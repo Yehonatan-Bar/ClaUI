@@ -317,7 +317,18 @@ SessionTab implements this interface, allowing each tab to provide its own panel
 5. Panel callbacks (`onClosed`, `onFocused`) feed back to TabManager
 
 ### Command Routing
-All commands (start, stop, send, compact, resume, sendFilePath) route through TabManager to the active (focused) tab. `startSession` and `resumeSession` always create a new tab.
+All commands (start, stop, send, compact, resume, sendFilePath, openPlanDocs) route through TabManager to the active (focused) tab. `startSession` and `resumeSession` always create a new tab. `openPlanDocs` is independent of tabs - it scans `Kingdom_of_Claudes_Beloved_MDs/` for `.html` files and opens the selected one in the default browser via `vscode.env.openExternal()`.
+
+### Open Plan Docs (`commands.ts`)
+The `claudeMirror.openPlanDocs` command opens HTML plan documents in the default browser:
+1. Webview sends `openPlanDocs` message -> MessageHandler delegates to command
+2. Command reads workspace `Kingdom_of_Claudes_Beloved_MDs/` directory
+3. Filters for `.html` files, sorts by modification time (newest first)
+4. Single file: opens directly. Multiple files: shows QuickPick with relative timestamps
+5. Opens via `vscode.env.openExternal(vscode.Uri.file(path))`
+6. Also accessible from Command Palette: "Claude Mirror: Open Plan Document"
+
+**UI**: "Plans" button in the status bar (next to "History"), styled identically.
 
 ### Process Crash Recovery (per-tab)
 1. SessionTab's process emits `'exit'` with non-zero code

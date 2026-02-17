@@ -30,11 +30,19 @@ export interface WebviewBridge {
  * Translates webview postMessages into CLI commands and
  * StreamDemux events into webview messages.
  */
+/** Tool names that require user approval when the CLI pauses after calling them */
+const APPROVAL_TOOLS = ['ExitPlanMode', 'AskUserQuestion'];
+
 export class MessageHandler {
   private log: (msg: string) => void = () => {};
   private firstMessageSent = false;
   private sessionNamer: SessionNamer | null = null;
   private titleCallback: ((title: string) => void) | null = null;
+
+  /** Tool names seen in the current assistant message (cleared on messageStart) */
+  private currentMessageToolNames: string[] = [];
+  /** Set when the CLI pauses waiting for plan/question approval */
+  private pendingApprovalTool: string | null = null;
 
   constructor(
     private readonly webview: WebviewBridge,
@@ -72,6 +80,8 @@ export class MessageHandler {
       switch (msg.type) {
         case 'sendMessage':
           this.log(`Sending user message: "${msg.text.slice(0, 80)}..."`);
+          // If there was a pending approval, the user's message implicitly responds to it
+          this.clearApprovalTracking();
           this.control.sendText(msg.text);
           this.webview.postMessage({ type: 'processBusy', busy: true });
           this.triggerSessionNaming(msg.text);
@@ -195,6 +205,19 @@ export class MessageHandler {
           vscode.commands.executeCommand('claudeMirror.openPlanDocs');
           break;
 
+        case 'planApprovalResponse':
+          this.log(`Plan approval response: action=${msg.action}`);
+          if (msg.action === 'approve') {
+            this.control.sendText('Yes, proceed with the plan.');
+          } else if (msg.action === 'reject') {
+            this.control.sendText('No, I reject this plan. Please revise it.');
+          } else if (msg.action === 'feedback') {
+            this.control.sendText(msg.feedback || 'Please revise the plan.');
+          }
+          this.clearApprovalTracking();
+          this.webview.postMessage({ type: 'processBusy', busy: true });
+          break;
+
         case 'ready':
           this.log('Webview ready');
           // Send text display settings
@@ -303,6 +326,7 @@ export class MessageHandler {
       'toolUseStart',
       (data: { messageId: string; blockIndex: number; toolName: string; toolId: string }) => {
         this.log(`-> webview: toolUseStart ${data.toolName}`);
+        this.currentMessageToolNames.push(data.toolName);
         this.webview.postMessage({
           type: 'toolUseStart',
           messageId: data.messageId,
@@ -326,6 +350,28 @@ export class MessageHandler {
     );
 
     this.demux.on(
+      'messageDelta',
+      (data: { stopReason: string | null }) => {
+        // When stop_reason is 'tool_use', the CLI is pausing for tool execution.
+        // If one of the tools is an approval tool (ExitPlanMode, AskUserQuestion),
+        // the CLI is waiting for the user to respond - notify the webview.
+        if (data.stopReason === 'tool_use') {
+          const approvalTool = this.currentMessageToolNames.find(
+            name => APPROVAL_TOOLS.includes(name)
+          );
+          if (approvalTool) {
+            this.log(`Plan approval required: tool=${approvalTool}`);
+            this.pendingApprovalTool = approvalTool;
+            this.webview.postMessage({
+              type: 'planApprovalRequired',
+              toolName: approvalTool,
+            });
+          }
+        }
+      }
+    );
+
+    this.demux.on(
       'assistantMessage',
       (event: AssistantMessage) => {
         const blockTypes = event.message.content.map(b => b.type).join(', ');
@@ -345,6 +391,8 @@ export class MessageHandler {
       'messageStart',
       (data: { messageId: string; model: string }) => {
         this.log(`-> webview: messageStart id=${data.messageId}`);
+        this.currentMessageToolNames = [];
+        this.pendingApprovalTool = null;
         this.webview.postMessage({
           type: 'messageStart',
           messageId: data.messageId,
@@ -374,6 +422,7 @@ export class MessageHandler {
     this.demux.on(
       'result',
       (event: ResultSuccess | ResultError) => {
+        this.clearApprovalTracking();
         if (event.subtype === 'success') {
           const success = event as ResultSuccess;
           this.webview.postMessage({

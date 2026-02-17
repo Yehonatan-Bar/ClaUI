@@ -11,6 +11,7 @@ import type {
   ContentBlockDelta,
   ContentBlockStop,
   MessageStart,
+  MessageDelta,
   MessageStop,
 } from '../types/stream-json';
 
@@ -27,6 +28,7 @@ import type {
  *  - 'toolUseStart'     ({ messageId, blockIndex, toolName, toolId })
  *  - 'toolUseDelta'     ({ messageId, blockIndex, partialJson })
  *  - 'blockStop'        ({ blockIndex })
+ *  - 'messageDelta'     ({ stopReason })
  *  - 'messageStart'     ({ messageId, model })
  *  - 'messageStop'      ()
  */
@@ -79,6 +81,9 @@ export class StreamDemux extends EventEmitter {
       case 'content_block_stop':
         this.handleContentBlockStop(payload as ContentBlockStop);
         break;
+      case 'message_delta':
+        this.handleMessageDelta(payload as MessageDelta);
+        break;
       case 'message_stop':
         this.handleMessageStop();
         break;
@@ -127,6 +132,12 @@ export class StreamDemux extends EventEmitter {
 
   private handleContentBlockStop(event: ContentBlockStop): void {
     this.emit('blockStop', { blockIndex: event.index });
+  }
+
+  private handleMessageDelta(event: MessageDelta): void {
+    this.emit('messageDelta', {
+      stopReason: event.delta.stop_reason,
+    });
   }
 
   private handleMessageStop(): void {
