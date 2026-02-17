@@ -1,0 +1,155 @@
+import React, { useMemo } from 'react';
+import { useClaudeStream } from './hooks/useClaudeStream';
+import { useAppStore } from './state/store';
+import { MessageList } from './components/ChatView/MessageList';
+import { InputArea } from './components/InputArea/InputArea';
+import { TextSettingsBar } from './components/TextSettingsBar/TextSettingsBar';
+import { ModelSelector } from './components/ModelSelector/ModelSelector';
+import { postToExtension } from './hooks/useClaudeStream';
+
+export const App: React.FC = () => {
+  useClaudeStream();
+
+  const { isConnected, isBusy, isResuming, lastError, cost, setError, messages, streamingMessageId, textSettings } = useAppStore();
+  const hasMessages = messages.length > 0 || streamingMessageId !== null;
+
+  console.log(`%c[App] render`, 'color: white; font-weight: bold; background: #333; padding: 2px 6px', {
+    isConnected,
+    hasMessages,
+    messageCount: messages.length,
+    streamingId: streamingMessageId,
+    isBusy,
+    lastError,
+    rendering: !isConnected && !hasMessages ? 'WelcomeScreen' : isConnected ? 'ChatUI' : 'SessionEndedBar',
+  });
+
+  // Apply text settings as CSS custom properties on the container
+  const containerStyle = useMemo(() => ({
+    '--chat-font-size': `${textSettings.fontSize}px`,
+    '--chat-font-family': textSettings.fontFamily || undefined,
+  } as React.CSSProperties), [textSettings.fontSize, textSettings.fontFamily]);
+
+  return (
+    <div className="app-container" style={containerStyle}>
+      {/* Error banner */}
+      {lastError && (
+        <div className="error-banner">
+          <span>{lastError}</span>
+          <button
+            className="error-dismiss"
+            onClick={() => setError(null)}
+            title="Dismiss"
+          >
+            x
+          </button>
+        </div>
+      )}
+
+      {/* Always show messages if they exist, regardless of connection state */}
+      {hasMessages && <MessageList />}
+
+      {isConnected ? (
+        <>
+          {isBusy && (
+            <div className="busy-indicator">
+              {isResuming ? 'Resuming conversation...' : 'Claude is thinking...'}
+            </div>
+          )}
+          <InputArea />
+          <StatusBar cost={cost} />
+        </>
+      ) : hasMessages ? (
+        <>
+          <SessionEndedBar />
+          <StatusBar cost={cost} />
+        </>
+      ) : (
+        <WelcomeScreen />
+      )}
+    </div>
+  );
+};
+
+/** Welcome screen shown when no session is active and no messages exist */
+const WelcomeScreen: React.FC = () => {
+  const handleStart = () => {
+    postToExtension({ type: 'startSession' });
+  };
+
+  const handleHistory = () => {
+    postToExtension({ type: 'showHistory' });
+  };
+
+  return (
+    <div className="welcome-screen">
+      <div className="welcome-title">Claude Code Mirror</div>
+      <div className="welcome-hint">
+        Start a new session to begin chatting with Claude Code.
+        Your conversation will be visible in both the chat UI and terminal.
+      </div>
+      <button className="start-button" onClick={handleStart}>
+        Start Session
+      </button>
+      <button className="history-button" onClick={handleHistory}>
+        Conversation History
+      </button>
+    </div>
+  );
+};
+
+/** Bar shown when session ended but messages are still visible */
+const SessionEndedBar: React.FC = () => {
+  const handleRestart = () => {
+    postToExtension({ type: 'startSession' });
+  };
+
+  const handleHistory = () => {
+    postToExtension({ type: 'showHistory' });
+  };
+
+  return (
+    <div className="session-ended-bar">
+      <span>Session ended</span>
+      <button className="restart-button" onClick={handleRestart}>
+        New Session
+      </button>
+      <button className="history-link-button" onClick={handleHistory}>
+        History
+      </button>
+    </div>
+  );
+};
+
+/** Bottom status bar showing cost and token info */
+const StatusBar: React.FC<{
+  cost: { costUsd: number; totalCostUsd: number; inputTokens: number; outputTokens: number };
+}> = ({ cost }) => {
+  const handleHistory = () => {
+    postToExtension({ type: 'showHistory' });
+  };
+
+  const handleOpenPlans = () => {
+    postToExtension({ type: 'openPlanDocs' });
+  };
+
+  return (
+    <div className="status-bar">
+      <div className="cost-display">
+        <span>Turn: ${(cost?.costUsd ?? 0).toFixed(4)}</span>
+        <span>Total: ${(cost?.totalCostUsd ?? 0).toFixed(4)}</span>
+      </div>
+      <button className="status-bar-history-btn" onClick={handleHistory} title="Conversation History (Ctrl+Shift+H)">
+        History
+      </button>
+      <button className="status-bar-plans-btn" onClick={handleOpenPlans} title="Open plan document in browser">
+        Plans
+      </button>
+      <ModelSelector />
+      <TextSettingsBar />
+      <div className="cost-display">
+        <span>In: {(cost?.inputTokens ?? 0).toLocaleString()}</span>
+        <span>Out: {(cost?.outputTokens ?? 0).toLocaleString()}</span>
+      </div>
+    </div>
+  );
+};

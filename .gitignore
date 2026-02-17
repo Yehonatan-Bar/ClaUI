@@ -1,0 +1,21 @@
+node_modules/
+dist/
+*.vsix
+.vscode-test/
+
+# Environment & secrets
+.env
+.env.*
+.credentials*
+*.pem
+*.key
+*.cert
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs & temp
+*.log
+*.bak
+*.tmp
