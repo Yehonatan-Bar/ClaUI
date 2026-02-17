@@ -444,6 +444,12 @@ export class MessageHandler {
     );
   }
 
+  /** Reset tool name tracking and pending approval state */
+  private clearApprovalTracking(): void {
+    this.currentMessageToolNames = [];
+    this.pendingApprovalTool = null;
+  }
+
   /** Fire-and-forget: spawn a Haiku process to name this session */
   private triggerSessionNaming(userText: string): void {
     this.log(`[SessionNaming] triggerSessionNaming called, text="${userText.slice(0, 50)}..."`);

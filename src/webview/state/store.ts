@@ -75,6 +75,9 @@ export interface AppState {
   // Resume indicator
   isResuming: boolean;
 
+  // Plan approval (CLI paused waiting for user approval of ExitPlanMode / AskUserQuestion)
+  pendingApproval: { toolName: string; planText: string } | null;
+
   // Actions
   setSession: (sessionId: string, model: string) => void;
   endSession: (reason: string) => void;
@@ -114,6 +117,7 @@ export interface AppState {
   setTextSettings: (settings: Partial<TextSettings>) => void;
   setResuming: (resuming: boolean) => void;
   setSelectedModel: (model: string) => void;
+  setPendingApproval: (approval: { toolName: string; planText: string } | null) => void;
   reset: () => void;
 }
 
@@ -173,6 +177,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   pendingFilePaths: null,
   promptHistory: [],
   isResuming: false,
+  pendingApproval: null,
 
   // Actions
   setSession: (sessionId, model) =>
@@ -190,6 +195,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       streamingMessageId: null,
       streamingBlocks: [],
       lastAssistantSnapshot: null,
+      pendingApproval: null,
     }),
 
   addUserMessage: (content) => {
@@ -386,6 +392,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setSelectedModel: (model) => set({ selectedModel: model }),
 
+  setPendingApproval: (approval) => set({ pendingApproval: approval }),
+
   reset: () =>
     set({
       sessionId: null,
@@ -401,5 +409,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       textSettings: { ...defaultTextSettings },
       pendingFilePaths: null,
       isResuming: false,
+      pendingApproval: null,
     }),
 }));
