@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>תוכנית: כפתור היסטוריית שיחות</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            padding: 40px 20px;
+            line-height: 1.8;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4A9FD9;
+            font-size: 28px;
+            margin-bottom: 8px;
+            border-bottom: 2px solid #4A9FD9;
+            padding-bottom: 12px;
+        }
+        .subtitle {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 32px;
+        }
+        h2 {
+            color: #98C379;
+            font-size: 20px;
+            margin-top: 32px;
+            margin-bottom: 12px;
+        }
+        h3 {
+            color: #D19A66;
+            font-size: 16px;
+            margin-top: 20px;
+            margin-bottom: 8px;
+        }
+        p {
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+        .card {
+            background: #16213e;
+            border: 1px solid #2a2a4a;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .step-number {
+            background: #4A9FD9;
+            color: #fff;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .card-title {
+            color: #E5C07B;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        ul {
+            padding-right: 24px;
+            margin-bottom: 12px;
+        }
+        li {
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+        .highlight {
+            background: #2a2a4a;
+            border-right: 3px solid #4A9FD9;
+            padding: 12px 16px;
+            border-radius: 0 6px 6px 0;
+            margin: 12px 0;
+            font-size: 14px;
+        }
+        .tag {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 6px;
+        }
+        .tag-new { background: #2d5a3d; color: #98C379; }
+        .tag-modify { background: #5a4a2d; color: #E5C07B; }
+        .edge-cases {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .edge-case {
+            background: #1e1e3a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .edge-case strong {
+            color: #E06C75;
+            font-size: 13px;
+        }
+        .edge-case p {
+            font-size: 13px;
+            color: #aaa;
+            margin: 4px 0 0 0;
+        }
+        .summary-box {
+            background: linear-gradient(135deg, #16213e, #1a1a3e);
+            border: 1px solid #4A9FD9;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 32px;
+        }
+        .summary-box h2 {
+            color: #4A9FD9;
+            margin-top: 0;
+        }
+        .files-count {
+            font-size: 24px;
+            font-weight: 700;
+            color: #4A9FD9;
+        }
+        .kbd {
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #E5C07B;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>תוכנית: כפתור היסטוריית שיחות</h1>
+        <div class="subtitle">Claude Code Mirror -- תכונה חדשה | 17 בפברואר 2026</div>
+
+        <h2>מה הבעיה?</h2>
+        <p>
+            כרגע, כשסוגרים לשונית של שיחה -- היא נעלמת לגמרי. אין דרך לחזור לשיחות קודמות או להמשיך אותן.
+            המשתמש רוצה כפתור שמציג רשימת שיחות מהעבר ומאפשר לחזור אליהן.
+        </p>
+
+        <h2>הגישה</h2>
+        <div class="highlight">
+            <strong>עקרון מפתח:</strong> הכלי של Claude כבר יודע לשחזר שיחות ישנות באופן אוטומטי.
+            אנחנו צריכים רק לשמור את המזהה של כל שיחה ולהציג רשימה נוחה למשתמש.
+            כשבוחרים שיחה -- הכלי מריץ אותה מחדש ומציג את כל ההיסטוריה.
+        </div>
+
+        <h2>שלבי ביצוע</h2>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="step-number">1</div>
+                <div class="card-title">שמירת פרטי שיחות</div>
+                <span class="tag tag-modify">שינוי קובץ קיים</span>
+            </div>
+            <p>
+                במקום הקוד הריק שקיים היום, נבנה מנגנון שמירה אמיתי.
+                בכל פעם שנפתחת שיחה חדשה -- נשמור את המזהה שלה, שם, מודל, ותאריך.
+                המידע נשמר בזיכרון של VS Code ושורד הפעלות מחדש.
+            </p>
+            <ul>
+                <li>שמירה אוטומטית ברגע שהשיחה מתחילה</li>
+                <li>עדכון השם כשהמערכת מייצרת שם אוטומטי</li>
+                <li>הגבלה ל-100 שיחות (הישנות ביותר נמחקות)</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="step-number">2</div>
+                <div class="card-title">חיבור לתשתית</div>
+                <span class="tag tag-modify">שינוי 3 קבצים</span>
+            </div>
+            <p>
+                חיבור מנגנון השמירה לכל החלקים הרלוונטיים במערכת:
+                נקודת ההפעלה הראשית, מנהל הלשוניות, וכל לשונית בודדת.
+            </p>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="step-number">3</div>
+                <div class="card-title">פקודת היסטוריה</div>
+                <span class="tag tag-new">פקודה חדשה</span>
+            </div>
+            <p>
+                פקודה חדשה שפותחת חלון בחירה מהיר (QuickPick) עם רשימת השיחות.
+                כל שיחה מציגה: שם, מודל, וזמן יחסי ("לפני 3 שעות", "אתמול").
+            </p>
+            <ul>
+                <li>קיצור מקלדת: <span class="kbd">Ctrl+Shift+H</span></li>
+                <li>חיפוש חופשי בין השיחות</li>
+                <li>בחירה פותחת לשונית חדשה עם השיחה</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="step-number">4</div>
+                <div class="card-title">כפתורים בממשק</div>
+                <span class="tag tag-modify">שינוי ממשק</span>
+            </div>
+            <p>
+                הוספת כפתור "היסטוריית שיחות" בשני מקומות:
+            </p>
+            <ul>
+                <li><strong>מסך הפתיחה</strong> -- מתחת לכפתור "התחל שיחה" הקיים</li>
+                <li><strong>סרגל סיום שיחה</strong> -- לצד כפתור "שיחה חדשה"</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="step-number">5</div>
+                <div class="card-title">אינדיקציה לשחזור</div>
+                <span class="tag tag-modify">שיפור חוויה</span>
+            </div>
+            <p>
+                כשמשחזרים שיחה, כל ההודעות הקודמות נטענות מחדש. במקום להציג "Claude חושב..."
+                נציג הודעה ברורה יותר: "משחזר שיחה..." כדי שהמשתמש ידע מה קורה.
+            </p>
+        </div>
+
+        <h2>מקרי קצה</h2>
+        <div class="edge-cases">
+            <div class="edge-case">
+                <strong>שיחה שנמחקה</strong>
+                <p>אם השיחה כבר לא קיימת -- תוצג הודעת שגיאה ברורה עם אפשרות לפתוח שיחה חדשה</p>
+            </div>
+            <div class="edge-case">
+                <strong>שיחות רבות</strong>
+                <p>מוגבל ל-100 שיחות, עם חיפוש מובנה בחלון הבחירה</p>
+            </div>
+            <div class="edge-case">
+                <strong>שיחה ללא שם</strong>
+                <p>תוצג עם שם ברירת מחדל "Session N"</p>
+            </div>
+            <div class="edge-case">
+                <strong>טעינת היסטוריה</strong>
+                <p>ההודעות נטענות אוטומטית ע"י הכלי -- אין צורך בשמירה ידנית</p>
+            </div>
+        </div>
+
+        <div class="summary-box">
+            <h2>סיכום</h2>
+            <p>
+                <span class="files-count">12</span> קבצים לשינוי |
+                <strong>0</strong> קבצים חדשים |
+                קיצור: <span class="kbd">Ctrl+Shift+H</span>
+            </p>
+            <p>
+                התוכנית משתמשת בתשתית קיימת של VS Code (שמירה ב-globalState, חלון QuickPick)
+                ובמנגנון השחזור המובנה של Claude CLI.
+                לא נדרשים רכיבי React חדשים -- רק כפתורים פשוטים שמפעילים את הפקודה.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

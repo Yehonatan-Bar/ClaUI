@@ -1,0 +1,180 @@
+{
+  "name": "claude-code-mirror",
+  "displayName": "Claude Code Mirror",
+  "description": "Rich chat interface for Claude Code with terminal mirroring",
+  "version": "0.1.0",
+  "publisher": "claude-code-mirror",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["AI", "Chat"],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "claudeMirror.startSession",
+        "title": "Claude Mirror: Start New Session"
+      },
+      {
+        "command": "claudeMirror.stopSession",
+        "title": "Claude Mirror: Stop Session"
+      },
+      {
+        "command": "claudeMirror.toggleView",
+        "title": "Claude Mirror: Toggle Chat/Terminal View"
+      },
+      {
+        "command": "claudeMirror.sendMessage",
+        "title": "Claude Mirror: Send Message"
+      },
+      {
+        "command": "claudeMirror.compact",
+        "title": "Claude Mirror: Compact Context"
+      },
+      {
+        "command": "claudeMirror.resumeSession",
+        "title": "Claude Mirror: Resume Session"
+      },
+      {
+        "command": "claudeMirror.sendFilePathToChat",
+        "title": "Claude Mirror: Send Path to Chat"
+      },
+      {
+        "command": "claudeMirror.showHistory",
+        "title": "Claude Mirror: Conversation History"
+      },
+      {
+        "command": "claudeMirror.cancelRequest",
+        "title": "Claude Mirror: Cancel Current Response"
+      },
+      {
+        "command": "claudeMirror.openPlanDocs",
+        "title": "Claude Mirror: Open Plan Document"
+      }
+    ],
+    "configuration": {
+      "title": "Claude Code Mirror",
+      "properties": {
+        "claudeMirror.cliPath": {
+          "type": "string",
+          "default": "claude",
+          "description": "Path to the Claude CLI executable"
+        },
+        "claudeMirror.useCtrlEnterToSend": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use Ctrl+Enter to send messages (Enter adds newline)"
+        },
+        "claudeMirror.autoRestart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically restart process on crash"
+        },
+        "claudeMirror.chatFontSize": {
+          "type": "number",
+          "default": 14,
+          "minimum": 10,
+          "maximum": 32,
+          "description": "Font size (px) for chat messages in the webview"
+        },
+        "claudeMirror.chatFontFamily": {
+          "type": "string",
+          "default": "",
+          "description": "Font family for chat messages. Leave empty to use VS Code default. For Hebrew, try: 'Segoe UI', 'David', 'Arial'"
+        },
+        "claudeMirror.autoNameSessions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically generate session tab names from the first message using Claude Haiku"
+        },
+        "claudeMirror.model": {
+          "type": "string",
+          "default": "",
+          "enum": ["", "claude-sonnet-4-5-20250929", "claude-opus-4-6", "claude-haiku-4-5-20251001"],
+          "enumDescriptions": [
+            "Default (CLI default)",
+            "Claude Sonnet 4.5",
+            "Claude Opus 4.6",
+            "Claude Haiku 4.5"
+          ],
+          "description": "Claude model to use for new sessions. Leave empty to use CLI default."
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "claudeMirror.startSession",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c"
+      },
+      {
+        "command": "claudeMirror.toggleView",
+        "key": "ctrl+shift+m",
+        "mac": "cmd+shift+m"
+      },
+      {
+        "command": "claudeMirror.sendFilePathToChat",
+        "key": "ctrl+alt+shift+c",
+        "mac": "cmd+alt+shift+c",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "claudeMirror.showHistory",
+        "key": "ctrl+shift+h",
+        "mac": "cmd+shift+h"
+      },
+      {
+        "command": "claudeMirror.cancelRequest",
+        "key": "escape",
+        "when": "activeWebviewPanelId == 'claudeMirror.chat'"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "claudeMirror.sendFilePathToChat",
+          "when": "resourceScheme == file || explorerResourceIsFolder",
+          "group": "navigation@100"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "claudeMirror.sendFilePathToChat",
+          "when": "resourceScheme == file",
+          "group": "navigation@100"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "claudeMirror.sendFilePathToChat"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "webpack --mode production",
+    "watch": "webpack --mode development --watch",
+    "lint": "eslint src --ext ts,tsx",
+    "verify:installed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installed.ps1",
+    "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/vscode": "^1.85.0",
+    "css-loader": "^6.9.0",
+    "style-loader": "^3.3.0",
+    "ts-loader": "^9.5.0",
+    "typescript": "^5.3.0",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.0"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "zustand": "^4.5.0"
+  }
+}

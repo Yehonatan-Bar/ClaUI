@@ -1,0 +1,31 @@
+/* RTL-specific styles for Hebrew/Arabic text support */
+
+/* Auto-direction on message containers */
+.message [dir="rtl"] {
+  text-align: right;
+  direction: rtl;
+}
+
+.message [dir="ltr"] {
+  text-align: left;
+  direction: ltr;
+}
+
+/* RTL input handling */
+.input-textarea[dir="rtl"] {
+  text-align: right;
+  direction: rtl;
+}
+
+/* Ensure code blocks remain LTR even in RTL context */
+[dir="rtl"] .code-block,
+[dir="rtl"] .code-block-content,
+[dir="rtl"] .tool-use-body {
+  direction: ltr;
+  text-align: left;
+}
+
+/* Fix mixed-direction inline elements */
+[dir="rtl"] .message-role {
+  text-align: right;
+}
