@@ -71,6 +71,20 @@ Then **reload VS Code** (Ctrl+Shift+P -> `Developer: Reload Window`).
 3. The chat panel opens. Type a message and press **Ctrl+Enter** to send
 4. Press **Ctrl+Shift+C** again to open additional parallel sessions in separate tabs
 
+### Sending files to the chat
+
+There are three ways to send file or folder paths into the chat:
+
+1. **Right-click in Explorer** - Right-click any file or folder in the Explorer sidebar, then select **"Claude Mirror: Send Path to Chat"**. The path is inserted into the chat input. Works with multiple selected files at once.
+
+2. **The "+" button** - Click the **+** button on the left side of the chat input area. A file picker opens - select one or more files and their paths are inserted into the input.
+
+3. **Keyboard shortcut** - While editing any file, press **Ctrl+Alt+Shift+C** to send the active file's path to the chat.
+
+In all cases, the path is inserted into the input textarea so you can add context before sending (e.g., "Fix the bug in `<path>`").
+
+You can also **paste images** directly into the chat input with **Ctrl+V** - they appear as thumbnails above the input and are sent alongside your message.
+
 ### Development mode (F5)
 
 For debugging the extension itself:
