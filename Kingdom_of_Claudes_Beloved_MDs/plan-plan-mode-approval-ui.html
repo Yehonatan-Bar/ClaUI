@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plan: Plan Mode Approval UI</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      line-height: 1.8;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #16213e;
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #64b5f6;
+      font-size: 1.8em;
+      margin-bottom: 10px;
+      border-bottom: 2px solid #64b5f6;
+      padding-bottom: 10px;
+    }
+    .subtitle {
+      color: #90a4ae;
+      font-size: 0.95em;
+      margin-bottom: 30px;
+    }
+    h2 {
+      color: #81c784;
+      font-size: 1.3em;
+      margin-top: 30px;
+      margin-bottom: 12px;
+    }
+    p {
+      margin-bottom: 12px;
+      color: #cfd8dc;
+    }
+    .problem-box {
+      background: #3e1a1a;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      border-right: 4px solid #ef5350;
+    }
+    .solution-box {
+      background: #1a3e1a;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      border-right: 4px solid #81c784;
+    }
+    .flow-box {
+      background: #0f3460;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      border-right: 4px solid #64b5f6;
+    }
+    .flow-step {
+      display: flex;
+      align-items: center;
+      margin: 10px 0;
+      gap: 12px;
+    }
+    .flow-step .num {
+      background: #64b5f6;
+      color: #1a1a2e;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    .flow-step .text {
+      color: #e0e0e0;
+    }
+    .highlight {
+      background: #1a3a5c;
+      border-radius: 6px;
+      padding: 15px 20px;
+      margin: 15px 0;
+      border-right: 3px solid #81c784;
+    }
+    .changes-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+    }
+    .changes-table th {
+      background: #0f3460;
+      color: #64b5f6;
+      padding: 10px 15px;
+      text-align: right;
+    }
+    .changes-table td {
+      padding: 10px 15px;
+      border-bottom: 1px solid #1a3a5c;
+    }
+    .changes-table tr:hover {
+      background: #1a3a5c;
+    }
+    .badge {
+      display: inline-block;
+      background: #64b5f6;
+      color: #1a1a2e;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 0.85em;
+      font-weight: 600;
+    }
+    .badge.green { background: #81c784; }
+    .badge.orange { background: #ffb74d; }
+    .mockup {
+      background: #1e1e1e;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      border: 1px solid #333;
+      font-family: 'Consolas', monospace;
+      font-size: 14px;
+    }
+    .mockup-bar {
+      display: flex;
+      gap: 8px;
+      padding: 10px;
+      background: #2d2d2d;
+      border-radius: 6px;
+      border-top: 2px solid #75beff;
+    }
+    .mockup-btn {
+      padding: 6px 16px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      border: none;
+      cursor: default;
+    }
+    .mockup-btn.approve { background: #0e639c; color: white; }
+    .mockup-btn.reject { background: #5a1d1d; color: white; }
+    .mockup-btn.feedback { background: transparent; color: #3794ff; border: 1px solid #3794ff; }
+    .mockup-title {
+      color: #75beff;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+    .footer {
+      margin-top: 30px;
+      padding-top: 15px;
+      border-top: 1px solid #2a3a5c;
+      color: #607d8b;
+      font-size: 0.85em;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>תוכנית: ממשק אישור תוכנית (Plan Mode)</h1>
+    <div class="subtitle">Claude Code Mirror - תוספת פיצ'ר חדש</div>
+
+    <h2>מה הבעיה?</h2>
+    <div class="problem-box">
+      <p>
+        כשקלוד נמצא ב"מצב תוכנית" ויוצר תוכנית עבודה, המערכת מחכה לאישור המשתמש.
+        כרגע, הממשק לא מזהה שקלוד מחכה - והמשתמש רואה רק "קלוד חושב..." לנצח, בלי שום אפשרות לאשר, לדחות, או להגיב.
+      </p>
+      <p>
+        <strong>שורש הבעיה:</strong> אירוע קריטי מהמערכת נופל בין הכיסאות ולא מטופל כלל.
+      </p>
+    </div>
+
+    <h2>מה הפתרון?</h2>
+    <div class="solution-box">
+      <p>
+        זיהוי אוטומטי של הרגע שבו קלוד מציג תוכנית ומחכה לאישור, והצגת פס פעולות ברור למשתמש:
+      </p>
+    </div>
+
+    <h2>איך ייראה הממשק?</h2>
+    <div class="mockup">
+      <div class="mockup-title">Plan Ready for Review</div>
+      <div class="mockup-bar">
+        <div class="mockup-btn approve">Approve</div>
+        <div class="mockup-btn reject">Reject</div>
+        <div class="mockup-btn feedback">Give Feedback</div>
+      </div>
+    </div>
+    <p>
+      שלושה כפתורים פשוטים שמחליפים את הודעת "קלוד חושב...":
+    </p>
+    <ul style="margin: 10px 20px; color: #cfd8dc;">
+      <li><strong>Approve</strong> - אישור התוכנית, קלוד ממשיך לעבוד</li>
+      <li><strong>Reject</strong> - דחיית התוכנית, קלוד חוזר לתכנן מחדש</li>
+      <li><strong>Give Feedback</strong> - שליחת הערות והנחיות לשיפור התוכנית</li>
+    </ul>
+
+    <h2>איך זה עובד?</h2>
+    <div class="flow-box">
+      <div class="flow-step">
+        <div class="num">1</div>
+        <div class="text">קלוד יוצר תוכנית ומבקש אישור (כלי ExitPlanMode)</div>
+      </div>
+      <div class="flow-step">
+        <div class="num">2</div>
+        <div class="text">המערכת מזהה את ההפסקה - הודעת "חושב..." נעלמת</div>
+      </div>
+      <div class="flow-step">
+        <div class="num">3</div>
+        <div class="text">מופיע פס אישור עם שלושה כפתורים</div>
+      </div>
+      <div class="flow-step">
+        <div class="num">4</div>
+        <div class="text">המשתמש בוחר פעולה (אישור / דחייה / משוב)</div>
+      </div>
+      <div class="flow-step">
+        <div class="num">5</div>
+        <div class="text">התגובה נשלחת לקלוד והוא ממשיך לעבוד בהתאם</div>
+      </div>
+    </div>
+
+    <h2>מה משתנה?</h2>
+    <table class="changes-table">
+      <thead>
+        <tr>
+          <th>רכיב</th>
+          <th>שינוי</th>
+          <th>היקף</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>זיהוי אירועים</td>
+          <td>טיפול באירוע "הפסקה לאישור" שנופל כרגע</td>
+          <td><span class="badge green">קטן</span></td>
+        </tr>
+        <tr>
+          <td>גשר הודעות</td>
+          <td>זיהוי כלי אישור + העברת הודעות</td>
+          <td><span class="badge orange">בינוני</span></td>
+        </tr>
+        <tr>
+          <td>סוגי הודעות</td>
+          <td>שני סוגי הודעה חדשים (בקשת אישור + תגובה)</td>
+          <td><span class="badge green">קטן</span></td>
+        </tr>
+        <tr>
+          <td>ניהול מצב</td>
+          <td>שדה חדש "ממתין לאישור" במצב האפליקציה</td>
+          <td><span class="badge green">קטן</span></td>
+        </tr>
+        <tr>
+          <td>רכיב ממשק חדש</td>
+          <td>פס אישור עם כפתורים ואפשרות משוב</td>
+          <td><span class="badge orange">בינוני</span></td>
+        </tr>
+        <tr>
+          <td>תצוגת כלי</td>
+          <td>עיצוב מותאם להצגת תוכנית (במקום JSON גולמי)</td>
+          <td><span class="badge green">קטן</span></td>
+        </tr>
+        <tr>
+          <td>עיצוב CSS</td>
+          <td>סגנונות לפס האישור והכפתורים</td>
+          <td><span class="badge green">קטן</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>סיכום</h2>
+    <div class="highlight">
+      <p>
+        שינוי ממוקד ב-9 קבצים שפותר בעיה קריטית בחוויית המשתמש:
+        במקום "קלוד חושב..." שנתקע לנצח, המשתמש רואה את התוכנית ויכול לאשר, לדחות, או לתת משוב - בדיוק כמו בממשק הרגיל של Claude Code.
+      </p>
+    </div>
+
+    <div class="footer">
+      Claude Code Mirror | 2026-02-17
+    </div>
+  </div>
+</body>
+</html>

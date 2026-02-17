@@ -71,6 +71,12 @@ export interface OpenPlanDocsRequest {
   type: 'openPlanDocs';
 }
 
+export interface PlanApprovalResponseMessage {
+  type: 'planApprovalResponse';
+  action: 'approve' | 'reject' | 'feedback';
+  feedback?: string;
+}
+
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
@@ -85,7 +91,8 @@ export type WebviewToExtensionMessage =
   | ClearSessionRequest
   | SetModelRequest
   | ShowHistoryRequest
-  | OpenPlanDocsRequest;
+  | OpenPlanDocsRequest
+  | PlanApprovalResponseMessage;
 
 export interface WebviewImageData {
   base64: string;
@@ -191,6 +198,11 @@ export interface ModelSettingMessage {
   model: string;
 }
 
+export interface PlanApprovalRequiredMessage {
+  type: 'planApprovalRequired';
+  toolName: string;
+}
+
 export type ExtensionToWebviewMessage =
   | SessionStartedMessage
   | SessionEndedMessage
@@ -207,4 +219,5 @@ export type ExtensionToWebviewMessage =
   | MessageStopMessage
   | FilePathsPickedMessage
   | TextSettingsMessage
-  | ModelSettingMessage;
+  | ModelSettingMessage
+  | PlanApprovalRequiredMessage;
