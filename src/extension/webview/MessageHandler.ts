@@ -64,6 +64,8 @@ export class MessageHandler {
   private toolBlockNames: Map<number, string> = new Map();
   /** Maps blockIndex -> first chunk of partial JSON (for enrichment context) */
   private toolBlockContexts: Map<number, string> = new Map();
+  /** Getter for the session/tab name, injected by SessionTab */
+  private getSessionName: (() => string) | null = null;
 
   constructor(
     private readonly webview: WebviewBridge,
@@ -95,6 +97,11 @@ export class MessageHandler {
   /** Register a callback invoked when an activity summary is generated */
   onActivitySummaryGenerated(callback: (summary: ActivitySummary) => void): void {
     this.activitySummaryCallback = callback;
+  }
+
+  /** Inject a getter for the current session/tab name (used for git push commit messages) */
+  setSessionNameGetter(getter: () => string): void {
+    this.getSessionName = getter;
   }
 
   /** Wire up all event listeners */
@@ -332,6 +339,23 @@ export class MessageHandler {
           this.handleOpenUrl(msg.url);
           break;
 
+        case 'gitPush':
+          this.handleGitPush();
+          break;
+
+        case 'gitPushConfig':
+          this.log(`Git push config request: "${msg.instruction.slice(0, 80)}..."`);
+          {
+            const configPrompt = `Please help me configure git push for this VS Code extension project. The settings are VS Code settings under "claudeMirror.gitPush.*": enabled (boolean), scriptPath (string, relative to workspace), commitMessageTemplate (string, supports {sessionName} placeholder). ${msg.instruction}`;
+            this.control.sendText(configPrompt);
+            this.webview.postMessage({ type: 'processBusy', busy: true });
+          }
+          break;
+
+        case 'getGitPushSettings':
+          this.sendGitPushSettings();
+          break;
+
         case 'ready':
           this.log('Webview ready');
           // Send text display settings
@@ -340,6 +364,8 @@ export class MessageHandler {
           this.sendModelSetting();
           // Send permission mode setting
           this.sendPermissionModeSetting();
+          // Send git push settings
+          this.sendGitPushSettings();
           // If process is already running, tell the webview
           if (this.processManager.isRunning && this.processManager.currentSessionId) {
             this.log('Sending existing session info to webview');
@@ -459,6 +485,80 @@ export class MessageHandler {
     });
   }
 
+  /** Read git push settings from VS Code config and send to webview */
+  private sendGitPushSettings(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const enabled = config.get<boolean>('gitPush.enabled', true);
+    const scriptPath = config.get<string>('gitPush.scriptPath', 'scripts/git-push.ps1');
+    const commitMessageTemplate = config.get<string>('gitPush.commitMessageTemplate', '{sessionName}');
+    this.log(`Sending git push settings: enabled=${enabled}, script="${scriptPath}"`);
+    this.webview.postMessage({
+      type: 'gitPushSettings',
+      enabled,
+      scriptPath,
+      commitMessageTemplate,
+    });
+  }
+
+  /** Execute the git push script */
+  private handleGitPush(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const enabled = config.get<boolean>('gitPush.enabled', true);
+
+    if (!enabled) {
+      this.webview.postMessage({
+        type: 'gitPushResult',
+        success: false,
+        output: 'Git push is not configured. Please set it up first.',
+      });
+      return;
+    }
+
+    const scriptPath = config.get<string>('gitPush.scriptPath', 'scripts/git-push.ps1');
+    const template = config.get<string>('gitPush.commitMessageTemplate', '{sessionName}');
+
+    const sessionName = this.getSessionName?.() || 'Claude session';
+    const commitMessage = template.replace('{sessionName}', sessionName);
+
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceRoot) {
+      this.webview.postMessage({
+        type: 'gitPushResult',
+        success: false,
+        output: 'No workspace folder open.',
+      });
+      return;
+    }
+
+    const path = require('path');
+    const fullScriptPath = path.resolve(workspaceRoot, scriptPath);
+    this.log(`Git push: running "${fullScriptPath}" with message "${commitMessage}"`);
+
+    const cp = require('child_process');
+    cp.execFile(
+      'powershell',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', fullScriptPath, '-Message', commitMessage],
+      { cwd: workspaceRoot, timeout: 30000 },
+      (error: Error | null, stdout: string, stderr: string) => {
+        if (error) {
+          this.log(`Git push failed: ${error.message}`);
+          this.webview.postMessage({
+            type: 'gitPushResult',
+            success: false,
+            output: stderr || error.message,
+          });
+        } else {
+          this.log('Git push succeeded');
+          this.webview.postMessage({
+            type: 'gitPushResult',
+            success: true,
+            output: stdout,
+          });
+        }
+      }
+    );
+  }
+
   /** Watch for settings changes and forward to webview */
   private watchConfigChanges(): void {
     vscode.workspace.onDidChangeConfiguration((e) => {
@@ -471,6 +571,9 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.permissionMode')) {
         this.sendPermissionModeSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.gitPush')) {
+        this.sendGitPushSettings();
       }
     });
   }

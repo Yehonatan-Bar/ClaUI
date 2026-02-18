@@ -89,6 +89,12 @@ export interface AppState {
   // Permission mode
   permissionMode: 'full-access' | 'supervised';
 
+  // Git push
+  gitPushSettings: { enabled: boolean; scriptPath: string; commitMessageTemplate: string } | null;
+  gitPushResult: { success: boolean; output: string } | null;
+  gitPushConfigPanelOpen: boolean;
+  gitPushRunning: boolean;
+
   // Actions
   setSession: (sessionId: string, model: string) => void;
   endSession: (reason: string) => void;
@@ -136,6 +142,10 @@ export interface AppState {
   setPermissionMode: (mode: 'full-access' | 'supervised') => void;
   setProjectPromptHistory: (history: string[]) => void;
   setGlobalPromptHistory: (history: string[]) => void;
+  setGitPushSettings: (settings: { enabled: boolean; scriptPath: string; commitMessageTemplate: string }) => void;
+  setGitPushResult: (result: { success: boolean; output: string } | null) => void;
+  setGitPushConfigPanelOpen: (open: boolean) => void;
+  setGitPushRunning: (running: boolean) => void;
   reset: () => void;
 }
 
@@ -201,6 +211,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   globalPromptHistory: [],
   activitySummary: null,
   permissionMode: 'full-access' as const,
+  gitPushSettings: null,
+  gitPushResult: null,
+  gitPushConfigPanelOpen: false,
+  gitPushRunning: false,
 
   // Actions
   setSession: (sessionId, model) =>
@@ -516,6 +530,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setGlobalPromptHistory: (history) => set({ globalPromptHistory: history }),
 
+  setGitPushSettings: (settings) => set({ gitPushSettings: settings }),
+  setGitPushResult: (result) => set({ gitPushResult: result }),
+  setGitPushConfigPanelOpen: (open) => set({ gitPushConfigPanelOpen: open }),
+  setGitPushRunning: (running) => set({ gitPushRunning: running }),
+
   reset: () =>
     set({
       sessionId: null,
@@ -537,5 +556,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       globalPromptHistory: [],
       activitySummary: null,
       permissionMode: 'full-access' as const,
+      gitPushSettings: null,
+      gitPushResult: null,
+      gitPushConfigPanelOpen: false,
+      gitPushRunning: false,
     }),
 }));

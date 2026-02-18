@@ -136,6 +136,21 @@
           "type": "string",
           "default": "",
           "description": "Directory for log files. Leave empty to use the extension's default storage location."
+        },
+        "claudeMirror.gitPush.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether git push is configured and ready to use via the Git button"
+        },
+        "claudeMirror.gitPush.scriptPath": {
+          "type": "string",
+          "default": "scripts/git-push.ps1",
+          "description": "Path to the git push script (relative to workspace root)"
+        },
+        "claudeMirror.gitPush.commitMessageTemplate": {
+          "type": "string",
+          "default": "{sessionName}",
+          "description": "Commit message template. Use {sessionName} for the current tab name."
         }
       }
     },

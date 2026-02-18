@@ -148,6 +148,7 @@ claude-code-mirror/
 |       |   |   +-- filePathLinks.tsx   #   Clickable file path and URL detection and rendering
 |       |   +-- InputArea/
 |       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt, image paste
+|       |   |   +-- GitPushPanel.tsx      #   Config panel for git push (status, ask Claude to configure)
 |       |   +-- ModelSelector/
 |       |   |   +-- ModelSelector.tsx     #   Model dropdown (Sonnet/Opus/Haiku)
 |       |   +-- TextSettingsBar/
@@ -207,6 +208,9 @@ claude-code-mirror/
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **PermissionModeSelector** - Dropdown in the status bar for choosing between "Full Access" (all tools auto-approved, default) and "Supervised" (only read-only tools allowed, write tools denied). Selection is persisted to VS Code settings (`claudeMirror.permissionMode`). In supervised mode, `--allowedTools` is passed to the CLI to restrict to read-only tools. Changes take effect on next session start.
+
+**GitPushButton** - One-click git add/commit/push via the `scripts/git-push.ps1` PowerShell script. The "Git" button in InputArea executes the script with the session tab name as commit message. A companion gear button opens a configuration panel where users can ask Claude to set up or modify the git push settings (`claudeMirror.gitPush.*`). If not configured (enabled=false), clicking the Git button opens the config panel instead. Results appear as auto-dismissing toast notifications.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/GIT_PUSH_BUTTON.md`
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Clear Session** - Button in the input area that resets all UI state (messages, cost, streaming) and restarts the CLI process. Sends `clearSession` message to the extension, which stops the current process and spawns a new one.
@@ -251,6 +255,9 @@ claude-code-mirror/
 | `claudeMirror.permissionMode` | `"full-access"` | Permission mode: "full-access" (all tools) or "supervised" (read-only tools only) |
 | `claudeMirror.enableFileLogging` | `true` | Write logs to disk files in addition to the Output Channel |
 | `claudeMirror.logDirectory` | `""` | Directory for log files (empty = extension's default storage) |
+| `claudeMirror.gitPush.enabled` | `false` | Whether git push is configured and ready to use via the Git button |
+| `claudeMirror.gitPush.scriptPath` | `"scripts/git-push.ps1"` | Path to the git push script (relative to workspace root) |
+| `claudeMirror.gitPush.commitMessageTemplate` | `"{sessionName}"` | Commit message template ({sessionName} = tab name) |
 
 ---
 

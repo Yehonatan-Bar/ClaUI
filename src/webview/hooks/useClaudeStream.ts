@@ -36,6 +36,9 @@ export function useClaudeStream(): void {
     setGlobalPromptHistory,
     setActivitySummary,
     setPermissionMode,
+    setGitPushSettings,
+    setGitPushResult,
+    setGitPushRunning,
   } = useAppStore();
 
   useEffect(() => {
@@ -76,10 +79,14 @@ export function useClaudeStream(): void {
 
         case 'messageStart':
           logState('before messageStart');
-          // A new assistant message is starting - clear any stale approval bar.
-          // This is a safety net: if the CLI moved on (user approved or the model
-          // started a new turn), the approval bar must not linger.
-          setPendingApproval(null);
+          // NOTE: Do NOT clear pendingApproval here. After ExitPlanMode, the CLI
+          // may emit additional empty message turns (message_start -> message_delta
+          // -> message_stop -> result) before the user has a chance to interact
+          // with the approval bar. Clearing here would hide Approve/Reject buttons.
+          // The approval bar is already properly cleared by:
+          //   - processBusy: true (sent when user sends a message or approval response)
+          //   - PlanApprovalBar button handlers (setPendingApproval(null))
+          //   - InputArea handler (when user types during pending approval)
           handleMessageStart(msg.messageId, msg.model);
           logState('after messageStart');
           break;
@@ -217,6 +224,19 @@ export function useClaudeStream(): void {
           setPendingApproval({ toolName: msg.toolName, planText });
           break;
         }
+
+        case 'gitPushResult':
+          setGitPushRunning(false);
+          setGitPushResult({ success: msg.success, output: msg.output });
+          break;
+
+        case 'gitPushSettings':
+          setGitPushSettings({
+            enabled: msg.enabled,
+            scriptPath: msg.scriptPath,
+            commitMessageTemplate: msg.commitMessageTemplate,
+          });
+          break;
       }
     }
 
@@ -252,6 +272,9 @@ export function useClaudeStream(): void {
     setGlobalPromptHistory,
     setActivitySummary,
     setPermissionMode,
+    setGitPushSettings,
+    setGitPushResult,
+    setGitPushRunning,
   ]);
 }
 
