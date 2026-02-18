@@ -195,7 +195,8 @@
     "watch": "webpack --mode development --watch",
     "lint": "eslint src --ext ts,tsx",
     "verify:installed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installed.ps1",
-    "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1"
+    "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1",
+    "git:push": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-push.ps1"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
