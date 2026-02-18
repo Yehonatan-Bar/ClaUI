@@ -148,12 +148,27 @@ const SessionEndedBar: React.FC = () => {
 const StatusBar: React.FC<{
   cost: { costUsd: number; totalCostUsd: number; inputTokens: number; outputTokens: number };
 }> = ({ cost }) => {
+  const { gitPushSettings, gitPushRunning, setGitPushRunning, setGitPushConfigPanelOpen } = useAppStore();
+
   const handleHistory = () => {
     postToExtension({ type: 'showHistory' });
   };
 
   const handleOpenPlans = () => {
     postToExtension({ type: 'openPlanDocs' });
+  };
+
+  const handleGitPush = () => {
+    if (!gitPushSettings?.enabled) {
+      setGitPushConfigPanelOpen(true);
+      return;
+    }
+    setGitPushRunning(true);
+    postToExtension({ type: 'gitPush' });
+  };
+
+  const handleToggleGitConfig = () => {
+    setGitPushConfigPanelOpen(!useAppStore.getState().gitPushConfigPanelOpen);
   };
 
   return (
@@ -168,6 +183,23 @@ const StatusBar: React.FC<{
       <button className="status-bar-plans-btn" onClick={handleOpenPlans} title="Open plan document in browser">
         Plans
       </button>
+      <div className="status-bar-git-group">
+        <button
+          className={`status-bar-git-btn ${gitPushSettings?.enabled ? '' : 'not-configured'}`}
+          onClick={handleGitPush}
+          disabled={gitPushRunning}
+          title={gitPushSettings?.enabled ? 'Git: add, commit & push' : 'Git push (setup needed)'}
+        >
+          {gitPushRunning ? '...' : 'Git'}
+        </button>
+        <button
+          className="status-bar-git-config-btn"
+          onClick={handleToggleGitConfig}
+          title="Git push settings"
+        >
+          *
+        </button>
+      </div>
       <ModelSelector />
       <PermissionModeSelector />
       <TextSettingsBar />

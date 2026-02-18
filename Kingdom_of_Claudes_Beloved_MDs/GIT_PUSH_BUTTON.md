@@ -13,7 +13,8 @@ A "Git" button in the InputArea executes `scripts/git-push.ps1` which:
 
 | File | Role |
 |------|------|
-| `src/webview/components/InputArea/InputArea.tsx` | Git button, gear toggle, toast notification |
+| `src/webview/App.tsx` | Git button and gear toggle in the StatusBar component |
+| `src/webview/components/InputArea/InputArea.tsx` | Git push toast notification, config panel rendering, settings request on mount |
 | `src/webview/components/InputArea/GitPushPanel.tsx` | Configuration panel component |
 | `src/extension/webview/MessageHandler.ts` | `handleGitPush()` executes the script, `sendGitPushSettings()` syncs config |
 | `src/extension/session/SessionTab.ts` | Wires `setSessionNameGetter` so MessageHandler can access the tab name |
@@ -33,13 +34,13 @@ A "Git" button in the InputArea executes `scripts/git-push.ps1` which:
 ## UI Components
 
 ### Git Button
-- Location: InputArea, between the History (H) button and the textarea
+- Location: Bottom status bar, next to History and Plans buttons
 - When configured (`enabled=true`): clicking executes the push script
 - When not configured: clicking opens the config panel
 - Shows "..." while the push is running
 
 ### Gear Toggle
-- Small `*` button joined to the right of the Git button
+- Small `*` button joined to the right of the Git button in the status bar
 - Always available - opens/closes the config panel regardless of config state
 
 ### Config Panel

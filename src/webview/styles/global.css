@@ -721,6 +721,55 @@ html, body, #root {
   color: var(--vscode-editor-foreground);
 }
 
+/* Git button group in status bar */
+.status-bar-git-group {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.status-bar-git-btn {
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 3px 0 0 3px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.status-bar-git-btn.not-configured {
+  opacity: 0.6;
+}
+
+.status-bar-git-btn:hover:not(:disabled) {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+
+.status-bar-git-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.status-bar-git-config-btn {
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-left: none;
+  border-radius: 0 3px 3px 0;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 1px 4px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.status-bar-git-config-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+
 /* RTL support */
 [dir="rtl"] {
   text-align: right;
