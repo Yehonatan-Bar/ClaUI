@@ -72,7 +72,7 @@ export const InputArea: React.FC = () => {
   const [pendingImages, setPendingImages] = useState<WebviewImageData[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoMgr = useMemo(() => new UndoManager(), []);
-  const { isBusy, isConnected, pendingFilePaths, setPendingFilePaths, promptHistory, addToPromptHistory, setPromptHistoryPanelOpen, pendingApproval, setPendingApproval, gitPushSettings, gitPushResult, setGitPushResult, gitPushConfigPanelOpen, setGitPushConfigPanelOpen, gitPushRunning, setGitPushRunning } = useAppStore();
+  const { isBusy, isConnected, pendingFilePaths, setPendingFilePaths, promptHistory, addToPromptHistory, setPromptHistoryPanelOpen, pendingApproval, setPendingApproval, gitPushResult, setGitPushResult, gitPushConfigPanelOpen, setGitPushConfigPanelOpen } = useAppStore();
 
   // History navigation: -1 = not browsing, 0..N = index into promptHistory (0 = oldest)
   const historyIndexRef = useRef(-1);
@@ -417,21 +417,6 @@ export const InputArea: React.FC = () => {
     setPromptHistoryPanelOpen(true);
   }, [setPromptHistoryPanelOpen]);
 
-  /** Git push: execute if configured, otherwise open config panel */
-  const handleGitPush = useCallback(() => {
-    if (!gitPushSettings?.enabled) {
-      setGitPushConfigPanelOpen(true);
-      return;
-    }
-    setGitPushRunning(true);
-    postToExtension({ type: 'gitPush' });
-  }, [gitPushSettings, setGitPushConfigPanelOpen, setGitPushRunning]);
-
-  /** Toggle git push config panel */
-  const handleToggleGitConfig = useCallback(() => {
-    setGitPushConfigPanelOpen(!gitPushConfigPanelOpen);
-  }, [gitPushConfigPanelOpen, setGitPushConfigPanelOpen]);
-
   // Auto-dismiss git push result toast after 5 seconds
   useEffect(() => {
     if (gitPushResult) {
@@ -510,24 +495,6 @@ export const InputArea: React.FC = () => {
         >
           H
         </button>
-        <div className="git-push-button-group">
-          <button
-            className={`git-push-button ${gitPushSettings?.enabled ? '' : 'not-configured'}`}
-            onClick={handleGitPush}
-            disabled={!isConnected || gitPushRunning}
-            title={gitPushSettings?.enabled ? 'Git: add, commit & push' : 'Git push (setup needed)'}
-          >
-            {gitPushRunning ? '...' : 'Git'}
-          </button>
-          <button
-            className="git-push-config-toggle"
-            onClick={handleToggleGitConfig}
-            disabled={!isConnected}
-            title="Git push settings"
-          >
-            *
-          </button>
-        </div>
         <textarea
           ref={textareaRef}
           className="input-textarea"
