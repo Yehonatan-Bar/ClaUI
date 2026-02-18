@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plan: Export Chat to HTML</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 40px 20px;
+      line-height: 1.7;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #00d2ff;
+      font-size: 28px;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #00d2ff33;
+      padding-bottom: 12px;
+    }
+    .subtitle {
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    h2 {
+      color: #7b68ee;
+      font-size: 20px;
+      margin-top: 32px;
+      margin-bottom: 12px;
+    }
+    h3 {
+      color: #ffa500;
+      font-size: 16px;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+    p {
+      margin-bottom: 12px;
+      color: #ccc;
+    }
+    .highlight {
+      background: #00d2ff15;
+      border-right: 3px solid #00d2ff;
+      padding: 16px 20px;
+      border-radius: 4px;
+      margin: 20px 0;
+    }
+    .step-card {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 12px 0;
+      border-right: 3px solid #7b68ee;
+    }
+    .step-number {
+      display: inline-block;
+      background: #7b68ee;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 28px;
+      font-weight: bold;
+      font-size: 14px;
+      margin-left: 10px;
+    }
+    .step-title {
+      display: inline;
+      font-weight: bold;
+      color: #e0e0e0;
+    }
+    .step-desc {
+      margin-top: 8px;
+      color: #aaa;
+      font-size: 14px;
+    }
+    ul {
+      padding-right: 24px;
+      margin: 8px 0;
+    }
+    li {
+      margin: 6px 0;
+      color: #bbb;
+    }
+    .result-box {
+      background: #0a3d0a;
+      border: 1px solid #2d8a2d;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-top: 24px;
+    }
+    .result-box h3 {
+      color: #4ade80;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-left: 8px;
+    }
+    .badge-new { background: #2d8a2d; color: #fff; }
+    .badge-modify { background: #8a6d2d; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>תוכנית: ייצוא שיחה לדף אינטרנט</h1>
+    <div class="subtitle">Claude Code Mirror - יכולת חדשה</div>
+
+    <div class="highlight">
+      <strong>מה נבנה:</strong> כפתור "Export" שיוצר קובץ HTML עצמאי מהשיחה הנוכחית.
+      הקובץ ייפתח בכל דפדפן, יציג את כל ההודעות, בלוקי קוד, וכלים - בדיוק כמו שנראה בתוסף.
+      <br><br>
+      <strong>למה ככה:</strong> ההודעות קיימות רק בזיכרון (לא נשמרות לדיסק כנתונים מובנים).
+      קובץ HTML עצמאי פותר את שתי הבעיות בבת אחת - גם שומר את הנתונים וגם מציג אותם.
+      אפס תשתית נדרשת, אפשר לשתף כקובץ בודד.
+    </div>
+
+    <h2>שלבי הביצוע</h2>
+
+    <div class="step-card">
+      <span class="step-number">1</span>
+      <div class="step-title">הגדרת הודעות חדשות</div>
+      <span class="badge badge-modify">שינוי</span>
+      <div class="step-desc">
+        הוספת שני סוגי הודעות חדשים לפרוטוקול התקשורת בין הממשק לתוסף:
+        <ul>
+          <li>בקשת ייצוא - הממשק שולח את כל ההודעות לתוסף</li>
+          <li>הפעלת ייצוא - התוסף מבקש מהממשק לאסוף ולשלוח את הנתונים</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <span class="step-number">2</span>
+      <div class="step-title">מנגנון המרת עיצוב</div>
+      <span class="badge badge-new">חדש</span>
+      <div class="step-desc">
+        העיצוב הנוכחי משתמש במשתנים של VS Code (ערכת נושא כהה).
+        ניצור מנגנון שממיר את המשתנים האלה לצבעים קונקרטיים, כך שהעיצוב יעבוד בדפדפן רגיל.
+      </div>
+    </div>
+
+    <div class="step-card">
+      <span class="step-number">3</span>
+      <div class="step-title">מנוע תצוגה בג'אווהסקריפט</div>
+      <span class="badge badge-new">חדש</span>
+      <div class="step-desc">
+        קוד תצוגה קל (~150-200 שורות) שמציג את ההודעות בדפדפן:
+        <ul>
+          <li>הודעות משתמש ומערכת עם עיצוב לפי תפקיד</li>
+          <li>בלוקי קוד עם כפתור העתקה וכיווץ/הרחבה</li>
+          <li>כלים (Tool Use) ותוצאות - ניתנים לכיווץ</li>
+          <li>תמונות מוצגות ישירות (מוטמעות בקובץ)</li>
+          <li>זיהוי אוטומטי של עברית והתאמת כיוון הטקסט</li>
+        </ul>
+        ללא תלות בספריות חיצוניות - קובץ קומפקטי ועצמאי לחלוטין.
+      </div>
+    </div>
+
+    <div class="step-card">
+      <span class="step-number">4</span>
+      <div class="step-title">מרכיב ה-HTML</div>
+      <span class="badge badge-new">חדש</span>
+      <div class="step-desc">
+        פונקציה מרכזית שמרכיבה את כל החלקים לקובץ HTML אחד:
+        עיצוב + נתוני שיחה (JSON) + קוד תצוגה + כותרת עם פרטי הפגישה ועלויות.
+      </div>
+    </div>
+
+    <div class="step-card">
+      <span class="step-number">5</span>
+      <div class="step-title">טיפול בבקשת ייצוא</div>
+      <span class="badge badge-modify">שינוי</span>
+      <div class="step-desc">
+        כשהמשתמש לוחץ "Export":
+        <ul>
+          <li>הממשק אוסף את כל ההודעות ושולח לתוסף</li>
+          <li>התוסף מייצר את ה-HTML, מציג חלון שמירה</li>
+          <li>אחרי השמירה - מציע לפתוח בדפדפן</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="step-card">
+      <span class="step-number">6</span>
+      <div class="step-title">כפתור Export בממשק</div>
+      <span class="badge badge-modify">שינוי</span>
+      <div class="step-desc">
+        כפתור חדש בשורת הסטטוס למטה, ליד "Plans" ו-"History".
+        נראה רק כשיש הודעות לייצא. גם זמין דרך תפריט הפקודות.
+      </div>
+    </div>
+
+    <div class="result-box">
+      <h3>התוצאה הסופית</h3>
+      <p>
+        המשתמש לוחץ "Export" -> בוחר היכן לשמור -> מקבל קובץ HTML אחד שמכיל את כל השיחה.
+        <br>
+        הקובץ נפתח בכל דפדפן, נראה כמו הממשק המקורי (ערכת נושא כהה), תומך בעברית,
+        ומציג בלוקי קוד, כלים, ותמונות. אפשר לשתף אותו כקובץ בודד.
+      </p>
+    </div>
+
+    <h2>היקף השינויים</h2>
+    <p>
+      <strong>3 קבצים חדשים</strong> (לוגיקת הייצוא) +
+      <strong>6 קבצים משתנים</strong> (הוספת כפתור, הודעות, וטיפול בפקודה).
+      <br>
+      הפיצ'ר עצמאי לחלוטין ולא משפיע על הפונקציונליות הקיימת.
+    </p>
+  </div>
+</body>
+</html>

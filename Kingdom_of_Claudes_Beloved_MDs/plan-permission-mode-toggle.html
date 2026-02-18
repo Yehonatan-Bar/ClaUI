@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Permission Mode Toggle - Plan</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      line-height: 1.8;
+    }
+    h1 { color: #89b4fa; border-bottom: 2px solid #45475a; padding-bottom: 10px; }
+    h2 { color: #a6e3a1; margin-top: 30px; }
+    h3 { color: #f9e2af; }
+    .context-box {
+      background: #313244;
+      border-right: 4px solid #89b4fa;
+      padding: 15px 20px;
+      border-radius: 0 8px 8px 0;
+      margin: 20px 0;
+    }
+    .step {
+      background: #313244;
+      border-radius: 8px;
+      padding: 15px 20px;
+      margin: 12px 0;
+    }
+    .step-number {
+      display: inline-block;
+      background: #89b4fa;
+      color: #1e1e2e;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 28px;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    .files-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+    }
+    .files-table th, .files-table td {
+      padding: 8px 12px;
+      border: 1px solid #45475a;
+      text-align: right;
+    }
+    .files-table th {
+      background: #313244;
+      color: #89b4fa;
+    }
+    .verification {
+      background: #1e3a2e;
+      border-right: 4px solid #a6e3a1;
+      padding: 15px 20px;
+      border-radius: 0 8px 8px 0;
+      margin: 20px 0;
+    }
+    ul { padding-right: 20px; }
+    li { margin: 6px 0; }
+  </style>
+</head>
+<body>
+
+<h1>תוכנית: מתג הרשאות לסשן</h1>
+
+<div class="context-box">
+  <h3>רקע</h3>
+  <p>
+    כרגע התוסף תמיד מפעיל את Claude עם הרשאות מלאות - כלומר Claude יכול לבצע כל פעולה
+    (עריכת קבצים, הרצת פקודות, כתיבת קבצים) בלי לבקש אישור.
+    הבקשה היא להוסיף כפתור שמאפשר לעבור למצב "מפוקח" בו Claude מוגבל לפעולות קריאה בלבד -
+    פעולות כתיבה נדחות.
+  </p>
+</div>
+
+<h2>הגישה</h2>
+<p>
+  נוסיף רכיב בחירה (dropdown) בשורת הסטטוס שמאפשר לבחור בין שני מצבים:
+</p>
+<ul>
+  <li><strong>Full Access</strong> - ההתנהגות הנוכחית, כל הכלים מאושרים אוטומטית</li>
+  <li><strong>Supervised</strong> - רק כלי קריאה מאושרים; כלי כתיבה נדחים</li>
+</ul>
+<p>
+  השינוי נכנס לתוקף בסשן הבא (כמו שינוי מודל). כלומר - מחליפים מצב, ובסשן הבא
+  Claude יעבוד במצב שנבחר.
+</p>
+
+<h2>שלבי ביצוע</h2>
+
+<div class="step">
+  <span class="step-number">1</span>
+  <strong>הגדרה ב-VS Code</strong>
+  <p>הוספת הגדרה חדשה בהגדרות התוסף: "Permission Mode" עם שתי אפשרויות.</p>
+</div>
+
+<div class="step">
+  <span class="step-number">2</span>
+  <strong>שינוי הפעלת ה-CLI</strong>
+  <p>במצב "Supervised", מעבירים ל-CLI רשימת כלים מאושרים (קריאה בלבד). כלים שלא ברשימה נדחים אוטומטית.</p>
+</div>
+
+<div class="step">
+  <span class="step-number">3</span>
+  <strong>תקשורת בין הממשק לתוסף</strong>
+  <p>הוספת שני סוגי הודעות חדשים: שליחת מצב מהממשק לתוסף, ושליחת המצב הנוכחי מהתוסף לממשק.</p>
+</div>
+
+<div class="step">
+  <span class="step-number">4</span>
+  <strong>רכיב ממשק (UI)</strong>
+  <p>
+    יצירת רכיב dropdown בשורת הסטטוס (ליד בחירת המודל) שמציג את המצב הנוכחי
+    ומאפשר לשנות אותו.
+  </p>
+</div>
+
+<div class="step">
+  <span class="step-number">5</span>
+  <strong>עיצוב</strong>
+  <p>עיצוב הרכיב לפי הסגנון הקיים של בחירת המודל - אותם צבעים, גופנים, ומרווחים.</p>
+</div>
+
+<h2>קבצים מושפעים</h2>
+<table class="files-table">
+  <tr><th>קובץ</th><th>שינוי</th></tr>
+  <tr><td>package.json</td><td>הוספת הגדרה</td></tr>
+  <tr><td>ClaudeProcessManager.ts</td><td>הגבלת כלים במצב מפוקח</td></tr>
+  <tr><td>webview-messages.ts</td><td>2 סוגי הודעות חדשים</td></tr>
+  <tr><td>MessageHandler.ts</td><td>טיפול בהגדרה + שליחה + מעקב</td></tr>
+  <tr><td>store.ts</td><td>מצב + פעולה</td></tr>
+  <tr><td>useClaudeStream.ts</td><td>טיפול בהודעה נכנסת</td></tr>
+  <tr><td>App.tsx</td><td>הוספת רכיב לשורת סטטוס</td></tr>
+  <tr><td>global.css</td><td>עיצוב</td></tr>
+  <tr><td>PermissionModeSelector.tsx</td><td>רכיב חדש</td></tr>
+</table>
+
+<div class="verification">
+  <h3>בדיקה</h3>
+  <ul>
+    <li>פתיחת Claude Mirror - רואים dropdown "Permissions" בשורת הסטטוס</li>
+    <li>מצב ברירת מחדל: Full Access (ההתנהגות הנוכחית)</li>
+    <li>מעבר ל-Supervised ופתיחת סשן חדש - Claude יכול רק לקרוא קבצים</li>
+    <li>ניסיון לבקש עריכה - Claude מקבל סירוב ומדווח למשתמש</li>
+    <li>חזרה ל-Full Access - הכל עובד כרגיל</li>
+  </ul>
+</div>
+
+</body>
+</html>

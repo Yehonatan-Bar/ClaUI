@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Summary - Plan</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 40px 20px;
+      line-height: 1.7;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 2rem;
+      color: #7dd3fc;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #1e3a5f;
+      padding-bottom: 12px;
+    }
+    .subtitle {
+      color: #94a3b8;
+      margin-bottom: 32px;
+      font-size: 1.05rem;
+    }
+    h2 {
+      font-size: 1.3rem;
+      color: #38bdf8;
+      margin-top: 32px;
+      margin-bottom: 12px;
+    }
+    h3 {
+      font-size: 1.1rem;
+      color: #67e8f9;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+    p, li {
+      color: #cbd5e1;
+      font-size: 0.95rem;
+    }
+    ul {
+      padding-right: 24px;
+      margin-bottom: 16px;
+    }
+    li {
+      margin-bottom: 6px;
+    }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+    .highlight-card {
+      background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%);
+      border-color: #38bdf8;
+    }
+    .flow-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin: 12px 0;
+    }
+    .flow-number {
+      background: #38bdf8;
+      color: #0f172a;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    .flow-text {
+      padding-top: 4px;
+    }
+    .mockup {
+      background: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #94a3b8;
+      direction: ltr;
+      text-align: left;
+      margin: 12px 0;
+      white-space: pre;
+    }
+    .accent { color: #38bdf8; }
+    .green { color: #4ade80; }
+    .yellow { color: #fbbf24; }
+    .divider {
+      border: none;
+      border-top: 1px solid #334155;
+      margin: 28px 0;
+    }
+    .badge {
+      display: inline-block;
+      background: #38bdf8;
+      color: #0f172a;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .cost-note {
+      background: #1a2e1a;
+      border: 1px solid #22543d;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #86efac;
+      font-size: 0.9rem;
+      margin: 12px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+    }
+    th {
+      background: #1e3a5f;
+      color: #7dd3fc;
+      padding: 10px 14px;
+      text-align: right;
+      font-size: 0.9rem;
+    }
+    td {
+      background: #1e293b;
+      padding: 10px 14px;
+      border-bottom: 1px solid #334155;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>סיכום פעילות חי - Activity Summary</h1>
+    <p class="subtitle">פיצ'ר חדש: הצגת סיכום מתעדכן של מה שקלוד קוד עושה כרגע, באמצעות קריאה קלה ל-Haiku</p>
+
+    <hr class="divider">
+
+    <h2>מה הפיצ'ר עושה?</h2>
+    <div class="card highlight-card">
+      <p>בזמן שקלוד קוד עובד, הוא משתמש בכלים שונים - קריאת קבצים, עריכה, הרצת פקודות. כל <strong>2-3 פעולות</strong>, המערכת שולחת את רשימת הפעולות ל-<span class="accent">Haiku</span> (מודל קליל ומהיר) שמסכם במשפט קצר מה קורה.</p>
+      <br>
+      <p>הסיכום מופיע ב-3 מקומות:</p>
+      <ul>
+        <li><strong>כותרת הטאב</strong> - מתעדכנת עם תיאור קצר (למשל: "Debugging Auth Flow")</li>
+        <li><strong>אינדיקטור הטעינה</strong> - במקום "Claude is thinking..." מופיע הסיכום</li>
+        <li><strong>כפתור [i] קטן</strong> - מרחפים מעליו ורואים הסבר מלא</li>
+      </ul>
+    </div>
+
+    <h2>איך זה עובד - שלב אחר שלב</h2>
+
+    <div class="flow-step">
+      <div class="flow-number">1</div>
+      <div class="flow-text">
+        <strong>מעקב אחר פעולות</strong> - המערכת כבר עוקבת אחרי כל כלי שקלוד משתמש בו (Read, Edit, Bash וכו'). עכשיו היא גם שומרת את ההקשר - למשל איזה קובץ נקרא או איזו פקודה הורצה.
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-number">2</div>
+      <div class="flow-text">
+        <strong>הפעלת סיכום</strong> - אחרי כל 3 פעולות (ניתן להגדרה), המערכת ממתינה 2 שניות (כדי לצבור עוד פעולות קרובות) ואז שולחת את הרשימה ל-Haiku.
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-number">3</div>
+      <div class="flow-text">
+        <strong>Haiku מחזיר סיכום</strong> - שורה אחת קצרה לכותרת (3-6 מילים) ומשפט מלא להסבר. הכל אוטומטי ומהיר - בדרך כלל פחות משנייה.
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-number">4</div>
+      <div class="flow-text">
+        <strong>עדכון הממשק</strong> - כותרת הטאב מתעדכנת, אינדיקטור הטעינה מציג את הסיכום הקצר, ולחיצת hover על כפתור [i] מראה את ההסבר המלא.
+      </div>
+    </div>
+
+    <h2>איך זה נראה</h2>
+
+    <h3>לפני (מצב נוכחי):</h3>
+    <div class="mockup">
+<span class="yellow">Tab: Claude Mirror 1</span>
+
+<span class="accent">[ Chat messages... ]</span>
+
+<span class="green">&#x27F3; Claude is thinking...</span>
+    </div>
+
+    <h3>אחרי (עם הפיצ'ר החדש):</h3>
+    <div class="mockup">
+<span class="yellow">Tab: Debugging Auth Flow</span>
+
+<span class="accent">[ Chat messages... ]</span>
+
+<span class="green">&#x27F3; Debugging auth flow...</span> <span class="accent">[i]</span>
+                                    ^
+                          hover = "Investigating authentication
+                          bug by reading and editing auth.ts,
+                          then running tests"
+    </div>
+
+    <h2>הגדרות</h2>
+    <table>
+      <tr>
+        <th>הגדרה</th>
+        <th>ברירת מחדל</th>
+        <th>תיאור</th>
+      </tr>
+      <tr>
+        <td>Activity Summary</td>
+        <td><span class="badge">ON</span></td>
+        <td>הפעלה/כיבוי של כל הפיצ'ר</td>
+      </tr>
+      <tr>
+        <td>Summary Threshold</td>
+        <td>3</td>
+        <td>כמה פעולות לצבור לפני שליחה ל-Haiku</td>
+      </tr>
+    </table>
+
+    <h2>עלות</h2>
+    <div class="cost-note">
+      כל קריאה ל-Haiku עולה כ-$0.0001-$0.0003 (זניח). בסשן ממוצע עם 20-30 פעולות, זה בערך 7-10 קריאות, סה"כ כ-$0.002. זניח לחלוטין ביחס לעלות המודל הראשי.
+    </div>
+
+    <h2>קבצים שמשתנים</h2>
+    <table>
+      <tr>
+        <th>קובץ</th>
+        <th>שינוי</th>
+      </tr>
+      <tr>
+        <td>ActivitySummarizer.ts</td>
+        <td><span class="badge">NEW</span> - מחלקה חדשה: צבירת פעולות, debounce, קריאה ל-Haiku</td>
+      </tr>
+      <tr>
+        <td>MessageHandler.ts</td>
+        <td>חיבור למסכם, לכידת הקשר פעולות, handler חדש ל-blockStop</td>
+      </tr>
+      <tr>
+        <td>SessionTab.ts</td>
+        <td>יצירת המסכם, חיבור callbacks, עדכון status bar</td>
+      </tr>
+      <tr>
+        <td>webview-messages.ts</td>
+        <td>הוספת סוג הודעה ActivitySummaryMessage</td>
+      </tr>
+      <tr>
+        <td>store.ts</td>
+        <td>state חדש לסיכום פעילות</td>
+      </tr>
+      <tr>
+        <td>useClaudeStream.ts</td>
+        <td>טיפול בהודעת activitySummary</td>
+      </tr>
+      <tr>
+        <td>App.tsx</td>
+        <td>שדרוג אינדיקטור טעינה + כפתור [i]</td>
+      </tr>
+      <tr>
+        <td>package.json</td>
+        <td>הגדרות חדשות</td>
+      </tr>
+    </table>
+
+    <hr class="divider">
+
+    <p style="color: #64748b; font-size: 0.85rem; text-align: center; margin-top: 20px;">
+      Claude Code Mirror - Activity Summary Feature Plan
+    </p>
+  </div>
+</body>
+</html>

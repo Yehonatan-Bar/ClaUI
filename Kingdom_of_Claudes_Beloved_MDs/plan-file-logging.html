@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plan: File-Based Logging</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      line-height: 1.8;
+    }
+    h1 {
+      color: #89b4fa;
+      border-bottom: 2px solid #45475a;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #a6e3a1;
+      margin-top: 30px;
+    }
+    h3 {
+      color: #f9e2af;
+    }
+    .context {
+      background: #313244;
+      border-right: 4px solid #89b4fa;
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    .feature-box {
+      background: #313244;
+      border-radius: 8px;
+      padding: 15px 20px;
+      margin: 10px 0;
+    }
+    .feature-box strong {
+      color: #cba6f7;
+    }
+    ul {
+      padding-right: 20px;
+    }
+    li {
+      margin: 8px 0;
+    }
+    .highlight {
+      color: #f38ba8;
+      font-weight: bold;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+    }
+    th, td {
+      border: 1px solid #45475a;
+      padding: 10px 14px;
+      text-align: right;
+    }
+    th {
+      background: #313244;
+      color: #89b4fa;
+    }
+    .steps {
+      counter-reset: step;
+      list-style: none;
+      padding: 0;
+    }
+    .steps li {
+      counter-increment: step;
+      padding: 10px 50px 10px 15px;
+      position: relative;
+      background: #313244;
+      border-radius: 8px;
+      margin: 8px 0;
+    }
+    .steps li::before {
+      content: counter(step);
+      position: absolute;
+      right: 15px;
+      top: 10px;
+      background: #89b4fa;
+      color: #1e1e2e;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>תוכנית: שמירת לוגים לקבצים</h1>
+
+  <div class="context">
+    <h3>רקע</h3>
+    <p>
+      כרגע כל הלוגים של התוסף מוצגים רק בחלון Output של VS Code.
+      הבעיה: כשסוגרים את VS Code או טוענים מחדש - <span class="highlight">הלוגים נמחקים</span>.
+      התוכנית מוסיפה שמירה אוטומטית של הלוגים לקבצים בדיסק, כך שהם נשמרים לצמיתות.
+    </p>
+  </div>
+
+  <h2>מה ישתנה?</h2>
+
+  <div class="feature-box">
+    <strong>קובץ לוג לכל סשן (טאב)</strong>
+    <p>כל טאב שנפתח יקבל קובץ לוג משלו. שם הקובץ יכלול את שם הסשן ואת התאריך והשעה.</p>
+    <p>דוגמה: <code dir="ltr">Fix_login_bug_18-14-30.log</code></p>
+  </div>
+
+  <div class="feature-box">
+    <strong>שם הקובץ מתעדכן אוטומטית</strong>
+    <p>כשהמערכת נותנת שם אוטומטי לסשן (או כשהמשתמש משנה שם ידנית) - קובץ הלוג משתנה בהתאם.</p>
+  </div>
+
+  <div class="feature-box">
+    <strong>קובץ חדש נוצר כאשר:</strong>
+    <ul>
+      <li>נשלחת פקודת <span class="highlight">Developer: Reload Window</span> - כי כל טעינה מחדש מפעילה את התוסף מאפס</li>
+      <li>הקובץ גדול מ-<span class="highlight">2MB</span> - רוטציה אוטומטית</li>
+      <li>נפתח <span class="highlight">סשן חדש</span> (טאב חדש)</li>
+    </ul>
+  </div>
+
+  <div class="feature-box">
+    <strong>קובץ לוג גלובלי</strong>
+    <p>בנוסף לקבצים של כל טאב, יהיה קובץ לוג מרכזי שמכיל את כל ההודעות מכל הטאבים יחד - שימושי לראיית תמונה כוללת.</p>
+  </div>
+
+  <h2>הגדרות חדשות</h2>
+
+  <table>
+    <tr>
+      <th>הגדרה</th>
+      <th>תיאור</th>
+      <th>ברירת מחדל</th>
+    </tr>
+    <tr>
+      <td>הפעלת לוגים לקובץ</td>
+      <td>מאפשר/מכבה כתיבה לדיסק</td>
+      <td>מופעל</td>
+    </tr>
+    <tr>
+      <td>תיקיית לוגים</td>
+      <td>אפשרות לשנות את מיקום שמירת הלוגים</td>
+      <td>תיקיית התוסף ב-VS Code</td>
+    </tr>
+  </table>
+
+  <h2>פקודה חדשה</h2>
+
+  <div class="feature-box">
+    <strong>Claude Mirror: Open Log Directory</strong>
+    <p>פקודה שפותחת את תיקיית הלוגים בסייר הקבצים - לגישה מהירה לקבצי הלוג.</p>
+  </div>
+
+  <h2>איפה הלוגים נשמרים?</h2>
+
+  <div class="feature-box">
+    <p>ברירת מחדל: תיקיית האחסון של התוסף ב-VS Code</p>
+    <p dir="ltr" style="font-size: 0.9em; color: #94e2d5;">
+      %APPDATA%/Code/User/globalStorage/claude-code-mirror.../logs/
+    </p>
+    <p>ניתן לשנות דרך ההגדרות.</p>
+  </div>
+
+  <h2>שלבי ביצוע</h2>
+
+  <ol class="steps">
+    <li>יצירת מודול FileLogger חדש - מנגנון הכתיבה, הרוטציה ושינוי השם</li>
+    <li>חיבור למנגנון ההפעלה של התוסף - לוגר גלובלי + העברת נתיב התיקייה</li>
+    <li>חיבור למנהל הטאבים - העברת הנתיב לכל טאב חדש</li>
+    <li>חיבור לכל סשן (טאב) - לוגר פרטי, עדכון שם, ניקוי משאבים</li>
+    <li>הוספת הגדרות ופקודה חדשה</li>
+    <li>בנייה, התקנה ובדיקות</li>
+  </ol>
+
+  <h2>בדיקות</h2>
+
+  <ul>
+    <li>פתיחת סשן - וידוא שקובץ לוג נוצר</li>
+    <li>שליחת הודעה - וידוא ששם הקובץ מתעדכן עם שם הסשן</li>
+    <li>שינוי שם ידני - וידוא שהקובץ משתנה שם</li>
+    <li>פתיחת טאב שני - וידוא קובץ נפרד</li>
+    <li>טעינה מחדש של VS Code - וידוא קבצים חדשים</li>
+    <li>הפעלת פקודת פתיחת תיקיית לוגים</li>
+  </ul>
+
+</body>
+</html>

@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useAppStore } from '../../state/store';
+import { postToExtension } from '../../hooks/useClaudeStream';
 import { MessageBubble } from './MessageBubble';
 import { StreamingText } from './StreamingText';
 import { ToolUseBlock } from './ToolUseBlock';
@@ -9,24 +10,10 @@ import { ToolUseBlock } from './ToolUseBlock';
  * Displays completed messages and current streaming content.
  */
 export const MessageList: React.FC = () => {
-  const { messages, streamingMessageId, streamingBlocks } = useAppStore();
+  const { messages, streamingMessageId, streamingBlocks, isBusy, truncateFromMessage, addUserMessage } = useAppStore();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const userScrolledUp = useRef(false);
-
-  console.log(`%c[MessageList] render`, 'color: lime; font-weight: bold', {
-    messageCount: messages.length,
-    messages: messages.map(m => ({
-      id: m.id,
-      role: m.role,
-      contentIsArray: Array.isArray(m.content),
-      contentType: typeof m.content,
-      contentLength: Array.isArray(m.content) ? m.content.length : 'N/A',
-      contentBlockTypes: Array.isArray(m.content) ? m.content.map(b => b.type) : m.content,
-    })),
-    streamingId: streamingMessageId,
-    streamingBlockCount: streamingBlocks.length,
-  });
 
   // Auto-scroll to bottom on new content, unless user has scrolled up
   useEffect(() => {
@@ -45,6 +32,18 @@ export const MessageList: React.FC = () => {
     userScrolledUp.current = distanceFromBottom > 100;
   };
 
+  /** Edit a previously sent user message: truncate all messages from that point
+   *  onward, add the edited message to the store, and send the updated text to
+   *  the extension to start a new session. */
+  const handleEditAndResend = useCallback((messageId: string, newText: string) => {
+    truncateFromMessage(messageId);
+    // Add the edited user message immediately so it's visible in the UI.
+    // The CLI may or may not echo it back via a userMessage event; adding it
+    // here ensures the user always sees what they sent.
+    addUserMessage(newText);
+    postToExtension({ type: 'editAndResend', text: newText });
+  }, [truncateFromMessage, addUserMessage]);
+
   return (
     <div
       className="message-list"
@@ -52,7 +51,12 @@ export const MessageList: React.FC = () => {
       onScroll={handleScroll}
     >
       {messages.map((msg) => (
-        <MessageBubble key={msg.id} message={msg} />
+        <MessageBubble
+          key={msg.id}
+          message={msg}
+          isBusy={isBusy}
+          onEditAndResend={handleEditAndResend}
+        />
       ))}
 
       {/* Show streaming content for the in-progress message */}

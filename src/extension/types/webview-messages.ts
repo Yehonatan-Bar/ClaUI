@@ -73,8 +73,35 @@ export interface OpenPlanDocsRequest {
 
 export interface PlanApprovalResponseMessage {
   type: 'planApprovalResponse';
-  action: 'approve' | 'reject' | 'feedback';
+  action: 'approve' | 'reject' | 'feedback' | 'questionAnswer';
   feedback?: string;
+  /** Selected option label(s) when answering AskUserQuestion */
+  selectedOptions?: string[];
+}
+
+export interface OpenFileRequest {
+  type: 'openFile';
+  filePath: string;
+}
+
+export interface OpenUrlRequest {
+  type: 'openUrl';
+  url: string;
+}
+
+export interface GetPromptHistoryRequest {
+  type: 'getPromptHistory';
+  scope: 'project' | 'global';
+}
+
+export interface EditAndResendRequest {
+  type: 'editAndResend';
+  text: string;
+}
+
+export interface SetPermissionModeRequest {
+  type: 'setPermissionMode';
+  mode: 'full-access' | 'supervised';
 }
 
 export type WebviewToExtensionMessage =
@@ -92,7 +119,12 @@ export type WebviewToExtensionMessage =
   | SetModelRequest
   | ShowHistoryRequest
   | OpenPlanDocsRequest
-  | PlanApprovalResponseMessage;
+  | PlanApprovalResponseMessage
+  | OpenFileRequest
+  | OpenUrlRequest
+  | GetPromptHistoryRequest
+  | EditAndResendRequest
+  | SetPermissionModeRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -203,6 +235,23 @@ export interface PlanApprovalRequiredMessage {
   toolName: string;
 }
 
+export interface PromptHistoryResponseMessage {
+  type: 'promptHistoryResponse';
+  scope: 'project' | 'global';
+  prompts: string[];
+}
+
+export interface ActivitySummaryMessage {
+  type: 'activitySummary';
+  shortLabel: string;
+  fullSummary: string;
+}
+
+export interface PermissionModeSettingMessage {
+  type: 'permissionModeSetting';
+  mode: 'full-access' | 'supervised';
+}
+
 export type ExtensionToWebviewMessage =
   | SessionStartedMessage
   | SessionEndedMessage
@@ -220,4 +269,7 @@ export type ExtensionToWebviewMessage =
   | FilePathsPickedMessage
   | TextSettingsMessage
   | ModelSettingMessage
-  | PlanApprovalRequiredMessage;
+  | PlanApprovalRequiredMessage
+  | PromptHistoryResponseMessage
+  | ActivitySummaryMessage
+  | PermissionModeSettingMessage;

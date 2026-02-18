@@ -3,6 +3,8 @@ import type { ClaudeProcessManager } from '../process/ClaudeProcessManager';
 import type { ControlProtocol } from '../process/ControlProtocol';
 import type { StreamDemux } from '../process/StreamDemux';
 import type { SessionNamer } from '../session/SessionNamer';
+import type { ActivitySummarizer, ActivitySummary } from '../session/ActivitySummarizer';
+import type { PromptHistoryStore } from '../session/PromptHistoryStore';
 import type {
   ExtensionToWebviewMessage,
   WebviewToExtensionMessage,
@@ -23,6 +25,9 @@ import type {
 export interface WebviewBridge {
   postMessage(msg: ExtensionToWebviewMessage): void;
   onMessage(callback: (msg: WebviewToExtensionMessage) => void): void;
+  /** Signal that a deliberate stop+restart is in progress (e.g. edit-and-resend).
+   *  The exit handler should suppress the sessionEnded message for this cycle. */
+  setSuppressNextExit?(suppress: boolean): void;
 }
 
 /**
@@ -32,6 +37,14 @@ export interface WebviewBridge {
  */
 /** Tool names that require user approval when the CLI pauses after calling them */
 const APPROVAL_TOOLS = ['ExitPlanMode', 'AskUserQuestion'];
+
+function isApprovalToolName(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  return APPROVAL_TOOLS.some((tool) => {
+    const t = tool.toLowerCase();
+    return normalized === t || normalized.endsWith(`.${t}`);
+  });
+}
 
 export class MessageHandler {
   private log: (msg: string) => void = () => {};
@@ -44,11 +57,20 @@ export class MessageHandler {
   /** Set when the CLI pauses waiting for plan/question approval */
   private pendingApprovalTool: string | null = null;
 
+  /** Activity summarizer: periodically summarizes tool activity via Haiku */
+  private activitySummarizer: ActivitySummarizer | null = null;
+  private activitySummaryCallback: ((summary: ActivitySummary) => void) | null = null;
+  /** Maps blockIndex -> toolName for tool_use blocks in the current message */
+  private toolBlockNames: Map<number, string> = new Map();
+  /** Maps blockIndex -> first chunk of partial JSON (for enrichment context) */
+  private toolBlockContexts: Map<number, string> = new Map();
+
   constructor(
     private readonly webview: WebviewBridge,
     private readonly processManager: ClaudeProcessManager,
     private readonly control: ControlProtocol,
-    private readonly demux: StreamDemux
+    private readonly demux: StreamDemux,
+    private readonly promptHistoryStore: PromptHistoryStore
   ) {}
 
   setLogger(logger: (msg: string) => void): void {
@@ -65,11 +87,22 @@ export class MessageHandler {
     this.titleCallback = callback;
   }
 
+  /** Attach an ActivitySummarizer for periodic tool activity summaries */
+  setActivitySummarizer(summarizer: ActivitySummarizer): void {
+    this.activitySummarizer = summarizer;
+  }
+
+  /** Register a callback invoked when an activity summary is generated */
+  onActivitySummaryGenerated(callback: (summary: ActivitySummary) => void): void {
+    this.activitySummaryCallback = callback;
+  }
+
   /** Wire up all event listeners */
   initialize(): void {
     this.bindWebviewMessages();
     this.bindDemuxEvents();
     this.watchConfigChanges();
+    this.wireActivitySummarizer();
   }
 
   /** Handle messages coming FROM the webview */
@@ -85,13 +118,20 @@ export class MessageHandler {
           this.control.sendText(msg.text);
           this.webview.postMessage({ type: 'processBusy', busy: true });
           this.triggerSessionNaming(msg.text);
+          // Persist prompt to project and global history
+          void this.promptHistoryStore.addPrompt(msg.text);
           break;
 
         case 'sendMessageWithImages':
           this.log(`Sending message with ${msg.images.length} images`);
+          // If there was a pending approval, the user's message implicitly responds to it
+          this.clearApprovalTracking();
           this.control.sendWithImages(msg.text, msg.images);
           this.webview.postMessage({ type: 'processBusy', busy: true });
           this.triggerSessionNaming(msg.text);
+          if (msg.text.trim()) {
+            void this.promptHistoryStore.addPrompt(msg.text);
+          }
           break;
 
         case 'cancelRequest':
@@ -104,6 +144,7 @@ export class MessageHandler {
 
         case 'startSession':
           this.firstMessageSent = false;
+          this.activitySummarizer?.reset();
           // If already running, just sync the webview state
           if (this.processManager.isRunning) {
             this.log('startSession - process already running, syncing state');
@@ -170,6 +211,7 @@ export class MessageHandler {
 
         case 'clearSession':
           this.firstMessageSent = false;
+          this.activitySummarizer?.reset();
           this.log('clearSession - stopping current process and starting fresh');
           this.processManager.stop();
           this.processManager
@@ -195,6 +237,11 @@ export class MessageHandler {
           vscode.workspace.getConfiguration('claudeMirror').update('model', msg.model, true);
           break;
 
+        case 'setPermissionMode':
+          this.log(`Setting permission mode to: "${msg.mode}"`);
+          vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', msg.mode, true);
+          break;
+
         case 'showHistory':
           this.log('Webview requested history view');
           vscode.commands.executeCommand('claudeMirror.showHistory');
@@ -213,9 +260,76 @@ export class MessageHandler {
             this.control.sendText('No, I reject this plan. Please revise it.');
           } else if (msg.action === 'feedback') {
             this.control.sendText(msg.feedback || 'Please revise the plan.');
+          } else if (msg.action === 'questionAnswer') {
+            // User selected option(s) from an AskUserQuestion prompt
+            const answer = msg.selectedOptions?.join(', ') || msg.feedback || '';
+            this.log(`Question answer: "${answer}"`);
+            this.control.sendText(answer);
           }
           this.clearApprovalTracking();
           this.webview.postMessage({ type: 'processBusy', busy: true });
+          break;
+
+        case 'editAndResend':
+          this.log(`Edit-and-resend: stopping session and restarting with edited prompt`);
+          this.clearApprovalTracking();
+          this.firstMessageSent = false;
+          this.activitySummarizer?.reset();
+          this.webview.postMessage({ type: 'processBusy', busy: true });
+          {
+            const editedText = msg.text;
+            // Tell the exit handler not to send sessionEnded - we're restarting intentionally
+            this.webview.setSuppressNextExit?.(true);
+            this.processManager.stop();
+            this.processManager
+              .start()
+              .then(() => {
+                this.log('New session started for edit-and-resend');
+                this.webview.postMessage({
+                  type: 'sessionStarted',
+                  sessionId: this.processManager.currentSessionId || 'pending',
+                  model: 'connecting...',
+                });
+                // Send the edited message immediately - don't wait for system/init.
+                // The CLI in pipe mode only emits init AFTER receiving the first message,
+                // so waiting for init before sending would deadlock.
+                this.log(`Edit-and-resend: sending edited prompt`);
+                this.control.sendText(editedText);
+                this.triggerSessionNaming(editedText);
+                void this.promptHistoryStore.addPrompt(editedText);
+              })
+              .catch((err) => {
+                this.webview.postMessage({ type: 'processBusy', busy: false });
+                this.webview.postMessage({
+                  type: 'error',
+                  message: `Failed to restart session for edit: ${err.message}`,
+                });
+              });
+          }
+          break;
+
+        case 'getPromptHistory':
+          this.log(`Fetching prompt history: scope=${msg.scope}`);
+          {
+            const prompts = msg.scope === 'project'
+              ? this.promptHistoryStore.getProjectHistory()
+              : this.promptHistoryStore.getGlobalHistory();
+            this.webview.postMessage({
+              type: 'promptHistoryResponse',
+              scope: msg.scope,
+              prompts,
+            });
+          }
+          break;
+
+        case 'openFile':
+          this.log(`Opening file in editor: "${msg.filePath}"`);
+          this.handleOpenFile(msg.filePath);
+          break;
+
+        case 'openUrl':
+          this.log(`Opening URL in browser: "${msg.url}"`);
+          this.handleOpenUrl(msg.url);
           break;
 
         case 'ready':
@@ -224,6 +338,8 @@ export class MessageHandler {
           this.sendTextSettings();
           // Send model setting
           this.sendModelSetting();
+          // Send permission mode setting
+          this.sendPermissionModeSetting();
           // If process is already running, tell the webview
           if (this.processManager.isRunning && this.processManager.currentSessionId) {
             this.log('Sending existing session info to webview');
@@ -257,6 +373,57 @@ export class MessageHandler {
     }
   }
 
+  /** Open a file in the VS Code editor, with optional :line:col navigation */
+  private handleOpenFile(rawPath: string): void {
+    // Parse optional :line and :line:col suffix
+    let filePath = rawPath;
+    let line: number | undefined;
+    let col: number | undefined;
+
+    const lineColMatch = filePath.match(/:(\d+)(?::(\d+))?$/);
+    if (lineColMatch) {
+      line = parseInt(lineColMatch[1], 10);
+      col = lineColMatch[2] ? parseInt(lineColMatch[2], 10) : undefined;
+      filePath = filePath.slice(0, lineColMatch.index);
+    }
+
+    // Resolve relative paths against workspace root
+    const isAbsolute = /^[A-Za-z]:[\\/]/.test(filePath) || filePath.startsWith('/');
+    if (!isAbsolute) {
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (workspaceRoot) {
+        const path = require('path');
+        filePath = path.resolve(workspaceRoot, filePath);
+      }
+    }
+
+    const uri = vscode.Uri.file(filePath);
+    const openOptions: vscode.TextDocumentShowOptions = {};
+    if (line !== undefined) {
+      // VS Code lines are 0-indexed, file paths use 1-indexed
+      const pos = new vscode.Position(line - 1, (col ?? 1) - 1);
+      openOptions.selection = new vscode.Range(pos, pos);
+    }
+
+    vscode.commands.executeCommand('vscode.open', uri, openOptions).then(
+      () => this.log(`Opened file: ${filePath}${line ? `:${line}` : ''}`),
+      (err) => this.log(`Failed to open file: ${err}`)
+    );
+  }
+
+  /** Open a URL in the user's default external browser */
+  private handleOpenUrl(url: string): void {
+    // Basic validation: only allow http/https URLs
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      this.log(`Rejected non-HTTP URL: "${url}"`);
+      return;
+    }
+    vscode.env.openExternal(vscode.Uri.parse(url)).then(
+      (success) => this.log(`Opened URL: ${url} (success=${success})`),
+      (err) => this.log(`Failed to open URL: ${err}`)
+    );
+  }
+
   /** Read text display settings from VS Code config and send to webview */
   private sendTextSettings(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -281,6 +448,17 @@ export class MessageHandler {
     });
   }
 
+  /** Read permission mode setting from VS Code config and send to webview */
+  private sendPermissionModeSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const mode = config.get<string>('permissionMode', 'full-access');
+    this.log(`Sending permission mode setting: "${mode}"`);
+    this.webview.postMessage({
+      type: 'permissionModeSetting',
+      mode: mode as 'full-access' | 'supervised',
+    });
+  }
+
   /** Watch for settings changes and forward to webview */
   private watchConfigChanges(): void {
     vscode.workspace.onDidChangeConfiguration((e) => {
@@ -290,6 +468,9 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.model')) {
         this.sendModelSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.permissionMode')) {
+        this.sendPermissionModeSetting();
       }
     });
   }
@@ -327,6 +508,8 @@ export class MessageHandler {
       (data: { messageId: string; blockIndex: number; toolName: string; toolId: string }) => {
         this.log(`-> webview: toolUseStart ${data.toolName}`);
         this.currentMessageToolNames.push(data.toolName);
+        // Track for activity summarizer enrichment
+        this.toolBlockNames.set(data.blockIndex, data.toolName);
         this.webview.postMessage({
           type: 'toolUseStart',
           messageId: data.messageId,
@@ -340,12 +523,29 @@ export class MessageHandler {
     this.demux.on(
       'toolUseDelta',
       (data: { messageId: string; blockIndex: number; partialJson: string }) => {
+        // Capture first chunk of JSON input for activity summarizer context
+        if (!this.toolBlockContexts.has(data.blockIndex)) {
+          this.toolBlockContexts.set(data.blockIndex, data.partialJson.slice(0, 150));
+        }
         this.webview.postMessage({
           type: 'toolUseInput',
           messageId: data.messageId,
           blockIndex: data.blockIndex,
           partialJson: data.partialJson,
         });
+      }
+    );
+
+    this.demux.on(
+      'blockStop',
+      (data: { blockIndex: number }) => {
+        const toolName = this.toolBlockNames.get(data.blockIndex);
+        if (toolName && this.activitySummarizer) {
+          const enriched = this.enrichToolName(toolName, data.blockIndex);
+          this.activitySummarizer.recordToolUse(enriched);
+        }
+        this.toolBlockNames.delete(data.blockIndex);
+        this.toolBlockContexts.delete(data.blockIndex);
       }
     );
 
@@ -357,15 +557,10 @@ export class MessageHandler {
         // the CLI is waiting for the user to respond - notify the webview.
         if (data.stopReason === 'tool_use') {
           const approvalTool = this.currentMessageToolNames.find(
-            name => APPROVAL_TOOLS.includes(name)
+            name => isApprovalToolName(name)
           );
           if (approvalTool) {
-            this.log(`Plan approval required: tool=${approvalTool}`);
-            this.pendingApprovalTool = approvalTool;
-            this.webview.postMessage({
-              type: 'planApprovalRequired',
-              toolName: approvalTool,
-            });
+            this.notifyPlanApprovalRequired(approvalTool);
           }
         }
       }
@@ -382,6 +577,16 @@ export class MessageHandler {
           content: event.message.content,
           model: event.message.model,
         });
+        // Fallback for CLI variants that don't emit (or reorder) message_delta.
+        // Detect approval waits directly from assistant stop_reason + tool blocks.
+        if (!this.pendingApprovalTool && event.message.stop_reason === 'tool_use') {
+          const approvalToolBlock = event.message.content.find(
+            (block) => block.type === 'tool_use' && !!block.name && isApprovalToolName(block.name)
+          );
+          if (approvalToolBlock?.name) {
+            this.notifyPlanApprovalRequired(approvalToolBlock.name);
+          }
+        }
         // Don't set busy=false here - intermediate assistant events arrive mid-stream.
         // Busy is cleared on 'result' event only.
       }
@@ -393,6 +598,8 @@ export class MessageHandler {
         this.log(`-> webview: messageStart id=${data.messageId}`);
         this.currentMessageToolNames = [];
         this.pendingApprovalTool = null;
+        this.toolBlockNames.clear();
+        this.toolBlockContexts.clear();
         this.webview.postMessage({
           type: 'messageStart',
           messageId: data.messageId,
@@ -448,6 +655,51 @@ export class MessageHandler {
   private clearApprovalTracking(): void {
     this.currentMessageToolNames = [];
     this.pendingApprovalTool = null;
+  }
+
+  /** Notify webview that user approval is required for a plan/question tool */
+  private notifyPlanApprovalRequired(toolName: string): void {
+    if (this.pendingApprovalTool === toolName) {
+      return;
+    }
+    this.log(`Plan approval required: tool=${toolName}`);
+    this.pendingApprovalTool = toolName;
+    this.webview.postMessage({
+      type: 'planApprovalRequired',
+      toolName,
+    });
+  }
+
+  /** Wire activity summarizer callback to forward summaries to webview and SessionTab */
+  private wireActivitySummarizer(): void {
+    if (!this.activitySummarizer) {
+      return;
+    }
+    this.activitySummarizer.onSummaryGenerated((summary) => {
+      this.log(`[ActivitySummary] Generated: "${summary.shortLabel}" | "${summary.fullSummary}"`);
+      // Forward to webview for busy indicator
+      this.webview.postMessage({
+        type: 'activitySummary',
+        shortLabel: summary.shortLabel,
+        fullSummary: summary.fullSummary,
+      });
+      // Forward to SessionTab for tab title update
+      this.activitySummaryCallback?.(summary);
+    });
+  }
+
+  /** Enrich a tool name with context from its first JSON argument (e.g., file path) */
+  private enrichToolName(toolName: string, blockIndex: number): string {
+    const rawJson = this.toolBlockContexts.get(blockIndex) || '';
+    if (!rawJson) {
+      return toolName;
+    }
+    // Try to extract file_path, command, path, or pattern from partial JSON
+    const pathMatch = rawJson.match(/"(?:file_path|path|command|pattern|query|url)":\s*"([^"]{1,80})/);
+    if (pathMatch) {
+      return `${toolName} (${pathMatch[1]})`;
+    }
+    return toolName;
   }
 
   /** Fire-and-forget: spawn a Haiku process to name this session */

@@ -78,10 +78,22 @@ export interface AppState {
   // Plan approval (CLI paused waiting for user approval of ExitPlanMode / AskUserQuestion)
   pendingApproval: { toolName: string; planText: string } | null;
 
+  // Prompt history panel
+  promptHistoryPanelOpen: boolean;
+  projectPromptHistory: string[];
+  globalPromptHistory: string[];
+
+  // Activity summary (from Haiku)
+  activitySummary: { shortLabel: string; fullSummary: string } | null;
+
+  // Permission mode
+  permissionMode: 'full-access' | 'supervised';
+
   // Actions
   setSession: (sessionId: string, model: string) => void;
   endSession: (reason: string) => void;
   addUserMessage: (content: string | ContentBlock[]) => void;
+  addAssistantMessage: (messageId: string, content: ContentBlock[], model: string) => void;
 
   // Streaming lifecycle
   handleMessageStart: (messageId: string, model: string) => void;
@@ -118,6 +130,12 @@ export interface AppState {
   setResuming: (resuming: boolean) => void;
   setSelectedModel: (model: string) => void;
   setPendingApproval: (approval: { toolName: string; planText: string } | null) => void;
+  truncateFromMessage: (messageId: string) => void;
+  setActivitySummary: (summary: { shortLabel: string; fullSummary: string } | null) => void;
+  setPromptHistoryPanelOpen: (open: boolean) => void;
+  setPermissionMode: (mode: 'full-access' | 'supervised') => void;
+  setProjectPromptHistory: (history: string[]) => void;
+  setGlobalPromptHistory: (history: string[]) => void;
   reset: () => void;
 }
 
@@ -178,6 +196,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   promptHistory: [],
   isResuming: false,
   pendingApproval: null,
+  promptHistoryPanelOpen: false,
+  projectPromptHistory: [],
+  globalPromptHistory: [],
+  activitySummary: null,
+  permissionMode: 'full-access' as const,
 
   // Actions
   setSession: (sessionId, model) =>
@@ -196,6 +219,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       streamingBlocks: [],
       lastAssistantSnapshot: null,
       pendingApproval: null,
+      activitySummary: null,
     }),
 
   addUserMessage: (content) => {
@@ -206,17 +230,79 @@ export const useAppStore = create<AppState>((set, get) => ({
         ? content
         : [{ type: 'text', text: String(content) }];
 
-    set((state) => ({
+    // Filter out tool_result blocks - these are API-internal messages
+    // (tool results sent back to Claude as user-role), not actual user input.
+    // They should not appear as "You" messages in the chat UI.
+    const userVisibleContent = normalizedContent.filter(
+      (block) => block.type !== 'tool_result'
+    );
+
+    // Skip entirely if no user-visible content remains
+    if (userVisibleContent.length === 0) {
+      return;
+    }
+
+    // Deduplicate: if the last message is a recent user message with the same
+    // text, skip adding it (handles CLI echo after edit-and-resend which
+    // already added the message directly). The 5-second window avoids
+    // suppressing legitimate repeated messages (e.g., sending "yes" twice).
+    const state = get();
+    const lastMsg = state.messages[state.messages.length - 1];
+    if (lastMsg?.role === 'user' && Date.now() - lastMsg.timestamp < 5000) {
+      const newText = userVisibleContent
+        .filter((b) => b.type === 'text')
+        .map((b) => b.text || '')
+        .join('');
+      const lastText = lastMsg.content
+        .filter((b) => b.type === 'text')
+        .map((b) => b.text || '')
+        .join('');
+      if (newText === lastText) {
+        return;
+      }
+    }
+
+    set((s) => ({
       messages: [
-        ...state.messages,
+        ...s.messages,
         {
           id: `user-${Date.now()}`,
           role: 'user' as const,
-          content: normalizedContent,
+          content: userVisibleContent,
           timestamp: Date.now(),
         },
       ],
     }));
+  },
+
+  /**
+   * Add a complete assistant message directly to the messages array.
+   * Used for replayed messages during session resume (no streaming pipeline).
+   */
+  addAssistantMessage: (messageId, content, model) => {
+    // Normalize content defensively
+    const normalizedContent: ContentBlock[] = Array.isArray(content)
+      ? content
+      : [{ type: 'text', text: String(content) }];
+
+    const newMessage: ChatMessage = {
+      id: messageId,
+      role: 'assistant',
+      content: normalizedContent,
+      model,
+      timestamp: Date.now(),
+    };
+
+    set((state) => {
+      // Upsert: replace if same ID exists, otherwise append
+      const existingIndex = state.messages.findIndex((m) => m.id === messageId);
+      if (existingIndex >= 0) {
+        const updatedMessages = [...state.messages];
+        updatedMessages[existingIndex] = newMessage;
+        return { messages: updatedMessages };
+      }
+      return { messages: [...state.messages, newMessage] };
+    });
   },
 
   /**
@@ -308,8 +394,15 @@ export const useAppStore = create<AppState>((set, get) => ({
    */
   finalizeStreamingMessage: () => {
     const state = get();
+    console.error('[FINALIZE] called', {
+      streamingMessageId: state.streamingMessageId,
+      streamingBlocksLength: state.streamingBlocks.length,
+      streamingBlockTypes: state.streamingBlocks.map(b => `${b.type}[${b.blockIndex}]`),
+      currentMessagesCount: state.messages.length,
+    });
+
     if (!state.streamingMessageId || state.streamingBlocks.length === 0) {
-      // Nothing to finalize
+      console.error('[FINALIZE] SKIPPED - nothing to finalize');
       return;
     }
 
@@ -318,6 +411,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const model = snapshot?.messageId === state.streamingMessageId
       ? snapshot.model
       : undefined;
+
+    console.error('[FINALIZE] built content', {
+      contentLength: content.length,
+      contentTypes: content.map(b => b.type),
+      textPreview: content.filter(b => b.type === 'text').map(b => (b.text || '').slice(0, 50)),
+    });
 
     const newMessage: ChatMessage = {
       id: state.streamingMessageId,
@@ -339,6 +438,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else {
       updatedMessages = [...state.messages, newMessage];
     }
+
+    console.error('[FINALIZE] setting messages', {
+      newMessagesCount: updatedMessages.length,
+      allIds: updatedMessages.map(m => `${m.role}:${m.id.slice(0,10)}`),
+    });
 
     set({
       messages: updatedMessages,
@@ -394,6 +498,24 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setPendingApproval: (approval) => set({ pendingApproval: approval }),
 
+  truncateFromMessage: (messageId) =>
+    set((state) => {
+      const index = state.messages.findIndex((m) => m.id === messageId);
+      if (index < 0) return state;
+      // Keep messages before the target, discard target and everything after
+      return { messages: state.messages.slice(0, index) };
+    }),
+
+  setActivitySummary: (summary) => set({ activitySummary: summary }),
+
+  setPermissionMode: (mode) => set({ permissionMode: mode }),
+
+  setPromptHistoryPanelOpen: (open) => set({ promptHistoryPanelOpen: open }),
+
+  setProjectPromptHistory: (history) => set({ projectPromptHistory: history }),
+
+  setGlobalPromptHistory: (history) => set({ globalPromptHistory: history }),
+
   reset: () =>
     set({
       sessionId: null,
@@ -410,5 +532,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       pendingFilePaths: null,
       isResuming: false,
       pendingApproval: null,
+      promptHistoryPanelOpen: false,
+      projectPromptHistory: [],
+      globalPromptHistory: [],
+      activitySummary: null,
+      permissionMode: 'full-access' as const,
     }),
 }));

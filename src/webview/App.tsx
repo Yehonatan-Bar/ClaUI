@@ -5,12 +5,15 @@ import { MessageList } from './components/ChatView/MessageList';
 import { InputArea } from './components/InputArea/InputArea';
 import { TextSettingsBar } from './components/TextSettingsBar/TextSettingsBar';
 import { ModelSelector } from './components/ModelSelector/ModelSelector';
+import { PermissionModeSelector } from './components/PermissionModeSelector/PermissionModeSelector';
+import { PlanApprovalBar } from './components/ChatView/PlanApprovalBar';
+import { PromptHistoryPanel } from './components/ChatView/PromptHistoryPanel';
 import { postToExtension } from './hooks/useClaudeStream';
 
 export const App: React.FC = () => {
   useClaudeStream();
 
-  const { isConnected, isBusy, isResuming, lastError, cost, setError, messages, streamingMessageId, textSettings } = useAppStore();
+  const { isConnected, isBusy, isResuming, lastError, cost, setError, messages, streamingMessageId, textSettings, pendingApproval, promptHistoryPanelOpen, activitySummary } = useAppStore();
   const hasMessages = messages.length > 0 || streamingMessageId !== null;
 
   console.log(`%c[App] render`, 'color: white; font-weight: bold; background: #333; padding: 2px 6px', {
@@ -31,6 +34,9 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-container" style={containerStyle}>
+      {/* Prompt history panel overlay */}
+      {promptHistoryPanelOpen && <PromptHistoryPanel />}
+
       {/* Error banner */}
       {lastError && (
         <div className="error-banner">
@@ -46,15 +52,33 @@ export const App: React.FC = () => {
       )}
 
       {/* Always show messages if they exist, regardless of connection state */}
-      {hasMessages && <MessageList />}
+      {hasMessages ? <MessageList /> : isConnected ? <div className="chat-spacer" /> : null}
 
       {isConnected ? (
         <>
-          {isBusy && (
-            <div className="busy-indicator">
-              {isResuming ? 'Resuming conversation...' : 'Claude is thinking...'}
+          {pendingApproval ? (
+            <PlanApprovalBar />
+          ) : isBusy ? (
+            <div className={`busy-indicator ${activitySummary ? 'busy-indicator-with-activity' : ''}`}>
+              <div className="busy-indicator-main">
+                <span className="thinking-dots">
+                  <span className="thinking-dot" />
+                  <span className="thinking-dot" />
+                  <span className="thinking-dot" />
+                </span>
+                <span className="busy-indicator-text">
+                  {isResuming ? 'Resuming conversation...' : (
+                    activitySummary ? activitySummary.shortLabel + '...' : 'Thinking...'
+                  )}
+                </span>
+              </div>
+              {activitySummary && (
+                <div className="activity-summary-detail">
+                  {activitySummary.fullSummary}
+                </div>
+              )}
             </div>
-          )}
+          ) : null}
           <InputArea />
           <StatusBar cost={cost} />
         </>
@@ -145,6 +169,7 @@ const StatusBar: React.FC<{
         Plans
       </button>
       <ModelSelector />
+      <PermissionModeSelector />
       <TextSettingsBar />
       <div className="cost-display">
         <span>In: {(cost?.inputTokens ?? 0).toLocaleString()}</span>

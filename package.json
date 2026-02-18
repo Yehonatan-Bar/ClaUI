@@ -51,6 +51,10 @@
       {
         "command": "claudeMirror.openPlanDocs",
         "title": "Claude Mirror: Open Plan Document"
+      },
+      {
+        "command": "claudeMirror.openLogDirectory",
+        "title": "Claude Mirror: Open Log Directory"
       }
     ],
     "configuration": {
@@ -88,17 +92,50 @@
           "default": true,
           "description": "Automatically generate session tab names from the first message using Claude Haiku"
         },
+        "claudeMirror.activitySummary": {
+          "type": "boolean",
+          "default": true,
+          "description": "Periodically summarize Claude's activity in the tab title using Haiku"
+        },
+        "claudeMirror.activitySummaryThreshold": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Number of tool uses before triggering an activity summary"
+        },
         "claudeMirror.model": {
           "type": "string",
           "default": "",
-          "enum": ["", "claude-sonnet-4-5-20250929", "claude-opus-4-6", "claude-haiku-4-5-20251001"],
+          "enum": ["", "claude-sonnet-4-6", "claude-sonnet-4-5-20250929", "claude-opus-4-6", "claude-haiku-4-5-20251001"],
           "enumDescriptions": [
             "Default (CLI default)",
+            "Claude Sonnet 4.6",
             "Claude Sonnet 4.5",
             "Claude Opus 4.6",
             "Claude Haiku 4.5"
           ],
           "description": "Claude model to use for new sessions. Leave empty to use CLI default."
+        },
+        "claudeMirror.permissionMode": {
+          "type": "string",
+          "default": "full-access",
+          "enum": ["full-access", "supervised"],
+          "enumDescriptions": [
+            "Full Access - All tools run without approval",
+            "Supervised - Only read-only tools allowed; write tools are denied"
+          ],
+          "description": "Permission mode for Claude sessions. Changes take effect on next session start."
+        },
+        "claudeMirror.enableFileLogging": {
+          "type": "boolean",
+          "default": true,
+          "description": "Write logs to disk files in addition to the Output Channel. Each session tab gets its own log file."
+        },
+        "claudeMirror.logDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "Directory for log files. Leave empty to use the extension's default storage location."
         }
       }
     },

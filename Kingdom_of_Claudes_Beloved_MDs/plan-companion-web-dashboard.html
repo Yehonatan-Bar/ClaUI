@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan: Companion Web Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    line-height: 1.7;
+    padding: 2rem;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+
+  h1 {
+    font-size: 2rem;
+    color: #60a5fa;
+    border-bottom: 2px solid #1e3a5f;
+    padding-bottom: 0.8rem;
+    margin-bottom: 1.5rem;
+  }
+  h2 {
+    font-size: 1.4rem;
+    color: #93c5fd;
+    margin-top: 2rem;
+    margin-bottom: 0.8rem;
+  }
+  h3 {
+    font-size: 1.1rem;
+    color: #a5b4fc;
+    margin-top: 1.2rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .context-box {
+    background: #1e293b;
+    border-right: 4px solid #3b82f6;
+    border-radius: 8px;
+    padding: 1.2rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .context-box p { margin-bottom: 0.5rem; }
+
+  .architecture-box {
+    background: #1a1a2e;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    direction: ltr;
+    text-align: left;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre;
+    overflow-x: auto;
+    color: #94a3b8;
+  }
+
+  .phase {
+    background: #1e293b;
+    border-radius: 10px;
+    padding: 1.2rem 1.5rem;
+    margin-bottom: 1rem;
+    border-right: 4px solid #10b981;
+    transition: transform 0.2s;
+  }
+  .phase:hover { transform: translateX(-4px); }
+  .phase-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .phase-number {
+    background: #10b981;
+    color: #0f172a;
+    font-weight: bold;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 0.7rem;
+    font-size: 0.9rem;
+  }
+  .phase-title { font-weight: bold; color: #6ee7b7; font-size: 1.1rem; }
+  .priority {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-weight: bold;
+  }
+  .priority-high { background: #dc262620; color: #f87171; border: 1px solid #f8717140; }
+  .priority-medium { background: #f59e0b20; color: #fbbf24; border: 1px solid #fbbf2440; }
+  .priority-low { background: #10b98120; color: #6ee7b7; border: 1px solid #6ee7b740; }
+
+  ul { padding-right: 1.5rem; margin-top: 0.5rem; }
+  li { margin-bottom: 0.3rem; color: #cbd5e1; }
+
+  .decision-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+  }
+  .decision-table th {
+    background: #1e3a5f;
+    color: #93c5fd;
+    padding: 0.6rem 1rem;
+    text-align: right;
+    font-size: 0.9rem;
+  }
+  .decision-table td {
+    background: #1e293b;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid #334155;
+    font-size: 0.9rem;
+  }
+
+  .risk-box {
+    background: #1e293b;
+    border-right: 3px solid #f59e0b;
+    border-radius: 6px;
+    padding: 0.8rem 1.2rem;
+    margin-bottom: 0.6rem;
+  }
+  .risk-title { color: #fbbf24; font-weight: bold; margin-bottom: 0.3rem; }
+  .risk-mitigation { color: #94a3b8; font-size: 0.9rem; }
+
+  .highlight { color: #60a5fa; font-weight: bold; }
+  .green { color: #6ee7b7; }
+
+  .summary-box {
+    background: linear-gradient(135deg, #1e3a5f, #1e293b);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-top: 2rem;
+    border: 1px solid #3b82f6;
+  }
+  .summary-box h2 { margin-top: 0; color: #60a5fa; }
+
+  .deps-badge {
+    display: inline-block;
+    background: #10b98130;
+    color: #6ee7b7;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-left: 0.3rem;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>תוכנית: לוח בקרה וובי לתוסף Claude Code Mirror</h1>
+
+<div class="context-box">
+  <p><strong>מה זה?</strong> לוח בקרה שנפתח בדפדפן ומציג בזמן אמת את כל הסשנים הפעילים בתוסף - הודעות, עלויות, לוגים, ומצב כל סשן.</p>
+  <p><strong>למה?</strong> כרגע כל הניטור קורה בתוך VS Code בלבד. לוח הבקרה מאפשר מבט-על על כל הסשנים מהדפדפן, בלי לעזוב את סביבת העבודה.</p>
+  <p><strong>איך זה עובד?</strong> שרת קטן מוטמע בתוך התוסף עצמו - נדלק ונכבה אוטומטית עם VS Code. הדפדפן מתחבר אליו דרך <span class="highlight">localhost</span> בלבד.</p>
+</div>
+
+<h2>ארכיטקטורה</h2>
+
+<div class="architecture-box">VS Code Extension (Node.js)
+  |
+  +-- TabManager (existing sessions)
+  |     +-- Session 1 (Claude CLI process)
+  |     +-- Session 2 ...
+  |
+  +-- DashboardServer (NEW)
+        |
+        +-- HTTP: serves dashboard page + REST API
+        +-- WebSocket: real-time event streaming
+        |
+        Browser (localhost:PORT)
+          +-- Session list
+          +-- Live message stream
+          +-- Cost overview
+          +-- Log viewer</div>
+
+<p><strong>למה בתוך התוסף ולא כתהליך נפרד?</strong></p>
+<ul>
+  <li>אפס הגדרה - נדלק ונכבה אוטומטית עם התוסף</li>
+  <li>גישה ישירה לכל הנתונים החיים - סשנים, הודעות, עלויות</li>
+  <li>תלות אחת בלבד בגודל <span class="deps-badge">75KB</span></li>
+  <li>אין צורך בסנכרון קבצים או תקשורת בין תהליכים</li>
+</ul>
+
+<h2>שלבי מימוש</h2>
+
+<div class="phase">
+  <div class="phase-header">
+    <div><span class="phase-number">1</span><span class="phase-title">תשתית השרת + רשימת סשנים</span></div>
+    <span class="priority priority-high">עדיפות גבוהה</span>
+  </div>
+  <ul>
+    <li>שרת HTTP + WebSocket מוטמע בתוסף, נדלק אוטומטית</li>
+    <li>כפתור "Dashboard" בסרגל הסטטוס פותח את הדפדפן</li>
+    <li>דף הבית מציג רשימת כל הסשנים הפעילים: שם, מודל, סטטוס (עסוק/פנוי), עלות</li>
+    <li>הגדרה חדשה: פורט מותאם אישית (ברירת מחדל - אוטומטי)</li>
+  </ul>
+</div>
+
+<div class="phase">
+  <div class="phase-header">
+    <div><span class="phase-number">2</span><span class="phase-title">סטרימינג בזמן אמת</span></div>
+    <span class="priority priority-high">עדיפות גבוהה</span>
+  </div>
+  <ul>
+    <li>חיבור WebSocket מהדפדפן לשרת - עדכונים חיים בלי ריענון</li>
+    <li>בחירת סשן מציגה את זרם ההודעות שלו בזמן אמת</li>
+    <li>טקסט מופיע תו-תו כמו בתוסף, כולל שימוש בכלים</li>
+    <li>רשימת הסשנים מתעדכנת אוטומטית (חדשים, סגורים, שינוי שם)</li>
+  </ul>
+</div>
+
+<div class="phase">
+  <div class="phase-header">
+    <div><span class="phase-number">3</span><span class="phase-title">היסטוריה + מעקב עלויות</span></div>
+    <span class="priority priority-medium">עדיפות בינונית</span>
+  </div>
+  <ul>
+    <li>לשונית היסטוריה עם סשנים קודמים (שם, מודל, תאריך)</li>
+    <li>סרגל עלויות מצטבר: עלות הסשן הנוכחי + סה"כ כל הסשנים</li>
+    <li>עלות לכל סשן ברשימה</li>
+  </ul>
+</div>
+
+<div class="phase">
+  <div class="phase-header">
+    <div><span class="phase-number">4</span><span class="phase-title">צפייה בלוגים</span></div>
+    <span class="priority priority-medium">עדיפות בינונית</span>
+  </div>
+  <ul>
+    <li>רשימת קבצי לוג עם חותמות זמן</li>
+    <li>צפייה בתוכן הלוג עם גלילה אוטומטית</li>
+    <li>חיפוש טקסט בתוך הלוגים</li>
+    <li>מצב "tail" - מעקב חי אחרי שורות חדשות</li>
+  </ul>
+</div>
+
+<div class="phase">
+  <div class="phase-header">
+    <div><span class="phase-number">5</span><span class="phase-title">שליטה מהדשבורד</span></div>
+    <span class="priority priority-low">עדיפות נמוכה</span>
+  </div>
+  <ul>
+    <li>שליחת הודעות לסשן מתוך הדפדפן</li>
+    <li>ביטול בקשה פעילה</li>
+    <li>יצירת סשן חדש מהדשבורד</li>
+  </ul>
+</div>
+
+<h2>החלטות טכנולוגיות</h2>
+
+<table class="decision-table">
+  <tr><th>נושא</th><th>בחירה</th><th>סיבה</th></tr>
+  <tr><td>שרת</td><td>Node.js מובנה (בלי Express)</td><td>פחות מ-15 נתיבים, אין צורך בפריימוורק</td></tr>
+  <tr><td>WebSocket</td><td>ספריית ws</td><td>סטנדרטית, 75KB, אפס תלויות</td></tr>
+  <tr><td>ממשק משתמש</td><td>קובץ HTML יחיד עם JS ו-CSS מוטמעים</td><td>בלי שלב בנייה נוסף, בלי React נוסף</td></tr>
+  <tr><td>פורט</td><td>אוטומטי (port 0) עם אפשרות לקביעה ידנית</td><td>מונע התנגשויות</td></tr>
+  <tr><td>אבטחה</td><td>חיבור ל-127.0.0.1 בלבד</td><td>מקומי בלבד, משתמש יחיד</td></tr>
+</table>
+
+<h2>סיכונים ופתרונות</h2>
+
+<div class="risk-box">
+  <div class="risk-title">התנגשות פורטים</div>
+  <div class="risk-mitigation">ברירת מחדל - פורט אוטומטי. הכתובת בפועל מוצגת בהתראה ובסרגל הסטטוס.</div>
+</div>
+
+<div class="risk-box">
+  <div class="risk-title">ניתוק WebSocket כשמרעננים VS Code</div>
+  <div class="risk-mitigation">הדפדפן מתחבר מחדש אוטומטית עם השהייה מדורגת. בחיבור מחדש - מקבל תמונת מצב מלאה.</div>
+</div>
+
+<div class="risk-box">
+  <div class="risk-title">זיכרון כפול מאחסון הודעות</div>
+  <div class="risk-mitigation">אחסון קל בלבד (ללא אובייקטי React). לסשנים ארוכים מאוד - חלון מתגלגל של 500 הודעות אחרונות.</div>
+</div>
+
+<div class="summary-box">
+  <h2>סיכום</h2>
+  <p>הדשבורד הוא <span class="green">שרת קטן מוטמע בתוסף</span> שמגיש דף HTML יחיד ומזרים עדכונים בזמן אמת דרך WebSocket.</p>
+  <p style="margin-top: 0.5rem;"><strong>תלויות חדשות:</strong> ספרייה אחת בלבד <span class="deps-badge">ws - 75KB</span></p>
+  <p style="margin-top: 0.5rem;"><strong>5 שלבים:</strong> מתשתית בסיסית ועד שליטה מלאה מהדפדפן, כל שלב עצמאי ושמיש.</p>
+  <p style="margin-top: 0.5rem;"><strong>אפס הגדרה:</strong> נדלק עם התוסף, נכבה עם התוסף. כפתור אחד בסרגל הסטטוס פותח הכל.</p>
+</div>
+
+</div>
+</body>
+</html>

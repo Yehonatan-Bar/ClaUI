@@ -5,6 +5,7 @@ import { postToExtension } from '../../hooks/useClaudeStream';
 /** Available Claude Code models with display labels */
 const MODEL_OPTIONS = [
   { label: 'Default', value: '' },
+  { label: 'Sonnet 4.6', value: 'claude-sonnet-4-6' },
   { label: 'Sonnet 4.5', value: 'claude-sonnet-4-5-20250929' },
   { label: 'Opus 4.6', value: 'claude-opus-4-6' },
   { label: 'Haiku 4.5', value: 'claude-haiku-4-5-20251001' },

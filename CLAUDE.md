@@ -66,3 +66,6 @@ Never trust CLI event field types at runtime. The TypeScript interfaces describe
 - **Webview console**: `Developer: Open Webview Developer Tools` - shows React errors, state logs
 - **Extension output**: `Output -> Claude Mirror` - shows process lifecycle, startup timestamps
 - **Error Boundary**: React crashes display error + stack trace in the webview panel (instead of blank screen). If you see a blank screen, it's the VS Code rendering bug above, not a React crash
+
+לתחקר תקלות עיין בלוגים האחרונים שבתקיה:
+C:\Users\yoni.bar\AppData\Roaming\Code\User\globalStorage\claude-code-mirror.claude-code-mirror\logs\ClaUiLogs

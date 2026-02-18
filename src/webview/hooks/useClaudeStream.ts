@@ -16,6 +16,7 @@ export function useClaudeStream(): void {
     setSession,
     endSession,
     addUserMessage,
+    addAssistantMessage,
     handleMessageStart,
     appendStreamingText,
     startToolUse,
@@ -30,6 +31,11 @@ export function useClaudeStream(): void {
     setTextSettings,
     setSelectedModel,
     setResuming,
+    setPendingApproval,
+    setProjectPromptHistory,
+    setGlobalPromptHistory,
+    setActivitySummary,
+    setPermissionMode,
   } = useAppStore();
 
   useEffect(() => {
@@ -70,6 +76,10 @@ export function useClaudeStream(): void {
 
         case 'messageStart':
           logState('before messageStart');
+          // A new assistant message is starting - clear any stale approval bar.
+          // This is a safety net: if the CLI moved on (user approved or the model
+          // started a new turn), the approval bar must not linger.
+          setPendingApproval(null);
           handleMessageStart(msg.messageId, msg.model);
           logState('after messageStart');
           break;
@@ -78,14 +88,24 @@ export function useClaudeStream(): void {
           appendStreamingText(msg.messageId, msg.blockIndex, msg.text);
           break;
 
-        case 'assistantMessage':
+        case 'assistantMessage': {
           console.log(`%c[STREAM] assistantMessage content`, 'color: cyan',
             'isArray:', Array.isArray(msg.content),
             'type:', typeof msg.content,
             'blocks:', Array.isArray(msg.content) ? msg.content.map((b: ContentBlock) => b.type) : msg.content
           );
-          updateAssistantSnapshot(msg.messageId, msg.content, msg.model);
+          const currentState = useAppStore.getState();
+          if (!currentState.streamingMessageId) {
+            // No active streaming message - this is a replayed/complete message
+            // (e.g. during session resume). Add directly to the messages array.
+            addAssistantMessage(msg.messageId, msg.content, msg.model);
+          } else {
+            // Mid-stream snapshot during live streaming - store for metadata only.
+            updateAssistantSnapshot(msg.messageId, msg.content, msg.model);
+          }
+          logState('after assistantMessage');
           break;
+        }
 
         case 'messageStop':
           logState('before messageStop/finalize');
@@ -119,6 +139,10 @@ export function useClaudeStream(): void {
         case 'costUpdate':
           logState('before costUpdate/clearStreaming');
           clearStreaming();
+          // Do NOT clear pendingApproval here.
+          // Newer CLI flows may emit a result/cost update before the user responds
+          // to a plan/question approval pause, so clearing it here can hide
+          // Approve/Reject/Feedback controls.
           updateCost({
             costUsd: msg.costUsd,
             totalCostUsd: msg.totalCostUsd,
@@ -135,6 +159,12 @@ export function useClaudeStream(): void {
 
         case 'processBusy':
           setBusy(msg.busy);
+          // If the process becomes busy again (e.g. user sent a message),
+          // clear any pending approval bar and previous activity summary
+          if (msg.busy) {
+            setPendingApproval(null);
+            setActivitySummary(null);
+          }
           break;
 
         case 'filePathsPicked':
@@ -151,6 +181,42 @@ export function useClaudeStream(): void {
         case 'modelSetting':
           setSelectedModel(msg.model);
           break;
+
+        case 'permissionModeSetting':
+          setPermissionMode(msg.mode);
+          break;
+
+        case 'promptHistoryResponse':
+          if (msg.scope === 'project') {
+            setProjectPromptHistory(msg.prompts);
+          } else {
+            setGlobalPromptHistory(msg.prompts);
+          }
+          break;
+
+        case 'activitySummary':
+          setActivitySummary({
+            shortLabel: msg.shortLabel,
+            fullSummary: msg.fullSummary,
+          });
+          break;
+
+        case 'planApprovalRequired': {
+          // Extract plan text from streaming blocks before finalizing
+          const currentState = useAppStore.getState();
+          const planBlock = currentState.streamingBlocks.find(
+            b => b.type === 'tool_use' && (b.toolName === 'ExitPlanMode' || b.toolName === 'AskUserQuestion')
+          );
+          const planText = planBlock?.partialJson || '';
+
+          // Finalize the streaming message so it appears in chat history
+          finalizeStreamingMessage();
+          // CLI is paused waiting for input, not busy
+          setBusy(false);
+          // Show the approval bar
+          setPendingApproval({ toolName: msg.toolName, planText });
+          break;
+        }
       }
     }
 
@@ -166,6 +232,7 @@ export function useClaudeStream(): void {
     setSession,
     endSession,
     addUserMessage,
+    addAssistantMessage,
     handleMessageStart,
     appendStreamingText,
     startToolUse,
@@ -180,6 +247,11 @@ export function useClaudeStream(): void {
     setTextSettings,
     setSelectedModel,
     setResuming,
+    setPendingApproval,
+    setProjectPromptHistory,
+    setGlobalPromptHistory,
+    setActivitySummary,
+    setPermissionMode,
   ]);
 }
 
