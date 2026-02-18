@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { ChatMessage } from '../../state/store';
 import type { ContentBlock } from '../../../extension/types/stream-json';
 import { CodeBlock } from './CodeBlock';
@@ -33,6 +33,28 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   // Only text-only user messages are editable (not images)
   const hasOnlyText = isUser && contentBlocks.every((b) => b.type === 'text');
   const canEdit = hasOnlyText && !isBusy && !!onEditAndResend;
+
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    if (!textContent) return;
+    try {
+      await navigator.clipboard.writeText(textContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = textContent;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [textContent]);
 
   const handleEditClick = () => {
     setEditText(textContent);
@@ -72,6 +94,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
           <span style={{ marginLeft: 8, fontWeight: 400, opacity: 0.7 }}>
             {message.model}
           </span>
+        )}
+        {textContent && (
+          <button
+            className="copy-message-btn"
+            onClick={handleCopy}
+            title="Copy to clipboard"
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
         )}
         {canEdit && !isEditing && (
           <button

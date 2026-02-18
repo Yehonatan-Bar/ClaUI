@@ -174,10 +174,10 @@ MessageHandler tracks tool names during streaming (`currentMessageToolNames`). W
 The `pendingApproval` state is cleared in several places to prevent the approval bar from lingering:
 1. **Button click**: PlanApprovalBar handlers call `setPendingApproval(null)` immediately on approve/reject/feedback.
 2. **Text input**: InputArea detects `pendingApproval` and routes typed messages as `planApprovalResponse` (feedback or questionAnswer), clearing the state.
-3. **processBusy: true**: useClaudeStream clears `pendingApproval` when the CLI becomes busy again.
-4. **messageStart**: useClaudeStream clears `pendingApproval` when a new assistant message starts streaming.
-5. **costUpdate (turn end)**: useClaudeStream clears `pendingApproval` when the turn completes.
-6. **Session end**: `endSession` in the store resets `pendingApproval` to null.
+3. **processBusy: true**: useClaudeStream clears `pendingApproval` when the CLI becomes busy again (sent when user sends a message or approval response).
+4. **Session end**: `endSession` in the store resets `pendingApproval` to null.
+
+**Important**: `messageStart` does NOT clear `pendingApproval`. After ExitPlanMode, the CLI can emit additional empty message turns before `result/success`, which would prematurely hide the approval bar before the user interacts with it. Similarly, `costUpdate` does NOT clear `pendingApproval` since newer CLI flows may emit result/cost updates before the user responds.
 
 ---
 
@@ -211,7 +211,7 @@ Detects Hebrew (U+0590-U+05FF) and Arabic (U+0600-U+06FF) characters in text. Re
 
 **MessageList** - Scrollable container with auto-scroll. Pauses auto-scroll when user scrolls up (>100px from bottom). Renders completed messages and streaming blocks.
 
-**MessageBubble** - Renders a completed message. Parses text content to extract fenced code blocks (``` delimiters). Applies RTL detection. Renders tool_use, tool_result, and image content blocks inline. Tool result blocks are rendered with a collapsible panel (collapsed by default) to keep the chat clean - file paths inside tool results are also clickable. Image blocks display as responsive thumbnails with rounded borders. File paths in plain text segments are detected and rendered as clickable links via `renderTextWithFileLinks()`.
+**MessageBubble** - Renders a completed message. Parses text content to extract fenced code blocks (``` delimiters). Applies RTL detection. Renders tool_use, tool_result, and image content blocks inline. Tool result blocks are rendered with a collapsible panel (collapsed by default) to keep the chat clean - file paths inside tool results are also clickable. Image blocks display as responsive thumbnails with rounded borders. File paths in plain text segments are detected and rendered as clickable links via `renderTextWithFileLinks()`. A **Copy button** appears on hover in the message role header for both user and assistant messages, copying the full text content to the clipboard (uses Clipboard API with `execCommand` fallback). Shows "Copied!" confirmation for 2 seconds.
 
 **StreamingText** - Renders in-progress text with a blinking cursor animation at the end.
 

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Git Push - כפתור דחיפה לגיט</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      padding: 40px 20px;
+      line-height: 1.7;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #58a6ff;
+      font-size: 28px;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #21262d;
+      padding-bottom: 12px;
+    }
+    .subtitle {
+      color: #8b949e;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    h2 {
+      color: #f0883e;
+      font-size: 20px;
+      margin: 28px 0 12px 0;
+    }
+    h3 {
+      color: #7ee787;
+      font-size: 16px;
+      margin: 20px 0 8px 0;
+    }
+    p, li {
+      color: #c9d1d9;
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+    ul {
+      padding-right: 24px;
+      margin-bottom: 16px;
+    }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+    .flow-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 12px 0;
+    }
+    .flow-number {
+      background: #58a6ff;
+      color: #0d1117;
+      min-width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .highlight {
+      background: #1f2937;
+      border-right: 3px solid #58a6ff;
+      padding: 12px 16px;
+      border-radius: 4px;
+      margin: 12px 0;
+    }
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .tag-new { background: #1f6feb33; color: #58a6ff; border: 1px solid #1f6feb; }
+    .tag-modify { background: #f0883e22; color: #f0883e; border: 1px solid #f0883e55; }
+    .files-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+    }
+    .files-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #21262d;
+      font-size: 14px;
+    }
+    .files-table td:first-child {
+      color: #8b949e;
+      width: 40%;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>כפתור דחיפה לגיט</h1>
+    <p class="subtitle">תוכנית הוספת כפתור Git Push לממשק עם תמיכה בקונפיגורציה</p>
+
+    <h2>מה מוסיפים?</h2>
+    <div class="card">
+      <p>כפתור <strong>"Git"</strong> באזור ההקלדה שמבצע את כל תהליך הדחיפה לגיט בלחיצה אחת:</p>
+      <ul>
+        <li>מוסיף את כל השינויים</li>
+        <li>יוצר הגבה (commit) עם שם הסשן כהודעת הגבה</li>
+        <li>דוחף לשרת המרוחק</li>
+      </ul>
+      <p>בנוסף - <strong>פאנל קונפיגורציה</strong> שמאפשר לבקש מקלוד להגדיר או לשנות את ההגדרות.</p>
+    </div>
+
+    <h2>איך זה עובד?</h2>
+
+    <h3>מצב 1: הקונפיגורציה לא הוגדרה</h3>
+    <div class="card">
+      <div class="flow-step">
+        <div class="flow-number">1</div>
+        <p>המשתמש לוחץ על כפתור "Git"</p>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">2</div>
+        <p>נפתח פאנל קונפיגורציה עם שדה קלט</p>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">3</div>
+        <p>המשתמש כותב הוראה (למשל: "הגדר דחיפה לגיט לפרויקט הזה")</p>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">4</div>
+        <p>ההוראה נשלחת לקלוד שמגדיר את ההגדרות אוטומטית</p>
+      </div>
+    </div>
+
+    <h3>מצב 2: הקונפיגורציה הוגדרה</h3>
+    <div class="card">
+      <div class="flow-step">
+        <div class="flow-number">1</div>
+        <p>המשתמש לוחץ על כפתור "Git"</p>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">2</div>
+        <p>הסקריפט רץ מיד - מוסיף, מגיב, ודוחף לגיט</p>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">3</div>
+        <p>מופיעה הודעת הצלחה או שגיאה (נעלמת אחרי 5 שניות)</p>
+      </div>
+    </div>
+
+    <h3>כפתור הגדרות (תמיד זמין)</h3>
+    <div class="card">
+      <p>כפתור גלגל שיניים קטן ליד כפתור Git - תמיד נגיש, גם כשהקונפיגורציה כבר מוגדרת.</p>
+      <p>מאפשר לבקש מקלוד לשנות הגדרות קיימות (למשל: "שנה את תבנית ההגבה", "עדכן את הנתיב לסקריפט").</p>
+    </div>
+
+    <h2>ההגדרות שנוספות</h2>
+    <div class="card">
+      <table class="files-table">
+        <tr>
+          <td>האם מופעל</td>
+          <td>מציין אם הכפתור מוכן לשימוש (ברירת מחדל: לא)</td>
+        </tr>
+        <tr>
+          <td>נתיב הסקריפט</td>
+          <td>נתיב לסקריפט הדחיפה (ברירת מחדל: scripts/git-push.ps1)</td>
+        </tr>
+        <tr>
+          <td>תבנית הודעת הגבה</td>
+          <td>תבנית להודעת הגבה, עם {sessionName} כשם הסשן</td>
+        </tr>
+      </table>
+    </div>
+
+    <h2>קבצים מושפעים</h2>
+    <div class="card">
+      <table class="files-table">
+        <tr>
+          <td><span class="tag tag-new">חדש</span> GitPushPanel</td>
+          <td>רכיב הפאנל עם שדה הקלט והסטטוס</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-modify">שינוי</span> InputArea</td>
+          <td>הוספת כפתור Git + גלגל שיניים + הודעות מצב</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-modify">שינוי</span> MessageHandler</td>
+          <td>טיפול בהרצת הסקריפט ושליחת הוראות קונפיגורציה</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-modify">שינוי</span> הגדרות הודעות</td>
+          <td>5 סוגי הודעות חדשים לתקשורת</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-modify">שינוי</span> מנוע המצב</td>
+          <td>שמירת הגדרות, תוצאות, ומצב הפאנל</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-modify">שינוי</span> הגדרות התוסף</td>
+          <td>3 שדות הגדרה חדשים ב-package.json</td>
+        </tr>
+        <tr>
+          <td><span class="tag tag-modify">שינוי</span> עיצוב</td>
+          <td>סגנונות לכפתור, פאנל, והודעות מצב</td>
+        </tr>
+      </table>
+    </div>
+
+    <h2>סיכום</h2>
+    <div class="highlight">
+      <p><strong>פשוט לשימוש:</strong> לחיצה אחת על "Git" דוחפת הכל לגיט.</p>
+      <p><strong>חכם:</strong> אם עוד לא הוגדר - מכוון את המשתמש להגדרה דרך קלוד.</p>
+      <p><strong>גמיש:</strong> תמיד אפשר לשנות הגדרות דרך פאנל ההגדרות.</p>
+    </div>
+  </div>
+</body>
+</html>

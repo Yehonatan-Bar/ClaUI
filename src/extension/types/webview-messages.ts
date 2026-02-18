@@ -104,6 +104,19 @@ export interface SetPermissionModeRequest {
   mode: 'full-access' | 'supervised';
 }
 
+export interface GitPushRequest {
+  type: 'gitPush';
+}
+
+export interface GitPushConfigRequest {
+  type: 'gitPushConfig';
+  instruction: string;
+}
+
+export interface GetGitPushSettingsRequest {
+  type: 'getGitPushSettings';
+}
+
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
@@ -124,7 +137,10 @@ export type WebviewToExtensionMessage =
   | OpenUrlRequest
   | GetPromptHistoryRequest
   | EditAndResendRequest
-  | SetPermissionModeRequest;
+  | SetPermissionModeRequest
+  | GitPushRequest
+  | GitPushConfigRequest
+  | GetGitPushSettingsRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -252,6 +268,19 @@ export interface PermissionModeSettingMessage {
   mode: 'full-access' | 'supervised';
 }
 
+export interface GitPushResultMessage {
+  type: 'gitPushResult';
+  success: boolean;
+  output: string;
+}
+
+export interface GitPushSettingsMessage {
+  type: 'gitPushSettings';
+  enabled: boolean;
+  scriptPath: string;
+  commitMessageTemplate: string;
+}
+
 export type ExtensionToWebviewMessage =
   | SessionStartedMessage
   | SessionEndedMessage
@@ -272,4 +301,6 @@ export type ExtensionToWebviewMessage =
   | PlanApprovalRequiredMessage
   | PromptHistoryResponseMessage
   | ActivitySummaryMessage
-  | PermissionModeSettingMessage;
+  | PermissionModeSettingMessage
+  | GitPushResultMessage
+  | GitPushSettingsMessage;

@@ -78,6 +78,7 @@ export class SessionTab implements WebviewBridge {
     this.demux = new StreamDemux();
     this.control = new ControlProtocol(this.processManager);
     this.messageHandler = new MessageHandler(this, this.processManager, this.control, this.demux, this.promptHistoryStore);
+    this.messageHandler.setSessionNameGetter(() => this.baseTitle);
 
     // Create per-tab file logger if file logging is enabled
     if (logDir) {

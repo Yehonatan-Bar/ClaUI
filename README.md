@@ -1,8 +1,136 @@
-# Claude Code Mirror - Technical Documentation
+# Claude Code Mirror
+
+A VS Code extension that gives Claude Code a rich chat UI - multiple tabs, model selection, file sending, image paste, and more.
+
+---
+
+## Installation (Fresh Machine)
+
+Follow these steps to go from zero to a working Claude Code chat session.
+
+### Step 1: Prerequisites
+
+Install these before anything else:
+
+| Requirement | Minimum Version | How to verify |
+|-------------|-----------------|---------------|
+| **Node.js** | 18+ | `node --version` |
+| **npm** | (comes with Node) | `npm --version` |
+| **VS Code** | 1.85+ | `code --version` |
+| **Claude CLI** | latest | `claude --version` |
+
+> **Claude CLI**: If `claude --version` fails, install it first:
+> `npm install -g @anthropic-ai/claude-code`
+> Then run `claude` once to authenticate with your Anthropic account.
+>
+> **VS Code CLI (`code`)**: If `code --version` fails, the `code` command is not on PATH yet.
+> - **Windows**: reinstall/update VS Code with "Add to PATH" enabled, then reopen terminal.
+> - **macOS**: run `Shell Command: Install 'code' command in PATH` from Command Palette.
+> - **Linux**: ensure the `code` binary is on PATH.
+
+### Step 2: Clone and install dependencies
+
+```bash
+git clone <repository-url> C:\projects\claude-code-mirror
+cd C:\projects\claude-code-mirror
+npm install
+```
+
+### Step 3: Build, package, and install the extension
+
+One command does everything:
+
+```bash
+npm run deploy:local
+```
+
+This runs: `npm run build` -> `vsce package` -> `code --install-extension` -> verification.
+
+### Step 4: Reload VS Code
+
+Press `Ctrl+Shift+P`, type `Reload Window`, and select **Developer: Reload Window**.
+
+### Step 5: Start using it
+
+Press **`Ctrl+Shift+C`** - a Claude Code chat panel opens. Type a message, press **`Ctrl+Enter`** to send.
+
+That's it. The extension is now installed globally - it works in any VS Code project.
+
+### Step 6 (Recommended): Verify the main shortcut once
+
+This ensures the next `Ctrl+Shift+C` opens Claude Mirror immediately on this machine:
+
+1. Open Keyboard Shortcuts: `Ctrl+K` then `Ctrl+S`.
+2. Search for `claudeMirror.startSession`.
+3. Confirm it is bound to **`Ctrl+Shift+C`**.
+4. Press **`Ctrl+Shift+C`** and verify a Claude Mirror chat tab opens.
+5. If it does not open, run `Ctrl+Shift+P` -> **Claude Mirror: Start New Session** once, then rebind `Ctrl+Shift+C` to `claudeMirror.startSession`.
+
+---
+
+## Keyboard Shortcuts
+
+These are the shortcuts you need to know:
+
+| Shortcut | What it does |
+|----------|-------------|
+| **`Ctrl+Shift+C`** | Open a new Claude session (the main shortcut) |
+| **`Ctrl+Enter`** | Send your message |
+| **`Enter`** | New line in the input (does NOT send) |
+| **`Escape`** | Cancel / pause the current response |
+| **`Ctrl+Shift+H`** | Open conversation history (resume past sessions) |
+| **`Ctrl+Shift+M`** | Toggle between chat and terminal view |
+| **`Ctrl+Alt+Shift+C`** | Send the current file's path to the chat |
+| **`Ctrl+V`** | Paste an image from clipboard into the chat |
+
+> **Mac users**: Replace `Ctrl` with `Cmd` for all shortcuts above.
+>
+> To customize shortcuts, open Keyboard Shortcuts (`Ctrl+K`, `Ctrl+S`) and search for `Claude Mirror` or `claudeMirror.*`.
+
+---
+
+## Sending Files to the Chat
+
+Three ways to reference files in your messages:
+
+1. **Right-click in Explorer** - Right-click any file or folder in the sidebar, select **"Claude Mirror: Send Path to Chat"**. Works with multiple selected files.
+
+2. **The "+" button** - Click the **+** button next to the chat input. A file picker opens.
+
+3. **Keyboard shortcut** - While editing a file, press **`Ctrl+Alt+Shift+C`** to send its path.
+
+The path is inserted into the input box so you can add context before sending (e.g., "Fix the bug in `<path>`").
+
+You can also **paste images** directly with **`Ctrl+V`** - they appear as thumbnails above the input.
+
+---
+
+## Updating After Code Changes
+
+When you pull new code or make changes to the extension source:
+
+```bash
+cd C:\projects\claude-code-mirror
+npm run deploy:local
+```
+
+Then reload VS Code: `Ctrl+Shift+P` -> **Developer: Reload Window**.
+
+> **Why not just `npm run build`?** VS Code runs extensions from `~/.vscode/extensions/`, not from your local `dist/` folder. `deploy:local` builds, packages into a `.vsix`, and installs it where VS Code actually reads it.
+
+---
+
+## Development Mode (F5)
+
+For debugging the extension source code itself:
+
+1. Open `C:\projects\claude-code-mirror` in VS Code
+2. Press **F5** to launch the Extension Development Host
+3. Run `npm run watch` in a terminal for auto-rebuild on changes
+
+---
 
 ## Overview
-
-A VS Code extension that provides a rich chat interface for Claude Code. The extension owns the Claude CLI process and distributes its output to a React-based webview chat UI (Phase 2 will add terminal mirroring).
 
 **Architecture**: Each tab creates its own CLI process (`claude -p --output-format stream-json`), stream parser, and React webview panel. A `TabManager` coordinates multiple independent sessions running in parallel.
 
@@ -23,90 +151,6 @@ A VS Code extension that provides a rich chat interface for Claude Code. The ext
 
 ---
 
-## Quick Start
-
-### Prerequisites
-
-- **Node.js** 18+ and npm
-- **Claude CLI** installed and accessible as `claude` in PATH
-- **VS Code** 1.85+
-
-### Install (use in any project)
-
-```bash
-cd C:\projects\claude-code-mirror
-npm install
-npm run build
-npx vsce package --allow-missing-repository
-code --install-extension claude-code-mirror-0.1.0.vsix
-```
-
-After installation, the extension is available globally in VS Code - open any project and use it.
-
-### Update after code changes
-
-Preferred (single command):
-
-```bash
-cd C:\projects\claude-code-mirror
-npm run deploy:local
-```
-
-Manual equivalent:
-
-```bash
-cd C:\projects\claude-code-mirror
-npm run build
-npx vsce package --allow-missing-repository
-code --install-extension claude-code-mirror-0.1.0.vsix --force
-```
-
-Then **reload VS Code** (Ctrl+Shift+P -> `Developer: Reload Window`).
-
-### Use the extension
-
-1. Open any project in VS Code
-2. Press **Ctrl+Shift+C** to start a Claude session (opens a new tab each time)
-   - Or: **Ctrl+Shift+P** -> `Claude Mirror: Start New Session`
-3. The chat panel opens. Type a message and press **Ctrl+Enter** to send
-4. Press **Ctrl+Shift+C** again to open additional parallel sessions in separate tabs
-
-### Sending files to the chat
-
-There are three ways to send file or folder paths into the chat:
-
-1. **Right-click in Explorer** - Right-click any file or folder in the Explorer sidebar, then select **"Claude Mirror: Send Path to Chat"**. The path is inserted into the chat input. Works with multiple selected files at once.
-
-2. **The "+" button** - Click the **+** button on the left side of the chat input area. A file picker opens - select one or more files and their paths are inserted into the input.
-
-3. **Keyboard shortcut** - While editing any file, press **Ctrl+Alt+Shift+C** to send the active file's path to the chat.
-
-In all cases, the path is inserted into the input textarea so you can add context before sending (e.g., "Fix the bug in `<path>`").
-
-You can also **paste images** directly into the chat input with **Ctrl+V** - they appear as thumbnails above the input and are sent alongside your message.
-
-### Development mode (F5)
-
-For debugging the extension itself:
-
-1. Open `C:\projects\claude-code-mirror` in VS Code
-2. Press **F5** to launch the Extension Development Host
-3. Changes rebuild automatically with `npm run watch`
-
-### Keybindings
-
-| Shortcut | Command |
-|----------|---------|
-| Ctrl+Shift+C | Start New Session |
-| Ctrl+Shift+M | Toggle Chat/Terminal View |
-| Ctrl+Alt+Shift+C | Send active file path to chat |
-| Ctrl+Shift+H | Conversation History |
-| Ctrl+Enter | Send message (in chat input, works even while Claude is busy) |
-| Enter | New line (in chat input) |
-| Escape | Cancel/pause current response (works when Claude Mirror panel is active) |
-
----
-
 ## Directory Structure
 
 ```
@@ -115,12 +159,16 @@ claude-code-mirror/
 +-- tsconfig.json                         # TypeScript config (ES2022, JSX)
 +-- webpack.config.js                     # Dual-target: extension (Node) + webview (browser)
 +-- .vscodeignore
++-- scripts/
+|   +-- deploy-local.ps1                  # Build + package + install (npm run deploy:local)
+|   +-- verify-installed.ps1              # Verify extension installed correctly
+|   +-- git-push.ps1                      # Stage + commit + push helper
 +-- dist/                                 # Build output
-|   +-- extension.js                      #   Extension host bundle (15 KB)
-|   +-- webview.js                        #   React webview bundle (170 KB)
+|   +-- extension.js                      #   Extension host bundle
+|   +-- webview.js                        #   React webview bundle
 +-- src/
 |   +-- extension/                        # Extension host code (Node.js context)
-|   |   +-- extension.ts                  #   Activation, creates TabManager
+|   |   +-- extension.ts                  #   Activation, creates TabManager, registers commands
 |   |   +-- commands.ts                   #   VS Code command handlers (routes via TabManager)
 |   |   +-- process/
 |   |   |   +-- ClaudeProcessManager.ts   #   Spawns and manages CLI process
@@ -133,7 +181,10 @@ claude-code-mirror/
 |   |   |   +-- SessionTab.ts             #   Per-tab bundle (process+demux+panel+handler)
 |   |   |   +-- TabManager.ts             #   Manages all tabs, tracks active tab
 |   |   |   +-- SessionNamer.ts           #   Auto-generates tab names via Haiku
+|   |   |   +-- ActivitySummarizer.ts     #   Periodic tool-activity summaries via Haiku
+|   |   |   +-- FileLogger.ts             #   Per-session log files on disk (2 MB rotation)
 |   |   |   +-- SessionStore.ts           #   Persists session metadata in globalState
+|   |   |   +-- PromptHistoryStore.ts     #   Persists user prompts (project + global scope)
 |   |   |   +-- SessionFork.ts            #   Phase 3 stub (fork/rewind)
 |   |   +-- terminal/                     #   Phase 2 stubs
 |   |   +-- auth/                         #   Phase 5 stub
@@ -141,7 +192,7 @@ claude-code-mirror/
 |   |       +-- stream-json.ts            #   CLI protocol type definitions
 |   |       +-- webview-messages.ts       #   postMessage contract
 |   +-- webview/                          # React webview code (browser context)
-|       +-- index.tsx                     #   React entry point
+|       +-- index.tsx                     #   React entry point + ErrorBoundary
 |       +-- App.tsx                       #   Main app with welcome/chat/status
 |       +-- state/store.ts               #   Zustand state management
 |       +-- hooks/
@@ -154,10 +205,15 @@ claude-code-mirror/
 |       |   |   +-- StreamingText.tsx     #   In-progress text with cursor
 |       |   |   +-- ToolUseBlock.tsx      #   Tool use display (collapsible)
 |       |   |   +-- CodeBlock.tsx         #   Syntax block with copy button
+|       |   |   +-- PlanApprovalBar.tsx   #   Plan approval + question UI
+|       |   |   +-- PromptHistoryPanel.tsx#   Browse past prompts (session/project/global)
+|       |   |   +-- filePathLinks.tsx     #   Clickable file paths and URLs in messages
 |       |   +-- InputArea/
-|       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt, image paste
+|       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, image paste
 |       |   +-- ModelSelector/
 |       |   |   +-- ModelSelector.tsx     #   Model dropdown (Sonnet/Opus/Haiku)
+|       |   +-- PermissionModeSelector/
+|       |   |   +-- PermissionModeSelector.tsx  # Full Access / Supervised toggle
 |       |   +-- TextSettingsBar/
 |       |       +-- TextSettingsBar.tsx   #   Font size/family controls
 |       +-- styles/
@@ -165,8 +221,11 @@ claude-code-mirror/
 |           +-- rtl.css                   #   RTL-specific overrides
 +-- Kingdom_of_Claudes_Beloved_MDs/       # Detailed component documentation
     +-- ARCHITECTURE.md                   #   Data flow and component interaction
-    +-- SESSION_NAMER.md                  #   Auto-naming feature (data flow, gotchas, debugging)
+    +-- SESSION_NAMER.md                  #   Auto-naming feature
+    +-- ACTIVITY_SUMMARIZER.md            #   Activity summary feature
+    +-- FILE_LOGGER.md                    #   File logging architecture
     +-- STREAM_JSON_PROTOCOL.md           #   CLI protocol reference
+    +-- DRAG_AND_DROP_CHALLENGE.md        #   Why drag-and-drop isn't supported
 ```
 
 ---
@@ -194,16 +253,34 @@ claude-code-mirror/
 **SessionNamer** - Spawns a one-shot `claude -p` process using Haiku to generate a 1-3 word tab name from the user's first message. Matches the language of the message (Hebrew/English). 10-second timeout, sanitized output, all errors silently logged.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_NAMER.md`
 
+**ActivitySummarizer** - After N tool uses (configurable), spawns a Haiku call to summarize what Claude is doing. Updates tab title with a short label and shows a detailed summary in the status bar tooltip.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ACTIVITY_SUMMARIZER.md`
+
+**FileLogger** - Writes per-session log files to disk. Auto-rotates at 2 MB. Files named `<session-name>_<dd-hh-mm>.log`. Renames when session is renamed. Controlled by `enableFileLogging` and `logDirectory` settings.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/FILE_LOGGER.md`
+
+**PromptHistoryStore** - Persists user prompts at two scopes: project (workspaceState) and global (globalState). Deduplicates consecutive entries. Capped at 200 per scope. Browsed via `PromptHistoryPanel`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
 **Stream-JSON Protocol** - Type definitions for the Claude CLI bidirectional JSON line protocol (stdin input, stdout output).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/STREAM_JSON_PROTOCOL.md`
 
 **React Chat UI** - React 18 components for message display, streaming text, tool use blocks, code blocks, image display, and RTL-aware input. The input area supports sending prompts while Claude is busy (interrupt), matching Claude Code CLI behavior. Ctrl+V pastes images from clipboard as base64 attachments (shown as thumbnails above the input, removable before sending). Both Send and Cancel buttons are visible during processing; Escape cancels the current response.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
+**PlanApprovalBar** - Dual-mode bar shown when Claude pauses for input: plan approval mode (Approve/Reject/Feedback buttons) or question mode (option buttons + custom answer textarea).
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**PromptHistoryPanel** - Modal overlay with 3 tabs (Session/Project/Global) for browsing and reusing past prompts. Click to insert, text filter, fetches data from extension via messaging.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
 **TextSettingsBar** - In-webview UI for adjusting chat text font size and font family. Supports Hebrew-friendly font presets. Settings are stored in Zustand and synced from VS Code configuration on startup and on change.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **ModelSelector** - Dropdown in the status bar for choosing the Claude model (Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default). Selection is persisted to VS Code settings (`claudeMirror.model`) and synced back to the webview on startup and on change.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**PermissionModeSelector** - Dropdown for choosing permission mode (Full Access or Supervised). Supervised mode restricts Claude to read-only tools. Applied on next session start via `--allowedTools`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Clear Session** - Button in the input area that resets all UI state (messages, cost, streaming) and restarts the CLI process. Sends `clearSession` message to the extension, which stops the current process and spawns a new one.
@@ -220,17 +297,44 @@ claude-code-mirror/
 
 ---
 
+## All Commands (Command Palette)
+
+Press `Ctrl+Shift+P` and type "Claude Mirror" to see all commands:
+
+| Command | What it does |
+|---------|-------------|
+| **Start New Session** | Open a new Claude chat tab |
+| **Stop Session** | Stop the active session's CLI process |
+| **Toggle Chat/Terminal View** | Switch between chat UI and terminal mirror |
+| **Send Message** | Send the current input (same as Ctrl+Enter) |
+| **Compact Context** | Compact the conversation context in the CLI |
+| **Resume Session** | Resume a previous session by ID |
+| **Send Path to Chat** | Insert a file/folder path into the chat input |
+| **Conversation History** | Browse and resume past sessions |
+| **Cancel Current Response** | Stop Claude's current response |
+| **Open Plan Document** | Open HTML plan docs from the project |
+| **Open Log Directory** | Open the folder where session logs are stored |
+
+---
+
 ## Configuration
+
+All settings are under `claudeMirror.*` in VS Code Settings (`Ctrl+,`).
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `claudeMirror.cliPath` | `"claude"` | Path to Claude CLI executable |
-| `claudeMirror.useCtrlEnterToSend` | `true` | Ctrl+Enter sends, Enter adds newline |
-| `claudeMirror.autoRestart` | `true` | Auto-restart process on crash |
-| `claudeMirror.chatFontSize` | `14` | Font size (px) for chat messages (10-32) |
-| `claudeMirror.chatFontFamily` | `""` | Font family for chat messages (empty = VS Code default) |
-| `claudeMirror.autoNameSessions` | `true` | Auto-generate tab names from first message using Haiku |
-| `claudeMirror.model` | `""` | Claude model to use for new sessions (empty = CLI default) |
+| `cliPath` | `"claude"` | Path to Claude CLI executable |
+| `useCtrlEnterToSend` | `true` | Ctrl+Enter sends, Enter adds newline |
+| `autoRestart` | `true` | Auto-restart process on crash |
+| `chatFontSize` | `14` | Font size (px) for chat messages (10-32) |
+| `chatFontFamily` | `""` | Font family for chat messages (empty = VS Code default) |
+| `autoNameSessions` | `true` | Auto-generate tab names from first message using Haiku |
+| `activitySummary` | `true` | Periodically summarize Claude's activity in the tab title |
+| `activitySummaryThreshold` | `3` | Number of tool uses before triggering an activity summary (1-10) |
+| `model` | `""` | Claude model for new sessions (empty = CLI default) |
+| `permissionMode` | `"full-access"` | Permission mode: `full-access` or `supervised` (read-only tools only) |
+| `enableFileLogging` | `true` | Write logs to disk files (one per session tab) |
+| `logDirectory` | `""` | Directory for log files (empty = extension default storage) |
 
 ---
 
