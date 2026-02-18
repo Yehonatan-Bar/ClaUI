@@ -5,7 +5,10 @@ import { ClaudeProcessManager } from '../process/ClaudeProcessManager';
 import { StreamDemux } from '../process/StreamDemux';
 import { ControlProtocol } from '../process/ControlProtocol';
 import { SessionNamer } from './SessionNamer';
+import { ActivitySummarizer } from './ActivitySummarizer';
+import { FileLogger } from './FileLogger';
 import type { SessionStore } from './SessionStore';
+import type { PromptHistoryStore } from './PromptHistoryStore';
 import { MessageHandler, type WebviewBridge } from '../webview/MessageHandler';
 import { buildWebviewHtml } from '../webview/WebviewProvider';
 import type { CliOutputEvent, AssistantMessage } from '../types/stream-json';
@@ -40,6 +43,20 @@ export class SessionTab implements WebviewBridge {
   private disposed = false;
   private currentModel = '';
   private sessionStartedAt = '';
+  /** When true, the next process exit should NOT send sessionEnded (edit-and-resend restart) */
+  private suppressNextExit = false;
+  /** The base title (without any busy indicator) */
+  private baseTitle = '';
+  /** Whether Claude is currently processing */
+  private isBusy = false;
+  /** Timer handle for the animated thinking indicator */
+  private thinkingAnimTimer: ReturnType<typeof setInterval> | null = null;
+  /** Current frame index for the thinking animation */
+  private thinkingFrame = 0;
+  /** Braille-based spinner frames that create a smooth rotation effect */
+  private static readonly THINKING_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  /** Per-tab file logger (null if file logging is disabled) */
+  private readonly fileLogger: FileLogger | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -49,7 +66,9 @@ export class SessionTab implements WebviewBridge {
     private readonly log: (msg: string) => void,
     private readonly statusBarItem: vscode.StatusBarItem,
     private readonly callbacks: SessionTabCallbacks,
-    private readonly sessionStore: SessionStore
+    private readonly sessionStore: SessionStore,
+    private readonly promptHistoryStore: PromptHistoryStore,
+    logDir: string | null
   ) {
     this.tabNumber = tabNumber;
     this.id = `tab-${tabNumber}`;
@@ -58,10 +77,22 @@ export class SessionTab implements WebviewBridge {
     this.processManager = new ClaudeProcessManager(context);
     this.demux = new StreamDemux();
     this.control = new ControlProtocol(this.processManager);
-    this.messageHandler = new MessageHandler(this, this.processManager, this.control, this.demux);
+    this.messageHandler = new MessageHandler(this, this.processManager, this.control, this.demux, this.promptHistoryStore);
 
-    // Set up per-tab logging with prefix
-    const tabLog = (msg: string) => log(`[Tab ${tabNumber}] ${msg}`);
+    // Create per-tab file logger if file logging is enabled
+    if (logDir) {
+      this.fileLogger = new FileLogger(logDir, `session-${tabNumber}`);
+    }
+
+    // Set up per-tab logging with prefix, dual-writing to file
+    const tabLog = (msg: string) => {
+      const prefixed = `[Tab ${tabNumber}] ${msg}`;
+      log(prefixed);
+      if (this.fileLogger) {
+        const timestamp = new Date().toISOString().slice(11, 23);
+        this.fileLogger.write(`[${timestamp}] ${prefixed}`);
+      }
+    };
     this.processManager.setLogger(tabLog);
     this.messageHandler.setLogger(tabLog);
 
@@ -76,13 +107,33 @@ export class SessionTab implements WebviewBridge {
         this.setTabName(name);
         // Update stored session name
         this.persistSessionMetadata(name);
+        // Rename the log file to include the session name
+        this.fileLogger?.updateSessionName(name);
+      }
+    });
+
+    // Wire activity summarizer: Haiku periodically summarizes tool activity
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const summaryThreshold = config.get<number>('activitySummaryThreshold', 3);
+    const activitySummarizer = new ActivitySummarizer({ threshold: summaryThreshold });
+    activitySummarizer.setLogger(tabLog);
+    this.messageHandler.setActivitySummarizer(activitySummarizer);
+    this.messageHandler.onActivitySummaryGenerated((summary) => {
+      tabLog(`[ActivitySummary] Callback: "${summary.shortLabel}"`);
+      if (!this.disposed) {
+        // Activity summary is displayed in the webview busy indicator.
+        // Tab title remains the session name from SessionNamer.
+        if (this.panel.active) {
+          this.statusBarItem.tooltip = summary.fullSummary;
+        }
       }
     });
 
     // Create webview panel in the specified column
+    this.baseTitle = `Claude Mirror ${tabNumber}`;
     this.panel = vscode.window.createWebviewPanel(
       'claudeMirror.chat',
-      `Claude Mirror ${tabNumber}`,
+      this.baseTitle,
       viewColumn,
       {
         enableScripts: true,
@@ -103,6 +154,9 @@ export class SessionTab implements WebviewBridge {
     this.wireDemuxStatusBar();
     this.wireDemuxSessionStore(tabLog);
     this.messageHandler.initialize();
+
+    // Move the new tab to the rightmost position in its editor group
+    this.moveTabToEnd();
   }
 
   // --- WebviewBridge implementation ---
@@ -110,6 +164,10 @@ export class SessionTab implements WebviewBridge {
   postMessage(msg: ExtensionToWebviewMessage): void {
     if (this.disposed || !this.panel) {
       return;
+    }
+    // Intercept processBusy messages to update the tab title indicator
+    if (msg.type === 'processBusy') {
+      this.setBusy(msg.busy);
     }
     if (!this.isWebviewReady) {
       this.pendingMessages.push(msg);
@@ -120,6 +178,10 @@ export class SessionTab implements WebviewBridge {
 
   onMessage(callback: (msg: WebviewToExtensionMessage) => void): void {
     this.messageCallback = callback;
+  }
+
+  setSuppressNextExit(suppress: boolean): void {
+    this.suppressNextExit = suppress;
   }
 
   // --- Public API ---
@@ -186,7 +248,9 @@ export class SessionTab implements WebviewBridge {
       return;
     }
     this.disposed = true;
+    this.stopThinkingAnimation();
     this.processManager.stop();
+    this.fileLogger?.dispose();
     this.panel.dispose();
   }
 
@@ -207,7 +271,66 @@ export class SessionTab implements WebviewBridge {
 
   /** Update the VS Code panel title */
   private setTabName(name: string): void {
-    this.panel.title = name;
+    this.baseTitle = name;
+    if (this.isBusy) {
+      this.applyThinkingFrame();
+    } else {
+      this.panel.title = name;
+    }
+  }
+
+  /** Update the busy state and start/stop the animated thinking indicator */
+  setBusy(busy: boolean): void {
+    if (this.isBusy === busy) {
+      return;
+    }
+    this.isBusy = busy;
+
+    if (busy) {
+      this.startThinkingAnimation();
+    } else {
+      this.stopThinkingAnimation();
+    }
+  }
+
+  /** Start cycling through spinner frames in the tab title */
+  private startThinkingAnimation(): void {
+    this.stopThinkingAnimation(); // clear any previous timer
+    this.thinkingFrame = 0;
+    this.applyThinkingFrame();
+    this.thinkingAnimTimer = setInterval(() => {
+      this.thinkingFrame = (this.thinkingFrame + 1) % SessionTab.THINKING_FRAMES.length;
+      this.applyThinkingFrame();
+    }, 120);
+  }
+
+  /** Stop the spinner animation and restore the clean title */
+  private stopThinkingAnimation(): void {
+    if (this.thinkingAnimTimer) {
+      clearInterval(this.thinkingAnimTimer);
+      this.thinkingAnimTimer = null;
+    }
+    if (this.baseTitle) {
+      this.panel.title = this.baseTitle;
+    }
+  }
+
+  /** Set the tab title to the current animation frame */
+  private applyThinkingFrame(): void {
+    if (!this.baseTitle) {
+      return;
+    }
+    const frame = SessionTab.THINKING_FRAMES[this.thinkingFrame];
+    this.panel.title = `${this.baseTitle} ${frame}`;
+  }
+
+  /** Move this tab to the rightmost position in its editor group */
+  private moveTabToEnd(): void {
+    // The panel is automatically focused on creation, so moveActiveEditor targets it
+    vscode.commands.executeCommand('moveActiveEditor', {
+      by: 'tab',
+      to: 'last',
+    });
   }
 
   /** Generate a colored SVG circle and set it as the panel's tab icon */
@@ -235,6 +358,7 @@ export class SessionTab implements WebviewBridge {
     if (newName && newName !== currentName) {
       this.setTabName(newName);
       this.log(`[Tab ${this.tabNumber}] Renamed to "${newName}"`);
+      this.fileLogger?.updateSessionName(newName);
     }
   }
 
@@ -267,7 +391,9 @@ export class SessionTab implements WebviewBridge {
 
     this.panel.onDidDispose(() => {
       this.disposed = true;
+      this.stopThinkingAnimation();
       this.processManager.stop();
+      this.fileLogger?.dispose();
       this.callbacks.onClosed(this.id);
     });
   }
@@ -311,6 +437,13 @@ export class SessionTab implements WebviewBridge {
 
     this.processManager.on('exit', (info: { code: number | null; signal: string | null }) => {
       tabLog(`Process exited: code=${info.code}, signal=${info.signal}`);
+
+      // Deliberate stop+restart (e.g. edit-and-resend): skip sessionEnded, the new start() handles it
+      if (this.suppressNextExit) {
+        tabLog('Suppressing exit handling (edit-and-resend restart in progress)');
+        this.suppressNextExit = false;
+        return;
+      }
 
       if (this.processManager.cancelledByUser) {
         const sessionToResume = this.processManager.currentSessionId;
@@ -418,7 +551,7 @@ export class SessionTab implements WebviewBridge {
   /** Update the panel title to include the session ID */
   updateTitle(sessionId: string): void {
     const shortId = sessionId.slice(0, 8);
-    this.panel.title = `Claude Mirror ${this.tabNumber} [${shortId}]`;
+    this.setTabName(`Claude Mirror ${this.tabNumber} [${shortId}]`);
   }
 
   private flushPendingMessages(): void {

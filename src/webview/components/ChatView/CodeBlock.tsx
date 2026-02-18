@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { renderTextWithFileLinks } from './filePathLinks';
 
 /** Lines shown when code block is collapsed */
 const COLLAPSED_LINE_COUNT = 4;
@@ -64,7 +65,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
         </div>
       </div>
       <pre className={`code-block-content${!expanded ? ' code-block-collapsed' : ''}`}>
-        <code>{visibleCode}</code>
+        <code>{renderTextWithFileLinks(visibleCode)}</code>
       </pre>
       {isLong && (
         <button

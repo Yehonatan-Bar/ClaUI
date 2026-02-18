@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plan: Session History Display Fix</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 40px 20px;
+      line-height: 1.8;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #16213e;
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #ff8a65;
+      font-size: 28px;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #ff8a65;
+      padding-bottom: 12px;
+    }
+    .subtitle {
+      color: #90a4ae;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    h2 {
+      color: #81c784;
+      font-size: 20px;
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+    p {
+      margin-bottom: 14px;
+      color: #cfd8dc;
+    }
+    .highlight {
+      background: #1b3a5c;
+      border-right: 4px solid #64b5f6;
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin: 16px 0;
+    }
+    .bug-box {
+      background: #3e2723;
+      border-right: 4px solid #ff8a65;
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin: 16px 0;
+    }
+    .fix-box {
+      background: #1b5e20;
+      border-right: 4px solid #81c784;
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin: 16px 0;
+    }
+    .flow-diagram {
+      background: #0d1b2a;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      font-family: monospace;
+      direction: ltr;
+      text-align: center;
+      font-size: 14px;
+      line-height: 2;
+      color: #90caf9;
+    }
+    .flow-diagram .arrow {
+      color: #ff8a65;
+    }
+    .file-count {
+      display: inline-block;
+      background: #81c784;
+      color: #1a1a2e;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 13px;
+      margin-right: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+    }
+    th {
+      background: #1b3a5c;
+      color: #64b5f6;
+      padding: 10px 14px;
+      text-align: right;
+      font-weight: 600;
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #263238;
+      color: #cfd8dc;
+    }
+    tr:hover td {
+      background: #1a2744;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>תיקון באג: הצגת היסטוריית שיחה</h1>
+    <div class="subtitle">תיקון - Claude Code Mirror</div>
+
+    <h2>מה הבעיה?</h2>
+    <p>
+      כשמשתמש בוחר שיחה ישנה מהיסטוריית השיחות, נפתח חלון <strong>ריק לגמרי</strong>.
+      השיחה ממשיכה ברקע (Claude "זוכר" את ההקשר), אבל ההודעות הקודמות לא מוצגות על המסך.
+    </p>
+
+    <div class="bug-box">
+      <strong>הסיבה:</strong> כשחוזרים לשיחה, המערכת מקבלת מ-Claude את כל ההודעות הקודמות.
+      הודעות של המשתמש נשמרות בהצלחה, אבל <strong>הודעות של Claude נשמרות רק באופן זמני</strong>
+      ולא מתווספות לתצוגה. הן "נופלות" בדרך.
+    </div>
+
+    <h2>מה הפתרון?</h2>
+
+    <div class="fix-box">
+      <strong>התיקון:</strong> כשמגיעה הודעת תשובה שלמה מ-Claude (לא הודעה שעדיין בשידור חי),
+      המערכת תזהה שזו הודעה היסטורית ותוסיף אותה <strong>ישירות לתצוגה</strong>,
+      במקום לשמור אותה באופן זמני.
+    </div>
+
+    <h2>איך זה עובד עכשיו?</h2>
+    <div class="flow-diagram">
+      Session resumed <span class="arrow">&rarr;</span> CLI replays messages <span class="arrow">&rarr;</span> User msgs shown <span class="arrow">&rarr;</span> Assistant msgs <span class="arrow" style="color: #ef5350">&rarr; LOST</span>
+    </div>
+
+    <h2>איך זה יעבוד אחרי התיקון?</h2>
+    <div class="flow-diagram">
+      Session resumed <span class="arrow">&rarr;</span> CLI replays messages <span class="arrow">&rarr;</span> User msgs shown <span class="arrow">&rarr;</span> Assistant msgs <span class="arrow" style="color: #81c784">&rarr; SHOWN</span>
+    </div>
+
+    <h2>מה משתנה בקוד?</h2>
+    <p><span class="file-count">2</span> קבצים מושפעים</p>
+
+    <table>
+      <tr>
+        <th>אזור</th>
+        <th>שינוי</th>
+      </tr>
+      <tr>
+        <td>ניהול מצב (Store)</td>
+        <td>פעולה חדשה שמוסיפה הודעת Claude שלמה ישירות לרשימת ההודעות</td>
+      </tr>
+      <tr>
+        <td>מטפל הודעות (Webview)</td>
+        <td>זיהוי אוטומטי: הודעה היסטורית -> תצוגה ישירה, הודעה בשידור חי -> התנהגות קיימת</td>
+      </tr>
+    </table>
+
+    <h2>מה לא משתנה?</h2>
+    <p>
+      שום דבר בצד השרת. התיקון הוא <strong>רק בצד התצוגה</strong>.
+      כל מנגנון השיחה החיה (streaming), ביטול, חידוש אוטומטי, ועריכת הודעות -
+      ממשיכים לעבוד בדיוק כמו קודם.
+    </p>
+  </div>
+</body>
+</html>

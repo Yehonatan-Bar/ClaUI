@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plan: Editable Prompts</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 40px 20px;
+      line-height: 1.8;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #16213e;
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #64b5f6;
+      font-size: 28px;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #64b5f6;
+      padding-bottom: 12px;
+    }
+    .subtitle {
+      color: #90a4ae;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    h2 {
+      color: #81c784;
+      font-size: 20px;
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+    p {
+      margin-bottom: 14px;
+      color: #cfd8dc;
+    }
+    .highlight {
+      background: #1b3a5c;
+      border-right: 4px solid #64b5f6;
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin: 16px 0;
+    }
+    .tradeoff {
+      background: #3e2723;
+      border-right: 4px solid #ff8a65;
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin: 16px 0;
+    }
+    .steps {
+      list-style: none;
+      counter-reset: step-counter;
+      margin: 16px 0;
+    }
+    .steps li {
+      counter-increment: step-counter;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+      background: #1a2744;
+      border-radius: 8px;
+      position: relative;
+      padding-right: 56px;
+    }
+    .steps li::before {
+      content: counter(step-counter);
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      background: #64b5f6;
+      color: #1a1a2e;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .steps li strong {
+      color: #e0e0e0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+    }
+    th {
+      background: #1b3a5c;
+      color: #64b5f6;
+      padding: 10px 14px;
+      text-align: right;
+      font-weight: 600;
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #263238;
+      color: #cfd8dc;
+    }
+    tr:hover td {
+      background: #1a2744;
+    }
+    .flow-diagram {
+      background: #0d1b2a;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      font-family: monospace;
+      direction: ltr;
+      text-align: center;
+      font-size: 14px;
+      line-height: 2;
+      color: #90caf9;
+    }
+    .flow-diagram .arrow {
+      color: #ff8a65;
+    }
+    .file-count {
+      display: inline-block;
+      background: #64b5f6;
+      color: #1a1a2e;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 13px;
+      margin-right: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>עריכת פרומפטים בשיחה</h1>
+    <div class="subtitle">תוכנית יישום - Claude Code Mirror</div>
+
+    <h2>מה הפיצ'ר הזה עושה?</h2>
+    <p>
+      כשמשתמש גולל אחורה בשיחה, הוא יוכל <strong>לערוך הודעה שכבר שלח</strong>.
+      כשהוא שולח את ההודעה המעודכנת, כל ההודעות שהגיעו <strong>אחריה נמחקות</strong>,
+      והשיחה ממשיכה מההודעה החדשה.
+    </p>
+
+    <h2>איך זה עובד?</h2>
+    <div class="flow-diagram">
+      User edits a message <span class="arrow">&rarr;</span> Messages after it are deleted <span class="arrow">&rarr;</span> New session starts <span class="arrow">&rarr;</span> Edited prompt is sent <span class="arrow">&rarr;</span> Claude responds
+    </div>
+
+    <div class="highlight">
+      <strong>הגישה:</strong> כשהמשתמש עורך פרומפט, המערכת מתחילה שיחה חדשה מול Claude
+      ושולחת את הפרומפט המעודכן כהודעה ראשונה. ההודעות שלפני העריכה נשארות מוצגות על המסך,
+      אבל Claude מתחיל שיחה נקייה.
+    </div>
+
+    <div class="tradeoff">
+      <strong>פשרה:</strong> Claude לא "זוכר" את ההודעות שקדמו לפרומפט שנערך.
+      הוא מקבל רק את ההודעה המעודכנת. זו הגישה הפשוטה והאמינה ביותר,
+      כי ה-CLI של Claude לא תומך ב"חזרה אחורה" באמצע שיחה.
+    </div>
+
+    <h2>חוויית המשתמש</h2>
+    <ol class="steps">
+      <li><strong>ריחוף מעל הודעה:</strong> כפתור "Edit" מופיע בפינה הימנית-עליונה של הודעות שהמשתמש שלח</li>
+      <li><strong>לחיצה על Edit:</strong> תוכן ההודעה הופך לתיבת טקסט שניתנת לעריכה</li>
+      <li><strong>עריכה ושליחה:</strong> המשתמש משנה את הטקסט ולוחץ "Send" (או "Cancel" לביטול)</li>
+      <li><strong>תוצאה:</strong> כל ההודעות מהנקודה הזו ואילך נמחקות, וClaude מגיב להודעה החדשה</li>
+    </ol>
+
+    <h2>מה משתנה בקוד?</h2>
+    <p><span class="file-count">6</span> קבצים מושפעים</p>
+
+    <table>
+      <tr>
+        <th>קובץ</th>
+        <th>שינוי</th>
+      </tr>
+      <tr>
+        <td>הודעות בין הרכיבים</td>
+        <td>הוספת סוג הודעה חדש "editAndResend"</td>
+      </tr>
+      <tr>
+        <td>ניהול מצב (Store)</td>
+        <td>פעולה חדשה שמקצצת את השיחה מנקודת העריכה</td>
+      </tr>
+      <tr>
+        <td>מטפל הודעות (Extension)</td>
+        <td>עצירת השיחה הנוכחית, הפעלת שיחה חדשה, ושליחת הפרומפט המעודכן</td>
+      </tr>
+      <tr>
+        <td>בועת הודעה (UI)</td>
+        <td>כפתור עריכה + תיבת טקסט מוטמעת</td>
+      </tr>
+      <tr>
+        <td>רשימת הודעות (UI)</td>
+        <td>חיבור הכפתור לפעולת העריכה</td>
+      </tr>
+      <tr>
+        <td>עיצוב (CSS)</td>
+        <td>סגנונות לכפתור העריכה ותיבת הטקסט</td>
+      </tr>
+    </table>
+
+    <h2>מקרי קצה</h2>
+    <table>
+      <tr>
+        <th>מצב</th>
+        <th>התנהגות</th>
+      </tr>
+      <tr>
+        <td>Claude עדיין מגיב</td>
+        <td>כפתור העריכה מוסתר עד שהתגובה מסתיימת</td>
+      </tr>
+      <tr>
+        <td>עריכת ההודעה הראשונה</td>
+        <td>כל השיחה נמחקת, ההודעה המעודכנת היא הראשונה בשיחה חדשה</td>
+      </tr>
+      <tr>
+        <td>השיחה כבר הסתיימה</td>
+        <td>העריכה מפעילה שיחה חדשה אוטומטית</td>
+      </tr>
+      <tr>
+        <td>הודעה עם תמונות</td>
+        <td>כפתור עריכה לא מופיע (רק הודעות טקסט ניתנות לעריכה)</td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>

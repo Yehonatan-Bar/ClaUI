@@ -37,6 +37,88 @@ function formatRelativeTime(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString();
 }
 
+/** Plan mode prompt template for CLAUDE.md injection */
+const PLAN_PROMPT_HEBREW = `
+---
+Plan mode -
+If you are in plan mode and creating a plan, then after you create the plan, create an HTML document that displays the plan:
+1. In Hebrew (note - it is important that it be in Hebrew)
+2. Written for a manager, meaning without code and tedious names, just a clear and easy-to-understand explanation.
+---`.trim();
+
+const PLAN_PROMPT_ENGLISH = `
+---
+Plan mode -
+If you are in plan mode and creating a plan, then after you create the plan, create an HTML document that displays the plan:
+1. In English
+2. Written for a manager, meaning without code and tedious names, just a clear and easy-to-understand explanation.
+---`.trim();
+
+/**
+ * Prompt the user to activate the Plans feature when no plan documents exist.
+ * Offers to inject a plan mode prompt into the project's CLAUDE.md file.
+ */
+async function promptPlanFeatureActivation(
+  workspaceRoot: string,
+  log: (msg: string) => void
+): Promise<void> {
+  const activate = await vscode.window.showInformationMessage(
+    'The Plans feature is not currently active. Would you like to enable it? ' +
+    'This will add a "Plan mode" instruction to your project\'s CLAUDE.md file, ' +
+    'so Claude Code will generate readable HTML plan documents for you.',
+    'Yes, enable it',
+    'No thanks'
+  );
+
+  if (activate !== 'Yes, enable it') {
+    return;
+  }
+
+  // Ask for language preference
+  const language = await vscode.window.showQuickPick(
+    [
+      { label: 'Hebrew', description: 'Plans will be generated in Hebrew', value: 'hebrew' },
+      { label: 'English', description: 'Plans will be generated in English', value: 'english' },
+    ],
+    { placeHolder: 'Which language should plans be written in?' }
+  );
+
+  if (!language) {
+    return;
+  }
+
+  const prompt = language.value === 'hebrew' ? PLAN_PROMPT_HEBREW : PLAN_PROMPT_ENGLISH;
+  const claudeMdPath = path.join(workspaceRoot, 'CLAUDE.md');
+
+  try {
+    if (fs.existsSync(claudeMdPath)) {
+      // Check if the plan prompt is already present
+      const existing = fs.readFileSync(claudeMdPath, 'utf-8');
+      if (existing.includes('Plan mode -')) {
+        vscode.window.showInformationMessage(
+          'A Plan mode instruction already exists in CLAUDE.md.'
+        );
+        return;
+      }
+      // Append the prompt to the existing file
+      fs.appendFileSync(claudeMdPath, '\n\n' + prompt + '\n', 'utf-8');
+      log(`Appended plan mode prompt (${language.value}) to existing CLAUDE.md`);
+    } else {
+      // Create a new CLAUDE.md with the prompt
+      fs.writeFileSync(claudeMdPath, prompt + '\n', 'utf-8');
+      log(`Created CLAUDE.md with plan mode prompt (${language.value})`);
+    }
+
+    vscode.window.showInformationMessage(
+      `Plans feature enabled (${language.label})! Claude Code will now generate HTML plan documents when in plan mode.`
+    );
+  } catch (err) {
+    vscode.window.showErrorMessage(
+      `Failed to update CLAUDE.md: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+}
+
 /**
  * Registers all VS Code commands for the extension.
  * Commands are routed through the TabManager to target the active tab.
@@ -45,7 +127,8 @@ export function registerCommands(
   context: vscode.ExtensionContext,
   tabManager: TabManager,
   sessionStore: SessionStore,
-  log: (msg: string) => void
+  log: (msg: string) => void,
+  logDir: string
 ): void {
   context.subscriptions.push(
     // Start a NEW session in a new tab
@@ -189,39 +272,32 @@ export function registerCommands(
         return;
       }
 
-      const kingdomDir = path.join(
-        workspaceFolders[0].uri.fsPath,
-        'Kingdom_of_Claudes_Beloved_MDs'
-      );
+      const workspaceRoot = workspaceFolders[0].uri.fsPath;
+      const kingdomDir = path.join(workspaceRoot, 'Kingdom_of_Claudes_Beloved_MDs');
 
-      if (!fs.existsSync(kingdomDir)) {
-        vscode.window.showInformationMessage(
-          'No plan documents folder found (Kingdom_of_Claudes_Beloved_MDs/).'
-        );
-        return;
+      // Collect HTML plan files (if the folder exists)
+      let htmlFiles: string[] = [];
+      if (fs.existsSync(kingdomDir)) {
+        try {
+          const allFiles = fs.readdirSync(kingdomDir);
+          htmlFiles = allFiles
+            .filter(f => f.endsWith('.html'))
+            .sort((a, b) => {
+              const aStat = fs.statSync(path.join(kingdomDir, a));
+              const bStat = fs.statSync(path.join(kingdomDir, b));
+              return bStat.mtimeMs - aStat.mtimeMs;
+            });
+        } catch (err) {
+          vscode.window.showErrorMessage(
+            `Failed to read plan docs folder: ${err instanceof Error ? err.message : String(err)}`
+          );
+          return;
+        }
       }
 
-      let htmlFiles: string[];
-      try {
-        const allFiles = fs.readdirSync(kingdomDir);
-        htmlFiles = allFiles
-          .filter(f => f.endsWith('.html'))
-          .sort((a, b) => {
-            const aStat = fs.statSync(path.join(kingdomDir, a));
-            const bStat = fs.statSync(path.join(kingdomDir, b));
-            return bStat.mtimeMs - aStat.mtimeMs;
-          });
-      } catch (err) {
-        vscode.window.showErrorMessage(
-          `Failed to read plan docs folder: ${err instanceof Error ? err.message : String(err)}`
-        );
-        return;
-      }
-
+      // No plan documents found - offer to activate the Plans feature
       if (htmlFiles.length === 0) {
-        vscode.window.showInformationMessage(
-          'No HTML plan documents found in Kingdom_of_Claudes_Beloved_MDs/.'
-        );
+        await promptPlanFeatureActivation(workspaceRoot, log);
         return;
       }
 
@@ -252,6 +328,18 @@ export function registerCommands(
       if (picked) {
         log(`Opening plan doc: ${picked.filePath}`);
         await vscode.env.openExternal(vscode.Uri.file(picked.filePath));
+      }
+    }),
+
+    // Open the log directory in the system file explorer
+    vscode.commands.registerCommand('claudeMirror.openLogDirectory', () => {
+      if (fs.existsSync(logDir)) {
+        vscode.env.openExternal(vscode.Uri.file(logDir));
+        log(`Opened log directory: ${logDir}`);
+      } else {
+        vscode.window.showInformationMessage(
+          'No log directory found yet. Logs will be created when a session starts.'
+        );
       }
     }),
 

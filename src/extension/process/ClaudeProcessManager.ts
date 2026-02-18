@@ -8,6 +8,7 @@ export interface ProcessStartOptions {
   fork?: boolean;
   cwd?: string;
   model?: string;
+  permissionMode?: 'full-access' | 'supervised';
 }
 
 export interface ProcessExitInfo {
@@ -50,6 +51,9 @@ export class ClaudeProcessManager extends EventEmitter {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const cliPath = config.get<string>('cliPath', 'claude');
 
+    const permissionMode = options?.permissionMode ||
+      config.get<string>('permissionMode', 'full-access');
+
     const args = [
       '-p',
       '--verbose',
@@ -58,6 +62,14 @@ export class ClaudeProcessManager extends EventEmitter {
       '--include-partial-messages',
       '--replay-user-messages',
     ];
+
+    // In supervised mode, restrict to read-only tools via --allowedTools
+    if (permissionMode === 'supervised') {
+      args.push(
+        '--allowedTools',
+        'Read,Grep,Glob,LS,Task,WebFetch,WebSearch,TodoRead,TodoWrite,AskUserQuestion,ExitPlanMode'
+      );
+    }
 
     // Add model flag if specified (from config or explicit option)
     const selectedModel = options?.model ||
@@ -88,33 +100,42 @@ export class ClaudeProcessManager extends EventEmitter {
     delete env.CLAUDECODE;
     delete env.CLAUDE_CODE_ENTRYPOINT;
 
-    this.process = spawn(cliPath, args, {
+    const child = spawn(cliPath, args, {
       cwd,
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: true,
     });
+    this.process = child;
 
-    this.log(`Process spawned, PID: ${this.process.pid ?? 'unknown'}`);
+    this.log(`Process spawned, PID: ${child.pid ?? 'unknown'}`);
     this.stdoutBuffer = '';
 
-    this.process.stdout!.on('data', (chunk: Buffer) => {
+    child.stdout!.on('data', (chunk: Buffer) => {
       this.handleStdoutChunk(chunk);
     });
 
-    this.process.stderr!.on('data', (chunk: Buffer) => {
+    child.stderr!.on('data', (chunk: Buffer) => {
       this.emit('stderr', chunk.toString('utf-8'));
     });
 
-    this.process.on('exit', (code, signal) => {
+    // Guard against stale exit/error handlers: only null this.process if the
+    // exiting process is still the current one.  During edit-and-resend the old
+    // process is stop()'d and a new one start()'d; the old exit fires
+    // asynchronously and must NOT overwrite the new process reference.
+    child.on('exit', (code, signal) => {
       const exitInfo: ProcessExitInfo = { code, signal };
       this.emit('exit', exitInfo);
-      this.process = null;
+      if (this.process === child) {
+        this.process = null;
+      }
     });
 
-    this.process.on('error', (err) => {
+    child.on('error', (err) => {
       this.emit('error', err);
-      this.process = null;
+      if (this.process === child) {
+        this.process = null;
+      }
     });
   }
 

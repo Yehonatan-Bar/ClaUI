@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { SessionTab } from './SessionTab';
 import type { SessionStore } from './SessionStore';
+import type { PromptHistoryStore } from './PromptHistoryStore';
 import type { ExtensionToWebviewMessage } from '../types/webview-messages';
 
 /** Distinct colors for tab header bars, cycling through the palette */
@@ -28,7 +29,9 @@ export class TabManager {
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly log: (msg: string) => void,
-    private readonly sessionStore: SessionStore
+    private readonly sessionStore: SessionStore,
+    private readonly promptHistoryStore: PromptHistoryStore,
+    private readonly logDir: string | null
   ) {
     // Single shared status bar item across all tabs
     this.statusBarItem = vscode.window.createStatusBarItem(
@@ -60,7 +63,9 @@ export class TabManager {
         onClosed: (tabId) => this.handleTabClosed(tabId),
         onFocused: (tabId) => this.handleTabFocused(tabId),
       },
-      this.sessionStore
+      this.sessionStore,
+      this.promptHistoryStore,
+      this.logDir
     );
 
     this.tabs.set(tab.id, tab);

@@ -1,8 +1,57 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { detectRtl } from '../../hooks/useRtlDetection';
 import type { WebviewImageData } from '../../../extension/types/webview-messages';
+
+/**
+ * Manages an undo/redo stack for a textarea controlled by React state.
+ * React controlled components break the browser's native undo because React
+ * resets the textarea value on every render. This class keeps its own stack
+ * of (text, cursorPosition) snapshots so Ctrl+Z / Ctrl+Y work as expected.
+ */
+class UndoManager {
+  private stack: Array<{ text: string; cursor: number }> = [{ text: '', cursor: 0 }];
+  private index = 0;
+  private static readonly MAX_STACK = 200;
+
+  /** Record a new state. Discards any redo entries beyond current index. */
+  push(text: string, cursor: number) {
+    // Skip if identical to current state (avoids duplicate entries)
+    const current = this.stack[this.index];
+    if (current && current.text === text) return;
+
+    // Discard redo history
+    this.stack = this.stack.slice(0, this.index + 1);
+    this.stack.push({ text, cursor });
+
+    // Cap stack size
+    if (this.stack.length > UndoManager.MAX_STACK) {
+      this.stack.shift();
+    }
+    this.index = this.stack.length - 1;
+  }
+
+  /** Move back one step. Returns the previous state or null if at bottom. */
+  undo(): { text: string; cursor: number } | null {
+    if (this.index <= 0) return null;
+    this.index--;
+    return this.stack[this.index];
+  }
+
+  /** Move forward one step. Returns the next state or null if at top. */
+  redo(): { text: string; cursor: number } | null {
+    if (this.index >= this.stack.length - 1) return null;
+    this.index++;
+    return this.stack[this.index];
+  }
+
+  /** Reset the entire stack (e.g. after sending a message). */
+  reset() {
+    this.stack = [{ text: '', cursor: 0 }];
+    this.index = 0;
+  }
+}
 
 /**
  * Chat input area with auto-growing textarea.
@@ -12,12 +61,17 @@ import type { WebviewImageData } from '../../../extension/types/webview-messages
  * "+" button opens VS Code file picker to paste file paths.
  * Explorer context action can also send paths into this input.
  * Ctrl+V pastes images from clipboard as base64 attachments.
+ *
+ * When a plan approval bar is active (pendingApproval is set), typed messages
+ * are routed as plan feedback instead of a new conversation message. This
+ * ensures the CLI receives the text in the approval context.
  */
 export const InputArea: React.FC = () => {
   const [text, setText] = useState('');
   const [pendingImages, setPendingImages] = useState<WebviewImageData[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { isBusy, isConnected, pendingFilePaths, setPendingFilePaths, promptHistory, addToPromptHistory } = useAppStore();
+  const undoMgr = useMemo(() => new UndoManager(), []);
+  const { isBusy, isConnected, pendingFilePaths, setPendingFilePaths, promptHistory, addToPromptHistory, setPromptHistoryPanelOpen, pendingApproval, setPendingApproval } = useAppStore();
 
   // History navigation: -1 = not browsing, 0..N = index into promptHistory (0 = oldest)
   const historyIndexRef = useRef(-1);
@@ -47,7 +101,9 @@ export const InputArea: React.FC = () => {
   // Auto-detect RTL for the input text
   const direction = text ? (detectRtl(text) ? 'rtl' : 'ltr') : 'auto';
 
-  /** Send the current message to Claude (allowed even while busy, to interrupt) */
+  /** Send the current message to Claude (allowed even while busy, to interrupt).
+   *  When a plan approval bar is active, the text is sent as plan feedback
+   *  so the CLI interprets it in the approval context. */
   const sendMessage = useCallback(() => {
     const trimmed = text.trim();
     if ((!trimmed && pendingImages.length === 0) || !isConnected) return;
@@ -58,19 +114,30 @@ export const InputArea: React.FC = () => {
     historyIndexRef.current = -1;
     draftRef.current = '';
 
-    if (pendingImages.length > 0) {
+    // If plan/question approval is pending, route text as feedback/answer
+    if (pendingApproval && trimmed && pendingImages.length === 0) {
+      const isQuestion = pendingApproval.toolName === 'AskUserQuestion';
+      postToExtension({
+        type: 'planApprovalResponse',
+        action: isQuestion ? 'questionAnswer' : 'feedback',
+        feedback: trimmed,
+        selectedOptions: isQuestion ? [trimmed] : undefined,
+      });
+      setPendingApproval(null);
+    } else if (pendingImages.length > 0) {
       postToExtension({ type: 'sendMessageWithImages', text: trimmed, images: pendingImages });
       setPendingImages([]);
     } else {
       postToExtension({ type: 'sendMessage', text: trimmed });
     }
     setText('');
+    undoMgr.reset();
 
     // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [text, pendingImages, isConnected, addToPromptHistory]);
+  }, [text, pendingImages, isConnected, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr]);
 
   /** Cancel the in-flight request */
   const cancelRequest = useCallback(() => {
@@ -86,9 +153,46 @@ export const InputArea: React.FC = () => {
     }
   }, []);
 
-  /** Handle keyboard events - Ctrl+Enter sends, Enter adds newline, Esc cancels, ArrowUp/Down navigates history */
+  /** Handle keyboard events - Ctrl+Enter sends, Enter adds newline, Esc cancels, Ctrl+Z/Y undo/redo, ArrowUp/Down navigates history */
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Undo: Ctrl+Z (without Shift)
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        e.preventDefault();
+        const prev = undoMgr.undo();
+        if (prev) {
+          setText(prev.text);
+          requestAnimationFrame(() => {
+            const el = textareaRef.current;
+            if (el) {
+              el.selectionStart = prev.cursor;
+              el.selectionEnd = prev.cursor;
+            }
+            resizeTextarea();
+          });
+        }
+        return;
+      }
+      // Redo: Ctrl+Y or Ctrl+Shift+Z
+      if (
+        ((e.key === 'y' || e.key === 'Y') && (e.ctrlKey || e.metaKey)) ||
+        (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)
+      ) {
+        e.preventDefault();
+        const next = undoMgr.redo();
+        if (next) {
+          setText(next.text);
+          requestAnimationFrame(() => {
+            const el = textareaRef.current;
+            if (el) {
+              el.selectionStart = next.cursor;
+              el.selectionEnd = next.cursor;
+            }
+            resizeTextarea();
+          });
+        }
+        return;
+      }
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         sendMessage();
@@ -120,6 +224,7 @@ export const InputArea: React.FC = () => {
 
           const historyText = history[historyIndexRef.current];
           setText(historyText);
+          undoMgr.push(historyText, 0);
           requestAnimationFrame(() => {
             if (textareaRef.current) {
               textareaRef.current.selectionStart = 0;
@@ -144,10 +249,12 @@ export const InputArea: React.FC = () => {
             historyIndexRef.current++;
             const historyText = history[historyIndexRef.current];
             setText(historyText);
+            undoMgr.push(historyText, historyText.length);
           } else {
             // Back to draft
             historyIndexRef.current = -1;
             setText(draftRef.current);
+            undoMgr.push(draftRef.current, draftRef.current.length);
           }
           requestAnimationFrame(() => {
             const textarea = textareaRef.current;
@@ -160,21 +267,53 @@ export const InputArea: React.FC = () => {
         }
       }
     },
-    [sendMessage, isBusy, cancelRequest, text, resizeTextarea]
+    [sendMessage, isBusy, cancelRequest, text, resizeTextarea, undoMgr]
   );
 
   /** Auto-resize textarea to fit content, reset history browsing on manual edits */
   const handleInput = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setText(e.target.value);
+      const newValue = e.target.value;
+      setText(newValue);
+      undoMgr.push(newValue, e.target.selectionStart);
       // Any manual typing exits history browsing mode
       historyIndexRef.current = -1;
       const el = e.target;
       el.style.height = 'auto';
       el.style.height = Math.min(el.scrollHeight, 200) + 'px';
     },
-    []
+    [undoMgr]
   );
+
+  /** Handle right-click to paste clipboard content (VS Code webview blocks native context menu) */
+  const handleContextMenu = useCallback((e: React.MouseEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
+    const el = textareaRef.current;
+    if (!el) return;
+
+    navigator.clipboard.readText().then((clipboardText) => {
+      if (!clipboardText) return;
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const before = text.substring(0, start);
+      const after = text.substring(end);
+      const newText = before + clipboardText + after;
+      const newCursorPos = start + clipboardText.length;
+      setText(newText);
+      undoMgr.push(newText, newCursorPos);
+
+      // Place cursor after pasted text
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = newCursorPos;
+          textareaRef.current.selectionEnd = newCursorPos;
+        }
+        resizeTextarea();
+      });
+    }).catch(() => {
+      // Clipboard API not available or permission denied - silently ignore
+    });
+  }, [text, resizeTextarea, undoMgr]);
 
   /** Handle paste events - extract images from clipboard */
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -236,8 +375,9 @@ export const InputArea: React.FC = () => {
 
     const pathText = pendingFilePaths.join('\n');
     setText((prev) => {
-      if (!prev) return pathText;
-      return prev + (prev.endsWith('\n') ? '' : '\n') + pathText;
+      const newText = !prev ? pathText : prev + (prev.endsWith('\n') ? '' : '\n') + pathText;
+      undoMgr.push(newText, newText.length);
+      return newText;
     });
     setPendingFilePaths(null);
 
@@ -250,7 +390,31 @@ export const InputArea: React.FC = () => {
         el.focus();
       }
     });
-  }, [pendingFilePaths, setPendingFilePaths]);
+  }, [pendingFilePaths, setPendingFilePaths, undoMgr]);
+
+  // Listen for prompt selection from history panel
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const prompt = (e as CustomEvent<string>).detail;
+      setText(prompt);
+      undoMgr.push(prompt, prompt.length);
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (el) {
+          el.style.height = 'auto';
+          el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+          el.focus();
+        }
+      });
+    };
+    window.addEventListener('prompt-history-select', handler);
+    return () => window.removeEventListener('prompt-history-select', handler);
+  }, [undoMgr]);
+
+  /** Toggle the prompt history panel */
+  const handleToggleHistory = useCallback(() => {
+    setPromptHistoryPanelOpen(true);
+  }, [setPromptHistoryPanelOpen]);
 
   // Focus textarea when component mounts
   useEffect(() => {
@@ -296,6 +460,14 @@ export const InputArea: React.FC = () => {
         >
           +
         </button>
+        <button
+          className="prompt-history-button"
+          onClick={handleToggleHistory}
+          disabled={!isConnected}
+          title="Prompt history"
+        >
+          H
+        </button>
         <textarea
           ref={textareaRef}
           className="input-textarea"
@@ -304,10 +476,15 @@ export const InputArea: React.FC = () => {
           onChange={handleInput}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
+          onContextMenu={handleContextMenu}
           placeholder={
-            isBusy
-              ? 'Type to interrupt... (Ctrl+Enter to send)'
-              : 'Type a message... (Ctrl+Enter to send)'
+            pendingApproval
+              ? (pendingApproval.toolName === 'AskUserQuestion'
+                ? 'Type your answer... (Ctrl+Enter to send)'
+                : 'Type feedback or approve/reject above... (Ctrl+Enter to send)')
+              : isBusy
+                ? 'Type to interrupt... (Ctrl+Enter to send)'
+                : 'Type a message... (Ctrl+Enter to send)'
           }
           disabled={!isConnected}
           rows={1}

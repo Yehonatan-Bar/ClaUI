@@ -119,7 +119,10 @@ claude-code-mirror/
 |   |   |   +-- SessionTab.ts             #   Per-tab bundle (process+demux+panel+handler)
 |   |   |   +-- TabManager.ts             #   Manages all tabs, tracks active tab
 |   |   |   +-- SessionNamer.ts           #   Auto-generates tab names via Haiku
+|   |   |   +-- ActivitySummarizer.ts     #   Periodic tool activity summary via Haiku
+|   |   |   +-- FileLogger.ts             #   Per-session file logging with rotation and rename
 |   |   |   +-- SessionStore.ts           #   Persists session metadata in globalState
+|   |   |   +-- PromptHistoryStore.ts     #   Persists prompt history (project + global scope)
 |   |   |   +-- SessionFork.ts            #   Phase 3 stub (fork/rewind)
 |   |   +-- terminal/                     #   Phase 2 stubs
 |   |   +-- auth/                         #   Phase 5 stub
@@ -138,8 +141,11 @@ claude-code-mirror/
 |       |   |   +-- MessageList.tsx       #   Scrollable message list
 |       |   |   +-- MessageBubble.tsx     #   Single message with content blocks
 |       |   |   +-- StreamingText.tsx     #   In-progress text with cursor
-|       |   |   +-- ToolUseBlock.tsx      #   Tool use display (collapsible)
+|       |   |   +-- ToolUseBlock.tsx      #   Tool use display (collapsible, plan-aware)
+|       |   |   +-- PlanApprovalBar.tsx  #   Dual-mode bar: plan approval (Approve/Reject/Feedback) or question UI (option buttons + custom answer)
+|       |   |   +-- PromptHistoryPanel.tsx #  3-tab prompt history overlay (session/project/global)
 |       |   |   +-- CodeBlock.tsx         #   Syntax block with copy button
+|       |   |   +-- filePathLinks.tsx   #   Clickable file path and URL detection and rendering
 |       |   +-- InputArea/
 |       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt, image paste
 |       |   +-- ModelSelector/
@@ -152,6 +158,8 @@ claude-code-mirror/
 +-- Kingdom_of_Claudes_Beloved_MDs/       # Detailed component documentation
     +-- ARCHITECTURE.md                   #   Data flow and component interaction
     +-- SESSION_NAMER.md                  #   Auto-naming feature (data flow, gotchas, debugging)
+    +-- ACTIVITY_SUMMARIZER.md            #   Periodic activity summary via Haiku
+    +-- FILE_LOGGER.md                    #   File-based logging with rotation and rename
     +-- STREAM_JSON_PROTOCOL.md           #   CLI protocol reference
 ```
 
@@ -168,17 +176,23 @@ claude-code-mirror/
 **ClaudeProcessManager** - Spawns the Claude CLI child process with stream-json flags, handles stdin/stdout piping, process lifecycle, and crash detection. Instantiated per-tab by SessionTab.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**StreamDemux** - Receives raw CLI JSON events and demultiplexes them into typed, semantic events (textDelta, toolUseStart, assistantMessage, etc.) for UI consumers. Instantiated per-tab.
+**StreamDemux** - Receives raw CLI JSON events and demultiplexes them into typed, semantic events (textDelta, toolUseStart, messageDelta, assistantMessage, etc.) for UI consumers. Instantiated per-tab.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **WebviewProvider / buildWebviewHtml** - `buildWebviewHtml()` is an exported utility that generates CSP-safe HTML for webview panels. WebviewProvider class is retained for backward compatibility. SessionTab uses `buildWebviewHtml()` directly.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**MessageHandler** - Bidirectional bridge translating webview postMessages into CLI commands and StreamDemux events into webview messages. Accepts a `WebviewBridge` interface (implemented by SessionTab). Triggers auto-naming on first user message.
+**MessageHandler** - Bidirectional bridge translating webview postMessages into CLI commands and StreamDemux events into webview messages. Accepts a `WebviewBridge` interface (implemented by SessionTab). Triggers auto-naming on first user message. Detects plan approval pauses (ExitPlanMode/AskUserQuestion) and forwards approval responses.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **SessionNamer** - Spawns a one-shot `claude -p` process using Haiku to generate a 1-3 word tab name from the user's first message. Matches the language of the message (Hebrew/English). 10-second timeout, sanitized output, all errors silently logged.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_NAMER.md`
+
+**ActivitySummarizer** - Periodically summarizes Claude's tool activity via Haiku. After every N tool uses (configurable, default 3), sends enriched tool names to Haiku for a short label + full summary. Displays a detailed summary panel in the busy indicator (short label + full sentence). Updates status bar tooltip. Does NOT overwrite tab title (session name stays fixed). Debounces rapid tool uses, prevents concurrent calls.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ACTIVITY_SUMMARIZER.md`
+
+**FileLogger** - Writes log lines to disk files alongside the OutputChannel. Each session tab gets its own log file named `<session-name>_<dd-hh-mm>.log`. A global logger captures extension-level messages. Files auto-rotate at 2MB, rename when the session name changes, and new files are created on Reload Window or new session. Configurable via `claudeMirror.enableFileLogging` and `claudeMirror.logDirectory`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/FILE_LOGGER.md`
 
 **Stream-JSON Protocol** - Type definitions for the Claude CLI bidirectional JSON line protocol (stdin input, stdout output).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/STREAM_JSON_PROTOCOL.md`
@@ -192,13 +206,28 @@ claude-code-mirror/
 **ModelSelector** - Dropdown in the status bar for choosing the Claude model (Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default). Selection is persisted to VS Code settings (`claudeMirror.model`) and synced back to the webview on startup and on change.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
+**PermissionModeSelector** - Dropdown in the status bar for choosing between "Full Access" (all tools auto-approved, default) and "Supervised" (only read-only tools allowed, write tools denied). Selection is persisted to VS Code settings (`claudeMirror.permissionMode`). In supervised mode, `--allowedTools` is passed to the CLI to restrict to read-only tools. Changes take effect on next session start.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
 **Clear Session** - Button in the input area that resets all UI state (messages, cost, streaming) and restarts the CLI process. Sends `clearSession` message to the extension, which stops the current process and spawns a new one.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **SessionStore** - Persists session metadata (ID, name, model, timestamps) in VS Code `globalState`. Used by the Conversation History QuickPick command to list and resume past sessions. Capped at 100 entries, sorted by most recently active.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**Open Plan Docs** - "Plans" button in the status bar that opens HTML plan documents from `Kingdom_of_Claudes_Beloved_MDs/` in the default browser. Single file opens directly; multiple files show a QuickPick sorted by modification time. Also available via Command Palette (`claudeMirror.openPlanDocs`).
+**PromptHistoryStore** - Persists user prompts at two scopes: project (`workspaceState`) and global (`globalState`). Prompts are saved on every `sendMessage`/`sendMessageWithImages`. Deduplicates consecutive entries, capped at 200 per scope. The webview requests history via `getPromptHistory` message and receives it via `promptHistoryResponse`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**Prompt History Panel** - Modal overlay with 3 tabs (Session / Project / Global) showing prompt history. Session tab uses in-memory `promptHistory` from the Zustand store. Project and Global tabs fetch from `PromptHistoryStore` via extension messaging. Includes text filter and click-to-insert into the input textarea. Opened via the "H" button in the input area.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the CLI pauses waiting for stdin input. The extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'`, shows an approval bar with Approve/Reject/Feedback buttons, and sends the user's response back to the CLI. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**Open Plan Docs** - "Plans" button in the status bar that opens HTML plan documents from `Kingdom_of_Claudes_Beloved_MDs/` in the default browser. Single file opens directly; multiple files show a QuickPick sorted by modification time. When no plan documents exist, offers to activate the Plans feature by injecting a "Plan mode" prompt into the project's `CLAUDE.md` (with Hebrew or English language choice). Also available via Command Palette (`claudeMirror.openPlanDocs`).
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**Editable Prompts** - Users can edit previously sent messages by hovering over a user message and clicking "Edit". The message content switches to an inline textarea. On send, all messages from the edit point onward are removed from the UI, the current CLI session is stopped, a new session starts, and the edited prompt is sent as the first message. Only text-only user messages are editable (not images). The edit button is hidden while the assistant is busy.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `Claude Mirror: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
@@ -216,7 +245,12 @@ claude-code-mirror/
 | `claudeMirror.chatFontSize` | `14` | Font size (px) for chat messages (10-32) |
 | `claudeMirror.chatFontFamily` | `""` | Font family for chat messages (empty = VS Code default) |
 | `claudeMirror.autoNameSessions` | `true` | Auto-generate tab names from first message using Haiku |
+| `claudeMirror.activitySummary` | `true` | Periodically summarize tool activity in busy indicator via Haiku |
+| `claudeMirror.activitySummaryThreshold` | `3` | Tool uses before triggering an activity summary (1-10) |
 | `claudeMirror.model` | `""` | Claude model to use for new sessions (empty = CLI default) |
+| `claudeMirror.permissionMode` | `"full-access"` | Permission mode: "full-access" (all tools) or "supervised" (read-only tools only) |
+| `claudeMirror.enableFileLogging` | `true` | Write logs to disk files in addition to the Output Channel |
+| `claudeMirror.logDirectory` | `""` | Directory for log files (empty = extension's default storage) |
 
 ---
 
@@ -368,6 +402,6 @@ The React app is wrapped in an `ErrorBoundary` component (`index.tsx`) that catc
 | **1.5 Multi-Tab** | Done | Multiple parallel sessions in separate VS Code tabs (SessionTab + TabManager) |
 | **2. Terminal Mirror** | Stub | PseudoTerminal mirroring same session |
 | **3. Sessions** | Partial | Multi-tab sessions (done), resume (done), fork (done), conversation history (done), rewind (stub) |
-| **4. Input** | Partial | File picker + Explorer send-path + keyboard shortcut (done), send-while-busy interrupt (done), image paste via Ctrl+V (done), RTL enhancements (done) |
+| **4. Input** | Partial | File picker + Explorer send-path + keyboard shortcut (done), send-while-busy interrupt (done), image paste via Ctrl+V (done), RTL enhancements (done), editable prompts (done) |
 | **5. Accounts** | Stub | Multi-account, compact mode, cost tracking |
 | **6. Polish** | Pending | Virtualized scrolling, error recovery, theming |

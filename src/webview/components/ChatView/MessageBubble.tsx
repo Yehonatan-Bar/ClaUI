@@ -1,25 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { ChatMessage } from '../../state/store';
 import type { ContentBlock } from '../../../extension/types/stream-json';
 import { CodeBlock } from './CodeBlock';
 import { ToolUseBlock } from './ToolUseBlock';
 import { useRtlDetection } from '../../hooks/useRtlDetection';
+import { renderTextWithFileLinks } from './filePathLinks';
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  isBusy?: boolean;
+  onEditAndResend?: (messageId: string, newText: string) => void;
 }
 
 /**
  * Renders a single completed message (user or assistant).
+ * User messages show an Edit button on hover (hidden while assistant is busy).
  */
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, onEditAndResend }) => {
   const isUser = message.role === 'user';
-
-  console.log(`%c[MessageBubble] render ${message.role}:${message.id}`, 'color: magenta', {
-    contentIsArray: Array.isArray(message.content),
-    contentType: typeof message.content,
-    rawContent: message.content,
-  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState('');
+  const editTextareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   // Defensive: normalize content to array in case it arrives as a string
   const contentBlocks: ContentBlock[] = Array.isArray(message.content)
@@ -28,6 +29,40 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
   const textContent = extractTextContent(contentBlocks);
   const { direction } = useRtlDetection(textContent);
+
+  // Only text-only user messages are editable (not images)
+  const hasOnlyText = isUser && contentBlocks.every((b) => b.type === 'text');
+  const canEdit = hasOnlyText && !isBusy && !!onEditAndResend;
+
+  const handleEditClick = () => {
+    setEditText(textContent);
+    setIsEditing(true);
+    // Focus the textarea after render
+    requestAnimationFrame(() => editTextareaRef.current?.focus());
+  };
+
+  const handleEditCancel = () => {
+    setIsEditing(false);
+    setEditText('');
+  };
+
+  const handleEditSend = () => {
+    const trimmed = editText.trim();
+    if (!trimmed || !onEditAndResend) return;
+    setIsEditing(false);
+    setEditText('');
+    onEditAndResend(message.id, trimmed);
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleEditSend();
+    }
+    if (e.key === 'Escape') {
+      handleEditCancel();
+    }
+  };
 
   return (
     <div className={`message ${isUser ? 'message-user' : 'message-assistant'}`}>
@@ -38,12 +73,43 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             {message.model}
           </span>
         )}
+        {canEdit && !isEditing && (
+          <button
+            className="edit-message-btn"
+            onClick={handleEditClick}
+            title="Edit and resend this message"
+          >
+            Edit
+          </button>
+        )}
       </div>
-      <div dir={direction}>
-        {contentBlocks.map((block, index) => (
-          <ContentBlockRenderer key={index} block={block} />
-        ))}
-      </div>
+
+      {isEditing ? (
+        <div className="edit-message-area">
+          <textarea
+            ref={editTextareaRef}
+            className="edit-message-textarea"
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onKeyDown={handleEditKeyDown}
+            rows={3}
+          />
+          <div className="edit-message-buttons">
+            <button className="edit-message-send" onClick={handleEditSend} disabled={!editText.trim()}>
+              Send
+            </button>
+            <button className="edit-message-cancel" onClick={handleEditCancel}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div dir={direction}>
+          {contentBlocks.map((block, index) => (
+            <ContentBlockRenderer key={index} block={block} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -112,7 +178,7 @@ const TextBlockRenderer: React.FC<{ text: string }> = ({ text }) => {
             className="text-content"
             style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
           >
-            {segment.content}
+            {renderTextWithFileLinks(segment.content)}
           </div>
         )
       )}
@@ -120,11 +186,13 @@ const TextBlockRenderer: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-/** Renders a tool_result block */
+/** Renders a tool_result block with collapsible body (collapsed by default) */
 const ToolResultRenderer: React.FC<{
   content?: string | ContentBlock[];
   isError?: boolean;
 }> = ({ content, isError }) => {
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
   if (!content) return null;
 
   const textContent =
@@ -144,12 +212,19 @@ const ToolResultRenderer: React.FC<{
           : undefined
       }
     >
-      <div className="tool-use-header">
+      <div
+        className="tool-use-header"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        style={{ cursor: 'pointer' }}
+      >
+        <span className={`tool-collapse-indicator${isCollapsed ? '' : ' expanded'}`} />
         <span style={{ opacity: 0.7 }}>
           {isError ? 'Error' : 'Result'}
         </span>
       </div>
-      <div className="tool-use-body">{textContent}</div>
+      {!isCollapsed && (
+        <div className="tool-use-body">{renderTextWithFileLinks(textContent)}</div>
+      )}
     </div>
   );
 };

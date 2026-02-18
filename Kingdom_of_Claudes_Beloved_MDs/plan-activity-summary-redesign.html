@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>תוכנית: שינוי תצוגת סיכום פעילות</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; background: #1e1e2e; color: #cdd6f4; line-height: 1.8; }
+  h1 { color: #89b4fa; border-bottom: 2px solid #45475a; padding-bottom: 12px; }
+  h2 { color: #a6e3a1; margin-top: 32px; }
+  .problem { background: #45475a; border-right: 4px solid #f38ba8; padding: 16px; border-radius: 8px; margin: 16px 0; }
+  .solution { background: #45475a; border-right: 4px solid #a6e3a1; padding: 16px; border-radius: 8px; margin: 16px 0; }
+  .visual { background: #313244; border: 1px solid #585b70; border-radius: 8px; padding: 16px; margin: 16px 0; font-family: 'Consolas', monospace; direction: ltr; text-align: center; }
+  .visual .label { color: #89b4fa; font-size: 14px; }
+  .visual .detail { color: #cdd6f4; font-size: 13px; margin-top: 6px; }
+  .visual .box { border: 1px solid #585b70; border-radius: 8px; display: inline-block; padding: 12px 24px; margin-top: 8px; background: rgba(137, 180, 250, 0.08); }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+  th { background: #313244; color: #89b4fa; padding: 10px; text-align: right; }
+  td { padding: 10px; border-bottom: 1px solid #45475a; }
+  .files { font-size: 13px; color: #94e2d5; }
+  .count { display: inline-block; background: #89b4fa; color: #1e1e2e; border-radius: 12px; padding: 2px 10px; font-size: 12px; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>תוכנית: שינוי תצוגת סיכום פעילות</h1>
+
+<h2>הבעיה</h2>
+<div class="problem">
+  <p><strong>שם הסשן נמחק:</strong> כשקלוד עובד ומשתמש ב-3 כלים או יותר, המערכת מייצרת סיכום קצר של הפעילות ו<strong>דורסת את שם הטאב</strong> עם הסיכום הזה. השם המקורי של הסשן (שנקבע בהתחלה) נעלם.</p>
+  <p><strong>הסיכום המפורט מוסתר:</strong> ההסבר המלא של מה קלוד עושה מוסתר מאחורי כפתור קטנטן [i] שצריך לרחף עליו כדי לראות tooltip. כמעט בלתי אפשרי לשים לב אליו.</p>
+</div>
+
+<h2>הפתרון</h2>
+<div class="solution">
+  <p><strong>1. שם הסשן נשאר קבוע</strong> - השם שנקבע בהתחלה (אחרי ההודעה הראשונה) לעולם לא ישתנה על ידי סיכומי פעילות.</p>
+  <p><strong>2. תצוגת סיכום בולטת ומפורטת</strong> - במקום כפתור tooltip זעיר, הסיכום המלא יוצג בצורה ברורה באזור ה"חושב..." עם רקע מודגש.</p>
+</div>
+
+<h2>איך זה ייראה</h2>
+
+<p><strong>לפני (רגיל, בלי סיכום):</strong></p>
+<div class="visual">
+  <span class="label">... Thinking...</span>
+</div>
+
+<p><strong>אחרי (עם סיכום פעילות):</strong></p>
+<div class="visual">
+  <div class="box">
+    <div class="label">... Refactoring auth module...</div>
+    <div class="detail">Claude is reading configuration files and updating the authentication middleware handlers.</div>
+  </div>
+</div>
+
+<h2>סיכום השינויים</h2>
+<table>
+  <tr>
+    <th>שינוי</th>
+    <th>תיאור</th>
+  </tr>
+  <tr>
+    <td>שם הטאב נשאר קבוע</td>
+    <td>הסרת השורה שדורסת את שם הסשן כשמגיע סיכום פעילות</td>
+  </tr>
+  <tr>
+    <td>תצוגת סיכום משופרת</td>
+    <td>במקום tooltip נסתר, הסיכום המלא מוצג בצורה בולטת מתחת לכותרת הקצרה, עם רקע מודגש ואנימציית הופעה</td>
+  </tr>
+  <tr>
+    <td>הסרת כפתור [i]</td>
+    <td>לא צריך יותר כפתור tooltip כי הסיכום המלא תמיד מוצג</td>
+  </tr>
+  <tr>
+    <td>איפוס בין תורות</td>
+    <td>כל תור חדש מתחיל עם "Thinking..." ועובר לסיכום אחרי 3 כלים</td>
+  </tr>
+</table>
+
+<p><span class="count">3 קבצים</span> משתנים | <span class="count">0 קבצים חדשים</span></p>
+
+</body>
+</html>

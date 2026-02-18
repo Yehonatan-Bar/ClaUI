@@ -68,6 +68,7 @@ claude -p --verbose
 - Parses stdout as newline-delimited JSON, buffering incomplete lines
 - Non-JSON lines emitted as `'raw'` events (progress indicators, etc.)
 - Supports `--resume <session-id>` and `--fork-session` flags for session management
+- Exit/error handlers are guarded against stale process references: during rapid stop()+start() (e.g. edit-and-resend), the old process's async exit handler will NOT null-out the newly spawned process reference
 
 **Events emitted:**
 | Event | Payload | When |
@@ -104,6 +105,7 @@ Demultiplexes raw `CliOutputEvent` objects into typed, semantic events.
 | `stream_event` -> content_block_start (tool_use) | `toolUseStart` | `{ messageId, blockIndex, toolName, toolId }` |
 | `stream_event` -> content_block_delta (json) | `toolUseDelta` | `{ messageId, blockIndex, partialJson }` |
 | `stream_event` -> content_block_stop | `blockStop` | `{ blockIndex }` |
+| `stream_event` -> message_delta | `messageDelta` | `{ stopReason }` |
 | `stream_event` -> message_stop | `messageStop` | (none) |
 | `assistant` | `assistantMessage` | Full `AssistantMessage` |
 | `user` | `userMessage` | Full `UserMessage` |
@@ -158,9 +160,24 @@ Bidirectional bridge between the webview and the CLI process. Accepts a `Webview
 | `stopSession` | Calls `processManager.stop()` |
 | `resumeSession` | Calls `processManager.start({ resume })` |
 | `forkSession` | Calls `processManager.start({ resume, fork: true })` |
+| `planApprovalResponse` | Sends approve/reject/feedback text via `control.sendText()` |
+| `openFile` | Opens a file in VS Code editor via `vscode.commands.executeCommand('vscode.open', uri)` |
+| `openUrl` | Opens a URL in the default browser via `vscode.env.openExternal()` (http/https only) |
 
 **Extension -> Webview direction:**
 StreamDemux events are translated to `ExtensionToWebviewMessage` types and sent via `webview.postMessage()`.
+
+**Plan Approval Detection:**
+MessageHandler tracks tool names during streaming (`currentMessageToolNames`). When `messageDelta` fires with `stopReason === 'tool_use'` and one of the tools is `ExitPlanMode` or `AskUserQuestion`, it sends a `planApprovalRequired` message to the webview with the `toolName`. The user's response is sent back as a plain text message to the CLI via stdin. For plan approvals: approve/reject/feedback text. For questions: the selected option label(s) or a custom text answer.
+
+**Plan Approval Cleanup (multiple safety nets):**
+The `pendingApproval` state is cleared in several places to prevent the approval bar from lingering:
+1. **Button click**: PlanApprovalBar handlers call `setPendingApproval(null)` immediately on approve/reject/feedback.
+2. **Text input**: InputArea detects `pendingApproval` and routes typed messages as `planApprovalResponse` (feedback or questionAnswer), clearing the state.
+3. **processBusy: true**: useClaudeStream clears `pendingApproval` when the CLI becomes busy again.
+4. **messageStart**: useClaudeStream clears `pendingApproval` when a new assistant message starts streaming.
+5. **costUpdate (turn end)**: useClaudeStream clears `pendingApproval` when the turn completes.
+6. **Session end**: `endSession` in the store resets `pendingApproval` to null.
 
 ---
 
@@ -180,6 +197,7 @@ Central state for the React UI:
 | `streamingMessageId` | `string | null` | Currently streaming message |
 | `streamingBlocks` | `StreamingBlock[]` | In-progress content blocks |
 | `cost` | `CostInfo` | Token and cost tracking |
+| `pendingApproval` | `{ toolName, planText } | null` | Plan approval waiting state |
 
 ### useClaudeStream Hook (`hooks/useClaudeStream.ts`)
 
@@ -193,15 +211,24 @@ Detects Hebrew (U+0590-U+05FF) and Arabic (U+0600-U+06FF) characters in text. Re
 
 **MessageList** - Scrollable container with auto-scroll. Pauses auto-scroll when user scrolls up (>100px from bottom). Renders completed messages and streaming blocks.
 
-**MessageBubble** - Renders a completed message. Parses text content to extract fenced code blocks (``` delimiters). Applies RTL detection. Renders tool_use, tool_result, and image content blocks inline. Image blocks display as responsive thumbnails with rounded borders.
+**MessageBubble** - Renders a completed message. Parses text content to extract fenced code blocks (``` delimiters). Applies RTL detection. Renders tool_use, tool_result, and image content blocks inline. Tool result blocks are rendered with a collapsible panel (collapsed by default) to keep the chat clean - file paths inside tool results are also clickable. Image blocks display as responsive thumbnails with rounded borders. File paths in plain text segments are detected and rendered as clickable links via `renderTextWithFileLinks()`.
 
 **StreamingText** - Renders in-progress text with a blinking cursor animation at the end.
 
-**ToolUseBlock** - Collapsible panel showing tool name and input JSON. Shows "running..." indicator during streaming.
+**ToolUseBlock** - Collapsible panel showing tool name and input JSON, **collapsed by default** with a disclosure triangle to expand. Shows "running..." indicator during streaming. Plan tools (`ExitPlanMode`, `AskUserQuestion`) get distinct blue styling, friendly labels ("Plan" / "Question"), and display extracted plan text instead of raw JSON. File paths inside tool content are rendered as clickable links.
 
-**CodeBlock** - Fenced code block with language label and copy-to-clipboard button. Uses VS Code theme variables for styling.
+**PlanApprovalBar** - Dual-mode action bar shown when `pendingApproval` is set in the store. Renders different UI based on `toolName`:
+- **ExitPlanMode**: Displays "Plan Ready for Review" with three buttons: Approve, Reject, and Give Feedback. Feedback mode expands a textarea.
+- **AskUserQuestion**: Displays the question text and clickable option buttons parsed from the tool's JSON input (`planText`). Supports single-select (click sends immediately) and multi-select (checkboxes with a Submit button). Includes a "Custom answer..." fallback for free-text responses.
+Each action sends a `planApprovalResponse` message (with action `approve`/`reject`/`feedback`/`questionAnswer`) to the extension and clears the approval state. Replaces the busy indicator when active. Users can also type directly in the InputArea while the approval bar is visible - this routes through `planApprovalResponse` as feedback/answer rather than creating a new conversation turn.
 
-**InputArea** - Auto-growing textarea with RTL auto-detection. Ctrl+Enter sends, Enter adds newline. Shows Cancel button when busy. Browse button (folder icon) opens VS Code's native file picker dialog and pastes selected file paths into the input. Ctrl+V with an image in the clipboard attaches it as a base64 thumbnail preview above the input; multiple images can be queued and individually removed. When images are pending, the message is sent via `sendMessageWithImages` which encodes them as Anthropic image content blocks.
+**CodeBlock** - Fenced code block with language label and copy-to-clipboard button. Uses VS Code theme variables for styling. File paths inside code blocks are also rendered as clickable links.
+
+**filePathLinks** (`ChatView/filePathLinks.tsx`) - Utility that detects file paths and URLs in text using regex and replaces them with clickable `<span>` elements. Supports two link types:
+- **File paths**: Windows absolute (`C:\...`), Unix absolute (`/...`), and relative paths (`src/...`, `./...`). Paths with `:line` or `:line:col` suffixes are also matched (e.g., `file.ts:42`). Uses **Ctrl+Click** (Cmd+Click on Mac) to open, matching VS Code's link convention. Sends an `openFile` message to the extension host, which resolves relative paths against the workspace root and opens the file at the correct position.
+- **URLs**: `http://` and `https://` URLs are detected and rendered as clickable links (single-click to open). Sends an `openUrl` message to the extension host, which opens the URL in the user's default browser via `vscode.env.openExternal()`. Overlap resolution ensures file paths and URLs don't conflict when both regexes could match.
+
+**InputArea** - Auto-growing textarea with RTL auto-detection. Ctrl+Enter sends, Enter adds newline. Shows Cancel button when busy. Browse button (folder icon) opens VS Code's native file picker dialog and pastes selected file paths into the input. Ctrl+V with an image in the clipboard attaches it as a base64 thumbnail preview above the input; multiple images can be queued and individually removed. When images are pending, the message is sent via `sendMessageWithImages` which encodes them as Anthropic image content blocks. When a plan approval bar is active (`pendingApproval` is set), typed messages are routed as `planApprovalResponse` feedback/answers instead of `sendMessage`, and the placeholder text changes to indicate the approval context.
 
 ---
 
@@ -214,8 +241,9 @@ Bundles all resources for one Claude session tab:
 - Creates its own `vscode.WebviewPanel` using `buildWebviewHtml()`
 - Implements `WebviewBridge` interface for MessageHandler
 - Wires all events (process -> demux -> handler -> webview) internally
-- Panel title: starts as `"Claude Mirror N"`, auto-renamed by SessionNamer after first user message
+- Panel title: starts as `"Claude Mirror N"`, auto-renamed by SessionNamer after first user message. An animated braille spinner is appended to the title while Claude is processing (busy state)
 - Tab icon: colored SVG circle generated per-tab and set via `panel.iconPath` so all tab colors are visible in the VS Code tab bar simultaneously
+- Busy indicator: `postMessage` intercepts `processBusy` messages and calls `setBusy()` which starts/stops an animated spinner (`setInterval` cycling through braille frames every 120ms). The base title (without indicator) is stored in `baseTitle` so toggling is clean. Timer is cleaned up on dispose.
 - Rename: floating pencil button in the webview (appears on hover) triggers a VS Code input box to rename the tab
 - Log prefix: `[Tab N]` on the shared output channel
 
@@ -226,6 +254,7 @@ Bundles all resources for one Claude session tab:
 | `stopSession()` | Kill CLI process |
 | `sendText(text)` | Send user message to CLI |
 | `compact(instructions?)` | Request context compaction |
+| `setBusy(busy)` | Toggle thinking indicator on tab title |
 | `reveal()` | Focus this tab's panel |
 | `dispose()` | Clean up all resources |
 
@@ -275,6 +304,46 @@ interface SessionMetadata {
 - `commands.ts showHistory` reads sessions and shows a VS Code QuickPick for resuming
 
 **Keybinding:** `Ctrl+Shift+H` opens the history QuickPick.
+
+### PromptHistoryStore (`session/PromptHistoryStore.ts`)
+
+Persists user prompts at two scopes for the Prompt History Panel feature.
+
+**Scopes:**
+- **Project** (`workspaceState`, key `claudeMirror.promptHistory.project`) - prompts from all sessions in the current workspace
+- **Global** (`globalState`, key `claudeMirror.promptHistory.global`) - prompts across all workspaces
+
+**Methods:**
+- `getProjectHistory()` - Returns project-scoped prompts (most recent last)
+- `getGlobalHistory()` - Returns global prompts (most recent last)
+- `addPrompt(prompt)` - Appends to both scopes, skips consecutive duplicates, caps at 200
+
+**Integration points:**
+- Created in `extension.ts activate()`, passed through `TabManager` -> `SessionTab` -> `MessageHandler`
+- `MessageHandler.sendMessage` and `sendMessageWithImages` call `addPrompt()` on every user message
+- `MessageHandler.getPromptHistory` responds with stored prompts when the webview requests them
+
+### Prompt History Panel (`components/ChatView/PromptHistoryPanel.tsx`)
+
+Modal overlay component with 3 tabs for browsing prompt history:
+
+| Tab | Source | Storage |
+|-----|--------|---------|
+| **Session** | `store.promptHistory` (Zustand) | In-memory, current session only |
+| **Project** | `PromptHistoryStore.getProjectHistory()` | VS Code `workspaceState` |
+| **Global** | `PromptHistoryStore.getGlobalHistory()` | VS Code `globalState` |
+
+**Features:**
+- Text filter input for searching prompts
+- Click-to-insert: dispatches a `prompt-history-select` CustomEvent that `InputArea` listens for
+- Close on Escape key or clicking the overlay backdrop
+- Prompts shown newest-first (reversed from storage order)
+
+**Message flow:**
+1. User clicks "H" button in InputArea -> sets `promptHistoryPanelOpen = true` in store
+2. Panel renders, tab switch triggers `postToExtension({ type: 'getPromptHistory', scope })`
+3. Extension responds with `promptHistoryResponse` containing the prompt array
+4. User clicks a prompt -> CustomEvent dispatched -> InputArea inserts text
 
 ### TabManager (`session/TabManager.ts`)
 
@@ -328,7 +397,75 @@ The `claudeMirror.openPlanDocs` command opens HTML plan documents in the default
 5. Opens via `vscode.env.openExternal(vscode.Uri.file(path))`
 6. Also accessible from Command Palette: "Claude Mirror: Open Plan Document"
 
+**Plans Feature Activation** - When no HTML plan documents exist (folder missing or empty), the command offers to activate the Plans feature:
+1. Shows an information message explaining the feature and asking if the user wants to enable it
+2. If yes, asks the user to choose a language (Hebrew or English) via QuickPick
+3. Injects a "Plan mode" prompt into the project's `CLAUDE.md` file (appends if file exists, creates if not)
+4. The prompt instructs Claude Code to generate a manager-friendly HTML plan document in the chosen language whenever it enters plan mode
+5. Checks for existing "Plan mode -" text to avoid duplicate injection
+
 **UI**: "Plans" button in the status bar (next to "History"), styled identically.
+
+### Editable Prompts (edit-and-resend)
+
+Users can edit a previously sent message and resend it, discarding everything after the edit point.
+
+**Flow:**
+1. User hovers over a user message -> "Edit" button appears in the role header
+2. Click "Edit" -> message content switches to an inline textarea pre-filled with the original text
+3. User modifies text and clicks "Send" (or Enter)
+4. Store's `truncateFromMessage(messageId)` removes the edited message and all messages after it
+5. `addUserMessage(newText)` adds the edited message immediately so it's visible in the UI
+6. Webview sends `editAndResend` message to extension
+7. MessageHandler immediately sets `processBusy: true` to block user input
+8. MessageHandler stops the current CLI process (with `setSuppressNextExit` to avoid showing "session ended")
+9. A fresh CLI process is spawned via `processManager.start()`
+10. Once the process starts, the edited text is sent immediately as the first stdin message
+11. The CLI emits `system/init` (which updates session metadata), then responds normally
+
+The edited message is sent **immediately** after process start, without waiting for `system/init`. The CLI in pipe mode only emits `system/init` after receiving its first stdin message, so waiting for init before sending would cause a deadlock.
+
+The edited message is added to the store locally (step 5) rather than waiting for the CLI echo, because the session restart can cause the echo to be delayed or lost. The `addUserMessage` function deduplicates within a 5-second window to prevent a duplicate if the CLI does echo the same text back.
+
+**Key files:**
+- `webview-messages.ts` - `EditAndResendRequest` type
+- `store.ts` - `truncateFromMessage` action, `addUserMessage` with deduplication
+- `MessageBubble.tsx` - Edit button, inline textarea, send/cancel
+- `MessageList.tsx` - `handleEditAndResend` callback wiring
+- `MessageHandler.ts` - `editAndResend` case: stop process, restart, send edited text immediately
+- `global.css` - `.edit-message-*` styles (button fades in on hover)
+
+**Edge cases:**
+- Edit button hidden while assistant is busy (`isBusy` prop)
+- Only text-only user messages are editable (messages with images skip the edit button)
+- Editing the first message clears the entire conversation
+- Duplicate user messages with the same text within 5s are deduplicated
+- If session already ended, a new one starts automatically
+
+**Tradeoff:** Claude does not "remember" messages before the edited prompt. The new session receives only the edited text. This is the simplest approach since the CLI does not support rewinding mid-conversation.
+
+### Permission Mode
+
+Controls whether Claude has full tool access or is restricted to read-only tools.
+
+**Modes:**
+- **Full Access** (default) - CLI runs with `-p` flag, all tools auto-approved
+- **Supervised** - CLI runs with `-p --allowedTools Read,Grep,Glob,LS,Task,WebFetch,WebSearch,TodoRead,TodoWrite,AskUserQuestion,ExitPlanMode` restricting to read-only tools. Write tools (Bash, Edit, Write) are denied by the CLI.
+
+**Data flow (same pattern as ModelSelector):**
+1. User selects mode in `PermissionModeSelector` dropdown (status bar)
+2. `setPermissionMode` updates Zustand store + sends `setPermissionMode` message to extension
+3. Extension persists to VS Code config (`claudeMirror.permissionMode`)
+4. On next session start, `ClaudeProcessManager.start()` reads the config and conditionally adds `--allowedTools`
+5. On webview ready, extension sends `permissionModeSetting` message to sync the dropdown
+
+**Key files:**
+- `ClaudeProcessManager.ts` - `--allowedTools` injection in `start()` when `supervised`
+- `webview-messages.ts` - `SetPermissionModeRequest`, `PermissionModeSettingMessage`
+- `MessageHandler.ts` - `setPermissionMode` handler, `sendPermissionModeSetting()`
+- `store.ts` - `permissionMode` state, `setPermissionMode` action
+- `useClaudeStream.ts` - `permissionModeSetting` case
+- `PermissionModeSelector.tsx` - UI dropdown component
 
 ### Process Crash Recovery (per-tab)
 1. SessionTab's process emits `'exit'` with non-zero code

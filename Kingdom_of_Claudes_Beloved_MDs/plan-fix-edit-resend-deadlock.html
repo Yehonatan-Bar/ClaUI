@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>תיקון באג: עריכת הודעה ושליחה מחדש</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      line-height: 1.7;
+    }
+    h1 { color: #4A9FD9; border-bottom: 2px solid #4A9FD9; padding-bottom: 10px; }
+    h2 { color: #E06C75; margin-top: 30px; }
+    .problem { background: #2d1f1f; border-right: 4px solid #E06C75; padding: 15px; border-radius: 6px; margin: 15px 0; }
+    .solution { background: #1f2d1f; border-right: 4px solid #98C379; padding: 15px; border-radius: 6px; margin: 15px 0; }
+    .flow { background: #1f1f2d; border-right: 4px solid #4A9FD9; padding: 15px; border-radius: 6px; margin: 15px 0; }
+    .arrow { color: #4A9FD9; font-weight: bold; }
+    .highlight { color: #E5C07B; font-weight: bold; }
+    .file { color: #98C379; font-family: monospace; direction: ltr; display: inline-block; }
+  </style>
+</head>
+<body>
+  <h1>תיקון באג: עריכת הודעה ושליחה מחדש</h1>
+
+  <h2>הבעיה</h2>
+  <div class="problem">
+    <p>כשהמשתמש עורך הודעה ושולח מחדש, הסשן "מתאפס" - לא מגיעה תגובה, ואז כששולחים הודעה חדשה, שם הסשן משתנה כאילו זה שיחה חדשה לגמרי.</p>
+  </div>
+
+  <h2>מה קורה מאחורי הקלעים</h2>
+  <div class="flow">
+    <p><span class="highlight">נעילה הדדית (Deadlock):</span></p>
+    <p>1. המערכת סוגרת את התהליך הישן ופותחת חדש</p>
+    <p>2. המערכת <strong>מחכה</strong> שהתהליך החדש יאותחל לפני שליחת ההודעה הערוכה</p>
+    <p>3. התהליך החדש <strong>מחכה</strong> לקבל הודעה ראשונה כדי להתאתחל</p>
+    <p>4. <span class="arrow">שני הצדדים מחכים אחד לשני ← אף אחד לא מתקדם</span></p>
+    <p>5. אחרי 30 שניות - timeout, המערכת מוותרת, ומה שנשאר זה תהליך "תקוע" שמקבל את ההודעה הבאה כסשן חדש</p>
+  </div>
+
+  <h2>הפתרון</h2>
+  <div class="solution">
+    <p>לא לחכות לאיתחול - לשלוח את ההודעה הערוכה <strong>מיד</strong> אחרי שהתהליך החדש עולה.</p>
+    <p>זה בדיוק מה שקורה כששולחים הודעה רגילה (שם זה עובד מצוין), אז פשוט מיישרים את ההתנהגות.</p>
+  </div>
+
+  <h2>מה משתנה</h2>
+  <div class="flow">
+    <p><span class="highlight">קובץ אחד:</span> <span class="file">MessageHandler.ts</span></p>
+    <ul>
+      <li>הסרת מנגנון ההמתנה המיותר (listener + timeout)</li>
+      <li>שליחה ישירה של ההודעה הערוכה ברגע שהתהליך מוכן</li>
+      <li>ניקוי קוד שנועד לחסום הודעות בזמן ההמתנה (כבר לא רלוונטי)</li>
+    </ul>
+  </div>
+
+  <h2>בדיקה</h2>
+  <div class="solution">
+    <ol>
+      <li>שליחת הודעה וקבלת תגובה</li>
+      <li>עריכת ההודעה ושליחה מחדש</li>
+      <li>בדיקה שמגיעה תגובה חדשה ושם הסשן מתעדכן בהתאם</li>
+    </ol>
+  </div>
+</body>
+</html>
