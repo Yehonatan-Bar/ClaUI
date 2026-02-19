@@ -401,6 +401,98 @@ The React app is wrapped in an `ErrorBoundary` component (`index.tsx`) that catc
 
 ---
 
+## VS Code Marketplace Publishing
+
+### Publisher Info
+
+| Item | Value |
+|------|-------|
+| Publisher ID | `JhonBar` |
+| Publisher Name | Jhon Bar |
+| Marketplace Manage | https://marketplace.visualstudio.com/manage/publishers/JhonBar |
+| Extension URL | https://marketplace.visualstudio.com/items?itemName=JhonBar.claude-code-mirror |
+| Azure DevOps (PAT) | https://dev.azure.com/yonzbar/_usersSettings/tokens |
+| Repository | https://github.com/Yehonatan-Bar/ClaUI |
+
+### PAT (Personal Access Token) Requirements
+
+When creating/renewing a PAT at the Azure DevOps link above:
+- **Organization**: Must be **"All accessible organizations"** (not a specific org)
+- **Scopes**: Custom defined > **Marketplace > Manage**
+- PAT expires periodically - renew when `vsce publish` fails with auth errors
+
+### Publishing an Update (Step by Step)
+
+After making code changes and testing locally with `npm run deploy:local`:
+
+```bash
+cd C:\projects\claude-code-mirror
+
+# 1. Make sure you're logged in (one-time, or after PAT renewal)
+vsce login JhonBar
+
+# 2. Publish with automatic version bump
+vsce publish patch
+```
+
+**What `vsce publish patch` does automatically:**
+1. Bumps `version` in `package.json` (e.g., `0.1.0` -> `0.1.1`)
+2. Runs `npm run build` (via the `vscode:prepublish` script)
+3. Packages everything into a `.vsix` (respecting `.vscodeignore`)
+4. Uploads to the Marketplace
+5. Verification runs (usually takes up to 5 minutes)
+
+**Version bump options:**
+
+| Command | Example | Use when |
+|---------|---------|----------|
+| `vsce publish patch` | 0.1.0 -> 0.1.1 | Bug fixes, small changes |
+| `vsce publish minor` | 0.1.1 -> 0.2.0 | New features |
+| `vsce publish major` | 0.2.0 -> 1.0.0 | Breaking changes |
+
+**After publishing:**
+- Update `CHANGELOG.md` with the new version entry
+- Users with auto-update enabled will get the new version automatically
+- The Marketplace page (`README.md`) updates within a few minutes
+
+### Publishing via Website (Fallback)
+
+If PAT/CLI issues prevent `vsce publish`:
+
+```bash
+# Build the .vsix package only
+vsce package
+```
+
+Then upload the `.vsix` manually at https://marketplace.visualstudio.com/manage/publishers/JhonBar
+
+Note: Manual upload does NOT auto-bump the version. Update `version` in `package.json` yourself before running `vsce package`.
+
+### Pre-publish Checklist
+
+1. Test locally with `npm run deploy:local` + VS Code reload
+2. Ensure `npm run build` succeeds
+3. Verify `images/icon.png` exists (copied from `src/logo.png`)
+
+### Key Files for Marketplace
+
+| File | Purpose |
+|------|---------|
+| `package.json` | Extension manifest (`publisher`, `icon`, `repository`, `license`) |
+| `README.md` | Displayed as the extension's Marketplace page |
+| `CHANGELOG.md` | Displayed in the "Changelog" tab on Marketplace |
+| `LICENSE` | MIT license |
+| `images/icon.png` | Extension icon (must NOT be in `src/` - excluded by `.vscodeignore`) |
+| `.vscodeignore` | Controls what goes into the `.vsix` package |
+
+### Tool Installation
+
+```bash
+npm install -g @vscode/vsce
+```
+
+---
+
 ## Implementation Phases
 
 | Phase | Status | Description |

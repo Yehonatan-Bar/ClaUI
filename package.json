@@ -1,9 +1,9 @@
 {
   "name": "claude-code-mirror",
-  "displayName": "Claude Code Mirror",
+  "displayName": "ClaUi",
   "description": "Rich chat interface for Claude Code with terminal mirroring",
   "version": "0.1.0",
-  "publisher": "JohnBar",
+  "publisher": "JhonBar",
   "icon": "images/icon.png",
   "engines": {
     "vscode": "^1.85.0"
