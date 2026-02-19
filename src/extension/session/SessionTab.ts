@@ -122,10 +122,12 @@ export class SessionTab implements WebviewBridge {
     this.messageHandler.onActivitySummaryGenerated((summary) => {
       tabLog(`[ActivitySummary] Callback: "${summary.shortLabel}"`);
       if (!this.disposed) {
-        // Activity summary is displayed in the webview busy indicator.
-        // Tab title remains the session name from SessionNamer.
-        if (this.panel.active) {
-          this.statusBarItem.tooltip = summary.fullSummary;
+        try {
+          if (this.panel.active) {
+            this.statusBarItem.tooltip = summary.fullSummary;
+          }
+        } catch {
+          // Panel may have been disposed between our flag check and the access
         }
       }
     });
@@ -174,7 +176,12 @@ export class SessionTab implements WebviewBridge {
       this.pendingMessages.push(msg);
       return;
     }
-    void this.panel.webview.postMessage(msg);
+    try {
+      void this.panel.webview.postMessage(msg);
+    } catch {
+      // Panel may have been disposed between our flag check and the actual call
+      this.disposed = true;
+    }
   }
 
   onMessage(callback: (msg: WebviewToExtensionMessage) => void): void {
@@ -223,7 +230,11 @@ export class SessionTab implements WebviewBridge {
     if (this.disposed) {
       return;
     }
-    this.panel.reveal();
+    try {
+      this.panel.reveal();
+    } catch {
+      this.disposed = true;
+    }
   }
 
   /** Whether this tab has been disposed */
@@ -361,13 +372,14 @@ export class SessionTab implements WebviewBridge {
 
   /** Prompt the user for a new tab name */
   private async handleRenameRequest(): Promise<void> {
-    const currentName = this.panel.title;
+    if (this.disposed) return;
+    const currentName = this.baseTitle || `ClaUi ${this.tabNumber}`;
     const newName = await vscode.window.showInputBox({
       prompt: 'Rename this tab',
       value: currentName,
       placeHolder: 'Tab name...',
     });
-    if (newName && newName !== currentName) {
+    if (newName && newName !== currentName && !this.disposed) {
       this.setTabName(newName);
       this.log(`[Tab ${this.tabNumber}] Renamed to "${newName}"`);
       this.fileLogger?.updateSessionName(newName);
@@ -540,16 +552,26 @@ export class SessionTab implements WebviewBridge {
 
   private wireDemuxStatusBar(): void {
     this.demux.on('messageStart', () => {
+      if (this.disposed) return;
       // Only show status bar if this is the active/focused tab
-      if (this.panel.active) {
-        this.statusBarItem.text = `$(loading~spin) Claude thinking... (Tab ${this.tabNumber})`;
-        this.statusBarItem.show();
+      try {
+        if (this.panel.active) {
+          this.statusBarItem.text = `$(loading~spin) Claude thinking... (Tab ${this.tabNumber})`;
+          this.statusBarItem.show();
+        }
+      } catch {
+        // Panel may have been disposed between our check and the access
       }
     });
 
     this.demux.on('assistantMessage', (_event: AssistantMessage) => {
-      if (this.panel.active) {
-        this.statusBarItem.hide();
+      if (this.disposed) return;
+      try {
+        if (this.panel.active) {
+          this.statusBarItem.hide();
+        }
+      } catch {
+        // Panel may have been disposed between our check and the access
       }
     });
   }
@@ -576,8 +598,13 @@ export class SessionTab implements WebviewBridge {
     }
     const queued = this.pendingMessages;
     this.pendingMessages = [];
-    for (const message of queued) {
-      void this.panel.webview.postMessage(message);
+    try {
+      for (const message of queued) {
+        void this.panel.webview.postMessage(message);
+      }
+    } catch {
+      // Panel may have been disposed between our flag check and the actual call
+      this.disposed = true;
     }
   }
 }
