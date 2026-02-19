@@ -274,14 +274,6 @@ export class MessageHandler {
           vscode.workspace.getConfiguration('claudeMirror').update('model', msg.model, true);
           break;
 
-        case 'switchToSonnet':
-          this.log('Switch to Sonnet 4.6 requested');
-          if (this.webview.switchModel) {
-            this.webview.switchModel('claude-sonnet-4-6').catch((err) => {
-              this.log(`Switch to Sonnet failed: ${err}`);
-            });
-          }
-          break;
 
         case 'setPermissionMode':
           this.log(`Setting permission mode to: "${msg.mode}"`);

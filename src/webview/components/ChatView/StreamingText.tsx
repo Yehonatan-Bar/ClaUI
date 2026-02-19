@@ -1,5 +1,4 @@
 import React from 'react';
-import { useRtlDetection } from '../../hooks/useRtlDetection';
 
 interface StreamingTextProps {
   text: string;
@@ -10,12 +9,10 @@ interface StreamingTextProps {
  * Shows a blinking cursor at the end to indicate in-progress content.
  */
 export const StreamingText: React.FC<StreamingTextProps> = ({ text }) => {
-  const { direction } = useRtlDetection(text);
-
   return (
     <div
       className="text-content"
-      dir={direction}
+      dir="auto"
       style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
     >
       {text}

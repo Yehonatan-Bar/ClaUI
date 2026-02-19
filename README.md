@@ -4,18 +4,37 @@ A VS Code extension that gives [Claude Code](https://docs.anthropic.com/en/docs/
 
 ## Features
 
-- **Multi-tab sessions** - Run multiple Claude conversations in parallel, each in its own VS Code tab with a distinct color
-- **Model selection** - Switch between Sonnet, Opus, and Haiku from the status bar
+### Tabs & Sessions
+
+- **Multi-tab sessions** - Run multiple Claude conversations in parallel, each in its own VS Code tab
+- **Tab colors** - Each tab gets a unique color from an 8-color palette (blue, coral, green, orange, purple, cyan, gold, brick) so you can tell them apart at a glance
+- **Auto-naming** - Tabs are automatically named based on your first message using a lightweight AI call
+- **Tab renaming** - Click the pencil icon in the top-right corner of any tab to rename it
+- **Activity indicator** - A spinning indicator appears in the tab title while Claude is working, plus a summary of what it's currently doing
+
+### Conversation History
+
+- **Resume past sessions** - Browse your conversation history and resume any past session. Claude picks up right where you left off, with the full conversation restored in the UI
+- **Prompt history** - Click the **H** button in the input area to open a 3-tier prompt history panel (Session / Project / Global). Filter prompts with search, or use **Arrow Up/Down** in the textarea to cycle through recent prompts
+
+### Input & Interaction
+
+- **Image paste** - Paste images from clipboard directly into the chat with `Ctrl+V`. Thumbnails preview above the input before sending
+- **Cancel with Escape** - Press **Escape** or click the **Cancel** button to stop Claude mid-response. The session auto-resumes so you can keep chatting immediately
 - **File sending** - Send file paths via right-click context menu, the "+" button, or a keyboard shortcut
-- **Image paste** - Paste images from clipboard directly into the chat with `Ctrl+V`
-- **Conversation history** - Browse and resume past sessions
-- **Auto-naming** - Tabs are automatically named based on your first message
-- **Activity summaries** - Tab title updates with what Claude is currently doing
 - **Plan approval** - Approve, reject, or give feedback on Claude's plans inline
-- **RTL support** - Full right-to-left support for Hebrew and Arabic
+
+### Configuration
+
+- **Model selection** - Switch between Sonnet, Opus, and Haiku from the status bar
 - **Permission modes** - Choose between Full Access and Supervised (read-only) modes
-- **Session logging** - Per-session log files saved to disk
+- **CLI path setting** - Point to a custom Claude CLI executable via `claudeMirror.cliPath` in VS Code settings
 - **Customizable fonts** - Adjust chat font size and family, including Hebrew-friendly presets
+
+### Other
+
+- **RTL support** - Full right-to-left support for Hebrew and Arabic
+- **Session logging** - Per-session log files saved to disk
 
 ## Prerequisites
 

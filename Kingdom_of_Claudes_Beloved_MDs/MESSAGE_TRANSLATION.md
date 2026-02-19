@@ -90,6 +90,6 @@ All three are cleared on `reset()`.
 
 ## Interactions with Other Components
 
-- **RTL Detection** (`useRtlDetection.ts`): Already exists in the codebase. Translated content uses explicit `dir="rtl"` wrapper since we know the output is Hebrew.
+- **RTL Detection** (`useRtlDetection.ts`): Exports `detectRtl()` for InputArea. Messages use `dir="auto"` natively. Translated content uses explicit `dir="rtl"` wrapper since we know the output is Hebrew.
 - **SessionNamer** (`SessionNamer.ts`): Same CLI spawn pattern, different model (Sonnet vs Haiku) and timeout (30s vs 10s).
 - **MessageHandler** (`MessageHandler.ts`): Translation is wired via `setMessageTranslator()` setter, same pattern as `setSessionNamer()` and `setActivitySummarizer()`.

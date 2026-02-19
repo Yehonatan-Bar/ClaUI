@@ -204,15 +204,15 @@ Central state for the React UI:
 
 Listens for `window.message` events (postMessages from extension host) and dispatches them to the Zustand store. Also exports `postToExtension()` for sending messages back.
 
-### useRtlDetection Hook (`hooks/useRtlDetection.ts`)
+### RTL Detection (`hooks/useRtlDetection.ts`)
 
-Detects Hebrew (U+0590-U+05FF) and Arabic (U+0600-U+06FF) characters in text. Returns `direction: 'rtl' | 'ltr' | 'auto'` for use in `dir` attributes.
+Exports `detectRtl(text)` which checks for Hebrew (U+0590-U+05FF) and Arabic (U+0600-U+06FF) characters. Used only by InputArea for per-keystroke textarea direction. Message bubbles and streaming text use the browser's native `dir="auto"` (first-strong-character algorithm) instead, so a mostly-English message containing a few Hebrew words stays LTR. MarkdownContent applies `dir="auto"` to each block-level element (p, li, headings, td) for per-paragraph direction detection.
 
 ### React Components
 
 **MessageList** - Scrollable container with auto-scroll. Pauses auto-scroll when user scrolls up (>100px from bottom). Renders completed messages and streaming blocks.
 
-**MessageBubble** - Renders a completed message. Parses text content to extract fenced code blocks (``` delimiters). Applies RTL detection. Renders tool_use, tool_result, and image content blocks inline. Tool result blocks are rendered with a collapsible panel (collapsed by default) to keep the chat clean - file paths inside tool results are also clickable. Image blocks display as responsive thumbnails with rounded borders. File paths in plain text segments are detected and rendered as clickable links via `renderTextWithFileLinks()`. A **Copy button** appears on hover in the message role header for both user and assistant messages, copying the full text content to the clipboard (uses Clipboard API with `execCommand` fallback). Shows "Copied!" confirmation for 2 seconds.
+**MessageBubble** - Renders a completed message. Parses text content to extract fenced code blocks (``` delimiters). Uses `dir="auto"` for automatic bidi direction. Renders tool_use, tool_result, and image content blocks inline. Tool result blocks are rendered with a collapsible panel (collapsed by default) to keep the chat clean - file paths inside tool results are also clickable. Image blocks display as responsive thumbnails with rounded borders. File paths in plain text segments are detected and rendered as clickable links via `renderTextWithFileLinks()`. A **Copy button** appears on hover in the message role header for both user and assistant messages, copying the full text content to the clipboard (uses Clipboard API with `execCommand` fallback). Shows "Copied!" confirmation for 2 seconds.
 
 **StreamingText** - Renders in-progress text with a blinking cursor animation at the end.
 

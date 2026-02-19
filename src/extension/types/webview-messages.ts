@@ -141,9 +141,6 @@ export interface FileSearchRequest {
   requestId: number;
 }
 
-export interface SwitchToSonnetRequest {
-  type: 'switchToSonnet';
-}
 
 export type WebviewToExtensionMessage =
   | SendTextMessage
@@ -171,8 +168,7 @@ export type WebviewToExtensionMessage =
   | GitPushConfigRequest
   | GetGitPushSettingsRequest
   | TranslateMessageRequest
-  | FileSearchRequest
-  | SwitchToSonnetRequest;
+  | FileSearchRequest;
 
 export interface WebviewImageData {
   base64: string;

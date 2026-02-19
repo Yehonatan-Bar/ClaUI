@@ -1138,28 +1138,6 @@ html, body, #root {
   font-style: italic;
 }
 
-/* Switch to Sonnet button */
-.switch-to-sonnet-btn {
-  background: none;
-  border: 1px solid var(--vscode-textLink-foreground, #3794ff);
-  border-radius: 3px;
-  color: var(--vscode-textLink-foreground, #3794ff);
-  cursor: pointer;
-  padding: 1px 6px;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.switch-to-sonnet-btn:hover:not(:disabled) {
-  background: var(--vscode-textLink-foreground, #3794ff);
-  color: var(--vscode-editor-background, #1e1e1e);
-}
-
-.switch-to-sonnet-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
 
 /* Permission mode selector */
 .permission-mode-selector {

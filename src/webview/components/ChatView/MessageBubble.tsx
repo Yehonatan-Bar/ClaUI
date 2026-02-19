@@ -5,7 +5,6 @@ import type { ContentBlock } from '../../../extension/types/stream-json';
 import { CodeBlock } from './CodeBlock';
 import { ToolUseBlock } from './ToolUseBlock';
 import { MarkdownContent } from './MarkdownContent';
-import { useRtlDetection } from '../../hooks/useRtlDetection';
 import { renderTextWithFileLinks } from './filePathLinks';
 import { postToExtension } from '../../hooks/useClaudeStream';
 
@@ -32,7 +31,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
     : [{ type: 'text', text: String(message.content) }];
 
   const textContent = extractTextContent(contentBlocks);
-  const { direction } = useRtlDetection(textContent);
 
   // Only text-only user messages are editable (not images)
   const hasOnlyText = isUser && contentBlocks.every((b) => b.type === 'text');
@@ -195,7 +193,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
             ))}
         </div>
       ) : (
-        <div dir={direction}>
+        <div dir="auto">
           {contentBlocks.map((block, index) => (
             <ContentBlockRenderer key={index} block={block} />
           ))}

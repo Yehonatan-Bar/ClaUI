@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>ClaUi - תוכנית עבודה</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; background: #f8f9fa; color: #333; line-height: 1.7; }
+    h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+    h2 { color: #2980b9; margin-top: 30px; }
+    .card { background: white; border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .status { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 13px; font-weight: bold; margin-right: 8px; }
+    .new { background: #e8f5e9; color: #2e7d32; }
+    .bug { background: #fff3e0; color: #e65100; }
+    .improve { background: #e3f2fd; color: #1565c0; }
+    .done { background: #f3e5f5; color: #7b1fa2; }
+    .wait { background: #fce4ec; color: #c62828; }
+    .already { background: #e0f2f1; color: #00695c; }
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    th, td { padding: 10px; text-align: right; border-bottom: 1px solid #e0e0e0; }
+    th { background: #eceff1; font-weight: 600; }
+    .summary { background: #e8eaf6; border-radius: 8px; padding: 15px; margin: 20px 0; }
+  </style>
+</head>
+<body>
+
+<h1>ClaUi - תוכנית עבודה</h1>
+
+<div class="summary">
+  <strong>סיכום:</strong> מתוך 7 פריטים שהוגדרו - 3 כבר עובדים ורק צריכים תיעוד, 2 הם באגים לתיקון, 1 הוא פיצ'ר חדש, ו-1 דורש הבהרה.
+</div>
+
+<h2>פריטי עבודה</h2>
+
+<div class="card">
+  <h3><span class="status new">חדש</span> כפתור שמירת קוד לקובץ</h3>
+  <p>הוספת כפתור "Save" לבלוקי קוד בצ'אט, ליד כפתור ה-Copy הקיים. לחיצה על הכפתור תפתח חלון שמירה של VS Code עם שם קובץ מוצע (לדוגמה: untitled.py לקוד פייתון), ולאחר השמירה הקובץ ייפתח בעורך.</p>
+</div>
+
+<div class="card">
+  <h3><span class="status bug">באג</span> תיקון הצגת "You" על טקסטים שגויים</h3>
+  <p>חלק מההודעות מציגות תווית "You" (אתה) למרות שהן לא הודעות שהמשתמש כתב. הבעיה: כשתוצאות כלים חוזרות מהמערכת, לפעמים יש בהן בלוקי טקסט ריקים שעוברים את הסינון הקיים. התיקון: סינון נוסף שמסיר בלוקי טקסט ריקים או שמכילים רק רווחים.</p>
+</div>
+
+<div class="card">
+  <h3><span class="status improve">שיפור</span> תצוגת קוד וכלים</h3>
+  <p>בלוקי כלים מציגים JSON גולמי שלא נוח לקריאה. השיפור: במקום להציג את כל ה-JSON, להציג רק את המידע העיקרי (שם הקובץ, הפקודה, השאילתה) בכותרת המקופלת, כך שהמשתמש רואה מה הכלי עשה בלי לפתוח את הבלוק.</p>
+</div>
+
+<div class="card">
+  <h3><span class="status wait">ממתין להבהרה</span> תיקון מצב תוכנית (Plan Mode)</h3>
+  <p>לאחר בדיקה מעמיקה של הקוד, מצב התוכנית נראה תקין: סרגל האישור מופיע, כפתורי אישור/דחייה/משוב עובדים, ושאלות מוצגות עם אפשרויות בחירה. <strong>נדרש מהמשתמש:</strong> תיאור מדויק של הבעיה כדי שאוכל לאתר ולתקן אותה.</p>
+</div>
+
+<h2>פריטים שכבר עובדים (תיעוד בלבד)</h2>
+
+<table>
+  <tr>
+    <th>פיצ'ר</th>
+    <th>מצב</th>
+    <th>פעולה</th>
+  </tr>
+  <tr>
+    <td>פתיחת קישורים</td>
+    <td><span class="status already">עובד</span></td>
+    <td>קישורים נפתחים בדפדפן בלחיצה, קבצים נפתחים בעורך ב-Ctrl+Click. להוסיף ל-README.</td>
+  </tr>
+  <tr>
+    <td>Sonnet 4.6</td>
+    <td><span class="status already">עובד</span></td>
+    <td>כבר קיים בבורר המודלים. להוסיף ל-README.</td>
+  </tr>
+  <tr>
+    <td>היסטוריית פרומפטים (3 רמות)</td>
+    <td><span class="status already">עובד</span></td>
+    <td>עובד עם 3 רמות: סשן, פרויקט, משתמש. כפתור H ו-Arrow Up/Down. להוסיף ל-README.</td>
+  </tr>
+</table>
+
+<h2>סדר ביצוע</h2>
+<ol>
+  <li>כפתור שמירת קוד לקובץ</li>
+  <li>תיקון באג "You"</li>
+  <li>שיפור תצוגת כלים</li>
+  <li>עדכון README עם כל הפיצ'רים</li>
+  <li>בנייה, התקנה ובדיקה</li>
+</ol>
+
+</body>
+</html>
