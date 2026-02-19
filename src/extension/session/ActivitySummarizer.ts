@@ -128,12 +128,24 @@ export class ActivitySummarizer {
 
     const toolList = toolNames.map(t => `- ${t}`).join('\n');
     const prompt =
-      'You are summarizing Claude Code\'s current activity based on its tool usage.\n\n' +
+      'You are describing what a developer\'s AI coding assistant (Claude Code) is currently doing, based on the tools it just used.\n\n' +
       'Tools used (most recent last):\n' +
       toolList + '\n\n' +
+      'INSTRUCTIONS:\n' +
+      '- Be SPECIFIC about WHICH files, functions, or components are being worked on.\n' +
+      '- Mention actual file names, folder names, or component names from the tool arguments.\n' +
+      '- NEVER use vague phrases like "reading files", "reviewing code", "exploring the project", "reading documentation", or "understanding the codebase".\n' +
+      '- Instead, say what EXACTLY is being read/edited/searched and WHY (infer the purpose from the file names).\n' +
+      '- Examples of GOOD output:\n' +
+      '  "Analyzing webpack config" / "Claude is checking the webpack build configuration for bundling issues."\n' +
+      '  "Editing auth middleware" / "Claude is modifying the authentication middleware in src/auth.ts."\n' +
+      '  "Searching for API routes" / "Claude is looking for route definitions across the Express router files."\n' +
+      '- Examples of BAD output (too generic):\n' +
+      '  "Reading project files" / "Claude is reviewing multiple files to understand the project."\n' +
+      '  "Exploring codebase" / "Claude is reading documentation and code files."\n\n' +
       'Respond with EXACTLY two lines:\n' +
-      'Line 1: Short activity label (3-6 words) for a tab title\n' +
-      'Line 2: One-sentence summary of what Claude is doing\n\n' +
+      'Line 1: Short specific activity label (3-6 words)\n' +
+      'Line 2: One sentence describing specifically what Claude is doing and which files/components are involved\n\n' +
       'Match the language of any file paths or context. Reply with ONLY the two lines.';
 
     const args = ['-p', '--model', 'claude-haiku-4-5-20251001'];

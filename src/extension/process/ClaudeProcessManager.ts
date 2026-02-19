@@ -188,20 +188,28 @@ export class ClaudeProcessManager extends EventEmitter {
     });
   }
 
-  /** Cancel the current request */
+  /** Cancel the current request by killing the process.
+   *  The polite control_request cancel is unreliable (CLI acknowledges but
+   *  continues generating), so we kill the process instead. The SessionTab
+   *  exit handler detects `cancelledByUser` and auto-resumes the session,
+   *  letting the user continue chatting. */
   sendCancel(): void {
     this._cancelledByUser = true;
-    this.send({
-      type: 'control_request',
-      request: { subtype: 'cancel' },
-    });
+
+    if (!this.process) {
+      return;
+    }
+
+    // Close stdin + kill the process to guarantee it stops
+    try { this.process.stdin?.end(); } catch { /* already closed */ }
+    try { this.process.kill('SIGTERM'); } catch { /* already dead */ }
   }
 
   /** Gracefully stop the process */
   stop(): void {
     if (this.process) {
-      this.process.stdin?.end();
-      this.process.kill('SIGTERM');
+      try { this.process.stdin?.end(); } catch { /* already closed */ }
+      try { this.process.kill('SIGTERM'); } catch { /* already dead */ }
       this.process = null;
       this.sessionId = null;
     }

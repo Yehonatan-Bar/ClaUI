@@ -86,7 +86,7 @@ claude -p --verbose
 | `send(message)` | Write JSON line to stdin |
 | `sendUserMessage(text)` | Send user text message |
 | `sendCompact(instructions?)` | Request context compaction |
-| `sendCancel()` | Cancel current request |
+| `sendCancel()` | Cancel: kills the process (polite cancel is unreliable). SessionTab auto-resumes. |
 | `stop()` | SIGTERM the process |
 
 ---
@@ -120,7 +120,7 @@ Convenience wrapper over ClaudeProcessManager for sending commands.
 - `sendText(text)` - Send plain text user message
 - `sendWithImages(text, images)` - Send message with base64 image content blocks
 - `compact(instructions?)` - Send compact control request
-- `cancel()` - Send cancel control request
+- `cancel()` - Kill the CLI process (auto-resumed by SessionTab exit handler)
 
 ---
 
