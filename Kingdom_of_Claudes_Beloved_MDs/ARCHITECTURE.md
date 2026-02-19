@@ -283,16 +283,18 @@ Persists session metadata in VS Code's `globalState` for the Conversation Histor
 **Interface:**
 ```typescript
 interface SessionMetadata {
-  sessionId: string;   // CLI session ID
-  name: string;        // Auto-generated or fallback "Session N"
-  model: string;       // Model used (e.g., "claude-sonnet-4-5-20250929")
-  startedAt: string;   // ISO date string
+  sessionId: string;    // CLI session ID
+  name: string;         // Auto-generated or fallback "Session N"
+  model: string;        // Model used (e.g., "claude-sonnet-4-5-20250929")
+  startedAt: string;    // ISO date string
   lastActiveAt: string; // ISO date string
+  firstPrompt?: string; // First line of the user's first message (max 120 chars)
 }
 ```
 
 **Methods:**
 - `getSessions()` - Returns all sessions sorted by `lastActiveAt` descending
+- `getSession(sessionId)` - Returns a single session by ID, or undefined
 - `saveSession(metadata)` - Upserts by `sessionId`, caps at 100, auto-sorts
 - `removeSession(sessionId)` - Deletes a single session
 - `clearAll()` - Wipes all stored sessions
@@ -300,10 +302,30 @@ interface SessionMetadata {
 **Integration points:**
 - Created in `extension.ts activate()`, passed to `TabManager` and `registerCommands()`
 - `TabManager` passes it to each `SessionTab`
-- `SessionTab` saves metadata on `demux.init` (captures sessionId + model) and on session name generation
-- `commands.ts showHistory` reads sessions and shows a VS Code QuickPick for resuming
+- `SessionTab` saves metadata on `demux.init` (preserves existing name/firstPrompt for resumed sessions), on session name generation, and on first prompt capture
+- `commands.ts showHistory` reads sessions and shows a VS Code QuickPick displaying the session name (label), model + relative time (description), and first prompt (detail)
 
 **Keybinding:** `Ctrl+Shift+H` opens the history QuickPick.
+
+### ConversationReader (`session/ConversationReader.ts`)
+
+Reads full conversation history from Claude Code's local session JSONL files when resuming a session.
+
+**Why this exists:** The Claude CLI in pipe mode (`-p`) waits for stdin input before emitting `system/init` and any message events. The `--replay-user-messages` flag only echoes new messages back on stdout; it does not replay conversation history. This means resumed sessions would show a blank webview until the user types something. ConversationReader solves this by reading the JSONL file directly from disk.
+
+**How it works:**
+1. Locates the JSONL file at `~/.claude/projects/<project-hash>/<session-id>.jsonl`
+2. Project hash is derived from the workspace path (`:`, `\`, `/` replaced with `-`)
+3. Falls back to scanning all project directories if the expected path doesn't match
+4. Parses each line: collects `user` messages and `assistant` messages
+5. Merges partial assistant entries by message ID (each JSONL entry has one content block)
+6. Filters out `tool_result` user messages and `thinking` assistant blocks
+7. Returns `SerializedChatMessage[]` ready for the webview
+
+**Integration:**
+- Called by `SessionTab.startSession()` when `options.resume` is set (not for forks)
+- Sends a `conversationHistory` postMessage to the webview
+- The webview `useClaudeStream` handler populates the messages array and clears `isResuming`
 
 ### PromptHistoryStore (`session/PromptHistoryStore.ts`)
 

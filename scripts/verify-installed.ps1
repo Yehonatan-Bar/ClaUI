@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $extensionRoot = Join-Path $env:USERPROFILE ".vscode\extensions"
 $installed = Get-ChildItem -Path $extensionRoot -Directory |
-  Where-Object { $_.Name -like "claude-code-mirror*" } |
+  Where-Object { $_.Name -like "*claude-code-mirror*" } |
   Sort-Object LastWriteTime -Descending |
   Select-Object -First 1
 

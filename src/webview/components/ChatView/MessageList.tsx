@@ -55,11 +55,15 @@ export const MessageList: React.FC = () => {
     const messageIndex = state.messages.findIndex((m) => m.id === messageId);
     if (messageIndex < 0) return;
 
+    // Send conversation history up to (but not including) the fork message
+    const messagesBeforeFork = state.messages.slice(0, messageIndex);
+
     postToExtension({
       type: 'forkFromMessage',
       sessionId,
       forkMessageIndex: messageIndex,
       promptText: messageText,
+      messages: messagesBeforeFork,
     });
   }, []);
 

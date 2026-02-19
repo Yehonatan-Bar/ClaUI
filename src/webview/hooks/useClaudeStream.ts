@@ -240,10 +240,38 @@ export function useClaudeStream(): void {
           break;
 
         case 'forkInit':
-          setForkInit({
-            forkMessageIndex: msg.forkMessageIndex,
-            promptText: msg.promptText,
-          });
+          // Populate the store with conversation history from the original tab
+          if (msg.messages && msg.messages.length > 0) {
+            useAppStore.setState({
+              messages: msg.messages.map((m: import('../../extension/types/webview-messages').SerializedChatMessage) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                model: m.model,
+                timestamp: m.timestamp,
+              })),
+            });
+          }
+          setForkInit({ promptText: msg.promptText });
+          break;
+
+        case 'conversationHistory':
+          // Populate the store with conversation history read from Claude's session storage.
+          // This is used when resuming a session - the CLI in pipe mode doesn't replay
+          // messages until user sends input, so we read them from disk instead.
+          if (msg.messages && msg.messages.length > 0) {
+            console.log(`%c[STREAM] conversationHistory: ${msg.messages.length} messages`, 'color: lime; font-weight: bold');
+            useAppStore.setState({
+              messages: msg.messages.map((m: import('../../extension/types/webview-messages').SerializedChatMessage) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                model: m.model,
+                timestamp: m.timestamp,
+              })),
+              isResuming: false,
+            });
+          }
           break;
       }
     }

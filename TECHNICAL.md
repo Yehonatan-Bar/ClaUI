@@ -60,6 +60,7 @@ claude-code-mirror/
 |   |   |   +-- ActivitySummarizer.ts     #   Periodic tool activity summary via Haiku
 |   |   |   +-- FileLogger.ts             #   Per-session file logging with rotation and rename
 |   |   |   +-- SessionStore.ts           #   Persists session metadata in globalState
+|   |   |   +-- ConversationReader.ts     #   Reads conversation history from Claude's session JSONL files
 |   |   |   +-- PromptHistoryStore.ts     #   Persists prompt history (project + global scope)
 |   |   |   +-- SessionFork.ts            #   Phase 3 stub (rewind)
 |   |   +-- terminal/                     #   Phase 2 stubs
@@ -83,6 +84,7 @@ claude-code-mirror/
 |       |   |   +-- PlanApprovalBar.tsx  #   Dual-mode bar: plan approval (Approve/Reject/Feedback) or question UI (option buttons + custom answer)
 |       |   |   +-- PromptHistoryPanel.tsx #  3-tab prompt history overlay (session/project/global)
 |       |   |   +-- CodeBlock.tsx         #   Syntax block with copy button
+|       |   |   +-- MarkdownContent.tsx  #   Markdown rendering with sanitization and link detection
 |       |   |   +-- filePathLinks.tsx   #   Clickable file path and URL detection and rendering
 |       |   +-- InputArea/
 |       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt, image paste
@@ -93,7 +95,8 @@ claude-code-mirror/
 |       |       +-- TextSettingsBar.tsx   #   Font size/family controls
 |       +-- styles/
 |           +-- global.css                #   VS Code theme variables
-|           +-- rtl.css                   #   RTL-specific overrides
+|           +-- markdown.css              #   Markdown element styles (headers, lists, tables, etc.)
+|           +-- rtl.css                   #   RTL-specific overrides (includes Markdown RTL rules)
 +-- Kingdom_of_Claudes_Beloved_MDs/       # Detailed component documentation
     +-- ARCHITECTURE.md                   #   Data flow and component interaction
     +-- SESSION_NAMER.md                  #   Auto-naming feature (data flow, gotchas, debugging)
@@ -136,6 +139,9 @@ claude-code-mirror/
 **Stream-JSON Protocol** - Type definitions for the Claude CLI bidirectional JSON line protocol (stdin input, stdout output).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/STREAM_JSON_PROTOCOL.md`
 
+**Markdown Rendering** - Text content in messages is rendered as formatted Markdown using `marked` (parser) and `DOMPurify` (sanitizer). Supports bold, italic, headers, lists, tables, blockquotes, inline code, links, and horizontal rules. Fenced code blocks are extracted first and rendered by `CodeBlock` (with copy/collapse); remaining text segments go through `MarkdownContent`. Bare file paths and URLs in rendered Markdown are linkified via DOM post-processing. Full RTL/Hebrew support with directional overrides for blockquotes, lists, and code.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/MARKDOWN_RENDERING.md`
+
 **React Chat UI** - React 18 components for message display, streaming text, tool use blocks, code blocks, image display, and RTL-aware input. The input area supports sending prompts while Claude is busy (interrupt), matching Claude Code CLI behavior. Ctrl+V pastes images from clipboard as base64 attachments (shown as thumbnails above the input, removable before sending). Both Send and Cancel buttons are visible during processing; Escape cancels the current response.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
@@ -154,7 +160,10 @@ claude-code-mirror/
 **Clear Session** - Button in the input area that resets all UI state (messages, cost, streaming) and restarts the CLI process. Sends `clearSession` message to the extension, which stops the current process and spawns a new one.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**SessionStore** - Persists session metadata (ID, name, model, timestamps) in VS Code `globalState`. Used by the Conversation History QuickPick command to list and resume past sessions. Capped at 100 entries, sorted by most recently active.
+**SessionStore** - Persists session metadata (ID, name, model, timestamps, first prompt) in VS Code `globalState`. Used by the Conversation History QuickPick command to list and resume past sessions. Shows session name, model, relative time, and first prompt line. Preserves existing names when sessions are resumed. Capped at 100 entries, sorted by most recently active.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**ConversationReader** - Reads full conversation history from Claude Code's local session storage (`~/.claude/projects/<project-hash>/<session-id>.jsonl`). When resuming a session, the CLI in pipe mode waits for user input before replaying messages. ConversationReader bypasses this by reading the JSONL file directly, merging partial assistant entries by message ID, filtering out tool_result and thinking blocks, and sending the conversation to the webview for immediate display. Used by `SessionTab.startSession()` during resume (not fork).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **PromptHistoryStore** - Persists user prompts at two scopes: project (`workspaceState`) and global (`globalState`). Prompts are saved on every `sendMessage`/`sendMessageWithImages`. Deduplicates consecutive entries, capped at 200 per scope. The webview requests history via `getPromptHistory` message and receives it via `promptHistoryResponse`.
@@ -209,6 +218,8 @@ claude-code-mirror/
 | react 18 | Webview UI framework |
 | react-dom 18 | React DOM renderer |
 | zustand 4 | Lightweight state management |
+| marked | Markdown-to-HTML parser (GFM support) |
+| dompurify | HTML sanitizer for XSS prevention |
 | webpack 5 | Bundling (dual-target) |
 | ts-loader | TypeScript compilation in webpack |
 | css-loader + style-loader | CSS bundling for webview |
@@ -272,7 +283,8 @@ Manual equivalent:
 cd C:\projects\claude-code-mirror
 npm run build
 npx vsce package --allow-missing-repository
-code --install-extension claude-code-mirror-0.1.0.vsix --force
+# Install the VSIX matching the current version in package.json:
+code --install-extension claude-code-mirror-*.vsix --force
 ```
 
 Then run `Developer: Reload Window`.
@@ -293,7 +305,7 @@ Run these checks after installing:
 ```powershell
 # 1) Verify the latest installed extension folder
 $ext = Get-ChildItem -Path "$env:USERPROFILE\.vscode\extensions" -Directory `
-  | Where-Object { $_.Name -like 'claude-code-mirror*' } `
+  | Where-Object { $_.Name -like '*claude-code-mirror*' } `
   | Sort-Object LastWriteTime -Descending `
   | Select-Object -First 1
 $ext.FullName

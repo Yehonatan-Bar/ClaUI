@@ -51,6 +51,7 @@ export class MessageHandler {
   private firstMessageSent = false;
   private sessionNamer: SessionNamer | null = null;
   private titleCallback: ((title: string) => void) | null = null;
+  private firstPromptCallback: ((prompt: string) => void) | null = null;
 
   /** Tool names seen in the current assistant message (cleared on messageStart) */
   private currentMessageToolNames: string[] = [];
@@ -87,6 +88,11 @@ export class MessageHandler {
   /** Register a callback invoked when a session name is generated */
   onSessionNameGenerated(callback: (title: string) => void): void {
     this.titleCallback = callback;
+  }
+
+  /** Register a callback invoked when the first user prompt is captured */
+  onFirstPromptCaptured(callback: (prompt: string) => void): void {
+    this.firstPromptCallback = callback;
   }
 
   /** Attach an ActivitySummarizer for periodic tool activity summaries */
@@ -283,12 +289,13 @@ export class MessageHandler {
           break;
 
         case 'forkFromMessage':
-          this.log(`Fork from message: sessionId=${msg.sessionId}, index=${msg.forkMessageIndex}`);
+          this.log(`Fork from message: sessionId=${msg.sessionId}, index=${msg.forkMessageIndex}, historyLen=${msg.messages?.length ?? 0}`);
           vscode.commands.executeCommand(
             'claudeMirror.forkFromMessage',
             msg.sessionId,
             msg.forkMessageIndex,
-            msg.promptText
+            msg.promptText,
+            msg.messages || []
           );
           break;
 
@@ -842,6 +849,13 @@ export class MessageHandler {
     }
 
     this.firstMessageSent = true;
+
+    // Capture the first line of the prompt for session history display
+    const firstLine = userText.split('\n')[0].trim().slice(0, 120);
+    if (firstLine && this.firstPromptCallback) {
+      this.firstPromptCallback(firstLine);
+    }
+
     this.log('[SessionNaming] Launching generateName...');
 
     this.sessionNamer

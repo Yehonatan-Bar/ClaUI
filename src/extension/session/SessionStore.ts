@@ -7,6 +7,7 @@ export interface SessionMetadata {
   model: string;
   startedAt: string;   // ISO date string
   lastActiveAt: string; // ISO date string
+  firstPrompt?: string; // First line of the user's first message
 }
 
 const STORAGE_KEY = 'claudeMirror.sessionHistory';
@@ -25,6 +26,12 @@ export class SessionStore {
     return sessions.sort(
       (a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime()
     );
+  }
+
+  /** Get a single session by ID, or undefined if not found */
+  getSession(sessionId: string): SessionMetadata | undefined {
+    const sessions = this.globalState.get<SessionMetadata[]>(STORAGE_KEY, []);
+    return sessions.find(s => s.sessionId === sessionId);
   }
 
   /** Save or update a session's metadata */

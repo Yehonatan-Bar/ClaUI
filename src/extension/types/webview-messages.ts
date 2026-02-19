@@ -106,6 +106,8 @@ export interface ForkFromMessageRequest {
   forkMessageIndex: number;
   /** The text content of the user message being forked */
   promptText: string;
+  /** Conversation history up to (but not including) the fork message */
+  messages: SerializedChatMessage[];
 }
 
 export interface SetPermissionModeRequest {
@@ -293,10 +295,25 @@ export interface GitPushSettingsMessage {
 
 export interface ForkInitMessage {
   type: 'forkInit';
-  /** Index in the replayed messages array at which to truncate */
-  forkMessageIndex: number;
   /** The prompt text to place in the input area */
   promptText: string;
+  /** Conversation history to display (already truncated at fork point) */
+  messages: SerializedChatMessage[];
+}
+
+export interface ConversationHistoryMessage {
+  type: 'conversationHistory';
+  /** Full conversation history loaded from Claude's session storage */
+  messages: SerializedChatMessage[];
+}
+
+/** Serializable chat message for passing between webview instances (e.g. fork) */
+export interface SerializedChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: ContentBlock[];
+  model?: string;
+  timestamp: number;
 }
 
 export type ExtensionToWebviewMessage =
@@ -322,4 +339,5 @@ export type ExtensionToWebviewMessage =
   | PermissionModeSettingMessage
   | GitPushResultMessage
   | GitPushSettingsMessage
-  | ForkInitMessage;
+  | ForkInitMessage
+  | ConversationHistoryMessage;
