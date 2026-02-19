@@ -2,7 +2,7 @@
   "name": "claude-code-mirror",
   "displayName": "ClaUi",
   "description": "Rich chat UI for Claude Code - multiple tabs, model selection, file sending, image paste, and more",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "publisher": "JhonBar",
   "icon": "images/icon.png",
   "engines": {
@@ -209,12 +209,12 @@
         },
         "claudeMirror.sessionVitals": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Show Session Vitals dashboard (timeline minimap, weather widget, cost heat bar, turn intensity borders)"
         },
         "claudeMirror.adventureWidget": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Show the Adventure Widget - a pixel-art dungeon crawler that visualizes Claude's tool activity as a roguelike adventure"
         },
         "claudeMirror.achievements.enabled": {

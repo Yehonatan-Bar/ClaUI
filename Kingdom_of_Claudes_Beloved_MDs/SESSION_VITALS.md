@@ -23,9 +23,10 @@ Vertical 24px strip rendered alongside the message list (right side). Each turn 
 - **Hover tooltip**: Shows turn number, category, tools used, duration, and cost
 
 ### Weather Widget
-20x20px animated icon fixed at top-right (`top: 28px; right: 32px`). Reflects overall session health via a **multi-dimensional composite score**. **Clickable**: clicking the icon opens a popover with a detailed explanation of the current mood state.
+20x20px animated icon fixed-position (default `top: 28px; left: 32px`). Reflects overall session health via a **multi-dimensional composite score**. **Draggable**: click and drag to reposition anywhere in the webview; position persists in `localStorage` (`claui-weather-pos`). **Clickable**: clicking (without dragging) opens a popover with a detailed explanation of the current mood state. A 4px dead zone distinguishes click from drag.
 
 - **File**: `src/webview/components/Vitals/WeatherWidget.tsx`
+- **Drag**: mousedown on icon starts tracking; mousemove updates position; mouseup saves to localStorage. Uses `useRef` for drag state (avoids re-renders during drag).
 - **Click popover**: Shows the weather symbol, label, and a human-readable description of what the current mood means. Closes on outside click.
 - **8 moods**: clear, partly-sunny, cloudy, rainy, thunderstorm, rainbow, night, snowflake
 - **Pulse animation**: CSS keyframe with configurable speed (slow/normal/fast)
@@ -129,7 +130,7 @@ export interface TurnRecord {
 
 ## Toggle
 
-- **Setting**: `claudeMirror.sessionVitals` (boolean, default `true`)
+- **Setting**: `claudeMirror.sessionVitals` (boolean, default `false`)
 - **UI**: "Vitals" button in the StatusBar opens a `VitalsInfoPanel` dropdown with explanations and a toggle switch (active state highlighted with link color)
 - **Behavior**: Hides ALL vitals components (timeline, weather, cost bar, intensity borders) when disabled
 - **Sync**: Two-way sync between VS Code settings and webview (same pattern as other settings)

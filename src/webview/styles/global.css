@@ -1178,6 +1178,11 @@ html, body, #root {
   50% { opacity: 1; }
 }
 
+/* When the process is idle but the latest activity summary is still shown */
+.busy-indicator-idle .busy-indicator-text {
+  animation: none;
+}
+
 /* Full summary detail line */
 .activity-summary-detail {
   font-size: 12px;
@@ -2333,14 +2338,13 @@ html, body, #root {
 /* Weather Widget */
 .weather-widget {
   position: fixed;
-  top: 28px;
-  left: 32px;
   z-index: 9998;
   width: 22px;
   height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
+  user-select: none;
 }
 
 .weather-icon {

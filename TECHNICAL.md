@@ -243,8 +243,8 @@ claude-code-mirror/
 | `claudeMirror.permissionMode` | `"full-access"` | Permission mode: "full-access" (all tools) or "supervised" (read-only tools only) |
 | `claudeMirror.enableFileLogging` | `true` | Write logs to disk files in addition to the Output Channel |
 | `claudeMirror.logDirectory` | `""` | Directory for log files (empty = extension's default storage) |
-| `claudeMirror.sessionVitals` | `true` | Show Session Vitals dashboard (timeline, weather, cost bar, turn borders) |
-| `claudeMirror.adventureWidget` | `true` | Show pixel-art dungeon crawler adventure widget |
+| `claudeMirror.sessionVitals` | `false` | Show Session Vitals dashboard (timeline, weather, cost bar, turn borders) |
+| `claudeMirror.adventureWidget` | `false` | Show pixel-art dungeon crawler adventure widget |
 | `claudeMirror.gitPush.enabled` | `true` | Whether git push is configured and ready to use via the Git button |
 | `claudeMirror.gitPush.scriptPath` | `"scripts/git-push.ps1"` | Path to the git push script (relative to workspace root) |
 | `claudeMirror.gitPush.commitMessageTemplate` | `"{sessionName}"` | Commit message template ({sessionName} = tab name) |

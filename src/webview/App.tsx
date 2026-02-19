@@ -126,17 +126,25 @@ export const App: React.FC = () => {
         <>
           {pendingApproval ? (
             <PlanApprovalBar />
-          ) : isBusy ? (
-            <div className={`busy-indicator ${activitySummary ? 'busy-indicator-with-activity' : ''}`}>
+          ) : (isBusy || !!activitySummary) ? (
+            <div
+              className={`busy-indicator ${activitySummary ? 'busy-indicator-with-activity' : ''} ${!isBusy && activitySummary ? 'busy-indicator-idle' : ''}`}
+            >
               <div className="busy-indicator-main">
-                <span className="thinking-dots">
-                  <span className="thinking-dot" />
-                  <span className="thinking-dot" />
-                  <span className="thinking-dot" />
-                </span>
+                {isBusy && (
+                  <span className="thinking-dots">
+                    <span className="thinking-dot" />
+                    <span className="thinking-dot" />
+                    <span className="thinking-dot" />
+                  </span>
+                )}
                 <span className="busy-indicator-text">
-                  {isResuming ? 'Resuming conversation...' : (
-                    activitySummary ? activitySummary.shortLabel + '...' : 'Thinking...'
+                  {isBusy ? (
+                    isResuming ? 'Resuming conversation...' : (
+                      activitySummary ? activitySummary.shortLabel + '...' : 'Thinking...'
+                    )
+                  ) : (
+                    activitySummary ? activitySummary.shortLabel : ''
                   )}
                 </span>
               </div>

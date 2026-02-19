@@ -89,7 +89,7 @@ export const DEFAULT_CONFIG: AdventureConfig = {
   cellSize: 10,
   wallThickness: 2,
   passageWidth: 8,
-  mazeWidth: 40,
-  mazeHeight: 40,
+  mazeWidth: 220,
+  mazeHeight: 220,
   heroScale: 2,
 };
