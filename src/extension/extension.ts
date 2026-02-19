@@ -37,6 +37,13 @@ export function activate(context: vscode.ExtensionContext): void {
   // Create session store for conversation history persistence
   const sessionStore = new SessionStore(context.globalState);
 
+  // Diagnostic: log stored sessions on activation
+  const storedSessions = sessionStore.getSessions();
+  log(`[SessionStore] Found ${storedSessions.length} stored sessions on activation`);
+  for (const s of storedSessions.slice(0, 5)) {
+    log(`[SessionStore]   - ${s.sessionId.slice(0, 8)}: "${s.name}" (${s.model}) lastActive=${s.lastActiveAt}`);
+  }
+
   // Create prompt history store for cross-session prompt persistence
   const promptHistoryStore = new PromptHistoryStore(context.globalState, context.workspaceState);
 

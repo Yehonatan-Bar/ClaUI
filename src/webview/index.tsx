@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import './styles/global.css';
+import './styles/markdown.css';
 import './styles/rtl.css';
 
 /** Error boundary to catch and display React render crashes */

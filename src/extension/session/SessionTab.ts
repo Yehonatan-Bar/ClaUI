@@ -6,6 +6,7 @@ import { StreamDemux } from '../process/StreamDemux';
 import { ControlProtocol } from '../process/ControlProtocol';
 import { SessionNamer } from './SessionNamer';
 import { ActivitySummarizer } from './ActivitySummarizer';
+import { ConversationReader } from './ConversationReader';
 import { FileLogger } from './FileLogger';
 import type { SessionStore } from './SessionStore';
 import type { PromptHistoryStore } from './PromptHistoryStore';
@@ -15,6 +16,7 @@ import type { CliOutputEvent, AssistantMessage } from '../types/stream-json';
 import type {
   ExtensionToWebviewMessage,
   WebviewToExtensionMessage,
+  SerializedChatMessage,
 } from '../types/webview-messages';
 
 export interface SessionTabCallbacks {
@@ -43,6 +45,8 @@ export class SessionTab implements WebviewBridge {
   private disposed = false;
   private currentModel = '';
   private sessionStartedAt = '';
+  /** First line of the user's first prompt (persisted to session history) */
+  private firstPrompt = '';
   /** When true, the next process exit should NOT send sessionEnded (edit-and-resend restart) */
   private suppressNextExit = false;
   /** The base title (without any busy indicator) */
@@ -58,7 +62,7 @@ export class SessionTab implements WebviewBridge {
   /** Per-tab file logger (null if file logging is disabled) */
   private readonly fileLogger: FileLogger | null = null;
   /** Fork initialization data (set before startSession when forking) */
-  private forkInitData: { forkMessageIndex: number; promptText: string } | null = null;
+  private forkInitData: { promptText: string; messages: SerializedChatMessage[] } | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -112,6 +116,14 @@ export class SessionTab implements WebviewBridge {
         this.persistSessionMetadata(name);
         // Rename the log file to include the session name
         this.fileLogger?.updateSessionName(name);
+      }
+    });
+
+    // Wire first prompt capture: store the first user message for history display
+    this.messageHandler.onFirstPromptCaptured((prompt) => {
+      if (!this.disposed) {
+        this.firstPrompt = prompt;
+        this.persistSessionMetadata();
       }
     });
 
@@ -197,7 +209,7 @@ export class SessionTab implements WebviewBridge {
   // --- Public API ---
 
   /** Set fork initialization data (must be called before startSession) */
-  setForkInit(init: { forkMessageIndex: number; promptText: string }): void {
+  setForkInit(init: { promptText: string; messages: SerializedChatMessage[] }): void {
     this.forkInitData = init;
   }
 
@@ -211,15 +223,53 @@ export class SessionTab implements WebviewBridge {
       isResume: !!options?.resume,
     });
 
-    // If this is a fork, send the fork init data to the webview
-    // so it knows where to truncate after replay completes
+    // If this is a fork, send the conversation history and prompt text
+    // directly to the new webview (don't rely on CLI replay)
     if (this.forkInitData) {
       this.postMessage({
         type: 'forkInit',
-        forkMessageIndex: this.forkInitData.forkMessageIndex,
         promptText: this.forkInitData.promptText,
+        messages: this.forkInitData.messages,
       });
       this.forkInitData = null;
+    }
+
+    // If resuming (not forking), restore session name and load conversation
+    // history immediately. The CLI in pipe mode doesn't emit system/init or
+    // replay messages until user sends input, so we read from disk instead.
+    if (options?.resume && !options?.fork) {
+      this.restoreSessionName(options.resume);
+      this.loadAndSendConversationHistory(options.resume);
+    }
+  }
+
+  /** Restore the tab name from SessionStore metadata (for resumed sessions) */
+  private restoreSessionName(sessionId: string): void {
+    const existing = this.sessionStore.getSession(sessionId);
+    if (existing?.name && !existing.name.startsWith('Session ')) {
+      this.log(`[Tab ${this.tabNumber}] Restoring session name: "${existing.name}"`);
+      this.setTabName(existing.name);
+      if (existing.firstPrompt) {
+        this.firstPrompt = existing.firstPrompt;
+      }
+    }
+  }
+
+  /** Read conversation history from Claude's session JSONL and send to webview */
+  private loadAndSendConversationHistory(sessionId: string): void {
+    const tabLog = this.log;
+    const reader = new ConversationReader((msg) => tabLog(`[Tab ${this.tabNumber}] ${msg}`));
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const messages = reader.readSession(sessionId, workspacePath);
+
+    if (messages.length > 0) {
+      this.log(`[Tab ${this.tabNumber}] Loaded ${messages.length} history messages for resumed session`);
+      this.postMessage({
+        type: 'conversationHistory',
+        messages,
+      });
+    } else {
+      this.log(`[Tab ${this.tabNumber}] No history messages found for session ${sessionId}`);
     }
   }
 
@@ -292,18 +342,21 @@ export class SessionTab implements WebviewBridge {
     this.panel.dispose();
   }
 
-  /** Persist session metadata to the session store */
+  /** Persist session metadata to the session store, preserving existing fields */
   private persistSessionMetadata(name?: string): void {
     const sid = this.processManager.currentSessionId;
     if (!sid) {
       return;
     }
+    // Load existing metadata to preserve fields not being explicitly overridden
+    const existing = this.sessionStore.getSession(sid);
     void this.sessionStore.saveSession({
       sessionId: sid,
-      name: name || `Session ${this.tabNumber}`,
+      name: name || existing?.name || `Session ${this.tabNumber}`,
       model: this.currentModel,
-      startedAt: this.sessionStartedAt || new Date().toISOString(),
+      startedAt: existing?.startedAt || this.sessionStartedAt || new Date().toISOString(),
       lastActiveAt: new Date().toISOString(),
+      firstPrompt: this.firstPrompt || existing?.firstPrompt,
     });
   }
 
@@ -599,6 +652,19 @@ export class SessionTab implements WebviewBridge {
     this.demux.on('init', (event: import('../types/stream-json').SystemInitEvent) => {
       this.currentModel = event.model;
       this.sessionStartedAt = new Date().toISOString();
+
+      // Restore existing metadata for resumed sessions (preserve name + firstPrompt)
+      const existing = this.sessionStore.getSession(event.session_id);
+      if (existing) {
+        if (existing.firstPrompt) {
+          this.firstPrompt = existing.firstPrompt;
+        }
+        if (existing.name && !existing.name.startsWith('Session ')) {
+          this.setTabName(existing.name);
+        }
+        this.sessionStartedAt = existing.startedAt;
+      }
+
       tabLog(`[SessionStore] Saving initial metadata: session=${event.session_id}, model=${event.model}`);
       this.persistSessionMetadata();
     });

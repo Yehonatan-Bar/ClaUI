@@ -29,3 +29,42 @@
 [dir="rtl"] .message-role {
   text-align: right;
 }
+
+/* RTL Markdown elements */
+[dir="rtl"] .markdown-content {
+  text-align: right;
+}
+
+/* Keep code LTR even in RTL context */
+[dir="rtl"] .markdown-content code,
+[dir="rtl"] .markdown-content pre {
+  direction: ltr;
+  text-align: left;
+}
+
+/* Lists in RTL: bullets/numbers on the right */
+[dir="rtl"] .markdown-content ul,
+[dir="rtl"] .markdown-content ol {
+  padding-left: 0;
+  padding-right: 1.8em;
+}
+
+/* Blockquote border on the right in RTL */
+[dir="rtl"] .markdown-content blockquote {
+  border-left: none;
+  border-right: 3px solid var(--vscode-textLink-foreground, #3794ff);
+  padding-left: 0;
+  padding-right: 0.8em;
+}
+
+/* Tables stay LTR */
+[dir="rtl"] .markdown-content table {
+  direction: ltr;
+  text-align: left;
+}
+
+/* Task list checkbox in RTL */
+[dir="rtl"] .markdown-content li input[type="checkbox"] {
+  margin-right: 0;
+  margin-left: 0.4em;
+}

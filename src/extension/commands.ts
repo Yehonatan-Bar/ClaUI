@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { TabManager } from './session/TabManager';
 import type { SessionStore } from './session/SessionStore';
+import type { SerializedChatMessage } from './types/webview-messages';
 
 function collectUrisFromArgs(args: unknown[]): vscode.Uri[] {
   const uris: vscode.Uri[] = [];
@@ -231,6 +232,7 @@ export function registerCommands(
     // Show conversation history in a QuickPick
     vscode.commands.registerCommand('claudeMirror.showHistory', async () => {
       const sessions = sessionStore.getSessions();
+      log(`[showHistory] Found ${sessions.length} sessions in store`);
 
       if (sessions.length === 0) {
         vscode.window.showInformationMessage('No conversation history yet.');
@@ -239,8 +241,8 @@ export function registerCommands(
 
       const items = sessions.map(s => ({
         label: s.name || `Session ${s.sessionId.slice(0, 8)}`,
-        description: s.model || '',
-        detail: formatRelativeTime(s.lastActiveAt),
+        description: `${s.model || ''}  ${formatRelativeTime(s.lastActiveAt)}`,
+        detail: s.firstPrompt || undefined,
         sessionId: s.sessionId,
       }));
 
@@ -346,11 +348,11 @@ export function registerCommands(
     // Fork conversation from a specific message (opens a new tab)
     vscode.commands.registerCommand(
       'claudeMirror.forkFromMessage',
-      async (sessionId: string, forkMessageIndex: number, promptText: string) => {
-        log(`Forking session ${sessionId} from message index ${forkMessageIndex}`);
+      async (sessionId: string, forkMessageIndex: number, promptText: string, messages: SerializedChatMessage[]) => {
+        log(`Forking session ${sessionId} from message index ${forkMessageIndex}, historyLen=${messages?.length ?? 0}`);
         const tab = tabManager.createTab();
         try {
-          tab.setForkInit({ forkMessageIndex, promptText });
+          tab.setForkInit({ promptText, messages: messages || [] });
           await tab.startSession({ resume: sessionId, fork: true });
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err);

@@ -17,32 +17,19 @@ export const App: React.FC = () => {
   const forkInit = useAppStore((s) => s.forkInit);
   const hasMessages = messages.length > 0 || streamingMessageId !== null;
 
-  // Fork completion: after forkInit is set (new forked tab), wait for replayed
-  // messages to stop arriving (500ms debounce), then truncate at the fork point
-  // and place the prompt text into the input area.
+  // Fork completion: messages are already loaded into the store by
+  // useClaudeStream's forkInit handler. Just set the prompt text in
+  // the input area and clear the fork state.
   useEffect(() => {
     if (!forkInit) return;
-    const timer = setTimeout(() => {
-      const state = useAppStore.getState();
-      if (!state.forkInit) return;
-      const { forkMessageIndex, promptText } = state.forkInit;
-      // Truncate messages: keep only those before forkMessageIndex
-      if (forkMessageIndex < state.messages.length) {
-        const targetMsg = state.messages[forkMessageIndex];
-        if (targetMsg) {
-          state.truncateFromMessage(targetMsg.id);
-        }
-      }
-      // Set the prompt text in InputArea via CustomEvent
-      if (promptText) {
-        window.dispatchEvent(
-          new CustomEvent('fork-set-input', { detail: promptText })
-        );
-      }
-      state.setForkInit(null);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [forkInit, messages.length]);
+    const { promptText } = forkInit;
+    if (promptText) {
+      window.dispatchEvent(
+        new CustomEvent('fork-set-input', { detail: promptText })
+      );
+    }
+    useAppStore.getState().setForkInit(null);
+  }, [forkInit]);
 
   console.log(`%c[App] render`, 'color: white; font-weight: bold; background: #333; padding: 2px 6px', {
     isConnected,

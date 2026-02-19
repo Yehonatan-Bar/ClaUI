@@ -96,7 +96,7 @@ export interface AppState {
   gitPushRunning: boolean;
 
   // Fork state (set when a forked tab receives forkInit from extension)
-  forkInit: { forkMessageIndex: number; promptText: string } | null;
+  forkInit: { promptText: string } | null;
 
   // Actions
   setSession: (sessionId: string, model: string) => void;
@@ -149,7 +149,7 @@ export interface AppState {
   setGitPushResult: (result: { success: boolean; output: string } | null) => void;
   setGitPushConfigPanelOpen: (open: boolean) => void;
   setGitPushRunning: (running: boolean) => void;
-  setForkInit: (init: { forkMessageIndex: number; promptText: string } | null) => void;
+  setForkInit: (init: { promptText: string } | null) => void;
   reset: () => void;
 }
 

@@ -3,6 +3,7 @@ import type { ChatMessage } from '../../state/store';
 import type { ContentBlock } from '../../../extension/types/stream-json';
 import { CodeBlock } from './CodeBlock';
 import { ToolUseBlock } from './ToolUseBlock';
+import { MarkdownContent } from './MarkdownContent';
 import { useRtlDetection } from '../../hooks/useRtlDetection';
 import { renderTextWithFileLinks } from './filePathLinks';
 
@@ -215,13 +216,7 @@ const TextBlockRenderer: React.FC<{ text: string }> = ({ text }) => {
             language={segment.language}
           />
         ) : (
-          <div
-            key={index}
-            className="text-content"
-            style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-          >
-            {renderTextWithFileLinks(segment.content)}
-          </div>
+          <MarkdownContent key={index} text={segment.content} />
         )
       )}
     </>
