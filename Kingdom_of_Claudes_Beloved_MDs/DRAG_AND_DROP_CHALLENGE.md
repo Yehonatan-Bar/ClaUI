@@ -2,13 +2,13 @@
 
 ## The Goal
 
-Allow users to drag files from Windows Explorer or VS Code's file explorer onto the Claude Mirror chat panel and have the file's full path pasted into the input textarea. This is how the Claude CLI works in a terminal - you drag a file onto the terminal window and the path appears as text input.
+Allow users to drag files from Windows Explorer or VS Code's file explorer onto the ClaUi chat panel and have the file's full path pasted into the input textarea. This is how the Claude CLI works in a terminal - you drag a file onto the terminal window and the path appears as text input.
 
 ## Resolution Implemented (February 17, 2026)
 
 Direct drag-and-drop onto the editor-area webview remains impossible due to VS Code interception. The extension now ships a reliable replacement workflow:
 
-- Explorer context menu command: `Claude Mirror: Send Path to Chat`
+- Explorer context menu command: `ClaUi: Send Path to Chat`
 - Supports single or multi-select files/folders from VS Code Explorer
 - Injects selected full paths into the chat input via existing `filePathsPicked` message flow
 - Keeps the existing `+` picker as an additional path entry method
@@ -108,7 +108,7 @@ VS Code terminals natively support drag-and-drop (file paths are pasted as text)
 
 **Files to modify:** New `TerminalDropProxy.ts` in `src/extension/terminal/`, wire in `extension.ts`.
 
-### 3. Explorer Context Menu ("Send Path to Claude Mirror")
+### 3. Explorer Context Menu ("Send Path to ClaUi")
 
 Add a right-click context menu item to VS Code's file explorer that sends the file path to the chat input.
 
@@ -186,7 +186,7 @@ The fundamental blocker is that **VS Code's editor area intercepts all drag even
 
 Implemented practical workaround:
 
-1. Explorer context menu: `Claude Mirror: Send Path to Chat`
+1. Explorer context menu: `ClaUi: Send Path to Chat`
 2. `+` button file picker in input area
 
 Direct drag-drop onto the editor-area webview remains blocked by VS Code.

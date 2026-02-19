@@ -1,4 +1,4 @@
-# Claude Code Mirror - Technical Documentation
+# ClaUi - Technical Documentation
 
 ## Overview
 
@@ -67,7 +67,7 @@ Then **reload VS Code** (Ctrl+Shift+P -> `Developer: Reload Window`).
 
 1. Open any project in VS Code
 2. Press **Ctrl+Shift+C** to start a Claude session (opens a new tab each time)
-   - Or: **Ctrl+Shift+P** -> `Claude Mirror: Start New Session`
+   - Or: **Ctrl+Shift+P** -> `ClaUi: Start New Session`
 3. The chat panel opens. Type a message and press **Ctrl+Enter** to send
 4. Press **Ctrl+Shift+C** again to open additional parallel sessions in separate tabs
 
@@ -89,7 +89,7 @@ For debugging the extension itself:
 | Ctrl+Shift+H | Conversation History |
 | Ctrl+Enter | Send message (in chat input, works even while Claude is busy) |
 | Enter | New line (in chat input) |
-| Escape | Cancel/pause current response (works when Claude Mirror panel is active) |
+| Escape | Cancel/pause current response (works when ClaUi panel is active) |
 
 ---
 
@@ -234,7 +234,7 @@ claude-code-mirror/
 **Editable Prompts** - Users can edit previously sent messages by hovering over a user message and clicking "Edit". The message content switches to an inline textarea. On send, all messages from the edit point onward are removed from the UI, the current CLI session is stopped, a new session starts, and the edited prompt is sent as the first message. Only text-only user messages are editable (not images). The edit button is hidden while the assistant is busy.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `Claude Mirror: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
+**File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/DRAG_AND_DROP_CHALLENGE.md`
 
 ---
@@ -373,7 +373,7 @@ If any check fails, VS Code is still on stale code. Re-run package/install and r
 1. Confirm extension is installed: `code --list-extensions --show-versions | rg claude-code-mirror`
 2. Reinstall with `--force`.
 3. Reload window (`Developer: Reload Window`).
-4. Check `Output -> Claude Mirror` for fresh startup timestamps after reload.
+4. Check `Output -> ClaUi` for fresh startup timestamps after reload.
 
 ### Production build note
 
@@ -389,7 +389,7 @@ The webview panel may open completely blank - no HTML renders at all (not even p
 
 **Fix**: Open `Developer: Toggle Developer Tools` (Ctrl+Shift+I). This forces the webview to repaint and content appears. You can close Developer Tools immediately after - the webview will keep working.
 
-**Symptoms**: The Output channel (`Claude Mirror`) shows `Webview: creating new panel` and `HTML length = ...` but no `Webview: received message type="ready"`. The panel is visible but empty.
+**Symptoms**: The Output channel (`ClaUi`) shows `Webview: creating new panel` and `HTML length = ...` but no `Webview: received message type="ready"`. The panel is visible but empty.
 
 **Known triggers**: VS Code reload, VS Code updates, certain window layouts. Observed on VS Code 1.109.0.
 

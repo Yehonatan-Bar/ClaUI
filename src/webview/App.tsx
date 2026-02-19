@@ -106,7 +106,7 @@ const WelcomeScreen: React.FC = () => {
 
   return (
     <div className="welcome-screen">
-      <div className="welcome-title">Claude Code Mirror</div>
+      <div className="welcome-title">ClaUi</div>
       <div className="welcome-hint">
         Start a new session to begin chatting with Claude Code.
         Your conversation will be visible in both the chat UI and terminal.

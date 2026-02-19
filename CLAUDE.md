@@ -19,7 +19,7 @@ npm run verify:installed
 
 **Mandatory** when adding new commands, menus, keybindings, or settings - these live in `package.json` (the extension manifest) and must be packaged to take effect.
 
-If verification fails: re-run `npm run deploy:local`, reload, check `Output -> Claude Mirror` for fresh startup timestamps.
+If verification fails: re-run `npm run deploy:local`, reload, check `Output -> ClaUi` for fresh startup timestamps.
 
 ## 3. Update Documentation
 
@@ -64,7 +64,7 @@ Never trust CLI event field types at runtime. The TypeScript interfaces describe
 ## 6. Debugging
 
 - **Webview console**: `Developer: Open Webview Developer Tools` - shows React errors, state logs
-- **Extension output**: `Output -> Claude Mirror` - shows process lifecycle, startup timestamps
+- **Extension output**: `Output -> ClaUi` - shows process lifecycle, startup timestamps
 - **Error Boundary**: React crashes display error + stack trace in the webview panel (instead of blank screen). If you see a blank screen, it's the VS Code rendering bug above, not a React crash
 
 לתחקר תקלות עיין בלוגים האחרונים שבתקיה:

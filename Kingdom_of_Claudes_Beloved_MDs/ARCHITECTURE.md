@@ -1,4 +1,4 @@
-# Architecture - Claude Code Mirror
+# Architecture - ClaUi
 
 ## Data Flow
 
@@ -241,7 +241,7 @@ Bundles all resources for one Claude session tab:
 - Creates its own `vscode.WebviewPanel` using `buildWebviewHtml()`
 - Implements `WebviewBridge` interface for MessageHandler
 - Wires all events (process -> demux -> handler -> webview) internally
-- Panel title: starts as `"Claude Mirror N"`, auto-renamed by SessionNamer after first user message. An animated braille spinner is appended to the title while Claude is processing (busy state)
+- Panel title: starts as `"ClaUi N"`, auto-renamed by SessionNamer after first user message. An animated braille spinner is appended to the title while Claude is processing (busy state)
 - Tab icon: colored SVG circle generated per-tab and set via `panel.iconPath` so all tab colors are visible in the VS Code tab bar simultaneously
 - Busy indicator: `postMessage` intercepts `processBusy` messages and calls `setBusy()` which starts/stops an animated spinner (`setInterval` cycling through braille frames every 120ms). The base title (without indicator) is stored in `baseTitle` so toggling is clean. Timer is cleaned up on dispose.
 - Rename: floating pencil button in the webview (appears on hover) triggers a VS Code input box to rename the tab
@@ -395,7 +395,7 @@ The `claudeMirror.openPlanDocs` command opens HTML plan documents in the default
 3. Filters for `.html` files, sorts by modification time (newest first)
 4. Single file: opens directly. Multiple files: shows QuickPick with relative timestamps
 5. Opens via `vscode.env.openExternal(vscode.Uri.file(path))`
-6. Also accessible from Command Palette: "Claude Mirror: Open Plan Document"
+6. Also accessible from Command Palette: "ClaUi: Open Plan Document"
 
 **Plans Feature Activation** - When no HTML plan documents exist (folder missing or empty), the command offers to activate the Plans feature:
 1. Shows an information message explaining the feature and asking if the user wants to enable it

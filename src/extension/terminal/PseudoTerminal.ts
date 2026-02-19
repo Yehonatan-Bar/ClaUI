@@ -12,7 +12,7 @@ export class ClaudePseudoTerminal implements vscode.Pseudoterminal {
   onDidClose = this.closeEmitter.event;
 
   open(_initialDimensions: vscode.TerminalDimensions | undefined): void {
-    this.writeLine('Claude Code Mirror - Terminal View');
+    this.writeLine('ClaUi - Terminal View');
     this.writeLine('(Phase 2: Terminal mirroring not yet implemented)');
     this.writeLine('');
   }

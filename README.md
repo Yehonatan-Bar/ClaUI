@@ -1,4 +1,4 @@
-# Claude Code Mirror
+# ClaUi
 
 A VS Code extension that gives Claude Code a rich chat UI - multiple tabs, model selection, file sending, image paste, and more.
 
@@ -58,13 +58,13 @@ That's it. The extension is now installed globally - it works in any VS Code pro
 
 ### Step 6 (Recommended): Verify the main shortcut once
 
-This ensures the next `Ctrl+Shift+C` opens Claude Mirror immediately on this machine:
+This ensures the next `Ctrl+Shift+C` opens ClaUi immediately on this machine:
 
 1. Open Keyboard Shortcuts: `Ctrl+K` then `Ctrl+S`.
 2. Search for `claudeMirror.startSession`.
 3. Confirm it is bound to **`Ctrl+Shift+C`**.
-4. Press **`Ctrl+Shift+C`** and verify a Claude Mirror chat tab opens.
-5. If it does not open, run `Ctrl+Shift+P` -> **Claude Mirror: Start New Session** once, then rebind `Ctrl+Shift+C` to `claudeMirror.startSession`.
+4. Press **`Ctrl+Shift+C`** and verify a ClaUi chat tab opens.
+5. If it does not open, run `Ctrl+Shift+P` -> **ClaUi: Start New Session** once, then rebind `Ctrl+Shift+C` to `claudeMirror.startSession`.
 
 ---
 
@@ -85,7 +85,7 @@ These are the shortcuts you need to know:
 
 > **Mac users**: Replace `Ctrl` with `Cmd` for all shortcuts above.
 >
-> To customize shortcuts, open Keyboard Shortcuts (`Ctrl+K`, `Ctrl+S`) and search for `Claude Mirror` or `claudeMirror.*`.
+> To customize shortcuts, open Keyboard Shortcuts (`Ctrl+K`, `Ctrl+S`) and search for `ClaUi` or `claudeMirror.*`.
 
 ---
 
@@ -93,7 +93,7 @@ These are the shortcuts you need to know:
 
 Three ways to reference files in your messages:
 
-1. **Right-click in Explorer** - Right-click any file or folder in the sidebar, select **"Claude Mirror: Send Path to Chat"**. Works with multiple selected files.
+1. **Right-click in Explorer** - Right-click any file or folder in the sidebar, select **"ClaUi: Send Path to Chat"**. Works with multiple selected files.
 
 2. **The "+" button** - Click the **+** button next to the chat input. A file picker opens.
 
@@ -292,14 +292,14 @@ claude-code-mirror/
 **Open Plan Docs** - "Plans" button in the status bar that opens HTML plan documents from `Kingdom_of_Claudes_Beloved_MDs/` in the default browser. Single file opens directly; multiple files show a QuickPick sorted by modification time. Also available via Command Palette (`claudeMirror.openPlanDocs`).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `Claude Mirror: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
+**File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/DRAG_AND_DROP_CHALLENGE.md`
 
 ---
 
 ## All Commands (Command Palette)
 
-Press `Ctrl+Shift+P` and type "Claude Mirror" to see all commands:
+Press `Ctrl+Shift+P` and type "ClaUi" to see all commands:
 
 | Command | What it does |
 |---------|-------------|
@@ -450,7 +450,7 @@ If any check fails, VS Code is still on stale code. Re-run package/install and r
 1. Confirm extension is installed: `code --list-extensions --show-versions | rg claude-code-mirror`
 2. Reinstall with `--force`.
 3. Reload window (`Developer: Reload Window`).
-4. Check `Output -> Claude Mirror` for fresh startup timestamps after reload.
+4. Check `Output -> ClaUi` for fresh startup timestamps after reload.
 
 ### Production build note
 
@@ -466,7 +466,7 @@ The webview panel may open completely blank - no HTML renders at all (not even p
 
 **Fix**: Open `Developer: Toggle Developer Tools` (Ctrl+Shift+I). This forces the webview to repaint and content appears. You can close Developer Tools immediately after - the webview will keep working.
 
-**Symptoms**: The Output channel (`Claude Mirror`) shows `Webview: creating new panel` and `HTML length = ...` but no `Webview: received message type="ready"`. The panel is visible but empty.
+**Symptoms**: The Output channel (`ClaUi`) shows `Webview: creating new panel` and `HTML length = ...` but no `Webview: received message type="ready"`. The panel is visible but empty.
 
 **Known triggers**: VS Code reload, VS Code updates, certain window layouts. Observed on VS Code 1.109.0.
 

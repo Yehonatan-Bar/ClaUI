@@ -75,7 +75,7 @@ Default: `<globalStorageUri>/logs/` (typically `%APPDATA%/Code/User/globalStorag
 
 Override: `claudeMirror.logDirectory` setting
 
-Access: `Claude Mirror: Open Log Directory` command opens the folder in the system file explorer.
+Access: `ClaUi: Open Log Directory` command opens the folder in the system file explorer.
 
 ## Configuration
 
@@ -87,7 +87,7 @@ Access: `Claude Mirror: Open Log Directory` command opens the folder in the syst
 ## Dual-Write Behavior
 
 Messages appear in:
-- **OutputChannel** (VS Code "Claude Mirror" output) - always, unchanged
+- **OutputChannel** (VS Code "ClaUi" output) - always, unchanged
 - **Global log file** - all messages from all tabs + extension lifecycle
 - **Per-tab log file** - only that tab's messages (via `tabLog` closure)
 
