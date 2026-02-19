@@ -216,7 +216,7 @@ Exports `detectRtl(text)` which checks for Hebrew (U+0590-U+05FF) and Arabic (U+
 
 ### React Components
 
-**MessageList** - Scrollable container with auto-scroll. Pauses auto-scroll when user scrolls up (>100px from bottom). Renders completed messages and streaming blocks.
+**MessageList** - Scrollable container with auto-scroll. Pauses auto-scroll when user scrolls up (>100px from bottom). Shows a floating "scroll to bottom" arrow button when the user has scrolled up; clicking it smooth-scrolls back to the latest message. Renders completed messages and streaming blocks.
 
 **MessageBubble** - Renders a completed message. Parses text content to extract fenced code blocks (``` delimiters). Uses `dir="auto"` for automatic bidi direction. Renders tool_use, tool_result, and image content blocks inline. Tool result blocks are rendered with a collapsible panel (collapsed by default) to keep the chat clean - file paths inside tool results are also clickable. Image blocks display as responsive thumbnails with rounded borders. File paths in plain text segments are detected and rendered as clickable links via `renderTextWithFileLinks()`. A **Copy button** appears on hover in the message role header for both user and assistant messages, copying the full text content to the clipboard (uses Clipboard API with `execCommand` fallback). Shows "Copied!" confirmation for 2 seconds.
 

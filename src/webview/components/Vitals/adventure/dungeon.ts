@@ -143,41 +143,89 @@ export class Dungeon {
     this.tiles.set(`${x},${y}`, value);
   }
 
-  /** Generate corridor tiles between two rooms */
+  /** Generate L-shaped corridor tiles between two rooms for maze-like feel */
   private generateCorridor(from: DungeonRoom, toPos: TilePos, dirIdx: number): void {
-    const dir = DIRECTIONS[dirIdx];
     const toCenter = {
       x: toPos.x + Math.floor(ROOM_SIZE / 2),
       y: toPos.y + Math.floor(ROOM_SIZE / 2),
     };
 
-    // Walk from source room center toward target
-    let cx = from.center.x;
-    let cy = from.center.y;
+    const cx = from.center.x;
+    const cy = from.center.y;
+    const tx = toCenter.x;
+    const ty = toCenter.y;
 
-    // Move in the primary direction until we reach the target row/column
-    const steps = CORRIDOR_LENGTH + ROOM_SIZE;
-    for (let i = 0; i < steps; i++) {
-      cx += dir.x;
-      cy += dir.y;
+    // Decide bend point: randomly along the corridor with some variation
+    const bendFraction = 0.3 + this.rng() * 0.4; // 30-70% along the way
 
-      // Check if we've reached the target room area
-      if (cx >= toPos.x && cx < toPos.x + ROOM_SIZE &&
-          cy >= toPos.y && cy < toPos.y + ROOM_SIZE) {
-        break;
+    // Build the corridor as a set of waypoints (L-shaped or Z-shaped)
+    const waypoints: TilePos[] = [{ x: cx, y: cy }];
+
+    const isHorizontalFirst = (dirIdx === 1 || dirIdx === 3); // right or left
+
+    if (isHorizontalFirst) {
+      // Go horizontal, then bend vertical
+      const bendX = Math.round(cx + (tx - cx) * bendFraction);
+      waypoints.push({ x: bendX, y: cy });
+      waypoints.push({ x: bendX, y: ty });
+      waypoints.push({ x: tx, y: ty });
+    } else {
+      // Go vertical, then bend horizontal
+      const bendY = Math.round(cy + (ty - cy) * bendFraction);
+      waypoints.push({ x: cx, y: bendY });
+      waypoints.push({ x: tx, y: bendY });
+      waypoints.push({ x: tx, y: ty });
+    }
+
+    // Walk each segment and carve corridor tiles
+    for (let w = 0; w < waypoints.length - 1; w++) {
+      const a = waypoints[w];
+      const b = waypoints[w + 1];
+      this.carveCorridorSegment(a, b, toPos);
+    }
+  }
+
+  /** Carve a straight corridor segment from A to B, with walls on sides */
+  private carveCorridorSegment(a: TilePos, b: TilePos, roomPos: TilePos): void {
+    let cx = a.x;
+    let cy = a.y;
+    const dx = Math.sign(b.x - a.x);
+    const dy = Math.sign(b.y - a.y);
+    const maxSteps = Math.abs(b.x - a.x) + Math.abs(b.y - a.y) + 1;
+
+    for (let i = 0; i < maxSteps; i++) {
+      // Skip if we're inside a room area
+      if (cx >= roomPos.x && cx < roomPos.x + ROOM_SIZE &&
+          cy >= roomPos.y && cy < roomPos.y + ROOM_SIZE) {
+        cx += dx;
+        cy += dy;
+        continue;
       }
 
       this.setTile(cx, cy, TILE.FLOOR);
-      // Add walls on the sides of the corridor
-      if (dir.x !== 0) {
-        // Horizontal corridor - walls above and below
+
+      // Add walls on the sides based on movement direction
+      if (dx !== 0) {
+        // Horizontal - walls above and below
         if (this.getTile(cx, cy - 1) === TILE.VOID) this.setTile(cx, cy - 1, TILE.WALL);
         if (this.getTile(cx, cy + 1) === TILE.VOID) this.setTile(cx, cy + 1, TILE.WALL);
-      } else {
-        // Vertical corridor - walls left and right
+      }
+      if (dy !== 0) {
+        // Vertical - walls left and right
         if (this.getTile(cx - 1, cy) === TILE.VOID) this.setTile(cx - 1, cy, TILE.WALL);
         if (this.getTile(cx + 1, cy) === TILE.VOID) this.setTile(cx + 1, cy, TILE.WALL);
       }
+      // At bend corners, add walls all around
+      if (dx === 0 && dy === 0) {
+        for (const d of DIRECTIONS) {
+          if (this.getTile(cx + d.x, cy + d.y) === TILE.VOID) {
+            this.setTile(cx + d.x, cy + d.y, TILE.WALL);
+          }
+        }
+      }
+
+      cx += dx;
+      cy += dy;
     }
   }
 
@@ -203,11 +251,18 @@ export class Dungeon {
     }
   }
 
-  /** Pick a direction for the next room (cycles with some variation) */
+  /** Pick a direction for the next room - avoids going back the way we came */
   private pickDirection(): number {
-    // Weighted: prefer right and down to create a general forward progression
-    const weights = [0.15, 0.4, 0.3, 0.15]; // up, right, down, left
-    const r = this.rng();
+    // More balanced weights - still slight forward bias but all directions possible
+    const baseWeights = [0.2, 0.3, 0.3, 0.2]; // up, right, down, left
+
+    // Penalize the reverse of the last direction to avoid backtracking
+    const reverseDir = (this.nextDirIdx + 2) % 4;
+    const weights = baseWeights.map((w, i) => i === reverseDir ? w * 0.2 : w);
+
+    // Normalize weights
+    const total = weights.reduce((a, b) => a + b, 0);
+    const r = this.rng() * total;
     let cumulative = 0;
     for (let i = 0; i < weights.length; i++) {
       cumulative += weights[i];
@@ -284,7 +339,7 @@ export class Dungeon {
     }
   }
 
-  /** Get the path from current hero position to target (simple line) */
+  /** Get the path from current hero position to target (zigzag for movement variety) */
   getPathToTarget(): TilePos[] {
     const path: TilePos[] = [];
     let cx = this.heroPos.x;
@@ -292,13 +347,37 @@ export class Dungeon {
     const tx = this.heroTarget.x;
     const ty = this.heroTarget.y;
 
-    // Simple pathfinding: move horizontally first, then vertically
-    while (cx !== tx) {
-      cx += cx < tx ? 1 : -1;
-      path.push({ x: cx, y: cy });
-    }
-    while (cy !== ty) {
-      cy += cy < ty ? 1 : -1;
+    // Zigzag: alternate horizontal and vertical steps for visible multi-directional movement
+    let moveX = true; // start with horizontal
+    while (cx !== tx || cy !== ty) {
+      const remainX = Math.abs(tx - cx);
+      const remainY = Math.abs(ty - cy);
+
+      if (remainX === 0) {
+        // Only vertical left
+        cy += cy < ty ? 1 : -1;
+      } else if (remainY === 0) {
+        // Only horizontal left
+        cx += cx < tx ? 1 : -1;
+      } else if (moveX) {
+        // Take 1-2 horizontal steps
+        const steps = Math.min(remainX, 1 + Math.floor(this.rng() * 2));
+        for (let i = 0; i < steps && cx !== tx; i++) {
+          cx += cx < tx ? 1 : -1;
+          path.push({ x: cx, y: cy });
+        }
+        moveX = false;
+        continue; // already pushed
+      } else {
+        // Take 1-2 vertical steps
+        const steps = Math.min(remainY, 1 + Math.floor(this.rng() * 2));
+        for (let i = 0; i < steps && cy !== ty; i++) {
+          cy += cy < ty ? 1 : -1;
+          path.push({ x: cx, y: cy });
+        }
+        moveX = true;
+        continue; // already pushed
+      }
       path.push({ x: cx, y: cy });
     }
 

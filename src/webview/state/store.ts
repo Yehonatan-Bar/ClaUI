@@ -396,11 +396,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         isConnected: true,
         lastError: null,
         sessionRecap: null,
+        // Session connected: show clear sky (not night/idle) even before first turn completes
         ...(isBrandNewSession
           ? {
             sessionActivityStarted: false,
             sessionActivityElapsedMs: 0,
             sessionActivityRunningSinceMs: null,
+            weather: { mood: 'clear' as WeatherMood, pulseRate: 'slow' as PulseRate },
           }
           : {}),
       };
@@ -422,6 +424,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         activitySummary: null,
         sessionActivityElapsedMs: finalElapsed,
         sessionActivityRunningSinceMs: null,
+        weather: { mood: 'night' as WeatherMood, pulseRate: 'slow' as PulseRate },
       };
     }),
 
