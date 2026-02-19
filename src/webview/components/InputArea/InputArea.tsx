@@ -412,6 +412,27 @@ export const InputArea: React.FC = () => {
     return () => window.removeEventListener('prompt-history-select', handler);
   }, [undoMgr]);
 
+  // Listen for fork-set-input events (from App.tsx fork completion logic)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const prompt = (e as CustomEvent<string>).detail;
+      setText(prompt);
+      undoMgr.push(prompt, prompt.length);
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (el) {
+          el.style.height = 'auto';
+          el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+          el.focus();
+          el.selectionStart = 0;
+          el.selectionEnd = el.value.length;
+        }
+      });
+    };
+    window.addEventListener('fork-set-input', handler);
+    return () => window.removeEventListener('fork-set-input', handler);
+  }, [undoMgr]);
+
   /** Toggle the prompt history panel */
   const handleToggleHistory = useCallback(() => {
     setPromptHistoryPanelOpen(true);

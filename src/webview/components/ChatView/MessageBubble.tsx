@@ -10,13 +10,14 @@ interface MessageBubbleProps {
   message: ChatMessage;
   isBusy?: boolean;
   onEditAndResend?: (messageId: string, newText: string) => void;
+  onFork?: (messageId: string, messageText: string) => void;
 }
 
 /**
  * Renders a single completed message (user or assistant).
  * User messages show an Edit button on hover (hidden while assistant is busy).
  */
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, onEditAndResend }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, onEditAndResend, onFork }) => {
   const isUser = message.role === 'user';
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -33,6 +34,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   // Only text-only user messages are editable (not images)
   const hasOnlyText = isUser && contentBlocks.every((b) => b.type === 'text');
   const canEdit = hasOnlyText && !isBusy && !!onEditAndResend;
+  const canFork = isUser && hasOnlyText && !!onFork;
 
   const [copied, setCopied] = useState(false);
 
@@ -111,6 +113,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
             title="Edit and resend this message"
           >
             Edit
+          </button>
+        )}
+        {canFork && !isEditing && (
+          <button
+            className="fork-message-btn"
+            onClick={() => onFork!(message.id, textContent)}
+            title="Fork conversation from this message"
+          >
+            Fork
           </button>
         )}
       </div>

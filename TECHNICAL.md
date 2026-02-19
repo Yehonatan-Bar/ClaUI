@@ -25,71 +25,9 @@ A VS Code extension that provides a rich chat interface for Claude Code. The ext
 
 ## Quick Start
 
-### Prerequisites
+For build instructions, development setup, and contributing: see [DEVELOPMENT.md](DEVELOPMENT.md).
 
-- **Node.js** 18+ and npm
-- **Claude CLI** installed and accessible as `claude` in PATH
-- **VS Code** 1.85+
-
-### Install (use in any project)
-
-```bash
-cd C:\projects\claude-code-mirror
-npm install
-npm run build
-npx vsce package --allow-missing-repository
-code --install-extension claude-code-mirror-0.1.0.vsix
-```
-
-After installation, the extension is available globally in VS Code - open any project and use it.
-
-### Update after code changes
-
-Preferred (single command):
-
-```bash
-cd C:\projects\claude-code-mirror
-npm run deploy:local
-```
-
-Manual equivalent:
-
-```bash
-cd C:\projects\claude-code-mirror
-npm run build
-npx vsce package --allow-missing-repository
-code --install-extension claude-code-mirror-0.1.0.vsix --force
-```
-
-Then **reload VS Code** (Ctrl+Shift+P -> `Developer: Reload Window`).
-
-### Use the extension
-
-1. Open any project in VS Code
-2. Press **Ctrl+Shift+C** to start a Claude session (opens a new tab each time)
-   - Or: **Ctrl+Shift+P** -> `ClaUi: Start New Session`
-3. The chat panel opens. Type a message and press **Ctrl+Enter** to send
-4. Press **Ctrl+Shift+C** again to open additional parallel sessions in separate tabs
-
-### Development mode (F5)
-
-For debugging the extension itself:
-
-1. Open `C:\projects\claude-code-mirror` in VS Code
-2. Press **F5** to launch the Extension Development Host
-3. Changes rebuild automatically with `npm run watch`
-
-### Keybindings
-
-| Shortcut | Command |
-|----------|---------|
-| Ctrl+Shift+C | Start New Session |
-| Ctrl+Shift+M | Toggle Chat/Terminal View |
-| Ctrl+Alt+Shift+C | Send active file path to chat |
-| Ctrl+Shift+H | Conversation History |
-| Ctrl+Enter | Send message (in chat input, works even while Claude is busy) |
-| Enter | New line (in chat input) |
-| Escape | Cancel/pause current response (works when ClaUi panel is active) |
+User-facing documentation (features, shortcuts, settings): see [README.md](README.md).
 
 ---
 
@@ -123,7 +61,7 @@ claude-code-mirror/
 |   |   |   +-- FileLogger.ts             #   Per-session file logging with rotation and rename
 |   |   |   +-- SessionStore.ts           #   Persists session metadata in globalState
 |   |   |   +-- PromptHistoryStore.ts     #   Persists prompt history (project + global scope)
-|   |   |   +-- SessionFork.ts            #   Phase 3 stub (fork/rewind)
+|   |   |   +-- SessionFork.ts            #   Phase 3 stub (rewind)
 |   |   +-- terminal/                     #   Phase 2 stubs
 |   |   +-- auth/                         #   Phase 5 stub
 |   |   +-- types/
@@ -232,6 +170,9 @@ claude-code-mirror/
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Editable Prompts** - Users can edit previously sent messages by hovering over a user message and clicking "Edit". The message content switches to an inline textarea. On send, all messages from the edit point onward are removed from the UI, the current CLI session is stopped, a new session starts, and the edited prompt is sent as the first message. Only text-only user messages are editable (not images). The edit button is hidden while the assistant is busy.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**Fork Conversation** - Users can fork the conversation from any user message by hovering and clicking "Fork". This opens a new tab that uses `--resume <sessionId> --fork-session` to create a branched CLI session with full conversation context. After the CLI replays all messages, the webview truncates messages at the fork point (keeping only history before the forked message) and places the forked message's text into the input area. The user can then edit and re-send, getting a different response branch. Uses a 500ms debounced timer to detect replay completion. Key files: `MessageBubble.tsx` (Fork button), `MessageList.tsx` (handler), `MessageHandler.ts` (`forkFromMessage`), `commands.ts` (`claudeMirror.forkFromMessage`), `SessionTab.ts` (`setForkInit`), `App.tsx` (fork completion logic), `InputArea.tsx` (`fork-set-input` listener).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
@@ -500,7 +441,7 @@ npm install -g @vscode/vsce
 | **1. Core Chat** | Done | Process management, stream parsing, React chat UI |
 | **1.5 Multi-Tab** | Done | Multiple parallel sessions in separate VS Code tabs (SessionTab + TabManager) |
 | **2. Terminal Mirror** | Stub | PseudoTerminal mirroring same session |
-| **3. Sessions** | Partial | Multi-tab sessions (done), resume (done), fork (done), conversation history (done), rewind (stub) |
+| **3. Sessions** | Partial | Multi-tab sessions (done), resume (done), fork from message (done), conversation history (done), rewind (stub) |
 | **4. Input** | Partial | File picker + Explorer send-path + keyboard shortcut (done), send-while-busy interrupt (done), image paste via Ctrl+V (done), RTL enhancements (done), editable prompts (done) |
 | **5. Accounts** | Stub | Multi-account, compact mode, cost tracking |
 | **6. Polish** | Pending | Virtualized scrolling, error recovery, theming |

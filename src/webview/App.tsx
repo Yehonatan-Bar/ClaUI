@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useClaudeStream } from './hooks/useClaudeStream';
 import { useAppStore } from './state/store';
 import { MessageList } from './components/ChatView/MessageList';
@@ -14,7 +14,35 @@ export const App: React.FC = () => {
   useClaudeStream();
 
   const { isConnected, isBusy, isResuming, lastError, cost, setError, messages, streamingMessageId, textSettings, pendingApproval, promptHistoryPanelOpen, activitySummary } = useAppStore();
+  const forkInit = useAppStore((s) => s.forkInit);
   const hasMessages = messages.length > 0 || streamingMessageId !== null;
+
+  // Fork completion: after forkInit is set (new forked tab), wait for replayed
+  // messages to stop arriving (500ms debounce), then truncate at the fork point
+  // and place the prompt text into the input area.
+  useEffect(() => {
+    if (!forkInit) return;
+    const timer = setTimeout(() => {
+      const state = useAppStore.getState();
+      if (!state.forkInit) return;
+      const { forkMessageIndex, promptText } = state.forkInit;
+      // Truncate messages: keep only those before forkMessageIndex
+      if (forkMessageIndex < state.messages.length) {
+        const targetMsg = state.messages[forkMessageIndex];
+        if (targetMsg) {
+          state.truncateFromMessage(targetMsg.id);
+        }
+      }
+      // Set the prompt text in InputArea via CustomEvent
+      if (promptText) {
+        window.dispatchEvent(
+          new CustomEvent('fork-set-input', { detail: promptText })
+        );
+      }
+      state.setForkInit(null);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [forkInit, messages.length]);
 
   console.log(`%c[App] render`, 'color: white; font-weight: bold; background: #333; padding: 2px 6px', {
     isConnected,

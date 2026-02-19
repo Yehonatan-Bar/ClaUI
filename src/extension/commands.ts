@@ -343,6 +343,24 @@ export function registerCommands(
       }
     }),
 
+    // Fork conversation from a specific message (opens a new tab)
+    vscode.commands.registerCommand(
+      'claudeMirror.forkFromMessage',
+      async (sessionId: string, forkMessageIndex: number, promptText: string) => {
+        log(`Forking session ${sessionId} from message index ${forkMessageIndex}`);
+        const tab = tabManager.createTab();
+        try {
+          tab.setForkInit({ forkMessageIndex, promptText });
+          await tab.startSession({ resume: sessionId, fork: true });
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          vscode.window.showErrorMessage(
+            `Failed to fork session: ${errorMessage}`
+          );
+        }
+      }
+    ),
+
     // Send file/folder path(s) to the ACTIVE tab's chat input
     vscode.commands.registerCommand(
       'claudeMirror.sendFilePathToChat',
