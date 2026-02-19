@@ -29,6 +29,7 @@ export function useClaudeStream(): void {
     setError,
     setPendingFilePaths,
     setTextSettings,
+    setTypingTheme,
     setSelectedModel,
     setResuming,
     setPendingApproval,
@@ -42,6 +43,13 @@ export function useClaudeStream(): void {
     setForkInit,
     setTranslation,
     setTranslating,
+    setAchievementsSettings,
+    setAchievementsSnapshot,
+    addAchievementToast,
+    setAchievementGoals,
+    setSessionRecap,
+    setVitalsEnabled,
+    addTurnRecord,
   } = useAppStore();
 
   useEffect(() => {
@@ -196,6 +204,10 @@ export function useClaudeStream(): void {
           setSelectedModel(msg.model);
           break;
 
+        case 'typingThemeSetting':
+          setTypingTheme(msg.theme);
+          break;
+
         case 'permissionModeSetting':
           setPermissionMode(msg.mode);
           break;
@@ -292,6 +304,37 @@ export function useClaudeStream(): void {
             new CustomEvent('file-search-results', { detail: msg })
           );
           break;
+
+        case 'achievementsSettings':
+          setAchievementsSettings({ enabled: msg.enabled, sound: msg.sound });
+          break;
+
+        case 'achievementsSnapshot':
+          setAchievementsSnapshot({
+            profile: msg.profile,
+            goals: msg.goals,
+          });
+          break;
+
+        case 'achievementAwarded':
+          addAchievementToast(msg.achievement, msg.profile);
+          break;
+
+        case 'achievementProgress':
+          setAchievementGoals(msg.goals);
+          break;
+
+        case 'sessionRecap':
+          setSessionRecap(msg.recap);
+          break;
+
+        case 'turnComplete':
+          addTurnRecord(msg.turn);
+          break;
+
+        case 'vitalsSetting':
+          setVitalsEnabled(msg.enabled);
+          break;
       }
     }
 
@@ -320,6 +363,7 @@ export function useClaudeStream(): void {
     setError,
     setPendingFilePaths,
     setTextSettings,
+    setTypingTheme,
     setSelectedModel,
     setResuming,
     setPendingApproval,
@@ -333,6 +377,13 @@ export function useClaudeStream(): void {
     setForkInit,
     setTranslation,
     setTranslating,
+    setAchievementsSettings,
+    setAchievementsSnapshot,
+    addAchievementToast,
+    setAchievementGoals,
+    setSessionRecap,
+    setVitalsEnabled,
+    addTurnRecord,
   ]);
 }
 

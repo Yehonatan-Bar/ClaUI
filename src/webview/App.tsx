@@ -8,14 +8,51 @@ import { ModelSelector } from './components/ModelSelector/ModelSelector';
 import { PermissionModeSelector } from './components/PermissionModeSelector/PermissionModeSelector';
 import { PlanApprovalBar } from './components/ChatView/PlanApprovalBar';
 import { PromptHistoryPanel } from './components/ChatView/PromptHistoryPanel';
+import { AchievementPanel } from './components/Achievements/AchievementPanel';
+import { AchievementToastStack } from './components/Achievements/AchievementToastStack';
+import { SessionRecapCard } from './components/Achievements/SessionRecapCard';
+import { VitalsContainer } from './components/Vitals/VitalsContainer';
+import { SessionTimeline } from './components/Vitals/SessionTimeline';
 import { postToExtension } from './hooks/useClaudeStream';
+
+function formatDuration(durationMs: number): string {
+  const totalSec = Math.max(0, Math.floor(durationMs / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return [h, m, s].map((n) => n.toString().padStart(2, '0')).join(':');
+}
 
 export const App: React.FC = () => {
   useClaudeStream();
 
-  const { isConnected, isBusy, isResuming, lastError, cost, setError, messages, streamingMessageId, textSettings, pendingApproval, promptHistoryPanelOpen, activitySummary } = useAppStore();
+  const {
+    isConnected,
+    isBusy,
+    isResuming,
+    lastError,
+    cost,
+    setError,
+    messages,
+    streamingMessageId,
+    textSettings,
+    typingTheme,
+    pendingApproval,
+    promptHistoryPanelOpen,
+    activitySummary,
+    achievementsEnabled,
+    achievementPanelOpen,
+    vitalsEnabled,
+    turnHistory,
+  } = useAppStore();
   const forkInit = useAppStore((s) => s.forkInit);
   const hasMessages = messages.length > 0 || streamingMessageId !== null;
+  const [scrollFraction, setScrollFraction] = React.useState(0);
+
+  const handleTimelineTurnClick = React.useCallback((messageId: string) => {
+    const el = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
 
   // Fork completion: messages are already loaded into the store by
   // useClaudeStream's forkInit handler. Just set the prompt text in
@@ -48,9 +85,10 @@ export const App: React.FC = () => {
   } as React.CSSProperties), [textSettings.fontSize, textSettings.fontFamily]);
 
   return (
-    <div className="app-container" style={containerStyle}>
+    <div className={`app-container theme-${typingTheme}`} style={containerStyle}>
       {/* Prompt history panel overlay */}
       {promptHistoryPanelOpen && <PromptHistoryPanel />}
+      {achievementsEnabled && achievementPanelOpen && <AchievementPanel />}
 
       {/* Error banner */}
       {lastError && (
@@ -66,8 +104,22 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {/* Vitals: weather widget + cost heat bar */}
+      <VitalsContainer />
+
       {/* Always show messages if they exist, regardless of connection state */}
-      {hasMessages ? <MessageList /> : isConnected ? <div className="chat-spacer" /> : null}
+      {hasMessages ? (
+        <div className="chat-area-wrapper">
+          <MessageList onScrollFractionChange={setScrollFraction} />
+          {vitalsEnabled && turnHistory.length > 0 && (
+            <SessionTimeline
+              turnHistory={turnHistory}
+              scrollFraction={scrollFraction}
+              onTurnClick={handleTimelineTurnClick}
+            />
+          )}
+        </div>
+      ) : isConnected ? <div className="chat-spacer" /> : null}
 
       {isConnected ? (
         <>
@@ -95,16 +147,19 @@ export const App: React.FC = () => {
             </div>
           ) : null}
           <InputArea />
+          {achievementsEnabled && <SessionRecapCard />}
           <StatusBar cost={cost} />
         </>
       ) : hasMessages ? (
         <>
+          {achievementsEnabled && <SessionRecapCard />}
           <SessionEndedBar />
           <StatusBar cost={cost} />
         </>
       ) : (
         <WelcomeScreen />
       )}
+      {achievementsEnabled && <AchievementToastStack />}
     </div>
   );
 };
@@ -163,7 +218,30 @@ const SessionEndedBar: React.FC = () => {
 const StatusBar: React.FC<{
   cost: { costUsd: number; totalCostUsd: number; inputTokens: number; outputTokens: number };
 }> = ({ cost }) => {
-  const { gitPushSettings, gitPushRunning, setGitPushRunning, setGitPushConfigPanelOpen } = useAppStore();
+  const [tickMs, setTickMs] = React.useState(() => Date.now());
+  const {
+    gitPushSettings,
+    gitPushRunning,
+    setGitPushRunning,
+    setGitPushConfigPanelOpen,
+    achievementsEnabled,
+    achievementProfile,
+    setAchievementPanelOpen,
+    vitalsEnabled,
+    setVitalsEnabled,
+    sessionActivityStarted,
+    sessionActivityElapsedMs,
+    sessionActivityRunningSinceMs,
+  } = useAppStore();
+
+  useEffect(() => {
+    const id = setInterval(() => setTickMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const activityMs = sessionActivityElapsedMs + (
+    sessionActivityRunningSinceMs ? Math.max(0, tickMs - sessionActivityRunningSinceMs) : 0
+  );
 
   const handleHistory = () => {
     postToExtension({ type: 'showHistory' });
@@ -186,12 +264,32 @@ const StatusBar: React.FC<{
     setGitPushConfigPanelOpen(!useAppStore.getState().gitPushConfigPanelOpen);
   };
 
+  const handleAchievements = () => {
+    postToExtension({ type: 'getAchievementsSnapshot' });
+    setAchievementPanelOpen(!useAppStore.getState().achievementPanelOpen);
+  };
+
   return (
     <div className="status-bar">
       <div className="cost-display">
         <span>Turn: ${(cost?.costUsd ?? 0).toFixed(4)}</span>
         <span>Total: ${(cost?.totalCostUsd ?? 0).toFixed(4)}</span>
       </div>
+      <div
+        className={`status-bar-session-clock ${sessionActivityRunningSinceMs ? 'running' : ''}`}
+        title="Claude active processing time (starts after first prompt)"
+      >
+        Active: {sessionActivityStarted ? formatDuration(activityMs) : '00:00:00'}
+      </div>
+      {achievementsEnabled && (
+        <button
+          className="status-bar-achievements-btn"
+          onClick={handleAchievements}
+          title="Achievements"
+        >
+          🏆 {achievementProfile.totalAchievements}
+        </button>
+      )}
       <button className="status-bar-history-btn" onClick={handleHistory} title="Conversation History (Ctrl+Shift+H)">
         History
       </button>
@@ -218,6 +316,17 @@ const StatusBar: React.FC<{
       <ModelSelector />
       <PermissionModeSelector />
       <TextSettingsBar />
+      <button
+        className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
+        onClick={() => {
+          const next = !vitalsEnabled;
+          setVitalsEnabled(next);
+          postToExtension({ type: 'setVitalsEnabled', enabled: next });
+        }}
+        title={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
+      >
+        Vitals
+      </button>
       <div className="cost-display">
         <span>In: {(cost?.inputTokens ?? 0).toLocaleString()}</span>
         <span>Out: {(cost?.outputTokens ?? 0).toLocaleString()}</span>

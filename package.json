@@ -65,6 +65,10 @@
       {
         "command": "claudeMirror.openLogDirectory",
         "title": "ClaUi: Open Log Directory"
+      },
+      {
+        "command": "claudeMirror.toggleAchievements",
+        "title": "ClaUi: Toggle Achievements"
       }
     ],
     "configuration": {
@@ -96,6 +100,21 @@
           "type": "string",
           "default": "",
           "description": "Font family for chat messages. Leave empty to use VS Code default. For Hebrew, try: 'Segoe UI', 'David', 'Arial'"
+        },
+        "claudeMirror.typingTheme": {
+          "type": "string",
+          "default": "zen",
+          "enum": [
+            "terminal-hacker",
+            "retro",
+            "zen"
+          ],
+          "enumDescriptions": [
+            "Terminal Hacker - Green on black with typewriter-style streaming",
+            "Retro - Pixel-inspired typography with CRT scanline atmosphere",
+            "Zen - Minimal styling with calm, soft animations"
+          ],
+          "description": "Visual personality theme for response rendering in the chat webview."
         },
         "claudeMirror.autoNameSessions": {
           "type": "boolean",
@@ -170,6 +189,21 @@
           "type": "string",
           "default": "{sessionName}",
           "description": "Commit message template. Use {sessionName} for the current tab name."
+        },
+        "claudeMirror.sessionVitals": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Session Vitals dashboard (timeline minimap, weather widget, cost heat bar, turn intensity borders)"
+        },
+        "claudeMirror.achievements.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the achievements system (XP, badges, goals, and recap). When disabled, all achievement UI and tracking are hidden."
+        },
+        "claudeMirror.achievements.sound": {
+          "type": "boolean",
+          "default": false,
+          "description": "Play short sound effects for achievement toasts."
         }
       }
     },
@@ -219,6 +253,9 @@
       "commandPalette": [
         {
           "command": "claudeMirror.sendFilePathToChat"
+        },
+        {
+          "command": "claudeMirror.toggleAchievements"
         }
       ]
     }

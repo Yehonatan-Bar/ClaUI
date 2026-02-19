@@ -94,18 +94,30 @@ claude-code-mirror/
 |       |   |   +-- GitPushPanel.tsx      #   Config panel for git push (status, ask Claude to configure)
 |       |   +-- ModelSelector/
 |       |   |   +-- ModelSelector.tsx          #   Model dropdown (Sonnet/Opus/Haiku)
-|       |   |   +-- SwitchToSonnetButton.tsx   #   One-click switch to Sonnet 4.6 mid-session
+|       |   +-- PermissionModeSelector/
+|       |   |   +-- PermissionModeSelector.tsx #   Full Access / Supervised mode toggle
+|       |   +-- Vitals/
+|       |   |   +-- SessionTimeline.tsx  #   Vertical color-coded turn minimap
+|       |   |   +-- WeatherWidget.tsx    #   Animated weather mood icon
+|       |   |   +-- CostHeatBar.tsx      #   Cost accumulation gradient bar
+|       |   |   +-- VitalsContainer.tsx  #   Conditional wrapper for weather + cost bar
 |       |   +-- TextSettingsBar/
-|       |       +-- TextSettingsBar.tsx   #   Font size/family controls
+|       |       +-- TextSettingsBar.tsx   #   Font size/family/theme controls
 |       +-- styles/
 |           +-- global.css                #   VS Code theme variables
 |           +-- markdown.css              #   Markdown element styles (headers, lists, tables, etc.)
 |           +-- rtl.css                   #   RTL-specific overrides (includes Markdown RTL rules)
 +-- Kingdom_of_Claudes_Beloved_MDs/       # Detailed component documentation
     +-- ARCHITECTURE.md                   #   Data flow and component interaction
-    +-- SESSION_NAMER.md                  #   Auto-naming feature (data flow, gotchas, debugging)
     +-- ACTIVITY_SUMMARIZER.md            #   Periodic activity summary via Haiku
+    +-- DRAG_AND_DROP_CHALLENGE.md        #   Why drag-and-drop is blocked, workarounds
     +-- FILE_LOGGER.md                    #   File-based logging with rotation and rename
+    +-- FILE_MENTION.md                   #   @ file mention autocomplete feature
+    +-- GIT_PUSH_BUTTON.md               #   Git push button and configuration
+    +-- MARKDOWN_RENDERING.md            #   Markdown rendering pipeline (marked + DOMPurify)
+    +-- MESSAGE_TRANSLATION.md           #   Hebrew translation via Sonnet CLI
+    +-- SESSION_NAMER.md                  #   Auto-naming feature (data flow, gotchas, debugging)
+    +-- SESSION_VITALS.md                 #   Session health dashboard (timeline, weather, cost bar)
     +-- STREAM_JSON_PROTOCOL.md           #   CLI protocol reference
 ```
 
@@ -152,10 +164,10 @@ claude-code-mirror/
 **React Chat UI** - React 18 components for message display, streaming text, tool use blocks, code blocks, image display, and RTL-aware input. The input area supports sending prompts while Claude is busy (interrupt), matching Claude Code CLI behavior. Ctrl+V pastes images from clipboard as base64 attachments (shown as thumbnails above the input, removable before sending). Both Send and Cancel buttons are visible during processing; Escape cancels the current response.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**TextSettingsBar** - In-webview UI for adjusting chat text font size and font family. Supports Hebrew-friendly font presets. Settings are stored in Zustand and synced from VS Code configuration on startup and on change.
+**TextSettingsBar** - In-webview UI for adjusting chat text font size, font family, and typing personality theme. Supports Hebrew-friendly font presets and three rendering themes: Terminal Hacker, Retro, and Zen. Settings are stored in Zustand and synced from VS Code configuration on startup and on change.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**ModelSelector** - Dropdown in the status bar for choosing the Claude model (Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default). Selection is persisted to VS Code settings (`claudeMirror.model`) and synced back to the webview on startup and on change. Includes a **SwitchToSonnetButton** ("S" button) that immediately switches the active session to Sonnet 4.6 by stopping the CLI process and resuming it with `--model claude-sonnet-4-6`. The button is hidden when already on Sonnet or when no session is active, and disabled while Claude is responding.
+**ModelSelector** - Dropdown in the status bar for choosing the Claude model (Sonnet 4.6, Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default). Selection is persisted to VS Code settings (`claudeMirror.model`) and synced back to the webview on startup and on change. Shows the currently active model label when connected.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **PermissionModeSelector** - Dropdown in the status bar for choosing between "Full Access" (all tools auto-approved, default) and "Supervised" (only read-only tools allowed, write tools denied). Selection is persisted to VS Code settings (`claudeMirror.permissionMode`). In supervised mode, `--allowedTools` is passed to the CLI to restrict to read-only tools. Changes take effect on next session start.
@@ -194,6 +206,9 @@ claude-code-mirror/
 **Fork Conversation** - Users can fork the conversation from any user message by hovering and clicking "Fork". This opens a new tab that uses `--resume <sessionId> --fork-session` to create a branched CLI session with full conversation context. After the CLI replays all messages, the webview truncates messages at the fork point (keeping only history before the forked message) and places the forked message's text into the input area. The user can then edit and re-send, getting a different response branch. Uses a 500ms debounced timer to detect replay completion. Key files: `MessageBubble.tsx` (Fork button), `MessageList.tsx` (handler), `MessageHandler.ts` (`forkFromMessage`), `commands.ts` (`claudeMirror.forkFromMessage`), `SessionTab.ts` (`setForkInit`), `App.tsx` (fork completion logic), `InputArea.tsx` (`fork-set-input` listener).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
+**Session Vitals** - Visual session health dashboard with 5 components: Session Timeline (vertical color-coded minimap alongside messages, click-to-jump), Weather Widget (animated mood icon reflecting error/success patterns), Cost Heat Bar (gradient strip showing cost accumulation), Turn Intensity Borders (colored left border on assistant messages based on tool activity), and a Vitals toggle button in the StatusBar. Data pipeline: `MessageHandler` builds `TurnRecord` on each CLI result event, sends to webview via `turnComplete` postMessage, stored in Zustand (`turnHistory[]`, `turnByMessageId{}`). Weather mood recalculated on each turn via sliding window algorithm. All components hidden when vitals disabled.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_VITALS.md`
+
 **File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/DRAG_AND_DROP_CHALLENGE.md`
 
@@ -208,6 +223,7 @@ claude-code-mirror/
 | `claudeMirror.autoRestart` | `true` | Auto-restart process on crash |
 | `claudeMirror.chatFontSize` | `14` | Font size (px) for chat messages (10-32) |
 | `claudeMirror.chatFontFamily` | `""` | Font family for chat messages (empty = VS Code default) |
+| `claudeMirror.typingTheme` | `"zen"` | Response rendering personality theme: "terminal-hacker", "retro", or "zen" |
 | `claudeMirror.autoNameSessions` | `true` | Auto-generate tab names from first message using Haiku |
 | `claudeMirror.activitySummary` | `true` | Periodically summarize tool activity in busy indicator via Haiku |
 | `claudeMirror.activitySummaryThreshold` | `3` | Tool uses before triggering an activity summary (1-10) |
@@ -215,7 +231,8 @@ claude-code-mirror/
 | `claudeMirror.permissionMode` | `"full-access"` | Permission mode: "full-access" (all tools) or "supervised" (read-only tools only) |
 | `claudeMirror.enableFileLogging` | `true` | Write logs to disk files in addition to the Output Channel |
 | `claudeMirror.logDirectory` | `""` | Directory for log files (empty = extension's default storage) |
-| `claudeMirror.gitPush.enabled` | `false` | Whether git push is configured and ready to use via the Git button |
+| `claudeMirror.sessionVitals` | `true` | Show Session Vitals dashboard (timeline, weather, cost bar, turn borders) |
+| `claudeMirror.gitPush.enabled` | `true` | Whether git push is configured and ready to use via the Git button |
 | `claudeMirror.gitPush.scriptPath` | `"scripts/git-push.ps1"` | Path to the git push script (relative to workspace root) |
 | `claudeMirror.gitPush.commitMessageTemplate` | `"{sessionName}"` | Commit message template ({sessionName} = tab name) |
 

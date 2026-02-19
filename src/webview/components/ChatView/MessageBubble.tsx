@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { ChatMessage } from '../../state/store';
 import { useAppStore } from '../../state/store';
+import type { TurnCategory } from '../../../extension/types/webview-messages';
 import type { ContentBlock } from '../../../extension/types/stream-json';
 import { CodeBlock } from './CodeBlock';
 import { ToolUseBlock } from './ToolUseBlock';
@@ -46,6 +47,30 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   const isTranslating = translatingMessageIds.has(message.id);
   const hasTranslation = message.id in translations;
   const isShowingTranslation = showingTranslation.has(message.id);
+
+  // Session Vitals: turn intensity border
+  const vitalsEnabled = useAppStore((s) => s.vitalsEnabled);
+  const turnData = useAppStore((s) => s.turnByMessageId[message.id]);
+
+  // Category colors with alpha variants for intensity: [full, medium, light]
+  const INTENSITY_COLORS: Record<TurnCategory, [string, string, string]> = {
+    success:      ['#4caf50', '#4caf50b3', '#4caf5066'],
+    error:        ['#f44336', '#f44336b3', '#f4433666'],
+    discussion:   ['#2196f3', '#2196f3b3', '#2196f366'],
+    'code-write': ['#9c27b0', '#9c27b0b3', '#9c27b066'],
+    research:     ['#ff9800', '#ff9800b3', '#ff980066'],
+    command:      ['#00bcd4', '#00bcd4b3', '#00bcd466'],
+  };
+
+  const vitalsBorderStyle = useMemo((): React.CSSProperties | undefined => {
+    if (!vitalsEnabled || !turnData || isUser) return undefined;
+    const colors = INTENSITY_COLORS[turnData.category];
+    const count = turnData.toolCount;
+    // 0 tools = thin/light, 1-3 = medium, 4+ = thick/full
+    const width = count === 0 ? 2 : count <= 3 ? 3 : 4;
+    const color = count === 0 ? colors[2] : count <= 3 ? colors[1] : colors[0];
+    return { borderLeft: `${width}px solid ${color}` };
+  }, [vitalsEnabled, turnData, isUser]);
 
   const handleTranslate = useCallback(() => {
     if (hasTranslation) {
@@ -117,7 +142,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   };
 
   return (
-    <div className={`message ${isUser ? 'message-user' : 'message-assistant'}`}>
+    <div className={`message ${isUser ? 'message-user' : 'message-assistant'}`} data-message-id={message.id} style={vitalsBorderStyle}>
       <div className="message-role">
         {isUser ? 'You' : 'Assistant'}
         {message.model && (

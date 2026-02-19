@@ -3,6 +3,7 @@ import { SessionTab } from './SessionTab';
 import type { SessionStore } from './SessionStore';
 import type { PromptHistoryStore } from './PromptHistoryStore';
 import type { ExtensionToWebviewMessage } from '../types/webview-messages';
+import type { AchievementService } from '../achievements/AchievementService';
 
 /** Distinct colors for tab header bars, cycling through the palette */
 const TAB_COLORS = [
@@ -31,6 +32,7 @@ export class TabManager {
     private readonly log: (msg: string) => void,
     private readonly sessionStore: SessionStore,
     private readonly promptHistoryStore: PromptHistoryStore,
+    private readonly achievementService: AchievementService,
     private readonly logDir: string | null
   ) {
     // Single shared status bar item across all tabs
@@ -65,6 +67,7 @@ export class TabManager {
       },
       this.sessionStore,
       this.promptHistoryStore,
+      this.achievementService,
       this.logDir
     );
 

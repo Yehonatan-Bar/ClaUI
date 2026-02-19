@@ -4,6 +4,8 @@
 
 import type { ContentBlock } from './stream-json';
 
+export type TypingTheme = 'terminal-hacker' | 'retro' | 'zen';
+
 // --- Webview -> Extension ---
 
 export interface SendTextMessage {
@@ -61,6 +63,11 @@ export interface ClearSessionRequest {
 export interface SetModelRequest {
   type: 'setModel';
   model: string;
+}
+
+export interface SetTypingThemeRequest {
+  type: 'setTypingTheme';
+  theme: TypingTheme;
 }
 
 export interface ShowHistoryRequest {
@@ -141,6 +148,20 @@ export interface FileSearchRequest {
   requestId: number;
 }
 
+export interface SetAchievementsEnabledRequest {
+  type: 'setAchievementsEnabled';
+  enabled: boolean;
+}
+
+export interface SetVitalsEnabledRequest {
+  type: 'setVitalsEnabled';
+  enabled: boolean;
+}
+
+export interface GetAchievementsSnapshotRequest {
+  type: 'getAchievementsSnapshot';
+}
+
 
 export type WebviewToExtensionMessage =
   | SendTextMessage
@@ -155,6 +176,7 @@ export type WebviewToExtensionMessage =
   | PickFilesRequest
   | ClearSessionRequest
   | SetModelRequest
+  | SetTypingThemeRequest
   | ShowHistoryRequest
   | OpenPlanDocsRequest
   | PlanApprovalResponseMessage
@@ -168,7 +190,10 @@ export type WebviewToExtensionMessage =
   | GitPushConfigRequest
   | GetGitPushSettingsRequest
   | TranslateMessageRequest
-  | FileSearchRequest;
+  | FileSearchRequest
+  | SetAchievementsEnabledRequest
+  | GetAchievementsSnapshotRequest
+  | SetVitalsEnabledRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -269,6 +294,11 @@ export interface TextSettingsMessage {
   fontFamily: string;
 }
 
+export interface TypingThemeSettingMessage {
+  type: 'typingThemeSetting';
+  theme: TypingTheme;
+}
+
 export interface ModelSettingMessage {
   type: 'modelSetting';
   model: string;
@@ -332,6 +362,106 @@ export interface TranslationResultMessage {
   error?: string;
 }
 
+export type AchievementRarity = 'common' | 'rare' | 'epic' | 'legendary';
+export type AchievementCategory = 'debugging' | 'testing' | 'refactor' | 'collaboration' | 'session';
+
+export interface AchievementProfilePayload {
+  totalXp: number;
+  level: number;
+  totalAchievements: number;
+  unlockedIds: string[];
+}
+
+export interface AchievementAwardPayload {
+  id: string;
+  title: string;
+  description: string;
+  rarity: AchievementRarity;
+  category: AchievementCategory;
+  xp: number;
+  hidden?: boolean;
+}
+
+export interface AchievementGoalPayload {
+  id: string;
+  title: string;
+  current: number;
+  target: number;
+  completed: boolean;
+}
+
+export interface SessionRecapPayload {
+  durationMs: number;
+  bugsFixed: number;
+  passingTests: number;
+  highestStreak: number;
+  newAchievements: string[];
+  xpEarned: number;
+  level: number;
+}
+
+export interface AchievementsSettingsMessage {
+  type: 'achievementsSettings';
+  enabled: boolean;
+  sound: boolean;
+}
+
+export interface AchievementsSnapshotMessage {
+  type: 'achievementsSnapshot';
+  profile: AchievementProfilePayload;
+  goals: AchievementGoalPayload[];
+}
+
+export interface AchievementAwardedMessage {
+  type: 'achievementAwarded';
+  achievement: AchievementAwardPayload;
+  profile: AchievementProfilePayload;
+}
+
+export interface AchievementProgressMessage {
+  type: 'achievementProgress';
+  goals: AchievementGoalPayload[];
+}
+
+export interface SessionRecapMessage {
+  type: 'sessionRecap';
+  recap: SessionRecapPayload;
+}
+
+// --- Session Vitals ---
+
+/** Category classification for a turn, used for timeline coloring */
+export type TurnCategory =
+  | 'success'       // Green - successful completion, no errors
+  | 'error'         // Red - tool_result.is_error or ResultError
+  | 'discussion'    // Blue - text-only, no tool usage
+  | 'code-write'    // Purple - Write, Edit, NotebookEdit tools
+  | 'research'      // Orange - Read, Grep, Glob, WebSearch, WebFetch
+  | 'command';      // Cyan - Bash tool usage
+
+export interface TurnRecord {
+  turnIndex: number;
+  toolNames: string[];
+  toolCount: number;
+  durationMs: number;
+  costUsd: number;
+  totalCostUsd: number;
+  isError: boolean;
+  category: TurnCategory;
+  timestamp: number;
+  messageId: string;
+}
+
+export interface TurnCompleteMessage {
+  type: 'turnComplete';
+  turn: TurnRecord;
+}
+
+export interface VitalsSettingMessage {
+  type: 'vitalsSetting';
+  enabled: boolean;
+}
+
 export interface ConversationHistoryMessage {
   type: 'conversationHistory';
   /** Full conversation history loaded from Claude's session storage */
@@ -363,6 +493,7 @@ export type ExtensionToWebviewMessage =
   | MessageStopMessage
   | FilePathsPickedMessage
   | TextSettingsMessage
+  | TypingThemeSettingMessage
   | ModelSettingMessage
   | PlanApprovalRequiredMessage
   | PromptHistoryResponseMessage
@@ -373,4 +504,11 @@ export type ExtensionToWebviewMessage =
   | ForkInitMessage
   | ConversationHistoryMessage
   | TranslationResultMessage
-  | FileSearchResultMessage;
+  | FileSearchResultMessage
+  | AchievementsSettingsMessage
+  | AchievementsSnapshotMessage
+  | AchievementAwardedMessage
+  | AchievementProgressMessage
+  | SessionRecapMessage
+  | TurnCompleteMessage
+  | VitalsSettingMessage;

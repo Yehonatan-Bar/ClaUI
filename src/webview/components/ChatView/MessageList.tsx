@@ -9,8 +9,12 @@ import { ToolUseBlock } from './ToolUseBlock';
  * Scrollable list of chat messages with auto-scroll behavior.
  * Displays completed messages and current streaming content.
  */
-export const MessageList: React.FC = () => {
-  const { messages, streamingMessageId, streamingBlocks, isBusy, truncateFromMessage, addUserMessage } = useAppStore();
+interface MessageListProps {
+  onScrollFractionChange?: (fraction: number) => void;
+}
+
+export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange }) => {
+  const { messages, streamingMessageId, streamingBlocks, isBusy, truncateFromMessage, addUserMessage, markSessionPromptSent } = useAppStore();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const userScrolledUp = useRef(false);
@@ -30,6 +34,12 @@ export const MessageList: React.FC = () => {
       container.scrollHeight - container.scrollTop - container.clientHeight;
     // Consider "scrolled up" if more than 100px from bottom
     userScrolledUp.current = distanceFromBottom > 100;
+
+    // Report scroll fraction for Session Vitals timeline position marker
+    if (onScrollFractionChange && container.scrollHeight > container.clientHeight) {
+      const fraction = container.scrollTop / (container.scrollHeight - container.clientHeight);
+      onScrollFractionChange(Math.max(0, Math.min(1, fraction)));
+    }
   };
 
   /** Edit a previously sent user message: truncate all messages from that point
@@ -41,8 +51,9 @@ export const MessageList: React.FC = () => {
     // The CLI may or may not echo it back via a userMessage event; adding it
     // here ensures the user always sees what they sent.
     addUserMessage(newText);
+    markSessionPromptSent();
     postToExtension({ type: 'editAndResend', text: newText });
-  }, [truncateFromMessage, addUserMessage]);
+  }, [truncateFromMessage, addUserMessage, markSessionPromptSent]);
 
   /** Fork conversation from a specific user message: opens a new tab
    *  with history up to (but not including) that message, and its text
