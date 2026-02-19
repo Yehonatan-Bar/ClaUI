@@ -301,6 +301,10 @@ export function useClaudeStream(): void {
           }
           break;
 
+        case 'translationLanguageSetting':
+          useAppStore.getState().setTranslationLanguage(msg.language);
+          break;
+
         case 'fileSearchResults':
           window.dispatchEvent(
             new CustomEvent('file-search-results', { detail: msg })

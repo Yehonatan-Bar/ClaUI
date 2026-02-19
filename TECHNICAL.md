@@ -105,10 +105,9 @@ claude-code-mirror/
 |       |   |   +-- AdventureWidget.tsx  #   Pixel-art dungeon crawler canvas wrapper
 |       |   |   +-- VitalsInfoPanel.tsx  #   Info panel with explanations + toggles
 |       |   |   +-- adventure/           #   Dungeon crawler engine
-|       |   |       +-- types.ts         #     AdventureBeat, RoomType, engine interfaces
-|       |   |       +-- sprites.ts       #     Palette, all pixel art sprites, drawSprite()
-|       |   |       +-- rooms.ts         #     5x5 room templates
-|       |   |       +-- dungeon.ts       #     Map generation, camera, pathfinding
+|       |   |       +-- types.ts         #     AdventureBeat, RoomType, AdventureConfig
+|       |   |       +-- sprites.ts       #     Palette, 4x4 mini sprites, drawSprite()
+|       |   |       +-- dungeon.ts       #     Maze class: generation, BFS, wall rendering, camera
 |       |   |       +-- AdventureEngine.ts #   State machine, animation loop, renderer
 |       |   +-- TextSettingsBar/
 |       |       +-- TextSettingsBar.tsx   #   Font size/family/theme controls
@@ -159,7 +158,7 @@ claude-code-mirror/
 **ActivitySummarizer** - Periodically summarizes Claude's tool activity via Haiku. After every N tool uses (configurable, default 3), sends enriched tool names to Haiku for a short label + full summary. Displays a detailed summary panel in the busy indicator (short label + full sentence). Updates status bar tooltip. Does NOT overwrite tab title (session name stays fixed). Debounces rapid tool uses, prevents concurrent calls.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ACTIVITY_SUMMARIZER.md`
 
-**Message Translation** -- Translates assistant message text to Hebrew using a one-shot Claude Sonnet 4.6 CLI call. Triggered by a "Translate" button on each assistant message. Translations are cached per message; toggling between original and translated view is instant after the first translation. Code blocks and technical terms are preserved untranslated.
+**Message Translation** -- Translates assistant message text to a configurable target language (default: Hebrew) using a one-shot Claude Sonnet 4.6 CLI call. Language is selectable via the gear icon panel next to Vitals, or via the `claudeMirror.translationLanguage` VS Code setting. Supports 10 languages: Hebrew, Arabic, Russian, Spanish, French, German, Portuguese, Chinese, Japanese, Korean. RTL layout is applied automatically for Hebrew and Arabic. Triggered by a per-message button showing the target language name. Translations are cached per message; toggling is instant after first translation. Code blocks and technical terms are preserved.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/MESSAGE_TRANSLATION.md`
 
 **FileLogger** - Writes log lines to disk files alongside the OutputChannel. Each session tab gets its own log file named `<session-name>_<dd-hh-mm>.log`. A global logger captures extension-level messages. Files auto-rotate at 2MB, rename when the session name changes, and new files are created on Reload Window or new session. Configurable via `claudeMirror.enableFileLogging` and `claudeMirror.logDirectory`.
@@ -219,7 +218,7 @@ claude-code-mirror/
 **Session Vitals** - Visual session health dashboard with 5 components: Session Timeline (vertical color-coded minimap alongside messages, click-to-jump), Weather Widget (animated mood icon reflecting error/success patterns), Cost Heat Bar (gradient strip showing cost accumulation), Turn Intensity Borders (colored left border on assistant messages based on tool activity), and a Vitals toggle button in the StatusBar. Data pipeline: `MessageHandler` builds `TurnRecord` on each CLI result event, sends to webview via `turnComplete` postMessage, stored in Zustand (`turnHistory[]`, `turnByMessageId{}`). Weather mood recalculated on each turn via sliding window algorithm. All components hidden when vitals disabled.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_VITALS.md`
 
-**Adventure Widget** - Pixel-art dungeon crawler that visualizes session activity as a top-down roguelike. Each CLI turn maps to a dungeon encounter: scrolls (Read), anvils (Edit), traps (errors), dragons (3+ errors), treasure (recovery). Canvas 2D engine with 8x8 sprites, PICO-8 palette, state machine (IDLE/WALKING/ENCOUNTER/RESOLUTION). Extension-side `AdventureInterpreter` converts `TurnRecord` to `AdventureBeat` via deterministic rules. Toggleable separately from main vitals.
+**Adventure Widget** - Pixel-art dungeon crawler that visualizes session activity as a thin-wall maze grid. Each CLI turn extends the maze and maps to an encounter: scrolls (Read), anvils (Edit), traps (errors), dragons (3+ errors), treasure (recovery). Canvas 2D engine with 4x4 mini sprites on a 40x40 cell maze, PICO-8 palette, BFS pathfinding, state machine (IDLE/WALKING/ENCOUNTER/RESOLUTION). Extension-side `AdventureInterpreter` converts `TurnRecord` to `AdventureBeat` via deterministic rules. Toggleable separately from main vitals.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ADVENTURE_WIDGET.md`
 
 **File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).

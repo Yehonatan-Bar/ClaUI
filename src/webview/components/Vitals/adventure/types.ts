@@ -1,6 +1,6 @@
 /**
  * Adventure Widget type definitions.
- * Defines the data model for the dungeon crawler session visualizer.
+ * Defines the data model for the maze-based dungeon crawler session visualizer.
  */
 
 export type AdventureBeatType =
@@ -47,37 +47,10 @@ export type Direction = 'up' | 'down' | 'left' | 'right';
 /** States of the adventure state machine */
 export type AdventureState = 'idle' | 'walking' | 'encounter' | 'resolution';
 
-/** A position on the dungeon grid (tile coordinates) */
+/** A position on the maze grid (cell coordinates) */
 export interface TilePos {
   x: number;
   y: number;
-}
-
-/** A room in the dungeon map */
-export interface DungeonRoom {
-  /** Top-left corner of the room in tile coordinates */
-  pos: TilePos;
-  /** Room width in tiles */
-  width: number;
-  /** Room height in tiles */
-  height: number;
-  /** Room type determines the tile layout */
-  type: RoomType;
-  /** The beat that created this room (null for initial room) */
-  beat: AdventureBeat | null;
-  /** Connected room indices */
-  connections: number[];
-  /** Center tile of the room (where character stands) */
-  center: TilePos;
-}
-
-/** The full dungeon map state */
-export interface DungeonMap {
-  rooms: DungeonRoom[];
-  /** 2D tile grid: tileId at each position */
-  tiles: Map<string, number>;
-  /** Next room generation offset */
-  nextOffset: TilePos;
 }
 
 /** Sprite frame: 2D array of palette indices (0 = transparent) */
@@ -90,21 +63,33 @@ export interface AnimatedSprite {
   fps: number;
 }
 
-/** Engine configuration */
+/** Engine configuration for the maze-based widget */
 export interface AdventureConfig {
   /** Canvas width in CSS pixels */
   canvasWidth: number;
   /** Canvas height in CSS pixels */
   canvasHeight: number;
-  /** Pixel scale (how many screen pixels per sprite pixel) */
-  pixelScale: number;
-  /** Tile size in sprite pixels */
-  tileSize: number;
+  /** Cell size in CSS pixels (passage + wall) */
+  cellSize: number;
+  /** Wall line thickness in CSS pixels */
+  wallThickness: number;
+  /** Passage width in CSS pixels (cellSize - wallThickness) */
+  passageWidth: number;
+  /** Maze grid width in cells */
+  mazeWidth: number;
+  /** Maze grid height in cells */
+  mazeHeight: number;
+  /** Scale for mini sprites (pixels per sprite pixel) */
+  heroScale: number;
 }
 
 export const DEFAULT_CONFIG: AdventureConfig = {
   canvasWidth: 120,
   canvasHeight: 120,
-  pixelScale: 2,
-  tileSize: 8,
+  cellSize: 10,
+  wallThickness: 2,
+  passageWidth: 8,
+  mazeWidth: 40,
+  mazeHeight: 40,
+  heroScale: 2,
 };

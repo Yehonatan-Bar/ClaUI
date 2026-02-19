@@ -2,6 +2,8 @@
 
 Pixel-art dungeon crawler that visualizes Claude Code session activity in real-time. Each tool call, error, and success maps to an encounter: reading scrolls for Read, mining walls for Edit, dragons for 3+ consecutive errors, treasure for recovery, etc.
 
+The widget renders a **thin-wall maze grid** where the hero navigates through dense corridors. Each Claude action extends the maze in a different direction, creating a visible sense of exploration and progression.
+
 ## Architecture
 
 Two-layer design:
@@ -54,10 +56,13 @@ Each turn produces exactly one beat. The mapping priority is:
 
 ### Rendering
 - **Size**: 120x120px widget (240x240 HiDPI)
-- **Tile size**: 8x8 pixels at 2x scale (15px rendered)
-- **Visible area**: ~8x8 tiles
+- **Cell size**: 10px per cell (8px passage + 2px wall line)
+- **Visible area**: 12x12 cells - shows dozens of corridors, turns, dead-ends simultaneously
+- **Hero sprite**: 4x4 pixels at 2x scale = 8px (fits inside 8px passages)
+- **Wall rendering**: 2px `fillRect()` lines between cells (not sprite tiles)
+- **Floor**: Alternating dark gray shades per cell
 - **Palette**: 17-color PICO-8-inspired palette tuned for dark backgrounds
-- **Sprites**: All pixel art defined as 2D number arrays (no external images)
+- **Sprites**: Mini 4x4 sprites for hero/encounters, 2D number arrays (no external images)
 - **`imageSmoothingEnabled = false`** for crisp pixel rendering
 
 ### State Machine
@@ -70,49 +75,67 @@ IDLE --[turnComplete]--> WALKING --[arrive]--> ENCOUNTER --[anim done]--> RESOLU
 
 | State | Visual | Duration |
 |-------|--------|----------|
-| IDLE | Character breathes/fidgets with micro-movement, sits at campfire after 10s (4fps) | After 10s no turns |
-| WALKING | Character walks zigzag path to next room, 2-frame walk cycle, 4 tiles/sec | Variable based on distance |
-| ENCOUNTER | Encounter animation plays in room, hero micro-movement continues | ~1s |
+| IDLE | Hero patrols through nearby maze corridors (BFS pathfinding), breathes/fidgets, ambient particles float. Sits at campfire after 20s. (8fps) | Until beats arrive or 20s for campfire |
+| WALKING | Character walks BFS-computed path through maze corridors, 2-frame walk cycle, dynamic speed (4-8 cells/sec based on path length) | Variable based on distance |
+| ENCOUNTER | Mini encounter sprite appears near hero, hero micro-movement continues | ~1s |
 | RESOLUTION | Result particles (gold, fire, sparkles) | ~0.5s |
 
 ### Movement System
 
-**Zigzag pathfinding**: Instead of moving all-horizontal then all-vertical, the hero alternates 1-2 horizontal steps with 1-2 vertical steps, creating visible multi-directional movement even on short paths.
+**BFS pathfinding**: Hero navigates through maze passages using breadth-first search. The path follows actual corridors through the maze, creating winding multi-directional movement.
 
-**L-shaped corridors**: Corridors between rooms bend at a random midpoint (30-70% along), so the hero always has at least one direction change per walk. The bend creates an L-shape or Z-shape depending on room placement.
+**Dynamic walk speed**: Speed scales with path length: `speed = min(8, 4 + pathLength/10)`. Short paths are slow enough to see, long paths don't take forever.
 
-**Balanced direction weights**: Rooms are placed in all four directions (up 20%, right 30%, down 30%, left 20%) with anti-backtracking (the reverse of the last direction is heavily penalized). This prevents monotonous right-only or down-only paths.
+**Idle patrol**: After ~1 second of idle, the hero picks 4-6 reachable cells within 8 BFS steps and walks through actual maze corridors between them. The patrol path is computed as BFS segments between waypoints. Pauses 1.5-3.5 seconds between patrols.
 
-**Idle micro-movement**: When idle or in encounter state, the hero drifts 1-2 pixels using sine waves (`sin(phase)` for X, `sin(phase*0.7+1.2)` for Y), creating a subtle breathing/fidget effect so the widget never looks frozen.
+**Idle micro-movement**: When idle or in encounter state, the hero drifts 1-2 pixels using sine waves, creating a subtle breathing/fidget effect.
+
+**Smooth camera**: Camera uses lerp interpolation: `cameraX += (targetX - cameraX) * 0.08 * dt * 60`. Creates visible scrolling through the maze instead of snapping.
+
+**Ambient particles**: Tiny sparkle and dust mote sprites (2x2px) spawn every ~0.8 seconds and drift upward across the canvas.
+
+**Torch glow**: Random cells marked as torches render flickering warm orange circles with a small orange dot.
 
 ### Performance
 - RAF loop runs ONLY during state transitions (WALKING/ENCOUNTER/RESOLUTION)
-- Idle loop: 4fps setInterval with micro-movement updates (not full 60fps RAF)
+- Idle loop: 8fps setInterval with patrol walking, micro-movement, ambient particles, smooth camera
 - Canvas is 120x120 native - trivial to repaint
 - Sprite data is static const arrays (zero GC pressure)
+- Maze data stored as `Set<string>` (O(1) passage lookups)
 - React component uses `React.memo` (re-renders only on new beats)
 - Beat queue with fast-forward: if queue > 5, older encounters resolve instantly
 - Beat history capped at 100
 
-## Dungeon Generation
+## Maze Generation
 
-Rooms are 5x5 tiles connected by L-shaped corridors (5 tiles long). Each room is placed in a randomly chosen direction from the previous room, with anti-backtracking to prevent going back the way we came. Corridors bend at a random midpoint creating visible turns.
+Uses **recursive backtracker** algorithm on a 40x40 cell grid:
+- Walls exist by default between all cells
+- Passages stored as `Set<string>` of removed wall keys (format: `"x,y,E"` for east wall, `"x,y,S"` for south wall)
+- Initial generation: ~300 cells from center (grid position 20,20) to fill viewport with dense maze
+- 8 torch markers placed at random visited cells for ambient glow
 
-### Room Templates
+### Beat-to-Maze Mapping
 
-5x5 tile layouts with interior wall details for maze-like feel:
+Each Claude action extends the maze in a direction:
 
-| Room | Beat(s) | Description |
-|------|---------|-------------|
-| `library` | read, scout | Alternating shelves and reading nooks |
-| `forge` | carve | Staggered wall segments around anvil |
-| `arena` | forge | Corner pillars for cover |
-| `junction` | fork | Wall stubs on all sides, open center |
-| `vault` | treasure | Heavily walled, narrow entry |
-| `lair` | monster | Irregular walls for organic feel |
-| `trap_room` | trap | Zigzag walls creating narrow passages |
-| `throne` | boss | Flanking pillars around throne |
-| `corridor` | checkpoint, wander | Narrow winding passage |
+| Beat | Action | Direction |
+|------|--------|-----------|
+| scout/read | Extend maze 10-20 cells | EAST (exploring) |
+| carve/forge | Extend maze 10-20 cells | SOUTH (digging deeper) |
+| fork | Carve 5-10 passages in 3 directions | Multi-direction junction |
+| trap/monster/boss | No extension - hero walks to dead end | Existing passages |
+| treasure | Remove walls around hero (radius 2) | Creates open area |
+| checkpoint | Remove walls (radius 1) + wander to random | Small cleared space + movement |
+| wander | No extension - hero wanders 6-12 cells | Random walk through existing |
+
+### Maze Extension
+
+When extending, the engine:
+1. Finds frontier cells (visited cells with unvisited neighbors) near the hero
+2. Biases selection toward the preferred direction
+3. Runs a small recursive backtracker generation from the frontier
+4. Sets the hero target to the furthest newly-created cell
+5. May add a torch marker in the new area
 
 ## Extension-Side: AdventureInterpreter
 
@@ -129,11 +152,10 @@ Instantiated per-tab in `SessionTab.ts`, injected into `MessageHandler` via `set
 
 | File | Purpose |
 |------|---------|
-| `src/webview/components/Vitals/adventure/types.ts` | AdventureBeat, RoomType, engine interfaces, DEFAULT_CONFIG |
-| `src/webview/components/Vitals/adventure/sprites.ts` | Palette, hero/encounter/tile sprites, drawSprite() |
-| `src/webview/components/Vitals/adventure/rooms.ts` | 5x5 room templates, getRoomTemplate() |
-| `src/webview/components/Vitals/adventure/dungeon.ts` | Dungeon class: map generation, corridors, camera, pathfinding |
-| `src/webview/components/Vitals/adventure/AdventureEngine.ts` | State machine, RAF loop, canvas rendering, particles |
+| `src/webview/components/Vitals/adventure/types.ts` | AdventureBeat, RoomType, AdventureConfig (cellSize, wallThickness, mazeWidth/Height), DEFAULT_CONFIG |
+| `src/webview/components/Vitals/adventure/sprites.ts` | Palette, 8x8 sprites (legacy), 4x4 mini sprites (hero/encounter/campfire), drawSprite(), getMiniEncounterSprites() |
+| `src/webview/components/Vitals/adventure/dungeon.ts` | Maze class: recursive backtracker generation, BFS pathfinding, wall-line rendering, smooth lerp camera, beat-to-maze extension |
+| `src/webview/components/Vitals/adventure/AdventureEngine.ts` | State machine, RAF loop, canvas rendering, mini sprite positioning, patrol through maze corridors, particles |
 | `src/webview/components/Vitals/AdventureWidget.tsx` | React wrapper, feeds beats to engine, tooltip on hover |
 
 ## Toggle
@@ -143,9 +165,20 @@ Instantiated per-tab in `SessionTab.ts`, injected into `MessageHandler` via `set
 - **Behavior**: Widget rendered only when both `vitalsEnabled` AND `adventureEnabled` are true
 - **State**: `adventureEnabled` in Zustand store, preserved across session resets
 
+## Dragging
+
+The widget is fully draggable via mouse:
+- **Grab cursor**: Shows `grab` on hover, `grabbing` while dragging
+- **Drag mechanics**: `mousedown` captures offset, `mousemove` on document updates position, `mouseup` clamps to viewport bounds and saves
+- **Persistence**: Position saved to `localStorage` under key `adventure-widget-position` and restored on mount
+- **Clamping**: On release, position is clamped so the widget stays fully within the viewport
+- **Default position**: If no saved position exists, CSS defaults apply (`top: 28px; right: 60px`)
+- **Inline style override**: When a saved/dragged position exists, `left`/`top` are set inline with `right: auto` to override the CSS default
+
 ## CSS
 
 Styles in `src/webview/styles/global.css`:
-- `.adventure-widget`: Fixed position, `top: 28px; right: 60px`, 120x120px, dark background, rounded border
+- `.adventure-widget`: Fixed position, default `top: 28px; right: 60px`, 120x120px, dark background, rounded border, `cursor: grab`, `user-select: none`
+- `.adventure-widget--dragging`: Applied during drag - `cursor: grabbing`, enhanced shadow
 - `.adventure-canvas`: `image-rendering: pixelated` for crisp pixel art
 - `.adventure-tooltip`: Monospace overlay at bottom of widget, yellow text on dark background

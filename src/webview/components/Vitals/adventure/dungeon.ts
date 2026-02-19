@@ -1,31 +1,15 @@
 /**
- * Dungeon map generation and camera system.
- * Generates rooms connected by corridors as the session progresses.
- * The camera follows the hero with the hero always centered.
+ * Maze generation, pathfinding, rendering, and camera.
+ * Replaces the old room+corridor Dungeon with a thin-wall maze grid.
+ *
+ * Maze is a grid of cells. Walls exist by default between all cells.
+ * Passages are stored as removed walls in a Set<string>.
+ * Wall key format: "x,y,E" (east wall of cell x,y) or "x,y,S" (south wall).
  */
 
-import type { AdventureBeat, TilePos, DungeonRoom, RoomType } from './types';
-import { getRoomTemplate, ROOM_SIZE, CORRIDOR_LENGTH } from './rooms';
-import { WALL, FLOOR_1, FLOOR_2, TORCH_1, TORCH_2, DOOR_OPEN, drawSprite } from './sprites';
-import type { SpriteFrame } from './types';
-
-/** Tile types stored in the map */
-export const TILE = {
-  VOID: 0,
-  FLOOR: 1,
-  WALL: 2,
-  TORCH: 3,
-  DOOR: 4,
-  ENCOUNTER: 5,
-} as const;
-
-/** Directions for room connections */
-const DIRECTIONS: TilePos[] = [
-  { x: 0, y: -1 },  // up
-  { x: 1, y: 0 },   // right
-  { x: 0, y: 1 },   // down
-  { x: -1, y: 0 },  // left
-];
+import type { AdventureBeat, TilePos, AdventureConfig } from './types';
+import { DEFAULT_CONFIG } from './types';
+import { PALETTE } from './sprites';
 
 /** Simple seeded random for deterministic generation */
 function seededRandom(seed: number): () => number {
@@ -36,351 +20,576 @@ function seededRandom(seed: number): () => number {
   };
 }
 
-export class Dungeon {
-  /** All rooms in the dungeon */
-  rooms: DungeonRoom[] = [];
+/** Directions: [dx, dy] */
+const DIRS: [number, number][] = [
+  [0, -1],  // 0: North
+  [1, 0],   // 1: East
+  [0, 1],   // 2: South
+  [-1, 0],  // 3: West
+];
 
-  /** Tile data: key = "x,y", value = tile type */
-  private tiles: Map<string, number> = new Map();
+export class Maze {
+  /** Set of removed walls (passages). Key: "x,y,dir" where dir is E or S */
+  passages: Set<string> = new Set();
 
-  /** Current hero position (tile coords) */
-  heroPos: TilePos = { x: 0, y: 0 };
+  /** Set of visited cells during generation. Key: "x,y" */
+  visited: Set<string> = new Set();
 
-  /** Target hero position (for animation) */
-  heroTarget: TilePos = { x: 0, y: 0 };
+  /** Grid dimensions */
+  width: number;
+  height: number;
 
-  /** Camera offset in pixels (top-left of viewport in world space) */
+  /** Hero position in cell coordinates */
+  heroPos: TilePos;
+
+  /** Hero target position (for walking animation) */
+  heroTarget: TilePos;
+
+  /** Smooth camera position in CSS pixels */
   cameraX = 0;
   cameraY = 0;
 
-  /** Random number generator */
+  /** Config reference */
+  private config: AdventureConfig;
+
+  /** RNG */
   private rng: () => number;
 
-  /** Next direction index for room placement (cycles to create maze-like paths) */
-  private nextDirIdx = 0;
+  /** Last direction used for beat extension (for anti-backtracking) */
+  private lastBeatDir = 1; // default: east
 
-  constructor(seed: number = 42) {
+  /** Torch cells for flickering glow */
+  torchCells: Set<string> = new Set();
+
+  constructor(seed: number = 42, config?: AdventureConfig) {
+    this.config = config || DEFAULT_CONFIG;
+    this.width = this.config.mazeWidth;
+    this.height = this.config.mazeHeight;
     this.rng = seededRandom(seed);
-    // Create the starting room (corridor)
-    this.addRoom('corridor', null);
-    const startRoom = this.rooms[0];
-    this.heroPos = { ...startRoom.center };
-    this.heroTarget = { ...startRoom.center };
+
+    // Start hero at center of the grid
+    const cx = Math.floor(this.width / 2);
+    const cy = Math.floor(this.height / 2);
+    this.heroPos = { x: cx, y: cy };
+    this.heroTarget = { x: cx, y: cy };
+
+    // Generate initial maze from center (~300 cells for dense visible area)
+    this.generateFrom(cx, cy, 300);
+
+    // Place torches at random visited cells
+    this.placeTorches(8);
+
+    // Snap camera initially
+    this.snapCamera();
   }
 
-  /** Add a new room connected to the last room */
-  addRoom(type: RoomType, beat: AdventureBeat | null): DungeonRoom {
-    const template = getRoomTemplate(type);
-    let pos: TilePos;
+  /** Generate maze from a starting cell using recursive backtracker (iterative stack) */
+  generateFrom(startX: number, startY: number, maxCells: number): void {
+    const stack: TilePos[] = [{ x: startX, y: startY }];
+    this.visited.add(`${startX},${startY}`);
+    let count = 0;
 
-    if (this.rooms.length === 0) {
-      // First room at origin
-      pos = { x: 0, y: 0 };
-    } else {
-      // Connect to the last room
-      const lastRoom = this.rooms[this.rooms.length - 1];
-      const dir = this.pickDirection();
-      const offset = DIRECTIONS[dir];
+    while (stack.length > 0 && count < maxCells) {
+      const current = stack[stack.length - 1];
+      const neighbors = this.getUnvisitedNeighbors(current.x, current.y);
 
-      // Place the new room with a corridor gap
-      const totalOffset = ROOM_SIZE + CORRIDOR_LENGTH;
-      pos = {
-        x: lastRoom.pos.x + offset.x * totalOffset,
-        y: lastRoom.pos.y + offset.y * totalOffset,
-      };
-
-      // Generate corridor tiles between the rooms
-      this.generateCorridor(lastRoom, pos, dir);
-
-      // Record connection
-      lastRoom.connections.push(this.rooms.length);
-    }
-
-    const room: DungeonRoom = {
-      pos,
-      width: ROOM_SIZE,
-      height: ROOM_SIZE,
-      type,
-      beat,
-      connections: [],
-      center: {
-        x: pos.x + Math.floor(ROOM_SIZE / 2),
-        y: pos.y + Math.floor(ROOM_SIZE / 2),
-      },
-    };
-
-    // Write room tiles to the map
-    for (let dy = 0; dy < ROOM_SIZE; dy++) {
-      for (let dx = 0; dx < ROOM_SIZE; dx++) {
-        const tileType = template[dy][dx];
-        if (tileType !== 0) {
-          this.setTile(pos.x + dx, pos.y + dy, tileType);
-        }
-      }
-    }
-
-    // Fill walls around the room
-    this.fillWallsAround(pos, ROOM_SIZE, ROOM_SIZE);
-
-    this.rooms.push(room);
-    return room;
-  }
-
-  /** Add a beat as a new room and set the hero target */
-  addBeat(beat: AdventureBeat): DungeonRoom {
-    const room = this.addRoom(beat.roomType, beat);
-    this.heroTarget = { ...room.center };
-    return room;
-  }
-
-  /** Get a tile value at coordinates */
-  getTile(x: number, y: number): number {
-    return this.tiles.get(`${x},${y}`) ?? TILE.VOID;
-  }
-
-  /** Set a tile value */
-  private setTile(x: number, y: number, value: number): void {
-    this.tiles.set(`${x},${y}`, value);
-  }
-
-  /** Generate L-shaped corridor tiles between two rooms for maze-like feel */
-  private generateCorridor(from: DungeonRoom, toPos: TilePos, dirIdx: number): void {
-    const toCenter = {
-      x: toPos.x + Math.floor(ROOM_SIZE / 2),
-      y: toPos.y + Math.floor(ROOM_SIZE / 2),
-    };
-
-    const cx = from.center.x;
-    const cy = from.center.y;
-    const tx = toCenter.x;
-    const ty = toCenter.y;
-
-    // Decide bend point: randomly along the corridor with some variation
-    const bendFraction = 0.3 + this.rng() * 0.4; // 30-70% along the way
-
-    // Build the corridor as a set of waypoints (L-shaped or Z-shaped)
-    const waypoints: TilePos[] = [{ x: cx, y: cy }];
-
-    const isHorizontalFirst = (dirIdx === 1 || dirIdx === 3); // right or left
-
-    if (isHorizontalFirst) {
-      // Go horizontal, then bend vertical
-      const bendX = Math.round(cx + (tx - cx) * bendFraction);
-      waypoints.push({ x: bendX, y: cy });
-      waypoints.push({ x: bendX, y: ty });
-      waypoints.push({ x: tx, y: ty });
-    } else {
-      // Go vertical, then bend horizontal
-      const bendY = Math.round(cy + (ty - cy) * bendFraction);
-      waypoints.push({ x: cx, y: bendY });
-      waypoints.push({ x: tx, y: bendY });
-      waypoints.push({ x: tx, y: ty });
-    }
-
-    // Walk each segment and carve corridor tiles
-    for (let w = 0; w < waypoints.length - 1; w++) {
-      const a = waypoints[w];
-      const b = waypoints[w + 1];
-      this.carveCorridorSegment(a, b, toPos);
-    }
-  }
-
-  /** Carve a straight corridor segment from A to B, with walls on sides */
-  private carveCorridorSegment(a: TilePos, b: TilePos, roomPos: TilePos): void {
-    let cx = a.x;
-    let cy = a.y;
-    const dx = Math.sign(b.x - a.x);
-    const dy = Math.sign(b.y - a.y);
-    const maxSteps = Math.abs(b.x - a.x) + Math.abs(b.y - a.y) + 1;
-
-    for (let i = 0; i < maxSteps; i++) {
-      // Skip if we're inside a room area
-      if (cx >= roomPos.x && cx < roomPos.x + ROOM_SIZE &&
-          cy >= roomPos.y && cy < roomPos.y + ROOM_SIZE) {
-        cx += dx;
-        cy += dy;
+      if (neighbors.length === 0) {
+        stack.pop();
         continue;
       }
 
-      this.setTile(cx, cy, TILE.FLOOR);
+      // Pick a random unvisited neighbor
+      const [nx, ny, dirIdx] = neighbors[Math.floor(this.rng() * neighbors.length)];
 
-      // Add walls on the sides based on movement direction
-      if (dx !== 0) {
-        // Horizontal - walls above and below
-        if (this.getTile(cx, cy - 1) === TILE.VOID) this.setTile(cx, cy - 1, TILE.WALL);
-        if (this.getTile(cx, cy + 1) === TILE.VOID) this.setTile(cx, cy + 1, TILE.WALL);
-      }
-      if (dy !== 0) {
-        // Vertical - walls left and right
-        if (this.getTile(cx - 1, cy) === TILE.VOID) this.setTile(cx - 1, cy, TILE.WALL);
-        if (this.getTile(cx + 1, cy) === TILE.VOID) this.setTile(cx + 1, cy, TILE.WALL);
-      }
-      // At bend corners, add walls all around
-      if (dx === 0 && dy === 0) {
-        for (const d of DIRECTIONS) {
-          if (this.getTile(cx + d.x, cy + d.y) === TILE.VOID) {
-            this.setTile(cx + d.x, cy + d.y, TILE.WALL);
-          }
-        }
-      }
+      // Remove wall between current and neighbor
+      this.removeWall(current.x, current.y, dirIdx);
 
-      cx += dx;
-      cy += dy;
+      this.visited.add(`${nx},${ny}`);
+      stack.push({ x: nx, y: ny });
+      count++;
     }
   }
 
-  /** Fill walls around a room where void tiles exist */
-  private fillWallsAround(pos: TilePos, w: number, h: number): void {
-    for (let dy = -1; dy <= h; dy++) {
-      for (let dx = -1; dx <= w; dx++) {
-        const tx = pos.x + dx;
-        const ty = pos.y + dy;
-        if (this.getTile(tx, ty) === TILE.VOID) {
-          // Check if adjacent to any non-void, non-wall tile
-          const adjacent = [
-            this.getTile(tx - 1, ty),
-            this.getTile(tx + 1, ty),
-            this.getTile(tx, ty - 1),
-            this.getTile(tx, ty + 1),
-          ];
-          if (adjacent.some(t => t !== TILE.VOID && t !== TILE.WALL)) {
-            this.setTile(tx, ty, TILE.WALL);
-          }
+  /** Get unvisited neighbor cells within bounds */
+  private getUnvisitedNeighbors(x: number, y: number): [number, number, number][] {
+    const result: [number, number, number][] = [];
+    for (let i = 0; i < DIRS.length; i++) {
+      const [dx, dy] = DIRS[i];
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height) {
+        if (!this.visited.has(`${nx},${ny}`)) {
+          result.push([nx, ny, i]);
         }
       }
     }
+    return result;
   }
 
-  /** Pick a direction for the next room - avoids going back the way we came */
-  private pickDirection(): number {
-    // More balanced weights - still slight forward bias but all directions possible
-    const baseWeights = [0.2, 0.3, 0.3, 0.2]; // up, right, down, left
+  /** Remove wall between cell (x,y) and the neighbor in direction dirIdx */
+  private removeWall(x: number, y: number, dirIdx: number): void {
+    // We only store E and S walls. N and W are stored as neighbors' S and E.
+    switch (dirIdx) {
+      case 0: // North: remove south wall of cell above (x, y-1)
+        this.passages.add(`${x},${y - 1},S`);
+        break;
+      case 1: // East: remove east wall of current cell
+        this.passages.add(`${x},${y},E`);
+        break;
+      case 2: // South: remove south wall of current cell
+        this.passages.add(`${x},${y},S`);
+        break;
+      case 3: // West: remove east wall of cell to the left (x-1, y)
+        this.passages.add(`${x - 1},${y},E`);
+        break;
+    }
+  }
 
-    // Penalize the reverse of the last direction to avoid backtracking
-    const reverseDir = (this.nextDirIdx + 2) % 4;
-    const weights = baseWeights.map((w, i) => i === reverseDir ? w * 0.2 : w);
+  /** Check if there is a passage between two adjacent cells */
+  hasPassage(x1: number, y1: number, x2: number, y2: number): boolean {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    if (dx === 1 && dy === 0) return this.passages.has(`${x1},${y1},E`);
+    if (dx === -1 && dy === 0) return this.passages.has(`${x2},${y2},E`);
+    if (dx === 0 && dy === 1) return this.passages.has(`${x1},${y1},S`);
+    if (dx === 0 && dy === -1) return this.passages.has(`${x2},${y2},S`);
+    return false;
+  }
 
-    // Normalize weights
-    const total = weights.reduce((a, b) => a + b, 0);
-    const r = this.rng() * total;
-    let cumulative = 0;
-    for (let i = 0; i < weights.length; i++) {
-      cumulative += weights[i];
-      if (r < cumulative) {
-        this.nextDirIdx = i;
-        return i;
+  /** BFS pathfinding from (sx,sy) to (tx,ty) through passages */
+  findPath(sx: number, sy: number, tx: number, ty: number): TilePos[] {
+    if (sx === tx && sy === ty) return [];
+
+    const queue: TilePos[] = [{ x: sx, y: sy }];
+    const came: Map<string, TilePos | null> = new Map();
+    came.set(`${sx},${sy}`, null);
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (current.x === tx && current.y === ty) {
+        // Reconstruct path
+        const path: TilePos[] = [];
+        let node: TilePos | null = current;
+        while (node) {
+          path.unshift(node);
+          node = came.get(`${node.x},${node.y}`) ?? null;
+        }
+        return path.slice(1); // exclude starting position
+      }
+
+      for (const [dx, dy] of DIRS) {
+        const nx = current.x + dx;
+        const ny = current.y + dy;
+        const key = `${nx},${ny}`;
+        if (!came.has(key) && this.hasPassage(current.x, current.y, nx, ny)) {
+          came.set(key, current);
+          queue.push({ x: nx, y: ny });
+        }
       }
     }
-    return 1; // default right
+
+    // No path found - return empty
+    return [];
   }
 
-  /** Update camera to center on hero position */
-  updateCamera(viewportWidth: number, viewportHeight: number, pixelScale: number, tileSize: number): void {
-    const tilePx = tileSize * pixelScale;
-    this.cameraX = this.heroPos.x * tilePx - viewportWidth / 2 + tilePx / 2;
-    this.cameraY = this.heroPos.y * tilePx - viewportHeight / 2 + tilePx / 2;
+  /** Get path from hero to target */
+  getPathToTarget(): TilePos[] {
+    return this.findPath(this.heroPos.x, this.heroPos.y, this.heroTarget.x, this.heroTarget.y);
   }
 
-  /** Render visible tiles onto a canvas */
-  renderTiles(
+  /** Extend the maze in a preferred direction from near the hero, returning the furthest new cell */
+  extendMaze(preferredDirIdx: number, cellCount: number): TilePos | null {
+    // Find frontier cells (visited cells with unvisited neighbors) near hero
+    const frontier = this.getFrontierNear(this.heroPos.x, this.heroPos.y, preferredDirIdx);
+    if (frontier.length === 0) return null;
+
+    // Pick a frontier cell (biased toward preferred direction)
+    const start = frontier[Math.floor(this.rng() * frontier.length)];
+
+    // Run a small generation from this frontier cell
+    const stack: TilePos[] = [start];
+    let count = 0;
+    let furthest = start;
+
+    while (stack.length > 0 && count < cellCount) {
+      const current = stack[stack.length - 1];
+      const neighbors = this.getUnvisitedNeighbors(current.x, current.y);
+
+      if (neighbors.length === 0) {
+        stack.pop();
+        continue;
+      }
+
+      // Bias toward preferred direction
+      let chosen: [number, number, number];
+      const preferred = neighbors.filter(n => n[2] === preferredDirIdx);
+      if (preferred.length > 0 && this.rng() < 0.5) {
+        chosen = preferred[0];
+      } else {
+        chosen = neighbors[Math.floor(this.rng() * neighbors.length)];
+      }
+
+      const [nx, ny, dirIdx] = chosen;
+      this.removeWall(current.x, current.y, dirIdx);
+      this.visited.add(`${nx},${ny}`);
+      stack.push({ x: nx, y: ny });
+      furthest = { x: nx, y: ny };
+      count++;
+    }
+
+    // Maybe add a torch in new area
+    if (count > 4 && this.rng() > 0.5) {
+      this.torchCells.add(`${furthest.x},${furthest.y}`);
+    }
+
+    return furthest;
+  }
+
+  /** Find frontier cells near a position, biased toward a direction */
+  private getFrontierNear(hx: number, hy: number, preferredDir: number): TilePos[] {
+    const candidates: TilePos[] = [];
+    const searchRadius = 8;
+
+    for (let dy = -searchRadius; dy <= searchRadius; dy++) {
+      for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+        const cx = hx + dx;
+        const cy = hy + dy;
+        if (cx < 0 || cx >= this.width || cy < 0 || cy >= this.height) continue;
+        if (!this.visited.has(`${cx},${cy}`)) continue;
+
+        // Check if this cell has unvisited neighbors
+        const unvisited = this.getUnvisitedNeighbors(cx, cy);
+        if (unvisited.length > 0) {
+          candidates.push({ x: cx, y: cy });
+        }
+      }
+    }
+
+    // Sort by distance in preferred direction
+    const [pdx, pdy] = DIRS[preferredDir];
+    candidates.sort((a, b) => {
+      const scoreA = (a.x - hx) * pdx + (a.y - hy) * pdy;
+      const scoreB = (b.x - hx) * pdx + (b.y - hy) * pdy;
+      return scoreB - scoreA; // Higher score = more in preferred direction
+    });
+
+    return candidates.slice(0, 5); // Top 5 candidates
+  }
+
+  /** Find a dead-end cell near the hero (for trap/monster beats) */
+  findDeadEnd(): TilePos | null {
+    const searchRadius = 10;
+    const hx = this.heroPos.x;
+    const hy = this.heroPos.y;
+    const deadEnds: TilePos[] = [];
+
+    for (let dy = -searchRadius; dy <= searchRadius; dy++) {
+      for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+        const cx = hx + dx;
+        const cy = hy + dy;
+        if (!this.visited.has(`${cx},${cy}`)) continue;
+        if (cx === hx && cy === hy) continue;
+
+        // Count passages from this cell
+        let passageCount = 0;
+        for (const [ddx, ddy] of DIRS) {
+          if (this.hasPassage(cx, cy, cx + ddx, cy + ddy)) passageCount++;
+        }
+        if (passageCount === 1) {
+          deadEnds.push({ x: cx, y: cy });
+        }
+      }
+    }
+
+    if (deadEnds.length === 0) return null;
+    return deadEnds[Math.floor(this.rng() * deadEnds.length)];
+  }
+
+  /** Remove walls around a cell to create an open area (for treasure/checkpoint) */
+  openArea(cx: number, cy: number, radius: number): void {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x < 0 || x >= this.width || y < 0 || y >= this.height) continue;
+        this.visited.add(`${x},${y}`);
+
+        // Remove walls to neighbors that are also in the area
+        if (x + 1 <= cx + radius && x + 1 < this.width) {
+          this.passages.add(`${x},${y},E`);
+          this.visited.add(`${x + 1},${y}`);
+        }
+        if (y + 1 <= cy + radius && y + 1 < this.height) {
+          this.passages.add(`${x},${y},S`);
+          this.visited.add(`${x},${y + 1}`);
+        }
+      }
+    }
+  }
+
+  /** Get walkable neighbor cells for patrol */
+  getPatrolPath(): TilePos[] {
+    const hx = this.heroPos.x;
+    const hy = this.heroPos.y;
+    const patrol: TilePos[] = [];
+
+    // BFS to find reachable cells within 8 steps (wide patrol range)
+    const reachable: TilePos[] = [];
+    const seen = new Set<string>();
+    const queue: [TilePos, number][] = [[{ x: hx, y: hy }, 0]];
+    seen.add(`${hx},${hy}`);
+
+    while (queue.length > 0) {
+      const [cell, dist] = queue.shift()!;
+      if (dist > 0) reachable.push(cell);
+      if (dist >= 8) continue;
+
+      for (const [dx, dy] of DIRS) {
+        const nx = cell.x + dx;
+        const ny = cell.y + dy;
+        const key = `${nx},${ny}`;
+        if (!seen.has(key) && this.hasPassage(cell.x, cell.y, nx, ny)) {
+          seen.add(key);
+          queue.push([{ x: nx, y: ny }, dist + 1]);
+        }
+      }
+    }
+
+    // Pick 4-6 random reachable cells for longer patrols
+    const count = Math.min(reachable.length, 4 + Math.floor(this.rng() * 3));
+    for (let i = 0; i < count; i++) {
+      const idx = Math.floor(this.rng() * reachable.length);
+      patrol.push(reachable[idx]);
+    }
+    // Return to start
+    patrol.push({ x: hx, y: hy });
+    return patrol;
+  }
+
+  /** Place torch markers at random visited cells */
+  private placeTorches(count: number): void {
+    const cells = Array.from(this.visited);
+    for (let i = 0; i < count && cells.length > 0; i++) {
+      const idx = Math.floor(this.rng() * cells.length);
+      this.torchCells.add(cells[idx]);
+    }
+  }
+
+  /** Snap camera to hero position instantly */
+  snapCamera(): void {
+    const { cellSize, canvasWidth, canvasHeight } = this.config;
+    this.cameraX = this.heroPos.x * cellSize + cellSize / 2 - canvasWidth / 2;
+    this.cameraY = this.heroPos.y * cellSize + cellSize / 2 - canvasHeight / 2;
+  }
+
+  /** Smooth-lerp camera toward hero position */
+  updateCamera(dt: number): void {
+    const { cellSize, canvasWidth, canvasHeight } = this.config;
+    const targetX = this.heroPos.x * cellSize + cellSize / 2 - canvasWidth / 2;
+    const targetY = this.heroPos.y * cellSize + cellSize / 2 - canvasHeight / 2;
+
+    const lerp = 0.08 * dt * 60;
+    this.cameraX += (targetX - this.cameraX) * Math.min(lerp, 1);
+    this.cameraY += (targetY - this.cameraY) * Math.min(lerp, 1);
+  }
+
+  /** Render the maze onto a canvas context */
+  renderMaze(
     ctx: CanvasRenderingContext2D,
-    viewportWidth: number,
-    viewportHeight: number,
-    pixelScale: number,
-    tileSize: number,
+    canvasWidth: number,
+    canvasHeight: number,
     frameCount: number,
   ): void {
-    const tilePx = tileSize * pixelScale;
-    const startTileX = Math.floor(this.cameraX / tilePx) - 1;
-    const startTileY = Math.floor(this.cameraY / tilePx) - 1;
-    const endTileX = startTileX + Math.ceil(viewportWidth / tilePx) + 2;
-    const endTileY = startTileY + Math.ceil(viewportHeight / tilePx) + 2;
+    const { cellSize, wallThickness } = this.config;
+    const camX = this.cameraX;
+    const camY = this.cameraY;
 
-    for (let ty = startTileY; ty <= endTileY; ty++) {
-      for (let tx = startTileX; tx <= endTileX; tx++) {
-        const tileType = this.getTile(tx, ty);
-        const screenX = tx * tilePx - this.cameraX;
-        const screenY = ty * tilePx - this.cameraY;
+    // Determine visible cell range
+    const startCellX = Math.floor(camX / cellSize) - 1;
+    const startCellY = Math.floor(camY / cellSize) - 1;
+    const endCellX = Math.ceil((camX + canvasWidth) / cellSize) + 1;
+    const endCellY = Math.ceil((camY + canvasHeight) / cellSize) + 1;
 
-        let sprite: SpriteFrame | null = null;
-        switch (tileType) {
-          case TILE.VOID:
-            // Draw nothing (black background)
-            continue;
-          case TILE.FLOOR:
-          case TILE.ENCOUNTER:
-          case TILE.DOOR:
-            // Use alternating floor variants based on position
-            sprite = ((tx + ty) % 3 === 0) ? FLOOR_2 : FLOOR_1;
-            break;
-          case TILE.WALL:
-            sprite = WALL;
-            break;
-          case TILE.TORCH: {
-            // Floor underneath
-            sprite = FLOOR_1;
-            drawSprite(ctx, sprite, screenX, screenY, pixelScale);
-            // Torch on top (animated)
-            const torchFrame = Math.floor(frameCount / 15) % 2 === 0 ? TORCH_1 : TORCH_2;
-            drawSprite(ctx, torchFrame, screenX, screenY, pixelScale);
-            continue; // Already drew floor + torch
+    // Draw floor for visited cells
+    const floorColor1 = PALETTE[16]; // dark gray
+    const floorColor2 = '#2a3045';   // slightly lighter
+    for (let cy = startCellY; cy <= endCellY; cy++) {
+      for (let cx = startCellX; cx <= endCellX; cx++) {
+        if (cx < 0 || cx >= this.width || cy < 0 || cy >= this.height) continue;
+        if (!this.visited.has(`${cx},${cy}`)) continue;
+
+        const screenX = cx * cellSize - camX;
+        const screenY = cy * cellSize - camY;
+
+        // Alternating floor shade
+        ctx.fillStyle = (cx + cy) % 3 === 0 ? floorColor2 : floorColor1;
+        ctx.fillRect(screenX, screenY, cellSize, cellSize);
+      }
+    }
+
+    // Draw walls (2px lines on cell edges where no passage exists)
+    ctx.fillStyle = PALETTE[9]; // dark blue walls
+    for (let cy = startCellY; cy <= endCellY; cy++) {
+      for (let cx = startCellX; cx <= endCellX; cx++) {
+        if (cx < 0 || cx >= this.width || cy < 0 || cy >= this.height) continue;
+        if (!this.visited.has(`${cx},${cy}`)) continue;
+
+        const screenX = cx * cellSize - camX;
+        const screenY = cy * cellSize - camY;
+
+        // East wall (right edge of cell)
+        if (!this.passages.has(`${cx},${cy},E`)) {
+          // Draw wall if the east neighbor is also visited (otherwise it's outer boundary)
+          const eastVisited = this.visited.has(`${cx + 1},${cy}`);
+          if (eastVisited || cx === this.width - 1) {
+            ctx.fillRect(screenX + cellSize - wallThickness, screenY, wallThickness, cellSize);
           }
         }
 
-        if (sprite) {
-          drawSprite(ctx, sprite, screenX, screenY, pixelScale);
+        // South wall (bottom edge of cell)
+        if (!this.passages.has(`${cx},${cy},S`)) {
+          const southVisited = this.visited.has(`${cx},${cy + 1}`);
+          if (southVisited || cy === this.height - 1) {
+            ctx.fillRect(screenX, screenY + cellSize - wallThickness, cellSize, wallThickness);
+          }
         }
 
-        // Draw door overlay on door tiles
-        if (tileType === TILE.DOOR) {
-          drawSprite(ctx, DOOR_OPEN, screenX, screenY, pixelScale);
+        // West boundary wall (left edge)
+        if (cx === 0 || !this.visited.has(`${cx - 1},${cy}`)) {
+          ctx.fillRect(screenX, screenY, wallThickness, cellSize);
+        } else if (!this.passages.has(`${cx - 1},${cy},E`)) {
+          // Wall between this cell and the west neighbor
+          // Already handled by the west neighbor's east wall
         }
+
+        // North boundary wall (top edge)
+        if (cy === 0 || !this.visited.has(`${cx},${cy - 1}`)) {
+          ctx.fillRect(screenX, screenY, cellSize, wallThickness);
+        }
+      }
+    }
+
+    // Draw torch glow effects
+    for (const key of this.torchCells) {
+      const parts = key.split(',');
+      const tx = parseInt(parts[0]);
+      const ty = parseInt(parts[1]);
+      if (tx < startCellX || tx > endCellX || ty < startCellY || ty > endCellY) continue;
+
+      const screenX = tx * cellSize - camX + cellSize / 2;
+      const screenY = ty * cellSize - camY + cellSize / 2;
+
+      // Flickering warm glow
+      const glowRadius = 10 + Math.sin(frameCount * 0.3 + tx * 7) * 3;
+      const alpha = 0.1 + Math.sin(frameCount * 0.2 + ty * 5) * 0.04;
+      ctx.fillStyle = `rgba(239, 125, 87, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(screenX, screenY, glowRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Torch pip (small orange dot)
+      ctx.fillStyle = PALETTE[4]; // orange
+      ctx.fillRect(screenX - 1, screenY - 1, 2, 2);
+    }
+  }
+
+  /** Process a beat: extend maze and set hero target */
+  addBeat(beat: AdventureBeat): void {
+    switch (beat.beat) {
+      case 'scout':
+      case 'read': {
+        // Extend maze to the right (exploring) - 10-20 cells
+        const count = 10 + Math.floor(this.rng() * 11);
+        const target = this.extendMaze(1, count); // East
+        if (target) {
+          this.heroTarget = target;
+        } else {
+          this.wanderToRandom();
+        }
+        this.lastBeatDir = 1;
+        break;
+      }
+      case 'carve':
+      case 'forge': {
+        // Extend maze downward (digging deeper) - 10-20 cells
+        const count = 10 + Math.floor(this.rng() * 11);
+        const target = this.extendMaze(2, count); // South
+        if (target) {
+          this.heroTarget = target;
+        } else {
+          this.wanderToRandom();
+        }
+        this.lastBeatDir = 2;
+        break;
+      }
+      case 'fork': {
+        // Create junction: extend in 3 directions - 5-10 cells each
+        for (let i = 0; i < 3; i++) {
+          const dir = (this.lastBeatDir + i + 1) % 4;
+          this.extendMaze(dir, 5 + Math.floor(this.rng() * 6));
+        }
+        this.wanderToRandom();
+        break;
+      }
+      case 'trap':
+      case 'monster':
+      case 'boss': {
+        // Walk to a dead end
+        const deadEnd = this.findDeadEnd();
+        if (deadEnd) {
+          this.heroTarget = deadEnd;
+        } else {
+          this.wanderToRandom();
+        }
+        break;
+      }
+      case 'treasure': {
+        // Open area around hero (radius 2 = 5x5 open space)
+        this.openArea(this.heroPos.x, this.heroPos.y, 2);
+        this.wanderToRandom();
+        break;
+      }
+      case 'checkpoint': {
+        // Cleared space (radius 1 = 3x3)
+        this.openArea(this.heroPos.x, this.heroPos.y, 1);
+        this.wanderToRandom(); // Walk away from cleared spot
+        break;
+      }
+      case 'wander':
+      default: {
+        // Meander through existing maze
+        this.wanderToRandom();
+        break;
       }
     }
   }
 
-  /** Get the path from current hero position to target (zigzag for movement variety) */
-  getPathToTarget(): TilePos[] {
-    const path: TilePos[] = [];
-    let cx = this.heroPos.x;
-    let cy = this.heroPos.y;
-    const tx = this.heroTarget.x;
-    const ty = this.heroTarget.y;
+  /** Set hero target to a random reachable cell nearby */
+  private wanderToRandom(): void {
+    const reachable: TilePos[] = [];
+    const seen = new Set<string>();
+    const queue: [TilePos, number][] = [[{ x: this.heroPos.x, y: this.heroPos.y }, 0]];
+    seen.add(`${this.heroPos.x},${this.heroPos.y}`);
+    const maxDist = 6 + Math.floor(this.rng() * 6); // 6-12 cells away
 
-    // Zigzag: alternate horizontal and vertical steps for visible multi-directional movement
-    let moveX = true; // start with horizontal
-    while (cx !== tx || cy !== ty) {
-      const remainX = Math.abs(tx - cx);
-      const remainY = Math.abs(ty - cy);
+    while (queue.length > 0) {
+      const [cell, dist] = queue.shift()!;
+      if (dist >= 4) reachable.push(cell); // min 4 cells away
+      if (dist >= maxDist) continue;
 
-      if (remainX === 0) {
-        // Only vertical left
-        cy += cy < ty ? 1 : -1;
-      } else if (remainY === 0) {
-        // Only horizontal left
-        cx += cx < tx ? 1 : -1;
-      } else if (moveX) {
-        // Take 1-2 horizontal steps
-        const steps = Math.min(remainX, 1 + Math.floor(this.rng() * 2));
-        for (let i = 0; i < steps && cx !== tx; i++) {
-          cx += cx < tx ? 1 : -1;
-          path.push({ x: cx, y: cy });
+      for (const [dx, dy] of DIRS) {
+        const nx = cell.x + dx;
+        const ny = cell.y + dy;
+        const key = `${nx},${ny}`;
+        if (!seen.has(key) && this.hasPassage(cell.x, cell.y, nx, ny)) {
+          seen.add(key);
+          queue.push([{ x: nx, y: ny }, dist + 1]);
         }
-        moveX = false;
-        continue; // already pushed
-      } else {
-        // Take 1-2 vertical steps
-        const steps = Math.min(remainY, 1 + Math.floor(this.rng() * 2));
-        for (let i = 0; i < steps && cy !== ty; i++) {
-          cy += cy < ty ? 1 : -1;
-          path.push({ x: cx, y: cy });
-        }
-        moveX = true;
-        continue; // already pushed
       }
-      path.push({ x: cx, y: cy });
     }
 
-    return path;
+    if (reachable.length > 0) {
+      this.heroTarget = reachable[Math.floor(this.rng() * reachable.length)];
+    }
   }
 }

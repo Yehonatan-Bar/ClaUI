@@ -2334,7 +2334,7 @@ html, body, #root {
 .weather-widget {
   position: fixed;
   top: 28px;
-  right: 32px;
+  left: 32px;
   z-index: 9998;
   width: 22px;
   height: 22px;
@@ -2469,7 +2469,7 @@ html, body, #root {
 .weather-popover {
   position: absolute;
   top: 28px;
-  right: 0;
+  left: 0;
   width: 220px;
   background: var(--vscode-editorWidget-background, #252526);
   border: 1px solid var(--vscode-editorWidget-border, #454545);
@@ -2599,6 +2599,21 @@ html, body, #root {
   color: var(--vscode-editor-foreground);
 }
 
+.vitals-info-language-select {
+  background: var(--vscode-dropdown-background, #3c3c3c);
+  color: var(--vscode-dropdown-foreground, #ccc);
+  border: 1px solid var(--vscode-dropdown-border, #555);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  outline: none;
+}
+
+.vitals-info-language-select:focus {
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
 .vitals-info-toggle-btn {
   position: relative;
   width: 36px;
@@ -2663,7 +2678,13 @@ html, body, #root {
   overflow: hidden;
   background: #0d0d1a;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-  cursor: default;
+  cursor: grab;
+  user-select: none;
+}
+
+.adventure-widget--dragging {
+  cursor: grabbing;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
 }
 
 .adventure-canvas {

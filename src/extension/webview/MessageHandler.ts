@@ -97,7 +97,7 @@ export class MessageHandler {
   private activitySummaryCallback: ((summary: ActivitySummary) => void) | null = null;
   /** Maps blockIndex -> toolName for tool_use blocks in the current message */
   private toolBlockNames: Map<number, string> = new Map();
-  /** Maps blockIndex -> first chunk of partial JSON (for enrichment context) */
+  /** Maps blockIndex -> accumulated input_json_delta chunks (for enrichment context) */
   private toolBlockContexts: Map<number, string> = new Map();
   /** Getter for the session/tab name, injected by SessionTab */
   private getSessionName: (() => string) | null = null;
@@ -509,8 +509,17 @@ export class MessageHandler {
           this.webview.postMessage(this.achievementService.buildSnapshotMessage(this.tabId));
           break;
 
-        case 'translateMessage':
-          this.log(`Translate request: messageId=${msg.messageId}, textLength=${msg.textContent.length}`);
+        case 'setTranslationLanguage': {
+          const lang = msg.language;
+          this.log(`Setting translation language: ${lang}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('translationLanguage', lang, true);
+          break;
+        }
+
+        case 'translateMessage': {
+          const config = vscode.workspace.getConfiguration('claudeMirror');
+          const targetLang = msg.language?.trim() || config.get<string>('translationLanguage', 'Hebrew');
+          this.log(`Translate request: messageId=${msg.messageId}, textLength=${msg.textContent.length}, language=${targetLang}`);
           if (!this.messageTranslator) {
             this.webview.postMessage({
               type: 'translationResult',
@@ -522,7 +531,7 @@ export class MessageHandler {
             break;
           }
           this.messageTranslator
-            .translate(msg.textContent)
+            .translate(msg.textContent, targetLang)
             .then((translatedText) => {
               this.webview.postMessage({
                 type: 'translationResult',
@@ -543,6 +552,7 @@ export class MessageHandler {
               });
             });
           break;
+        }
 
         case 'ready':
           this.log('Webview ready');
@@ -560,6 +570,8 @@ export class MessageHandler {
           this.sendVitalsSetting();
           // Send adventure widget setting
           this.sendAdventureWidgetSetting();
+          // Send translation language setting
+          this.sendTranslationLanguageSetting();
           // Send achievement settings/snapshot
           this.webview.postMessage(this.achievementService.buildSettingsMessage());
           this.webview.postMessage(this.achievementService.buildSnapshotMessage(this.tabId));
@@ -771,6 +783,17 @@ export class MessageHandler {
     });
   }
 
+  /** Read translation language setting from VS Code config and send to webview */
+  private sendTranslationLanguageSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const language = config.get<string>('translationLanguage', 'Hebrew');
+    this.log(`Sending translation language setting: language=${language}`);
+    this.webview.postMessage({
+      type: 'translationLanguageSetting',
+      language,
+    });
+  }
+
   /** Execute the git push script */
   private handleGitPush(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -855,6 +878,9 @@ export class MessageHandler {
       if (e.affectsConfiguration('claudeMirror.adventureWidget')) {
         this.sendAdventureWidgetSetting();
       }
+      if (e.affectsConfiguration('claudeMirror.translationLanguage')) {
+        this.sendTranslationLanguageSetting();
+      }
       if (
         e.affectsConfiguration('claudeMirror.achievements.enabled') ||
         e.affectsConfiguration('claudeMirror.achievements.sound')
@@ -917,10 +943,11 @@ export class MessageHandler {
     this.demux.on(
       'toolUseDelta',
       (data: { messageId: string; blockIndex: number; partialJson: string }) => {
-        // Capture first chunk of JSON input for activity summarizer context
-        if (!this.toolBlockContexts.has(data.blockIndex)) {
-          this.toolBlockContexts.set(data.blockIndex, data.partialJson.slice(0, 150));
-        }
+        // Accumulate streamed JSON input so enrichment can parse real tool arguments.
+        const prev = this.toolBlockContexts.get(data.blockIndex) || '';
+        const combined = prev + data.partialJson;
+        // Guard memory growth in unusually large tool payloads.
+        this.toolBlockContexts.set(data.blockIndex, combined.length > 8000 ? combined.slice(0, 8000) : combined);
         this.webview.postMessage({
           type: 'toolUseInput',
           messageId: data.messageId,
@@ -1046,10 +1073,10 @@ export class MessageHandler {
           const success = event as ResultSuccess;
           this.webview.postMessage({
             type: 'costUpdate',
-            costUsd: success.cost_usd,
-            totalCostUsd: success.total_cost_usd,
-            inputTokens: success.usage.input_tokens,
-            outputTokens: success.usage.output_tokens,
+            costUsd: success.cost_usd ?? 0,
+            totalCostUsd: success.total_cost_usd ?? 0,
+            inputTokens: success.usage?.input_tokens ?? 0,
+            outputTokens: success.usage?.output_tokens ?? 0,
           });
           // Session Vitals: emit turn completion record
           const successTurn = {
@@ -1064,6 +1091,7 @@ export class MessageHandler {
             timestamp: Date.now(),
             messageId: this.lastMessageId,
           };
+          this.log(`Emitting turnComplete: turn=${successTurn.turnIndex} category=${successTurn.category} tools=[${successTurn.toolNames.join(',')}]`);
           this.webview.postMessage({ type: 'turnComplete', turn: successTurn });
           // Adventure Widget: generate and send beat
           if (this.adventureInterpreter) {
@@ -1090,6 +1118,7 @@ export class MessageHandler {
             timestamp: Date.now(),
             messageId: this.lastMessageId,
           };
+          this.log(`Emitting turnComplete (error): turn=${errorTurn.turnIndex}`);
           this.webview.postMessage({ type: 'turnComplete', turn: errorTurn });
           // Adventure Widget: generate and send beat
           if (this.adventureInterpreter) {
@@ -1165,18 +1194,132 @@ export class MessageHandler {
     });
   }
 
-  /** Enrich a tool name with context from its first JSON argument (e.g., file path) */
+  /** Enrich a tool name with parsed tool arguments (path/query/command/etc.) */
   private enrichToolName(toolName: string, blockIndex: number): string {
     const rawJson = this.toolBlockContexts.get(blockIndex) || '';
     if (!rawJson) {
       return toolName;
     }
-    // Try to extract file_path, command, path, or pattern from partial JSON
-    const pathMatch = rawJson.match(/"(?:file_path|path|command|pattern|query|url)":\s*"([^"]{1,80})/);
-    if (pathMatch) {
-      return `${toolName} (${pathMatch[1]})`;
+
+    const snippets: string[] = [];
+    const seenLabels = new Set<string>();
+
+    const normalizeSnippet = (value: string, maxLen = 90): string => {
+      const compact = value.replace(/\s+/g, ' ').trim();
+      if (compact.length <= maxLen) {
+        return compact;
+      }
+      return `${compact.slice(0, maxLen - 3)}...`;
+    };
+
+    const addSnippet = (label: string, value: unknown): void => {
+      if (snippets.length >= 4 || seenLabels.has(label) || typeof value !== 'string') {
+        return;
+      }
+      const cleaned = normalizeSnippet(value);
+      if (!cleaned) {
+        return;
+      }
+      snippets.push(`${label}=${cleaned}`);
+      seenLabels.add(label);
+    };
+
+    const extractSearchQuery = (value: unknown): string | null => {
+      if (!Array.isArray(value)) {
+        return null;
+      }
+      for (const entry of value) {
+        if (entry && typeof entry === 'object') {
+          const q = (entry as Record<string, unknown>).q;
+          if (typeof q === 'string' && q.trim()) {
+            return q.trim();
+          }
+        }
+      }
+      return null;
+    };
+
+    try {
+      const parsed = JSON.parse(rawJson) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const payload = parsed as Record<string, unknown>;
+
+        addSnippet('file', payload.file_path);
+        addSnippet('path', payload.path);
+        addSnippet('pattern', payload.pattern);
+        addSnippet('query', payload.query);
+        addSnippet('url', payload.url);
+        addSnippet('command', payload.command);
+        addSnippet('prompt', payload.prompt);
+
+        const q = extractSearchQuery(payload.search_query);
+        if (q) {
+          addSnippet('query', q);
+        }
+
+        if (Array.isArray(payload.open)) {
+          for (const entry of payload.open) {
+            if (entry && typeof entry === 'object') {
+              addSnippet('ref', (entry as Record<string, unknown>).ref_id);
+              if (snippets.length >= 4) {
+                break;
+              }
+            }
+          }
+        }
+
+        if (Array.isArray(payload.tool_uses)) {
+          for (const toolUse of payload.tool_uses) {
+            if (!toolUse || typeof toolUse !== 'object') {
+              continue;
+            }
+            const use = toolUse as Record<string, unknown>;
+            addSnippet('tool', use.recipient_name);
+            const parameters = use.parameters;
+            if (parameters && typeof parameters === 'object' && !Array.isArray(parameters)) {
+              const params = parameters as Record<string, unknown>;
+              addSnippet('command', params.command);
+              addSnippet('query', params.q);
+              addSnippet('path', params.path);
+              addSnippet('pattern', params.pattern);
+            }
+            if (snippets.length >= 4) {
+              break;
+            }
+          }
+        }
+      }
+    } catch {
+      // Keep regex fallback below for partially streamed or invalid JSON fragments.
     }
-    return toolName;
+
+    if (snippets.length === 0) {
+      const patterns: Array<{ label: string; regex: RegExp }> = [
+        { label: 'file', regex: /"(?:file_path|filepath)"\s*:\s*"([^"]{1,200})"/ },
+        { label: 'path', regex: /"(?:path|relative_workspace_path)"\s*:\s*"([^"]{1,200})"/ },
+        { label: 'pattern', regex: /"pattern"\s*:\s*"([^"]{1,200})"/ },
+        { label: 'query', regex: /"(?:query|q)"\s*:\s*"([^"]{1,200})"/ },
+        { label: 'url', regex: /"url"\s*:\s*"([^"]{1,200})"/ },
+        { label: 'command', regex: /"command"\s*:\s*"([^"]{1,400})"/ },
+      ];
+
+      for (const entry of patterns) {
+        const match = rawJson.match(entry.regex);
+        if (match?.[1]) {
+          addSnippet(entry.label, match[1]);
+        }
+        if (snippets.length >= 4) {
+          break;
+        }
+      }
+    }
+
+    if (snippets.length === 0) {
+      return toolName;
+    }
+
+    const details = snippets.join('; ');
+    return `${toolName} (${details})`;
   }
 
   /** Fire-and-forget: spawn a Haiku process to name this session */

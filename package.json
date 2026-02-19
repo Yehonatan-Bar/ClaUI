@@ -190,6 +190,23 @@
           "default": "{sessionName}",
           "description": "Commit message template. Use {sessionName} for the current tab name."
         },
+        "claudeMirror.translationLanguage": {
+          "type": "string",
+          "default": "Hebrew",
+          "enum": [
+            "Hebrew",
+            "Arabic",
+            "Russian",
+            "Spanish",
+            "French",
+            "German",
+            "Portuguese",
+            "Chinese",
+            "Japanese",
+            "Korean"
+          ],
+          "description": "Target language for the Translate button on assistant messages"
+        },
         "claudeMirror.sessionVitals": {
           "type": "boolean",
           "default": true,
