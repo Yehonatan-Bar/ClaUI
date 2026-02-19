@@ -149,7 +149,7 @@ export function registerCommands(
     vscode.commands.registerCommand('claudeMirror.stopSession', () => {
       const tab = tabManager.getActiveTab();
       if (!tab) {
-        vscode.window.showWarningMessage('No active Claude Mirror tab.');
+        vscode.window.showWarningMessage('No active ClaUi tab.');
         return;
       }
       tab.stopSession();
@@ -357,7 +357,7 @@ export function registerCommands(
 
         if (uris.length === 0) {
           vscode.window.showWarningMessage(
-            'No local file or folder selected to send to Claude Mirror.'
+            'No local file or folder selected to send to ClaUi.'
           );
           return;
         }

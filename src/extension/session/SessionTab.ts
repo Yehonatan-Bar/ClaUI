@@ -131,7 +131,7 @@ export class SessionTab implements WebviewBridge {
     });
 
     // Create webview panel in the specified column
-    this.baseTitle = `Claude Mirror ${tabNumber}`;
+    this.baseTitle = `ClaUi ${tabNumber}`;
     this.panel = vscode.window.createWebviewPanel(
       'claudeMirror.chat',
       this.baseTitle,
@@ -474,13 +474,13 @@ export class SessionTab implements WebviewBridge {
         this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
         this.postMessage({
           type: 'error',
-          message: `Claude process exited with code ${info.code}. Check "Claude Mirror" output channel for details.`,
+          message: `Claude process exited with code ${info.code}. Check "ClaUi" output channel for details.`,
         });
 
         if (autoRestart && currentSessionId) {
           vscode.window
             .showWarningMessage(
-              `Claude Mirror ${this.tabNumber}: process exited (code ${info.code}). Restart?`,
+              `ClaUi ${this.tabNumber}: process exited (code ${info.code}). Restart?`,
               'Restart',
               'Show Log',
               'Cancel'
@@ -552,7 +552,7 @@ export class SessionTab implements WebviewBridge {
   /** Update the panel title to include the session ID */
   updateTitle(sessionId: string): void {
     const shortId = sessionId.slice(0, 8);
-    this.setTabName(`Claude Mirror ${this.tabNumber} [${shortId}]`);
+    this.setTabName(`ClaUi ${this.tabNumber} [${shortId}]`);
   }
 
   private flushPendingMessages(): void {

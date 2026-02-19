@@ -79,7 +79,7 @@ User message: "<first 200 chars of user message>"
 5. **Reject** if longer than 40 characters -> return `null`
 6. **Reject** if more than 5 words -> return `null`
 
-If sanitization rejects the output, the tab keeps its default title (`Claude Mirror N`).
+If sanitization rejects the output, the tab keeps its default title (`ClaUi N`).
 
 ## Flag Reset Points
 
@@ -119,7 +119,7 @@ Same pattern as `ClaudeProcessManager`: deletes `CLAUDECODE` and `CLAUDE_CODE_EN
 
 ## Debugging
 
-All logs go to the `Claude Mirror` output channel with `[SessionNaming]` and `SessionNamer:` prefixes.
+All logs go to the `ClaUi` output channel with `[SessionNaming]` and `SessionNamer:` prefixes.
 
 **Key log lines to look for:**
 

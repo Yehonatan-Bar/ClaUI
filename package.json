@@ -24,51 +24,51 @@
     "commands": [
       {
         "command": "claudeMirror.startSession",
-        "title": "Claude Mirror: Start New Session"
+        "title": "ClaUi: Start New Session"
       },
       {
         "command": "claudeMirror.stopSession",
-        "title": "Claude Mirror: Stop Session"
+        "title": "ClaUi: Stop Session"
       },
       {
         "command": "claudeMirror.toggleView",
-        "title": "Claude Mirror: Toggle Chat/Terminal View"
+        "title": "ClaUi: Toggle Chat/Terminal View"
       },
       {
         "command": "claudeMirror.sendMessage",
-        "title": "Claude Mirror: Send Message"
+        "title": "ClaUi: Send Message"
       },
       {
         "command": "claudeMirror.compact",
-        "title": "Claude Mirror: Compact Context"
+        "title": "ClaUi: Compact Context"
       },
       {
         "command": "claudeMirror.resumeSession",
-        "title": "Claude Mirror: Resume Session"
+        "title": "ClaUi: Resume Session"
       },
       {
         "command": "claudeMirror.sendFilePathToChat",
-        "title": "Claude Mirror: Send Path to Chat"
+        "title": "ClaUi: Send Path to Chat"
       },
       {
         "command": "claudeMirror.showHistory",
-        "title": "Claude Mirror: Conversation History"
+        "title": "ClaUi: Conversation History"
       },
       {
         "command": "claudeMirror.cancelRequest",
-        "title": "Claude Mirror: Cancel Current Response"
+        "title": "ClaUi: Cancel Current Response"
       },
       {
         "command": "claudeMirror.openPlanDocs",
-        "title": "Claude Mirror: Open Plan Document"
+        "title": "ClaUi: Open Plan Document"
       },
       {
         "command": "claudeMirror.openLogDirectory",
-        "title": "Claude Mirror: Open Log Directory"
+        "title": "ClaUi: Open Log Directory"
       }
     ],
     "configuration": {
-      "title": "Claude Code Mirror",
+      "title": "ClaUi",
       "properties": {
         "claudeMirror.cliPath": {
           "type": "string",

@@ -19,7 +19,7 @@ function log(message: string): void {
 
 export function activate(context: vscode.ExtensionContext): void {
   // Create output channel for debugging (shared by all tabs)
-  outputChannel = vscode.window.createOutputChannel('Claude Mirror');
+  outputChannel = vscode.window.createOutputChannel('ClaUi');
   context.subscriptions.push(outputChannel);
 
   // Set up file-based logging

@@ -34,7 +34,7 @@ export function buildWebviewHtml(
              img-src ${webview.cspSource} data:;
              font-src ${webview.cspSource};"
   />
-  <title>Claude Mirror</title>
+  <title>ClaUi</title>
   <style>
     html, body, #root {
       margin: 0;
@@ -132,7 +132,7 @@ export class WebviewProvider {
 
     this.panel = vscode.window.createWebviewPanel(
       'claudeMirror.chat',
-      'Claude Mirror',
+      'ClaUi',
       vscode.ViewColumn.Beside,
       {
         enableScripts: true,
