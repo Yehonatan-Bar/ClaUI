@@ -5,37 +5,41 @@ Visual session health dashboard providing real-time feedback about session activ
 ## Components
 
 ### Session Timeline (Minimap)
-Vertical 24px strip rendered alongside the message list (right side). Each turn is a colored segment proportional to its duration.
+Vertical 24px strip rendered alongside the message list (right side). Each turn is a colored segment proportional to its duration. Has an info trigger ("?") at the top that shows a legend tooltip on hover explaining what the timeline is and the color codes.
 
 - **File**: `src/webview/components/Vitals/SessionTimeline.tsx`
-- **Color map** by category:
-  - `success` = green (#4caf50)
-  - `error` = red (#f44336)
-  - `discussion` = blue (#2196f3)
-  - `code-write` = purple (#9c27b0)
-  - `research` = orange (#ff9800)
-  - `command` = cyan (#00bcd4)
+- **Structure**: Info trigger at top (18px, flex-shrink: 0) + segments container (flex: 1) below
+- **Info trigger**: "?" button at top of timeline. Hover shows a styled legend tooltip with description, color legend, and usage hint. Positioned to the left of the timeline (right: 28px).
+- **Color map** by category (defined in `CATEGORY_COLORS` and `CATEGORY_LABELS`):
+  - `success` = green (#4caf50) / "Success"
+  - `error` = red (#f44336) / "Error"
+  - `discussion` = blue (#2196f3) / "Discussion"
+  - `code-write` = purple (#9c27b0) / "Code Write"
+  - `research` = orange (#ff9800) / "Research"
+  - `command` = cyan (#00bcd4) / "Command"
 - **Opacity**: Scales with turn cost relative to session max (`0.35 + 0.65 * costRatio`)
 - **Position marker**: White triangle tracks current scroll position
 - **Click-to-jump**: Clicking a segment scrolls the corresponding message into view
 - **Hover tooltip**: Shows turn number, category, tools used, duration, and cost
 
 ### Weather Widget
-20x20px animated icon fixed at top-right (`top: 28px; right: 6px`). Reflects session mood based on recent error/success patterns.
+20x20px animated icon fixed at top-right (`top: 28px; right: 32px`). Reflects overall session health via a **multi-dimensional composite score**. **Clickable**: clicking the icon opens a popover with a detailed explanation of the current mood state.
 
 - **File**: `src/webview/components/Vitals/WeatherWidget.tsx`
+- **Click popover**: Shows the weather symbol, label, and a human-readable description of what the current mood means. Closes on outside click.
 - **8 moods**: clear, partly-sunny, cloudy, rainy, thunderstorm, rainbow, night, snowflake
 - **Pulse animation**: CSS keyframe with configurable speed (slow/normal/fast)
-- **Mood algorithm** (in `calculateWeather()` in `store.ts`):
-  - No turns -> night/slow
-  - 3+ errors in last 5 turns -> thunderstorm/fast
-  - 2+ errors in last 5 -> rainy/fast
-  - Previous error + current success -> rainbow/normal
-  - 1 error in last 5 -> cloudy/normal
-  - 1 error in last 8 -> partly-sunny/slow
-  - 5+ success streak -> clear/slow
-  - Default -> partly-sunny/slow
-  - Session ended -> snowflake (disconnected) or night (completed)
+- **Mood algorithm** (in `calculateWeather()` in `store.ts`) - composite of 4 dimensions:
+  1. **Error pressure** (30%): errors in last 5 turns / total recent turns
+  2. **Cost velocity** (25%): recent per-turn cost vs session average (0 at normal, 1 at 3x)
+  3. **Momentum** (25%): recent turn duration vs session average (rising = worse)
+  4. **Productivity flow** (20%): ratio of productive categories (code-write, research, command) vs discussion/error
+  - Composite < 0.15 -> clear/slow
+  - Composite 0.15-0.30 -> partly-sunny/normal
+  - Composite 0.30-0.45 -> cloudy/normal
+  - Composite 0.45-0.60 -> rainy/fast
+  - Composite 0.60+ -> thunderstorm/fast
+  - **Special overrides**: previous error + current success -> rainbow/normal; no turns -> night/slow; disconnected -> snowflake
 
 ### Cost Heat Bar
 4px horizontal gradient strip showing cost accumulation.
@@ -53,9 +57,22 @@ Colored left border on each assistant message bubble, reflecting the turn's cate
 - **Color**: Category color with opacity based on tool count (40% / 70% / 100%)
 
 ### VitalsContainer
-Wrapper that conditionally renders WeatherWidget + CostHeatBar when vitals are enabled.
+Wrapper that conditionally renders WeatherWidget + AdventureWidget + CostHeatBar when vitals are enabled.
 
 - **File**: `src/webview/components/Vitals/VitalsContainer.tsx`
+- AdventureWidget additionally requires `adventureEnabled` to be true
+
+### VitalsInfoPanel
+Dropdown panel opened by clicking the "Vitals" button in the StatusBar. Shows explanations of all vitals components and toggle switches.
+
+- **File**: `src/webview/components/Vitals/VitalsInfoPanel.tsx`
+- **Content**: Explains weather icon, cost heat bar, timeline, intensity borders, and adventure widget
+- **Toggles**: Adventure Widget (separate toggle) and Show Vitals (master toggle)
+- **Closes on**: clicking the close button or clicking outside the panel
+
+### Adventure Widget
+Pixel-art dungeon crawler canvas, documented separately.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ADVENTURE_WIDGET.md`
 
 ## Data Pipeline
 
@@ -67,9 +84,10 @@ MessageHandler.ts (result handler)
     - Snapshots toolNames BEFORE clearApprovalTracking()
     - Builds TurnRecord with categorizeTurn() helper
     - postMessage({ type: 'turnComplete', turn })
+    - Calls AdventureInterpreter.interpret(turn) -> postMessage({ type: 'adventureBeat', beat })
     |
     v
-useClaudeStream.ts -> addTurnRecord(msg.turn)
+useClaudeStream.ts -> addTurnRecord(msg.turn) / addAdventureBeat(msg.beat)
     |
     v
 Zustand store
@@ -112,7 +130,7 @@ export interface TurnRecord {
 ## Toggle
 
 - **Setting**: `claudeMirror.sessionVitals` (boolean, default `true`)
-- **UI**: "Vitals" button in the StatusBar (active state highlighted with link color)
+- **UI**: "Vitals" button in the StatusBar opens a `VitalsInfoPanel` dropdown with explanations and a toggle switch (active state highlighted with link color)
 - **Behavior**: Hides ALL vitals components (timeline, weather, cost bar, intensity borders) when disabled
 - **Sync**: Two-way sync between VS Code settings and webview (same pattern as other settings)
 
@@ -130,6 +148,7 @@ export interface TurnRecord {
 | `src/webview/components/Vitals/WeatherWidget.tsx` | Weather mood icon |
 | `src/webview/components/Vitals/CostHeatBar.tsx` | Cost gradient bar |
 | `src/webview/components/Vitals/VitalsContainer.tsx` | Conditional wrapper |
+| `src/webview/components/Vitals/VitalsInfoPanel.tsx` | Info panel with explanations + toggle |
 | `src/webview/components/ChatView/MessageBubble.tsx` | Turn intensity borders |
 | `src/webview/components/ChatView/MessageList.tsx` | Scroll fraction tracking |
 | `src/webview/styles/global.css` | All vitals CSS |
@@ -146,4 +165,5 @@ export interface TurnRecord {
 
 - Session resume: Historical turns don't have TurnRecords (timeline starts empty on resume)
 - `duration_ms` may be undefined for some CLI versions (falls back to 0, segments use equal heights)
-- Weather algorithm uses a simple sliding window - no persistence across sessions
+- Weather algorithm uses a sliding window over recent turns - no persistence across sessions
+- Cost velocity and momentum scores need a few turns of history to be meaningful (early turns default to low scores)

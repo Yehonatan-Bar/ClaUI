@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>תוכנית: מערכת מזג אוויר חכמה</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    padding: 32px;
+    line-height: 1.7;
+  }
+  .container { max-width: 720px; margin: 0 auto; }
+  h1 {
+    font-size: 24px;
+    color: #58a6ff;
+    margin-bottom: 8px;
+    border-bottom: 2px solid #21262d;
+    padding-bottom: 12px;
+  }
+  .subtitle {
+    color: #8b949e;
+    font-size: 14px;
+    margin-bottom: 28px;
+  }
+  h2 {
+    font-size: 18px;
+    color: #f0f6fc;
+    margin: 24px 0 12px 0;
+  }
+  .problem-box {
+    background: #1c1410;
+    border: 1px solid #da8b45;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  .problem-box strong { color: #da8b45; }
+  .solution-box {
+    background: #0d1f0d;
+    border: 1px solid #3fb950;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  .solution-box strong { color: #3fb950; }
+  .dimension {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .dimension-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+    width: 36px;
+    text-align: center;
+  }
+  .dimension-text strong {
+    color: #f0f6fc;
+    display: block;
+    margin-bottom: 2px;
+  }
+  .dimension-text span {
+    font-size: 13px;
+    color: #8b949e;
+  }
+  .weight {
+    background: #21262d;
+    color: #58a6ff;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    margin-right: auto;
+    flex-shrink: 0;
+  }
+  .weather-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  .weather-table th {
+    text-align: right;
+    padding: 8px 12px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    color: #58a6ff;
+    font-weight: 600;
+  }
+  .weather-table td {
+    padding: 8px 12px;
+    border: 1px solid #30363d;
+  }
+  .weather-table tr:nth-child(even) { background: #0d1117; }
+  .weather-table tr:nth-child(odd) { background: #161b22; }
+  .impact {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+  }
+  .impact li {
+    margin-bottom: 6px;
+    padding-right: 8px;
+  }
+  .tag-no-change {
+    display: inline-block;
+    background: #21262d;
+    color: #8b949e;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>תוכנית: שדרוג מערכת מזג האוויר</h1>
+  <p class="subtitle">סמל מזג האוויר בפינת המסך - הפיכתו למדד משמעותי</p>
+
+  <div class="problem-box">
+    <strong>הבעיה:</strong> כיום הסמל מתבסס רק על שגיאות קוד. מכיוון שכמעט אין שגיאות - הוא כמעט תמיד מראה "שמש" ולא נותן שום ערך.
+  </div>
+
+  <div class="solution-box">
+    <strong>הפתרון:</strong> להפוך את מזג האוויר למדד מרובה ממדים שמשקלל 4 אותות שונים. כך הוא ישקף את בריאות הסשן באופן אמיתי ומגוון.
+  </div>
+
+  <h2>4 הממדים שמרכיבים את הציון</h2>
+
+  <div class="dimension">
+    <div class="dimension-icon">X</div>
+    <div class="dimension-text">
+      <strong>שגיאות</strong>
+      <span>כמה שגיאות התרחשו בתורות האחרונים. מה שהיה קיים עד היום - נשאר, אבל כממד אחד מתוך ארבעה.</span>
+    </div>
+    <div class="weight">30%</div>
+  </div>
+
+  <div class="dimension">
+    <div class="dimension-icon">$</div>
+    <div class="dimension-text">
+      <strong>קצב שריפת עלויות</strong>
+      <span>האם העלות-לתור עולה? אם 3 התורות האחרונים יקרים פי 2 מהממוצע - הציון עולה. מזהה ספייקים בהוצאות.</span>
+    </div>
+    <div class="weight">25%</div>
+  </div>
+
+  <div class="dimension">
+    <div class="dimension-icon">//</div>
+    <div class="dimension-text">
+      <strong>מומנטום / קצב</strong>
+      <span>האם התורות מתארכים? אם הזמן-לתור עולה ביחס לממוצע - סימן שדברים נתקעים או מסתבכים.</span>
+    </div>
+    <div class="weight">25%</div>
+  </div>
+
+  <div class="dimension">
+    <div class="dimension-icon">+</div>
+    <div class="dimension-text">
+      <strong>פרודוקטיביות</strong>
+      <span>מה היחס בין תורות פרודוקטיביים (כתיבת קוד, מחקר, פקודות) לבין תורות של דיון בלבד? יותר מדי דיבורים = סימן לסחרור.</span>
+    </div>
+    <div class="weight">20%</div>
+  </div>
+
+  <h2>מיפוי למזג אוויר</h2>
+
+  <table class="weather-table">
+    <tr>
+      <th>ציון</th>
+      <th>מצב</th>
+      <th>משמעות</th>
+    </tr>
+    <tr>
+      <td>0 - 0.15</td>
+      <td>שמש</td>
+      <td>הכל זורם - עלויות יעילות, קצב יציב, עבודה פרודוקטיבית</td>
+    </tr>
+    <tr>
+      <td>0.15 - 0.30</td>
+      <td>חצי מעונן</td>
+      <td>בסדר גמור. עלייה קלה בעלות או האטה קלה</td>
+    </tr>
+    <tr>
+      <td>0.30 - 0.45</td>
+      <td>מעונן</td>
+      <td>אותות מדאיגים - עלויות עולות, קצב יורד, או פחות פרודוקטיבי</td>
+    </tr>
+    <tr>
+      <td>0.45 - 0.60</td>
+      <td>גשום</td>
+      <td>מספר אותות דולקים - ספייקים, האטות, או שגיאות</td>
+    </tr>
+    <tr>
+      <td>0.60+</td>
+      <td>סופת רעמים</td>
+      <td>בעיות משמעותיות - עלויות גבוהות, תקיעות, שגיאות, או סחרור</td>
+    </tr>
+  </table>
+
+  <p style="margin-top: 12px; font-size: 13px; color: #8b949e;">
+    מצבים מיוחדים: <strong style="color:#e040fb">קשת</strong> = התאוששות אחרי תקופה קשה |
+    <strong style="color:#78909c">לילה</strong> = לא פעיל |
+    <strong style="color:#b3e5fc">שלג</strong> = מנותק
+  </p>
+
+  <h2>מה משתנה ומה לא</h2>
+  <div class="impact">
+    <ul>
+      <li>משתנה: <strong>הלוגיקה שמחשבת את מזג האוויר</strong> - במקום למדוד רק שגיאות, מודדת 4 ממדים</li>
+      <li>משתנה: <strong>תיאורי מזג האוויר</strong> - מעודכנים לשקף את המשמעות החדשה</li>
+      <li><span class="tag-no-change">ללא שינוי</span> הסמלים, הצבעים, המיקום, העיצוב</li>
+      <li><span class="tag-no-change">ללא שינוי</span> צד השרת / ההרחבה - הכל מחושב מנתונים קיימים</li>
+      <li><span class="tag-no-change">ללא שינוי</span> מבנה ה-store - אין צורך בשדות חדשים</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

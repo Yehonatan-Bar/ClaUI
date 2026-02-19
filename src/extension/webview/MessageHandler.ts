@@ -4,6 +4,7 @@ import type { ControlProtocol } from '../process/ControlProtocol';
 import type { StreamDemux } from '../process/StreamDemux';
 import type { SessionNamer } from '../session/SessionNamer';
 import type { ActivitySummarizer, ActivitySummary } from '../session/ActivitySummarizer';
+import type { AdventureInterpreter } from '../session/AdventureInterpreter';
 import type { MessageTranslator } from '../session/MessageTranslator';
 import type { PromptHistoryStore } from '../session/PromptHistoryStore';
 import type { AchievementService } from '../achievements/AchievementService';
@@ -11,6 +12,7 @@ import type {
   ExtensionToWebviewMessage,
   TypingTheme,
   TurnCategory,
+  TurnRecord,
   WebviewToExtensionMessage,
 } from '../types/webview-messages';
 import type {
@@ -52,6 +54,11 @@ function isApprovalToolName(name: string): boolean {
   });
 }
 
+function isEnterPlanModeTool(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  return normalized === 'enterplanmode' || normalized.endsWith('.enterplanmode');
+}
+
 /** Tool name sets for turn categorization (Session Vitals) */
 const CODE_WRITE_TOOLS = ['Write', 'Edit', 'NotebookEdit', 'MultiEdit'];
 const RESEARCH_TOOLS = ['Read', 'Grep', 'Glob', 'WebSearch', 'WebFetch'];
@@ -82,6 +89,8 @@ export class MessageHandler {
   private approvalResponseProcessed = false;
   /** After user approves ExitPlanMode, auto-approve subsequent ExitPlanMode calls in the same turn */
   private autoApproveExitPlanMode = false;
+  /** Tracks whether EnterPlanMode was called in this session (prevents stale ExitPlanMode after compaction) */
+  private planModeActive = false;
 
   /** Activity summarizer: periodically summarizes tool activity via Haiku */
   private activitySummarizer: ActivitySummarizer | null = null;
@@ -94,6 +103,8 @@ export class MessageHandler {
   private getSessionName: (() => string) | null = null;
   /** Message translator for Hebrew translation feature */
   private messageTranslator: MessageTranslator | null = null;
+  /** Adventure interpreter for dungeon crawler beat generation */
+  private adventureInterpreter: AdventureInterpreter | null = null;
 
   /** Turn counter for Session Vitals (reset on session clear) */
   private turnIndex = 0;
@@ -147,6 +158,11 @@ export class MessageHandler {
   /** Attach a MessageTranslator for Hebrew translation feature */
   setMessageTranslator(translator: MessageTranslator): void {
     this.messageTranslator = translator;
+  }
+
+  /** Attach an AdventureInterpreter for dungeon crawler beat generation */
+  setAdventureInterpreter(interpreter: AdventureInterpreter): void {
+    this.adventureInterpreter = interpreter;
   }
 
   /** Wire up all event listeners */
@@ -212,6 +228,7 @@ export class MessageHandler {
         case 'startSession':
           this.firstMessageSent = false;
           this.activitySummarizer?.reset();
+          this.adventureInterpreter?.reset();
           // If already running, just sync the webview state
           if (this.processManager.isRunning) {
             this.log('startSession - process already running, syncing state');
@@ -293,6 +310,7 @@ export class MessageHandler {
         case 'clearSession':
           this.firstMessageSent = false;
           this.activitySummarizer?.reset();
+          this.adventureInterpreter?.reset();
           this.log('clearSession - stopping current process and starting fresh');
           this.achievementService.onSessionEnd(this.tabId);
           this.processManager.stop();
@@ -336,6 +354,11 @@ export class MessageHandler {
           vscode.workspace.getConfiguration('claudeMirror').update('sessionVitals', msg.enabled, true);
           break;
 
+        case 'setAdventureWidgetEnabled':
+          this.log(`Setting adventure widget to: ${msg.enabled}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('adventureWidget', msg.enabled, true);
+          break;
+
         case 'showHistory':
           this.log('Webview requested history view');
           vscode.commands.executeCommand('claudeMirror.showHistory');
@@ -354,6 +377,15 @@ export class MessageHandler {
             const norm = this.pendingApprovalTool.trim().toLowerCase();
             if (norm === 'exitplanmode' || norm.endsWith('.exitplanmode')) {
               this.autoApproveExitPlanMode = true;
+              // Plan mode cycle complete - clear the flag
+              this.planModeActive = false;
+            }
+          }
+          // Rejecting or giving feedback on ExitPlanMode also ends the plan cycle
+          if ((msg.action === 'reject' || msg.action === 'feedback') && this.pendingApprovalTool) {
+            const norm = this.pendingApprovalTool.trim().toLowerCase();
+            if (norm === 'exitplanmode' || norm.endsWith('.exitplanmode')) {
+              this.planModeActive = false;
             }
           }
           if (msg.action === 'approve') {
@@ -526,6 +558,8 @@ export class MessageHandler {
           this.sendGitPushSettings();
           // Send session vitals setting
           this.sendVitalsSetting();
+          // Send adventure widget setting
+          this.sendAdventureWidgetSetting();
           // Send achievement settings/snapshot
           this.webview.postMessage(this.achievementService.buildSettingsMessage());
           this.webview.postMessage(this.achievementService.buildSnapshotMessage(this.tabId));
@@ -726,6 +760,17 @@ export class MessageHandler {
     });
   }
 
+  /** Read adventure widget setting from VS Code config and send to webview */
+  private sendAdventureWidgetSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const enabled = config.get<boolean>('adventureWidget', true);
+    this.log(`Sending adventure widget setting: enabled=${enabled}`);
+    this.webview.postMessage({
+      type: 'adventureWidgetSetting',
+      enabled,
+    });
+  }
+
   /** Execute the git push script */
   private handleGitPush(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -807,6 +852,9 @@ export class MessageHandler {
       if (e.affectsConfiguration('claudeMirror.sessionVitals')) {
         this.sendVitalsSetting();
       }
+      if (e.affectsConfiguration('claudeMirror.adventureWidget')) {
+        this.sendAdventureWidgetSetting();
+      }
       if (
         e.affectsConfiguration('claudeMirror.achievements.enabled') ||
         e.affectsConfiguration('claudeMirror.achievements.sound')
@@ -849,6 +897,11 @@ export class MessageHandler {
       (data: { messageId: string; blockIndex: number; toolName: string; toolId: string }) => {
         this.log(`-> webview: toolUseStart ${data.toolName}`);
         this.currentMessageToolNames.push(data.toolName);
+        // Track plan mode: EnterPlanMode sets the flag so ExitPlanMode knows it's legitimate
+        if (isEnterPlanModeTool(data.toolName)) {
+          this.planModeActive = true;
+          this.log('Plan mode activated (EnterPlanMode detected)');
+        }
         // Track for activity summarizer enrichment
         this.toolBlockNames.set(data.blockIndex, data.toolName);
         this.webview.postMessage({
@@ -999,21 +1052,24 @@ export class MessageHandler {
             outputTokens: success.usage.output_tokens,
           });
           // Session Vitals: emit turn completion record
-          this.webview.postMessage({
-            type: 'turnComplete',
-            turn: {
-              turnIndex: this.turnIndex++,
-              toolNames: toolNamesSnapshot,
-              toolCount: toolNamesSnapshot.length,
-              durationMs: (success as any).duration_ms ?? 0,
-              costUsd: success.cost_usd ?? 0,
-              totalCostUsd: success.total_cost_usd ?? 0,
-              isError: false,
-              category: categorizeTurn(toolNamesSnapshot, false),
-              timestamp: Date.now(),
-              messageId: this.lastMessageId,
-            },
-          });
+          const successTurn = {
+            turnIndex: this.turnIndex++,
+            toolNames: toolNamesSnapshot,
+            toolCount: toolNamesSnapshot.length,
+            durationMs: (success as any).duration_ms ?? 0,
+            costUsd: success.cost_usd ?? 0,
+            totalCostUsd: success.total_cost_usd ?? 0,
+            isError: false,
+            category: categorizeTurn(toolNamesSnapshot, false),
+            timestamp: Date.now(),
+            messageId: this.lastMessageId,
+          };
+          this.webview.postMessage({ type: 'turnComplete', turn: successTurn });
+          // Adventure Widget: generate and send beat
+          if (this.adventureInterpreter) {
+            const beat = this.adventureInterpreter.interpret(successTurn as TurnRecord);
+            this.webview.postMessage({ type: 'adventureBeat', beat });
+          }
         } else {
           this.achievementService.onResult(this.tabId, false);
           const error = event as ResultError;
@@ -1022,21 +1078,24 @@ export class MessageHandler {
             message: error.error,
           });
           // Session Vitals: emit error turn record
-          this.webview.postMessage({
-            type: 'turnComplete',
-            turn: {
-              turnIndex: this.turnIndex++,
-              toolNames: toolNamesSnapshot,
-              toolCount: toolNamesSnapshot.length,
-              durationMs: 0,
-              costUsd: 0,
-              totalCostUsd: 0,
-              isError: true,
-              category: 'error',
-              timestamp: Date.now(),
-              messageId: this.lastMessageId,
-            },
-          });
+          const errorTurn = {
+            turnIndex: this.turnIndex++,
+            toolNames: toolNamesSnapshot,
+            toolCount: toolNamesSnapshot.length,
+            durationMs: 0,
+            costUsd: 0,
+            totalCostUsd: 0,
+            isError: true,
+            category: 'error' as const,
+            timestamp: Date.now(),
+            messageId: this.lastMessageId,
+          };
+          this.webview.postMessage({ type: 'turnComplete', turn: errorTurn });
+          // Adventure Widget: generate and send beat
+          if (this.adventureInterpreter) {
+            const beat = this.adventureInterpreter.interpret(errorTurn as TurnRecord);
+            this.webview.postMessage({ type: 'adventureBeat', beat });
+          }
         }
         this.webview.postMessage({ type: 'processBusy', busy: false });
       }
@@ -1068,6 +1127,15 @@ export class MessageHandler {
     if (isExitPlanMode && this.autoApproveExitPlanMode) {
       this.log(`Auto-approving subsequent ExitPlanMode (user already approved in this turn)`);
       this.approvalResponseProcessed = true; // suppress fallback events for this message
+      this.control.sendText('Yes, proceed with the plan.');
+      return;
+    }
+    // Auto-approve stale ExitPlanMode after context compaction: if EnterPlanMode
+    // was never called in this session, ExitPlanMode is a stale artifact from
+    // compacted context. Auto-approve to prevent the user from getting stuck.
+    if (isExitPlanMode && !this.planModeActive) {
+      this.log(`Auto-approving stale ExitPlanMode (no EnterPlanMode seen in session)`);
+      this.approvalResponseProcessed = true;
       this.control.sendText('Yes, proceed with the plan.');
       return;
     }

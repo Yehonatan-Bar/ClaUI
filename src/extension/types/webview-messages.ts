@@ -158,6 +158,11 @@ export interface SetVitalsEnabledRequest {
   enabled: boolean;
 }
 
+export interface SetAdventureWidgetEnabledRequest {
+  type: 'setAdventureWidgetEnabled';
+  enabled: boolean;
+}
+
 export interface GetAchievementsSnapshotRequest {
   type: 'getAchievementsSnapshot';
 }
@@ -193,7 +198,8 @@ export type WebviewToExtensionMessage =
   | FileSearchRequest
   | SetAchievementsEnabledRequest
   | GetAchievementsSnapshotRequest
-  | SetVitalsEnabledRequest;
+  | SetVitalsEnabledRequest
+  | SetAdventureWidgetEnabledRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -462,6 +468,28 @@ export interface VitalsSettingMessage {
   enabled: boolean;
 }
 
+export interface AdventureWidgetSettingMessage {
+  type: 'adventureWidgetSetting';
+  enabled: boolean;
+}
+
+export interface AdventureBeatMessage {
+  type: 'adventureBeat';
+  beat: {
+    turnIndex: number;
+    timestamp: number;
+    beat: string;
+    intensity: 1 | 2 | 3;
+    outcome: 'success' | 'fail' | 'mixed' | 'neutral';
+    toolNames: string[];
+    labelShort: string;
+    tooltipDetail?: string;
+    roomType: string;
+    isHaikuEnhanced: boolean;
+    achievementRarity?: string;
+  };
+}
+
 export interface ConversationHistoryMessage {
   type: 'conversationHistory';
   /** Full conversation history loaded from Claude's session storage */
@@ -511,4 +539,6 @@ export type ExtensionToWebviewMessage =
   | AchievementProgressMessage
   | SessionRecapMessage
   | TurnCompleteMessage
-  | VitalsSettingMessage;
+  | VitalsSettingMessage
+  | AdventureWidgetSettingMessage
+  | AdventureBeatMessage;

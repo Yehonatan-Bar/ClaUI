@@ -10,6 +10,15 @@ const CATEGORY_COLORS: Record<TurnCategory, string> = {
   command: '#00bcd4',
 };
 
+const CATEGORY_LABELS: Record<TurnCategory, string> = {
+  success: 'Success',
+  error: 'Error',
+  discussion: 'Discussion',
+  'code-write': 'Code Write',
+  research: 'Research',
+  command: 'Command',
+};
+
 interface SessionTimelineProps {
   turnHistory: TurnRecord[];
   scrollFraction: number;
@@ -19,6 +28,7 @@ interface SessionTimelineProps {
 export const SessionTimeline: React.FC<SessionTimelineProps> = React.memo(
   ({ turnHistory, scrollFraction, onTurnClick }) => {
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+    const [showLegend, setShowLegend] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
     const maxCost = useMemo(
@@ -49,40 +59,72 @@ export const SessionTimeline: React.FC<SessionTimelineProps> = React.memo(
 
     return (
       <div className="session-timeline" ref={containerRef}>
-        {/* Position marker */}
+        {/* Info trigger with legend tooltip */}
         <div
-          className="timeline-position-marker"
-          style={{ top: `${scrollFraction * 100}%` }}
-        />
-
-        {/* Segments */}
-        {segments.map(({ turn, heightPercent, opacity }) => (
-          <div
-            key={turn.turnIndex}
-            className="timeline-segment"
-            style={{
-              height: `${heightPercent}%`,
-              backgroundColor: CATEGORY_COLORS[turn.category],
-              opacity,
-            }}
-            onClick={() => handleClick(turn.messageId)}
-            onMouseEnter={() => setHoveredIndex(turn.turnIndex)}
-            onMouseLeave={() => setHoveredIndex(null)}
-          >
-            {hoveredIndex === turn.turnIndex && (
-              <div className="timeline-tooltip">
-                <div>Turn {turn.turnIndex + 1}: {turn.category}</div>
-                {turn.toolNames.length > 0 && (
-                  <div>{turn.toolNames.join(', ')}</div>
-                )}
-                <div>
-                  {turn.durationMs > 0 ? `${(turn.durationMs / 1000).toFixed(1)}s` : ''}
-                  {turn.costUsd > 0 ? ` | $${turn.costUsd.toFixed(4)}` : ''}
-                </div>
+          className="timeline-info-trigger"
+          onMouseEnter={() => setShowLegend(true)}
+          onMouseLeave={() => setShowLegend(false)}
+        >
+          ?
+          {showLegend && (
+            <div className="timeline-legend">
+              <div className="timeline-legend-title">Session Timeline</div>
+              <div className="timeline-legend-desc">
+                Visual map of your conversation. Each block is a turn — taller blocks took longer, brighter blocks cost more.
               </div>
-            )}
-          </div>
-        ))}
+              <div className="timeline-legend-items">
+                {(Object.keys(CATEGORY_COLORS) as TurnCategory[]).map((cat) => (
+                  <div key={cat} className="timeline-legend-item">
+                    <span
+                      className="timeline-legend-swatch"
+                      style={{ backgroundColor: CATEGORY_COLORS[cat] }}
+                    />
+                    {CATEGORY_LABELS[cat]}
+                  </div>
+                ))}
+              </div>
+              <div className="timeline-legend-hint">Click a block to jump to that turn</div>
+            </div>
+          )}
+        </div>
+
+        {/* Segments area */}
+        <div className="timeline-segments">
+          {/* Position marker */}
+          <div
+            className="timeline-position-marker"
+            style={{ top: `${scrollFraction * 100}%` }}
+          />
+
+          {/* Segments */}
+          {segments.map(({ turn, heightPercent, opacity }) => (
+            <div
+              key={turn.turnIndex}
+              className="timeline-segment"
+              style={{
+                height: `${heightPercent}%`,
+                backgroundColor: CATEGORY_COLORS[turn.category],
+                opacity,
+              }}
+              onClick={() => handleClick(turn.messageId)}
+              onMouseEnter={() => setHoveredIndex(turn.turnIndex)}
+              onMouseLeave={() => setHoveredIndex(null)}
+            >
+              {hoveredIndex === turn.turnIndex && (
+                <div className="timeline-tooltip">
+                  <div>Turn {turn.turnIndex + 1}: {turn.category}</div>
+                  {turn.toolNames.length > 0 && (
+                    <div>{turn.toolNames.join(', ')}</div>
+                  )}
+                  <div>
+                    {turn.durationMs > 0 ? `${(turn.durationMs / 1000).toFixed(1)}s` : ''}
+                    {turn.costUsd > 0 ? ` | $${turn.costUsd.toFixed(4)}` : ''}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     );
   },
