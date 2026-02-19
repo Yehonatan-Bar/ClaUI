@@ -1,5 +1,13 @@
 import { create } from 'zustand';
 import type { ContentBlock } from '../../extension/types/stream-json';
+import type { TypingTheme } from '../../extension/types/webview-messages';
+import type {
+  AchievementAwardPayload,
+  AchievementGoalPayload,
+  AchievementProfilePayload,
+  SessionRecapPayload,
+  TurnRecord,
+} from '../../extension/types/webview-messages';
 
 // --- Message types for the UI ---
 
@@ -41,6 +49,11 @@ export interface TextSettings {
   fontFamily: string;  // CSS font-family string, empty = use VS Code default
 }
 
+export interface AchievementToast extends AchievementAwardPayload {
+  toastId: string;
+  createdAt: number;
+}
+
 export interface AppState {
   // Session
   sessionId: string | null;
@@ -65,6 +78,7 @@ export interface AppState {
 
   // Text display settings
   textSettings: TextSettings;
+  typingTheme: TypingTheme;
 
   // File paths dropped/picked
   pendingFilePaths: string[] | null;
@@ -102,6 +116,26 @@ export interface AppState {
   translations: Record<string, string>;
   translatingMessageIds: Set<string>;
   showingTranslation: Set<string>;
+
+  // Session Vitals
+  vitalsEnabled: boolean;
+  turnHistory: TurnRecord[];
+  turnByMessageId: Record<string, TurnRecord>;
+  weather: WeatherState;
+
+  // Achievements
+  achievementsEnabled: boolean;
+  achievementsSound: boolean;
+  achievementProfile: AchievementProfilePayload;
+  achievementGoals: AchievementGoalPayload[];
+  achievementToasts: AchievementToast[];
+  achievementPanelOpen: boolean;
+  sessionRecap: SessionRecapPayload | null;
+
+  // Session activity timer (Claude active processing time only)
+  sessionActivityStarted: boolean;
+  sessionActivityElapsedMs: number;
+  sessionActivityRunningSinceMs: number | null;
 
   // Actions
   setSession: (sessionId: string, model: string) => void;
@@ -141,6 +175,7 @@ export interface AppState {
   setPendingFilePaths: (paths: string[] | null) => void;
   addToPromptHistory: (prompt: string) => void;
   setTextSettings: (settings: Partial<TextSettings>) => void;
+  setTypingTheme: (theme: TypingTheme) => void;
   setResuming: (resuming: boolean) => void;
   setSelectedModel: (model: string) => void;
   setPendingApproval: (approval: { toolName: string; planText: string } | null) => void;
@@ -158,6 +193,16 @@ export interface AppState {
   setTranslation: (messageId: string, translatedText: string) => void;
   setTranslating: (messageId: string, translating: boolean) => void;
   toggleTranslationView: (messageId: string) => void;
+  setVitalsEnabled: (enabled: boolean) => void;
+  addTurnRecord: (turn: TurnRecord) => void;
+  setAchievementsSettings: (settings: { enabled: boolean; sound: boolean }) => void;
+  setAchievementsSnapshot: (snapshot: { profile: AchievementProfilePayload; goals: AchievementGoalPayload[] }) => void;
+  addAchievementToast: (toast: AchievementAwardPayload, profile: AchievementProfilePayload) => void;
+  dismissAchievementToast: (toastId: string) => void;
+  setAchievementPanelOpen: (open: boolean) => void;
+  setSessionRecap: (recap: SessionRecapPayload | null) => void;
+  setAchievementGoals: (goals: AchievementGoalPayload[]) => void;
+  markSessionPromptSent: () => void;
   reset: () => void;
 }
 
@@ -171,6 +216,53 @@ const initialCost: CostInfo = {
   totalCostUsd: 0,
   inputTokens: 0,
   outputTokens: 0,
+};
+
+// --- Session Vitals ---
+
+export type WeatherMood = 'clear' | 'partly-sunny' | 'cloudy' | 'rainy' | 'thunderstorm' | 'rainbow' | 'night' | 'snowflake';
+export type PulseRate = 'slow' | 'normal' | 'fast';
+
+export interface WeatherState {
+  mood: WeatherMood;
+  pulseRate: PulseRate;
+}
+
+const initialWeather: WeatherState = { mood: 'night', pulseRate: 'slow' };
+
+function calculateWeather(turns: TurnRecord[]): WeatherState {
+  if (turns.length === 0) return { mood: 'night', pulseRate: 'slow' };
+
+  const recent5 = turns.slice(-5);
+  const recent8 = turns.slice(-8);
+  const errorsInLast5 = recent5.filter(t => t.isError).length;
+  const errorsInLast8 = recent8.filter(t => t.isError).length;
+  const lastTurn = turns[turns.length - 1];
+  const secondLast = turns.length > 1 ? turns[turns.length - 2] : null;
+
+  // Rainbow: error just resolved (previous was error, current is success)
+  if (secondLast?.isError && !lastTurn.isError) {
+    return { mood: 'rainbow', pulseRate: 'normal' };
+  }
+  // Thunderstorm: 3+ errors in last 5 turns
+  if (errorsInLast5 >= 3) return { mood: 'thunderstorm', pulseRate: 'fast' };
+  // Rainy: 2+ errors in last 5
+  if (errorsInLast5 >= 2) return { mood: 'rainy', pulseRate: 'fast' };
+  // Cloudy: 1 error in last 5
+  if (errorsInLast5 >= 1) return { mood: 'cloudy', pulseRate: 'normal' };
+  // Partly sunny: 1 error in last 8
+  if (errorsInLast8 >= 1) return { mood: 'partly-sunny', pulseRate: 'slow' };
+  // Clear sky: 5+ successful turns
+  if (recent5.filter(t => !t.isError).length >= 5) return { mood: 'clear', pulseRate: 'slow' };
+
+  return { mood: 'partly-sunny', pulseRate: 'slow' };
+}
+
+const initialAchievementProfile: AchievementProfilePayload = {
+  totalXp: 0,
+  level: 1,
+  totalAchievements: 0,
+  unlockedIds: [],
 };
 
 /**
@@ -214,6 +306,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   cost: { ...initialCost },
   lastError: null,
   textSettings: { ...defaultTextSettings },
+  typingTheme: 'zen' as const,
   pendingFilePaths: null,
   promptHistory: [],
   isResuming: false,
@@ -231,25 +324,58 @@ export const useAppStore = create<AppState>((set, get) => ({
   translations: {},
   translatingMessageIds: new Set(),
   showingTranslation: new Set(),
+  vitalsEnabled: true,
+  turnHistory: [],
+  turnByMessageId: {},
+  weather: { ...initialWeather },
+  achievementsEnabled: true,
+  achievementsSound: false,
+  achievementProfile: { ...initialAchievementProfile },
+  achievementGoals: [],
+  achievementToasts: [],
+  achievementPanelOpen: false,
+  sessionRecap: null,
+  sessionActivityStarted: false,
+  sessionActivityElapsedMs: 0,
+  sessionActivityRunningSinceMs: null,
 
   // Actions
   setSession: (sessionId, model) =>
-    set({
-      sessionId,
-      model,
-      isConnected: true,
-      lastError: null,
+    set((state) => {
+      const isNewSession = state.sessionId !== sessionId;
+      return {
+        sessionId,
+        model,
+        isConnected: true,
+        lastError: null,
+        sessionRecap: null,
+        ...(isNewSession
+          ? {
+            sessionActivityStarted: false,
+            sessionActivityElapsedMs: 0,
+            sessionActivityRunningSinceMs: null,
+          }
+          : {}),
+      };
     }),
 
   endSession: (_reason) =>
-    set({
-      isConnected: false,
-      isBusy: false,
-      streamingMessageId: null,
-      streamingBlocks: [],
-      lastAssistantSnapshot: null,
-      pendingApproval: null,
-      activitySummary: null,
+    set((state) => {
+      const now = Date.now();
+      const finalElapsed = state.sessionActivityRunningSinceMs
+        ? state.sessionActivityElapsedMs + (now - state.sessionActivityRunningSinceMs)
+        : state.sessionActivityElapsedMs;
+      return {
+        isConnected: false,
+        isBusy: false,
+        streamingMessageId: null,
+        streamingBlocks: [],
+        lastAssistantSnapshot: null,
+        pendingApproval: null,
+        activitySummary: null,
+        sessionActivityElapsedMs: finalElapsed,
+        sessionActivityRunningSinceMs: null,
+      };
     }),
 
   addUserMessage: (content) => {
@@ -497,7 +623,30 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  setBusy: (busy) => set({ isBusy: busy }),
+  setBusy: (busy) =>
+    set((state) => {
+      if (!state.sessionActivityStarted) {
+        return { isBusy: busy };
+      }
+
+      const now = Date.now();
+      if (busy && state.sessionActivityRunningSinceMs === null) {
+        return {
+          isBusy: true,
+          sessionActivityRunningSinceMs: now,
+        };
+      }
+
+      if (!busy && state.sessionActivityRunningSinceMs !== null) {
+        return {
+          isBusy: false,
+          sessionActivityElapsedMs: state.sessionActivityElapsedMs + (now - state.sessionActivityRunningSinceMs),
+          sessionActivityRunningSinceMs: null,
+        };
+      }
+
+      return { isBusy: busy };
+    }),
 
   updateCost: (cost) => set({ cost }),
 
@@ -521,6 +670,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       textSettings: { ...state.textSettings, ...settings },
     })),
+
+  setTypingTheme: (theme) => set({ typingTheme: theme }),
 
   setResuming: (resuming) => set({ isResuming: resuming }),
 
@@ -580,8 +731,68 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { showingTranslation: newSet };
     }),
 
-  reset: () =>
+  setVitalsEnabled: (enabled) => set({ vitalsEnabled: enabled }),
+
+  addTurnRecord: (turn) =>
+    set((state) => {
+      const updated = [...state.turnHistory, turn];
+      const trimmed = updated.length > 200 ? updated.slice(-200) : updated;
+      return {
+        turnHistory: trimmed,
+        turnByMessageId: { ...state.turnByMessageId, [turn.messageId]: turn },
+        weather: calculateWeather(trimmed),
+      };
+    }),
+
+  setAchievementsSettings: ({ enabled, sound }) =>
+    set((state) => ({
+      achievementsEnabled: enabled,
+      achievementsSound: sound,
+      achievementPanelOpen: enabled ? state.achievementPanelOpen : false,
+      achievementToasts: enabled ? state.achievementToasts : [],
+    })),
+
+  setAchievementsSnapshot: ({ profile, goals }) =>
     set({
+      achievementProfile: profile,
+      achievementGoals: goals,
+    }),
+
+  addAchievementToast: (toast, profile) =>
+    set((state) => ({
+      achievementProfile: profile,
+      achievementToasts: [
+        ...state.achievementToasts,
+        {
+          ...toast,
+          toastId: `${toast.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          createdAt: Date.now(),
+        },
+      ],
+    })),
+
+  dismissAchievementToast: (toastId) =>
+    set((state) => ({
+      achievementToasts: state.achievementToasts.filter((toast) => toast.toastId !== toastId),
+    })),
+
+  setAchievementPanelOpen: (open) => set({ achievementPanelOpen: open }),
+  setSessionRecap: (recap) => set({ sessionRecap: recap }),
+  setAchievementGoals: (goals) => set({ achievementGoals: goals }),
+  markSessionPromptSent: () =>
+    set((state) => {
+      if (state.sessionActivityStarted) {
+        return state;
+      }
+      return {
+        sessionActivityStarted: true,
+        sessionActivityElapsedMs: 0,
+        sessionActivityRunningSinceMs: null,
+      };
+    }),
+
+  reset: () =>
+    set((state) => ({
       sessionId: null,
       model: null,
       isConnected: false,
@@ -593,6 +804,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       cost: { ...initialCost },
       lastError: null,
       textSettings: { ...defaultTextSettings },
+      typingTheme: 'zen' as const,
       pendingFilePaths: null,
       isResuming: false,
       pendingApproval: null,
@@ -609,5 +821,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       translations: {},
       translatingMessageIds: new Set(),
       showingTranslation: new Set(),
-    }),
+      vitalsEnabled: state.vitalsEnabled,
+      turnHistory: [],
+      turnByMessageId: {},
+      weather: { ...initialWeather },
+      achievementsEnabled: state.achievementsEnabled,
+      achievementsSound: state.achievementsSound,
+      achievementProfile: state.achievementProfile,
+      achievementGoals: [],
+      achievementToasts: [],
+      achievementPanelOpen: false,
+      sessionRecap: null,
+      sessionActivityStarted: false,
+      sessionActivityElapsedMs: 0,
+      sessionActivityRunningSinceMs: null,
+    })),
 }));

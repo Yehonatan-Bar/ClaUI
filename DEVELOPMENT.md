@@ -165,7 +165,7 @@ claude-code-mirror/
 |       |   +-- PermissionModeSelector/
 |       |   |   +-- PermissionModeSelector.tsx  # Full Access / Supervised toggle
 |       |   +-- TextSettingsBar/
-|       |       +-- TextSettingsBar.tsx   #   Font size/family controls
+|       |       +-- TextSettingsBar.tsx   #   Font size/family/theme controls
 |       +-- styles/
 |           +-- global.css                #   VS Code theme variables
 |           +-- rtl.css                   #   RTL-specific overrides
@@ -224,7 +224,7 @@ claude-code-mirror/
 **PromptHistoryPanel** - Modal overlay with 3 tabs (Session/Project/Global) for browsing and reusing past prompts. Click to insert, text filter, fetches data from extension via messaging.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**TextSettingsBar** - In-webview UI for adjusting chat text font size and font family. Supports Hebrew-friendly font presets. Settings are stored in Zustand and synced from VS Code configuration on startup and on change.
+**TextSettingsBar** - In-webview UI for adjusting chat text font size, font family, and typing personality theme. Supports Hebrew-friendly font presets and three rendering themes: Terminal Hacker, Retro, and Zen. Settings are stored in Zustand and synced from VS Code configuration on startup and on change.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **ModelSelector** - Dropdown in the status bar for choosing the Claude model (Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default). Selection is persisted to VS Code settings (`claudeMirror.model`) and synced back to the webview on startup and on change.

@@ -1,5 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useAppStore } from '../../state/store';
+import { postToExtension } from '../../hooks/useClaudeStream';
+import type { TypingTheme } from '../../../extension/types/webview-messages';
 
 /** Font presets that work well for both Hebrew and English */
 const FONT_PRESETS = [
@@ -12,13 +14,19 @@ const FONT_PRESETS = [
   { label: 'Calibri', value: 'Calibri, sans-serif' },
 ];
 
+const THEME_PRESETS: Array<{ label: string; value: TypingTheme }> = [
+  { label: 'Terminal Hacker', value: 'terminal-hacker' },
+  { label: 'Retro', value: 'retro' },
+  { label: 'Zen', value: 'zen' },
+];
+
 /**
- * Compact settings bar for adjusting chat text font size and family.
+ * Compact settings bar for adjusting chat text font size, family, and theme.
  * Appears as a toggleable panel in the status bar area.
  */
 export const TextSettingsBar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const { textSettings, setTextSettings } = useAppStore();
+  const { textSettings, typingTheme, setTextSettings, setTypingTheme } = useAppStore();
 
   const changeFontSize = useCallback((delta: number) => {
     const newSize = Math.max(10, Math.min(32, textSettings.fontSize + delta));
@@ -28,6 +36,11 @@ export const TextSettingsBar: React.FC = () => {
   const changeFontFamily = useCallback((value: string) => {
     setTextSettings({ fontFamily: value });
   }, [setTextSettings]);
+
+  const changeTheme = useCallback((theme: TypingTheme) => {
+    setTypingTheme(theme);
+    postToExtension({ type: 'setTypingTheme', theme });
+  }, [setTypingTheme]);
 
   if (!isOpen) {
     return (
@@ -71,6 +84,20 @@ export const TextSettingsBar: React.FC = () => {
           onChange={(e) => changeFontFamily(e.target.value)}
         >
           {FONT_PRESETS.map((preset) => (
+            <option key={preset.value} value={preset.value}>
+              {preset.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="text-settings-row">
+        <span className="text-settings-label">Theme</span>
+        <select
+          className="text-settings-select"
+          value={typingTheme}
+          onChange={(e) => changeTheme(e.target.value as TypingTheme)}
+        >
+          {THEME_PRESETS.map((preset) => (
             <option key={preset.value} value={preset.value}>
               {preset.label}
             </option>

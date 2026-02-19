@@ -74,7 +74,22 @@ export const InputArea: React.FC = () => {
   const [pendingImages, setPendingImages] = useState<WebviewImageData[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoMgr = useMemo(() => new UndoManager(), []);
-  const { isBusy, isConnected, pendingFilePaths, setPendingFilePaths, promptHistory, addToPromptHistory, setPromptHistoryPanelOpen, pendingApproval, setPendingApproval, gitPushResult, setGitPushResult, gitPushConfigPanelOpen, setGitPushConfigPanelOpen } = useAppStore();
+  const {
+    isBusy,
+    isConnected,
+    pendingFilePaths,
+    setPendingFilePaths,
+    promptHistory,
+    addToPromptHistory,
+    setPromptHistoryPanelOpen,
+    pendingApproval,
+    setPendingApproval,
+    gitPushResult,
+    setGitPushResult,
+    gitPushConfigPanelOpen,
+    setGitPushConfigPanelOpen,
+    markSessionPromptSent,
+  } = useAppStore();
   const fileMention = useFileMention(textareaRef);
 
   // History navigation: -1 = not browsing, 0..N = index into promptHistory (0 = oldest)
@@ -120,6 +135,7 @@ export const InputArea: React.FC = () => {
 
     // If plan/question approval is pending, route text as feedback/answer
     if (pendingApproval && trimmed && pendingImages.length === 0) {
+      markSessionPromptSent();
       const isQuestion = pendingApproval.toolName === 'AskUserQuestion';
       postToExtension({
         type: 'planApprovalResponse',
@@ -129,9 +145,11 @@ export const InputArea: React.FC = () => {
       });
       setPendingApproval(null);
     } else if (pendingImages.length > 0) {
+      markSessionPromptSent();
       postToExtension({ type: 'sendMessageWithImages', text: trimmed, images: pendingImages });
       setPendingImages([]);
     } else {
+      markSessionPromptSent();
       postToExtension({ type: 'sendMessage', text: trimmed });
     }
     setText('');
@@ -141,7 +159,7 @@ export const InputArea: React.FC = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [text, pendingImages, isConnected, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr]);
+  }, [text, pendingImages, isConnected, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent]);
 
   /** Cancel the in-flight request */
   const cancelRequest = useCallback(() => {

@@ -4,6 +4,7 @@ import { TabManager } from './session/TabManager';
 import { SessionStore } from './session/SessionStore';
 import { PromptHistoryStore } from './session/PromptHistoryStore';
 import { FileLogger } from './session/FileLogger';
+import { AchievementService } from './achievements/AchievementService';
 import { registerCommands } from './commands';
 
 let tabManager: TabManager;
@@ -46,9 +47,17 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Create prompt history store for cross-session prompt persistence
   const promptHistoryStore = new PromptHistoryStore(context.globalState, context.workspaceState);
+  const achievementService = new AchievementService(context.globalState, log);
 
   // Create the tab manager that owns all session tabs
-  tabManager = new TabManager(context, log, sessionStore, promptHistoryStore, enableFileLogging ? logDir : null);
+  tabManager = new TabManager(
+    context,
+    log,
+    sessionStore,
+    promptHistoryStore,
+    achievementService,
+    enableFileLogging ? logDir : null
+  );
 
   // Register commands routed through the tab manager
   registerCommands(context, tabManager, sessionStore, log, logDir);

@@ -6,8 +6,11 @@ import type { SessionNamer } from '../session/SessionNamer';
 import type { ActivitySummarizer, ActivitySummary } from '../session/ActivitySummarizer';
 import type { MessageTranslator } from '../session/MessageTranslator';
 import type { PromptHistoryStore } from '../session/PromptHistoryStore';
+import type { AchievementService } from '../achievements/AchievementService';
 import type {
   ExtensionToWebviewMessage,
+  TypingTheme,
+  TurnCategory,
   WebviewToExtensionMessage,
 } from '../types/webview-messages';
 import type {
@@ -49,6 +52,21 @@ function isApprovalToolName(name: string): boolean {
   });
 }
 
+/** Tool name sets for turn categorization (Session Vitals) */
+const CODE_WRITE_TOOLS = ['Write', 'Edit', 'NotebookEdit', 'MultiEdit'];
+const RESEARCH_TOOLS = ['Read', 'Grep', 'Glob', 'WebSearch', 'WebFetch'];
+const COMMAND_TOOLS = ['Bash', 'Terminal'];
+
+function categorizeTurn(toolNames: string[], isError: boolean): TurnCategory {
+  if (isError) return 'error';
+  if (toolNames.length === 0) return 'discussion';
+  const baseNames = toolNames.map(n => n.includes('__') ? n.split('__').pop()! : n);
+  if (baseNames.some(n => CODE_WRITE_TOOLS.includes(n))) return 'code-write';
+  if (baseNames.some(n => COMMAND_TOOLS.includes(n))) return 'command';
+  if (baseNames.some(n => RESEARCH_TOOLS.includes(n))) return 'research';
+  return 'success';
+}
+
 export class MessageHandler {
   private log: (msg: string) => void = () => {};
   private firstMessageSent = false;
@@ -62,6 +80,8 @@ export class MessageHandler {
   private pendingApprovalTool: string | null = null;
   /** Set after user responds to approval - suppresses stale re-notifications from late events */
   private approvalResponseProcessed = false;
+  /** After user approves ExitPlanMode, auto-approve subsequent ExitPlanMode calls in the same turn */
+  private autoApproveExitPlanMode = false;
 
   /** Activity summarizer: periodically summarizes tool activity via Haiku */
   private activitySummarizer: ActivitySummarizer | null = null;
@@ -75,12 +95,19 @@ export class MessageHandler {
   /** Message translator for Hebrew translation feature */
   private messageTranslator: MessageTranslator | null = null;
 
+  /** Turn counter for Session Vitals (reset on session clear) */
+  private turnIndex = 0;
+  /** Last assistant message ID for TurnRecord association */
+  private lastMessageId = '';
+
   constructor(
+    private readonly tabId: string,
     private readonly webview: WebviewBridge,
     private readonly processManager: ClaudeProcessManager,
     private readonly control: ControlProtocol,
     private readonly demux: StreamDemux,
-    private readonly promptHistoryStore: PromptHistoryStore
+    private readonly promptHistoryStore: PromptHistoryStore,
+    private readonly achievementService: AchievementService
   ) {}
 
   setLogger(logger: (msg: string) => void): void {
@@ -140,6 +167,8 @@ export class MessageHandler {
           this.log(`Sending user message: "${msg.text.slice(0, 80)}..."`);
           // If there was a pending approval, the user's message implicitly responds to it
           this.clearApprovalTracking();
+          this.autoApproveExitPlanMode = false;
+          this.achievementService.onUserPrompt(this.tabId, msg.text);
           this.control.sendText(msg.text);
           this.webview.postMessage({ type: 'processBusy', busy: true });
           this.triggerSessionNaming(msg.text);
@@ -151,6 +180,10 @@ export class MessageHandler {
           this.log(`Sending message with ${msg.images.length} images`);
           // If there was a pending approval, the user's message implicitly responds to it
           this.clearApprovalTracking();
+          this.autoApproveExitPlanMode = false;
+          if (msg.text.trim()) {
+            this.achievementService.onUserPrompt(this.tabId, msg.text);
+          }
           this.control.sendWithImages(msg.text, msg.images);
           this.webview.postMessage({ type: 'processBusy', busy: true });
           this.triggerSessionNaming(msg.text);
@@ -164,6 +197,7 @@ export class MessageHandler {
           // Immediate UI feedback so the user sees the cancel take effect
           this.webview.postMessage({ type: 'processBusy', busy: false });
           this.clearApprovalTracking();
+          this.achievementService.onCancel(this.tabId);
           try {
             this.control.cancel();
           } catch (err) {
@@ -191,6 +225,7 @@ export class MessageHandler {
           this.processManager
             .start({ cwd: msg.workspacePath })
             .then(() => {
+              this.achievementService.onSessionStart(this.tabId);
               this.log('Process started from webview button');
               this.webview.postMessage({
                 type: 'sessionStarted',
@@ -208,6 +243,7 @@ export class MessageHandler {
 
         case 'stopSession':
           this.processManager.stop();
+          this.achievementService.onSessionEnd(this.tabId);
           this.webview.postMessage({
             type: 'sessionEnded',
             reason: 'stopped',
@@ -216,8 +252,12 @@ export class MessageHandler {
 
         case 'resumeSession':
           this.firstMessageSent = false;
+          this.achievementService.onSessionEnd(this.tabId);
           this.processManager
             .start({ resume: msg.sessionId })
+            .then(() => {
+              this.achievementService.onSessionStart(this.tabId);
+            })
             .catch((err) => {
               this.webview.postMessage({
                 type: 'error',
@@ -228,8 +268,12 @@ export class MessageHandler {
 
         case 'forkSession':
           this.firstMessageSent = false;
+          this.achievementService.onSessionEnd(this.tabId);
           this.processManager
             .start({ resume: msg.sessionId, fork: true })
+            .then(() => {
+              this.achievementService.onSessionStart(this.tabId);
+            })
             .catch((err) => {
               this.webview.postMessage({
                 type: 'error',
@@ -250,10 +294,12 @@ export class MessageHandler {
           this.firstMessageSent = false;
           this.activitySummarizer?.reset();
           this.log('clearSession - stopping current process and starting fresh');
+          this.achievementService.onSessionEnd(this.tabId);
           this.processManager.stop();
           this.processManager
             .start({ cwd: msg.workspacePath })
             .then(() => {
+              this.achievementService.onSessionStart(this.tabId);
               this.log('Process restarted after clear');
               this.webview.postMessage({
                 type: 'sessionStarted',
@@ -274,10 +320,20 @@ export class MessageHandler {
           vscode.workspace.getConfiguration('claudeMirror').update('model', msg.model, true);
           break;
 
+        case 'setTypingTheme':
+          this.log(`Setting typing theme to: "${msg.theme}"`);
+          vscode.workspace.getConfiguration('claudeMirror').update('typingTheme', msg.theme, true);
+          break;
+
 
         case 'setPermissionMode':
           this.log(`Setting permission mode to: "${msg.mode}"`);
           vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', msg.mode, true);
+          break;
+
+        case 'setVitalsEnabled':
+          this.log(`Setting session vitals to: ${msg.enabled}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('sessionVitals', msg.enabled, true);
           break;
 
         case 'showHistory':
@@ -292,6 +348,14 @@ export class MessageHandler {
 
         case 'planApprovalResponse':
           this.log(`Plan approval response: action=${msg.action}`);
+          // If user approves an ExitPlanMode, auto-approve subsequent ExitPlanMode
+          // calls in the same turn so the user isn't interrupted repeatedly.
+          if (msg.action === 'approve' && this.pendingApprovalTool) {
+            const norm = this.pendingApprovalTool.trim().toLowerCase();
+            if (norm === 'exitplanmode' || norm.endsWith('.exitplanmode')) {
+              this.autoApproveExitPlanMode = true;
+            }
+          }
           if (msg.action === 'approve') {
             this.control.sendText('Yes, proceed with the plan.');
           } else if (msg.action === 'reject') {
@@ -325,8 +389,10 @@ export class MessageHandler {
         case 'editAndResend':
           this.log(`Edit-and-resend: stopping session and restarting with edited prompt`);
           this.clearApprovalTracking();
+          this.autoApproveExitPlanMode = false;
           this.firstMessageSent = false;
           this.activitySummarizer?.reset();
+          this.achievementService.onSessionEnd(this.tabId);
           this.webview.postMessage({ type: 'processBusy', busy: true });
           {
             const editedText = msg.text;
@@ -336,6 +402,7 @@ export class MessageHandler {
             this.processManager
               .start()
               .then(() => {
+                this.achievementService.onSessionStart(this.tabId);
                 this.log('New session started for edit-and-resend');
                 this.webview.postMessage({
                   type: 'sessionStarted',
@@ -401,6 +468,15 @@ export class MessageHandler {
           this.sendGitPushSettings();
           break;
 
+        case 'setAchievementsEnabled':
+          vscode.workspace.getConfiguration('claudeMirror').update('achievements.enabled', msg.enabled, true);
+          break;
+
+        case 'getAchievementsSnapshot':
+          this.webview.postMessage(this.achievementService.buildSettingsMessage());
+          this.webview.postMessage(this.achievementService.buildSnapshotMessage(this.tabId));
+          break;
+
         case 'translateMessage':
           this.log(`Translate request: messageId=${msg.messageId}, textLength=${msg.textContent.length}`);
           if (!this.messageTranslator) {
@@ -440,12 +516,19 @@ export class MessageHandler {
           this.log('Webview ready');
           // Send text display settings
           this.sendTextSettings();
+          // Send typing theme setting
+          this.sendTypingThemeSetting();
           // Send model setting
           this.sendModelSetting();
           // Send permission mode setting
           this.sendPermissionModeSetting();
           // Send git push settings
           this.sendGitPushSettings();
+          // Send session vitals setting
+          this.sendVitalsSetting();
+          // Send achievement settings/snapshot
+          this.webview.postMessage(this.achievementService.buildSettingsMessage());
+          this.webview.postMessage(this.achievementService.buildSnapshotMessage(this.tabId));
           // If process is already running, tell the webview
           if (this.processManager.isRunning && this.processManager.currentSessionId) {
             this.log('Sending existing session info to webview');
@@ -584,6 +667,17 @@ export class MessageHandler {
     });
   }
 
+  /** Read typing theme setting from VS Code config and send to webview */
+  private sendTypingThemeSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const theme = config.get<TypingTheme>('typingTheme', 'zen');
+    this.log(`Sending typing theme setting: "${theme}"`);
+    this.webview.postMessage({
+      type: 'typingThemeSetting',
+      theme,
+    });
+  }
+
   /** Read model setting from VS Code config and send to webview */
   private sendModelSetting(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -618,6 +712,17 @@ export class MessageHandler {
       enabled,
       scriptPath,
       commitMessageTemplate,
+    });
+  }
+
+  /** Read session vitals setting from VS Code config and send to webview */
+  private sendVitalsSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const enabled = config.get<boolean>('sessionVitals', true);
+    this.log(`Sending vitals setting: enabled=${enabled}`);
+    this.webview.postMessage({
+      type: 'vitalsSetting',
+      enabled,
     });
   }
 
@@ -690,11 +795,23 @@ export class MessageHandler {
       if (e.affectsConfiguration('claudeMirror.model')) {
         this.sendModelSetting();
       }
+      if (e.affectsConfiguration('claudeMirror.typingTheme')) {
+        this.sendTypingThemeSetting();
+      }
       if (e.affectsConfiguration('claudeMirror.permissionMode')) {
         this.sendPermissionModeSetting();
       }
       if (e.affectsConfiguration('claudeMirror.gitPush')) {
         this.sendGitPushSettings();
+      }
+      if (e.affectsConfiguration('claudeMirror.sessionVitals')) {
+        this.sendVitalsSetting();
+      }
+      if (
+        e.affectsConfiguration('claudeMirror.achievements.enabled') ||
+        e.affectsConfiguration('claudeMirror.achievements.sound')
+      ) {
+        this.achievementService.onConfigChanged();
       }
     });
   }
@@ -764,9 +881,13 @@ export class MessageHandler {
       'blockStop',
       (data: { blockIndex: number }) => {
         const toolName = this.toolBlockNames.get(data.blockIndex);
+        const rawInput = this.toolBlockContexts.get(data.blockIndex) || '';
         if (toolName && this.activitySummarizer) {
           const enriched = this.enrichToolName(toolName, data.blockIndex);
           this.activitySummarizer.recordToolUse(enriched);
+        }
+        if (toolName) {
+          this.achievementService.onToolUse(this.tabId, toolName, rawInput);
         }
         this.toolBlockNames.delete(data.blockIndex);
         this.toolBlockContexts.delete(data.blockIndex);
@@ -794,6 +915,13 @@ export class MessageHandler {
       'assistantMessage',
       (event: AssistantMessage) => {
         const blockTypes = event.message.content.map(b => b.type).join(', ');
+        const assistantText = event.message.content
+          .filter((block) => block.type === 'text')
+          .map((block) => block.text || '')
+          .join('\n');
+        if (assistantText.trim()) {
+          this.achievementService.onAssistantText(this.tabId, assistantText);
+        }
         this.log(`-> webview: assistantMessage id=${event.message.id} blocks=[${blockTypes}]`);
         this.webview.postMessage({
           type: 'assistantMessage',
@@ -820,6 +948,7 @@ export class MessageHandler {
       'messageStart',
       (data: { messageId: string; model: string }) => {
         this.log(`-> webview: messageStart id=${data.messageId}`);
+        this.lastMessageId = data.messageId;
         this.currentMessageToolNames = [];
         this.pendingApprovalTool = null;
         this.approvalResponseProcessed = false;
@@ -854,8 +983,13 @@ export class MessageHandler {
     this.demux.on(
       'result',
       (event: ResultSuccess | ResultError) => {
+        // Snapshot tool names BEFORE clearing (clearApprovalTracking resets the array)
+        const toolNamesSnapshot = [...this.currentMessageToolNames];
+
         this.clearApprovalTracking();
+        this.autoApproveExitPlanMode = false;
         if (event.subtype === 'success') {
+          this.achievementService.onResult(this.tabId, true);
           const success = event as ResultSuccess;
           this.webview.postMessage({
             type: 'costUpdate',
@@ -864,11 +998,44 @@ export class MessageHandler {
             inputTokens: success.usage.input_tokens,
             outputTokens: success.usage.output_tokens,
           });
+          // Session Vitals: emit turn completion record
+          this.webview.postMessage({
+            type: 'turnComplete',
+            turn: {
+              turnIndex: this.turnIndex++,
+              toolNames: toolNamesSnapshot,
+              toolCount: toolNamesSnapshot.length,
+              durationMs: (success as any).duration_ms ?? 0,
+              costUsd: success.cost_usd ?? 0,
+              totalCostUsd: success.total_cost_usd ?? 0,
+              isError: false,
+              category: categorizeTurn(toolNamesSnapshot, false),
+              timestamp: Date.now(),
+              messageId: this.lastMessageId,
+            },
+          });
         } else {
+          this.achievementService.onResult(this.tabId, false);
           const error = event as ResultError;
           this.webview.postMessage({
             type: 'error',
             message: error.error,
+          });
+          // Session Vitals: emit error turn record
+          this.webview.postMessage({
+            type: 'turnComplete',
+            turn: {
+              turnIndex: this.turnIndex++,
+              toolNames: toolNamesSnapshot,
+              toolCount: toolNamesSnapshot.length,
+              durationMs: 0,
+              costUsd: 0,
+              totalCostUsd: 0,
+              isError: true,
+              category: 'error',
+              timestamp: Date.now(),
+              messageId: this.lastMessageId,
+            },
           });
         }
         this.webview.postMessage({ type: 'processBusy', busy: false });
@@ -891,6 +1058,17 @@ export class MessageHandler {
     // fallback) can race with clearApprovalTracking and re-trigger. Suppress them.
     if (this.approvalResponseProcessed) {
       this.log(`Suppressing stale plan approval notification for ${toolName} - already responded`);
+      return;
+    }
+    // Auto-approve subsequent ExitPlanMode calls after user already approved one
+    // in this turn. This prevents repeated approval prompts when Claude re-enters
+    // plan mode during implementation.
+    const norm = toolName.trim().toLowerCase();
+    const isExitPlanMode = norm === 'exitplanmode' || norm.endsWith('.exitplanmode');
+    if (isExitPlanMode && this.autoApproveExitPlanMode) {
+      this.log(`Auto-approving subsequent ExitPlanMode (user already approved in this turn)`);
+      this.approvalResponseProcessed = true; // suppress fallback events for this message
+      this.control.sendText('Yes, proceed with the plan.');
       return;
     }
     this.log(`Plan approval required: tool=${toolName}`);

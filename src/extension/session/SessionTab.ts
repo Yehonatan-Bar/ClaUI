@@ -9,6 +9,7 @@ import { MessageTranslator } from './MessageTranslator';
 import { ActivitySummarizer } from './ActivitySummarizer';
 import { ConversationReader } from './ConversationReader';
 import { FileLogger } from './FileLogger';
+import type { AchievementService } from '../achievements/AchievementService';
 import type { SessionStore } from './SessionStore';
 import type { PromptHistoryStore } from './PromptHistoryStore';
 import { MessageHandler, type WebviewBridge } from '../webview/MessageHandler';
@@ -75,6 +76,7 @@ export class SessionTab implements WebviewBridge {
     private readonly callbacks: SessionTabCallbacks,
     private readonly sessionStore: SessionStore,
     private readonly promptHistoryStore: PromptHistoryStore,
+    private readonly achievementService: AchievementService,
     logDir: string | null
   ) {
     this.tabNumber = tabNumber;
@@ -84,7 +86,15 @@ export class SessionTab implements WebviewBridge {
     this.processManager = new ClaudeProcessManager(context);
     this.demux = new StreamDemux();
     this.control = new ControlProtocol(this.processManager);
-    this.messageHandler = new MessageHandler(this, this.processManager, this.control, this.demux, this.promptHistoryStore);
+    this.messageHandler = new MessageHandler(
+      this.id,
+      this,
+      this.processManager,
+      this.control,
+      this.demux,
+      this.promptHistoryStore,
+      this.achievementService
+    );
     this.messageHandler.setSessionNameGetter(() => this.baseTitle);
 
     // Create per-tab file logger if file logging is enabled
@@ -172,6 +182,7 @@ export class SessionTab implements WebviewBridge {
     this.setTabIcon(tabColor);
 
     this.panel.webview.html = buildWebviewHtml(this.panel.webview, context);
+    this.achievementService.registerTab(this.id, (msg) => this.postMessage(msg));
     this.wireWebviewEvents();
     this.wireProcessEvents(tabLog);
     this.wireDemuxStatusBar();
@@ -246,6 +257,7 @@ export class SessionTab implements WebviewBridge {
   /** Start a new Claude CLI session in this tab */
   async startSession(options?: { resume?: string; fork?: boolean; cwd?: string }): Promise<void> {
     await this.processManager.start(options);
+    this.achievementService.onSessionStart(this.id);
     this.postMessage({
       type: 'sessionStarted',
       sessionId: this.processManager.currentSessionId || 'pending',
@@ -369,6 +381,8 @@ export class SessionTab implements WebviewBridge {
     }
     this.disposed = true;
     this.stopThinkingAnimation();
+    this.achievementService.onSessionEnd(this.id);
+    this.achievementService.unregisterTab(this.id);
     this.processManager.stop();
     this.fileLogger?.dispose();
     this.panel.dispose();
@@ -520,6 +534,8 @@ export class SessionTab implements WebviewBridge {
       this.disposed = true;
       try {
         this.stopThinkingAnimation();
+        this.achievementService.onSessionEnd(this.id);
+        this.achievementService.unregisterTab(this.id);
         this.processManager.stop();
         this.fileLogger?.dispose();
       } finally {
@@ -601,6 +617,8 @@ export class SessionTab implements WebviewBridge {
       const currentSessionId = this.processManager.currentSessionId;
 
       if (info.code !== 0 && info.code !== null) {
+        this.achievementService.onSessionCrash(this.id);
+        this.achievementService.onSessionEnd(this.id);
         this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
         this.postMessage({
           type: 'error',
@@ -634,17 +652,22 @@ export class SessionTab implements WebviewBridge {
         }
       } else {
         tabLog('Process completed normally');
+        this.achievementService.onSessionEnd(this.id);
         this.postMessage({ type: 'sessionEnded', reason: 'completed' });
       }
     });
 
     this.processManager.on('stderr', (text: string) => {
       tabLog(`STDERR: ${text}`);
+      this.achievementService.onRuntimeError(this.id);
       this.postMessage({ type: 'error', message: text.trim() });
     });
 
     this.processManager.on('error', (err: Error) => {
       tabLog(`Process error: ${err.message}`);
+      this.achievementService.onRuntimeError(this.id);
+      this.achievementService.onSessionCrash(this.id);
+      this.achievementService.onSessionEnd(this.id);
       vscode.window.showErrorMessage(
         `Claude CLI error (Tab ${this.tabNumber}): ${err.message}. Is "claude" in your PATH?`
       );

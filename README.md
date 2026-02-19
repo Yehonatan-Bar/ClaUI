@@ -30,6 +30,7 @@ A VS Code extension that gives [Claude Code](https://docs.anthropic.com/en/docs/
 - **Permission modes** - Choose between Full Access and Supervised (read-only) modes
 - **CLI path setting** - Point to a custom Claude CLI executable via `claudeMirror.cliPath` in VS Code settings
 - **Customizable fonts** - Adjust chat font size and family, including Hebrew-friendly presets
+- **Typing personality themes** - Pick Terminal Hacker, Retro, or Zen rendering styles for response display
 
 ### Other
 
@@ -105,6 +106,7 @@ All settings are under `claudeMirror.*` in VS Code Settings (`Ctrl+,`).
 | `autoRestart` | `true` | Auto-restart CLI process on crash |
 | `chatFontSize` | `14` | Font size (px) for chat messages (10-32) |
 | `chatFontFamily` | `""` | Font family for chat (empty = VS Code default) |
+| `typingTheme` | `"zen"` | Response rendering personality theme: `terminal-hacker`, `retro`, or `zen` |
 | `autoNameSessions` | `true` | Auto-generate tab names from first message |
 | `activitySummary` | `true` | Summarize Claude's activity in the tab title |
 | `activitySummaryThreshold` | `3` | Tool uses before triggering a summary (1-10) |

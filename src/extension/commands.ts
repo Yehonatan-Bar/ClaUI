@@ -345,6 +345,17 @@ export function registerCommands(
       }
     }),
 
+    // Toggle achievements globally (full hide + full disable)
+    vscode.commands.registerCommand('claudeMirror.toggleAchievements', async () => {
+      const config = vscode.workspace.getConfiguration('claudeMirror');
+      const current = config.get<boolean>('achievements.enabled', true);
+      const next = !current;
+      await config.update('achievements.enabled', next, true);
+      vscode.window.showInformationMessage(
+        next ? 'ClaUi achievements enabled.' : 'ClaUi achievements disabled.'
+      );
+    }),
+
     // Fork conversation from a specific message (opens a new tab)
     vscode.commands.registerCommand(
       'claudeMirror.forkFromMessage',

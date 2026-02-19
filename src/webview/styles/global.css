@@ -49,6 +49,140 @@ html, body, #root {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  transition: background-color 180ms ease, color 180ms ease;
+  --theme-chat-font-family: inherit;
+}
+
+/* Terminal Hacker: green-on-black palette with sharper terminal contrast */
+.app-container.theme-terminal-hacker {
+  --theme-chat-font-family: 'Consolas', 'Courier New', monospace;
+  --vscode-editor-background: #040a04;
+  --vscode-editor-foreground: #a6f7a8;
+  --vscode-descriptionForeground: #58b55a;
+  --vscode-input-background: #071207;
+  --vscode-input-foreground: #c4ffbf;
+  --vscode-input-border: #2d7031;
+  --vscode-panel-border: #1f4f23;
+  --vscode-toolbar-hoverBackground: rgba(130, 255, 128, 0.16);
+  --vscode-focusBorder: #63ff7b;
+  --vscode-button-background: #1f5b27;
+  --vscode-button-foreground: #d8ffd8;
+  --vscode-button-hoverBackground: #2b7a36;
+  --vscode-statusBar-background: #081408;
+  --vscode-sideBar-background: #051005;
+  --vscode-sideBarSectionHeader-background: #0c1e0f;
+  --vscode-textLink-foreground: #82ff8c;
+  --vscode-textLink-activeForeground: #c0ffc0;
+  --vscode-editorCursor-foreground: #8cff93;
+  --vscode-textCodeBlock-background: #07130a;
+}
+
+.theme-terminal-hacker .message-assistant {
+  border-left: 2px solid color-mix(in srgb, var(--vscode-focusBorder) 55%, transparent);
+}
+
+.theme-terminal-hacker .streaming-text-terminal-hacker {
+  text-shadow: 0 0 3px rgba(120, 255, 140, 0.28);
+}
+
+.theme-terminal-hacker .streaming-cursor {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--vscode-editorCursor-foreground) 65%, transparent);
+}
+
+/* Retro: amber-on-deep-blue with CRT scanline atmosphere */
+.app-container.theme-retro {
+  --theme-chat-font-family: 'Lucida Console', 'Courier New', monospace;
+  --vscode-editor-background: #181628;
+  --vscode-editor-foreground: #ffd89f;
+  --vscode-descriptionForeground: #d4b47a;
+  --vscode-input-background: #23203a;
+  --vscode-input-foreground: #ffe8bf;
+  --vscode-input-border: #8d6f4a;
+  --vscode-panel-border: #6f5a3f;
+  --vscode-toolbar-hoverBackground: rgba(255, 196, 120, 0.15);
+  --vscode-focusBorder: #ffb86f;
+  --vscode-button-background: #6e5336;
+  --vscode-button-foreground: #fff0d1;
+  --vscode-button-hoverBackground: #8c6a45;
+  --vscode-statusBar-background: #211d34;
+  --vscode-sideBar-background: #1a1730;
+  --vscode-sideBarSectionHeader-background: #26203f;
+  --vscode-textLink-foreground: #ffc98a;
+  --vscode-textLink-activeForeground: #ffe0af;
+  --vscode-editorCursor-foreground: #ffc77d;
+  --vscode-textCodeBlock-background: #201c33;
+}
+
+.app-container.theme-retro::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 236, 206, 0.08) 0px,
+    rgba(255, 236, 206, 0.08) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  opacity: 0.28;
+  mix-blend-mode: screen;
+  animation: retroFlicker 0.2s steps(2, end) infinite;
+  z-index: 4;
+}
+
+.app-container.theme-retro::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at center, transparent 45%, rgba(0, 0, 0, 0.36) 100%);
+  z-index: 4;
+}
+
+.app-container.theme-retro > * {
+  position: relative;
+  z-index: 3;
+}
+
+.theme-retro .message-user,
+.theme-retro .message-assistant {
+  border-radius: 2px;
+}
+
+.theme-retro .streaming-text-retro {
+  letter-spacing: 0.03em;
+}
+
+/* Zen: minimal styling with calmer motion and softer transitions */
+.app-container.theme-zen {
+  --theme-chat-font-family: 'Segoe UI', 'Calibri', sans-serif;
+}
+
+.theme-zen .message,
+.theme-zen .input-textarea,
+.theme-zen .tool-use-block {
+  transition: background-color 260ms ease, border-color 260ms ease, color 260ms ease;
+}
+
+.theme-zen .message-user {
+  background: color-mix(in srgb, var(--vscode-input-background) 82%, var(--vscode-editor-background));
+  border-color: color-mix(in srgb, var(--vscode-panel-border, #333) 35%, transparent);
+}
+
+.theme-zen .busy-indicator-text {
+  animation: zenBreath 3.2s ease-in-out infinite;
+}
+
+.theme-zen .thinking-dot {
+  animation-duration: 2.1s;
+}
+
+.theme-zen .streaming-cursor {
+  animation-duration: 1.4s;
+  opacity: 0.75;
 }
 
 /* Spacer pushes input to bottom when no messages exist */
@@ -68,7 +202,7 @@ html, body, #root {
   margin-bottom: 16px;
   max-width: 100%;
   font-size: var(--chat-font-size, inherit);
-  font-family: var(--chat-font-family, inherit);
+  font-family: var(--chat-font-family, var(--theme-chat-font-family, inherit));
 }
 
 .message-user {
@@ -105,6 +239,16 @@ html, body, #root {
 
 @keyframes blink {
   50% { opacity: 0; }
+}
+
+@keyframes retroFlicker {
+  0%, 100% { opacity: 0.24; }
+  50% { opacity: 0.32; }
+}
+
+@keyframes zenBreath {
+  0%, 100% { opacity: 0.68; }
+  50% { opacity: 1; }
 }
 
 /* Tool use blocks */
@@ -612,7 +756,7 @@ html, body, #root {
   color: var(--vscode-input-foreground);
   border: 1px solid var(--vscode-input-border, #3c3c3c);
   border-radius: 6px;
-  font-family: var(--chat-font-family, inherit);
+  font-family: var(--chat-font-family, var(--theme-chat-font-family, inherit));
   font-size: var(--chat-font-size, inherit);
   line-height: 1.5;
   resize: none;
@@ -701,6 +845,23 @@ html, body, #root {
 }
 
 .status-bar-history-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+
+.status-bar-achievements-btn {
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 3px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.status-bar-achievements-btn:hover {
   background: var(--vscode-toolbar-hoverBackground);
   color: var(--vscode-editor-foreground);
 }
@@ -977,6 +1138,163 @@ html, body, #root {
   animation: summaryFadeIn 0.3s ease-out;
 }
 
+.achievement-panel {
+  position: absolute;
+  right: 16px;
+  bottom: 42px;
+  width: 300px;
+  z-index: 25;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  padding: 10px;
+  font-size: 12px;
+}
+
+.achievement-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.achievement-panel-close {
+  background: none;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+}
+
+.achievement-panel-profile {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+  margin-bottom: 8px;
+}
+
+.achievement-panel-goals-title {
+  margin-bottom: 6px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.achievement-panel-goals {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.achievement-goal {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 4px;
+}
+
+.achievement-goal.done {
+  border-color: var(--vscode-charts-green, #89d185);
+}
+
+.achievement-goal-empty {
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+.achievement-disable-btn {
+  margin-top: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  background: none;
+  border: 1px solid var(--vscode-inputValidation-warningBorder, #cca700);
+  color: var(--vscode-inputValidation-warningForeground, #cca700);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.achievement-disable-btn:hover {
+  background: color-mix(in srgb, var(--vscode-inputValidation-warningBackground, #5a4b00) 35%, transparent);
+}
+
+.achievement-toast-stack {
+  position: absolute;
+  right: 16px;
+  top: 12px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 340px;
+}
+
+.achievement-toast {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  border-radius: 8px;
+  border: 1px solid var(--vscode-panel-border, #333);
+  padding: 8px 10px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  animation: summaryFadeIn 0.2s ease-out;
+}
+
+.achievement-toast-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.achievement-toast-main span {
+  color: var(--vscode-descriptionForeground);
+}
+
+.achievement-toast-meta {
+  font-weight: 700;
+}
+
+.achievement-toast-dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.achievement-toast-common {
+  border-color: var(--vscode-input-border, #3c3c3c);
+}
+
+.achievement-toast-rare {
+  border-color: #4da3ff;
+}
+
+.achievement-toast-epic {
+  border-color: #e8b339;
+}
+
+.achievement-toast-legendary {
+  border-color: #ff6a3d;
+}
+
+.session-recap-card {
+  margin: 8px 16px 0 16px;
+  padding: 8px 10px;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  background: color-mix(in srgb, var(--vscode-focusBorder, #007fd4) 6%, var(--vscode-editor-background));
+}
+
+.session-recap-title {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
 @keyframes summaryFadeIn {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
@@ -1042,6 +1360,7 @@ html, body, #root {
 .text-settings-panel {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 4px 8px;
   font-size: 11px;
@@ -1798,4 +2117,182 @@ html, body, #root {
 [dir="rtl"] .file-mention-popup {
   text-align: left;
   direction: ltr;
+}
+
+/* ============================================
+   Session Vitals
+   ============================================ */
+
+/* Chat area wrapper - flex row for message list + timeline */
+.chat-area-wrapper {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.chat-area-wrapper .message-list {
+  flex: 1;
+}
+
+/* Session Timeline Minimap */
+.session-timeline {
+  width: 24px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.08);
+  border-left: 1px solid var(--vscode-panel-border, #333);
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-segment {
+  width: 100%;
+  min-height: 4px;
+  cursor: pointer;
+  transition: filter 0.15s;
+  position: relative;
+}
+
+.timeline-segment:hover {
+  filter: brightness(1.4);
+}
+
+.timeline-tooltip {
+  position: absolute;
+  right: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+  z-index: 100;
+  pointer-events: none;
+  color: var(--vscode-editor-foreground);
+  line-height: 1.4;
+}
+
+.timeline-position-marker {
+  position: absolute;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 7px solid var(--vscode-editor-foreground);
+  opacity: 0.6;
+  transition: top 0.15s ease-out;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Weather Widget */
+.weather-widget {
+  position: fixed;
+  top: 28px;
+  right: 6px;
+  z-index: 9998;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.weather-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.weather-symbol {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Weather pulse ring */
+.weather-pulse {
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.weather-pulse-slow {
+  animation: weatherPulse 4s ease-in-out infinite;
+}
+
+.weather-pulse-normal {
+  animation: weatherPulse 2s ease-in-out infinite;
+}
+
+.weather-pulse-fast {
+  animation: weatherPulse 0.8s ease-in-out infinite;
+}
+
+@keyframes weatherPulse {
+  0%, 100% { transform: scale(1); opacity: 0; }
+  50% { transform: scale(1.5); opacity: 0.35; }
+}
+
+/* Weather mood colors */
+.weather-clear { color: #fdd835; }
+.weather-partly-sunny { color: #fdd835; }
+.weather-cloudy { color: #9e9e9e; }
+.weather-rainy { color: #42a5f5; }
+.weather-thunderstorm { color: #ff7043; }
+.weather-rainbow { color: #e040fb; }
+.weather-night { color: #78909c; }
+.weather-snowflake { color: #b3e5fc; }
+
+/* Cost Heat Bar */
+.cost-heat-bar {
+  height: 3px;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.1);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.cost-heat-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4caf50, #ffeb3b 40%, #ff9800 70%, #f44336);
+  transition: width 0.4s ease;
+  border-radius: 0 1px 1px 0;
+}
+
+/* Vitals toggle button in status bar */
+.status-bar-vitals-btn {
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 3px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.status-bar-vitals-btn.active {
+  color: var(--vscode-textLink-foreground, #3794ff);
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.status-bar-vitals-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
 }

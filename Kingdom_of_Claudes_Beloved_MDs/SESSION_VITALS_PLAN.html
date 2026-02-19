@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Session Vitals - ClaUi</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      background: #0f1117;
+      color: #e0e0e0;
+      line-height: 1.7;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 2.2rem;
+      color: #fff;
+      margin-bottom: 8px;
+      border-bottom: 3px solid #3794ff;
+      padding-bottom: 12px;
+    }
+    .subtitle {
+      color: #888;
+      font-size: 1rem;
+      margin-bottom: 40px;
+    }
+    h2 {
+      font-size: 1.4rem;
+      color: #3794ff;
+      margin: 36px 0 16px;
+      padding-right: 12px;
+      border-right: 4px solid #3794ff;
+    }
+    h3 {
+      font-size: 1.1rem;
+      color: #c9d1d9;
+      margin: 20px 0 10px;
+    }
+    p, li {
+      font-size: 0.95rem;
+      color: #b0b8c4;
+    }
+    ul {
+      padding-right: 24px;
+      margin-bottom: 16px;
+    }
+    li { margin-bottom: 6px; }
+
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2d3140;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: #3794ff44; }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+    .icon-timeline { background: linear-gradient(135deg, #4caf50, #2196f3, #9c27b0); }
+    .icon-weather { background: linear-gradient(135deg, #fdd835, #42a5f5); }
+    .icon-cost { background: linear-gradient(90deg, #4caf50, #ff9800, #f44336); }
+    .icon-border { background: linear-gradient(135deg, #9c27b0, #00bcd4); }
+    .icon-toggle { background: #3794ff; }
+    .icon-data { background: linear-gradient(135deg, #00bcd4, #4caf50); }
+
+    .card-title {
+      font-size: 1.15rem;
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .color-legend {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .color-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+    }
+    .color-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .weather-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 12px 0;
+    }
+    .weather-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #12141c;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.88rem;
+    }
+    .weather-emoji {
+      font-size: 1.3rem;
+      width: 28px;
+      text-align: center;
+    }
+
+    .phase-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+    }
+    .phase-table th {
+      background: #1a1d27;
+      color: #3794ff;
+      padding: 10px 14px;
+      text-align: right;
+      font-weight: 600;
+      border-bottom: 2px solid #3794ff33;
+    }
+    .phase-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #2d3140;
+      font-size: 0.9rem;
+    }
+    .phase-num {
+      color: #3794ff;
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .highlight {
+      background: #3794ff15;
+      border: 1px solid #3794ff33;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 20px 0;
+    }
+    .highlight p {
+      color: #c9d1d9;
+    }
+
+    .summary-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 24px 0;
+    }
+    .stat-card {
+      background: #12141c;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+    .stat-number {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #3794ff;
+    }
+    .stat-label {
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    .mockup {
+      background: #12141c;
+      border: 1px solid #2d3140;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 16px 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      direction: ltr;
+      text-align: left;
+      color: #888;
+      line-height: 1.4;
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <h1>Session Vitals</h1>
+    <p class="subtitle">מערכת חיווי ויזואלית לסשנים ב-ClaUi - תוכנית פיתוח</p>
+
+    <div class="summary-stats">
+      <div class="stat-card">
+        <div class="stat-number">5</div>
+        <div class="stat-label">רכיבים ויזואליים</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">4</div>
+        <div class="stat-label">קבצים חדשים</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">9</div>
+        <div class="stat-label">קבצים קיימים לעדכון</div>
+      </div>
+    </div>
+
+    <h2>מה זה?</h2>
+    <p>
+      Session Vitals הוא דשבורד ויזואלי שמציג את "בריאות הסשן" בזמן אמת.
+      במקום לראות רק מספרי עלויות וטוקנים, המשתמש מקבל אינדיקציות צבעוניות אינטואיטיביות
+      שמראות מה קורה - האם הכל זורם חלק, האם יש שגיאות, מה סוג הפעילות, וכמה הסשן עולה.
+    </p>
+
+    <h2>הרכיבים</h2>
+
+    <!-- Timeline -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-timeline">&#9783;</div>
+        <div class="card-title">ציר זמן צבעוני (Timeline Minimap)</div>
+      </div>
+      <p>
+        פס צר בצד ימין של הצ'אט שמציג את כל הסשן כבלוקים צבעוניים.
+        כל בלוק מייצג תור אחד של שיחה. הגובה מייצג את משך הזמן, והצבע מייצג את סוג הפעילות.
+      </p>
+      <div class="color-legend">
+        <div class="color-item"><div class="color-dot" style="background:#4caf50"></div>הצלחה</div>
+        <div class="color-item"><div class="color-dot" style="background:#f44336"></div>שגיאה</div>
+        <div class="color-item"><div class="color-dot" style="background:#2196f3"></div>דיון / תכנון</div>
+        <div class="color-item"><div class="color-dot" style="background:#9c27b0"></div>כתיבת קוד</div>
+        <div class="color-item"><div class="color-dot" style="background:#ff9800"></div>מחקר / חיפוש</div>
+        <div class="color-item"><div class="color-dot" style="background:#00bcd4"></div>הרצת פקודות</div>
+      </div>
+      <ul>
+        <li>לחיצה על בלוק - קופצים לנקודה הזו בשיחה</li>
+        <li>ריחוף - מציג פירוט: מספר תור, כלים שנוצלו, זמן, עלות</li>
+        <li>סמן מיקום שמסתנכרן עם הגלילה</li>
+        <li>עוצמת הצבע (שקיפות) - ככל שהתור יקר יותר, הצבע עז יותר</li>
+      </ul>
+    </div>
+
+    <!-- Weather -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-weather">&#9788;</div>
+        <div class="card-title">ווידג'ט מזג אוויר (Weather Widget)</div>
+      </div>
+      <p>
+        אייקון קטן ומונפש בפינה הימנית העליונה של הממשק שמשקף את "מצב הרוח" של הסשן.
+        משתנה אוטומטית על סמך ניתוח הפלט - שגיאות, הצלחות, והמגמה האחרונה.
+      </p>
+      <div class="weather-grid">
+        <div class="weather-item"><span class="weather-emoji">&#9728;&#65039;</span>שמש - הכל זורם חלק</div>
+        <div class="weather-item"><span class="weather-emoji">&#9925;</span>עננות חלקית - בעיה קטנה</div>
+        <div class="weather-item"><span class="weather-emoji">&#9729;&#65039;</span>מעונן - תוצאות מעורבות</div>
+        <div class="weather-item"><span class="weather-emoji">&#127783;&#65039;</span>גשם - שגיאות פעילות</div>
+        <div class="weather-item"><span class="weather-emoji">&#9928;&#65039;</span>סופה - לולאת דיבוג</div>
+        <div class="weather-item"><span class="weather-emoji">&#127752;</span>קשת - באג תוקן!</div>
+        <div class="weather-item"><span class="weather-emoji">&#127769;</span>לילה - ממתין לקלט</div>
+        <div class="weather-item"><span class="weather-emoji">&#10052;&#65039;</span>קפוא - סשן מנותק</div>
+      </div>
+      <p style="margin-top: 10px;">
+        סביב האייקון יש טבעת פעימה מונפשת: נושמת לאט במצב מנוחה, פועמת מהר כשיש פעילות ערה.
+      </p>
+    </div>
+
+    <!-- Cost Heat Bar -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-cost">$</div>
+        <div class="card-title">פס חום עלויות (Cost Heat Bar)</div>
+      </div>
+      <p>
+        פס דק (4 פיקסלים) מתחת לווידג'ט מזג האוויר שמראה הצטברות עלויות במבט אחד.
+        מתחיל ירוק (זול), עובר לצהוב, לכתום, ולאדום ככל שהעלות עולה.
+        מתמלא בהדרגה משמאל לימין ונותן תחושה מיידית של "כמה עולה הסשן הזה".
+      </p>
+    </div>
+
+    <!-- Turn Borders -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-border">&#9474;</div>
+        <div class="card-title">גבולות עוצמה לכל הודעה (Turn Intensity Borders)</div>
+      </div>
+      <p>
+        כל הודעה של הסייען מקבלת פס צבעוני עדין בצד שמאל שמראה את "הכובד" שלה:
+      </p>
+      <ul>
+        <li>פס דק ועדין - תשובה טקסטואלית פשוטה</li>
+        <li>פס בינוני - שימוש ב-1 עד 3 כלים</li>
+        <li>פס עבה ועז - שימוש ב-4+ כלים, תור כבד</li>
+      </ul>
+      <p>הצבע תואם את קטגוריית הפעילות (סגול לקוד, כתום למחקר, וכו').</p>
+    </div>
+
+    <!-- Toggle -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-toggle">&#8853;</div>
+        <div class="card-title">כפתור כיבוי/הפעלה</div>
+      </div>
+      <p>
+        כפתור "Vitals" בשורת הסטטוס התחתונה.
+        לחיצה מכבה לחלוטין את כל הרכיבים הויזואליים - ציר הזמן, מזג האוויר, פס העלויות, וגבולות ההודעות.
+        ההגדרה נשמרת בהגדרות VS Code ומתמידה בין סשנים.
+      </p>
+      <div class="highlight">
+        <p>
+          <strong>חשוב:</strong> גם כשהפיצ'ר כבוי, המערכת ממשיכה לאסוף נתונים ברקע.
+          כך שאם מפעילים את הפיצ'ר באמצע סשן - רואים את כל ההיסטוריה מההתחלה.
+        </p>
+      </div>
+    </div>
+
+    <h2>איך זה עובד מאחורי הקלעים</h2>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-data">&#8644;</div>
+        <div class="card-title">צינור הנתונים</div>
+      </div>
+      <p>
+        המערכת מנצלת נתונים שכבר קיימים בפלט של Claude אבל עד היום לא הועברו לממשק.
+        בסוף כל תור, Claude מחזיר מידע כמו זמן ריצה ועלות - שעד עכשיו נזרקו.
+        הפיצ'ר החדש לוכד את המידע הזה, מסווג את סוג הפעילות (קוד/מחקר/שגיאה וכו'),
+        ושולח "רשומת תור" לממשק שמצטברת לציר הזמן ומשפיעה על מזג האוויר.
+      </p>
+    </div>
+
+    <h2>שלבי פיתוח</h2>
+
+    <table class="phase-table">
+      <thead>
+        <tr>
+          <th>שלב</th>
+          <th>תיאור</th>
+          <th>תלוי ב-</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="phase-num">1</span></td>
+          <td>צינור נתונים - איסוף מידע מהתהליך והעברה לממשק</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><span class="phase-num">2</span></td>
+          <td>כפתור הפעלה/כיבוי בשורת הסטטוס</td>
+          <td>שלב 1</td>
+        </tr>
+        <tr>
+          <td><span class="phase-num">3</span></td>
+          <td>רכיבים ויזואליים - ציר זמן, מזג אוויר, פס עלויות</td>
+          <td>שלב 1</td>
+        </tr>
+        <tr>
+          <td><span class="phase-num">4</span></td>
+          <td>גבולות עוצמה על בועות ההודעות</td>
+          <td>שלב 1</td>
+        </tr>
+        <tr>
+          <td><span class="phase-num">5</span></td>
+          <td>ליטוש, מקרי קצה, ובדיקות</td>
+          <td>שלבים 2-4</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>סיכון ואבטחת איכות</h2>
+    <ul>
+      <li><strong>ביצועים:</strong> הרכיבים הויזואליים מתעדכנים רק בסיום כל תור (לא בכל תו שנשלח) - אין השפעה על ביצועים</li>
+      <li><strong>תאימות:</strong> הכל מבוסס CSS בלבד (ללא ספריות חיצוניות) - עובד בתוך מדיניות האבטחה הקיימת</li>
+      <li><strong>מגבלת זיכרון:</strong> מוגבל ל-200 רשומות תור מקסימום למניעת בעיות זיכרון בסשנים ארוכים</li>
+      <li><strong>כפתור כיבוי:</strong> מאפשר למשתמשים שלא אוהבים את זה לכבות לחלוטין בלחיצה אחת</li>
+    </ul>
+
+  </div>
+</body>
+</html>
