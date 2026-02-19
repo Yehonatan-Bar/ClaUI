@@ -299,6 +299,13 @@ Send control commands.
 }
 ```
 
+> **Cancel reliability note:** The CLI acknowledges the cancel with a
+> `{ "type": "control_response" }` event but may continue generating
+> (especially during agentic tool-use loops). ClaUi therefore kills
+> the process (stdin close + SIGTERM) and auto-resumes the session
+> via `--resume` to guarantee the generation stops while keeping the
+> conversation alive.
+
 ---
 
 ## Event Sequence (Typical Turn)

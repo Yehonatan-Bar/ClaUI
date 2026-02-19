@@ -74,12 +74,23 @@ export class TabManager {
     return tab;
   }
 
-  /** Get the currently focused tab, or null if none */
+  /** Get the currently focused tab, or null if none (skips disposed zombie tabs) */
   getActiveTab(): SessionTab | null {
     if (!this.activeTabId) {
       return null;
     }
-    return this.tabs.get(this.activeTabId) ?? null;
+    const tab = this.tabs.get(this.activeTabId);
+    if (!tab) {
+      return null;
+    }
+    // Guard against zombie tabs whose panel was disposed but onClosed never fired
+    if (tab.isDisposed) {
+      this.log(`Active tab ${this.activeTabId} is disposed (zombie) - removing`);
+      this.tabs.delete(this.activeTabId);
+      this.activeTabId = null;
+      return null;
+    }
+    return tab;
   }
 
   /** Get or create: returns active tab if one exists, otherwise creates a new one */

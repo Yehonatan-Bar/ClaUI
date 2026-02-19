@@ -220,12 +220,20 @@ export class SessionTab implements WebviewBridge {
 
   /** Reveal (focus) this tab's panel in its current column */
   reveal(): void {
+    if (this.disposed) {
+      return;
+    }
     this.panel.reveal();
+  }
+
+  /** Whether this tab has been disposed */
+  get isDisposed(): boolean {
+    return this.disposed;
   }
 
   /** The ViewColumn this panel currently lives in */
   get viewColumn(): vscode.ViewColumn | undefined {
-    return this.panel.viewColumn;
+    return this.disposed ? undefined : this.panel.viewColumn;
   }
 
   /** Whether the underlying CLI process is running */
@@ -240,7 +248,7 @@ export class SessionTab implements WebviewBridge {
 
   /** Whether this tab's panel is visible */
   get isVisible(): boolean {
-    return this.panel.visible;
+    return this.disposed ? false : this.panel.visible;
   }
 
   /** Clean up all resources for this tab */
@@ -273,6 +281,9 @@ export class SessionTab implements WebviewBridge {
   /** Update the VS Code panel title */
   private setTabName(name: string): void {
     this.baseTitle = name;
+    if (this.disposed) {
+      return;
+    }
     if (this.isBusy) {
       this.applyThinkingFrame();
     } else {
@@ -311,14 +322,14 @@ export class SessionTab implements WebviewBridge {
       clearInterval(this.thinkingAnimTimer);
       this.thinkingAnimTimer = null;
     }
-    if (this.baseTitle) {
+    if (this.baseTitle && !this.disposed) {
       this.panel.title = this.baseTitle;
     }
   }
 
   /** Set the tab title to the current animation frame */
   private applyThinkingFrame(): void {
-    if (!this.baseTitle) {
+    if (!this.baseTitle || this.disposed) {
       return;
     }
     const frame = SessionTab.THINKING_FRAMES[this.thinkingFrame];
@@ -392,10 +403,14 @@ export class SessionTab implements WebviewBridge {
 
     this.panel.onDidDispose(() => {
       this.disposed = true;
-      this.stopThinkingAnimation();
-      this.processManager.stop();
-      this.fileLogger?.dispose();
-      this.callbacks.onClosed(this.id);
+      try {
+        this.stopThinkingAnimation();
+        this.processManager.stop();
+        this.fileLogger?.dispose();
+      } finally {
+        // Must always fire so TabManager removes this tab from its map
+        this.callbacks.onClosed(this.id);
+      }
     });
   }
 

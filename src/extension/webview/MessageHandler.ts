@@ -142,7 +142,12 @@ export class MessageHandler {
           break;
 
         case 'cancelRequest':
-          this.control.cancel();
+          this.log('Cancel requested - killing process');
+          try {
+            this.control.cancel();
+          } catch (err) {
+            this.log(`Cancel error (non-fatal): ${err}`);
+          }
           break;
 
         case 'compact':
