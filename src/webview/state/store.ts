@@ -98,6 +98,11 @@ export interface AppState {
   // Fork state (set when a forked tab receives forkInit from extension)
   forkInit: { promptText: string } | null;
 
+  // Translation state (Hebrew translation feature)
+  translations: Record<string, string>;
+  translatingMessageIds: Set<string>;
+  showingTranslation: Set<string>;
+
   // Actions
   setSession: (sessionId: string, model: string) => void;
   endSession: (reason: string) => void;
@@ -150,6 +155,9 @@ export interface AppState {
   setGitPushConfigPanelOpen: (open: boolean) => void;
   setGitPushRunning: (running: boolean) => void;
   setForkInit: (init: { promptText: string } | null) => void;
+  setTranslation: (messageId: string, translatedText: string) => void;
+  setTranslating: (messageId: string, translating: boolean) => void;
+  toggleTranslationView: (messageId: string) => void;
   reset: () => void;
 }
 
@@ -220,6 +228,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   gitPushConfigPanelOpen: false,
   gitPushRunning: false,
   forkInit: null,
+  translations: {},
+  translatingMessageIds: new Set(),
+  showingTranslation: new Set(),
 
   // Actions
   setSession: (sessionId, model) =>
@@ -541,6 +552,34 @@ export const useAppStore = create<AppState>((set, get) => ({
   setGitPushRunning: (running) => set({ gitPushRunning: running }),
   setForkInit: (init) => set({ forkInit: init }),
 
+  setTranslation: (messageId, translatedText) =>
+    set((state) => ({
+      translations: { ...state.translations, [messageId]: translatedText },
+      showingTranslation: new Set([...state.showingTranslation, messageId]),
+    })),
+
+  setTranslating: (messageId, translating) =>
+    set((state) => {
+      const newSet = new Set(state.translatingMessageIds);
+      if (translating) {
+        newSet.add(messageId);
+      } else {
+        newSet.delete(messageId);
+      }
+      return { translatingMessageIds: newSet };
+    }),
+
+  toggleTranslationView: (messageId) =>
+    set((state) => {
+      const newSet = new Set(state.showingTranslation);
+      if (newSet.has(messageId)) {
+        newSet.delete(messageId);
+      } else {
+        newSet.add(messageId);
+      }
+      return { showingTranslation: newSet };
+    }),
+
   reset: () =>
     set({
       sessionId: null,
@@ -567,5 +606,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       gitPushConfigPanelOpen: false,
       gitPushRunning: false,
       forkInit: null,
+      translations: {},
+      translatingMessageIds: new Set(),
+      showingTranslation: new Set(),
     }),
 }));

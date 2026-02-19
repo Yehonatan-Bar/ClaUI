@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ChildProcess, spawn } from 'child_process';
+import { ChildProcess, spawn, exec } from 'child_process';
 import { EventEmitter } from 'events';
 import type { CliOutputEvent, CliInputMessage } from '../types/stream-json';
 
@@ -188,6 +188,27 @@ export class ClaudeProcessManager extends EventEmitter {
     });
   }
 
+  /** Kill the entire process tree.
+   *  On Windows with shell:true, process.kill('SIGTERM') only kills the
+   *  cmd.exe wrapper -- the actual CLI child process becomes an orphan.
+   *  Use taskkill /F /T to kill the full tree instead. */
+  private killProcessTree(): void {
+    if (!this.process?.pid) {
+      return;
+    }
+    const pid = this.process.pid;
+    if (process.platform === 'win32') {
+      this.log(`Killing process tree (taskkill /F /T /PID ${pid})`);
+      exec(`taskkill /F /T /PID ${pid}`, (err) => {
+        if (err) {
+          this.log(`taskkill failed (process may already be dead): ${err.message}`);
+        }
+      });
+    } else {
+      try { this.process.kill('SIGTERM'); } catch { /* already dead */ }
+    }
+  }
+
   /** Cancel the current request by killing the process.
    *  The polite control_request cancel is unreliable (CLI acknowledges but
    *  continues generating), so we kill the process instead. The SessionTab
@@ -200,16 +221,16 @@ export class ClaudeProcessManager extends EventEmitter {
       return;
     }
 
-    // Close stdin + kill the process to guarantee it stops
+    // Close stdin + kill the entire process tree to guarantee it stops
     try { this.process.stdin?.end(); } catch { /* already closed */ }
-    try { this.process.kill('SIGTERM'); } catch { /* already dead */ }
+    this.killProcessTree();
   }
 
   /** Gracefully stop the process */
   stop(): void {
     if (this.process) {
       try { this.process.stdin?.end(); } catch { /* already closed */ }
-      try { this.process.kill('SIGTERM'); } catch { /* already dead */ }
+      this.killProcessTree();
       this.process = null;
       this.sessionId = null;
     }

@@ -294,6 +294,7 @@ html, body, #root {
   display: flex;
   gap: 8px;
   align-items: flex-end;
+  position: relative;
 }
 
 .clear-session-button {
@@ -1137,6 +1138,29 @@ html, body, #root {
   font-style: italic;
 }
 
+/* Switch to Sonnet button */
+.switch-to-sonnet-btn {
+  background: none;
+  border: 1px solid var(--vscode-textLink-foreground, #3794ff);
+  border-radius: 3px;
+  color: var(--vscode-textLink-foreground, #3794ff);
+  cursor: pointer;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.switch-to-sonnet-btn:hover:not(:disabled) {
+  background: var(--vscode-textLink-foreground, #3794ff);
+  color: var(--vscode-editor-background, #1e1e1e);
+}
+
+.switch-to-sonnet-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* Permission mode selector */
 .permission-mode-selector {
   display: flex;
@@ -1420,6 +1444,49 @@ html, body, #root {
   border-color: var(--vscode-focusBorder);
 }
 
+/* Translate message button - appears on hover for assistant messages */
+.translate-message-btn {
+  float: right;
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 3px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  margin-right: 4px;
+}
+
+.message:hover .translate-message-btn {
+  opacity: 1;
+}
+
+.translate-message-btn.showing-translation {
+  opacity: 1;
+  color: var(--vscode-textLink-foreground, #3794ff);
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.translate-message-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+  border-color: var(--vscode-focusBorder);
+}
+
+.translate-message-btn:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.translate-message-btn.translating {
+  opacity: 1;
+  animation: textFade 2s ease-in-out infinite;
+}
+
 /* Edit message button and inline editing */
 .edit-message-btn {
   float: right;
@@ -1684,4 +1751,73 @@ html, body, #root {
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
+}
+
+/* === File Mention Autocomplete Popup === */
+
+.file-mention-popup {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--vscode-editorSuggestWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-editorSuggestWidget-border, var(--vscode-panel-border, #333));
+  border-radius: 6px;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
+  z-index: 50;
+  margin-bottom: 4px;
+}
+
+.file-mention-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--vscode-editorSuggestWidget-foreground, var(--vscode-editor-foreground));
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.file-mention-item:hover,
+.file-mention-item.selected {
+  background: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-list-activeSelectionBackground, #094771));
+  color: var(--vscode-editorSuggestWidget-selectedForeground, var(--vscode-list-activeSelectionForeground, #fff));
+}
+
+.file-mention-item-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-mention-item-path {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-mention-item.selected .file-mention-item-path {
+  color: var(--vscode-editorSuggestWidget-selectedForeground, var(--vscode-list-activeSelectionForeground, rgba(255, 255, 255, 0.7)));
+}
+
+.file-mention-loading,
+.file-mention-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+[dir="rtl"] .file-mention-popup {
+  text-align: left;
+  direction: ltr;
 }

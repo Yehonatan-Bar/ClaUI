@@ -7,7 +7,7 @@ $installed = Get-ChildItem -Path $extensionRoot -Directory |
   Select-Object -First 1
 
 if (-not $installed) {
-  throw "Claude Code Mirror extension was not found under $extensionRoot"
+  throw "ClaUi extension was not found under $extensionRoot"
 }
 
 $packageJsonPath = Join-Path $installed.FullName "package.json"

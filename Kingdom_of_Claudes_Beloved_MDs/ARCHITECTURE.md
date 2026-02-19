@@ -163,6 +163,7 @@ Bidirectional bridge between the webview and the CLI process. Accepts a `Webview
 | `planApprovalResponse` | Sends approve/reject/feedback text via `control.sendText()` |
 | `openFile` | Opens a file in VS Code editor via `vscode.commands.executeCommand('vscode.open', uri)` |
 | `openUrl` | Opens a URL in the default browser via `vscode.env.openExternal()` (http/https only) |
+| `switchToSonnet` | Calls `SessionTab.switchModel('claude-sonnet-4-6')` -- stops process and resumes with new model |
 
 **Extension -> Webview direction:**
 StreamDemux events are translated to `ExtensionToWebviewMessage` types and sent via `webview.postMessage()`.

@@ -3,6 +3,8 @@ import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { detectRtl } from '../../hooks/useRtlDetection';
 import { GitPushPanel } from './GitPushPanel';
+import { FileMentionPopup } from './FileMentionPopup';
+import { useFileMention } from '../../hooks/useFileMention';
 import type { WebviewImageData } from '../../../extension/types/webview-messages';
 
 /**
@@ -73,6 +75,7 @@ export const InputArea: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoMgr = useMemo(() => new UndoManager(), []);
   const { isBusy, isConnected, pendingFilePaths, setPendingFilePaths, promptHistory, addToPromptHistory, setPromptHistoryPanelOpen, pendingApproval, setPendingApproval, gitPushResult, setGitPushResult, gitPushConfigPanelOpen, setGitPushConfigPanelOpen } = useAppStore();
+  const fileMention = useFileMention(textareaRef);
 
   // History navigation: -1 = not browsing, 0..N = index into promptHistory (0 = oldest)
   const historyIndexRef = useRef(-1);
@@ -155,8 +158,52 @@ export const InputArea: React.FC = () => {
   }, []);
 
   /** Handle keyboard events - Ctrl+Enter sends, Enter adds newline, Esc cancels, Ctrl+Z/Y undo/redo, ArrowUp/Down navigates history */
+  /** Helper to apply a file mention insertion result to textarea state */
+  const applyMentionInsert = useCallback((inserted: { text: string; cursor: number }) => {
+    setText(inserted.text);
+    undoMgr.push(inserted.text, inserted.cursor);
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        textareaRef.current.selectionStart = inserted.cursor;
+        textareaRef.current.selectionEnd = inserted.cursor;
+      }
+      resizeTextarea();
+    });
+  }, [undoMgr, resizeTextarea]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // File mention popup intercepts navigation keys when open
+      if (fileMention.isOpen) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          fileMention.moveSelection(1);
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          fileMention.moveSelection(-1);
+          return;
+        }
+        if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          const inserted = fileMention.confirmSelection();
+          if (inserted) applyMentionInsert(inserted);
+          return;
+        }
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const inserted = fileMention.confirmSelection();
+          if (inserted) applyMentionInsert(inserted);
+          return;
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          fileMention.dismiss();
+          return;
+        }
+      }
+
       // Undo: Ctrl+Z (without Shift)
       if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
@@ -268,7 +315,7 @@ export const InputArea: React.FC = () => {
         }
       }
     },
-    [sendMessage, isBusy, cancelRequest, text, resizeTextarea, undoMgr]
+    [sendMessage, isBusy, cancelRequest, text, resizeTextarea, undoMgr, fileMention, applyMentionInsert]
   );
 
   /** Auto-resize textarea to fit content, reset history browsing on manual edits */
@@ -282,8 +329,10 @@ export const InputArea: React.FC = () => {
       const el = e.target;
       el.style.height = 'auto';
       el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+      // Notify file mention hook for @ trigger detection
+      fileMention.handleTextChange(newValue, e.target.selectionStart);
     },
-    [undoMgr]
+    [undoMgr, fileMention]
   );
 
   /** Handle right-click to paste clipboard content (VS Code webview blocks native context menu) */
@@ -492,6 +541,20 @@ export const InputArea: React.FC = () => {
       )}
 
       <div className="input-wrapper">
+        {fileMention.isOpen && (
+          <FileMentionPopup
+            results={fileMention.results}
+            selectedIndex={fileMention.selectedIndex}
+            onSelect={(path) => {
+              const inserted = fileMention.selectPath(path);
+              if (inserted) {
+                applyMentionInsert(inserted);
+                textareaRef.current?.focus();
+              }
+            }}
+            isLoading={fileMention.isLoading}
+          />
+        )}
         <button
           className="clear-session-button"
           onClick={handleClearSession}

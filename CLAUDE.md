@@ -47,6 +47,10 @@ Extension code runs in **Node.js**, webview code runs in **browser**. They are s
 
 The webview runs in a sandboxed iframe with strict Content Security Policy. Adding new external resources (scripts, styles, images) requires updating the CSP in `WebviewProvider.ts`.
 
+### Process kill on Windows requires taskkill
+
+`process.kill('SIGTERM')` with `shell: true` only kills the `cmd.exe` wrapper, NOT the actual Claude CLI process. The extension uses `taskkill /F /T /PID` to kill the entire process tree. If you add new spawn calls with `shell: true`, use the same `killProcessTree()` pattern from `ClaudeProcessManager.ts`.
+
 ### Blank webview panel (VS Code bug, not our code)
 
 Panel may open completely blank after reload/update. **Fix**: Open `Developer: Toggle Developer Tools` (Ctrl+Shift+I) to force repaint, then close it. Symptom: Output channel shows `Webview: creating new panel` but no `received message type="ready"`.

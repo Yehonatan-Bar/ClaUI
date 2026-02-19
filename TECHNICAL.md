@@ -58,6 +58,7 @@ claude-code-mirror/
 |   |   |   +-- TabManager.ts             #   Manages all tabs, tracks active tab
 |   |   |   +-- SessionNamer.ts           #   Auto-generates tab names via Haiku
 |   |   |   +-- ActivitySummarizer.ts     #   Periodic tool activity summary via Haiku
+|   |   |   +-- MessageTranslator.ts      #   Translates assistant messages to Hebrew via Sonnet CLI call
 |   |   |   +-- FileLogger.ts             #   Per-session file logging with rotation and rename
 |   |   |   +-- SessionStore.ts           #   Persists session metadata in globalState
 |   |   |   +-- ConversationReader.ts     #   Reads conversation history from Claude's session JSONL files
@@ -75,6 +76,7 @@ claude-code-mirror/
 |       +-- hooks/
 |       |   +-- useClaudeStream.ts        #   postMessage event dispatcher
 |       |   +-- useRtlDetection.ts        #   Hebrew/Arabic RTL detection
+|       |   +-- useFileMention.ts         #   @ file mention trigger detection, debounced search, popup state
 |       +-- components/
 |       |   +-- ChatView/
 |       |   |   +-- MessageList.tsx       #   Scrollable message list
@@ -87,10 +89,12 @@ claude-code-mirror/
 |       |   |   +-- MarkdownContent.tsx  #   Markdown rendering with sanitization and link detection
 |       |   |   +-- filePathLinks.tsx   #   Clickable file path and URL detection and rendering
 |       |   +-- InputArea/
-|       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt, image paste
+|       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt, image paste, @ file mentions
+|       |   |   +-- FileMentionPopup.tsx  #   Autocomplete popup for @ file mentions
 |       |   |   +-- GitPushPanel.tsx      #   Config panel for git push (status, ask Claude to configure)
 |       |   +-- ModelSelector/
-|       |   |   +-- ModelSelector.tsx     #   Model dropdown (Sonnet/Opus/Haiku)
+|       |   |   +-- ModelSelector.tsx          #   Model dropdown (Sonnet/Opus/Haiku)
+|       |   |   +-- SwitchToSonnetButton.tsx   #   One-click switch to Sonnet 4.6 mid-session
 |       |   +-- TextSettingsBar/
 |       |       +-- TextSettingsBar.tsx   #   Font size/family controls
 |       +-- styles/
@@ -115,7 +119,7 @@ claude-code-mirror/
 **TabManager** - Manages all SessionTab instances. Tracks the active (focused) tab, provides create/close/closeAll methods, shares a single status bar item, assigns distinct colors from an 8-color palette, and groups tabs in the same editor column.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**ClaudeProcessManager** - Spawns the Claude CLI child process with stream-json flags, handles stdin/stdout piping, process lifecycle, and crash detection. Instantiated per-tab by SessionTab.
+**ClaudeProcessManager** - Spawns the Claude CLI child process with stream-json flags, handles stdin/stdout piping, process lifecycle, and crash detection. Uses `taskkill /F /T` on Windows to kill the entire process tree (required because `shell: true` creates a cmd.exe wrapper that SIGTERM alone cannot penetrate). Instantiated per-tab by SessionTab.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **StreamDemux** - Receives raw CLI JSON events and demultiplexes them into typed, semantic events (textDelta, toolUseStart, messageDelta, assistantMessage, etc.) for UI consumers. Instantiated per-tab.
@@ -133,6 +137,9 @@ claude-code-mirror/
 **ActivitySummarizer** - Periodically summarizes Claude's tool activity via Haiku. After every N tool uses (configurable, default 3), sends enriched tool names to Haiku for a short label + full summary. Displays a detailed summary panel in the busy indicator (short label + full sentence). Updates status bar tooltip. Does NOT overwrite tab title (session name stays fixed). Debounces rapid tool uses, prevents concurrent calls.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ACTIVITY_SUMMARIZER.md`
 
+**Message Translation** -- Translates assistant message text to Hebrew using a one-shot Claude Sonnet 4.6 CLI call. Triggered by a "Translate" button on each assistant message. Translations are cached per message; toggling between original and translated view is instant after the first translation. Code blocks and technical terms are preserved untranslated.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/MESSAGE_TRANSLATION.md`
+
 **FileLogger** - Writes log lines to disk files alongside the OutputChannel. Each session tab gets its own log file named `<session-name>_<dd-hh-mm>.log`. A global logger captures extension-level messages. Files auto-rotate at 2MB, rename when the session name changes, and new files are created on Reload Window or new session. Configurable via `claudeMirror.enableFileLogging` and `claudeMirror.logDirectory`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/FILE_LOGGER.md`
 
@@ -148,7 +155,7 @@ claude-code-mirror/
 **TextSettingsBar** - In-webview UI for adjusting chat text font size and font family. Supports Hebrew-friendly font presets. Settings are stored in Zustand and synced from VS Code configuration on startup and on change.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**ModelSelector** - Dropdown in the status bar for choosing the Claude model (Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default). Selection is persisted to VS Code settings (`claudeMirror.model`) and synced back to the webview on startup and on change.
+**ModelSelector** - Dropdown in the status bar for choosing the Claude model (Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default). Selection is persisted to VS Code settings (`claudeMirror.model`) and synced back to the webview on startup and on change. Includes a **SwitchToSonnetButton** ("S" button) that immediately switches the active session to Sonnet 4.6 by stopping the CLI process and resuming it with `--model claude-sonnet-4-6`. The button is hidden when already on Sonnet or when no session is active, and disabled while Claude is responding.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **PermissionModeSelector** - Dropdown in the status bar for choosing between "Full Access" (all tools auto-approved, default) and "Supervised" (only read-only tools allowed, write tools denied). Selection is persisted to VS Code settings (`claudeMirror.permissionMode`). In supervised mode, `--allowedTools` is passed to the CLI to restrict to read-only tools. Changes take effect on next session start.
@@ -171,6 +178,9 @@ claude-code-mirror/
 
 **Prompt History Panel** - Modal overlay with 3 tabs (Session / Project / Global) showing prompt history. Session tab uses in-memory `promptHistory` from the Zustand store. Project and Global tabs fetch from `PromptHistoryStore` via extension messaging. Includes text filter and click-to-insert into the input textarea. Opened via the "H" button in the input area.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**File Mention (@)** - Inline autocomplete triggered by typing `@` in the chat textarea. Searches workspace files via `vscode.workspace.findFiles()` with 150ms debounce, showing results in a popup above the input. Navigate with ArrowUp/Down, select with Enter/Tab/click. Replaces `@query` with the relative file path. Uses custom DOM events for extension-to-webview communication (same pattern as prompt history). All state is local to the `useFileMention` hook (not in Zustand).
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/FILE_MENTION.md`
 
 **Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the CLI pauses waiting for stdin input. The extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'`, shows an approval bar with Approve/Reject/Feedback buttons, and sends the user's response back to the CLI. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`

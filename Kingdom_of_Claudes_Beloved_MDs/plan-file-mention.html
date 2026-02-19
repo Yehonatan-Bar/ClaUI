@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>תוכנית: תיוג קבצים עם @</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 40px 20px;
+      line-height: 1.8;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #16213e;
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #4fc3f7;
+      font-size: 28px;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #4fc3f7;
+      padding-bottom: 12px;
+    }
+    .subtitle {
+      color: #90a4ae;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    h2 {
+      color: #81d4fa;
+      font-size: 20px;
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+    p {
+      margin-bottom: 12px;
+      color: #cfd8dc;
+    }
+    .highlight {
+      background: #0a3d62;
+      border-right: 4px solid #4fc3f7;
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    .flow-steps {
+      list-style: none;
+      padding: 0;
+      counter-reset: step;
+    }
+    .flow-steps li {
+      counter-increment: step;
+      position: relative;
+      padding: 12px 20px 12px 0;
+      margin-bottom: 8px;
+      background: #1a2744;
+      border-radius: 8px;
+      padding-right: 60px;
+    }
+    .flow-steps li::before {
+      content: counter(step);
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #4fc3f7;
+      color: #1a1a2e;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+    }
+    th {
+      background: #0a3d62;
+      color: #4fc3f7;
+      padding: 10px 16px;
+      text-align: right;
+      font-weight: 600;
+    }
+    td {
+      padding: 10px 16px;
+      border-bottom: 1px solid #2a3a5c;
+    }
+    tr:hover td {
+      background: #1a2744;
+    }
+    .status {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status-new { background: #1b5e20; color: #a5d6a7; }
+    .status-modify { background: #4a148c; color: #ce93d8; }
+    .summary-box {
+      background: #0d2137;
+      border: 1px solid #4fc3f7;
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 24px;
+    }
+    .summary-box h3 {
+      color: #4fc3f7;
+      margin-bottom: 12px;
+    }
+    .risk-low {
+      color: #a5d6a7;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>תוכנית: תיוג קבצים עם @</h1>
+    <p class="subtitle">תוסף ClaUi - פיצ'ר חדש</p>
+
+    <h2>מה הפיצ'ר?</h2>
+    <div class="highlight">
+      <p>
+        כשהמשתמש מקליד <strong>@</strong> בתיבת הצ'אט, מיד נפתח חלון קופץ שמציג קבצים מתוך הפרויקט.
+        ככל שהמשתמש ממשיך להקליד - התוצאות מסוננות בזמן אמת.
+        אפשר לנווט עם חצים ולבחור עם Enter, או ללחוץ בעכבר.
+        הנתיב של הקובץ שנבחר מוכנס אוטומטית לתוך ההודעה.
+      </p>
+    </div>
+
+    <h2>למה צריך את זה?</h2>
+    <p>
+      היום, הדרך היחידה להכניס נתיב קובץ היא דרך כפתור <strong>+</strong> שפותח חלון בחירת קבצים של מערכת ההפעלה -
+      תהליך איטי שדורש כמה לחיצות. הפיצ'ר החדש מאפשר למצוא ולהכניס קבצים ישירות תוך כדי כתיבה,
+      בדיוק כמו תיוג ב-GitHub, Slack או Cursor.
+    </p>
+
+    <h2>איך זה עובד?</h2>
+    <ol class="flow-steps">
+      <li>המשתמש מקליד <strong>@</strong> בתיבת הקלט</li>
+      <li>מיד נפתח חלון קופץ מעל תיבת הקלט</li>
+      <li>כל תו נוסף מסנן את רשימת הקבצים בזמן אמת</li>
+      <li>חצי מקלדת (למעלה/למטה) מנווטים בין התוצאות</li>
+      <li>Enter או לחיצת עכבר - מכניסים את נתיב הקובץ</li>
+      <li>Escape סוגר את החלון הקופץ</li>
+    </ol>
+
+    <h2>שינויים בקוד</h2>
+    <table>
+      <tr>
+        <th>רכיב</th>
+        <th>סוג שינוי</th>
+        <th>תיאור</th>
+      </tr>
+      <tr>
+        <td>הגדרת הודעות</td>
+        <td><span class="status status-modify">עדכון</span></td>
+        <td>הוספת שני סוגי הודעות חדשים - בקשת חיפוש ותוצאות חיפוש</td>
+      </tr>
+      <tr>
+        <td>מטפל הודעות (צד השרת)</td>
+        <td><span class="status status-modify">עדכון</span></td>
+        <td>מטפל חדש שמחפש קבצים בפרויקט ומחזיר תוצאות</td>
+      </tr>
+      <tr>
+        <td>מאזין הודעות (צד הדפדפן)</td>
+        <td><span class="status status-modify">עדכון</span></td>
+        <td>קליטת תוצאות חיפוש והעברתן לרכיב הקופץ</td>
+      </tr>
+      <tr>
+        <td>לוגיקת תיוג קבצים</td>
+        <td><span class="status status-new">חדש</span></td>
+        <td>לוגיקת זיהוי @, חיפוש עם השהייה, ניהול מצב הקופץ</td>
+      </tr>
+      <tr>
+        <td>חלון קופץ</td>
+        <td><span class="status status-new">חדש</span></td>
+        <td>רכיב ויזואלי שמציג רשימת קבצים תואמים</td>
+      </tr>
+      <tr>
+        <td>אזור הקלט</td>
+        <td><span class="status status-modify">עדכון</span></td>
+        <td>שילוב הקופץ + יירוט מקשים כשהקופץ פתוח</td>
+      </tr>
+      <tr>
+        <td>עיצוב</td>
+        <td><span class="status status-modify">עדכון</span></td>
+        <td>סגנונות CSS לחלון הקופץ בהתאמה לערכת הנושא של VS Code</td>
+      </tr>
+    </table>
+
+    <h2>התנהגות מקלדת</h2>
+    <table>
+      <tr>
+        <th>מקש</th>
+        <th>כשהקופץ פתוח</th>
+        <th>כשהקופץ סגור</th>
+      </tr>
+      <tr>
+        <td>חץ למעלה/למטה</td>
+        <td>ניווט בתוצאות</td>
+        <td>היסטוריית הודעות (כמו היום)</td>
+      </tr>
+      <tr>
+        <td>Enter</td>
+        <td>בחירת קובץ</td>
+        <td>שורה חדשה (כמו היום)</td>
+      </tr>
+      <tr>
+        <td>Escape</td>
+        <td>סגירת הקופץ</td>
+        <td>ביטול בקשה (כמו היום)</td>
+      </tr>
+      <tr>
+        <td>Ctrl+Enter</td>
+        <td>שליחת הודעה</td>
+        <td>שליחת הודעה (כמו היום)</td>
+      </tr>
+    </table>
+
+    <div class="summary-box">
+      <h3>סיכום</h3>
+      <p>
+        <strong>היקף:</strong> 2 קבצים חדשים, 5 קבצים מעודכנים
+      </p>
+      <p>
+        <strong>סיכון:</strong> <span class="risk-low">נמוך</span> - הפיצ'ר מבודד לאזור הקלט בלבד, לא משנה התנהגות קיימת
+      </p>
+      <p>
+        <strong>תאימות לאחור:</strong> מלאה - כל קיצורי המקלדת הקיימים עובדים כרגיל כשהקופץ סגור
+      </p>
+    </div>
+  </div>
+</body>
+</html>

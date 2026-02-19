@@ -128,6 +128,23 @@ export interface GetGitPushSettingsRequest {
   type: 'getGitPushSettings';
 }
 
+export interface TranslateMessageRequest {
+  type: 'translateMessage';
+  messageId: string;
+  /** Text content to translate (code blocks already stripped by the webview) */
+  textContent: string;
+}
+
+export interface FileSearchRequest {
+  type: 'fileSearch';
+  query: string;
+  requestId: number;
+}
+
+export interface SwitchToSonnetRequest {
+  type: 'switchToSonnet';
+}
+
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
@@ -152,7 +169,10 @@ export type WebviewToExtensionMessage =
   | SetPermissionModeRequest
   | GitPushRequest
   | GitPushConfigRequest
-  | GetGitPushSettingsRequest;
+  | GetGitPushSettingsRequest
+  | TranslateMessageRequest
+  | FileSearchRequest
+  | SwitchToSonnetRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -301,6 +321,21 @@ export interface ForkInitMessage {
   messages: SerializedChatMessage[];
 }
 
+export interface FileSearchResultMessage {
+  type: 'fileSearchResults';
+  results: Array<{ relativePath: string; fileName: string }>;
+  requestId: number;
+}
+
+export interface TranslationResultMessage {
+  type: 'translationResult';
+  messageId: string;
+  /** The translated text, or null if translation failed */
+  translatedText: string | null;
+  success: boolean;
+  error?: string;
+}
+
 export interface ConversationHistoryMessage {
   type: 'conversationHistory';
   /** Full conversation history loaded from Claude's session storage */
@@ -340,4 +375,6 @@ export type ExtensionToWebviewMessage =
   | GitPushResultMessage
   | GitPushSettingsMessage
   | ForkInitMessage
-  | ConversationHistoryMessage;
+  | ConversationHistoryMessage
+  | TranslationResultMessage
+  | FileSearchResultMessage;
