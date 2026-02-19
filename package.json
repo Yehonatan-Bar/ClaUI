@@ -1,7 +1,7 @@
 {
   "name": "claude-code-mirror",
   "displayName": "ClaUi",
-  "description": "Rich chat interface for Claude Code with terminal mirroring",
+  "description": "Rich chat UI for Claude Code - multiple tabs, model selection, file sending, image paste, and more",
   "version": "0.1.2",
   "publisher": "JhonBar",
   "icon": "images/icon.png",
