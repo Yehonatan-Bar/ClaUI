@@ -2,7 +2,7 @@
   "name": "claude-code-mirror",
   "displayName": "ClaUi",
   "description": "Rich chat UI for Claude Code - multiple tabs, model selection, file sending, image paste, and more",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "JhonBar",
   "icon": "images/icon.png",
   "engines": {
