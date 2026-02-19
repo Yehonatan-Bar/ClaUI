@@ -7,6 +7,7 @@ import { ControlProtocol } from '../process/ControlProtocol';
 import { SessionNamer } from './SessionNamer';
 import { MessageTranslator } from './MessageTranslator';
 import { ActivitySummarizer } from './ActivitySummarizer';
+import { AdventureInterpreter } from './AdventureInterpreter';
 import { ConversationReader } from './ConversationReader';
 import { FileLogger } from './FileLogger';
 import type { AchievementService } from '../achievements/AchievementService';
@@ -161,6 +162,11 @@ export class SessionTab implements WebviewBridge {
     const messageTranslator = new MessageTranslator();
     messageTranslator.setLogger(tabLog);
     this.messageHandler.setMessageTranslator(messageTranslator);
+
+    // Wire adventure interpreter for dungeon crawler beat generation
+    const adventureInterpreter = new AdventureInterpreter();
+    adventureInterpreter.setLogger(tabLog);
+    this.messageHandler.setAdventureInterpreter(adventureInterpreter);
 
     // Create webview panel in the specified column
     this.baseTitle = `ClaUi ${tabNumber}`;

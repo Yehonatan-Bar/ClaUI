@@ -195,6 +195,41 @@ html, body, #root {
   flex: 1;
   overflow-y: auto;
   padding: 12px 16px;
+  position: relative;
+}
+
+/* Scroll-to-bottom floating button */
+.scroll-to-bottom-btn {
+  position: sticky;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
+  background: var(--vscode-editor-background, #1e1e1e);
+  color: var(--vscode-foreground, #ccc);
+  cursor: pointer;
+  opacity: 0.85;
+  z-index: 10;
+  transition: opacity 0.15s, background 0.15s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  margin: 0 auto;
+  pointer-events: auto;
+}
+
+.scroll-to-bottom-btn:hover {
+  opacity: 1;
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+}
+
+.scroll-to-bottom-btn:active {
+  opacity: 1;
+  background: var(--vscode-list-activeSelectionBackground, #094771);
 }
 
 /* Individual message - text uses custom font settings */
@@ -829,6 +864,22 @@ html, body, #root {
 .cost-display {
   display: flex;
   gap: 12px;
+}
+
+.status-bar-session-clock {
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 3px;
+  padding: 1px 6px;
+  line-height: 1.4;
+  color: var(--vscode-descriptionForeground);
+  background: transparent;
+  min-width: 108px;
+  text-align: center;
+}
+
+.status-bar-session-clock.running {
+  color: var(--vscode-charts-green, #89d185);
+  border-color: color-mix(in srgb, var(--vscode-charts-green, #89d185) 55%, var(--vscode-panel-border, #333));
 }
 
 /* History button in status bar - always visible */
@@ -2137,7 +2188,7 @@ html, body, #root {
 
 /* Session Timeline Minimap */
 .session-timeline {
-  width: 24px;
+  width: 16px;
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
@@ -2161,7 +2212,7 @@ html, body, #root {
 
 .timeline-tooltip {
   position: absolute;
-  right: 28px;
+  right: 20px;
   top: 50%;
   transform: translateY(-50%);
   background: var(--vscode-editorWidget-background, #252526);
@@ -2190,11 +2241,100 @@ html, body, #root {
   pointer-events: none;
 }
 
+/* Info trigger at top of timeline */
+.timeline-info-trigger {
+  height: 14px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--vscode-descriptionForeground, #888);
+  cursor: help;
+  position: relative;
+  border-bottom: 1px solid var(--vscode-panel-border, #333);
+  user-select: none;
+}
+
+.timeline-info-trigger:hover {
+  color: var(--vscode-foreground);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Segments wrapper (flex child fills remaining height) */
+.timeline-segments {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Legend tooltip */
+.timeline-legend {
+  position: absolute;
+  right: 20px;
+  top: 0;
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 11px;
+  white-space: nowrap;
+  z-index: 200;
+  pointer-events: none;
+  color: var(--vscode-editor-foreground);
+  line-height: 1.5;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.timeline-legend-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.timeline-legend-desc {
+  margin-bottom: 8px;
+  opacity: 0.8;
+  white-space: normal;
+  max-width: 220px;
+}
+
+.timeline-legend-items {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.timeline-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.timeline-legend-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.timeline-legend-hint {
+  margin-top: 8px;
+  opacity: 0.5;
+  font-size: 10px;
+}
+
 /* Weather Widget */
 .weather-widget {
   position: fixed;
   top: 28px;
-  right: 6px;
+  right: 32px;
   z-index: 9998;
   width: 22px;
   height: 22px;
@@ -2295,4 +2435,258 @@ html, body, #root {
 
 .status-bar-vitals-btn:hover {
   background: var(--vscode-toolbar-hoverBackground);
+}
+
+/* Vitals button wrapper (for positioning the info panel) */
+.status-bar-vitals-wrapper {
+  position: relative;
+}
+
+.status-bar-vitals-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-bar-vitals-settings-btn {
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 3px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 1px 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.status-bar-vitals-settings-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+
+/* Weather Popover (click on weather icon) */
+.weather-popover {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  width: 220px;
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 6px;
+  padding: 10px 12px;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: vitalsPopIn 0.15s ease-out;
+}
+
+.weather-popover-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.weather-popover-symbol {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.weather-popover-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-editor-foreground);
+}
+
+.weather-popover-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Vitals Info Panel (from status bar button) */
+.vitals-info-panel {
+  position: absolute;
+  bottom: 28px;
+  right: 0;
+  width: 280px;
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 6px;
+  padding: 12px;
+  z-index: 9999;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+  animation: vitalsPopIn 0.15s ease-out;
+}
+
+.vitals-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--vscode-panel-border, #333);
+}
+
+.vitals-info-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-editor-foreground);
+}
+
+.vitals-info-close {
+  background: none;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.vitals-info-close:hover {
+  color: var(--vscode-editor-foreground);
+}
+
+.vitals-info-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.vitals-info-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.vitals-info-icon {
+  font-size: 14px;
+  line-height: 1.3;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+  opacity: 0.8;
+}
+
+.vitals-info-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.vitals-info-text strong {
+  font-size: 12px;
+  color: var(--vscode-editor-foreground);
+  font-weight: 600;
+}
+
+.vitals-info-text span {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Vitals toggle row */
+.vitals-info-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--vscode-panel-border, #333);
+  font-size: 12px;
+  color: var(--vscode-editor-foreground);
+}
+
+.vitals-info-toggle-btn {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+}
+
+.vitals-info-toggle-btn.on {
+  background: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.vitals-info-toggle-btn.off {
+  background: var(--vscode-panel-border, #555);
+}
+
+.vitals-toggle-knob {
+  position: absolute;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.2s;
+}
+
+.vitals-info-toggle-btn.on .vitals-toggle-knob {
+  left: 18px;
+}
+
+.vitals-info-toggle-btn.off .vitals-toggle-knob {
+  left: 2px;
+}
+
+@keyframes vitalsPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   Adventure Widget (Dungeon Crawler)
+   ============================================ */
+
+.adventure-widget {
+  position: fixed;
+  top: 28px;
+  right: 60px;
+  z-index: 9997;
+  width: 120px;
+  height: 120px;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #0d0d1a;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  cursor: default;
+}
+
+.adventure-canvas {
+  display: block;
+  width: 120px;
+  height: 120px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.adventure-tooltip {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fdd835;
+  font-size: 9px;
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  pointer-events: none;
 }

@@ -171,6 +171,12 @@ StreamDemux events are translated to `ExtensionToWebviewMessage` types and sent 
 **Plan Approval Detection:**
 MessageHandler tracks tool names during streaming (`currentMessageToolNames`). When `messageDelta` fires with `stopReason === 'tool_use'` and one of the tools is `ExitPlanMode` or `AskUserQuestion`, it sends a `planApprovalRequired` message to the webview with the `toolName`. The user's response is sent back as a plain text message to the CLI via stdin. For plan approvals: approve/reject/feedback text. For questions: the selected option label(s) or a custom text answer.
 
+**Stale Plan Mode Detection (post-compaction):**
+After context compaction, the Claude model may call `ExitPlanMode` as a stale artifact (the compacted context mentions plan mode, but no real plan exists). MessageHandler tracks a `planModeActive` flag:
+- Set to `true` when `EnterPlanMode` tool is seen in `toolUseStart`
+- Set to `false` when the user responds to an ExitPlanMode approval (approve/reject/feedback)
+- When `ExitPlanMode` is detected but `planModeActive` is `false`, the extension auto-approves silently (`"Yes, proceed with the plan."`) instead of showing the approval bar. This prevents the user from getting stuck on a "Plan Ready for Review" prompt with no actual plan to review.
+
 **Plan Approval Cleanup (multiple safety nets):**
 The `pendingApproval` state is cleared in several places to prevent the approval bar from lingering:
 1. **Button click**: PlanApprovalBar handlers call `setPendingApproval(null)` immediately on approve/reject/feedback.

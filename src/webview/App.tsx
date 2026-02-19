@@ -13,6 +13,7 @@ import { AchievementToastStack } from './components/Achievements/AchievementToas
 import { SessionRecapCard } from './components/Achievements/SessionRecapCard';
 import { VitalsContainer } from './components/Vitals/VitalsContainer';
 import { SessionTimeline } from './components/Vitals/SessionTimeline';
+import { VitalsInfoPanel } from './components/Vitals/VitalsInfoPanel';
 import { postToExtension } from './hooks/useClaudeStream';
 
 function formatDuration(durationMs: number): string {
@@ -219,6 +220,8 @@ const StatusBar: React.FC<{
   cost: { costUsd: number; totalCostUsd: number; inputTokens: number; outputTokens: number };
 }> = ({ cost }) => {
   const [tickMs, setTickMs] = React.useState(() => Date.now());
+  const [vitalsInfoOpen, setVitalsInfoOpen] = React.useState(false);
+  const vitalsInfoRef = React.useRef<HTMLDivElement>(null);
   const {
     gitPushSettings,
     gitPushRunning,
@@ -238,6 +241,18 @@ const StatusBar: React.FC<{
     const id = setInterval(() => setTickMs(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Close vitals info panel on outside click
+  useEffect(() => {
+    if (!vitalsInfoOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (vitalsInfoRef.current && !vitalsInfoRef.current.contains(e.target as Node)) {
+        setVitalsInfoOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [vitalsInfoOpen]);
 
   const activityMs = sessionActivityElapsedMs + (
     sessionActivityRunningSinceMs ? Math.max(0, tickMs - sessionActivityRunningSinceMs) : 0
@@ -269,6 +284,12 @@ const StatusBar: React.FC<{
     setAchievementPanelOpen(!useAppStore.getState().achievementPanelOpen);
   };
 
+  const handleToggleVitals = () => {
+    const next = !vitalsEnabled;
+    setVitalsEnabled(next);
+    postToExtension({ type: 'setVitalsEnabled', enabled: next });
+  };
+
   return (
     <div className="status-bar">
       <div className="cost-display">
@@ -287,7 +308,7 @@ const StatusBar: React.FC<{
           onClick={handleAchievements}
           title="Achievements"
         >
-          🏆 {achievementProfile.totalAchievements}
+          Trophy {achievementProfile.totalAchievements}
         </button>
       )}
       <button className="status-bar-history-btn" onClick={handleHistory} title="Conversation History (Ctrl+Shift+H)">
@@ -316,17 +337,26 @@ const StatusBar: React.FC<{
       <ModelSelector />
       <PermissionModeSelector />
       <TextSettingsBar />
-      <button
-        className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
-        onClick={() => {
-          const next = !vitalsEnabled;
-          setVitalsEnabled(next);
-          postToExtension({ type: 'setVitalsEnabled', enabled: next });
-        }}
-        title={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
-      >
-        Vitals
-      </button>
+      <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
+        <div className="status-bar-vitals-controls">
+          <button
+            className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
+            onClick={handleToggleVitals}
+            title={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
+          >
+            Vitals
+          </button>
+          <button
+            className="status-bar-vitals-settings-btn"
+            onClick={() => setVitalsInfoOpen((prev) => !prev)}
+            title="Vitals settings"
+            aria-label="Vitals settings"
+          >
+            {'\u2699'}
+          </button>
+        </div>
+        {vitalsInfoOpen && <VitalsInfoPanel onClose={() => setVitalsInfoOpen(false)} />}
+      </div>
       <div className="cost-display">
         <span>In: {(cost?.inputTokens ?? 0).toLocaleString()}</span>
         <span>Out: {(cost?.outputTokens ?? 0).toLocaleString()}</span>

@@ -58,6 +58,7 @@ claude-code-mirror/
 |   |   |   +-- TabManager.ts             #   Manages all tabs, tracks active tab
 |   |   |   +-- SessionNamer.ts           #   Auto-generates tab names via Haiku
 |   |   |   +-- ActivitySummarizer.ts     #   Periodic tool activity summary via Haiku
+|   |   |   +-- AdventureInterpreter.ts  #   Converts TurnRecords to AdventureBeats (dungeon crawler)
 |   |   |   +-- MessageTranslator.ts      #   Translates assistant messages to Hebrew via Sonnet CLI call
 |   |   |   +-- FileLogger.ts             #   Per-session file logging with rotation and rename
 |   |   |   +-- SessionStore.ts           #   Persists session metadata in globalState
@@ -100,7 +101,15 @@ claude-code-mirror/
 |       |   |   +-- SessionTimeline.tsx  #   Vertical color-coded turn minimap
 |       |   |   +-- WeatherWidget.tsx    #   Animated weather mood icon
 |       |   |   +-- CostHeatBar.tsx      #   Cost accumulation gradient bar
-|       |   |   +-- VitalsContainer.tsx  #   Conditional wrapper for weather + cost bar
+|       |   |   +-- VitalsContainer.tsx  #   Conditional wrapper for weather + cost bar + adventure
+|       |   |   +-- AdventureWidget.tsx  #   Pixel-art dungeon crawler canvas wrapper
+|       |   |   +-- VitalsInfoPanel.tsx  #   Info panel with explanations + toggles
+|       |   |   +-- adventure/           #   Dungeon crawler engine
+|       |   |       +-- types.ts         #     AdventureBeat, RoomType, engine interfaces
+|       |   |       +-- sprites.ts       #     Palette, all pixel art sprites, drawSprite()
+|       |   |       +-- rooms.ts         #     5x5 room templates
+|       |   |       +-- dungeon.ts       #     Map generation, camera, pathfinding
+|       |   |       +-- AdventureEngine.ts #   State machine, animation loop, renderer
 |       |   +-- TextSettingsBar/
 |       |       +-- TextSettingsBar.tsx   #   Font size/family/theme controls
 |       +-- styles/
@@ -110,6 +119,7 @@ claude-code-mirror/
 +-- Kingdom_of_Claudes_Beloved_MDs/       # Detailed component documentation
     +-- ARCHITECTURE.md                   #   Data flow and component interaction
     +-- ACTIVITY_SUMMARIZER.md            #   Periodic activity summary via Haiku
+    +-- ADVENTURE_WIDGET.md              #   Pixel-art dungeon crawler session visualizer
     +-- DRAG_AND_DROP_CHALLENGE.md        #   Why drag-and-drop is blocked, workarounds
     +-- FILE_LOGGER.md                    #   File-based logging with rotation and rename
     +-- FILE_MENTION.md                   #   @ file mention autocomplete feature
@@ -194,7 +204,7 @@ claude-code-mirror/
 **File Mention (@)** - Inline autocomplete triggered by typing `@` in the chat textarea. Searches workspace files via `vscode.workspace.findFiles()` with 150ms debounce, showing results in a popup above the input. Navigate with ArrowUp/Down, select with Enter/Tab/click. Replaces `@query` with the relative file path. Uses custom DOM events for extension-to-webview communication (same pattern as prompt history). All state is local to the `useFileMention` hook (not in Zustand).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/FILE_MENTION.md`
 
-**Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the CLI pauses waiting for stdin input. The extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'`, shows an approval bar with Approve/Reject/Feedback buttons, and sends the user's response back to the CLI. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON.
+**Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the CLI pauses waiting for stdin input. The extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'`, shows an approval bar with Approve/Reject/Feedback buttons, and sends the user's response back to the CLI. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON. Stale `ExitPlanMode` calls after context compaction (where no `EnterPlanMode` was seen) are auto-approved silently via the `planModeActive` flag.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Open Plan Docs** - "Plans" button in the status bar that opens HTML plan documents from `Kingdom_of_Claudes_Beloved_MDs/` in the default browser. Single file opens directly; multiple files show a QuickPick sorted by modification time. When no plan documents exist, offers to activate the Plans feature by injecting a "Plan mode" prompt into the project's `CLAUDE.md` (with Hebrew or English language choice). Also available via Command Palette (`claudeMirror.openPlanDocs`).
@@ -208,6 +218,9 @@ claude-code-mirror/
 
 **Session Vitals** - Visual session health dashboard with 5 components: Session Timeline (vertical color-coded minimap alongside messages, click-to-jump), Weather Widget (animated mood icon reflecting error/success patterns), Cost Heat Bar (gradient strip showing cost accumulation), Turn Intensity Borders (colored left border on assistant messages based on tool activity), and a Vitals toggle button in the StatusBar. Data pipeline: `MessageHandler` builds `TurnRecord` on each CLI result event, sends to webview via `turnComplete` postMessage, stored in Zustand (`turnHistory[]`, `turnByMessageId{}`). Weather mood recalculated on each turn via sliding window algorithm. All components hidden when vitals disabled.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_VITALS.md`
+
+**Adventure Widget** - Pixel-art dungeon crawler that visualizes session activity as a top-down roguelike. Each CLI turn maps to a dungeon encounter: scrolls (Read), anvils (Edit), traps (errors), dragons (3+ errors), treasure (recovery). Canvas 2D engine with 8x8 sprites, PICO-8 palette, state machine (IDLE/WALKING/ENCOUNTER/RESOLUTION). Extension-side `AdventureInterpreter` converts `TurnRecord` to `AdventureBeat` via deterministic rules. Toggleable separately from main vitals.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ADVENTURE_WIDGET.md`
 
 **File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/DRAG_AND_DROP_CHALLENGE.md`
@@ -232,6 +245,7 @@ claude-code-mirror/
 | `claudeMirror.enableFileLogging` | `true` | Write logs to disk files in addition to the Output Channel |
 | `claudeMirror.logDirectory` | `""` | Directory for log files (empty = extension's default storage) |
 | `claudeMirror.sessionVitals` | `true` | Show Session Vitals dashboard (timeline, weather, cost bar, turn borders) |
+| `claudeMirror.adventureWidget` | `true` | Show pixel-art dungeon crawler adventure widget |
 | `claudeMirror.gitPush.enabled` | `true` | Whether git push is configured and ready to use via the Git button |
 | `claudeMirror.gitPush.scriptPath` | `"scripts/git-push.ps1"` | Path to the git push script (relative to workspace root) |
 | `claudeMirror.gitPush.commitMessageTemplate` | `"{sessionName}"` | Commit message template ({sessionName} = tab name) |

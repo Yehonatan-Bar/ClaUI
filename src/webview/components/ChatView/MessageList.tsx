@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { MessageBubble } from './MessageBubble';
@@ -18,6 +18,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const userScrolledUp = useRef(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   // Auto-scroll to bottom on new content, unless user has scrolled up
   useEffect(() => {
@@ -33,7 +34,9 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
     const distanceFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
     // Consider "scrolled up" if more than 100px from bottom
-    userScrolledUp.current = distanceFromBottom > 100;
+    const scrolledUp = distanceFromBottom > 100;
+    userScrolledUp.current = scrolledUp;
+    setShowScrollToBottom(scrolledUp);
 
     // Report scroll fraction for Session Vitals timeline position marker
     if (onScrollFractionChange && container.scrollHeight > container.clientHeight) {
@@ -78,6 +81,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
     });
   }, []);
 
+  const scrollToBottom = useCallback(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    userScrolledUp.current = false;
+    setShowScrollToBottom(false);
+  }, []);
+
   return (
     <div
       className="message-list"
@@ -114,6 +123,19 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
       )}
 
       <div ref={bottomRef} />
+
+      {showScrollToBottom && (
+        <button
+          className="scroll-to-bottom-btn"
+          onClick={scrollToBottom}
+          title="Scroll to bottom"
+          aria-label="Scroll to bottom"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 11.5L2.5 6l1-1L8 9.5 12.5 5l1 1z" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 };

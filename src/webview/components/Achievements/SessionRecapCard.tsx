@@ -10,15 +10,20 @@ function formatDuration(durationMs: number): string {
 }
 
 export const SessionRecapCard: React.FC = () => {
-  const { sessionRecap } = useAppStore();
+  const { sessionRecap, sessionActivityElapsedMs, sessionActivityRunningSinceMs } = useAppStore();
   if (!sessionRecap) {
     return null;
   }
 
+  const activityMs = sessionActivityElapsedMs + (
+    sessionActivityRunningSinceMs ? Math.max(0, Date.now() - sessionActivityRunningSinceMs) : 0
+  );
+
   return (
     <div className="session-recap-card">
       <div className="session-recap-title">Session Recap</div>
-      <div>Duration: {formatDuration(sessionRecap.durationMs)}</div>
+      <div>Active Claude Time: {formatDuration(activityMs)}</div>
+      <div>Total Session Duration: {formatDuration(sessionRecap.durationMs)}</div>
       <div>Bugs fixed: {sessionRecap.bugsFixed}</div>
       <div>Passing tests: {sessionRecap.passingTests}</div>
       <div>New badges: {sessionRecap.newAchievements.length > 0 ? sessionRecap.newAchievements.join(', ') : 'None'}</div>

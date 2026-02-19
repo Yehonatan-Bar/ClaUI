@@ -8,6 +8,7 @@ import type {
   SessionRecapPayload,
   TurnRecord,
 } from '../../extension/types/webview-messages';
+import type { AdventureBeat } from '../components/Vitals/adventure/types';
 
 // --- Message types for the UI ---
 
@@ -132,6 +133,10 @@ export interface AppState {
   achievementPanelOpen: boolean;
   sessionRecap: SessionRecapPayload | null;
 
+  // Adventure Widget
+  adventureEnabled: boolean;
+  adventureBeats: AdventureBeat[];
+
   // Session activity timer (Claude active processing time only)
   sessionActivityStarted: boolean;
   sessionActivityElapsedMs: number;
@@ -202,6 +207,8 @@ export interface AppState {
   setAchievementPanelOpen: (open: boolean) => void;
   setSessionRecap: (recap: SessionRecapPayload | null) => void;
   setAchievementGoals: (goals: AchievementGoalPayload[]) => void;
+  setAdventureEnabled: (enabled: boolean) => void;
+  addAdventureBeat: (beat: AdventureBeat) => void;
   markSessionPromptSent: () => void;
   reset: () => void;
 }
@@ -230,32 +237,62 @@ export interface WeatherState {
 
 const initialWeather: WeatherState = { mood: 'night', pulseRate: 'slow' };
 
+/**
+ * Multi-dimensional weather: composite score from 4 signals.
+ * Each dimension scores 0-1 (higher = worse).
+ *   - Error pressure  (30%): errors in recent turns
+ *   - Cost velocity   (25%): recent per-turn cost vs session average
+ *   - Momentum        (25%): recent turn duration vs session average
+ *   - Productivity    (20%): productive categories vs discussion/error
+ */
 function calculateWeather(turns: TurnRecord[]): WeatherState {
   if (turns.length === 0) return { mood: 'night', pulseRate: 'slow' };
 
-  const recent5 = turns.slice(-5);
-  const recent8 = turns.slice(-8);
-  const errorsInLast5 = recent5.filter(t => t.isError).length;
-  const errorsInLast8 = recent8.filter(t => t.isError).length;
+  const recent = turns.slice(-5);
+  const recentLen = recent.length;
   const lastTurn = turns[turns.length - 1];
   const secondLast = turns.length > 1 ? turns[turns.length - 2] : null;
 
-  // Rainbow: error just resolved (previous was error, current is success)
+  // Rainbow: recovery after error
   if (secondLast?.isError && !lastTurn.isError) {
     return { mood: 'rainbow', pulseRate: 'normal' };
   }
-  // Thunderstorm: 3+ errors in last 5 turns
-  if (errorsInLast5 >= 3) return { mood: 'thunderstorm', pulseRate: 'fast' };
-  // Rainy: 2+ errors in last 5
-  if (errorsInLast5 >= 2) return { mood: 'rainy', pulseRate: 'fast' };
-  // Cloudy: 1 error in last 5
-  if (errorsInLast5 >= 1) return { mood: 'cloudy', pulseRate: 'normal' };
-  // Partly sunny: 1 error in last 8
-  if (errorsInLast8 >= 1) return { mood: 'partly-sunny', pulseRate: 'slow' };
-  // Clear sky: 5+ successful turns
-  if (recent5.filter(t => !t.isError).length >= 5) return { mood: 'clear', pulseRate: 'slow' };
 
-  return { mood: 'partly-sunny', pulseRate: 'slow' };
+  // 1. Error pressure (0-1)
+  const errorScore = recent.filter(t => t.isError).length / recentLen;
+
+  // 2. Cost velocity (0-1): how much recent cost exceeds session average
+  const avgCost = turns.reduce((s, t) => s + t.costUsd, 0) / turns.length;
+  const recentAvgCost = recent.reduce((s, t) => s + t.costUsd, 0) / recentLen;
+  const costRatio = avgCost > 0.0001 ? recentAvgCost / avgCost : 0;
+  // 0 when at-or-below average, 1 when 3x average
+  const costScore = Math.min(1, Math.max(0, (costRatio - 1) / 2));
+
+  // 3. Momentum (0-1): rising turn duration = worse
+  const avgDur = turns.reduce((s, t) => s + t.durationMs, 0) / turns.length;
+  const recentAvgDur = recent.reduce((s, t) => s + t.durationMs, 0) / recentLen;
+  const durRatio = avgDur > 100 ? recentAvgDur / avgDur : 0;
+  const momentumScore = Math.min(1, Math.max(0, (durRatio - 1) / 2));
+
+  // 4. Productivity flow (0-1): low ratio of productive turns = worse
+  const productiveCategories = new Set(['code-write', 'research', 'command', 'success']);
+  const productiveCount = recent.filter(t => productiveCategories.has(t.category)).length;
+  const flowScore = 1 - (productiveCount / recentLen);
+
+  // Weighted composite
+  const composite = errorScore * 0.30 + costScore * 0.25 + momentumScore * 0.25 + flowScore * 0.20;
+
+  // Map to mood
+  let mood: WeatherMood;
+  if (composite < 0.15) mood = 'clear';
+  else if (composite < 0.30) mood = 'partly-sunny';
+  else if (composite < 0.45) mood = 'cloudy';
+  else if (composite < 0.60) mood = 'rainy';
+  else mood = 'thunderstorm';
+
+  const pulseRate: PulseRate = composite < 0.15 ? 'slow' : composite < 0.45 ? 'normal' : 'fast';
+
+  return { mood, pulseRate };
 }
 
 const initialAchievementProfile: AchievementProfilePayload = {
@@ -335,6 +372,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   achievementToasts: [],
   achievementPanelOpen: false,
   sessionRecap: null,
+  adventureEnabled: true,
+  adventureBeats: [],
   sessionActivityStarted: false,
   sessionActivityElapsedMs: 0,
   sessionActivityRunningSinceMs: null,
@@ -342,14 +381,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Actions
   setSession: (sessionId, model) =>
     set((state) => {
-      const isNewSession = state.sessionId !== sessionId;
+      const isPendingToRealTransition =
+        state.sessionId === 'pending' &&
+        sessionId !== 'pending' &&
+        !!sessionId;
+      const isBrandNewSession =
+        !state.isConnected ||
+        (!isPendingToRealTransition &&
+          state.sessionId !== null &&
+          state.sessionId !== sessionId);
       return {
         sessionId,
         model,
         isConnected: true,
         lastError: null,
         sessionRecap: null,
-        ...(isNewSession
+        ...(isBrandNewSession
           ? {
             sessionActivityStarted: false,
             sessionActivityElapsedMs: 0,
@@ -779,10 +826,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   setAchievementPanelOpen: (open) => set({ achievementPanelOpen: open }),
   setSessionRecap: (recap) => set({ sessionRecap: recap }),
   setAchievementGoals: (goals) => set({ achievementGoals: goals }),
+  setAdventureEnabled: (enabled) => set({ adventureEnabled: enabled }),
+
+  addAdventureBeat: (beat) =>
+    set((state) => {
+      const updated = [...state.adventureBeats, beat];
+      const trimmed = updated.length > 100 ? updated.slice(-100) : updated;
+      return { adventureBeats: trimmed };
+    }),
+
   markSessionPromptSent: () =>
     set((state) => {
       if (state.sessionActivityStarted) {
-        return state;
+        return {};
       }
       return {
         sessionActivityStarted: true,
@@ -822,6 +878,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       translatingMessageIds: new Set(),
       showingTranslation: new Set(),
       vitalsEnabled: state.vitalsEnabled,
+      adventureEnabled: state.adventureEnabled,
+      adventureBeats: [],
       turnHistory: [],
       turnByMessageId: {},
       weather: { ...initialWeather },

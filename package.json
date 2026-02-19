@@ -195,6 +195,11 @@
           "default": true,
           "description": "Show Session Vitals dashboard (timeline minimap, weather widget, cost heat bar, turn intensity borders)"
         },
+        "claudeMirror.adventureWidget": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the Adventure Widget - a pixel-art dungeon crawler that visualizes Claude's tool activity as a roguelike adventure"
+        },
         "claudeMirror.achievements.enabled": {
           "type": "boolean",
           "default": true,

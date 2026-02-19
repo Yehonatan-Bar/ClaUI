@@ -49,7 +49,9 @@ export function useClaudeStream(): void {
     setAchievementGoals,
     setSessionRecap,
     setVitalsEnabled,
+    setAdventureEnabled,
     addTurnRecord,
+    addAdventureBeat,
   } = useAppStore();
 
   useEffect(() => {
@@ -335,6 +337,14 @@ export function useClaudeStream(): void {
         case 'vitalsSetting':
           setVitalsEnabled(msg.enabled);
           break;
+
+        case 'adventureWidgetSetting':
+          setAdventureEnabled(msg.enabled);
+          break;
+
+        case 'adventureBeat':
+          addAdventureBeat(msg.beat as import('../components/Vitals/adventure/types').AdventureBeat);
+          break;
       }
     }
 
@@ -383,7 +393,9 @@ export function useClaudeStream(): void {
     setAchievementGoals,
     setSessionRecap,
     setVitalsEnabled,
+    setAdventureEnabled,
     addTurnRecord,
+    addAdventureBeat,
   ]);
 }
 
