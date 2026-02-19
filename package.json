@@ -3,10 +3,17 @@
   "displayName": "Claude Code Mirror",
   "description": "Rich chat interface for Claude Code with terminal mirroring",
   "version": "0.1.0",
-  "publisher": "claude-code-mirror",
+  "publisher": "JohnBar",
+  "icon": "images/icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Yehonatan-Bar/ClaUI"
+  },
+  "homepage": "https://github.com/Yehonatan-Bar/ClaUI#readme",
   "categories": ["AI", "Chat"],
   "activationEvents": [],
   "main": "./dist/extension.js",
