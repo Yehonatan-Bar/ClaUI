@@ -137,6 +137,11 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ text }) => {
     // Linkify bare file paths and URLs in text nodes
     linkifyTextNodes(container);
 
+    // Per-paragraph bidi: let the browser detect direction for each block element
+    container.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6, td, th').forEach((el) => {
+      el.setAttribute('dir', 'auto');
+    });
+
     // Event delegation for clickable elements
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;

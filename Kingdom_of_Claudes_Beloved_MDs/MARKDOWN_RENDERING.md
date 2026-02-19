@@ -85,7 +85,9 @@ All Markdown styles use VS Code CSS variables for automatic theme adaptation:
 
 ### RTL Support
 
-When the message container has `dir="rtl"` (detected by `useRtlDetection`):
+Message containers use `dir="auto"` (browser's first-strong-character algorithm) instead of the old any-Hebrew-char heuristic. MarkdownContent also applies `dir="auto"` to each block-level element (p, li, headings, td) so each paragraph independently detects its direction.
+
+When an element resolves to RTL:
 
 - `.markdown-content` text aligns right
 - Lists (`ul`, `ol`) use `padding-right` instead of `padding-left`

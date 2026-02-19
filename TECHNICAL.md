@@ -75,7 +75,7 @@ claude-code-mirror/
 |       +-- state/store.ts               #   Zustand state management
 |       +-- hooks/
 |       |   +-- useClaudeStream.ts        #   postMessage event dispatcher
-|       |   +-- useRtlDetection.ts        #   Hebrew/Arabic RTL detection
+|       |   +-- useRtlDetection.ts        #   detectRtl() helper for InputArea (messages use dir="auto")
 |       |   +-- useFileMention.ts         #   @ file mention trigger detection, debounced search, popup state
 |       +-- components/
 |       |   +-- ChatView/
