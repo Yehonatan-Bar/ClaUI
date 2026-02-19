@@ -396,6 +396,18 @@ export const SPARKLE: SpriteFrame = [
   [0, 0, 0, 0],
 ];
 
+/** Tiny sparkle for ambient dust (2x2) */
+export const SPARKLE_SMALL: SpriteFrame = [
+  [12, 0],
+  [0, 12],
+];
+
+/** Tiny dust mote for ambient floating (2x2) */
+export const DUST_SMALL: SpriteFrame = [
+  [15, 0],
+  [0, 15],
+];
+
 // =====================================================
 // ENCOUNTER SPRITE MAP - maps beat type to sprite(s)
 // =====================================================
@@ -429,5 +441,149 @@ export function getResolutionParticle(beat: AdventureBeatType): SpriteFrame | nu
     case 'read':
     case 'scout':      return SPARKLE;
     default:           return null;
+  }
+}
+
+// =====================================================
+// MINI SPRITES (4x4 pixels) for maze view
+// At heroScale=2, these render as 8x8 CSS pixels, fitting in 8px passages
+// =====================================================
+
+// --- Mini Hero ---
+export const HERO_MINI_IDLE1: SpriteFrame = [
+  [0, 5, 5, 0],    // gold hat
+  [0, 13, 13, 0],  // face
+  [0, 10, 10, 0],  // blue body
+  [0, 14, 14, 0],  // legs
+];
+
+export const HERO_MINI_IDLE2: SpriteFrame = [
+  [0, 5, 5, 0],    // gold hat
+  [0, 13, 13, 0],  // face
+  [0, 10, 10, 0],  // blue body
+  [0, 0, 14, 0],   // weight shift
+];
+
+export const HERO_MINI_WALK1: SpriteFrame = [
+  [0, 5, 5, 0],    // gold hat
+  [0, 13, 13, 0],  // face
+  [0, 10, 10, 0],  // blue body
+  [14, 0, 0, 14],  // legs apart
+];
+
+export const HERO_MINI_WALK2: SpriteFrame = [
+  [0, 5, 5, 0],    // gold hat
+  [0, 13, 13, 0],  // face
+  [0, 10, 10, 0],  // blue body
+  [0, 14, 14, 0],  // legs together
+];
+
+export const HERO_MINI_ACTION: SpriteFrame = [
+  [0, 5, 5, 0],    // gold hat
+  [0, 13, 13, 14], // face + arm raised
+  [0, 10, 10, 0],  // blue body
+  [0, 14, 14, 0],  // legs
+];
+
+export const HERO_MINI_SIT: SpriteFrame = [
+  [0, 0, 0, 0],    // empty (lower)
+  [0, 5, 5, 0],    // gold hat
+  [0, 13, 13, 0],  // face
+  [10, 10, 10, 10], // sitting body wide
+];
+
+// --- Mini Encounters ---
+export const MINI_SCROLL: SpriteFrame = [
+  [0, 12, 12, 0],  // glow
+  [0, 13, 13, 0],  // scroll top
+  [0, 14, 14, 0],  // scroll body
+  [0, 15, 15, 0],  // pedestal
+];
+
+export const MINI_LANTERN: SpriteFrame = [
+  [0, 5, 5, 0],    // flame
+  [0, 4, 4, 0],    // fire
+  [15, 4, 4, 15],  // lantern body
+  [0, 15, 15, 0],  // handle
+];
+
+export const MINI_ANVIL: SpriteFrame = [
+  [0, 4, 0, 5],    // sparks
+  [15, 15, 15, 15], // anvil top
+  [0, 16, 16, 0],  // anvil body
+  [0, 16, 16, 0],  // anvil base
+];
+
+export const MINI_SKELETON: SpriteFrame = [
+  [0, 13, 13, 0],  // skull
+  [0, 13, 13, 0],  // head
+  [14, 13, 13, 14], // arms+torso
+  [0, 13, 13, 0],  // legs
+];
+
+export const MINI_DRAGON: SpriteFrame = [
+  [3, 0, 0, 3],    // horns
+  [3, 3, 3, 3],    // head
+  [0, 5, 5, 0],    // eyes
+  [0, 4, 4, 0],    // fire breath
+];
+
+export const MINI_CHEST: SpriteFrame = [
+  [4, 4, 4, 4],    // lid
+  [4, 5, 5, 4],    // gold showing
+  [4, 4, 4, 4],    // body
+  [0, 0, 0, 0],    // empty
+];
+
+export const MINI_SPIKES: SpriteFrame = [
+  [0, 0, 0, 0],    // empty
+  [0, 15, 0, 15],  // spike tips
+  [15, 15, 15, 15], // spike middle
+  [16, 16, 16, 16], // base
+];
+
+export const MINI_SIGNPOST: SpriteFrame = [
+  [15, 15, 15, 0], // top sign
+  [0, 0, 16, 0],   // post
+  [0, 0, 16, 15],  // post + bottom sign
+  [0, 0, 16, 0],   // post base
+];
+
+export const MINI_FLAG: SpriteFrame = [
+  [16, 6, 6, 6],   // pole + flag
+  [16, 0, 6, 6],   // pole + flag
+  [16, 0, 0, 0],   // pole
+  [16, 0, 0, 0],   // pole base
+];
+
+// --- Mini Campfire ---
+export const MINI_CAMPFIRE1: SpriteFrame = [
+  [0, 0, 5, 0],    // flame tip
+  [0, 4, 5, 4],    // flame body
+  [0, 3, 4, 3],    // embers
+  [4, 16, 16, 4],  // logs
+];
+
+export const MINI_CAMPFIRE2: SpriteFrame = [
+  [0, 5, 0, 0],    // flame tip (shifted)
+  [0, 5, 4, 0],    // flame body
+  [0, 4, 3, 3],    // embers
+  [4, 16, 16, 4],  // logs
+];
+
+/** Get mini encounter sprites for the maze view */
+export function getMiniEncounterSprites(beat: AdventureBeatType): SpriteFrame[] {
+  switch (beat) {
+    case 'read':       return [MINI_SCROLL];
+    case 'scout':      return [MINI_LANTERN];
+    case 'carve':      return [MINI_ANVIL];
+    case 'forge':      return [MINI_ANVIL];
+    case 'fork':       return [MINI_SIGNPOST];
+    case 'trap':       return [MINI_SPIKES];
+    case 'monster':    return [MINI_SKELETON];
+    case 'boss':       return [MINI_DRAGON];
+    case 'treasure':   return [MINI_CHEST];
+    case 'checkpoint': return [MINI_FLAG];
+    case 'wander':     return [];
   }
 }

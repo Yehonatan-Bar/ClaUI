@@ -1,9 +1,12 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 
+/** RTL languages that need dir="rtl" when displaying translations */
+export const RTL_LANGUAGES = new Set(['Hebrew', 'Arabic']);
+
 /**
  * Spawns a one-shot Claude CLI process to translate message text
- * to Hebrew using Sonnet 4.6. Follows the SessionNamer pattern.
+ * using Sonnet 4.6. Follows the SessionNamer pattern.
  */
 export class MessageTranslator {
   private log: (msg: string) => void = () => {};
@@ -13,19 +16,22 @@ export class MessageTranslator {
   }
 
   /**
-   * Translate text content to Hebrew using Claude Sonnet via the CLI.
+   * Translate text content using Claude Sonnet via the CLI.
    * Code blocks should be stripped BEFORE calling this method.
+   * @param textContent Text to translate (code blocks already stripped)
+   * @param language Target language (defaults to config setting, then Hebrew)
    * Returns the translated text, or null on failure.
    */
-  async translate(textContent: string): Promise<string | null> {
+  async translate(textContent: string, language?: string): Promise<string | null> {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const cliPath = config.get<string>('cliPath', 'claude');
+    const targetLang = language || config.get<string>('translationLanguage', 'Hebrew');
 
     const prompt = [
-      'You are a professional translator. Translate the following text to Hebrew.',
+      `You are a professional translator. Translate the following text to ${targetLang}.`,
       '',
       'RULES:',
-      '- Translate ALL text content to Hebrew.',
+      `- Translate ALL text content to ${targetLang}.`,
       '- Preserve all markdown formatting (bold, italic, headers, lists, links, etc.).',
       '- Do NOT translate technical terms, variable names, function names, file paths, or command names.',
       '- Do NOT translate text inside inline code (backticks).',
@@ -45,7 +51,7 @@ export class MessageTranslator {
     delete env.CLAUDECODE;
     delete env.CLAUDE_CODE_ENTRYPOINT;
 
-    this.log(`[MessageTranslator] Spawning CLI for translation (${textContent.length} chars)`);
+    this.log(`[MessageTranslator] Spawning CLI for translation to ${targetLang} (${textContent.length} chars)`);
 
     return new Promise<string | null>((resolve) => {
       let stdout = '';

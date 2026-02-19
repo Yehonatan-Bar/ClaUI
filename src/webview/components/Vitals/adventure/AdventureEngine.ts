@@ -1,20 +1,22 @@
 /**
  * Adventure Engine - core state machine, animation loop, and canvas rendering.
- * Manages the dungeon crawler visualization driven by AdventureBeat events.
+ * Uses Maze class for thin-wall maze grid with mini sprites.
  */
 
 import type { AdventureBeat, AdventureState, TilePos, AdventureConfig } from './types';
 import { DEFAULT_CONFIG } from './types';
-import { Dungeon } from './dungeon';
+import { Maze } from './dungeon';
 import {
   drawSprite,
-  HERO_IDLE_1, HERO_IDLE_2,
-  HERO_WALK_1, HERO_WALK_2,
-  HERO_ACTION, HERO_SIT,
-  CAMPFIRE_1, CAMPFIRE_2,
-  getEncounterSprites,
+  HERO_MINI_IDLE1, HERO_MINI_IDLE2,
+  HERO_MINI_WALK1, HERO_MINI_WALK2,
+  HERO_MINI_ACTION, HERO_MINI_SIT,
+  MINI_CAMPFIRE1, MINI_CAMPFIRE2,
+  getMiniEncounterSprites,
   getResolutionParticle,
   PALETTE,
+  SPARKLE_SMALL,
+  DUST_SMALL,
 } from './sprites';
 import type { SpriteFrame } from './types';
 
@@ -33,7 +35,7 @@ export class AdventureEngine {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private config: AdventureConfig;
-  private dungeon: Dungeon;
+  private maze: Maze;
 
   // State machine
   private state: AdventureState = 'idle';
@@ -49,7 +51,7 @@ export class AdventureEngine {
   private lastFrameTime = 0;
   private walkPath: TilePos[] = [];
   private walkStep = 0;
-  private walkProgress = 0; // 0-1 interpolation between tiles
+  private walkProgress = 0;
   private encounterTimer = 0;
   private resolutionTimer = 0;
 
@@ -58,10 +60,20 @@ export class AdventureEngine {
   private isAtCampfire = false;
   private idleIntervalId: ReturnType<typeof setInterval> | null = null;
 
-  // Hero micro-movement (sub-pixel idle drift)
+  // Hero micro-movement
   private microOffsetX = 0;
   private microOffsetY = 0;
   private microPhase = 0;
+
+  // Idle patrol
+  private patrolPath: TilePos[] = [];
+  private patrolIdx = 0;
+  private patrolProgress = 0;
+  private patrolCooldown = 0;
+  private isPatrolling = false;
+
+  // Ambient particles
+  private ambientTimer = 0;
 
   // Particles
   private particles: Particle[] = [];
@@ -90,10 +102,13 @@ export class AdventureEngine {
     // Pixel art: no smoothing
     this.ctx.imageSmoothingEnabled = false;
 
-    // Initialize dungeon
-    this.dungeon = new Dungeon(Date.now());
+    // Initialize maze
+    this.maze = new Maze(Date.now(), this.config);
 
-    // Start idle animation (low frequency)
+    // Start patrol quickly after load
+    this.patrolCooldown = 1.0;
+
+    // Start idle animation
     this.startIdleLoop();
 
     // Initial render
@@ -117,8 +132,8 @@ export class AdventureEngine {
     this.beatQueue.push(beat);
     this.idleTimer = 0;
     this.isAtCampfire = false;
+    this.isPatrolling = false;
 
-    // If idle, start processing
     if (this.state === 'idle') {
       this.processNextBeat();
     }
@@ -149,21 +164,22 @@ export class AdventureEngine {
     // Fast-forward if queue is too long
     while (this.beatQueue.length > 5) {
       const skipped = this.beatQueue.shift()!;
-      // Instantly add room and move hero
-      this.dungeon.addBeat(skipped);
-      this.dungeon.heroPos = { ...this.dungeon.heroTarget };
+      this.maze.addBeat(skipped);
+      this.maze.heroPos = { ...this.maze.heroTarget };
     }
 
     this.currentBeat = this.beatQueue.shift()!;
     this._tooltipText = this.buildTooltip(this.currentBeat);
 
-    // Add room to dungeon
-    this.dungeon.addBeat(this.currentBeat);
+    // Extend maze based on beat
+    this.maze.addBeat(this.currentBeat);
 
-    // Start walking
-    this.walkPath = this.dungeon.getPathToTarget();
+    // Find path through maze corridors
+    this.walkPath = this.maze.getPathToTarget();
     this.walkStep = 0;
     this.walkProgress = 0;
+
+    // Scale walk speed for longer paths
     this.transitionTo('walking');
   }
 
@@ -199,7 +215,7 @@ export class AdventureEngine {
     if (this.rafId !== null) return;
     this.lastFrameTime = performance.now();
     const loop = (now: number) => {
-      const dt = (now - this.lastFrameTime) / 1000;
+      const dt = Math.min((now - this.lastFrameTime) / 1000, 0.1); // cap at 100ms
       this.lastFrameTime = now;
       this.update(dt);
       this.render();
@@ -217,23 +233,49 @@ export class AdventureEngine {
 
   private startIdleLoop(): void {
     if (this.idleIntervalId !== null) return;
-    // Higher frequency idle rendering (4fps) for visible micro-movement
     this.idleIntervalId = setInterval(() => {
       this.frameCount++;
-      this.idleTimer += 0.25;
-      this.microPhase += 0.15;
+      const dt = 0.125; // 1/8 second
+      this.idleTimer += dt;
+      this.microPhase += 0.2;
+      this.ambientTimer += dt;
 
-      // Subtle breathing/fidget motion (1-2 pixel drift)
+      // Breathing/fidget motion (1-2 pixel drift - smaller for mini sprites)
       this.microOffsetX = Math.sin(this.microPhase) * 1.5;
-      this.microOffsetY = Math.sin(this.microPhase * 0.7 + 1.2) * 1.0;
+      this.microOffsetY = Math.sin(this.microPhase * 0.7 + 1.2) * 1;
 
-      // Transition to campfire after 10 seconds of idle
+      // Spawn ambient dust particles periodically
+      if (this.ambientTimer > 0.8) {
+        this.ambientTimer = 0;
+        this.spawnAmbientParticle();
+      }
+
+      // Update particles
+      this.updateParticles(dt);
+
+      // Smooth camera during idle
+      this.maze.updateCamera(dt);
+
+      // Idle patrol
+      if (!this.isPatrolling && !this.isAtCampfire) {
+        this.patrolCooldown -= dt;
+        if (this.patrolCooldown <= 0) {
+          this.startPatrol();
+        }
+      }
+
+      if (this.isPatrolling) {
+        this.updatePatrol(dt);
+      }
+
+      // Campfire after 20s idle
       if (this.idleTimer > 20 && !this.isAtCampfire && !this._isBusy) {
         this.isAtCampfire = true;
+        this.isPatrolling = false;
       }
 
       this.render();
-    }, 250);
+    }, 125);
   }
 
   private stopIdleLoop(): void {
@@ -241,6 +283,67 @@ export class AdventureEngine {
       clearInterval(this.idleIntervalId);
       this.idleIntervalId = null;
     }
+    this.isPatrolling = false;
+  }
+
+  /** Start an idle patrol through nearby maze corridors */
+  private startPatrol(): void {
+    const targets = this.maze.getPatrolPath();
+    if (targets.length <= 1) {
+      this.patrolCooldown = 2;
+      return;
+    }
+
+    // Build actual BFS paths between patrol waypoints
+    this.patrolPath = [];
+    let current = this.maze.heroPos;
+    for (const target of targets) {
+      const segment = this.maze.findPath(current.x, current.y, target.x, target.y);
+      this.patrolPath.push(...segment);
+      current = target;
+    }
+
+    if (this.patrolPath.length === 0) {
+      this.patrolCooldown = 2;
+      return;
+    }
+
+    this.patrolIdx = 0;
+    this.patrolProgress = 0;
+    this.isPatrolling = true;
+  }
+
+  /** Update patrol walking through maze paths */
+  private updatePatrol(dt: number): void {
+    if (this.patrolIdx >= this.patrolPath.length) {
+      this.isPatrolling = false;
+      this.patrolCooldown = 1.5 + Math.random() * 2;
+      return;
+    }
+
+    this.patrolProgress += dt * 3; // 3 cells/sec patrol speed
+    if (this.patrolProgress >= 1) {
+      this.patrolProgress = 0;
+      this.maze.heroPos = { ...this.patrolPath[this.patrolIdx] };
+      this.patrolIdx++;
+    }
+  }
+
+  /** Spawn a floating ambient dust/spark particle */
+  private spawnAmbientParticle(): void {
+    const { canvasWidth, canvasHeight } = this.config;
+    const x = Math.random() * canvasWidth;
+    const y = canvasHeight * 0.3 + Math.random() * canvasHeight * 0.5;
+
+    this.particles.push({
+      x,
+      y,
+      vx: (Math.random() - 0.5) * 6,
+      vy: -3 - Math.random() * 5,
+      life: 1.5 + Math.random() * 1.5,
+      maxLife: 3,
+      sprite: Math.random() > 0.5 ? SPARKLE_SMALL : DUST_SMALL,
+    });
   }
 
   // ====== UPDATE ======
@@ -248,6 +351,9 @@ export class AdventureEngine {
   private update(dt: number): void {
     this.frameCount++;
     this.stateTimer += dt;
+
+    // Smooth camera during active states
+    this.maze.updateCamera(dt);
 
     // Update particles
     this.updateParticles(dt);
@@ -271,14 +377,19 @@ export class AdventureEngine {
       return;
     }
 
-    this.walkProgress += dt * 4; // tiles per second (slower = more visible movement)
+    // Dynamic speed: faster for longer paths
+    const speed = Math.min(8, 4 + this.walkPath.length / 10);
+    this.walkProgress += dt * speed;
+
     if (this.walkProgress >= 1) {
       this.walkProgress = 0;
-      this.dungeon.heroPos = this.walkPath[this.walkStep];
-      this.walkStep++;
+      if (this.walkStep < this.walkPath.length) {
+        this.maze.heroPos = { ...this.walkPath[this.walkStep] };
+        this.walkStep++;
+      }
 
       if (this.walkStep >= this.walkPath.length) {
-        this.dungeon.heroPos = { ...this.dungeon.heroTarget };
+        this.maze.heroPos = { ...this.maze.heroTarget };
         this.transitionTo('encounter');
       }
     }
@@ -286,7 +397,6 @@ export class AdventureEngine {
 
   private updateEncounter(_dt: number): void {
     this.encounterTimer++;
-    // Encounter animation lasts ~60 frames (~1 second at 60fps)
     if (this.encounterTimer > 60) {
       this.transitionTo('resolution');
     }
@@ -294,7 +404,6 @@ export class AdventureEngine {
 
   private updateResolution(_dt: number): void {
     this.resolutionTimer++;
-    // Resolution lasts ~30 frames (~0.5 seconds)
     if (this.resolutionTimer > 30) {
       this.processNextBeat();
     }
@@ -305,7 +414,7 @@ export class AdventureEngine {
       const p = this.particles[i];
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.vy += 30 * dt; // gravity
+      p.vy += 30 * dt;
       p.life -= dt;
       if (p.life <= 0) {
         this.particles.splice(i, 1);
@@ -318,14 +427,13 @@ export class AdventureEngine {
     const sprite = getResolutionParticle(this.currentBeat.beat);
     if (!sprite) return;
 
-    const { pixelScale, tileSize } = this.config;
-    const tilePx = tileSize * pixelScale;
-    const heroScreenX = this.dungeon.heroPos.x * tilePx - this.dungeon.cameraX;
-    const heroScreenY = this.dungeon.heroPos.y * tilePx - this.dungeon.cameraY;
+    const { cellSize, heroScale } = this.config;
+    const heroScreenX = this.maze.heroPos.x * cellSize - this.maze.cameraX + cellSize / 2;
+    const heroScreenY = this.maze.heroPos.y * cellSize - this.maze.cameraY;
 
     for (let i = 0; i < 5; i++) {
       this.particles.push({
-        x: heroScreenX + tilePx / 2,
+        x: heroScreenX,
         y: heroScreenY,
         vx: (Math.random() - 0.5) * 40,
         vy: -20 - Math.random() * 30,
@@ -339,20 +447,17 @@ export class AdventureEngine {
   // ====== RENDER ======
 
   private render(): void {
-    const { canvasWidth, canvasHeight, pixelScale, tileSize } = this.config;
+    const { canvasWidth, canvasHeight } = this.config;
     const ctx = this.ctx;
 
     // Clear canvas with dark background
     ctx.fillStyle = '#0d0d1a';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    // Update camera
-    this.dungeon.updateCamera(canvasWidth, canvasHeight, pixelScale, tileSize);
+    // Render maze (floor + walls + torches)
+    this.maze.renderMaze(ctx, canvasWidth, canvasHeight, this.frameCount);
 
-    // Render dungeon tiles
-    this.dungeon.renderTiles(ctx, canvasWidth, canvasHeight, pixelScale, tileSize, this.frameCount);
-
-    // Render encounter object (if in encounter/resolution state)
+    // Render encounter object
     if ((this.state === 'encounter' || this.state === 'resolution') && this.currentBeat) {
       this.renderEncounter();
     }
@@ -375,24 +480,25 @@ export class AdventureEngine {
   }
 
   private renderHero(): void {
-    const { pixelScale, tileSize } = this.config;
-    const tilePx = tileSize * pixelScale;
+    const { cellSize, heroScale } = this.config;
+    // Center the 4x4 sprite (8px at 2x scale) within the 10px cell
+    const spriteSize = 4 * heroScale; // 8px
+    const offset = (cellSize - spriteSize) / 2; // 1px centering
 
     let heroX: number;
     let heroY: number;
 
     if (this.state === 'walking' && this.walkPath.length > 0 && this.walkStep < this.walkPath.length) {
-      // Interpolate between current position and next path tile
-      const from = this.walkStep > 0 ? this.walkPath[this.walkStep - 1] : this.dungeon.heroPos;
+      const from = this.walkStep > 0 ? this.walkPath[this.walkStep - 1] : this.maze.heroPos;
       const to = this.walkPath[this.walkStep];
-      heroX = (from.x + (to.x - from.x) * this.walkProgress) * tilePx - this.dungeon.cameraX;
-      heroY = (from.y + (to.y - from.y) * this.walkProgress) * tilePx - this.dungeon.cameraY;
+      heroX = (from.x + (to.x - from.x) * this.walkProgress) * cellSize - this.maze.cameraX + offset;
+      heroY = (from.y + (to.y - from.y) * this.walkProgress) * cellSize - this.maze.cameraY + offset;
     } else {
-      heroX = this.dungeon.heroPos.x * tilePx - this.dungeon.cameraX;
-      heroY = this.dungeon.heroPos.y * tilePx - this.dungeon.cameraY;
+      heroX = this.maze.heroPos.x * cellSize - this.maze.cameraX + offset;
+      heroY = this.maze.heroPos.y * cellSize - this.maze.cameraY + offset;
     }
 
-    // Apply idle micro-movement offset (subtle breathing/fidget)
+    // Apply idle micro-movement
     if (this.state === 'idle' || this.state === 'encounter') {
       heroX += this.microOffsetX;
       heroY += this.microOffsetY;
@@ -401,62 +507,66 @@ export class AdventureEngine {
     let sprite: SpriteFrame;
     switch (this.state) {
       case 'walking':
-        sprite = Math.floor(this.frameCount / 8) % 2 === 0 ? HERO_WALK_1 : HERO_WALK_2;
+        sprite = Math.floor(this.frameCount / 8) % 2 === 0 ? HERO_MINI_WALK1 : HERO_MINI_WALK2;
         break;
       case 'encounter':
-        sprite = HERO_ACTION;
+        sprite = HERO_MINI_ACTION;
         break;
       case 'idle':
         if (this.isAtCampfire) {
-          sprite = HERO_SIT;
+          sprite = HERO_MINI_SIT;
+        } else if (this.isPatrolling) {
+          sprite = Math.floor(this.frameCount / 3) % 2 === 0 ? HERO_MINI_WALK1 : HERO_MINI_WALK2;
         } else {
-          sprite = Math.floor(this.frameCount / 4) % 2 === 0 ? HERO_IDLE_1 : HERO_IDLE_2;
+          sprite = Math.floor(this.frameCount / 4) % 2 === 0 ? HERO_MINI_IDLE1 : HERO_MINI_IDLE2;
         }
         break;
       default:
-        sprite = HERO_IDLE_1;
+        sprite = HERO_MINI_IDLE1;
     }
 
-    drawSprite(this.ctx, sprite, heroX, heroY, pixelScale);
+    drawSprite(this.ctx, sprite, heroX, heroY, heroScale);
   }
 
   private renderEncounter(): void {
     if (!this.currentBeat) return;
-    const { pixelScale, tileSize } = this.config;
-    const tilePx = tileSize * pixelScale;
+    const { cellSize, heroScale } = this.config;
 
-    const sprites = getEncounterSprites(this.currentBeat.beat);
+    const sprites = getMiniEncounterSprites(this.currentBeat.beat);
     if (sprites.length === 0) return;
 
-    // Place encounter one tile to the right of hero
-    const encounterX = this.dungeon.heroTarget.x * tilePx - this.dungeon.cameraX + tilePx;
-    const encounterY = this.dungeon.heroTarget.y * tilePx - this.dungeon.cameraY;
+    const spriteSize = 4 * heroScale;
+    const offset = (cellSize - spriteSize) / 2;
+
+    // Place encounter at the hero's target cell (offset slightly to the right)
+    const encounterX = this.maze.heroTarget.x * cellSize - this.maze.cameraX + offset + cellSize;
+    const encounterY = this.maze.heroTarget.y * cellSize - this.maze.cameraY + offset;
 
     const frameIdx = sprites.length > 1
       ? Math.floor(this.frameCount / 15) % sprites.length
       : 0;
 
-    drawSprite(this.ctx, sprites[frameIdx], encounterX, encounterY, pixelScale);
+    drawSprite(this.ctx, sprites[frameIdx], encounterX, encounterY, heroScale);
   }
 
   private renderCampfire(): void {
-    const { pixelScale, tileSize } = this.config;
-    const tilePx = tileSize * pixelScale;
+    const { cellSize, heroScale } = this.config;
+    const spriteSize = 4 * heroScale;
+    const offset = (cellSize - spriteSize) / 2;
 
-    // Place campfire one tile to the right of hero
-    const cfX = this.dungeon.heroPos.x * tilePx - this.dungeon.cameraX + tilePx;
-    const cfY = this.dungeon.heroPos.y * tilePx - this.dungeon.cameraY;
+    const cfX = this.maze.heroPos.x * cellSize - this.maze.cameraX + offset + cellSize;
+    const cfY = this.maze.heroPos.y * cellSize - this.maze.cameraY + offset;
 
-    const sprite = Math.floor(this.frameCount / 3) % 2 === 0 ? CAMPFIRE_1 : CAMPFIRE_2;
-    drawSprite(this.ctx, sprite, cfX, cfY, pixelScale);
+    const sprite = Math.floor(this.frameCount / 3) % 2 === 0 ? MINI_CAMPFIRE1 : MINI_CAMPFIRE2;
+    drawSprite(this.ctx, sprite, cfX, cfY, heroScale);
   }
 
   private renderParticles(): void {
-    const { pixelScale } = this.config;
+    const { heroScale } = this.config;
     for (const p of this.particles) {
       const alpha = Math.max(0, p.life / p.maxLife);
       this.ctx.globalAlpha = alpha;
-      drawSprite(this.ctx, p.sprite, p.x, p.y, pixelScale);
+      drawSprite(this.ctx, p.sprite, p.x, p.y, heroScale);
     }
     this.ctx.globalAlpha = 1;
   }

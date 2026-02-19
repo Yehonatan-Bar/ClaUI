@@ -43,10 +43,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   const translatingMessageIds = useAppStore((s) => s.translatingMessageIds);
   const showingTranslation = useAppStore((s) => s.showingTranslation);
   const toggleTranslationView = useAppStore((s) => s.toggleTranslationView);
+  const translationLanguage = useAppStore((s) => s.translationLanguage);
 
   const isTranslating = translatingMessageIds.has(message.id);
   const hasTranslation = message.id in translations;
   const isShowingTranslation = showingTranslation.has(message.id);
+  const isRtlLanguage = translationLanguage === 'Hebrew' || translationLanguage === 'Arabic';
 
   // Session Vitals: turn intensity border
   const vitalsEnabled = useAppStore((s) => s.vitalsEnabled);
@@ -86,8 +88,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
       type: 'translateMessage',
       messageId: message.id,
       textContent: translatableText,
+      language: translationLanguage,
     });
-  }, [message.id, hasTranslation, contentBlocks, toggleTranslationView]);
+  }, [message.id, hasTranslation, contentBlocks, toggleTranslationView, translationLanguage]);
 
   const [copied, setCopied] = useState(false);
 
@@ -181,10 +184,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
           <button
             className={`translate-message-btn${isShowingTranslation ? ' showing-translation' : ''}${isTranslating ? ' translating' : ''}`}
             onClick={handleTranslate}
-            title={isShowingTranslation ? 'Show original' : 'Translate to Hebrew'}
+            title={isShowingTranslation ? 'Show original' : `Translate to ${translationLanguage}`}
             disabled={isTranslating}
           >
-            {isTranslating ? 'Translating...' : isShowingTranslation ? 'Original' : 'Translate'}
+            {isTranslating ? 'Translating...' : isShowingTranslation ? 'Original' : translationLanguage}
           </button>
         )}
       </div>
@@ -209,7 +212,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
           </div>
         </div>
       ) : isShowingTranslation ? (
-        <div dir="rtl">
+        <div dir={isRtlLanguage ? 'rtl' : 'auto'}>
           <TextBlockRenderer text={translations[message.id]} />
           {contentBlocks
             .filter((block) => block.type !== 'text')

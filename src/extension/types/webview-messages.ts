@@ -140,6 +140,8 @@ export interface TranslateMessageRequest {
   messageId: string;
   /** Text content to translate (code blocks already stripped by the webview) */
   textContent: string;
+  /** Target language selected in the webview (fallback to config when omitted) */
+  language?: string;
 }
 
 export interface FileSearchRequest {
@@ -161,6 +163,11 @@ export interface SetVitalsEnabledRequest {
 export interface SetAdventureWidgetEnabledRequest {
   type: 'setAdventureWidgetEnabled';
   enabled: boolean;
+}
+
+export interface SetTranslationLanguageRequest {
+  type: 'setTranslationLanguage';
+  language: string;
 }
 
 export interface GetAchievementsSnapshotRequest {
@@ -199,7 +206,8 @@ export type WebviewToExtensionMessage =
   | SetAchievementsEnabledRequest
   | GetAchievementsSnapshotRequest
   | SetVitalsEnabledRequest
-  | SetAdventureWidgetEnabledRequest;
+  | SetAdventureWidgetEnabledRequest
+  | SetTranslationLanguageRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -368,6 +376,11 @@ export interface TranslationResultMessage {
   error?: string;
 }
 
+export interface TranslationLanguageSettingMessage {
+  type: 'translationLanguageSetting';
+  language: string;
+}
+
 export type AchievementRarity = 'common' | 'rare' | 'epic' | 'legendary';
 export type AchievementCategory = 'debugging' | 'testing' | 'refactor' | 'collaboration' | 'session';
 
@@ -532,6 +545,7 @@ export type ExtensionToWebviewMessage =
   | ForkInitMessage
   | ConversationHistoryMessage
   | TranslationResultMessage
+  | TranslationLanguageSettingMessage
   | FileSearchResultMessage
   | AchievementsSettingsMessage
   | AchievementsSnapshotMessage

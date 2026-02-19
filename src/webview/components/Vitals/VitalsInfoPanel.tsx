@@ -2,6 +2,11 @@ import React from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 
+const LANGUAGE_OPTIONS = [
+  'Hebrew', 'Arabic', 'Russian', 'Spanish', 'French',
+  'German', 'Portuguese', 'Chinese', 'Japanese', 'Korean',
+];
+
 interface VitalsInfoPanelProps {
   onClose: () => void;
 }
@@ -11,6 +16,8 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
   const setVitalsEnabled = useAppStore((s) => s.setVitalsEnabled);
   const adventureEnabled = useAppStore((s) => s.adventureEnabled);
   const setAdventureEnabled = useAppStore((s) => s.setAdventureEnabled);
+  const translationLanguage = useAppStore((s) => s.translationLanguage);
+  const setTranslationLanguage = useAppStore((s) => s.setTranslationLanguage);
 
   const handleToggle = () => {
     const next = !vitalsEnabled;
@@ -22,6 +29,11 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
     const next = !adventureEnabled;
     setAdventureEnabled(next);
     postToExtension({ type: 'setAdventureWidgetEnabled', enabled: next });
+  };
+
+  const handleLanguageChange = (language: string) => {
+    setTranslationLanguage(language);
+    postToExtension({ type: 'setTranslationLanguage', language });
   };
 
   return (
@@ -63,6 +75,19 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
             <span>Pixel-art dungeon crawler. Each turn = a room: scrolls (read), anvils (edit), traps (errors), dragons (3+ errors), treasure (recovery).</span>
           </div>
         </div>
+      </div>
+
+      <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
+        <span>Translate to</span>
+        <select
+          className="vitals-info-language-select"
+          value={translationLanguage}
+          onChange={(e) => handleLanguageChange(e.target.value)}
+        >
+          {LANGUAGE_OPTIONS.map((lang) => (
+            <option key={lang} value={lang}>{lang}</option>
+          ))}
+        </select>
       </div>
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>

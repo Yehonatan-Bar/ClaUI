@@ -125,16 +125,21 @@ export class ActivitySummarizer {
   private async callHaiku(toolNames: string[]): Promise<ActivitySummary | null> {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const cliPath = config.get<string>('cliPath', 'claude');
+    const targetLanguage = config.get<string>('translationLanguage', 'Hebrew');
 
     const toolList = toolNames.map(t => `- ${t}`).join('\n');
     const prompt =
       'You are describing what a developer\'s AI coding assistant (Claude Code) is currently doing, based on the tools it just used.\n\n' +
+      `Target output language: ${targetLanguage}\n\n` +
       'Tools used (most recent last):\n' +
       toolList + '\n\n' +
       'INSTRUCTIONS:\n' +
+      `- Write BOTH lines in ${targetLanguage}.\n` +
       '- Be SPECIFIC about WHICH files, functions, or components are being worked on.\n' +
       '- Mention actual file names, folder names, or component names from the tool arguments.\n' +
       '- NEVER use vague phrases like "reading files", "reviewing code", "exploring the project", "reading documentation", or "understanding the codebase".\n' +
+      '- NEVER claim missing context (do not say "insufficient context", "unable to determine", or similar).\n' +
+      '- If some parameters are missing, summarize concretely using the details that ARE present in the tool list.\n' +
       '- Instead, say what EXACTLY is being read/edited/searched and WHY (infer the purpose from the file names).\n' +
       '- Examples of GOOD output:\n' +
       '  "Analyzing webpack config" / "Claude is checking the webpack build configuration for bundling issues."\n' +
@@ -146,7 +151,7 @@ export class ActivitySummarizer {
       'Respond with EXACTLY two lines:\n' +
       'Line 1: Short specific activity label (3-6 words)\n' +
       'Line 2: One sentence describing specifically what Claude is doing and which files/components are involved\n\n' +
-      'Match the language of any file paths or context. Reply with ONLY the two lines.';
+      'Reply with ONLY the two lines.';
 
     const args = ['-p', '--model', 'claude-haiku-4-5-20251001'];
 
@@ -233,6 +238,12 @@ export class ActivitySummarizer {
 
     // Strip leading/trailing punctuation
     shortLabel = shortLabel.replace(/^[.,!?:;\-]+|[.,!?:;\-]+$/g, '').trim();
+
+    // Guard against "no context" meta-responses leaking into the UI.
+    const missingContextPattern = /(insufficient context|unable to determine|not enough context|missing context|cannot determine)/i;
+    if (missingContextPattern.test(shortLabel) || missingContextPattern.test(fullSummary)) {
+      return null;
+    }
 
     // Reject empty or too long
     if (!shortLabel || shortLabel.length > 50) {
