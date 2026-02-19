@@ -8,3 +8,5 @@ webpack.config.js
 **/*.map
 **/*.ts
 !dist/**
+DEVELOPMENT.md
+Kingdom_of_Claudes_Beloved_MDs/**

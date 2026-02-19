@@ -99,6 +99,15 @@ export interface EditAndResendRequest {
   text: string;
 }
 
+export interface ForkFromMessageRequest {
+  type: 'forkFromMessage';
+  sessionId: string;
+  /** Index of the user message to fork from (0-based in the messages array) */
+  forkMessageIndex: number;
+  /** The text content of the user message being forked */
+  promptText: string;
+}
+
 export interface SetPermissionModeRequest {
   type: 'setPermissionMode';
   mode: 'full-access' | 'supervised';
@@ -137,6 +146,7 @@ export type WebviewToExtensionMessage =
   | OpenUrlRequest
   | GetPromptHistoryRequest
   | EditAndResendRequest
+  | ForkFromMessageRequest
   | SetPermissionModeRequest
   | GitPushRequest
   | GitPushConfigRequest
@@ -281,6 +291,14 @@ export interface GitPushSettingsMessage {
   commitMessageTemplate: string;
 }
 
+export interface ForkInitMessage {
+  type: 'forkInit';
+  /** Index in the replayed messages array at which to truncate */
+  forkMessageIndex: number;
+  /** The prompt text to place in the input area */
+  promptText: string;
+}
+
 export type ExtensionToWebviewMessage =
   | SessionStartedMessage
   | SessionEndedMessage
@@ -303,4 +321,5 @@ export type ExtensionToWebviewMessage =
   | ActivitySummaryMessage
   | PermissionModeSettingMessage
   | GitPushResultMessage
-  | GitPushSettingsMessage;
+  | GitPushSettingsMessage
+  | ForkInitMessage;

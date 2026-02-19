@@ -1446,6 +1446,33 @@ html, body, #root {
   border-color: var(--vscode-focusBorder);
 }
 
+/* Fork message button - appears on hover for user messages */
+.fork-message-btn {
+  float: right;
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 3px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  margin-right: 4px;
+}
+
+.message-user:hover .fork-message-btn {
+  opacity: 1;
+}
+
+.fork-message-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+  border-color: var(--vscode-focusBorder);
+}
+
 .edit-message-area {
   margin-top: 4px;
 }

@@ -95,6 +95,9 @@ export interface AppState {
   gitPushConfigPanelOpen: boolean;
   gitPushRunning: boolean;
 
+  // Fork state (set when a forked tab receives forkInit from extension)
+  forkInit: { forkMessageIndex: number; promptText: string } | null;
+
   // Actions
   setSession: (sessionId: string, model: string) => void;
   endSession: (reason: string) => void;
@@ -146,6 +149,7 @@ export interface AppState {
   setGitPushResult: (result: { success: boolean; output: string } | null) => void;
   setGitPushConfigPanelOpen: (open: boolean) => void;
   setGitPushRunning: (running: boolean) => void;
+  setForkInit: (init: { forkMessageIndex: number; promptText: string } | null) => void;
   reset: () => void;
 }
 
@@ -215,6 +219,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   gitPushResult: null,
   gitPushConfigPanelOpen: false,
   gitPushRunning: false,
+  forkInit: null,
 
   // Actions
   setSession: (sessionId, model) =>
@@ -534,6 +539,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setGitPushResult: (result) => set({ gitPushResult: result }),
   setGitPushConfigPanelOpen: (open) => set({ gitPushConfigPanelOpen: open }),
   setGitPushRunning: (running) => set({ gitPushRunning: running }),
+  setForkInit: (init) => set({ forkInit: init }),
 
   reset: () =>
     set({
@@ -560,5 +566,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       gitPushResult: null,
       gitPushConfigPanelOpen: false,
       gitPushRunning: false,
+      forkInit: null,
     }),
 }));

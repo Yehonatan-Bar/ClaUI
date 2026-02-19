@@ -44,6 +44,25 @@ export const MessageList: React.FC = () => {
     postToExtension({ type: 'editAndResend', text: newText });
   }, [truncateFromMessage, addUserMessage]);
 
+  /** Fork conversation from a specific user message: opens a new tab
+   *  with history up to (but not including) that message, and its text
+   *  pre-filled in the input area. */
+  const handleFork = useCallback((messageId: string, messageText: string) => {
+    const state = useAppStore.getState();
+    const sessionId = state.sessionId;
+    if (!sessionId) return;
+
+    const messageIndex = state.messages.findIndex((m) => m.id === messageId);
+    if (messageIndex < 0) return;
+
+    postToExtension({
+      type: 'forkFromMessage',
+      sessionId,
+      forkMessageIndex: messageIndex,
+      promptText: messageText,
+    });
+  }, []);
+
   return (
     <div
       className="message-list"
@@ -56,6 +75,7 @@ export const MessageList: React.FC = () => {
           message={msg}
           isBusy={isBusy}
           onEditAndResend={handleEditAndResend}
+          onFork={handleFork}
         />
       ))}
 

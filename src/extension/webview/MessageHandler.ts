@@ -282,6 +282,16 @@ export class MessageHandler {
           this.webview.postMessage({ type: 'processBusy', busy: true });
           break;
 
+        case 'forkFromMessage':
+          this.log(`Fork from message: sessionId=${msg.sessionId}, index=${msg.forkMessageIndex}`);
+          vscode.commands.executeCommand(
+            'claudeMirror.forkFromMessage',
+            msg.sessionId,
+            msg.forkMessageIndex,
+            msg.promptText
+          );
+          break;
+
         case 'editAndResend':
           this.log(`Edit-and-resend: stopping session and restarting with edited prompt`);
           this.clearApprovalTracking();

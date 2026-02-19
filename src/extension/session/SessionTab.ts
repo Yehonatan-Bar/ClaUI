@@ -57,6 +57,8 @@ export class SessionTab implements WebviewBridge {
   private static readonly THINKING_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   /** Per-tab file logger (null if file logging is disabled) */
   private readonly fileLogger: FileLogger | null = null;
+  /** Fork initialization data (set before startSession when forking) */
+  private forkInitData: { forkMessageIndex: number; promptText: string } | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -194,6 +196,11 @@ export class SessionTab implements WebviewBridge {
 
   // --- Public API ---
 
+  /** Set fork initialization data (must be called before startSession) */
+  setForkInit(init: { forkMessageIndex: number; promptText: string }): void {
+    this.forkInitData = init;
+  }
+
   /** Start a new Claude CLI session in this tab */
   async startSession(options?: { resume?: string; fork?: boolean; cwd?: string }): Promise<void> {
     await this.processManager.start(options);
@@ -203,6 +210,17 @@ export class SessionTab implements WebviewBridge {
       model: 'connecting...',
       isResume: !!options?.resume,
     });
+
+    // If this is a fork, send the fork init data to the webview
+    // so it knows where to truncate after replay completes
+    if (this.forkInitData) {
+      this.postMessage({
+        type: 'forkInit',
+        forkMessageIndex: this.forkInitData.forkMessageIndex,
+        promptText: this.forkInitData.promptText,
+      });
+      this.forkInitData = null;
+    }
   }
 
   /** Stop the CLI session in this tab */

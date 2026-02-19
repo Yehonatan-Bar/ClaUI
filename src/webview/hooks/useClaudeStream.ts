@@ -39,6 +39,7 @@ export function useClaudeStream(): void {
     setGitPushSettings,
     setGitPushResult,
     setGitPushRunning,
+    setForkInit,
   } = useAppStore();
 
   useEffect(() => {
@@ -237,6 +238,13 @@ export function useClaudeStream(): void {
             commitMessageTemplate: msg.commitMessageTemplate,
           });
           break;
+
+        case 'forkInit':
+          setForkInit({
+            forkMessageIndex: msg.forkMessageIndex,
+            promptText: msg.promptText,
+          });
+          break;
       }
     }
 
@@ -275,6 +283,7 @@ export function useClaudeStream(): void {
     setGitPushSettings,
     setGitPushResult,
     setGitPushRunning,
+    setForkInit,
   ]);
 }
 

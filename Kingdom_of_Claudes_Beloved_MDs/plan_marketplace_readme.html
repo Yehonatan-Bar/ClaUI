@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClaUi - תיקון תיאור חנות התוספים</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            line-height: 1.8;
+        }
+        h1 {
+            color: #e94560;
+            border-bottom: 2px solid #e94560;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #0f3460;
+            background: #16213e;
+            padding: 10px 15px;
+            border-radius: 6px;
+            color: #e94560;
+        }
+        .problem {
+            background: #2d1117;
+            border-right: 4px solid #e94560;
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .solution {
+            background: #0d1f0d;
+            border-right: 4px solid #3fb950;
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .step {
+            background: #16213e;
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .step-number {
+            display: inline-block;
+            background: #e94560;
+            color: white;
+            width: 28px;
+            height: 28px;
+            text-align: center;
+            line-height: 28px;
+            border-radius: 50%;
+            margin-left: 10px;
+            font-weight: bold;
+        }
+        ul {
+            padding-right: 25px;
+        }
+        li {
+            margin: 8px 0;
+        }
+        .impact {
+            background: #1a1a3e;
+            border: 1px solid #0f3460;
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>תיקון תיאור התוסף בחנות VS Code</h1>
+
+    <h2>הבעיה</h2>
+    <div class="problem">
+        <p>כרגע, הדף של התוסף בחנות התוספים של VS Code מציג <strong>הוראות טכניות למפתחים</strong> במקום תיאור למשתמשים:</p>
+        <ul>
+            <li>הוראות התקנה מקוד מקור (clone, npm install)</li>
+            <li>תרשימי ארכיטקטורה פנימיים</li>
+            <li>מבנה תיקיות של קוד המקור</li>
+            <li>הגדרות Webpack ופרטי בנייה</li>
+            <li>תיעוד פנימי של רכיבים</li>
+        </ul>
+        <p>משתמש שמחפש תוסף בחנות רואה מידע שלא רלוונטי לו בכלל.</p>
+    </div>
+
+    <h2>הפתרון</h2>
+    <div class="solution">
+        <p>לשכתב את קובץ התיאור (README) כך שיציג מידע רלוונטי למשתמשי קצה, ולהעביר את התיעוד הטכני לקובץ נפרד למפתחים.</p>
+    </div>
+
+    <h2>שלבי הביצוע</h2>
+
+    <div class="step">
+        <span class="step-number">1</span>
+        <strong>שכתוב דף החנות</strong>
+        <p>הדף החדש יכלול:</p>
+        <ul>
+            <li>תיאור קצר - מה התוסף עושה</li>
+            <li>רשימת יכולות (מולטי-טאב, בחירת מודל, שליחת קבצים, הדבקת תמונות, ועוד)</li>
+            <li>דרישות מוקדמות (Claude CLI)</li>
+            <li>איך מתחילים - התקנה מהחנות ולחיצה על קיצור מקלדת</li>
+            <li>טבלת קיצורי מקלדת</li>
+            <li>טבלת הגדרות</li>
+        </ul>
+    </div>
+
+    <div class="step">
+        <span class="step-number">2</span>
+        <strong>העברת תיעוד טכני לקובץ נפרד</strong>
+        <p>כל המידע הטכני-פנימי יעבור לקובץ חדש בשם DEVELOPMENT.md, שמיועד למפתחים שרוצים לתרום לפרויקט.</p>
+    </div>
+
+    <div class="step">
+        <span class="step-number">3</span>
+        <strong>הגנה על גודל החבילה</strong>
+        <p>הקובץ הטכני לא יארז לתוך התוסף עצמו, כדי לא להגדיל את גודל ההורדה.</p>
+    </div>
+
+    <h2>השפעה</h2>
+    <div class="impact">
+        <ul>
+            <li>דף התוסף בחנות ייראה מקצועי ורלוונטי למשתמשים</li>
+            <li>שום מידע טכני לא ילך לאיבוד - הוא פשוט עובר למקום מתאים יותר</li>
+            <li>אין שינוי בקוד או בפונקציונליות של התוסף עצמו</li>
+            <li>אין סיכון - מדובר בשינוי תיעוד בלבד</li>
+        </ul>
+    </div>
+</body>
+</html>
