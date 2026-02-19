@@ -13,43 +13,43 @@ import type { RoomType } from './types';
 
 export type RoomTemplate = number[][];
 
-/** Library room - bookshelves and scroll pedestal */
+/** Library room - shelves with reading nooks */
 const LIBRARY: RoomTemplate = [
   [2, 4, 1, 4, 2],
-  [2, 1, 1, 1, 2],
-  [3, 1, 5, 1, 3],
-  [2, 1, 1, 1, 2],
+  [2, 1, 1, 1, 3],
+  [3, 1, 5, 1, 2],
+  [2, 1, 1, 1, 3],
   [2, 4, 1, 4, 2],
 ];
 
-/** Forge room - anvil and fire */
+/** Forge room - walls around the anvil */
 const FORGE: RoomTemplate = [
   [2, 4, 1, 4, 2],
-  [3, 1, 1, 1, 3],
+  [3, 1, 1, 2, 3],
   [1, 1, 5, 1, 1],
-  [3, 1, 1, 1, 3],
+  [3, 2, 1, 1, 3],
   [2, 4, 1, 4, 2],
 ];
 
-/** Arena - open combat space */
+/** Arena - pillars in corners for cover */
 const ARENA: RoomTemplate = [
   [2, 4, 1, 4, 2],
-  [1, 1, 1, 1, 1],
+  [1, 2, 1, 2, 1],
   [1, 1, 5, 1, 1],
-  [1, 1, 1, 1, 1],
+  [1, 2, 1, 2, 1],
   [2, 4, 1, 4, 2],
 ];
 
-/** Junction - crossroads with multiple exits */
+/** Junction - crossroads with wall stubs */
 const JUNCTION: RoomTemplate = [
-  [0, 4, 1, 4, 0],
+  [2, 4, 1, 4, 2],
   [4, 1, 1, 1, 4],
   [1, 1, 5, 1, 1],
   [4, 1, 1, 1, 4],
-  [0, 4, 1, 4, 0],
+  [2, 4, 1, 4, 2],
 ];
 
-/** Vault - treasure room */
+/** Vault - heavily walled treasure room */
 const VAULT: RoomTemplate = [
   [2, 2, 4, 2, 2],
   [2, 1, 1, 1, 2],
@@ -58,39 +58,39 @@ const VAULT: RoomTemplate = [
   [2, 2, 1, 2, 2],
 ];
 
-/** Lair - monster den */
+/** Lair - irregular walls for organic feel */
 const LAIR: RoomTemplate = [
   [2, 4, 1, 4, 2],
-  [1, 1, 1, 1, 1],
-  [1, 1, 5, 1, 1],
-  [1, 1, 1, 1, 1],
-  [2, 1, 1, 1, 2],
+  [1, 2, 1, 1, 1],
+  [1, 1, 5, 1, 2],
+  [1, 1, 1, 2, 1],
+  [2, 1, 1, 4, 2],
 ];
 
-/** Trap room - narrow with hazards */
+/** Trap room - narrow zigzag path through hazards */
 const TRAP_ROOM: RoomTemplate = [
   [2, 4, 1, 4, 2],
-  [2, 1, 1, 1, 2],
+  [2, 1, 2, 1, 2],
   [1, 1, 5, 1, 1],
-  [2, 1, 1, 1, 2],
+  [2, 1, 2, 1, 2],
   [2, 4, 1, 4, 2],
 ];
 
-/** Throne room - boss arena, larger feel */
+/** Throne room - pillars flanking the throne */
 const THRONE: RoomTemplate = [
   [2, 4, 1, 4, 2],
-  [3, 1, 1, 1, 3],
+  [3, 2, 1, 2, 3],
   [1, 1, 5, 1, 1],
-  [3, 1, 1, 1, 3],
+  [3, 2, 1, 2, 3],
   [2, 4, 1, 4, 2],
 ];
 
-/** Corridor - simple passage */
+/** Corridor - narrow winding passage */
 const CORRIDOR: RoomTemplate = [
   [2, 4, 1, 4, 2],
+  [2, 2, 1, 0, 2],
   [2, 0, 1, 0, 2],
-  [2, 0, 1, 0, 2],
-  [2, 0, 1, 0, 2],
+  [2, 0, 1, 2, 2],
   [2, 4, 1, 4, 2],
 ];
 
@@ -115,4 +115,4 @@ export function getRoomTemplate(type: RoomType): RoomTemplate {
 export const ROOM_SIZE = 5;
 
 /** Corridor length between rooms in tiles */
-export const CORRIDOR_LENGTH = 3;
+export const CORRIDOR_LENGTH = 5;

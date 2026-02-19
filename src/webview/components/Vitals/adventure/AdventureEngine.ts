@@ -58,6 +58,11 @@ export class AdventureEngine {
   private isAtCampfire = false;
   private idleIntervalId: ReturnType<typeof setInterval> | null = null;
 
+  // Hero micro-movement (sub-pixel idle drift)
+  private microOffsetX = 0;
+  private microOffsetY = 0;
+  private microPhase = 0;
+
   // Particles
   private particles: Particle[] = [];
 
@@ -174,6 +179,8 @@ export class AdventureEngine {
         break;
       case 'walking':
         this.stopIdleLoop();
+        this.microOffsetX = 0;
+        this.microOffsetY = 0;
         this.startAnimationLoop();
         break;
       case 'encounter':
@@ -210,10 +217,15 @@ export class AdventureEngine {
 
   private startIdleLoop(): void {
     if (this.idleIntervalId !== null) return;
-    // Low frequency idle rendering (2fps)
+    // Higher frequency idle rendering (4fps) for visible micro-movement
     this.idleIntervalId = setInterval(() => {
       this.frameCount++;
-      this.idleTimer += 0.5;
+      this.idleTimer += 0.25;
+      this.microPhase += 0.15;
+
+      // Subtle breathing/fidget motion (1-2 pixel drift)
+      this.microOffsetX = Math.sin(this.microPhase) * 1.5;
+      this.microOffsetY = Math.sin(this.microPhase * 0.7 + 1.2) * 1.0;
 
       // Transition to campfire after 10 seconds of idle
       if (this.idleTimer > 20 && !this.isAtCampfire && !this._isBusy) {
@@ -221,7 +233,7 @@ export class AdventureEngine {
       }
 
       this.render();
-    }, 500);
+    }, 250);
   }
 
   private stopIdleLoop(): void {
@@ -259,7 +271,7 @@ export class AdventureEngine {
       return;
     }
 
-    this.walkProgress += dt * 6; // tiles per second
+    this.walkProgress += dt * 4; // tiles per second (slower = more visible movement)
     if (this.walkProgress >= 1) {
       this.walkProgress = 0;
       this.dungeon.heroPos = this.walkPath[this.walkStep];
@@ -378,6 +390,12 @@ export class AdventureEngine {
     } else {
       heroX = this.dungeon.heroPos.x * tilePx - this.dungeon.cameraX;
       heroY = this.dungeon.heroPos.y * tilePx - this.dungeon.cameraY;
+    }
+
+    // Apply idle micro-movement offset (subtle breathing/fidget)
+    if (this.state === 'idle' || this.state === 'encounter') {
+      heroX += this.microOffsetX;
+      heroY += this.microOffsetY;
     }
 
     let sprite: SpriteFrame;

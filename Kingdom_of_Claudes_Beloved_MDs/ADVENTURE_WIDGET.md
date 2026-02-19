@@ -70,35 +70,49 @@ IDLE --[turnComplete]--> WALKING --[arrive]--> ENCOUNTER --[anim done]--> RESOLU
 
 | State | Visual | Duration |
 |-------|--------|----------|
-| IDLE | Character sits at campfire, flame flickers (2fps) | After 10s no turns |
-| WALKING | Character walks to next room, 2-frame walk cycle | 0.8-1.2s |
-| ENCOUNTER | Encounter animation plays in room | 1-1.5s |
-| RESOLUTION | Result particles (gold, fire, sparkles) | 0.5s |
+| IDLE | Character breathes/fidgets with micro-movement, sits at campfire after 10s (4fps) | After 10s no turns |
+| WALKING | Character walks zigzag path to next room, 2-frame walk cycle, 4 tiles/sec | Variable based on distance |
+| ENCOUNTER | Encounter animation plays in room, hero micro-movement continues | ~1s |
+| RESOLUTION | Result particles (gold, fire, sparkles) | ~0.5s |
+
+### Movement System
+
+**Zigzag pathfinding**: Instead of moving all-horizontal then all-vertical, the hero alternates 1-2 horizontal steps with 1-2 vertical steps, creating visible multi-directional movement even on short paths.
+
+**L-shaped corridors**: Corridors between rooms bend at a random midpoint (30-70% along), so the hero always has at least one direction change per walk. The bend creates an L-shape or Z-shape depending on room placement.
+
+**Balanced direction weights**: Rooms are placed in all four directions (up 20%, right 30%, down 30%, left 20%) with anti-backtracking (the reverse of the last direction is heavily penalized). This prevents monotonous right-only or down-only paths.
+
+**Idle micro-movement**: When idle or in encounter state, the hero drifts 1-2 pixels using sine waves (`sin(phase)` for X, `sin(phase*0.7+1.2)` for Y), creating a subtle breathing/fidget effect so the widget never looks frozen.
 
 ### Performance
 - RAF loop runs ONLY during state transitions (WALKING/ENCOUNTER/RESOLUTION)
-- Idle campfire: 2fps setInterval (not full 60fps RAF)
+- Idle loop: 4fps setInterval with micro-movement updates (not full 60fps RAF)
 - Canvas is 120x120 native - trivial to repaint
 - Sprite data is static const arrays (zero GC pressure)
 - React component uses `React.memo` (re-renders only on new beats)
-- Beat queue with fast-forward: if queue > 5, older encounters resolve at 4x speed
+- Beat queue with fast-forward: if queue > 5, older encounters resolve instantly
 - Beat history capped at 100
 
-## Room Templates
+## Dungeon Generation
 
-5x5 tile layouts for each room type:
+Rooms are 5x5 tiles connected by L-shaped corridors (5 tiles long). Each room is placed in a randomly chosen direction from the previous room, with anti-backtracking to prevent going back the way we came. Corridors bend at a random midpoint creating visible turns.
+
+### Room Templates
+
+5x5 tile layouts with interior wall details for maze-like feel:
 
 | Room | Beat(s) | Description |
 |------|---------|-------------|
-| `library` | read, scout | Bookshelves on walls, scroll pedestal center |
-| `forge` | carve | Anvil center, fire pits on sides |
-| `arena` | forge | Open floor, pillars at corners |
-| `junction` | fork | 2-4 exits, signpost center |
-| `vault` | treasure | Chest center, gold pile decoration |
-| `lair` | monster | Bones on floor, monster center |
-| `trap_room` | trap | Spike pits, narrow path |
-| `throne` | boss | Large boss area, pillars |
-| `corridor` | checkpoint, wander | Narrow passage connecting rooms |
+| `library` | read, scout | Alternating shelves and reading nooks |
+| `forge` | carve | Staggered wall segments around anvil |
+| `arena` | forge | Corner pillars for cover |
+| `junction` | fork | Wall stubs on all sides, open center |
+| `vault` | treasure | Heavily walled, narrow entry |
+| `lair` | monster | Irregular walls for organic feel |
+| `trap_room` | trap | Zigzag walls creating narrow passages |
+| `throne` | boss | Flanking pillars around throne |
+| `corridor` | checkpoint, wander | Narrow winding passage |
 
 ## Extension-Side: AdventureInterpreter
 

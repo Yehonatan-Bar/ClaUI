@@ -80,7 +80,7 @@ claude-code-mirror/
 |       |   +-- useFileMention.ts         #   @ file mention trigger detection, debounced search, popup state
 |       +-- components/
 |       |   +-- ChatView/
-|       |   |   +-- MessageList.tsx       #   Scrollable message list
+|       |   |   +-- MessageList.tsx       #   Scrollable message list with scroll-to-bottom button
 |       |   |   +-- MessageBubble.tsx     #   Single message with content blocks
 |       |   |   +-- StreamingText.tsx     #   In-progress text with cursor
 |       |   |   +-- ToolUseBlock.tsx      #   Tool use display (collapsible, plan-aware)
