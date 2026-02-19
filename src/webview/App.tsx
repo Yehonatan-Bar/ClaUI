@@ -5,6 +5,7 @@ import { MessageList } from './components/ChatView/MessageList';
 import { InputArea } from './components/InputArea/InputArea';
 import { TextSettingsBar } from './components/TextSettingsBar/TextSettingsBar';
 import { ModelSelector } from './components/ModelSelector/ModelSelector';
+import { SwitchToSonnetButton } from './components/ModelSelector/SwitchToSonnetButton';
 import { PermissionModeSelector } from './components/PermissionModeSelector/PermissionModeSelector';
 import { PlanApprovalBar } from './components/ChatView/PlanApprovalBar';
 import { PromptHistoryPanel } from './components/ChatView/PromptHistoryPanel';
@@ -215,6 +216,7 @@ const StatusBar: React.FC<{
           *
         </button>
       </div>
+      <SwitchToSonnetButton />
       <ModelSelector />
       <PermissionModeSelector />
       <TextSettingsBar />

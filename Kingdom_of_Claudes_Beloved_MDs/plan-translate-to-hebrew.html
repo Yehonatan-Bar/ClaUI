@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClaUi - Translate to Hebrew Feature</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 40px 20px;
+      line-height: 1.8;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #16213e;
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #4fc3f7;
+      font-size: 28px;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #4fc3f7;
+      padding-bottom: 12px;
+    }
+    .subtitle {
+      color: #90a4ae;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    h2 {
+      color: #81d4fa;
+      font-size: 20px;
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+    h3 {
+      color: #b0bec5;
+      font-size: 16px;
+      margin-top: 16px;
+      margin-bottom: 8px;
+    }
+    p, li {
+      color: #cfd8dc;
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+    ul {
+      padding-right: 24px;
+      margin-bottom: 16px;
+    }
+    li { margin-bottom: 6px; }
+    .highlight {
+      background: #1e3a5f;
+      border-right: 4px solid #4fc3f7;
+      padding: 16px 20px;
+      border-radius: 0 8px 8px 0;
+      margin: 16px 0;
+    }
+    .flow-diagram {
+      background: #0f1729;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .flow-step {
+      display: inline-block;
+      background: #1e3a5f;
+      color: #81d4fa;
+      padding: 8px 16px;
+      border-radius: 8px;
+      margin: 4px;
+      font-size: 14px;
+    }
+    .flow-arrow {
+      display: inline-block;
+      color: #4fc3f7;
+      font-size: 20px;
+      margin: 0 4px;
+      vertical-align: middle;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+    }
+    th {
+      background: #1e3a5f;
+      color: #4fc3f7;
+      padding: 10px 14px;
+      text-align: right;
+      font-size: 14px;
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #263238;
+      font-size: 14px;
+    }
+    tr:hover td { background: rgba(79, 195, 247, 0.05); }
+    .badge {
+      display: inline-block;
+      background: #4fc3f7;
+      color: #1a1a2e;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-new {
+      background: #66bb6a;
+    }
+    .badge-modify {
+      background: #ffa726;
+    }
+    .section-divider {
+      border: none;
+      border-top: 1px solid #263238;
+      margin: 24px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>פיצ'ר חדש: כפתור תרגום לעברית</h1>
+    <div class="subtitle">ClaUi - תוכנית פיתוח | תאריך: 19.02.2026</div>
+
+    <h2>מה הפיצ'ר עושה?</h2>
+    <p>
+      כפתור "Translate" חדש יופיע על כל הודעת תשובה של קלוד בממשק.
+      בלחיצה עליו, הטקסט (לא קוד!) יתורגם לעברית באמצעות מודל Sonnet 4.6.
+      לאחר התרגום, הכפתור הופך ל-"Original" ומאפשר חזרה לטקסט המקורי.
+    </p>
+
+    <h2>איך זה עובד?</h2>
+    <div class="flow-diagram">
+      <div class="flow-step">המשתמש לוחץ "Translate"</div>
+      <div class="flow-arrow">&larr;</div>
+      <div class="flow-step">הטקסט נשלח ל-Sonnet 4.6</div>
+      <div class="flow-arrow">&larr;</div>
+      <div class="flow-step">התרגום חוזר ומוצג</div>
+      <div class="flow-arrow">&larr;</div>
+      <div class="flow-step">הכפתור הופך ל-"Original"</div>
+    </div>
+
+    <div class="highlight">
+      <strong>חשוב:</strong> התרגום נשמר במטמון (cache). לחיצה חוזרת על הכפתור מחליפה בין עברית לאנגלית באופן מיידי, בלי קריאה נוספת למודל.
+    </div>
+
+    <h2>מצבי הכפתור</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>מצב</th>
+          <th>תווית</th>
+          <th>נראות</th>
+          <th>התנהגות</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>ברירת מחדל</td>
+          <td>Translate</td>
+          <td>מופיע בריחוף עכבר</td>
+          <td>לחיצה שולחת לתרגום</td>
+        </tr>
+        <tr>
+          <td>בטעינה</td>
+          <td>...Translating</td>
+          <td>תמיד נראה (מהבהב)</td>
+          <td>כפתור מושבת</td>
+        </tr>
+        <tr>
+          <td>מציג תרגום</td>
+          <td>Original</td>
+          <td>תמיד נראה (כחול)</td>
+          <td>לחיצה חוזרת לאנגלית</td>
+        </tr>
+        <tr>
+          <td>יש תרגום, מציג מקור</td>
+          <td>Translate</td>
+          <td>מופיע בריחוף עכבר</td>
+          <td>לחיצה מציגה תרגום (מהמטמון)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>מה כן ומה לא מתורגם</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>תוכן</th>
+          <th>מתורגם?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>טקסט רגיל של קלוד</td><td>כן</td></tr>
+        <tr><td>עיצוב (כותרות, רשימות, bold)</td><td>נשמר כמו שהוא</td></tr>
+        <tr><td>בלוקי קוד</td><td>לא - נשארים באנגלית</td></tr>
+        <tr><td>שמות פונקציות, משתנים, נתיבי קבצים</td><td>לא - נשארים באנגלית</td></tr>
+        <tr><td>קוד בתוך backticks</td><td>לא</td></tr>
+        <tr><td>בלוקי כלים (Tool Use / Tool Result)</td><td>לא</td></tr>
+        <tr><td>תמונות</td><td>לא רלוונטי</td></tr>
+      </tbody>
+    </table>
+
+    <h2>קבצים שנדרש לשנות</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>קובץ</th>
+          <th>סוג</th>
+          <th>תיאור השינוי</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>webview-messages.ts</td>
+          <td><span class="badge badge-modify">עדכון</span></td>
+          <td>הוספת שני סוגי הודעות חדשים (בקשת תרגום + תוצאה)</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>MessageTranslator.ts</td>
+          <td><span class="badge badge-new">חדש</span></td>
+          <td>שירות התרגום - שולח טקסט ל-Sonnet 4.6 ומחזיר תרגום</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>MessageHandler.ts</td>
+          <td><span class="badge badge-modify">עדכון</span></td>
+          <td>טיפול בבקשת תרגום שמגיעה מהממשק</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>SessionTab.ts</td>
+          <td><span class="badge badge-modify">עדכון</span></td>
+          <td>יצירת שירות התרגום וחיבורו למערכת</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>store.ts</td>
+          <td><span class="badge badge-modify">עדכון</span></td>
+          <td>ניהול מצב התרגומים (מטמון, טעינה, מצב תצוגה)</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>useClaudeStream.ts</td>
+          <td><span class="badge badge-modify">עדכון</span></td>
+          <td>קבלת תוצאת התרגום מהתוסף ושמירה בחנות</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>MessageBubble.tsx</td>
+          <td><span class="badge badge-modify">עדכון</span></td>
+          <td>הכפתור עצמו, לוגיקת החלפה, הצגת הטקסט המתורגם</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td>global.css</td>
+          <td><span class="badge badge-modify">עדכון</span></td>
+          <td>עיצוב הכפתור (בדיוק כמו כפתור Copy הקיים)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <hr class="section-divider">
+
+    <h2>סיכונים ושיקולים</h2>
+    <ul>
+      <li><strong>זמן תגובה:</strong> התרגום לוקח כ-5-10 שניות (תלוי באורך הטקסט). האנימציה "...Translating" מידעת את המשתמש.</li>
+      <li><strong>עלות:</strong> כל תרגום הוא קריאה ל-Sonnet 4.6. התרגום נשמר במטמון כך שאין קריאות כפולות.</li>
+      <li><strong>זמינות CLI:</strong> התרגום דורש גישה ל-CLI של Claude (כמו שאר המערכת). אם ה-CLI לא זמין, הכפתור חוזר למצב רגיל.</li>
+      <li><strong>timeout:</strong> מוגדר 30 שניות. אם התרגום לא חוזר בזמן, הבקשה מבוטלת והמשתמש יכול לנסות שוב.</li>
+    </ul>
+
+    <h2>בדיקות</h2>
+    <ul>
+      <li>לחיצה על Translate - הטקסט מתורגם לעברית</li>
+      <li>לחיצה על Original - חזרה לאנגלית</li>
+      <li>לחיצה חוזרת על Translate - מיידי (מהמטמון)</li>
+      <li>בלוקי קוד נשארים באנגלית</li>
+      <li>טקסט עברית מיושר מימין לשמאל (RTL)</li>
+      <li>הכפתור נראה רק בריחוף עכבר (כמו Copy)</li>
+    </ul>
+  </div>
+</body>
+</html>

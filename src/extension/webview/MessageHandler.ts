@@ -4,6 +4,7 @@ import type { ControlProtocol } from '../process/ControlProtocol';
 import type { StreamDemux } from '../process/StreamDemux';
 import type { SessionNamer } from '../session/SessionNamer';
 import type { ActivitySummarizer, ActivitySummary } from '../session/ActivitySummarizer';
+import type { MessageTranslator } from '../session/MessageTranslator';
 import type { PromptHistoryStore } from '../session/PromptHistoryStore';
 import type {
   ExtensionToWebviewMessage,
@@ -28,6 +29,8 @@ export interface WebviewBridge {
   /** Signal that a deliberate stop+restart is in progress (e.g. edit-and-resend).
    *  The exit handler should suppress the sessionEnded message for this cycle. */
   setSuppressNextExit?(suppress: boolean): void;
+  /** Switch the running session to a different model (stop + resume with new --model flag) */
+  switchModel?(model: string): Promise<void>;
 }
 
 /**
@@ -57,6 +60,8 @@ export class MessageHandler {
   private currentMessageToolNames: string[] = [];
   /** Set when the CLI pauses waiting for plan/question approval */
   private pendingApprovalTool: string | null = null;
+  /** Set after user responds to approval - suppresses stale re-notifications from late events */
+  private approvalResponseProcessed = false;
 
   /** Activity summarizer: periodically summarizes tool activity via Haiku */
   private activitySummarizer: ActivitySummarizer | null = null;
@@ -67,6 +72,8 @@ export class MessageHandler {
   private toolBlockContexts: Map<number, string> = new Map();
   /** Getter for the session/tab name, injected by SessionTab */
   private getSessionName: (() => string) | null = null;
+  /** Message translator for Hebrew translation feature */
+  private messageTranslator: MessageTranslator | null = null;
 
   constructor(
     private readonly webview: WebviewBridge,
@@ -110,6 +117,11 @@ export class MessageHandler {
     this.getSessionName = getter;
   }
 
+  /** Attach a MessageTranslator for Hebrew translation feature */
+  setMessageTranslator(translator: MessageTranslator): void {
+    this.messageTranslator = translator;
+  }
+
   /** Wire up all event listeners */
   initialize(): void {
     this.bindWebviewMessages();
@@ -149,6 +161,9 @@ export class MessageHandler {
 
         case 'cancelRequest':
           this.log('Cancel requested - killing process');
+          // Immediate UI feedback so the user sees the cancel take effect
+          this.webview.postMessage({ type: 'processBusy', busy: false });
+          this.clearApprovalTracking();
           try {
             this.control.cancel();
           } catch (err) {
@@ -227,6 +242,10 @@ export class MessageHandler {
           this.handlePickFiles();
           break;
 
+        case 'fileSearch':
+          this.handleFileSearch(msg.query, msg.requestId);
+          break;
+
         case 'clearSession':
           this.firstMessageSent = false;
           this.activitySummarizer?.reset();
@@ -253,6 +272,15 @@ export class MessageHandler {
         case 'setModel':
           this.log(`Setting model to: "${msg.model}"`);
           vscode.workspace.getConfiguration('claudeMirror').update('model', msg.model, true);
+          break;
+
+        case 'switchToSonnet':
+          this.log('Switch to Sonnet 4.6 requested');
+          if (this.webview.switchModel) {
+            this.webview.switchModel('claude-sonnet-4-6').catch((err) => {
+              this.log(`Switch to Sonnet failed: ${err}`);
+            });
+          }
           break;
 
         case 'setPermissionMode':
@@ -285,6 +313,9 @@ export class MessageHandler {
             this.control.sendText(answer);
           }
           this.clearApprovalTracking();
+          // Suppress stale re-notifications from late assistantMessage events
+          // that may arrive after the user has already responded.
+          this.approvalResponseProcessed = true;
           this.webview.postMessage({ type: 'processBusy', busy: true });
           break;
 
@@ -378,6 +409,41 @@ export class MessageHandler {
           this.sendGitPushSettings();
           break;
 
+        case 'translateMessage':
+          this.log(`Translate request: messageId=${msg.messageId}, textLength=${msg.textContent.length}`);
+          if (!this.messageTranslator) {
+            this.webview.postMessage({
+              type: 'translationResult',
+              messageId: msg.messageId,
+              translatedText: null,
+              success: false,
+              error: 'Translator not available',
+            });
+            break;
+          }
+          this.messageTranslator
+            .translate(msg.textContent)
+            .then((translatedText) => {
+              this.webview.postMessage({
+                type: 'translationResult',
+                messageId: msg.messageId,
+                translatedText,
+                success: !!translatedText,
+                error: translatedText ? undefined : 'Translation failed',
+              });
+            })
+            .catch((err) => {
+              this.log(`Translation error: ${err}`);
+              this.webview.postMessage({
+                type: 'translationResult',
+                messageId: msg.messageId,
+                translatedText: null,
+                success: false,
+                error: `Translation error: ${err.message}`,
+              });
+            });
+          break;
+
         case 'ready':
           this.log('Webview ready');
           // Send text display settings
@@ -417,6 +483,47 @@ export class MessageHandler {
       this.webview.postMessage({
         type: 'filePathsPicked',
         paths,
+      });
+    }
+  }
+
+  /** Search workspace files matching a query and send results to webview */
+  private async handleFileSearch(query: string, requestId: number): Promise<void> {
+    try {
+      // Build case-insensitive glob: each letter becomes [aA] character class
+      const ciQuery = query.replace(/[a-zA-Z]/g, c => `[${c.toLowerCase()}${c.toUpperCase()}]`);
+      const glob = query ? `**/*${ciQuery}*` : '**/*';
+      const excludePattern = '{**/node_modules/**,**/.git/**,**/dist/**,**/.vscode/**}';
+      const uris = await vscode.workspace.findFiles(glob, excludePattern, 50);
+
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+      const pathMod = require('path');
+
+      const results = uris.map(uri => ({
+        relativePath: pathMod.relative(workspaceRoot, uri.fsPath).replace(/\\/g, '/'),
+        fileName: pathMod.basename(uri.fsPath),
+      }));
+
+      const queryLower = query.toLowerCase();
+      results.sort((a: { relativePath: string; fileName: string }, b: { relativePath: string; fileName: string }) => {
+        const aMatch = a.fileName.toLowerCase().includes(queryLower);
+        const bMatch = b.fileName.toLowerCase().includes(queryLower);
+        if (aMatch && !bMatch) return -1;
+        if (!aMatch && bMatch) return 1;
+        return a.relativePath.localeCompare(b.relativePath);
+      });
+
+      this.webview.postMessage({
+        type: 'fileSearchResults',
+        results: results.slice(0, 50),
+        requestId,
+      });
+    } catch (err) {
+      this.log(`File search error: ${err}`);
+      this.webview.postMessage({
+        type: 'fileSearchResults',
+        results: [],
+        requestId,
       });
     }
   }
@@ -723,6 +830,7 @@ export class MessageHandler {
         this.log(`-> webview: messageStart id=${data.messageId}`);
         this.currentMessageToolNames = [];
         this.pendingApprovalTool = null;
+        this.approvalResponseProcessed = false;
         this.toolBlockNames.clear();
         this.toolBlockContexts.clear();
         this.webview.postMessage({
@@ -785,6 +893,12 @@ export class MessageHandler {
   /** Notify webview that user approval is required for a plan/question tool */
   private notifyPlanApprovalRequired(toolName: string): void {
     if (this.pendingApprovalTool === toolName) {
+      return;
+    }
+    // After the user responds to an approval, late events (e.g. assistantMessage
+    // fallback) can race with clearApprovalTracking and re-trigger. Suppress them.
+    if (this.approvalResponseProcessed) {
+      this.log(`Suppressing stale plan approval notification for ${toolName} - already responded`);
       return;
     }
     this.log(`Plan approval required: tool=${toolName}`);

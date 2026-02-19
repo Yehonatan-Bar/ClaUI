@@ -5,6 +5,7 @@ import { ClaudeProcessManager } from '../process/ClaudeProcessManager';
 import { StreamDemux } from '../process/StreamDemux';
 import { ControlProtocol } from '../process/ControlProtocol';
 import { SessionNamer } from './SessionNamer';
+import { MessageTranslator } from './MessageTranslator';
 import { ActivitySummarizer } from './ActivitySummarizer';
 import { ConversationReader } from './ConversationReader';
 import { FileLogger } from './FileLogger';
@@ -146,6 +147,11 @@ export class SessionTab implements WebviewBridge {
       }
     });
 
+    // Wire message translator for Hebrew translation feature
+    const messageTranslator = new MessageTranslator();
+    messageTranslator.setLogger(tabLog);
+    this.messageHandler.setMessageTranslator(messageTranslator);
+
     // Create webview panel in the specified column
     this.baseTitle = `ClaUi ${tabNumber}`;
     this.panel = vscode.window.createWebviewPanel(
@@ -204,6 +210,30 @@ export class SessionTab implements WebviewBridge {
 
   setSuppressNextExit(suppress: boolean): void {
     this.suppressNextExit = suppress;
+  }
+
+  async switchModel(model: string): Promise<void> {
+    const sessionToResume = this.processManager.currentSessionId;
+    if (!sessionToResume) {
+      this.log(`[Tab ${this.tabNumber}] Cannot switch model: no active session`);
+      return;
+    }
+
+    this.log(`[Tab ${this.tabNumber}] Switching model to "${model}" (session ${sessionToResume})`);
+    this.suppressNextExit = true;
+    this.postMessage({ type: 'processBusy', busy: false });
+    this.processManager.stop();
+
+    try {
+      await this.processManager.start({ resume: sessionToResume, model });
+      this.log(`[Tab ${this.tabNumber}] Session resumed with model "${model}"`);
+      await vscode.workspace.getConfiguration('claudeMirror').update('model', model, true);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      this.log(`[Tab ${this.tabNumber}] Failed to switch model: ${errMsg}`);
+      this.postMessage({ type: 'error', message: `Failed to switch model: ${errMsg}` });
+      this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+    }
   }
 
   // --- Public API ---
@@ -285,6 +315,8 @@ export class SessionTab implements WebviewBridge {
 
   /** Cancel the current in-flight request (pause - keeps session alive) */
   cancelRequest(): void {
+    // Immediate UI feedback so the cancel feels instant
+    this.postMessage({ type: 'processBusy', busy: false });
     this.control.cancel();
   }
 

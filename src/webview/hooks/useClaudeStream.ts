@@ -40,6 +40,8 @@ export function useClaudeStream(): void {
     setGitPushResult,
     setGitPushRunning,
     setForkInit,
+    setTranslation,
+    setTranslating,
   } = useAppStore();
 
   useEffect(() => {
@@ -167,11 +169,15 @@ export function useClaudeStream(): void {
 
         case 'processBusy':
           setBusy(msg.busy);
-          // If the process becomes busy again (e.g. user sent a message),
-          // clear any pending approval bar and previous activity summary
           if (msg.busy) {
+            // Process becomes busy (e.g. user sent a message) -
+            // clear any pending approval bar and previous activity summary
             setPendingApproval(null);
             setActivitySummary(null);
+          } else {
+            // Process becomes idle (e.g. cancel or result) -
+            // finalize any in-progress streaming so partial content is preserved
+            clearStreaming();
           }
           break;
 
@@ -273,6 +279,19 @@ export function useClaudeStream(): void {
             });
           }
           break;
+
+        case 'translationResult':
+          setTranslating(msg.messageId, false);
+          if (msg.success && msg.translatedText) {
+            setTranslation(msg.messageId, msg.translatedText);
+          }
+          break;
+
+        case 'fileSearchResults':
+          window.dispatchEvent(
+            new CustomEvent('file-search-results', { detail: msg })
+          );
+          break;
       }
     }
 
@@ -312,6 +331,8 @@ export function useClaudeStream(): void {
     setGitPushResult,
     setGitPushRunning,
     setForkInit,
+    setTranslation,
+    setTranslating,
   ]);
 }
 

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plan: Switch to Sonnet Button</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      background: #f5f7fa;
+      color: #1a1a2e;
+      line-height: 1.8;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      padding: 48px;
+    }
+    h1 {
+      font-size: 28px;
+      color: #16213e;
+      border-bottom: 3px solid #3a86ff;
+      padding-bottom: 12px;
+      margin-bottom: 32px;
+    }
+    h2 {
+      font-size: 20px;
+      color: #3a86ff;
+      margin-top: 32px;
+      margin-bottom: 16px;
+    }
+    p { margin-bottom: 16px; }
+    .highlight-box {
+      background: #eef4ff;
+      border-right: 4px solid #3a86ff;
+      padding: 20px 24px;
+      border-radius: 0 8px 8px 0;
+      margin: 24px 0;
+    }
+    .step {
+      background: #fafbfd;
+      border: 1px solid #e8ecf1;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 16px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .step-number {
+      background: #3a86ff;
+      color: #fff;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .step-content { flex: 1; }
+    .step-title { font-weight: 700; margin-bottom: 4px; }
+    .step-desc { color: #555; font-size: 15px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 15px;
+    }
+    th {
+      background: #3a86ff;
+      color: #fff;
+      padding: 12px 16px;
+      text-align: right;
+    }
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e8ecf1;
+    }
+    tr:nth-child(even) { background: #f9fafb; }
+    .flow-diagram {
+      background: #1a1a2e;
+      color: #a8d8ea;
+      border-radius: 12px;
+      padding: 24px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      direction: ltr;
+      text-align: left;
+      overflow-x: auto;
+      margin: 16px 0;
+      line-height: 1.6;
+    }
+    .badge {
+      display: inline-block;
+      background: #e8f5e9;
+      color: #2e7d32;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .badge-warn {
+      background: #fff3e0;
+      color: #e65100;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e8ecf1;
+      color: #999;
+      font-size: 13px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>תוכנית: כפתור מעבר מהיר ל-Sonnet 4.6</h1>
+
+    <div class="highlight-box">
+      <strong>מטרה:</strong> הוספת כפתור ייעודי בסרגל התחתון של התוסף שמאפשר למשתמש לעבור מיידית למודל Sonnet 4.6 באמצע שיחה פעילה, בלי לאבד את ההיסטוריה.
+    </div>
+
+    <h2>הבעיה</h2>
+    <p>
+      כיום, בורר המודלים בסרגל התחתון משנה את המודל רק עבור <strong>השיחה הבאה</strong>.
+      אין דרך לשנות את המודל של שיחה שכבר רצה. המשתמש צריך כפתור שמבצע את השינוי <strong>מיידית</strong>.
+    </p>
+
+    <h2>הפתרון</h2>
+    <p>
+      כפתור כחול קטן בסרגל התחתון (ליד בורר המודלים) שבלחיצה אחת עוצר את התהליך הנוכחי וממשיך אותו מחדש עם Sonnet 4.6. ההיסטוריה נשמרת במלואה -- המשתמש ממשיך לשוחח כרגיל, רק עם מודל שונה.
+    </p>
+
+    <h2>איך זה עובד</h2>
+    <div class="flow-diagram">
+User clicks [S] button<br>
+&nbsp;&nbsp;-> Extension stops current CLI process<br>
+&nbsp;&nbsp;-> Extension restarts with --resume (same session) + --model sonnet-4.6<br>
+&nbsp;&nbsp;-> CLI picks up where it left off, now using Sonnet<br>
+&nbsp;&nbsp;-> Button auto-hides (already on Sonnet)<br>
+&nbsp;&nbsp;-> User continues chatting normally
+    </div>
+
+    <h2>שלבי הפיתוח</h2>
+
+    <div class="step">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <div class="step-title">הגדרת הודעה חדשה</div>
+        <div class="step-desc">הוספת סוג הודעה "switchToSonnet" לחוזה התקשורת בין ממשק המשתמש לתוסף.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <div class="step-title">לוגיקת המעבר בצד השרת</div>
+        <div class="step-desc">הוספת פונקציה שעוצרת את התהליך הנוכחי וממשיכה אותו מחדש עם המודל החדש. משתמשת במנגנון קיים ומוכח (אותו מנגנון כמו ביטול וחידוש שיחה).</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <div class="step-title">טיפול בהודעה</div>
+        <div class="step-desc">חיבור ההודעה מממשק המשתמש ללוגיקת המעבר בצד השרת.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">4</div>
+      <div class="step-content">
+        <div class="step-title">יצירת הכפתור בממשק</div>
+        <div class="step-desc">רכיב React קטן שמציג כפתור "S" כחול. הכפתור מוסתר כשכבר על Sonnet או כשאין שיחה פעילה, ומושבת כשהמודל עסוק בתשובה.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">5</div>
+      <div class="step-content">
+        <div class="step-title">שילוב בסרגל ועיצוב</div>
+        <div class="step-desc">הצבת הכפתור בסרגל התחתון ליד בורר המודלים, עם עיצוב כחול מודגש שתואם לשפה העיצובית הקיימת.</div>
+      </div>
+    </div>
+
+    <h2>מצבי קצה</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>מצב</th>
+          <th>התנהגות</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>לחיצה בזמן שהמודל עסוק</td>
+          <td><span class="badge-warn badge">הכפתור מושבת</span> -- יש להמתין או לבטל קודם</td>
+        </tr>
+        <tr>
+          <td>אין שיחה פעילה</td>
+          <td><span class="badge">הכפתור מוסתר</span></td>
+        </tr>
+        <tr>
+          <td>כבר על Sonnet 4.6</td>
+          <td><span class="badge">הכפתור מוסתר</span></td>
+        </tr>
+        <tr>
+          <td>שגיאה בחידוש</td>
+          <td>הצגת הודעת שגיאה למשתמש</td>
+        </tr>
+        <tr>
+          <td>לחיצה כפולה מהירה</td>
+          <td>המערכת מטפלת בזה אוטומטית -- תהליך ישן נעצר לפני שחדש מתחיל</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>היקף השינוי</h2>
+    <p>
+      <strong>6 קבצים</strong> (1 חדש, 5 עריכות קטנות). השינוי מבוסס על מנגנון קיים ומוכח בקוד, ולכן הסיכון נמוך.
+    </p>
+
+    <h2>בדיקה</h2>
+    <p>
+      לאחר הפיתוח, יש לוודא:
+    </p>
+    <div class="step">
+      <div class="step-number">V</div>
+      <div class="step-content">
+        <div class="step-desc">
+          פתיחת שיחה עם מודל שאינו Sonnet -> לחיצה על הכפתור -> וידוא שהמודל הפעיל השתנה ל-Sonnet 4.6 -> וידוא שהשיחה ממשיכה רגיל עם כל ההיסטוריה -> וידוא שהכפתור נעלם אחרי המעבר.
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      תוכנית פיתוח | ClaUi Extension | 2026-02-19
+    </div>
+  </div>
+</body>
+</html>

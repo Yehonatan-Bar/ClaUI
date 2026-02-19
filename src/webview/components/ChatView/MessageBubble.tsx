@@ -1,11 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import type { ChatMessage } from '../../state/store';
+import { useAppStore } from '../../state/store';
 import type { ContentBlock } from '../../../extension/types/stream-json';
 import { CodeBlock } from './CodeBlock';
 import { ToolUseBlock } from './ToolUseBlock';
 import { MarkdownContent } from './MarkdownContent';
 import { useRtlDetection } from '../../hooks/useRtlDetection';
 import { renderTextWithFileLinks } from './filePathLinks';
+import { postToExtension } from '../../hooks/useClaudeStream';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -36,6 +38,33 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   const hasOnlyText = isUser && contentBlocks.every((b) => b.type === 'text');
   const canEdit = hasOnlyText && !isBusy && !!onEditAndResend;
   const canFork = isUser && hasOnlyText && !!onFork;
+
+  // Translation state from store
+  const translations = useAppStore((s) => s.translations);
+  const translatingMessageIds = useAppStore((s) => s.translatingMessageIds);
+  const showingTranslation = useAppStore((s) => s.showingTranslation);
+  const toggleTranslationView = useAppStore((s) => s.toggleTranslationView);
+
+  const isTranslating = translatingMessageIds.has(message.id);
+  const hasTranslation = message.id in translations;
+  const isShowingTranslation = showingTranslation.has(message.id);
+
+  const handleTranslate = useCallback(() => {
+    if (hasTranslation) {
+      toggleTranslationView(message.id);
+      return;
+    }
+    // Extract text content, excluding code blocks
+    const translatableText = extractTranslatableText(contentBlocks);
+    if (!translatableText.trim()) return;
+
+    useAppStore.getState().setTranslating(message.id, true);
+    postToExtension({
+      type: 'translateMessage',
+      messageId: message.id,
+      textContent: translatableText,
+    });
+  }, [message.id, hasTranslation, contentBlocks, toggleTranslationView]);
 
   const [copied, setCopied] = useState(false);
 
@@ -125,6 +154,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
             Fork
           </button>
         )}
+        {!isUser && textContent && (
+          <button
+            className={`translate-message-btn${isShowingTranslation ? ' showing-translation' : ''}${isTranslating ? ' translating' : ''}`}
+            onClick={handleTranslate}
+            title={isShowingTranslation ? 'Show original' : 'Translate to Hebrew'}
+            disabled={isTranslating}
+          >
+            {isTranslating ? 'Translating...' : isShowingTranslation ? 'Original' : 'Translate'}
+          </button>
+        )}
       </div>
 
       {isEditing ? (
@@ -145,6 +184,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
               Cancel
             </button>
           </div>
+        </div>
+      ) : isShowingTranslation ? (
+        <div dir="rtl">
+          <TextBlockRenderer text={translations[message.id]} />
+          {contentBlocks
+            .filter((block) => block.type !== 'text')
+            .map((block, index) => (
+              <ContentBlockRenderer key={`orig-${index}`} block={block} />
+            ))}
         </div>
       ) : (
         <div dir={direction}>
@@ -312,4 +360,19 @@ function extractTextContent(blocks: ContentBlock[]): string {
     .filter((b) => b.type === 'text')
     .map((b) => b.text || '')
     .join(' ');
+}
+
+/**
+ * Extract translatable text from content blocks.
+ * Strips fenced code blocks (which should not be translated).
+ */
+function extractTranslatableText(blocks: ContentBlock[]): string {
+  return blocks
+    .filter((b) => b.type === 'text')
+    .map((b) => {
+      const text = b.text || '';
+      // Remove fenced code blocks, keep everything else
+      return text.replace(/```[\w]*\n[\s\S]*?```/g, '').trim();
+    })
+    .join('\n\n');
 }

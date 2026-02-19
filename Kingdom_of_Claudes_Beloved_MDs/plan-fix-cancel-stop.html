@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>תוכנית: תיקון ביטול/עצירה</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 40px 20px;
+      line-height: 1.7;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.8rem;
+      color: #f8fafc;
+      margin-bottom: 8px;
+      border-bottom: 3px solid #ef4444;
+      padding-bottom: 12px;
+    }
+    .subtitle {
+      color: #94a3b8;
+      font-size: 0.95rem;
+      margin-bottom: 32px;
+    }
+    .section {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      border-right: 4px solid #3b82f6;
+    }
+    .section.problem {
+      border-right-color: #ef4444;
+    }
+    .section.fix {
+      border-right-color: #22c55e;
+    }
+    .section.test {
+      border-right-color: #a855f7;
+    }
+    h2 {
+      font-size: 1.2rem;
+      color: #60a5fa;
+      margin-bottom: 12px;
+    }
+    .section.problem h2 { color: #f87171; }
+    .section.fix h2 { color: #4ade80; }
+    .section.test h2 { color: #c084fc; }
+    p {
+      color: #cbd5e1;
+      margin-bottom: 10px;
+    }
+    ul {
+      padding-right: 24px;
+      margin-bottom: 10px;
+    }
+    li {
+      margin-bottom: 6px;
+      color: #cbd5e1;
+    }
+    .highlight {
+      background: #ef44441a;
+      border: 1px solid #ef444440;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 12px 0;
+    }
+    .highlight p {
+      color: #fca5a5;
+      font-weight: 500;
+    }
+    .fix-item {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 12px 0;
+    }
+    .fix-item strong {
+      color: #4ade80;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+    .badge.critical { background: #ef44441a; color: #f87171; border: 1px solid #ef444440; }
+    .badge.important { background: #f59e0b1a; color: #fbbf24; border: 1px solid #f59e0b40; }
+    .badge.nice { background: #22c55e1a; color: #4ade80; border: 1px solid #22c55e40; }
+    .files-changed {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-top: 16px;
+    }
+    .files-changed strong {
+      color: #94a3b8;
+      display: block;
+      margin-bottom: 8px;
+    }
+    .file-count {
+      color: #60a5fa;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>תיקון: כפתור ביטול/עצירה לא עוצר את התהליך</h1>
+    <div class="subtitle">תוכנית לתיקון בעיה קריטית - לחיצה על Cancel לא עוצרת את Claude</div>
+
+    <div class="section problem">
+      <h2>הבעיה</h2>
+      <p>כשלוחצים על "ביטול" או Escape במהלך תשובה של Claude, התהליך ממשיך לרוץ ולבצע פעולות (עריכת קבצים, קריאת קבצים וכו'). גם בקשה מפורשת לעצור - לא עוזרת.</p>
+
+      <div class="highlight">
+        <p><strong>שורש הבעיה:</strong> ב-Windows, התהליך מופעל דרך מעטפת (cmd.exe). כשלוחצים ביטול, רק המעטפת נהרגת - אבל תהליך Claude עצמו ממשיך לרוץ כ"יתום" ללא שליטה.</p>
+      </div>
+    </div>
+
+    <div class="section fix">
+      <h2>התיקון - 3 שינויים</h2>
+
+      <div class="fix-item">
+        <strong>1. הריגת עץ התהליכים <span class="badge critical">קריטי</span></strong>
+        <p>במקום להרוג רק את המעטפת, נשתמש בפקודת Windows מובנית שהורגת את <strong>כל עץ התהליכים</strong> - כולל תהליך Claude עצמו וכל מה שמתחתיו. זה הליבה של התיקון.</p>
+      </div>
+
+      <div class="fix-item">
+        <strong>2. תגובה מיידית בממשק <span class="badge important">חשוב</span></strong>
+        <p>כרגע, הממשק ממתין שהתהליך באמת ייסגר כדי להראות שהביטול הצליח. אם התהליך תקוע - הממשק תקוע גם. השינוי: ברגע שלוחצים ביטול, הממשק מגיב מיד - כפתור הביטול נעלם ושדה הקלט חוזר להיות פעיל.</p>
+      </div>
+
+      <div class="fix-item">
+        <strong>3. שמירת תוכן חלקי <span class="badge nice">שיפור</span></strong>
+        <p>כשמבטלים באמצע תשובה, התוכן שכבר הגיע מ-Claude נשמר בהיסטוריית הצ'אט במקום להיעלם. כך לא מאבדים מידע שכבר הוצג.</p>
+      </div>
+
+      <div class="files-changed">
+        <strong>קבצים שישתנו:</strong>
+        <ul>
+          <li><span class="file-count">3</span> קבצים בלבד - שינוי ממוקד ומינימלי</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="section test">
+      <h2>איך נבדוק</h2>
+      <ul>
+        <li>נפתח שיחה עם Claude ונשלח הודעה שמייצרת תשובה ארוכה</li>
+        <li>נלחץ Cancel באמצע - ונוודא שהתהליך באמת נעצר</li>
+        <li>נוודא שהממשק מגיב מיד ולא נתקע</li>
+        <li>נוודא שאין תהליכים "יתומים" שממשיכים לרוץ ברקע</li>
+        <li>נוודא שאפשר להמשיך לשלוח הודעות אחרי הביטול</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>
