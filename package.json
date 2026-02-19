@@ -2,7 +2,7 @@
   "name": "claude-code-mirror",
   "displayName": "ClaUi",
   "description": "Rich chat interface for Claude Code with terminal mirroring",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "JhonBar",
   "icon": "images/icon.png",
   "engines": {
@@ -14,7 +14,10 @@
     "url": "https://github.com/Yehonatan-Bar/ClaUI"
   },
   "homepage": "https://github.com/Yehonatan-Bar/ClaUI#readme",
-  "categories": ["AI", "Chat"],
+  "categories": [
+    "AI",
+    "Chat"
+  ],
   "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
@@ -114,7 +117,13 @@
         "claudeMirror.model": {
           "type": "string",
           "default": "",
-          "enum": ["", "claude-sonnet-4-6", "claude-sonnet-4-5-20250929", "claude-opus-4-6", "claude-haiku-4-5-20251001"],
+          "enum": [
+            "",
+            "claude-sonnet-4-6",
+            "claude-sonnet-4-5-20250929",
+            "claude-opus-4-6",
+            "claude-haiku-4-5-20251001"
+          ],
           "enumDescriptions": [
             "Default (CLI default)",
             "Claude Sonnet 4.6",
@@ -127,7 +136,10 @@
         "claudeMirror.permissionMode": {
           "type": "string",
           "default": "full-access",
-          "enum": ["full-access", "supervised"],
+          "enum": [
+            "full-access",
+            "supervised"
+          ],
           "enumDescriptions": [
             "Full Access - All tools run without approval",
             "Supervised - Only read-only tools allowed; write tools are denied"
