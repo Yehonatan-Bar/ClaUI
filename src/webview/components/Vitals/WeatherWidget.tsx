@@ -38,10 +38,34 @@ interface WeatherWidgetProps {
   weather: WeatherState;
 }
 
+const STORAGE_KEY = 'claui-weather-pos';
+
+function loadPosition(): { top: number; left: number } | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return null;
+}
+
+function savePosition(top: number, left: number) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ top, left }));
+  } catch { /* ignore */ }
+}
+
 export const WeatherWidget: React.FC<WeatherWidgetProps> = React.memo(
   ({ weather }) => {
     const [popoverOpen, setPopoverOpen] = useState(false);
     const widgetRef = useRef<HTMLDivElement>(null);
+    const dragRef = useRef<{
+      startX: number; startY: number;
+      startTop: number; startLeft: number;
+      moved: boolean;
+    } | null>(null);
+
+    const saved = loadPosition();
+    const [pos, setPos] = useState({ top: saved?.top ?? 28, left: saved?.left ?? 32 });
 
     const togglePopover = useCallback(() => {
       setPopoverOpen((prev) => !prev);
@@ -59,13 +83,64 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = React.memo(
       return () => document.removeEventListener('mousedown', handler);
     }, [popoverOpen]);
 
+    // Drag handlers
+    const onMouseDown = useCallback((e: React.MouseEvent) => {
+      // Only left button
+      if (e.button !== 0) return;
+      dragRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startTop: pos.top,
+        startLeft: pos.left,
+        moved: false,
+      };
+      e.preventDefault();
+    }, [pos]);
+
+    useEffect(() => {
+      const onMouseMove = (e: MouseEvent) => {
+        const d = dragRef.current;
+        if (!d) return;
+        const dx = e.clientX - d.startX;
+        const dy = e.clientY - d.startY;
+        if (!d.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+        d.moved = true;
+        setPos({ top: d.startTop + dy, left: d.startLeft + dx });
+      };
+      const onMouseUp = () => {
+        const d = dragRef.current;
+        if (!d) return;
+        if (d.moved) {
+          setPos((cur) => { savePosition(cur.top, cur.left); return cur; });
+        }
+        dragRef.current = null;
+      };
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+    }, []);
+
+    const handleClick = useCallback(() => {
+      // Only toggle popover if we didn't just drag
+      if (dragRef.current?.moved) return;
+      togglePopover();
+    }, [togglePopover]);
+
     return (
-      <div className="weather-widget" ref={widgetRef}>
+      <div
+        className="weather-widget"
+        ref={widgetRef}
+        style={{ top: pos.top, left: pos.left }}
+      >
         <div
           className={`weather-icon weather-${weather.mood}`}
-          onClick={togglePopover}
+          onMouseDown={onMouseDown}
+          onClick={handleClick}
           title={WEATHER_LABELS[weather.mood]}
-          style={{ cursor: 'pointer' }}
+          style={{ cursor: dragRef.current?.moved ? 'grabbing' : 'grab' }}
         >
           <span className="weather-symbol">{WEATHER_SYMBOLS[weather.mood]}</span>
           <div className={`weather-pulse weather-pulse-${weather.pulseRate}`} />

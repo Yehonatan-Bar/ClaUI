@@ -209,7 +209,15 @@ export class Maze {
     // Run a small generation from this frontier cell
     const stack: TilePos[] = [start];
     let count = 0;
+    const [pdx, pdy] = DIRS[preferredDirIdx];
+    const scoreCell = (x: number, y: number): number => {
+      const directional = (x - this.heroPos.x) * pdx + (y - this.heroPos.y) * pdy;
+      const spread = Math.abs(x - this.heroPos.x) + Math.abs(y - this.heroPos.y);
+      return directional * 10 + spread;
+    };
+
     let furthest = start;
+    let furthestScore = scoreCell(start.x, start.y);
 
     while (stack.length > 0 && count < cellCount) {
       const current = stack[stack.length - 1];
@@ -233,7 +241,11 @@ export class Maze {
       this.removeWall(current.x, current.y, dirIdx);
       this.visited.add(`${nx},${ny}`);
       stack.push({ x: nx, y: ny });
-      furthest = { x: nx, y: ny };
+      const score = scoreCell(nx, ny);
+      if (score > furthestScore) {
+        furthest = { x: nx, y: ny };
+        furthestScore = score;
+      }
       count++;
     }
 
@@ -245,10 +257,54 @@ export class Maze {
     return furthest;
   }
 
+  /** Pick a direction that can actually extend near the hero, with graceful fallback when blocked */
+  private chooseExtensionDirection(preferredDirIdx: number): number {
+    const candidates = [
+      preferredDirIdx,
+      (preferredDirIdx + 1) % 4,
+      (preferredDirIdx + 3) % 4,
+      (preferredDirIdx + 2) % 4,
+    ];
+
+    for (const dir of candidates) {
+      if (this.hasDirectionalFrontier(dir)) {
+        return dir;
+      }
+    }
+
+    return preferredDirIdx;
+  }
+
+  /** True if a visited cell near the hero can extend one step in this direction */
+  private hasDirectionalFrontier(dirIdx: number): boolean {
+    const [dx, dy] = DIRS[dirIdx];
+    const hx = this.heroPos.x;
+    const hy = this.heroPos.y;
+    const searchRadius = 12;
+
+    for (let oy = -searchRadius; oy <= searchRadius; oy++) {
+      for (let ox = -searchRadius; ox <= searchRadius; ox++) {
+        const cx = hx + ox;
+        const cy = hy + oy;
+        if (cx < 0 || cx >= this.width || cy < 0 || cy >= this.height) continue;
+        if (!this.visited.has(`${cx},${cy}`)) continue;
+
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (nx < 0 || nx >= this.width || ny < 0 || ny >= this.height) continue;
+        if (!this.visited.has(`${nx},${ny}`)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   /** Find frontier cells near a position, biased toward a direction */
   private getFrontierNear(hx: number, hy: number, preferredDir: number): TilePos[] {
     const candidates: TilePos[] = [];
-    const searchRadius = 8;
+    const searchRadius = 12;
 
     for (let dy = -searchRadius; dy <= searchRadius; dy++) {
       for (let dx = -searchRadius; dx <= searchRadius; dx++) {
@@ -273,7 +329,7 @@ export class Maze {
       return scoreB - scoreA; // Higher score = more in preferred direction
     });
 
-    return candidates.slice(0, 5); // Top 5 candidates
+    return candidates.slice(0, 10); // Top candidates in preferred direction
   }
 
   /** Find a dead-end cell near the hero (for trap/monster beats) */
@@ -500,26 +556,28 @@ export class Maze {
       case 'read': {
         // Extend maze to the right (exploring) - 10-20 cells
         const count = 10 + Math.floor(this.rng() * 11);
-        const target = this.extendMaze(1, count); // East
+        const dir = this.chooseExtensionDirection(1); // Prefer East
+        const target = this.extendMaze(dir, count);
         if (target) {
           this.heroTarget = target;
         } else {
           this.wanderToRandom();
         }
-        this.lastBeatDir = 1;
+        this.lastBeatDir = dir;
         break;
       }
       case 'carve':
       case 'forge': {
         // Extend maze downward (digging deeper) - 10-20 cells
         const count = 10 + Math.floor(this.rng() * 11);
-        const target = this.extendMaze(2, count); // South
+        const dir = this.chooseExtensionDirection(2); // Prefer South
+        const target = this.extendMaze(dir, count);
         if (target) {
           this.heroTarget = target;
         } else {
           this.wanderToRandom();
         }
-        this.lastBeatDir = 2;
+        this.lastBeatDir = dir;
         break;
       }
       case 'fork': {

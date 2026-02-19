@@ -160,7 +160,7 @@ Instantiated per-tab in `SessionTab.ts`, injected into `MessageHandler` via `set
 
 ## Toggle
 
-- **Setting**: `claudeMirror.adventureWidget` (boolean, default `true`)
+- **Setting**: `claudeMirror.adventureWidget` (boolean, default `false`)
 - **UI**: Toggle in `VitalsInfoPanel` (separate from the main vitals toggle)
 - **Behavior**: Widget rendered only when both `vitalsEnabled` AND `adventureEnabled` are true
 - **State**: `adventureEnabled` in Zustand store, preserved across session resets

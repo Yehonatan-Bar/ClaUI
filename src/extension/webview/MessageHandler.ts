@@ -764,7 +764,7 @@ export class MessageHandler {
   /** Read session vitals setting from VS Code config and send to webview */
   private sendVitalsSetting(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
-    const enabled = config.get<boolean>('sessionVitals', true);
+    const enabled = config.get<boolean>('sessionVitals', false);
     this.log(`Sending vitals setting: enabled=${enabled}`);
     this.webview.postMessage({
       type: 'vitalsSetting',
@@ -775,7 +775,7 @@ export class MessageHandler {
   /** Read adventure widget setting from VS Code config and send to webview */
   private sendAdventureWidgetSetting(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
-    const enabled = config.get<boolean>('adventureWidget', true);
+    const enabled = config.get<boolean>('adventureWidget', false);
     this.log(`Sending adventure widget setting: enabled=${enabled}`);
     this.webview.postMessage({
       type: 'adventureWidgetSetting',
