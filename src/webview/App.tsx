@@ -15,6 +15,7 @@ import { VitalsContainer } from './components/Vitals/VitalsContainer';
 import { SessionTimeline } from './components/Vitals/SessionTimeline';
 import { VitalsInfoPanel } from './components/Vitals/VitalsInfoPanel';
 import { postToExtension } from './hooks/useClaudeStream';
+import { detectRtl } from './hooks/useRtlDetection';
 
 function formatDuration(durationMs: number): string {
   const totalSec = Math.max(0, Math.floor(durationMs / 1000));
@@ -49,6 +50,8 @@ export const App: React.FC = () => {
   const forkInit = useAppStore((s) => s.forkInit);
   const hasMessages = messages.length > 0 || streamingMessageId !== null;
   const [scrollFraction, setScrollFraction] = React.useState(0);
+  const activityText = activitySummary ? `${activitySummary.shortLabel} ${activitySummary.fullSummary}` : '';
+  const activityDir: 'rtl' | 'ltr' = activityText && detectRtl(activityText) ? 'rtl' : 'ltr';
 
   const handleTimelineTurnClick = React.useCallback((messageId: string) => {
     const el = document.querySelector(`[data-message-id="${messageId}"]`);
@@ -138,7 +141,7 @@ export const App: React.FC = () => {
                     <span className="thinking-dot" />
                   </span>
                 )}
-                <span className="busy-indicator-text">
+                <span className="busy-indicator-text" dir={activityDir}>
                   {isBusy ? (
                     isResuming ? 'Resuming conversation...' : (
                       activitySummary ? activitySummary.shortLabel + '...' : 'Thinking...'
@@ -149,7 +152,7 @@ export const App: React.FC = () => {
                 </span>
               </div>
               {activitySummary && (
-                <div className="activity-summary-detail">
+                <div className="activity-summary-detail" dir={activityDir}>
                   {activitySummary.fullSummary}
                 </div>
               )}
