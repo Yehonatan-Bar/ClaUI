@@ -6,6 +6,7 @@ import type {
   AchievementGoalPayload,
   AchievementProfilePayload,
   SessionRecapPayload,
+  TurnCategory,
   TurnRecord,
 } from '../../extension/types/webview-messages';
 import type { AdventureBeat } from '../components/Vitals/adventure/types';
@@ -62,6 +63,7 @@ export interface AppState {
   selectedModel: string;  // model chosen by user for next session
   isConnected: boolean;
   isBusy: boolean;
+  lastActivityAt: number;
 
   // Messages
   messages: ChatMessage[];
@@ -176,6 +178,7 @@ export interface AppState {
   clearStreaming: () => void;
 
   setBusy: (busy: boolean) => void;
+  markActivity: () => void;
   updateCost: (cost: CostInfo) => void;
   setError: (message: string | null) => void;
   setPendingFilePaths: (paths: string[] | null) => void;
@@ -201,6 +204,7 @@ export interface AppState {
   setTranslating: (messageId: string, translating: boolean) => void;
   toggleTranslationView: (messageId: string) => void;
   setVitalsEnabled: (enabled: boolean) => void;
+  rebuildTurnHistoryFromMessages: (messages?: ChatMessage[]) => void;
   addTurnRecord: (turn: TurnRecord) => void;
   setAchievementsSettings: (settings: { enabled: boolean; sound: boolean }) => void;
   setAchievementsSnapshot: (snapshot: { profile: AchievementProfilePayload; goals: AchievementGoalPayload[] }) => void;
@@ -331,6 +335,59 @@ function buildContentFromBlocks(blocks: StreamingBlock[]): ContentBlock[] {
   });
 }
 
+/** Tool name sets for Session Vitals turn categorization */
+const CODE_WRITE_TOOLS = new Set(['Write', 'Edit', 'NotebookEdit', 'MultiEdit']);
+const RESEARCH_TOOLS = new Set(['Read', 'Grep', 'Glob', 'WebSearch', 'WebFetch']);
+const COMMAND_TOOLS = new Set(['Bash', 'Terminal']);
+
+function categorizeTurn(toolNames: string[], isError: boolean): TurnCategory {
+  if (isError) return 'error';
+  if (toolNames.length === 0) return 'discussion';
+  const baseNames = toolNames.map((name) => (name.includes('__') ? name.split('__').pop() || name : name));
+  if (baseNames.some((name) => CODE_WRITE_TOOLS.has(name))) return 'code-write';
+  if (baseNames.some((name) => COMMAND_TOOLS.has(name))) return 'command';
+  if (baseNames.some((name) => RESEARCH_TOOLS.has(name))) return 'research';
+  return 'success';
+}
+
+function buildTurnByMessageId(turns: TurnRecord[]): Record<string, TurnRecord> {
+  const byId: Record<string, TurnRecord> = {};
+  for (const turn of turns) {
+    byId[turn.messageId] = turn;
+  }
+  return byId;
+}
+
+function buildTurnHistoryFromMessages(messages: ChatMessage[]): TurnRecord[] {
+  const turns: TurnRecord[] = [];
+
+  for (const message of messages) {
+    if (message.role !== 'assistant') continue;
+    const content = message.content;
+    const toolNames = content
+      .filter((block) => block.type === 'tool_use')
+      .map((block) => block.name || '')
+      .filter((name): name is string => !!name);
+    const isError = content.some((block) => block.type === 'tool_result' && block.is_error === true);
+
+    turns.push({
+      turnIndex: turns.length,
+      toolNames,
+      toolCount: toolNames.length,
+      durationMs: 0,
+      costUsd: 0,
+      totalCostUsd: 0,
+      isError,
+      category: categorizeTurn(toolNames, isError),
+      timestamp: message.timestamp || Date.now(),
+      messageId: message.id,
+    });
+  }
+
+  if (turns.length <= 200) return turns;
+  return turns.slice(-200).map((turn, index) => ({ ...turn, turnIndex: index }));
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   // Initial state
   sessionId: null,
@@ -338,6 +395,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedModel: '',
   isConnected: false,
   isBusy: false,
+  lastActivityAt: 0,
   messages: [],
   streamingMessageId: null,
   streamingBlocks: [],
@@ -428,6 +486,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         sessionActivityElapsedMs: finalElapsed,
         sessionActivityRunningSinceMs: null,
         weather: { mood: 'night' as WeatherMood, pulseRate: 'slow' as PulseRate },
+        lastActivityAt: 0,
       };
     }),
 
@@ -678,16 +737,23 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setBusy: (busy) =>
     set((state) => {
+      const now = Date.now();
       if (!state.sessionActivityStarted) {
-        return { isBusy: busy };
+        return busy
+          ? { isBusy: true, lastActivityAt: now }
+          : { isBusy: false };
       }
 
-      const now = Date.now();
       if (busy && state.sessionActivityRunningSinceMs === null) {
         return {
           isBusy: true,
           sessionActivityRunningSinceMs: now,
+          lastActivityAt: now,
         };
+      }
+
+      if (busy) {
+        return { isBusy: true, lastActivityAt: now };
       }
 
       if (!busy && state.sessionActivityRunningSinceMs !== null) {
@@ -700,6 +766,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       return { isBusy: busy };
     }),
+
+  markActivity: () => set({ lastActivityAt: Date.now() }),
 
   updateCost: (cost) => set({ cost }),
 
@@ -737,7 +805,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       const index = state.messages.findIndex((m) => m.id === messageId);
       if (index < 0) return state;
       // Keep messages before the target, discard target and everything after
-      return { messages: state.messages.slice(0, index) };
+      const retainedMessages = state.messages.slice(0, index);
+      const retainedAssistantIds = new Set(
+        retainedMessages
+          .filter((m) => m.role === 'assistant')
+          .map((m) => m.id)
+      );
+      const retainedTurns = state.turnHistory
+        .filter((turn) => retainedAssistantIds.has(turn.messageId))
+        .map((turn, turnIndex) => ({ ...turn, turnIndex }));
+      return {
+        messages: retainedMessages,
+        turnHistory: retainedTurns,
+        turnByMessageId: buildTurnByMessageId(retainedTurns),
+        weather: calculateWeather(retainedTurns),
+      };
     }),
 
   setActivitySummary: (summary) => set({ activitySummary: summary }),
@@ -797,16 +879,49 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { showingTranslation: newSet };
     }),
 
-  setVitalsEnabled: (enabled) => set({ vitalsEnabled: enabled }),
+  setVitalsEnabled: (enabled) =>
+    set((state) => {
+      if (!enabled || state.turnHistory.length > 0) {
+        return { vitalsEnabled: enabled };
+      }
+      const rebuilt = buildTurnHistoryFromMessages(state.messages);
+      return {
+        vitalsEnabled: enabled,
+        turnHistory: rebuilt,
+        turnByMessageId: buildTurnByMessageId(rebuilt),
+        weather: calculateWeather(rebuilt),
+      };
+    }),
+
+  rebuildTurnHistoryFromMessages: (messages) =>
+    set((state) => {
+      const rebuilt = buildTurnHistoryFromMessages(messages ?? state.messages);
+      return {
+        turnHistory: rebuilt,
+        turnByMessageId: buildTurnByMessageId(rebuilt),
+        weather: calculateWeather(rebuilt),
+      };
+    }),
 
   addTurnRecord: (turn) =>
     set((state) => {
-      const updated = [...state.turnHistory, turn];
-      const trimmed = updated.length > 200 ? updated.slice(-200) : updated;
+      const existingIndex = state.turnHistory.findIndex((t) => t.messageId === turn.messageId);
+      let updated = [...state.turnHistory];
+      if (existingIndex >= 0) {
+        updated[existingIndex] = { ...turn, turnIndex: existingIndex };
+      } else {
+        updated.push({ ...turn, turnIndex: updated.length });
+      }
+      if (updated.length > 200) {
+        updated = updated.slice(-200);
+      }
+      const normalized = updated.map((t, idx) =>
+        t.turnIndex === idx ? t : { ...t, turnIndex: idx }
+      );
       return {
-        turnHistory: trimmed,
-        turnByMessageId: { ...state.turnByMessageId, [turn.messageId]: turn },
-        weather: calculateWeather(trimmed),
+        turnHistory: normalized,
+        turnByMessageId: buildTurnByMessageId(normalized),
+        weather: calculateWeather(normalized),
       };
     }),
 
@@ -872,6 +987,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       model: null,
       isConnected: false,
       isBusy: false,
+      lastActivityAt: 0,
       messages: [],
       streamingMessageId: null,
       streamingBlocks: [],

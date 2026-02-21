@@ -28,6 +28,9 @@ export class ActivitySummarizer {
   /** Debounce delay in ms after reaching threshold */
   private debounceMs: number;
 
+  /** Timeout for the Haiku summarization call */
+  private timeoutMs: number;
+
   /** Whether a Haiku call is currently in-flight */
   private inFlight = false;
 
@@ -37,9 +40,10 @@ export class ActivitySummarizer {
   /** Callback when a new summary is generated */
   private summaryCallback: ((summary: ActivitySummary) => void) | null = null;
 
-  constructor(options?: { threshold?: number; debounceMs?: number }) {
+  constructor(options?: { threshold?: number; debounceMs?: number; timeoutMs?: number }) {
     this.threshold = options?.threshold ?? 3;
     this.debounceMs = options?.debounceMs ?? 2000;
+    this.timeoutMs = options?.timeoutMs ?? 45_000;
   }
 
   setLogger(logger: (msg: string) => void): void {
@@ -186,12 +190,12 @@ export class ActivitySummarizer {
         return;
       }
 
-      // 10-second timeout
+      // Timeout guard (Haiku calls can be noticeably slower on busy systems)
       const timer = setTimeout(() => {
-        this.log('[ActivitySummarizer] timeout (10s), killing process');
+        this.log(`[ActivitySummarizer] timeout (${this.timeoutMs}ms), killing process`);
         child.kill('SIGTERM');
         finish(null);
-      }, 10_000);
+      }, this.timeoutMs);
 
       child.stdout?.on('data', (chunk: Buffer) => {
         stdout += chunk.toString('utf-8');

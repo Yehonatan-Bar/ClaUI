@@ -9,6 +9,7 @@ import type { MessageTranslator } from '../session/MessageTranslator';
 import type { PromptHistoryStore } from '../session/PromptHistoryStore';
 import type { AchievementService } from '../achievements/AchievementService';
 import type {
+  AdventureBeatMessage,
   ExtensionToWebviewMessage,
   TypingTheme,
   TurnCategory,
@@ -21,6 +22,7 @@ import type {
   UserMessage,
   ResultSuccess,
   ResultError,
+  ContentBlock,
 } from '../types/stream-json';
 
 /**
@@ -83,6 +85,10 @@ export class MessageHandler {
 
   /** Tool names seen in the current assistant message (cleared on messageStart) */
   private currentMessageToolNames: string[] = [];
+  /** Adventure semantic metadata collected during the current assistant message */
+  private currentAdventureArtifacts = new Set<string>();
+  private currentAdventureIndicators = new Set<string>();
+  private currentAdventureCommandTags = new Set<string>();
   /** Set when the CLI pauses waiting for plan/question approval */
   private pendingApprovalTool: string | null = null;
   /** Set after user responds to approval - suppresses stale re-notifications from late events */
@@ -99,6 +105,10 @@ export class MessageHandler {
   private toolBlockNames: Map<number, string> = new Map();
   /** Maps blockIndex -> accumulated input_json_delta chunks (for enrichment context) */
   private toolBlockContexts: Map<number, string> = new Map();
+  /** True once at least one tool blockStop was seen in the current message */
+  private sawToolBlockStopThisMessage = false;
+  /** Guard against duplicate fallback extraction from repeated assistant snapshots */
+  private fallbackToolUseRecordedForMessage = false;
   /** Getter for the session/tab name, injected by SessionTab */
   private getSessionName: (() => string) | null = null;
   /** Message translator for Hebrew translation feature */
@@ -108,6 +118,8 @@ export class MessageHandler {
 
   /** Turn counter for Session Vitals (reset on session clear) */
   private turnIndex = 0;
+  /** Monotonic beat counter for Adventure widget (must be unique per beat, not per turn). */
+  private adventureBeatIndex = 0;
   /** Last assistant message ID for TurnRecord association */
   private lastMessageId = '';
 
@@ -358,6 +370,19 @@ export class MessageHandler {
           this.log(`Setting adventure widget to: ${msg.enabled}`);
           vscode.workspace.getConfiguration('claudeMirror').update('adventureWidget', msg.enabled, true);
           break;
+
+        case 'adventureDebugLog': {
+          let payloadText = '';
+          if (msg.payload) {
+            try {
+              payloadText = ` ${JSON.stringify(msg.payload)}`;
+            } catch {
+              payloadText = ' [payload-unserializable]';
+            }
+          }
+          this.log(`[AdventureDebug][${msg.source}] ${msg.event}${payloadText}`);
+          break;
+        }
 
         case 'showHistory':
           this.log('Webview requested history view');
@@ -937,6 +962,9 @@ export class MessageHandler {
           toolName: data.toolName,
           toolId: data.toolId,
         });
+        if (this.adventureInterpreter) {
+          this.emitAdventureBeat(this.buildLiveToolBeat(data.toolName), 'toolUseStart');
+        }
       }
     );
 
@@ -962,12 +990,14 @@ export class MessageHandler {
       (data: { blockIndex: number }) => {
         const toolName = this.toolBlockNames.get(data.blockIndex);
         const rawInput = this.toolBlockContexts.get(data.blockIndex) || '';
-        if (toolName && this.activitySummarizer) {
-          const enriched = this.enrichToolName(toolName, data.blockIndex);
-          this.activitySummarizer.recordToolUse(enriched);
-        }
         if (toolName) {
+          this.sawToolBlockStopThisMessage = true;
+          if (this.activitySummarizer) {
+            const enriched = this.enrichToolNameFromRaw(toolName, rawInput);
+            this.activitySummarizer.recordToolUse(enriched);
+          }
           this.achievementService.onToolUse(this.tabId, toolName, rawInput);
+          this.collectAdventureContext(toolName, rawInput);
         }
         this.toolBlockNames.delete(data.blockIndex);
         this.toolBlockContexts.delete(data.blockIndex);
@@ -1002,6 +1032,7 @@ export class MessageHandler {
         if (assistantText.trim()) {
           this.achievementService.onAssistantText(this.tabId, assistantText);
         }
+        this.recordToolUseFallbackFromAssistantMessage(event.message.content);
         this.log(`-> webview: assistantMessage id=${event.message.id} blocks=[${blockTypes}]`);
         this.webview.postMessage({
           type: 'assistantMessage',
@@ -1034,6 +1065,11 @@ export class MessageHandler {
         this.approvalResponseProcessed = false;
         this.toolBlockNames.clear();
         this.toolBlockContexts.clear();
+        this.currentAdventureArtifacts.clear();
+        this.currentAdventureIndicators.clear();
+        this.currentAdventureCommandTags.clear();
+        this.sawToolBlockStopThisMessage = false;
+        this.fallbackToolUseRecordedForMessage = false;
         this.webview.postMessage({
           type: 'messageStart',
           messageId: data.messageId,
@@ -1065,6 +1101,7 @@ export class MessageHandler {
       (event: ResultSuccess | ResultError) => {
         // Snapshot tool names BEFORE clearing (clearApprovalTracking resets the array)
         const toolNamesSnapshot = [...this.currentMessageToolNames];
+        const adventureSnapshot = this.snapshotAdventureMetadata();
 
         this.clearApprovalTracking();
         this.autoApproveExitPlanMode = false;
@@ -1090,13 +1127,16 @@ export class MessageHandler {
             category: categorizeTurn(toolNamesSnapshot, false),
             timestamp: Date.now(),
             messageId: this.lastMessageId,
+            adventureArtifacts: adventureSnapshot.artifacts,
+            adventureIndicators: adventureSnapshot.indicators,
+            adventureCommandTags: adventureSnapshot.commandTags,
           };
           this.log(`Emitting turnComplete: turn=${successTurn.turnIndex} category=${successTurn.category} tools=[${successTurn.toolNames.join(',')}]`);
           this.webview.postMessage({ type: 'turnComplete', turn: successTurn });
           // Adventure Widget: generate and send beat
           if (this.adventureInterpreter) {
             const beat = this.adventureInterpreter.interpret(successTurn as TurnRecord);
-            this.webview.postMessage({ type: 'adventureBeat', beat });
+            this.emitAdventureBeat(beat, 'resultSuccess');
           }
         } else {
           this.achievementService.onResult(this.tabId, false);
@@ -1117,18 +1157,110 @@ export class MessageHandler {
             category: 'error' as const,
             timestamp: Date.now(),
             messageId: this.lastMessageId,
+            adventureArtifacts: adventureSnapshot.artifacts,
+            adventureIndicators: adventureSnapshot.indicators,
+            adventureCommandTags: adventureSnapshot.commandTags,
           };
           this.log(`Emitting turnComplete (error): turn=${errorTurn.turnIndex}`);
           this.webview.postMessage({ type: 'turnComplete', turn: errorTurn });
           // Adventure Widget: generate and send beat
           if (this.adventureInterpreter) {
             const beat = this.adventureInterpreter.interpret(errorTurn as TurnRecord);
-            this.webview.postMessage({ type: 'adventureBeat', beat });
+            this.emitAdventureBeat(beat, 'resultError');
           }
         }
+        this.currentAdventureArtifacts.clear();
+        this.currentAdventureIndicators.clear();
+        this.currentAdventureCommandTags.clear();
         this.webview.postMessage({ type: 'processBusy', busy: false });
       }
     );
+  }
+
+  /** Emit adventure beat with a unique monotonically increasing index (not tied to turnIndex). */
+  private emitAdventureBeat(beat: AdventureBeatMessage['beat'], source: string): void {
+    const emittedBeat: AdventureBeatMessage['beat'] = {
+      ...beat,
+      turnIndex: this.adventureBeatIndex++,
+      timestamp: beat.timestamp || Date.now(),
+    };
+    this.log(
+      `Emitting adventureBeat [${source}]: beatIdx=${emittedBeat.turnIndex} beat=${emittedBeat.beat} intensity=${emittedBeat.intensity}`
+    );
+    this.webview.postMessage({ type: 'adventureBeat', beat: emittedBeat });
+  }
+
+  /** Generate a live beat from a single tool-use event to keep movement flowing during long turns. */
+  private buildLiveToolBeat(toolName: string): AdventureBeatMessage['beat'] {
+    const baseName = toolName.includes('__') ? toolName.split('__').pop() || toolName : toolName;
+
+    let beat: AdventureBeatMessage['beat']['beat'] = 'wander';
+    let roomType: AdventureBeatMessage['beat']['roomType'] = 'corridor';
+    let labelShort = 'Exploring...';
+    let outcome: AdventureBeatMessage['beat']['outcome'] = 'neutral';
+    let intensity: AdventureBeatMessage['beat']['intensity'] = 1;
+    const artifacts: string[] = [];
+    const indicators: string[] = [];
+    const commandTags: string[] = [];
+
+    if (baseName === 'Read') {
+      beat = 'read';
+      roomType = 'library';
+      labelShort = 'Reading scrolls';
+      outcome = 'success';
+      intensity = 2;
+      artifacts.push('scroll');
+      indicators.push('lore-scan');
+    } else if (RESEARCH_TOOLS.includes(baseName)) {
+      beat = 'scout';
+      roomType = 'library';
+      labelShort = 'Searching the map';
+      outcome = 'success';
+      intensity = 2;
+      artifacts.push('map-fragment');
+      indicators.push('recon');
+    } else if (CODE_WRITE_TOOLS.includes(baseName)) {
+      beat = 'carve';
+      roomType = 'forge';
+      labelShort = 'Mining the wall';
+      outcome = 'success';
+      intensity = 2;
+      artifacts.push('rune-shard');
+      indicators.push('crafting');
+    } else if (COMMAND_TOOLS.includes(baseName)) {
+      beat = 'forge';
+      roomType = 'arena';
+      labelShort = 'Working the forge';
+      outcome = 'success';
+      intensity = 2;
+      artifacts.push('gear');
+      indicators.push('execution');
+      commandTags.push('build');
+    } else if (baseName === 'ExitPlanMode' || baseName === 'AskUserQuestion') {
+      beat = 'fork';
+      roomType = 'junction';
+      labelShort = 'Crossroads';
+      outcome = 'neutral';
+      intensity = 1;
+      artifacts.push('junction-key');
+      indicators.push('planning');
+    }
+
+    return {
+      turnIndex: -1,
+      timestamp: Date.now(),
+      beat,
+      intensity,
+      outcome,
+      toolNames: [toolName],
+      labelShort,
+      tooltipDetail: toolName,
+      roomType,
+      isHaikuEnhanced: false,
+      artifacts,
+      indicators,
+      commandTags,
+    };
   }
 
   /** Reset tool name tracking and pending approval state */
@@ -1194,9 +1326,199 @@ export class MessageHandler {
     });
   }
 
-  /** Enrich a tool name with parsed tool arguments (path/query/command/etc.) */
-  private enrichToolName(toolName: string, blockIndex: number): string {
-    const rawJson = this.toolBlockContexts.get(blockIndex) || '';
+  /** Fallback: extract tool uses from assistant snapshots if blockStop events are missing */
+  private recordToolUseFallbackFromAssistantMessage(content: ContentBlock[]): void {
+    if (this.sawToolBlockStopThisMessage || this.fallbackToolUseRecordedForMessage) {
+      return;
+    }
+
+    const toolBlocks = content.filter(
+      (block): block is ContentBlock => block.type === 'tool_use' && typeof block.name === 'string' && !!block.name.trim()
+    );
+    if (toolBlocks.length === 0) {
+      return;
+    }
+
+    this.log(`[ToolUseFallback] Extracting ${toolBlocks.length} tool uses from assistantMessage (no tool blockStop seen)`);
+    for (const block of toolBlocks) {
+      const toolName = (block.name || '').trim();
+      if (!toolName) {
+        continue;
+      }
+      const rawInput = this.serializeToolInput(block.input);
+      if (this.activitySummarizer) {
+        const enriched = this.enrichToolNameFromRaw(toolName, rawInput);
+        this.activitySummarizer.recordToolUse(enriched);
+      }
+      this.achievementService.onToolUse(this.tabId, toolName, rawInput);
+      this.collectAdventureContext(toolName, rawInput);
+      if (!this.currentMessageToolNames.includes(toolName)) {
+        this.currentMessageToolNames.push(toolName);
+      }
+    }
+
+    this.fallbackToolUseRecordedForMessage = true;
+  }
+
+  /** Snapshot semantic adventure metadata collected across tool calls in this turn. */
+  private snapshotAdventureMetadata(): {
+    artifacts: string[];
+    indicators: string[];
+    commandTags: string[];
+  } {
+    return {
+      artifacts: Array.from(this.currentAdventureArtifacts).slice(0, 8),
+      indicators: Array.from(this.currentAdventureIndicators).slice(0, 8),
+      commandTags: Array.from(this.currentAdventureCommandTags).slice(0, 8),
+    };
+  }
+
+  /** Extract game-facing semantic signals from tool usage so visuals can react meaningfully. */
+  private collectAdventureContext(toolName: string, rawInput: string): void {
+    const baseName = toolName.includes('__') ? toolName.split('__').pop() || toolName : toolName;
+
+    if (baseName === 'Read') {
+      this.currentAdventureArtifacts.add('scroll');
+      this.currentAdventureIndicators.add('lore-scan');
+    } else if (RESEARCH_TOOLS.includes(baseName)) {
+      this.currentAdventureArtifacts.add('map-fragment');
+      this.currentAdventureIndicators.add('recon');
+    } else if (CODE_WRITE_TOOLS.includes(baseName)) {
+      this.currentAdventureArtifacts.add('rune-shard');
+      this.currentAdventureIndicators.add('crafting');
+    } else if (COMMAND_TOOLS.includes(baseName)) {
+      this.currentAdventureArtifacts.add('gear');
+      this.currentAdventureIndicators.add('execution');
+    } else if (baseName === 'ExitPlanMode' || baseName === 'AskUserQuestion' || baseName === 'EnterPlanMode') {
+      this.currentAdventureArtifacts.add('junction-key');
+      this.currentAdventureIndicators.add('planning');
+    }
+
+    const commands = this.extractCommandTexts(rawInput);
+    for (const command of commands) {
+      const tags = this.classifyCommandTags(command);
+      for (const tag of tags) {
+        this.currentAdventureCommandTags.add(tag);
+        switch (tag) {
+          case 'git':
+            this.currentAdventureArtifacts.add('commit-sigil');
+            this.currentAdventureIndicators.add('vcs-flow');
+            break;
+          case 'test':
+            this.currentAdventureArtifacts.add('trial-mark');
+            this.currentAdventureIndicators.add('validation');
+            break;
+          case 'build':
+            this.currentAdventureArtifacts.add('blueprint');
+            this.currentAdventureIndicators.add('assembly');
+            break;
+          case 'deploy':
+            this.currentAdventureArtifacts.add('portal-seal');
+            this.currentAdventureIndicators.add('release-window');
+            break;
+          case 'search':
+            this.currentAdventureArtifacts.add('tracker-lens');
+            this.currentAdventureIndicators.add('trace-hunt');
+            break;
+        }
+      }
+    }
+  }
+
+  private extractCommandTexts(rawInput: string): string[] {
+    if (!rawInput) return [];
+    const commands = new Set<string>();
+    const pushCommand = (value: unknown): void => {
+      if (typeof value !== 'string') return;
+      const normalized = value.replace(/\s+/g, ' ').trim();
+      if (!normalized) return;
+      commands.add(normalized.slice(0, 180));
+    };
+
+    try {
+      const parsed = JSON.parse(rawInput) as unknown;
+      if (parsed && typeof parsed === 'object') {
+        if (Array.isArray(parsed)) {
+          for (const entry of parsed) {
+            if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+              const payload = entry as Record<string, unknown>;
+              pushCommand(payload.command);
+            }
+          }
+        } else {
+          const payload = parsed as Record<string, unknown>;
+          pushCommand(payload.command);
+          pushCommand(payload.cmd);
+          if (Array.isArray(payload.commands)) {
+            for (const entry of payload.commands) pushCommand(entry);
+          }
+          if (Array.isArray(payload.tool_uses)) {
+            for (const toolUse of payload.tool_uses) {
+              if (!toolUse || typeof toolUse !== 'object') continue;
+              const use = toolUse as Record<string, unknown>;
+              const params = use.parameters;
+              if (!params || typeof params !== 'object' || Array.isArray(params)) continue;
+              pushCommand((params as Record<string, unknown>).command);
+            }
+          }
+        }
+      }
+    } catch {
+      // Fallback regex for partial/invalid tool JSON fragments.
+    }
+
+    if (commands.size === 0) {
+      const regex = /"command"\s*:\s*"([^"]{1,500})"/g;
+      let match: RegExpExecArray | null;
+      while ((match = regex.exec(rawInput)) !== null) {
+        pushCommand(match[1]);
+        if (commands.size >= 6) break;
+      }
+    }
+
+    return Array.from(commands).slice(0, 6);
+  }
+
+  private classifyCommandTags(command: string): string[] {
+    const normalized = command.toLowerCase();
+    const tags = new Set<string>();
+
+    if (/\bgit\b/.test(normalized)) tags.add('git');
+    if (/\b(test|jest|vitest|pytest)\b/.test(normalized) || normalized.includes('go test') || normalized.includes('cargo test')) {
+      tags.add('test');
+    }
+    if (
+      /\b(build|compile|tsc)\b/.test(normalized) ||
+      normalized.includes('vite build') ||
+      normalized.includes('webpack') ||
+      normalized.includes('cargo build') ||
+      normalized.includes('go build')
+    ) {
+      tags.add('build');
+    }
+    if (/\b(deploy|release|publish|docker|kubectl|terraform)\b/.test(normalized)) tags.add('deploy');
+    if (/\b(rg|grep|find|ls|dir|cat)\b/.test(normalized)) tags.add('search');
+
+    return Array.from(tags);
+  }
+
+  /** Serialize tool input to a JSON string for enrichment and achievement classification */
+  private serializeToolInput(input: unknown): string {
+    if (typeof input === 'string') {
+      return input;
+    }
+    if (input === null || input === undefined) {
+      return '';
+    }
+    try {
+      return JSON.stringify(input);
+    } catch {
+      return '';
+    }
+  }
+
+  /** Enrich a tool name using raw JSON tool input */
+  private enrichToolNameFromRaw(toolName: string, rawJson: string): string {
     if (!rawJson) {
       return toolName;
     }

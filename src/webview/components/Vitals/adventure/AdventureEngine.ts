@@ -11,6 +11,7 @@ import {
   HERO_MINI_IDLE1, HERO_MINI_IDLE2,
   HERO_MINI_WALK1, HERO_MINI_WALK2,
   HERO_MINI_ACTION, HERO_MINI_SIT,
+  MINI_SCROLL, MINI_LANTERN, MINI_ANVIL, MINI_CHEST, MINI_FLAG, MINI_SIGNPOST,
   MINI_CAMPFIRE1, MINI_CAMPFIRE2,
   getMiniEncounterSprites,
   getResolutionParticle,
@@ -54,6 +55,8 @@ export class AdventureEngine {
   private walkProgress = 0;
   private encounterTimer = 0;
   private resolutionTimer = 0;
+  private isCatchupBeat = false;
+  private isCurrentAmbientBeat = false;
 
   // Idle state
   private idleTimer = 0;
@@ -81,8 +84,21 @@ export class AdventureEngine {
   // Tooltip
   private _tooltipText: string | null = null;
 
+  // Semantic visuals (artifacts/commands/indicators)
+  private artifactCounts = new Map<string, number>();
+  private commandAuraTag: string | null = null;
+  private commandAuraTimer = 0;
+  private indicatorDanger = 0;
+  private indicatorFocus = 0;
+  private indicatorMomentum = 0;
+
   // Busy state from Claude
   private _isBusy = false;
+  private activityWalkCooldown = 0;
+  private idleWalkCooldown = 4;
+  private readonly strictNoRevisit = true;
+  private readonly debugEnabled = true;
+  private beatSeq = 0;
 
   constructor(canvas: HTMLCanvasElement, config?: Partial<AdventureConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -105,14 +121,37 @@ export class AdventureEngine {
     // Initialize maze
     this.maze = new Maze(Date.now(), this.config);
 
-    // Start patrol quickly after load
-    this.patrolCooldown = 1.0;
+    // In strict no-revisit mode, idle patrol is disabled because patrol loops revisit cells.
+    this.patrolCooldown = this.strictNoRevisit ? Number.POSITIVE_INFINITY : 1.0;
 
     // Start idle animation
     this.startIdleLoop();
 
     // Initial render
     this.render();
+    this.debug('Engine:init', {
+      strictNoRevisit: this.strictNoRevisit,
+      canvas: { width: this.config.canvasWidth, height: this.config.canvasHeight },
+    });
+  }
+
+  private debug(event: string, payload?: Record<string, unknown>): void {
+    if (!this.debugEnabled) return;
+    const vscode = (window as any).acquireVsCodeApi?.();
+    if (vscode) {
+      vscode.postMessage({
+        type: 'adventureDebugLog',
+        source: 'engine',
+        event,
+        payload,
+        ts: Date.now(),
+      });
+    }
+    if (payload) {
+      console.debug(`[AdventureDebug][Engine] ${event}`, payload);
+      return;
+    }
+    console.debug(`[AdventureDebug][Engine] ${event}`);
   }
 
   /** Clean up resources */
@@ -129,6 +168,7 @@ export class AdventureEngine {
 
   /** Add a new beat from a turn event */
   addBeat(beat: AdventureBeat): void {
+    this.applyBeatSemantics(beat);
     this.beatQueue.push(beat);
     this.idleTimer = 0;
     this.isAtCampfire = false;
@@ -145,7 +185,12 @@ export class AdventureEngine {
     if (busy) {
       this.idleTimer = 0;
       this.isAtCampfire = false;
+      this.activityWalkCooldown = Math.min(this.activityWalkCooldown, 0.25);
+      return;
     }
+
+    // After activity ends, wait a bit before the next tiny idle roam.
+    this.idleWalkCooldown = Math.max(this.idleWalkCooldown, 4 + Math.random() * 2);
   }
 
   /** Get tooltip text for the current state */
@@ -157,30 +202,163 @@ export class AdventureEngine {
 
   private processNextBeat(): void {
     if (this.beatQueue.length === 0) {
+      this.isCatchupBeat = false;
+      this.isCurrentAmbientBeat = false;
       this.transitionTo('idle');
       return;
     }
 
-    // Fast-forward if queue is too long
-    while (this.beatQueue.length > 5) {
+    // Fast-forward only when queue is very long, but keep hero position so catch-up walk stays visible.
+    let skippedCount = 0;
+    while (this.beatQueue.length > 12) {
       const skipped = this.beatQueue.shift()!;
       this.maze.addBeat(skipped);
-      this.maze.heroPos = { ...this.maze.heroTarget };
+      skippedCount++;
     }
 
     this.currentBeat = this.beatQueue.shift()!;
+    this.beatSeq++;
+    this.isCatchupBeat = skippedCount > 0;
+    this.isCurrentAmbientBeat = this.currentBeat.turnIndex < 0;
     this._tooltipText = this.buildTooltip(this.currentBeat);
 
-    // Extend maze based on beat
-    this.maze.addBeat(this.currentBeat);
+    // Save the hero's current position BEFORE this walk starts so chooseFarTarget can compute
+    // a forward vector (prev_start → current_pos) and avoid sending the hero backwards.
+    const walkStart = { ...this.maze.heroPos };
 
-    // Find path through maze corridors
-    this.walkPath = this.maze.getPathToTarget();
+    let movedInsideAddBeat = false;
+    let walkedStepInPath: TilePos | undefined;
+    if (this.isCurrentAmbientBeat) {
+      // Ambient walks should always be possible; don't require fresh-only paths.
+      this.maze.setAmbientTarget(this._isBusy);
+      this.walkPath = this.maze.getPathToTarget();
+    } else {
+      // Extend maze based on beat
+      this.maze.addBeat(this.currentBeat);
+      movedInsideAddBeat = this.maze.heroPos.x !== walkStart.x || this.maze.heroPos.y !== walkStart.y;
+
+      // Find path through maze corridors
+      this.walkPath = this.maze.getFreshPathToTarget();
+      walkedStepInPath = this.walkPath.find(step => this.maze.hasWalkedCell(step.x, step.y));
+      if (this.walkPath.some(step => this.maze.hasWalkedCell(step.x, step.y))) {
+        // Hard safety rail: never execute a path that includes a previously walked cell.
+        this.walkPath = [];
+        this.maze.heroTarget = { ...this.maze.heroPos };
+      }
+    }
+
+    // Commit the walk-start snapshot AFTER target selection so it's available for the NEXT beat.
+    this.maze.heroLastStart = walkStart;
     this.walkStep = 0;
     this.walkProgress = 0;
+    this.debug('processNextBeat', {
+      beatSeq: this.beatSeq,
+      beatType: this.currentBeat.beat,
+      queueAfterPop: this.beatQueue.length,
+      skippedCount,
+      catchup: this.isCatchupBeat,
+      walkStart,
+      heroPosAfterAddBeat: this.maze.heroPos,
+      heroTarget: this.maze.heroTarget,
+      movedInsideAddBeat,
+      pathLen: this.walkPath.length,
+      walkedStepInPath: walkedStepInPath ? { x: walkedStepInPath.x, y: walkedStepInPath.y } : null,
+    });
 
     // Scale walk speed for longer paths
     this.transitionTo('walking');
+  }
+
+  private createAmbientBeat(active: boolean): AdventureBeat {
+    return {
+      turnIndex: -1,
+      timestamp: Date.now(),
+      beat: 'wander',
+      intensity: active ? 2 : 1,
+      outcome: 'neutral',
+      toolNames: [],
+      labelShort: '',
+      roomType: 'corridor',
+      isHaikuEnhanced: false,
+    };
+  }
+
+  private maybeQueueAmbientWalk(dt: number): void {
+    this.activityWalkCooldown = Math.max(0, this.activityWalkCooldown - dt);
+    this.idleWalkCooldown = Math.max(0, this.idleWalkCooldown - dt);
+
+    if (this.state !== 'idle' || this.beatQueue.length > 0) return;
+
+    if (this._isBusy) {
+      if (this.activityWalkCooldown <= 0) {
+        this.addBeat(this.createAmbientBeat(true));
+        // Keep activity motion visible, but not frantic.
+        this.activityWalkCooldown = 0.6 + Math.random() * 0.5;
+      }
+      return;
+    }
+
+    if (this.idleWalkCooldown <= 0) {
+      this.addBeat(this.createAmbientBeat(false));
+      // Very subtle movement when idle.
+      this.idleWalkCooldown = 3.5 + Math.random() * 2.5;
+    }
+  }
+
+  private applyBeatSemantics(beat: AdventureBeat): void {
+    const artifacts = beat.artifacts || [];
+    for (const artifact of artifacts) {
+      if (!artifact) continue;
+      const prev = this.artifactCounts.get(artifact) || 0;
+      this.artifactCounts.set(artifact, prev + 1);
+    }
+
+    const commandTags = beat.commandTags || [];
+    if (commandTags.length > 0) {
+      this.commandAuraTag = commandTags[commandTags.length - 1];
+      this.commandAuraTimer = 4.5;
+    }
+
+    const indicators = beat.indicators || [];
+    for (const indicator of indicators) {
+      switch (indicator) {
+        case 'error-pressure':
+        case 'high-cost':
+        case 'long-turn':
+        case 'release-window':
+          this.indicatorDanger = Math.min(1, this.indicatorDanger + 0.22);
+          break;
+        case 'momentum':
+        case 'multi-tool':
+        case 'assembly':
+        case 'crafting':
+          this.indicatorMomentum = Math.min(1, this.indicatorMomentum + 0.2);
+          break;
+        default:
+          this.indicatorFocus = Math.min(1, this.indicatorFocus + 0.18);
+          break;
+      }
+    }
+
+    if (beat.outcome === 'fail') {
+      this.indicatorDanger = Math.min(1, this.indicatorDanger + 0.28);
+    } else if (beat.outcome === 'success') {
+      this.indicatorMomentum = Math.min(1, this.indicatorMomentum + 0.12);
+      this.indicatorFocus = Math.min(1, this.indicatorFocus + 0.08);
+    }
+  }
+
+  private decaySemanticVisuals(dt: number): void {
+    if (this.commandAuraTimer > 0) {
+      this.commandAuraTimer = Math.max(0, this.commandAuraTimer - dt);
+      if (this.commandAuraTimer <= 0) {
+        this.commandAuraTag = null;
+      }
+    }
+
+    this.indicatorDanger = Math.max(0, this.indicatorDanger - dt * 0.04);
+    this.indicatorFocus = Math.max(0, this.indicatorFocus - dt * 0.03);
+    this.indicatorMomentum = Math.max(0, this.indicatorMomentum - dt * 0.035);
   }
 
   private transitionTo(newState: AdventureState): void {
@@ -252,20 +430,23 @@ export class AdventureEngine {
 
       // Update particles
       this.updateParticles(dt);
+      this.decaySemanticVisuals(dt);
 
       // Smooth camera during idle
       this.maze.updateCamera(dt);
 
-      // Idle patrol
-      if (!this.isPatrolling && !this.isAtCampfire) {
-        this.patrolCooldown -= dt;
-        if (this.patrolCooldown <= 0) {
-          this.startPatrol();
+      // Idle patrol (disabled in strict no-revisit mode).
+      if (!this.strictNoRevisit) {
+        if (!this.isPatrolling && !this.isAtCampfire) {
+          this.patrolCooldown -= dt;
+          if (this.patrolCooldown <= 0) {
+            this.startPatrol();
+          }
         }
-      }
 
-      if (this.isPatrolling) {
-        this.updatePatrol(dt);
+        if (this.isPatrolling) {
+          this.updatePatrol(dt);
+        }
       }
 
       // Campfire after 20s idle
@@ -273,6 +454,9 @@ export class AdventureEngine {
         this.isAtCampfire = true;
         this.isPatrolling = false;
       }
+
+      // Keep moving during activity, and drift slowly even in long idle periods.
+      this.maybeQueueAmbientWalk(dt);
 
       this.render();
     }, 125);
@@ -357,6 +541,7 @@ export class AdventureEngine {
 
     // Update particles
     this.updateParticles(dt);
+    this.decaySemanticVisuals(dt);
 
     switch (this.state) {
       case 'walking':
@@ -377,34 +562,68 @@ export class AdventureEngine {
       return;
     }
 
-    // Dynamic speed: faster for longer paths
-    const speed = Math.min(8, 4 + this.walkPath.length / 10);
+    // Slow baseline speed with gentle scaling.
+    const speed = this.isCurrentAmbientBeat
+      ? (this._isBusy ? 2.2 : 1.0)
+      : Math.min(
+        4.8,
+        1.8 +
+        Math.min(1.1, this.walkPath.length / 28) +
+        Math.min(1.1, this.beatQueue.length * 0.18) +
+        (this.isCatchupBeat ? 0.6 : 0)
+      );
     this.walkProgress += dt * speed;
 
-    if (this.walkProgress >= 1) {
-      this.walkProgress = 0;
+    while (this.walkProgress >= 1) {
+      this.walkProgress -= 1;
       if (this.walkStep < this.walkPath.length) {
-        this.maze.heroPos = { ...this.walkPath[this.walkStep] };
+        const nextCell = this.walkPath[this.walkStep];
+        if (!this.isCurrentAmbientBeat && this.maze.hasWalkedCell(nextCell.x, nextCell.y)) {
+          // Never step onto a previously walked tile, even on edge-case race conditions.
+          this.debug('updateWalking:guardHit', {
+            beatSeq: this.beatSeq,
+            nextCell,
+            heroPos: this.maze.heroPos,
+          });
+          this.walkPath = [];
+          this.maze.heroTarget = { ...this.maze.heroPos };
+          this.transitionTo('encounter');
+          return;
+        }
+        this.maze.heroPos = { ...nextCell };
         this.walkStep++;
       }
 
       if (this.walkStep >= this.walkPath.length) {
         this.maze.heroPos = { ...this.maze.heroTarget };
+        // Record every cell walked so the next beat avoids sending the hero back over them.
+        if (!this.isCurrentAmbientBeat) {
+          this.maze.markCellsWalked(this.walkPath);
+        }
+        this.debug('updateWalking:arrive', {
+          beatSeq: this.beatSeq,
+          walkLen: this.walkPath.length,
+          endPos: this.maze.heroPos,
+          queueRemaining: this.beatQueue.length,
+        });
         this.transitionTo('encounter');
+        break;
       }
     }
   }
 
-  private updateEncounter(_dt: number): void {
-    this.encounterTimer++;
-    if (this.encounterTimer > 60) {
+  private updateEncounter(dt: number): void {
+    this.encounterTimer += dt;
+    const duration = (this.isCatchupBeat || this.beatQueue.length > 0) ? 0.15 : 0.35;
+    if (this.encounterTimer >= duration) {
       this.transitionTo('resolution');
     }
   }
 
-  private updateResolution(_dt: number): void {
-    this.resolutionTimer++;
-    if (this.resolutionTimer > 30) {
+  private updateResolution(dt: number): void {
+    this.resolutionTimer += dt;
+    const duration = (this.isCatchupBeat || this.beatQueue.length > 0) ? 0.08 : 0.18;
+    if (this.resolutionTimer >= duration) {
       this.processNextBeat();
     }
   }
@@ -464,12 +683,17 @@ export class AdventureEngine {
 
     // Render hero
     this.renderHero();
+    this.renderCommandAura();
 
     // Render particles
     this.renderParticles();
 
     // Render beat label
-    if (this.currentBeat && (this.state === 'encounter' || this.state === 'resolution')) {
+    if (
+      this.currentBeat &&
+      this.currentBeat.labelShort.trim().length > 0 &&
+      (this.state === 'encounter' || this.state === 'resolution')
+    ) {
       this.renderLabel(this.currentBeat.labelShort);
     }
 
@@ -477,6 +701,10 @@ export class AdventureEngine {
     if (this.isAtCampfire) {
       this.renderCampfire();
     }
+
+    // HUD overlays reacting to tool findings and session indicators.
+    this.renderIndicatorPanel();
+    this.renderArtifactPanel();
   }
 
   private renderHero(): void {
@@ -526,6 +754,110 @@ export class AdventureEngine {
     }
 
     drawSprite(this.ctx, sprite, heroX, heroY, heroScale);
+  }
+
+  private renderCommandAura(): void {
+    if (!this.commandAuraTag || this.commandAuraTimer <= 0) return;
+
+    const { cellSize } = this.config;
+    const centerX = this.maze.heroPos.x * cellSize - this.maze.cameraX + cellSize / 2;
+    const centerY = this.maze.heroPos.y * cellSize - this.maze.cameraY + cellSize / 2;
+    const pulse = 0.7 + Math.sin(this.frameCount * 0.22) * 0.3;
+    const auraAlpha = Math.min(0.55, 0.2 + this.commandAuraTimer * 0.08) * pulse;
+
+    let color = PALETTE[12]; // default cyan
+    switch (this.commandAuraTag) {
+      case 'git':
+        color = PALETTE[6];
+        break;
+      case 'test':
+        color = PALETTE[11];
+        break;
+      case 'build':
+        color = PALETTE[4];
+        break;
+      case 'deploy':
+        color = PALETTE[12];
+        break;
+      case 'search':
+        color = PALETTE[5];
+        break;
+    }
+
+    this.ctx.save();
+    this.ctx.globalAlpha = auraAlpha;
+    this.ctx.strokeStyle = color;
+    this.ctx.lineWidth = 1.5;
+    this.ctx.beginPath();
+    this.ctx.arc(centerX, centerY, 8 + pulse * 4, 0, Math.PI * 2);
+    this.ctx.stroke();
+    this.ctx.beginPath();
+    this.ctx.arc(centerX, centerY, 13 + pulse * 3, 0, Math.PI * 2);
+    this.ctx.stroke();
+    this.ctx.restore();
+  }
+
+  private renderIndicatorPanel(): void {
+    const x = 4;
+    const y = 4;
+    const w = 38;
+    const barW = 28;
+    const barH = 3;
+
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    this.ctx.fillRect(x - 2, y - 2, w, 18);
+
+    const bars = [
+      { value: this.indicatorDanger, color: PALETTE[3], label: 'D' },
+      { value: this.indicatorFocus, color: PALETTE[12], label: 'F' },
+      { value: this.indicatorMomentum, color: PALETTE[6], label: 'M' },
+    ];
+
+    bars.forEach((bar, i) => {
+      const by = y + i * 5;
+      this.ctx.fillStyle = PALETTE[1];
+      this.ctx.fillRect(x + 8, by, barW, barH);
+      this.ctx.fillStyle = bar.color;
+      this.ctx.fillRect(x + 8, by, Math.max(1, Math.floor(barW * bar.value)), barH);
+      this.ctx.fillStyle = PALETTE[13];
+      this.ctx.font = '6px monospace';
+      this.ctx.fillText(bar.label, x, by + 3);
+    });
+  }
+
+  private renderArtifactPanel(): void {
+    if (this.artifactCounts.size === 0) return;
+
+    const topArtifacts = Array.from(this.artifactCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+    if (topArtifacts.length === 0) return;
+
+    const panelWidth = 16 + topArtifacts.length * 20;
+    const panelX = this.config.canvasWidth - panelWidth - 3;
+    const panelY = this.config.canvasHeight - 14;
+
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    this.ctx.fillRect(panelX, panelY, panelWidth, 12);
+
+    topArtifacts.forEach(([artifact, count], idx) => {
+      const icon = this.getArtifactIcon(artifact);
+      const x = panelX + 3 + idx * 20;
+      const y = panelY + 2;
+      drawSprite(this.ctx, icon, x, y, 2);
+      this.ctx.fillStyle = PALETTE[13];
+      this.ctx.font = '6px monospace';
+      this.ctx.fillText(String(count), x + 9, y + 7);
+    });
+  }
+
+  private getArtifactIcon(artifact: string): SpriteFrame {
+    if (artifact.includes('scroll') || artifact.includes('lore')) return MINI_SCROLL;
+    if (artifact.includes('map') || artifact.includes('tracker')) return MINI_LANTERN;
+    if (artifact.includes('rune') || artifact.includes('blueprint') || artifact.includes('gear')) return MINI_ANVIL;
+    if (artifact.includes('portal') || artifact.includes('trial') || artifact.includes('commit')) return MINI_SIGNPOST;
+    if (artifact.includes('checkpoint') || artifact.includes('junction')) return MINI_FLAG;
+    return MINI_CHEST;
   }
 
   private renderEncounter(): void {
@@ -585,7 +917,10 @@ export class AdventureEngine {
   // ====== TOOLTIP ======
 
   private buildTooltip(beat: AdventureBeat): string {
-    const parts: string[] = [beat.labelShort];
+    const parts: string[] = [];
+    if (beat.labelShort.trim().length > 0) {
+      parts.push(beat.labelShort);
+    }
     if (beat.tooltipDetail) {
       parts.push(beat.tooltipDetail);
     } else if (beat.toolNames.length > 0) {
