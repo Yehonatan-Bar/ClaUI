@@ -39,6 +39,12 @@ export interface AdventureBeat {
   roomType: RoomType;
   isHaikuEnhanced: boolean;
   achievementRarity?: string;
+  /** Semantic loot/events extracted from tool usage (files, symbols, refs, etc.) */
+  artifacts?: string[];
+  /** Session health or runtime indicators (errors, long turn, high cost, etc.) */
+  indicators?: string[];
+  /** Command classes extracted from shell/terminal usage (git/test/build/deploy/...) */
+  commandTags?: string[];
 }
 
 /** Direction the character can face/walk */

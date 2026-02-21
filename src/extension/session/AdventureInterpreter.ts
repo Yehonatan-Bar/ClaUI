@@ -30,6 +30,9 @@ interface AdventureBeatPayload {
   roomType: RoomType;
   isHaikuEnhanced: boolean;
   achievementRarity?: string;
+  artifacts?: string[];
+  indicators?: string[];
+  commandTags?: string[];
 }
 
 /** Tool name sets for beat classification */
@@ -38,6 +41,11 @@ const SCOUT_TOOLS = ['Grep', 'Glob', 'WebSearch', 'WebFetch'];
 const WRITE_TOOLS = ['Write', 'Edit', 'NotebookEdit', 'MultiEdit'];
 const BASH_TOOLS = ['Bash', 'Terminal'];
 const FORK_TOOLS = ['ExitPlanMode', 'AskUserQuestion'];
+const TEST_COMMAND_TOKENS = ['test', 'jest', 'vitest', 'pytest', 'go test', 'cargo test'];
+const BUILD_COMMAND_TOKENS = ['build', 'compile', 'tsc', 'webpack', 'vite build'];
+const DEPLOY_COMMAND_TOKENS = ['deploy', 'release', 'publish', 'docker', 'kubectl', 'terraform'];
+const GIT_COMMAND_TOKENS = ['git'];
+const SEARCH_COMMAND_TOKENS = ['rg', 'grep', 'find', 'ls', 'dir', 'cat'];
 
 /** Beat → Room mapping */
 const BEAT_ROOM_MAP: Record<AdventureBeatType, RoomType> = {
@@ -102,6 +110,9 @@ export class AdventureInterpreter {
     let beat: AdventureBeatType;
     let intensity: 1 | 2 | 3 = 1;
     let outcome: 'success' | 'fail' | 'mixed' | 'neutral' = 'neutral';
+    const commandTags = this.normalizeCommandTags(turn.adventureCommandTags);
+    const artifacts = this.deriveArtifacts(turn, baseNames, commandTags);
+    const indicators = this.deriveIndicators(turn);
 
     // --- Error conditions (highest priority) ---
     if (turn.isError) {
@@ -186,11 +197,33 @@ export class AdventureInterpreter {
       }
     }
 
-    // Build tooltip detail from tool names
-    let tooltipDetail: string | undefined;
-    if (turn.toolNames.length > 0) {
-      tooltipDetail = turn.toolNames.join(', ');
+    // Command tags can refine the scene even when tool class is broad.
+    if (!turn.isError && beat !== 'treasure' && beat !== 'boss' && beat !== 'monster' && beat !== 'trap') {
+      if (commandTags.includes('deploy')) {
+        beat = 'treasure';
+        intensity = Math.max(intensity, 2) as 1 | 2 | 3;
+        outcome = 'success';
+      } else if (commandTags.includes('test')) {
+        beat = 'checkpoint';
+        intensity = Math.max(intensity, 2) as 1 | 2 | 3;
+        outcome = 'success';
+      } else if (commandTags.includes('build') && beat === 'wander') {
+        beat = 'forge';
+        intensity = 2;
+        outcome = 'success';
+      } else if (commandTags.includes('search') && beat === 'wander') {
+        beat = 'scout';
+        intensity = 1;
+        outcome = 'success';
+      } else if (commandTags.includes('git') && beat === 'wander') {
+        beat = this.consecutiveSuccesses >= 2 ? 'checkpoint' : 'fork';
+        intensity = 1;
+        outcome = 'success';
+      }
     }
+
+    // Build tooltip detail from tool names
+    const tooltipDetail = this.buildTooltip(turn.toolNames, artifacts, indicators, commandTags);
 
     const payload: AdventureBeatPayload = {
       turnIndex: turn.turnIndex,
@@ -204,6 +237,9 @@ export class AdventureInterpreter {
       roomType: BEAT_ROOM_MAP[beat],
       isHaikuEnhanced: false,
       achievementRarity,
+      artifacts,
+      indicators,
+      commandTags,
     };
 
     this.log(
@@ -212,5 +248,83 @@ export class AdventureInterpreter {
     );
 
     return payload;
+  }
+
+  private normalizeCommandTags(tags: string[] | undefined): string[] {
+    if (!tags || tags.length === 0) return [];
+    const normalized = new Set<string>();
+    for (const raw of tags) {
+      const tag = raw.trim().toLowerCase();
+      if (!tag) continue;
+      if (GIT_COMMAND_TOKENS.some((t) => tag.includes(t))) normalized.add('git');
+      if (TEST_COMMAND_TOKENS.some((t) => tag.includes(t))) normalized.add('test');
+      if (BUILD_COMMAND_TOKENS.some((t) => tag.includes(t))) normalized.add('build');
+      if (DEPLOY_COMMAND_TOKENS.some((t) => tag.includes(t))) normalized.add('deploy');
+      if (SEARCH_COMMAND_TOKENS.some((t) => tag.includes(t))) normalized.add('search');
+
+      // Keep already-canonical tags if they were sent directly.
+      if (
+        tag === 'git' ||
+        tag === 'test' ||
+        tag === 'build' ||
+        tag === 'deploy' ||
+        tag === 'search'
+      ) {
+        normalized.add(tag);
+      }
+    }
+    return Array.from(normalized);
+  }
+
+  private deriveArtifacts(turn: TurnRecord, baseNames: string[], commandTags: string[]): string[] {
+    const artifacts = new Set<string>();
+
+    if (baseNames.some((n) => READ_TOOLS.includes(n))) artifacts.add('scroll');
+    if (baseNames.some((n) => SCOUT_TOOLS.includes(n))) artifacts.add('map-fragment');
+    if (baseNames.some((n) => WRITE_TOOLS.includes(n))) artifacts.add('rune-shard');
+    if (baseNames.some((n) => BASH_TOOLS.includes(n))) artifacts.add('gear');
+    if (baseNames.some((n) => FORK_TOOLS.includes(n))) artifacts.add('junction-key');
+    if (turn.isError) artifacts.add('scar');
+
+    if (commandTags.includes('git')) artifacts.add('commit-sigil');
+    if (commandTags.includes('test')) artifacts.add('trial-mark');
+    if (commandTags.includes('build')) artifacts.add('blueprint');
+    if (commandTags.includes('deploy')) artifacts.add('portal-seal');
+    if (commandTags.includes('search')) artifacts.add('tracker-lens');
+
+    return Array.from(artifacts).slice(0, 6);
+  }
+
+  private deriveIndicators(turn: TurnRecord): string[] {
+    const indicators = new Set<string>(turn.adventureIndicators || []);
+    if (turn.isError) indicators.add('error-pressure');
+    if (!turn.isError && turn.toolCount >= 3) indicators.add('momentum');
+    if (turn.durationMs >= 20000) indicators.add('long-turn');
+    if (turn.costUsd >= 0.02) indicators.add('high-cost');
+    if (turn.toolCount >= 5) indicators.add('multi-tool');
+    return Array.from(indicators).slice(0, 6);
+  }
+
+  private buildTooltip(
+    toolNames: string[],
+    artifacts: string[],
+    indicators: string[],
+    commandTags: string[]
+  ): string | undefined {
+    const parts: string[] = [];
+    if (toolNames.length > 0) {
+      parts.push(toolNames.slice(0, 3).join(', '));
+    }
+    if (artifacts.length > 0) {
+      parts.push(`items: ${artifacts.slice(0, 3).join(', ')}`);
+    }
+    if (commandTags.length > 0) {
+      parts.push(`commands: ${commandTags.slice(0, 3).join(', ')}`);
+    }
+    if (indicators.length > 0) {
+      parts.push(`signals: ${indicators.slice(0, 3).join(', ')}`);
+    }
+    if (parts.length === 0) return undefined;
+    return parts.join(' | ');
   }
 }

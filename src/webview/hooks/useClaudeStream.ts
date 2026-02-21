@@ -25,6 +25,7 @@ export function useClaudeStream(): void {
     finalizeStreamingMessage,
     clearStreaming,
     setBusy,
+    markActivity,
     updateCost,
     setError,
     setPendingFilePaths,
@@ -49,6 +50,7 @@ export function useClaudeStream(): void {
     setAchievementGoals,
     setSessionRecap,
     setVitalsEnabled,
+    rebuildTurnHistoryFromMessages,
     setAdventureEnabled,
     addTurnRecord,
     addAdventureBeat,
@@ -75,6 +77,22 @@ export function useClaudeStream(): void {
           isBusy: s.isBusy,
         });
       };
+
+      const isActivityEvent =
+        msg.type === 'messageStart' ||
+        msg.type === 'streamingText' ||
+        msg.type === 'assistantMessage' ||
+        msg.type === 'toolUseStart' ||
+        msg.type === 'toolUseInput' ||
+        msg.type === 'messageStop' ||
+        msg.type === 'processBusy' ||
+        msg.type === 'costUpdate' ||
+        msg.type === 'userMessage' ||
+        msg.type === 'planApprovalRequired';
+
+      if (isActivityEvent) {
+        markActivity();
+      }
 
       switch (msg.type) {
         case 'sessionStarted':
@@ -262,15 +280,17 @@ export function useClaudeStream(): void {
         case 'forkInit':
           // Populate the store with conversation history from the original tab
           if (msg.messages && msg.messages.length > 0) {
+            const hydratedMessages = msg.messages.map((m: import('../../extension/types/webview-messages').SerializedChatMessage) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              model: m.model,
+              timestamp: m.timestamp,
+            }));
             useAppStore.setState({
-              messages: msg.messages.map((m: import('../../extension/types/webview-messages').SerializedChatMessage) => ({
-                id: m.id,
-                role: m.role,
-                content: m.content,
-                model: m.model,
-                timestamp: m.timestamp,
-              })),
+              messages: hydratedMessages,
             });
+            rebuildTurnHistoryFromMessages(hydratedMessages);
           }
           setForkInit({ promptText: msg.promptText });
           break;
@@ -281,16 +301,18 @@ export function useClaudeStream(): void {
           // messages until user sends input, so we read them from disk instead.
           if (msg.messages && msg.messages.length > 0) {
             console.log(`%c[STREAM] conversationHistory: ${msg.messages.length} messages`, 'color: lime; font-weight: bold');
+            const hydratedMessages = msg.messages.map((m: import('../../extension/types/webview-messages').SerializedChatMessage) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              model: m.model,
+              timestamp: m.timestamp,
+            }));
             useAppStore.setState({
-              messages: msg.messages.map((m: import('../../extension/types/webview-messages').SerializedChatMessage) => ({
-                id: m.id,
-                role: m.role,
-                content: m.content,
-                model: m.model,
-                timestamp: m.timestamp,
-              })),
+              messages: hydratedMessages,
               isResuming: false,
             });
+            rebuildTurnHistoryFromMessages(hydratedMessages);
           }
           break;
 
@@ -373,6 +395,7 @@ export function useClaudeStream(): void {
     finalizeStreamingMessage,
     clearStreaming,
     setBusy,
+    markActivity,
     updateCost,
     setError,
     setPendingFilePaths,
@@ -397,6 +420,7 @@ export function useClaudeStream(): void {
     setAchievementGoals,
     setSessionRecap,
     setVitalsEnabled,
+    rebuildTurnHistoryFromMessages,
     setAdventureEnabled,
     addTurnRecord,
     addAdventureBeat,

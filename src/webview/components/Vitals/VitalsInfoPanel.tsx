@@ -56,7 +56,15 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
           <span className="vitals-info-icon">{'\u2502'}</span>
           <div className="vitals-info-text">
             <strong>Timeline</strong>
-            <span>Vertical minimap on the right side. Each segment = one Claude turn. Colors: green (success), red (error), blue (discussion), purple (code), orange (research), cyan (commands).</span>
+            <span>
+              Vertical minimap on the right side. Each segment = one completed Claude turn.
+              <br />
+              Green = success, Red = error/failure, Blue = discussion only (no tools).
+              <br />
+              Purple = code-write tools (Write/Edit/MultiEdit/NotebookEdit).
+              <br />
+              Orange = research tools (Read/Grep/Glob/WebSearch/WebFetch), Cyan = command tools (Bash/Terminal).
+            </span>
           </div>
         </div>
 
@@ -64,7 +72,12 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
           <span className="vitals-info-icon">{'\u275A'}</span>
           <div className="vitals-info-text">
             <strong>Intensity Borders</strong>
-            <span>Colored left border on each message. Color = category, thickness = number of tools used.</span>
+            <span>
+              Left border on assistant messages uses the same category colors as the timeline.
+              <br />
+              Border width reflects tool activity in that turn:
+              thin/light = 0 tools, medium = 1-3 tools, thick/strong = 4+ tools.
+            </span>
           </div>
         </div>
 

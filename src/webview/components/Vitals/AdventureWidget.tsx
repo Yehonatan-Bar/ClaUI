@@ -3,6 +3,7 @@ import { useAppStore } from '../../state/store';
 import { AdventureEngine } from './adventure/AdventureEngine';
 
 const STORAGE_KEY = 'adventure-widget-position';
+const ACTIVITY_GRACE_MS = 2500;
 
 interface WidgetPosition {
   left: number;
@@ -36,6 +37,8 @@ export const AdventureWidget: React.FC = React.memo(() => {
 
   const adventureBeats = useAppStore((s) => s.adventureBeats);
   const isBusy = useAppStore((s) => s.isBusy);
+  const lastActivityAt = useAppStore((s) => s.lastActivityAt);
+  const [hasRecentActivity, setHasRecentActivity] = useState(false);
 
   // Drag state
   const [position, setPosition] = useState<WidgetPosition | null>(loadPosition);
@@ -72,10 +75,24 @@ export const AdventureWidget: React.FC = React.memo(() => {
     }
   }, [adventureBeats]);
 
-  // Signal busy/idle
   useEffect(() => {
-    engineRef.current?.setBusy(isBusy);
-  }, [isBusy]);
+    if (!lastActivityAt) return;
+
+    setHasRecentActivity(true);
+    const timeoutId = window.setTimeout(() => {
+      setHasRecentActivity(false);
+    }, ACTIVITY_GRACE_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [lastActivityAt]);
+
+  // Signal active/idle
+  useEffect(() => {
+    const isActive = isBusy || hasRecentActivity;
+    engineRef.current?.setBusy(isActive);
+  }, [isBusy, hasRecentActivity]);
 
   // --- Drag handlers ---
   const handleMouseDown = useCallback((e: React.MouseEvent) => {

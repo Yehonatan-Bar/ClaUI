@@ -170,6 +170,14 @@ export interface SetTranslationLanguageRequest {
   language: string;
 }
 
+export interface AdventureDebugLogMessage {
+  type: 'adventureDebugLog';
+  source: 'engine' | 'maze';
+  event: string;
+  payload?: Record<string, unknown>;
+  ts: number;
+}
+
 export interface GetAchievementsSnapshotRequest {
   type: 'getAchievementsSnapshot';
 }
@@ -207,7 +215,8 @@ export type WebviewToExtensionMessage =
   | GetAchievementsSnapshotRequest
   | SetVitalsEnabledRequest
   | SetAdventureWidgetEnabledRequest
-  | SetTranslationLanguageRequest;
+  | SetTranslationLanguageRequest
+  | AdventureDebugLogMessage;
 
 export interface WebviewImageData {
   base64: string;
@@ -469,6 +478,10 @@ export interface TurnRecord {
   category: TurnCategory;
   timestamp: number;
   messageId: string;
+  /** Adventure metadata inferred from tool inputs (optional, UI-only) */
+  adventureArtifacts?: string[];
+  adventureIndicators?: string[];
+  adventureCommandTags?: string[];
 }
 
 export interface TurnCompleteMessage {
@@ -500,6 +513,9 @@ export interface AdventureBeatMessage {
     roomType: string;
     isHaikuEnhanced: boolean;
     achievementRarity?: string;
+    artifacts?: string[];
+    indicators?: string[];
+    commandTags?: string[];
   };
 }
 
