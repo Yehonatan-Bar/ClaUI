@@ -12,10 +12,12 @@ import { AchievementPanel } from './components/Achievements/AchievementPanel';
 import { AchievementToastStack } from './components/Achievements/AchievementToastStack';
 import { SessionRecapCard } from './components/Achievements/SessionRecapCard';
 import { VitalsContainer } from './components/Vitals/VitalsContainer';
+import { AdventureWidget } from './components/Vitals/AdventureWidget';
 import { SessionTimeline } from './components/Vitals/SessionTimeline';
 import { VitalsInfoPanel } from './components/Vitals/VitalsInfoPanel';
 import { DashboardPanel } from './components/Dashboard';
 import { postToExtension } from './hooks/useClaudeStream';
+import { t as tAch } from './components/Achievements/achievementI18n';
 import { detectRtl } from './hooks/useRtlDetection';
 import { deriveTurnHistoryFromMessages } from './utils/turnVitals';
 
@@ -47,6 +49,7 @@ export const App: React.FC = () => {
     achievementsEnabled,
     achievementPanelOpen,
     vitalsEnabled,
+    adventureEnabled,
     turnHistory,
     dashboardOpen,
   } = useAppStore();
@@ -118,6 +121,8 @@ export const App: React.FC = () => {
 
       {/* Vitals: weather widget + cost heat bar */}
       <VitalsContainer />
+      {/* Adventure widget: independent of vitals, toggled via gear settings */}
+      {adventureEnabled && <AdventureWidget />}
 
       {/* Always show messages if they exist, regardless of connection state */}
       {hasMessages ? (
@@ -248,6 +253,7 @@ const StatusBar: React.FC<{
     setGitPushConfigPanelOpen,
     achievementsEnabled,
     achievementProfile,
+    achievementLanguage,
     setAchievementPanelOpen,
     vitalsEnabled,
     setVitalsEnabled,
@@ -330,9 +336,9 @@ const StatusBar: React.FC<{
         <button
           className="status-bar-achievements-btn"
           onClick={handleAchievements}
-          title="Achievements"
+          title={tAch(achievementLanguage).achievements}
         >
-          Trophy {achievementProfile.totalAchievements}
+          {tAch(achievementLanguage).trophy} {achievementProfile.totalAchievements}
         </button>
       )}
       <button className="status-bar-history-btn" onClick={handleHistory} title="Conversation History (Ctrl+Shift+H)">

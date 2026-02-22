@@ -209,6 +209,22 @@ export interface GetProjectAnalyticsRequest {
   type: 'getProjectAnalytics';
 }
 
+export interface EnhancePromptRequest {
+  type: 'enhancePrompt';
+  text: string;
+  model?: string;
+}
+
+export interface SetAutoEnhanceRequest {
+  type: 'setAutoEnhance';
+  enabled: boolean;
+}
+
+export interface SetEnhancerModelRequest {
+  type: 'setEnhancerModel';
+  model: string;
+}
+
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
@@ -247,7 +263,10 @@ export type WebviewToExtensionMessage =
   | OpenSettingsRequest
   | SetTurnAnalysisEnabledRequest
   | SetAnalysisModelRequest
-  | GetProjectAnalyticsRequest;
+  | GetProjectAnalyticsRequest
+  | EnhancePromptRequest
+  | SetAutoEnhanceRequest
+  | SetEnhancerModelRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -648,6 +667,19 @@ export interface ProjectAnalyticsDataMessage {
   sessions: SessionSummary[];
 }
 
+export interface EnhancePromptResultMessage {
+  type: 'enhancePromptResult';
+  enhancedText: string | null;
+  success: boolean;
+  error?: string;
+}
+
+export interface PromptEnhancerSettingsMessage {
+  type: 'promptEnhancerSettings';
+  autoEnhance: boolean;
+  enhancerModel: string;
+}
+
 /** Serializable chat message for passing between webview instances (e.g. fork) */
 export interface SerializedChatMessage {
   id: string;
@@ -698,4 +730,6 @@ export type ExtensionToWebviewMessage =
   | TurnSemanticsMessage
   | TurnAnalysisSettingsMessage
   | SessionMetadataMessage
-  | ProjectAnalyticsDataMessage;
+  | ProjectAnalyticsDataMessage
+  | EnhancePromptResultMessage
+  | PromptEnhancerSettingsMessage;

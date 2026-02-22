@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClaUi - Prompt Enhancer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      line-height: 1.7;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 28px;
+      color: #58a6ff;
+      border-bottom: 2px solid #30363d;
+      padding-bottom: 16px;
+      margin-bottom: 32px;
+    }
+    h2 {
+      font-size: 20px;
+      color: #bc8cff;
+      margin-top: 36px;
+      margin-bottom: 16px;
+    }
+    h3 {
+      font-size: 16px;
+      color: #3fb950;
+      margin-top: 24px;
+      margin-bottom: 10px;
+    }
+    p {
+      margin-bottom: 14px;
+      color: #c9d1d9;
+    }
+    .highlight {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 20px 0;
+    }
+    .feature-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .feature-card .icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    .feature-card .title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #58a6ff;
+      margin-bottom: 6px;
+    }
+    .feature-card .desc {
+      font-size: 13px;
+      color: #8b949e;
+    }
+    .flow-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .flow-number {
+      background: #58a6ff;
+      color: #0d1117;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .flow-content {
+      padding-top: 4px;
+    }
+    .flow-content strong {
+      color: #e6edf3;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+    .badge-new { background: #1f6feb33; color: #58a6ff; border: 1px solid #1f6feb; }
+    .badge-modify { background: #3fb95033; color: #3fb950; border: 1px solid #3fb950; }
+    .files-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+    }
+    .files-table th, .files-table td {
+      padding: 10px 14px;
+      text-align: right;
+      border-bottom: 1px solid #21262d;
+    }
+    .files-table th {
+      color: #8b949e;
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+    .files-table td {
+      font-size: 13px;
+    }
+    .mockup {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .mockup-input {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px;
+      direction: ltr;
+    }
+    .mockup-textarea {
+      flex: 1;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #e6edf3;
+      font-size: 13px;
+      min-height: 40px;
+      text-align: left;
+    }
+    .mockup-btn {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .mockup-enhance {
+      background: none;
+      color: #58a6ff;
+      border-color: #58a6ff;
+      display: flex;
+      gap: 0;
+    }
+    .mockup-enhance-main {
+      padding: 6px 10px;
+      border-radius: 6px 0 0 6px;
+      border: 1px solid #58a6ff;
+      background: none;
+      color: #58a6ff;
+      font-size: 16px;
+    }
+    .mockup-enhance-gear {
+      padding: 6px 6px;
+      border-radius: 0 6px 6px 0;
+      border: 1px solid #58a6ff;
+      border-right: 1px solid #58a6ff;
+      background: none;
+      color: #8b949e;
+      font-size: 11px;
+    }
+    .mockup-send {
+      background: #238636;
+      color: #fff;
+      border-color: #238636;
+    }
+    .mockup-label {
+      font-size: 11px;
+      color: #8b949e;
+      margin-top: 8px;
+    }
+    .mockup-popover {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px;
+      width: 200px;
+      margin: 12px auto 0;
+      text-align: left;
+      direction: ltr;
+    }
+    .mockup-popover-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+    }
+    .mockup-popover-row + .mockup-popover-row {
+      border-top: 1px solid #21262d;
+      padding-top: 10px;
+      margin-top: 4px;
+    }
+    .mockup-toggle {
+      width: 36px;
+      height: 20px;
+      background: #58a6ff;
+      border-radius: 10px;
+      position: relative;
+      display: inline-block;
+    }
+    .mockup-toggle-knob {
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      position: absolute;
+      top: 2px;
+      left: 18px;
+    }
+    .risk-item {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+      align-items: flex-start;
+    }
+    .risk-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .summary-box {
+      background: linear-gradient(135deg, #1f6feb22, #bc8cff22);
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      margin-top: 32px;
+    }
+    .summary-box h2 {
+      margin-top: 0;
+      color: #58a6ff;
+    }
+    .summary-stats {
+      display: flex;
+      gap: 24px;
+      margin-top: 16px;
+    }
+    .stat {
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #58a6ff;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #8b949e;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>ClaUi - כפתור שיפור פרומפטים</h1>
+
+    <p>
+      פיצ'ר חדש שמוסיף כפתור חכם לאזור הקלט של הצ'אט. הכפתור משתמש בבינה מלאכותית כדי
+      לשפר את הפרומפט של המשתמש לפני שהוא נשלח - מוסיף מבנה, בהירות, ומנחה את המודל
+      לתת תשובות טובות יותר.
+    </p>
+
+    <h2>מה הפיצ'ר עושה?</h2>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="icon">&#10024;</div>
+        <div class="title">שיפור ידני</div>
+        <div class="desc">
+          לחיצה על הכפתור משפרת את הפרומפט הנוכחי. המשתמש רואה את התוצאה
+          ויכול לערוך לפני שליחה.
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#9881;</div>
+        <div class="title">מצב אוטומטי</div>
+        <div class="desc">
+          הפעלת מצב אוטומטי דרך גלגל השיניים - כל פרומפט משתפר אוטומטית
+          לפני שליחה עם אינדיקציה ויזואלית.
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#129302;</div>
+        <div class="title">בחירת מודל</div>
+        <div class="desc">
+          המשתמש בוחר איזה מודל ירוץ את השיפור - מ-Haiku (מהיר וזול)
+          עד Opus (איכות מקסימלית).
+        </div>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#127468;&#127463;</div>
+        <div class="title">תמיכה בעברית</div>
+        <div class="desc">
+          השיפור שומר על שפת הפרומפט המקורית - פרומפט בעברית ישופר
+          בעברית, באנגלית - באנגלית.
+        </div>
+      </div>
+    </div>
+
+    <h2>מראה ויזואלי</h2>
+
+    <div class="mockup">
+      <p style="font-size: 13px; color: #8b949e; margin-bottom: 16px;">הדמיה של אזור הקלט עם הכפתור החדש</p>
+      <div class="mockup-input">
+        <div class="mockup-textarea">Write a function that sorts users...</div>
+        <div class="mockup-enhance" style="display: flex; gap: 0;">
+          <span class="mockup-enhance-main">&#10024;</span>
+          <span class="mockup-enhance-gear">&#9881;</span>
+        </div>
+        <span class="mockup-btn mockup-send">Send</span>
+      </div>
+      <div class="mockup-label">
+        &#8593; כפתור השיפור (&#10024;) + גלגל שיניים (&#9881;) ליד כפתור השליחה
+      </div>
+
+      <div class="mockup-popover">
+        <p style="font-size: 12px; color: #8b949e; margin-bottom: 8px; text-align: center;">Enhancer Settings</p>
+        <div class="mockup-popover-row">
+          <span style="font-size: 12px; color: #e6edf3;">Auto-enhance</span>
+          <span class="mockup-toggle"><span class="mockup-toggle-knob"></span></span>
+        </div>
+        <div class="mockup-popover-row">
+          <span style="font-size: 12px; color: #e6edf3;">Model</span>
+          <span style="font-size: 11px; color: #58a6ff; background: #21262d; padding: 2px 8px; border-radius: 4px;">Sonnet 4.6</span>
+        </div>
+      </div>
+      <div class="mockup-label">
+        &#8593; חלונית הגדרות שנפתחת בלחיצה על גלגל השיניים
+      </div>
+    </div>
+
+    <h2>זרימת עבודה</h2>
+
+    <h3>שיפור ידני</h3>
+    <div>
+      <div class="flow-step">
+        <div class="flow-number">1</div>
+        <div class="flow-content">
+          <strong>המשתמש מקליד פרומפט</strong>
+          <p>המשתמש כותב את הבקשה שלו בתיבת הקלט כרגיל</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">2</div>
+        <div class="flow-content">
+          <strong>לחיצה על כפתור השיפור</strong>
+          <p>הכפתור מציג אנימציית סיבוב, תיבת הקלט מעומעמת עם כיתוב "Enhancing..."</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">3</div>
+        <div class="flow-content">
+          <strong>תוצאה מוחלפת בתיבה</strong>
+          <p>הטקסט המשופר מחליף את המקורי. המשתמש יכול לערוך או לשלוח כפי שהוא</p>
+        </div>
+      </div>
+    </div>
+
+    <h3>מצב אוטומטי</h3>
+    <div>
+      <div class="flow-step">
+        <div class="flow-number">1</div>
+        <div class="flow-content">
+          <strong>הפעלה דרך גלגל השיניים</strong>
+          <p>המשתמש מפעיל את מתג ה-Auto-enhance. הכפתור מקבל מסגרת כחולה כאינדיקציה</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">2</div>
+        <div class="flow-content">
+          <strong>לחיצה על Send</strong>
+          <p>במקום שליחה ישירה, המערכת מריצה שיפור קודם. מוצגת אנימציה של גבול מהבהב</p>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">3</div>
+        <div class="flow-content">
+          <strong>שליחה אוטומטית</strong>
+          <p>ברגע שהשיפור מסתיים, הטקסט המשופר נשלח אוטומטית. אם השיפור נכשל, הטקסט המקורי נשלח</p>
+        </div>
+      </div>
+    </div>
+
+    <h2>קבצים מושפעים</h2>
+
+    <table class="files-table">
+      <thead>
+        <tr>
+          <th>קובץ</th>
+          <th>סוג שינוי</th>
+          <th>תיאור</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>PromptEnhancer.ts</td>
+          <td><span class="badge badge-new">חדש</span></td>
+          <td>הלוגיקה המרכזית - מריץ את מודל ה-AI לשיפור</td>
+        </tr>
+        <tr>
+          <td>webview-messages.ts</td>
+          <td><span class="badge badge-modify">שינוי</span></td>
+          <td>5 הודעות חדשות לתקשורת בין הממשק לתוסף</td>
+        </tr>
+        <tr>
+          <td>package.json</td>
+          <td><span class="badge badge-modify">שינוי</span></td>
+          <td>2 הגדרות חדשות (מצב אוטומטי + בחירת מודל)</td>
+        </tr>
+        <tr>
+          <td>store.ts</td>
+          <td><span class="badge badge-modify">שינוי</span></td>
+          <td>4 שדות מצב חדשים + 5 פעולות</td>
+        </tr>
+        <tr>
+          <td>MessageHandler.ts</td>
+          <td><span class="badge badge-modify">שינוי</span></td>
+          <td>טיפול בהודעות חדשות + סנכרון הגדרות</td>
+        </tr>
+        <tr>
+          <td>SessionTab.ts</td>
+          <td><span class="badge badge-modify">שינוי</span></td>
+          <td>חיווט הרכיב החדש (3 שורות)</td>
+        </tr>
+        <tr>
+          <td>useClaudeStream.ts</td>
+          <td><span class="badge badge-modify">שינוי</span></td>
+          <td>2 טיפולי הודעות חדשים</td>
+        </tr>
+        <tr>
+          <td>InputArea.tsx</td>
+          <td><span class="badge badge-modify">שינוי</span></td>
+          <td>ממשק המשתמש - כפתור, חלונית, אנימציות</td>
+        </tr>
+        <tr>
+          <td>global.css</td>
+          <td><span class="badge badge-modify">שינוי</span></td>
+          <td>~120 שורות CSS חדשות לעיצוב</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>סיכונים ומענה</h2>
+
+    <div class="highlight">
+      <div class="risk-item">
+        <div class="risk-icon">&#9201;</div>
+        <div>
+          <strong>זמן תגובה</strong>
+          <p>השיפור דורש קריאת API שלוקחת כמה שניות. מוצגת אנימציה ברורה בזמן ההמתנה, עם טיימאאוט של 30 שניות.</p>
+        </div>
+      </div>
+      <div class="risk-item">
+        <div class="risk-icon">&#128176;</div>
+        <div>
+          <strong>עלות</strong>
+          <p>כל שיפור = קריאת API אחת. ברירת המחדל היא Sonnet (איזון טוב). המשתמש יכול לבחור Haiku לחיסכון.</p>
+        </div>
+      </div>
+      <div class="risk-item">
+        <div class="risk-icon">&#128274;</div>
+        <div>
+          <strong>שמירת כוונה</strong>
+          <p>הפרומפט לשיפור מדגיש במפורש: לשמור על הכוונה המקורית, לא לשנות מה שהמשתמש רוצה.</p>
+        </div>
+      </div>
+      <div class="risk-item">
+        <div class="risk-icon">&#128165;</div>
+        <div>
+          <strong>כשל</strong>
+          <p>אם השיפור נכשל - במצב ידני: הטקסט המקורי נשאר. במצב אוטומטי: הטקסט המקורי נשלח.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary-box">
+      <h2>סיכום</h2>
+      <p>
+        הפיצ'ר מוסיף יכולת שיפור פרומפטים חכמה שמשלבת הנדסת פרומפטים מתקדמת
+        ישירות בממשק המשתמש. הוא עוקב אחרי הדפוסים הקיימים בפרויקט (כמו מתרגם ההודעות ומנתח התורנים)
+        ולא דורש ארכיטקטורה חדשה.
+      </p>
+      <div class="summary-stats">
+        <div class="stat">
+          <div class="stat-value">1</div>
+          <div class="stat-label">קובץ חדש</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">8</div>
+          <div class="stat-label">קבצים מעודכנים</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">~350</div>
+          <div class="stat-label">שורות קוד חדשות</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

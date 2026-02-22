@@ -89,6 +89,16 @@ export const InputArea: React.FC = () => {
     gitPushConfigPanelOpen,
     setGitPushConfigPanelOpen,
     markSessionPromptSent,
+    isEnhancing,
+    autoEnhanceEnabled,
+    enhancerModel,
+    enhancerPopoverOpen,
+    enhanceComparisonData,
+    setIsEnhancing,
+    setAutoEnhanceEnabled,
+    setEnhancerModel,
+    setEnhancerPopoverOpen,
+    setEnhanceComparisonData,
   } = useAppStore();
   const fileMention = useFileMention(textareaRef);
 
@@ -96,6 +106,11 @@ export const InputArea: React.FC = () => {
   const historyIndexRef = useRef(-1);
   // Save the draft text when user starts navigating history
   const draftRef = useRef('');
+
+  // Ref: tracks when auto-enhance intercepted a send
+  const autoSendAfterEnhanceRef = useRef(false);
+  // Ref: captures original text before enhancement for comparison view
+  const originalTextBeforeEnhanceRef = useRef('');
 
   // Seed prompt history from existing user messages on mount (covers messages
   // sent before this feature was deployed or before a reload)
@@ -120,12 +135,78 @@ export const InputArea: React.FC = () => {
   // Auto-detect RTL for the input text
   const direction = text ? (detectRtl(text) ? 'rtl' : 'ltr') : 'auto';
 
+  /** Trigger prompt enhancement via the extension host */
+  const handleEnhancePrompt = useCallback(() => {
+    const trimmed = text.trim();
+    if (!trimmed || isEnhancing || !isConnected) return;
+    originalTextBeforeEnhanceRef.current = trimmed;
+    setIsEnhancing(true);
+    postToExtension({ type: 'enhancePrompt', text: trimmed } as any);
+  }, [text, isEnhancing, isConnected, setIsEnhancing]);
+
+  /** Toggle the enhancer settings popover */
+  const handleToggleEnhancerPopover = useCallback(() => {
+    setEnhancerPopoverOpen(!enhancerPopoverOpen);
+  }, [enhancerPopoverOpen, setEnhancerPopoverOpen]);
+
+  /** Toggle auto-enhance mode */
+  const handleAutoEnhanceToggle = useCallback(() => {
+    const newVal = !autoEnhanceEnabled;
+    setAutoEnhanceEnabled(newVal);
+    postToExtension({ type: 'setAutoEnhance', enabled: newVal } as any);
+  }, [autoEnhanceEnabled, setAutoEnhanceEnabled]);
+
+  /** Change enhancer model */
+  const handleEnhancerModelChange = useCallback((model: string) => {
+    setEnhancerModel(model);
+    postToExtension({ type: 'setEnhancerModel', model } as any);
+  }, [setEnhancerModel]);
+
+  /** Use the enhanced text from the comparison panel */
+  const handleUseEnhanced = useCallback(() => {
+    if (!enhanceComparisonData) return;
+    const enhanced = enhanceComparisonData.enhancedText;
+    setText(enhanced);
+    undoMgr.push(enhanced, enhanced.length);
+    setEnhanceComparisonData(null);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el) {
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+        el.focus();
+        el.selectionStart = enhanced.length;
+        el.selectionEnd = enhanced.length;
+      }
+    });
+  }, [enhanceComparisonData, undoMgr, setEnhanceComparisonData]);
+
+  /** Dismiss comparison panel and keep the original text */
+  const handleUseOriginal = useCallback(() => {
+    if (!enhanceComparisonData) return;
+    const original = enhanceComparisonData.originalText;
+    setText(original);
+    undoMgr.push(original, original.length);
+    setEnhanceComparisonData(null);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }, [enhanceComparisonData, undoMgr, setEnhanceComparisonData]);
+
   /** Send the current message to Claude (allowed even while busy, to interrupt).
    *  When a plan approval bar is active, the text is sent as plan feedback
    *  so the CLI interprets it in the approval context. */
   const sendMessage = useCallback(() => {
     const trimmed = text.trim();
     if ((!trimmed && pendingImages.length === 0) || !isConnected) return;
+
+    // Auto-enhance: intercept send, enhance first, then auto-send
+    if (autoEnhanceEnabled && trimmed && !isEnhancing && pendingImages.length === 0 && !pendingApproval) {
+      setIsEnhancing(true);
+      autoSendAfterEnhanceRef.current = true;
+      postToExtension({ type: 'enhancePrompt', text: trimmed } as any);
+      return;
+    }
 
     if (trimmed) {
       addToPromptHistory(trimmed);
@@ -160,7 +241,7 @@ export const InputArea: React.FC = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [text, pendingImages, isConnected, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent]);
+  }, [text, pendingImages, isConnected, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing]);
 
   /** Cancel the in-flight request */
   const cancelRequest = useCallback(() => {
@@ -260,9 +341,18 @@ export const InputArea: React.FC = () => {
         }
         return;
       }
+      // Ctrl+Shift+E: enhance prompt
+      if (e.key === 'e' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+        e.preventDefault();
+        handleEnhancePrompt();
+        return;
+      }
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         sendMessage();
+      } else if (e.key === 'Escape' && enhanceComparisonData) {
+        e.preventDefault();
+        handleUseOriginal();
       } else if (e.key === 'Escape' && isBusy) {
         e.preventDefault();
         cancelRequest();
@@ -334,7 +424,7 @@ export const InputArea: React.FC = () => {
         }
       }
     },
-    [sendMessage, isBusy, cancelRequest, text, resizeTextarea, undoMgr, fileMention, applyMentionInsert]
+    [sendMessage, isBusy, cancelRequest, text, resizeTextarea, undoMgr, fileMention, applyMentionInsert, handleEnhancePrompt, enhanceComparisonData, handleUseOriginal]
   );
 
   /** Auto-resize textarea to fit content, reset history browsing on manual edits */
@@ -501,6 +591,62 @@ export const InputArea: React.FC = () => {
     return () => window.removeEventListener('fork-set-input', handler);
   }, [undoMgr]);
 
+  // Listen for prompt enhancement results
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const enhanced = (e as CustomEvent<string>).detail;
+
+      // If auto-enhance triggered this, send immediately (no comparison)
+      if (autoSendAfterEnhanceRef.current) {
+        autoSendAfterEnhanceRef.current = false;
+        setTimeout(() => {
+          const store = useAppStore.getState();
+          store.addToPromptHistory(enhanced);
+          store.markSessionPromptSent();
+          postToExtension({ type: 'sendMessage', text: enhanced });
+          setText('');
+          undoMgr.reset();
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+          }
+        }, 0);
+        return;
+      }
+
+      // Manual enhance: show comparison panel
+      const original = originalTextBeforeEnhanceRef.current;
+      setEnhanceComparisonData({ originalText: original, enhancedText: enhanced });
+    };
+    window.addEventListener('prompt-enhanced', handler);
+    return () => window.removeEventListener('prompt-enhanced', handler);
+  }, [undoMgr, setEnhanceComparisonData]);
+
+  // Listen for prompt enhancement failures
+  useEffect(() => {
+    const handler = () => {
+      // Auto-send was pending but enhancement failed -- send original text
+      if (autoSendAfterEnhanceRef.current) {
+        autoSendAfterEnhanceRef.current = false;
+        sendMessage();
+      }
+    };
+    window.addEventListener('prompt-enhance-failed', handler);
+    return () => window.removeEventListener('prompt-enhance-failed', handler);
+  }, [sendMessage]);
+
+  // Close enhancer popover on outside click
+  useEffect(() => {
+    if (!enhancerPopoverOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.enhance-button-group')) {
+        setEnhancerPopoverOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [enhancerPopoverOpen, setEnhancerPopoverOpen]);
+
   /** Toggle the prompt history panel */
   const handleToggleHistory = useCallback(() => {
     setPromptHistoryPanelOpen(true);
@@ -559,6 +705,56 @@ export const InputArea: React.FC = () => {
         <GitPushPanel onClose={() => setGitPushConfigPanelOpen(false)} />
       )}
 
+      {/* Prompt enhancement comparison panel */}
+      {enhanceComparisonData && (
+        <div className="enhance-comparison-panel">
+          <div className="enhance-comparison-header">
+            <span className="enhance-comparison-title">Prompt Comparison</span>
+            <button
+              className="enhance-comparison-close"
+              onClick={handleUseOriginal}
+              title="Dismiss and keep original"
+            >
+              x
+            </button>
+          </div>
+          <div className="enhance-comparison-body">
+            <div className="enhance-comparison-section">
+              <div className="enhance-comparison-label">Original</div>
+              <div
+                className="enhance-comparison-text"
+                dir={detectRtl(enhanceComparisonData.originalText) ? 'rtl' : 'ltr'}
+              >
+                {enhanceComparisonData.originalText}
+              </div>
+            </div>
+            <div className="enhance-comparison-section">
+              <div className="enhance-comparison-label">Enhanced</div>
+              <div
+                className="enhance-comparison-text enhanced"
+                dir={detectRtl(enhanceComparisonData.enhancedText) ? 'rtl' : 'ltr'}
+              >
+                {enhanceComparisonData.enhancedText}
+              </div>
+            </div>
+          </div>
+          <div className="enhance-comparison-actions">
+            <button
+              className="enhance-comparison-btn original"
+              onClick={handleUseOriginal}
+            >
+              Use Original
+            </button>
+            <button
+              className="enhance-comparison-btn enhanced"
+              onClick={handleUseEnhanced}
+            >
+              Use Enhanced
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="input-wrapper">
         {fileMention.isOpen && (
           <FileMentionPopup
@@ -598,28 +794,78 @@ export const InputArea: React.FC = () => {
         >
           H
         </button>
-        <textarea
-          ref={textareaRef}
-          className="input-textarea"
-          dir={direction}
-          value={text}
-          onChange={handleInput}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          onContextMenu={handleContextMenu}
-          placeholder={
-            pendingApproval
-              ? (pendingApproval.toolName === 'AskUserQuestion'
-                ? 'Type your answer... (Ctrl+Enter to send)'
-                : 'Type feedback or approve/reject above... (Ctrl+Enter to send)')
-              : isBusy
-                ? 'Type to interrupt... (Ctrl+Enter to send)'
-                : 'Type a message... (Ctrl+Enter to send)'
-          }
-          disabled={!isConnected}
-          rows={1}
-        />
+        <div className={`textarea-container${isEnhancing ? ' enhancing' : ''}`}>
+          <textarea
+            ref={textareaRef}
+            className="input-textarea"
+            dir={direction}
+            value={text}
+            onChange={handleInput}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onContextMenu={handleContextMenu}
+            placeholder={
+              pendingApproval
+                ? (pendingApproval.toolName === 'AskUserQuestion'
+                  ? 'Type your answer... (Ctrl+Enter to send)'
+                  : 'Type feedback or approve/reject above... (Ctrl+Enter to send)')
+                : isBusy
+                  ? 'Type to interrupt... (Ctrl+Enter to send)'
+                  : 'Type a message... (Ctrl+Enter to send)'
+            }
+            disabled={!isConnected}
+            rows={1}
+          />
+          {isEnhancing && (
+            <div className="enhance-overlay">
+              <span className="enhance-overlay-text">Enhancing...</span>
+            </div>
+          )}
+        </div>
         <div className="input-buttons">
+          <div className="enhance-button-group">
+            <button
+              className={`enhance-button${isEnhancing ? ' enhancing' : ''}${autoEnhanceEnabled ? ' auto-active' : ''}`}
+              onClick={handleEnhancePrompt}
+              disabled={!text.trim() || isEnhancing || !isConnected}
+              title={autoEnhanceEnabled ? 'Auto-enhance is ON (Ctrl+Shift+E)' : 'Enhance prompt (Ctrl+Shift+E)'}
+            >
+              {isEnhancing ? '\u21BB' : '\u2728'}
+            </button>
+            <button
+              className="enhance-gear-button"
+              onClick={handleToggleEnhancerPopover}
+              title="Enhancer settings"
+            >
+              {'\u2699'}
+            </button>
+            {enhancerPopoverOpen && (
+              <div className="enhance-popover">
+                <div className="enhance-popover-row">
+                  <span className="enhance-popover-label">Auto-enhance</span>
+                  <button
+                    className={`enhance-toggle-btn ${autoEnhanceEnabled ? 'on' : 'off'}`}
+                    onClick={handleAutoEnhanceToggle}
+                  >
+                    <span className="enhance-toggle-knob" />
+                  </button>
+                </div>
+                <div className="enhance-popover-row">
+                  <span className="enhance-popover-label">Model</span>
+                  <select
+                    className="enhance-model-select"
+                    value={enhancerModel}
+                    onChange={(e) => handleEnhancerModelChange(e.target.value)}
+                  >
+                    <option value="claude-haiku-4-5-20251001">Haiku</option>
+                    <option value="claude-sonnet-4-6">Sonnet 4.6</option>
+                    <option value="claude-sonnet-4-5-20250929">Sonnet 4.5</option>
+                    <option value="claude-opus-4-6">Opus 4.6</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
           {isBusy && (
             <button
               className="cancel-button"
@@ -632,7 +878,7 @@ export const InputArea: React.FC = () => {
           <button
             className="send-button"
             onClick={sendMessage}
-            disabled={(!text.trim() && pendingImages.length === 0) || !isConnected}
+            disabled={(!text.trim() && pendingImages.length === 0) || !isConnected || isEnhancing || !!enhanceComparisonData}
           >
             Send
           </button>

@@ -16,7 +16,7 @@ import { postToExtension } from '../../hooks/useClaudeStream';
  * Lookahead prevents consuming trailing punctuation that is not part of the path.
  */
 export const FILE_PATH_REGEX =
-  /(?:[A-Za-z]:[/\\](?:[^\s:*?"<>|])+\.\w{1,10}|(?:\.{0,2}\/|\/)(?:[^\s:*?"<>|])+\.\w{1,10}|(?:[a-zA-Z_][\w.-]*\/)+[a-zA-Z_][\w.-]*\.\w{1,10})(?::\d+(?::\d+)?)?(?=[\s)}\]>,;:'"!?`]|$)/g;
+  /(?:[A-Za-z]:[/\\](?:[^\s:*?"<>|])+\.\w{1,10}|(?:\.{0,2}\/|\/)(?:[^\s:*?"<>|])+\.\w{1,10}|(?:[a-zA-Z_][\w.-]*\/)+[a-zA-Z_][\w.-]*\.\w{1,10})(?::\d+(?::\d+)?)?(?=[\s.)}\]>,;:'"!?`]|$)/g;
 
 /**
  * Regex to match URLs in text content.

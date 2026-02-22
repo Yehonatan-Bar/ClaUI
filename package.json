@@ -18,7 +18,7 @@
     "url": "https://github.com/Yehonatan-Bar/ClaUI/issues",
     "email": "yonzbar@gmail.com"
   },
-  "qna": "https://github.com/Yehonatan-Bar/ClaUI/discussions",
+  "qna": "https://github.com/Yehonatan-Bar/ClaUI/issues",
   "categories": [
     "AI",
     "Chat"
@@ -240,6 +240,28 @@
             "Opus - highest quality, slower and more expensive"
           ],
           "description": "Model used for background analysis: session naming, activity summaries, and semantic turn analysis"
+        },
+        "claudeMirror.promptEnhancer.autoEnhance": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically enhance prompts before sending them to Claude"
+        },
+        "claudeMirror.promptEnhancer.model": {
+          "type": "string",
+          "default": "claude-sonnet-4-6",
+          "enum": [
+            "claude-haiku-4-5-20251001",
+            "claude-sonnet-4-6",
+            "claude-sonnet-4-5-20250929",
+            "claude-opus-4-6"
+          ],
+          "enumDescriptions": [
+            "Haiku - fastest and cheapest",
+            "Sonnet 4.6 - good balance of quality and speed (recommended)",
+            "Sonnet 4.5 - previous generation",
+            "Opus 4.6 - highest quality, slower"
+          ],
+          "description": "Model used for prompt enhancement"
         },
         "claudeMirror.turnAnalysis.enabled": {
           "type": "boolean",

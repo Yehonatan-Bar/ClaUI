@@ -58,6 +58,8 @@ export function useClaudeStream(): void {
     setTurnAnalysisSettings,
     setSessionMetadata,
     setProjectSessions,
+    setIsEnhancing,
+    setPromptEnhancerSettings,
   } = useAppStore();
 
   useEffect(() => {
@@ -391,6 +393,26 @@ export function useClaudeStream(): void {
         case 'projectAnalyticsData':
           setProjectSessions(msg.sessions);
           break;
+
+        case 'enhancePromptResult':
+          setIsEnhancing(false);
+          if (msg.success && msg.enhancedText) {
+            window.dispatchEvent(
+              new CustomEvent('prompt-enhanced', { detail: msg.enhancedText })
+            );
+          } else {
+            window.dispatchEvent(
+              new CustomEvent('prompt-enhance-failed', { detail: msg.error })
+            );
+          }
+          break;
+
+        case 'promptEnhancerSettings':
+          setPromptEnhancerSettings({
+            autoEnhance: msg.autoEnhance,
+            enhancerModel: msg.enhancerModel,
+          });
+          break;
       }
     }
 
@@ -448,6 +470,8 @@ export function useClaudeStream(): void {
     setTurnAnalysisSettings,
     setSessionMetadata,
     setProjectSessions,
+    setIsEnhancing,
+    setPromptEnhancerSettings,
   ]);
 }
 

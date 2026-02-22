@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClaUi - Prompt Enhancer Comparison View</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 30px;
+      line-height: 1.7;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #a78bfa;
+      font-size: 28px;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #a78bfa33;
+      padding-bottom: 12px;
+    }
+    .subtitle {
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+    h2 {
+      color: #60a5fa;
+      font-size: 20px;
+      margin-top: 32px;
+      margin-bottom: 12px;
+    }
+    h3 {
+      color: #34d399;
+      font-size: 16px;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+    p { margin-bottom: 12px; }
+    .card {
+      background: #16213e;
+      border: 1px solid #2a2a4a;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .card.highlight {
+      border-color: #a78bfa55;
+      background: linear-gradient(135deg, #16213e 0%, #1a1a3e 100%);
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+    .badge-change { background: #f59e0b33; color: #f59e0b; }
+    .badge-new { background: #34d39933; color: #34d399; }
+    .badge-none { background: #64748b33; color: #64748b; }
+    ul {
+      padding-right: 24px;
+      margin-bottom: 12px;
+    }
+    li { margin-bottom: 6px; }
+    .flow-step {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+    .flow-number {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #a78bfa;
+      color: #1a1a2e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .flow-content {
+      flex: 1;
+      padding-top: 4px;
+    }
+    .mockup {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: monospace;
+      font-size: 13px;
+      direction: ltr;
+      text-align: left;
+      margin: 16px 0;
+      line-height: 1.6;
+    }
+    .mockup .header {
+      color: #58a6ff;
+      font-weight: bold;
+      border-bottom: 1px solid #30363d;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+    .mockup .label {
+      color: #8b949e;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .mockup .text-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: 8px 10px;
+      margin: 4px 0 12px 0;
+      color: #c9d1d9;
+    }
+    .mockup .text-box.enhanced {
+      border-color: #58a6ff;
+      border-style: dashed;
+    }
+    .mockup .actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 8px;
+    }
+    .mockup .btn {
+      padding: 4px 14px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .mockup .btn-secondary {
+      background: none;
+      border: 1px solid #30363d;
+      color: #8b949e;
+    }
+    .mockup .btn-primary {
+      background: #238636;
+      border: 1px solid #238636;
+      color: #fff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+    }
+    th, td {
+      padding: 8px 12px;
+      border: 1px solid #2a2a4a;
+      text-align: right;
+      font-size: 14px;
+    }
+    th {
+      background: #1e2a4a;
+      color: #60a5fa;
+      font-weight: 600;
+    }
+    .scope-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      background: #34d39922;
+      color: #34d399;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>תכנון: תצוגת השוואת פרומפטים</h1>
+    <div class="subtitle">ClaUi - שיפור כלי שדרוג הפרומפטים | תאריך: 2026-02-22</div>
+
+    <h2>מה הבעיה?</h2>
+    <div class="card">
+      <p>כרגע, כשמשתמש משדרג פרומפט באמצעות כלי השדרוג, <strong>הטקסט המשודרג מחליף את המקורי</strong> בלי אפשרות להשוות ביניהם.</p>
+      <p>המשתמש צריך לסמוך על Ctrl+Z כדי לחזור למקור - אין שום תצוגה ויזואלית של שני הגרסאות.</p>
+    </div>
+
+    <h2>מה הפתרון?</h2>
+    <div class="card highlight">
+      <p>הוספת <strong>פאנל השוואה</strong> שמופיע מעל שדה הקלט, ומציג את שתי הגרסאות בצורה מוערמת (אחת מעל השנייה):</p>
+      <ul>
+        <li>הטקסט <strong>המקורי</strong> - כמו שהמשתמש הקליד</li>
+        <li>הטקסט <strong>המשודרג</strong> - הגרסה שהכלי הפיק</li>
+      </ul>
+      <p>המשתמש בוחר: "השתמש במשודרג" או "השתמש במקורי", והפאנל נסגר.</p>
+      <p><strong>למה ערימה ולא זה-לצד-זה?</strong> הפאנל הצדדי של VS Code צר (300-400 פיקסלים). חלוקה אופקית תיתן לכל צד ~150 פיקסלים - צר מדי לקריאה נוחה.</p>
+    </div>
+
+    <h2>מראה חזותי (mockup)</h2>
+    <div class="mockup">
+      <div class="header">Prompt Comparison &times;</div>
+      <div class="label">ORIGINAL</div>
+      <div class="text-box">Fix the bug in the login page</div>
+      <div class="label">ENHANCED</div>
+      <div class="text-box enhanced">Investigate and fix the authentication bug on the login page. Check for: incorrect credential validation, session handling issues, and CSRF token problems. Think step by step.</div>
+      <div class="actions">
+        <span class="btn btn-secondary">Use Original</span>
+        <span class="btn btn-primary">Use Enhanced</span>
+      </div>
+    </div>
+
+    <h2>תהליך העבודה של המשתמש</h2>
+    <div class="card">
+      <div class="flow-step">
+        <div class="flow-number">1</div>
+        <div class="flow-content">המשתמש מקליד פרומפט בשדה הקלט</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">2</div>
+        <div class="flow-content">לוחץ על כפתור השדרוג (או Ctrl+Shift+E)</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">3</div>
+        <div class="flow-content">אנימציית "משדרג..." מופיעה על שדה הקלט (ללא שינוי מהמצב הנוכחי)</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">4</div>
+        <div class="flow-content"><strong>פאנל ההשוואה נפתח</strong> - מציג מקור ומשודרג אחד מעל השני</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">5</div>
+        <div class="flow-content">המשתמש קורא, משווה, ובוחר: "השתמש במשודרג" או "השתמש במקורי"</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-number">6</div>
+        <div class="flow-content">הטקסט שנבחר מוכנס לשדה הקלט, הפאנל נסגר</div>
+      </div>
+    </div>
+
+    <h2>מה משתנה?</h2>
+    <table>
+      <tr>
+        <th>קובץ</th>
+        <th>שינוי</th>
+        <th>היקף</th>
+      </tr>
+      <tr>
+        <td>ניהול מצב (store)</td>
+        <td>שדה חדש לנתוני ההשוואה</td>
+        <td><span class="badge badge-change">שינוי קטן</span></td>
+      </tr>
+      <tr>
+        <td>אזור הקלט (InputArea)</td>
+        <td>פאנל השוואה + לוגיקת בחירה</td>
+        <td><span class="badge badge-new">תוספת</span></td>
+      </tr>
+      <tr>
+        <td>עיצוב (CSS)</td>
+        <td>~90 שורות עיצוב לפאנל</td>
+        <td><span class="badge badge-new">תוספת</span></td>
+      </tr>
+      <tr>
+        <td>שרת/Backend</td>
+        <td>ללא שינוי</td>
+        <td><span class="badge badge-none">ללא</span></td>
+      </tr>
+      <tr>
+        <td>סוגי הודעות</td>
+        <td>ללא שינוי</td>
+        <td><span class="badge badge-none">ללא</span></td>
+      </tr>
+    </table>
+
+    <h2>מקרי קצה</h2>
+    <div class="card">
+      <table>
+        <tr>
+          <th>מקרה</th>
+          <th>התנהגות</th>
+        </tr>
+        <tr>
+          <td>שדרוג אוטומטי + שליחה</td>
+          <td>פאנל ההשוואה <strong>לא מופיע</strong> - נשלח מיד (כמו היום)</td>
+        </tr>
+        <tr>
+          <td>טקסט בעברית (RTL)</td>
+          <td>כיוון הטקסט מזוהה אוטומטית בכל אחד מהאזורים</td>
+        </tr>
+        <tr>
+          <td>פרומפט ארוך</td>
+          <td>כל אזור מוגבל ל-150px גובה עם גלילה</td>
+        </tr>
+        <tr>
+          <td>לחיצה על Send בזמן השוואה</td>
+          <td>כפתור השליחה מושבת - צריך לבחור קודם</td>
+        </tr>
+        <tr>
+          <td>לחיצה על Escape בזמן השוואה</td>
+          <td>סוגר את הפאנל, שומר על המקורי</td>
+        </tr>
+      </table>
+    </div>
+
+    <h2>אימות (בדיקה)</h2>
+    <div class="card">
+      <ul>
+        <li>הפעלת build ו-deploy מקומי</li>
+        <li>הקלדת פרומפט ולחיצה על שדרוג - הפאנל אמור להופיע</li>
+        <li>בחירת "השתמש במשודרג" - הטקסט המשודרג מוכנס לשדה</li>
+        <li>בחירת "השתמש במקורי" - הטקסט המקורי נשמר</li>
+        <li>מצב שדרוג אוטומטי - שולח מיד בלי פאנל השוואה</li>
+        <li>טקסט בעברית מוצג נכון בשני האזורים</li>
+        <li>מקש Escape סוגר את הפאנל</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

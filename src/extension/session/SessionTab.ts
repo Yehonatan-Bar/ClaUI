@@ -9,6 +9,7 @@ import { MessageTranslator } from './MessageTranslator';
 import { ActivitySummarizer } from './ActivitySummarizer';
 import { AdventureInterpreter } from './AdventureInterpreter';
 import { TurnAnalyzer } from './TurnAnalyzer';
+import { PromptEnhancer } from './PromptEnhancer';
 import { ConversationReader } from './ConversationReader';
 import { FileLogger } from './FileLogger';
 import type { AchievementService } from '../achievements/AchievementService';
@@ -178,6 +179,11 @@ export class SessionTab implements WebviewBridge {
     const turnAnalyzer = new TurnAnalyzer();
     turnAnalyzer.setLogger(tabLog);
     this.messageHandler.setTurnAnalyzer(turnAnalyzer);
+
+    // Wire prompt enhancer for AI-powered prompt improvement
+    const promptEnhancer = new PromptEnhancer();
+    promptEnhancer.setLogger(tabLog);
+    this.messageHandler.setPromptEnhancer(promptEnhancer);
 
     // Create webview panel in the specified column
     this.baseTitle = `ClaUi ${tabNumber}`;
