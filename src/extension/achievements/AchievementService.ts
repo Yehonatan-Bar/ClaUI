@@ -129,9 +129,17 @@ export class AchievementService {
       // --- Cross-session achievements ---
       const crossAwards: AchievementAward[] = [];
 
-      // Centurion: 100 sessions
+      // Session count achievements
+      if (this.profile.counters.sessionsCompleted >= 50) {
+        const a = awardFromDef(getAchievementDefinition('half-century'));
+        if (a) crossAwards.push(a);
+      }
       if (this.profile.counters.sessionsCompleted >= 100) {
         const a = awardFromDef(getAchievementDefinition('centurion'));
+        if (a) crossAwards.push(a);
+      }
+      if (this.profile.counters.sessionsCompleted >= 200) {
+        const a = awardFromDef(getAchievementDefinition('double-centurion'));
         if (a) crossAwards.push(a);
       }
 
@@ -142,6 +150,28 @@ export class AchievementService {
       }
       if (this.profile.counters.consecutiveDays >= 7) {
         const a = awardFromDef(getAchievementDefinition('daily-streak-7'));
+        if (a) crossAwards.push(a);
+      }
+      if (this.profile.counters.consecutiveDays >= 14) {
+        const a = awardFromDef(getAchievementDefinition('daily-streak-14'));
+        if (a) crossAwards.push(a);
+      }
+      if (this.profile.counters.consecutiveDays >= 30) {
+        const a = awardFromDef(getAchievementDefinition('daily-streak-30'));
+        if (a) crossAwards.push(a);
+      }
+
+      // Time Investor achievements
+      if (this.profile.counters.totalSessionMinutes >= 500) {
+        const a = awardFromDef(getAchievementDefinition('time-investor-i'));
+        if (a) crossAwards.push(a);
+      }
+      if (this.profile.counters.totalSessionMinutes >= 2000) {
+        const a = awardFromDef(getAchievementDefinition('time-investor-ii'));
+        if (a) crossAwards.push(a);
+      }
+      if (this.profile.counters.totalSessionMinutes >= 5000) {
+        const a = awardFromDef(getAchievementDefinition('time-investor-iii'));
         if (a) crossAwards.push(a);
       }
 
@@ -303,6 +333,12 @@ export class AchievementService {
       if (a) tierAwards.push(a);
     }
 
+    // Bug Slayer IV
+    if (this.profile.counters.bugFixes >= 250) {
+      const a = awardFromDef(getAchievementDefinition('bug-slayer-iv'));
+      if (a) tierAwards.push(a);
+    }
+
     // Test Master tiers
     if (this.profile.counters.testPasses >= 25) {
       const a = awardFromDef(getAchievementDefinition('test-master-i'));
@@ -314,6 +350,24 @@ export class AchievementService {
     }
     if (this.profile.counters.testPasses >= 500) {
       const a = awardFromDef(getAchievementDefinition('test-master-iii'));
+      if (a) tierAwards.push(a);
+    }
+    if (this.profile.counters.testPasses >= 1000) {
+      const a = awardFromDef(getAchievementDefinition('test-master-iv'));
+      if (a) tierAwards.push(a);
+    }
+
+    // Edit Veteran tiers
+    if (this.profile.counters.totalEdits >= 500) {
+      const a = awardFromDef(getAchievementDefinition('edit-veteran-i'));
+      if (a) tierAwards.push(a);
+    }
+    if (this.profile.counters.totalEdits >= 2000) {
+      const a = awardFromDef(getAchievementDefinition('edit-veteran-ii'));
+      if (a) tierAwards.push(a);
+    }
+    if (this.profile.counters.totalEdits >= 5000) {
+      const a = awardFromDef(getAchievementDefinition('edit-veteran-iii'));
       if (a) tierAwards.push(a);
     }
 

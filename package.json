@@ -294,6 +294,76 @@
           "type": "boolean",
           "default": true,
           "description": "Enable AI-powered session insights at the end of each session (once per day). Uses Claude Sonnet for deeper analysis of your coding patterns."
+        },
+        "claudeMirror.skillGen.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable automatic skill generation from SR-PTD documents"
+        },
+        "claudeMirror.skillGen.threshold": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "maximum": 100,
+          "description": "Number of new documents before triggering skill generation"
+        },
+        "claudeMirror.skillGen.docsDirectory": {
+          "type": "string",
+          "default": "C:/projects/Skills/Dev_doc_for_skills",
+          "description": "Directory containing SR-PTD documents (source documents for skill generation)"
+        },
+        "claudeMirror.skillGen.docsPattern": {
+          "type": "string",
+          "default": "SR-PTD*.md",
+          "description": "Glob pattern for matching SR-PTD document files"
+        },
+        "claudeMirror.skillGen.skillsDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "Target directory to install generated skills. Leave empty to use ~/.claude/skills/"
+        },
+        "claudeMirror.skillGen.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Path to the Python executable for running the skill generation pipeline"
+        },
+        "claudeMirror.skillGen.toolkitPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Python skill generation toolkit directory"
+        },
+        "claudeMirror.skillGen.workspaceDir": {
+          "type": "string",
+          "default": "",
+          "description": "Isolated workspace directory for pipeline artifacts (extractions, clusters, skills_out). Leave empty for auto."
+        },
+        "claudeMirror.skillGen.pipelineMode": {
+          "type": "string",
+          "default": "run_pipeline",
+          "enum": ["run_pipeline", "python_api", "create_skills"],
+          "enumDescriptions": [
+            "run_pipeline.py with resume support (recommended)",
+            "Python API - direct module import (most controlled)",
+            "create_skills.py - MVP/debug only (no resume, per-phase timeout)"
+          ],
+          "description": "How to invoke the Python skill generation pipeline"
+        },
+        "claudeMirror.skillGen.autoRun": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically run skill generation when document threshold is reached. If false, only shows a notification."
+        },
+        "claudeMirror.skillGen.timeoutMs": {
+          "type": "number",
+          "default": 600000,
+          "minimum": 60000,
+          "maximum": 3600000,
+          "description": "Maximum pipeline run time in milliseconds (default: 10 minutes)"
+        },
+        "claudeMirror.skillGen.aiDeduplication": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use AI (Claude Sonnet) for ambiguous skill deduplication decisions"
         }
       }
     },

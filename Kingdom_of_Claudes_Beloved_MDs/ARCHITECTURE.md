@@ -179,8 +179,16 @@ The `result` event fires when the CLI turn completes (after `ExitPlanMode` pause
 **Stale Plan Mode Detection (post-compaction):**
 After context compaction, the Claude model may call `ExitPlanMode` as a stale artifact (the compacted context mentions plan mode, but no real plan exists). MessageHandler tracks a `planModeActive` flag:
 - Set to `true` when `EnterPlanMode` tool is seen in `toolUseStart`
-- Set to `false` when the user responds to an ExitPlanMode approval (approve/reject/feedback)
+- Set to `false` when the user responds to ANY ExitPlanMode approval (approve/approveClearBypass/approveManual/reject/feedback)
 - When `ExitPlanMode` is detected but `planModeActive` is `false`, the extension auto-approves silently (`"Yes, proceed with the plan."`) instead of showing the approval bar. This prevents the user from getting stuck on a "Plan Ready for Review" prompt with no actual plan to review.
+- **Safety valve**: A counter (`staleExitPlanModeAutoApproveCount`) tracks consecutive auto-approvals. After 3 consecutive auto-approvals without user interaction, the approval bar is shown to the user so they can intervene (prevents infinite ExitPlanMode loops). The counter resets when the user manually responds to any approval.
+
+**Plan Approval Options (CLI-matching):**
+PlanApprovalBar shows 4 options matching the CLI's plan approval UX:
+1. **"Yes, clear context and bypass permissions"** (`approveClearBypass`): Approves the plan, sends approval text, then triggers context compaction.
+2. **"Yes, and bypass permissions"** (`approve`): Standard approval - proceeds in full-access mode.
+3. **"Yes, manually approve edits"** (`approveManual`): Approves the plan, switches to supervised permission mode.
+4. **"Type here to tell Claude what to change"** (`feedback`): Opens a text area for custom feedback.
 
 **Plan Approval Cleanup (multiple safety nets):**
 The `pendingApproval` state is cleared in several places to prevent the approval bar from lingering:

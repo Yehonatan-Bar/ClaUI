@@ -70,6 +70,12 @@ claude-code-mirror/
 |   |   |   +-- SessionFork.ts            #   Phase 3 stub (rewind)
 |   |   +-- terminal/                     #   Phase 2 stubs
 |   |   +-- auth/                         #   Phase 5 stub
+|   |   +-- skillgen/
+|   |   |   +-- SkillGenStore.ts          #   Document ledger persistence (globalState)
+|   |   |   +-- SkillGenService.ts        #   Main orchestrator (scan, preflight, lock, pipeline, dedup, install)
+|   |   |   +-- PythonPipelineRunner.ts   #   Python subprocess execution with progress monitoring
+|   |   |   +-- DeduplicationEngine.ts    #   3-tier dedup (traceability, metadata similarity, AI placeholder)
+|   |   |   +-- SkillInstaller.ts         #   Atomic skill installation with backup/rollback
 |   |   +-- achievements/
 |   |   |   +-- AchievementCatalog.ts     #   30 achievement definitions, 7 categories
 |   |   |   +-- AchievementStore.ts       #   Persistence via VS Code globalState (8 counters, 15 levels)
@@ -123,6 +129,9 @@ claude-code-mirror/
 |       |   |   +-- AchievementToastStack.tsx #  Toast notifications for earned achievements
 |       |   |   +-- SessionRecapCard.tsx     #   End-of-session summary card
 |       |   |   +-- achievementI18n.ts       #   i18n translations (EN/HE) for all achievement UI
+|       |   +-- SkillGen/
+|       |   |   +-- SkillGenPanel.tsx     #   Full overlay panel (toggle, progress, history, actions)
+|       |   |   +-- index.ts             #   Barrel export
 |       |   +-- Dashboard/
 |       |   |   +-- DashboardPanel.tsx    #   Root overlay (tab nav, close, Esc, Session/Project toggle)
 |       |   |   +-- MetricsCards.tsx      #   8-card summary row
@@ -163,6 +172,7 @@ claude-code-mirror/
     +-- SESSION_VITALS.md                 #   Session health dashboard (timeline, weather, cost bar)
     +-- STREAM_JSON_PROTOCOL.md           #   CLI protocol reference
     +-- PROMPT_ENHANCER.md               #   AI prompt enhancement feature
+    +-- SKILL_GENERATION.md             #   Auto skill generation from SR-PTD docs
 ```
 
 ---
@@ -265,6 +275,9 @@ claude-code-mirror/
 **TurnAnalyzer** - Background semantic analysis engine (enabled by default). After each turn completes, spawns a one-shot Claude CLI process (using `claudeMirror.analysisModel`) to classify user mood, task type, outcome, and bug repetition. Results arrive asynchronously and merge into `turnHistory` via `turnSemantics` postMessage. Includes queue (max 20), per-session cap, timeout, and enable flag for cost control.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ANALYTICS_DASHBOARD.md`
 
+**Auto Skill Generation** - Automatically generates Claude skills from accumulated SR-PTD documentation files. Scans a configurable docs directory, maintains a persistent document ledger (fingerprint-based change detection), and triggers a Python skill-generation pipeline when the pending document count reaches a configurable threshold. Features 3-tier deduplication (traceability fingerprint, metadata similarity via trigram matching, AI placeholder), atomic skill installation with backup/rollback, cross-process locking, and a full webview panel with progress bar, history table, and Generate Now/Cancel controls. Status bar indicator shows pending/threshold count with pulse animation when threshold is reached. Backend: `SkillGenStore`, `SkillGenService`, `PythonPipelineRunner`, `DeduplicationEngine`, `SkillInstaller`. Frontend: `SkillGenPanel`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/SKILL_GENERATION.md`
+
 **Prompt Enhancer** - AI-powered prompt rewriting that improves user prompts before sending. Uses a one-shot `claude -p` CLI call with a meta-prompt applying advanced prompt engineering (scaffolding, structure, context cues). Manual mode: sparkles button or Ctrl+Shift+E opens a comparison panel showing original and enhanced prompts stacked vertically for side-by-side review. Auto mode: intercepts Send, enhances, then auto-sends (falls back to original on failure). Gear popover with auto-enhance toggle and model selector. Configurable via `claudeMirror.promptEnhancer.*` settings.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/PROMPT_ENHANCER.md`
 
@@ -304,6 +317,18 @@ claude-code-mirror/
 | `claudeMirror.gitPush.enabled` | `true` | Whether git push is configured and ready to use via the Git button |
 | `claudeMirror.gitPush.scriptPath` | `"scripts/git-push.ps1"` | Path to the git push script (relative to workspace root) |
 | `claudeMirror.gitPush.commitMessageTemplate` | `"{sessionName}"` | Commit message template ({sessionName} = tab name) |
+| `claudeMirror.skillGen.enabled` | `false` | Enable auto skill generation feature |
+| `claudeMirror.skillGen.threshold` | `5` | Number of new SR-PTD docs to trigger generation (1-50) |
+| `claudeMirror.skillGen.docsDirectory` | `"C:\\projects\\Skills\\Dev_doc_for_skills"` | Directory containing SR-PTD documents |
+| `claudeMirror.skillGen.docsPattern` | `"SR-PTD_*.md"` | Glob pattern for SR-PTD files |
+| `claudeMirror.skillGen.skillsDirectory` | `"~/.claude/skills"` | Target directory for generated skills |
+| `claudeMirror.skillGen.pythonPath` | `"python"` | Path to Python executable |
+| `claudeMirror.skillGen.toolkitPath` | `""` | Path to skill generation toolkit |
+| `claudeMirror.skillGen.workspaceDir` | `""` | Isolated workspace directory for pipeline |
+| `claudeMirror.skillGen.pipelineMode` | `"run_pipeline"` | Pipeline mode: run_pipeline, python_api, or create_skills |
+| `claudeMirror.skillGen.autoRun` | `true` | Automatically run pipeline when threshold reached |
+| `claudeMirror.skillGen.timeoutMs` | `300000` | Pipeline timeout in milliseconds (5 min default) |
+| `claudeMirror.skillGen.aiDeduplication` | `false` | Enable AI-powered deduplication (Tier 3) |
 
 ---
 

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Skill Generation - Implementation Plan</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      line-height: 1.7;
+      padding: 2rem;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+
+    h1 {
+      font-size: 2rem;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      color: #94a3b8;
+      font-size: 1rem;
+      margin-bottom: 2rem;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 1rem;
+    }
+
+    .section {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid #334155;
+    }
+    .section h2 {
+      font-size: 1.3rem;
+      color: #a78bfa;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .section h2 .icon {
+      font-size: 1.5rem;
+    }
+
+    .highlight-box {
+      background: #0f172a;
+      border: 1px solid #4338ca;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 0.75rem 0;
+    }
+
+    .flow-diagram {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1rem 0;
+      text-align: center;
+    }
+    .flow-step {
+      display: inline-block;
+      background: #1e293b;
+      border: 2px solid #6366f1;
+      border-radius: 10px;
+      padding: 0.6rem 1.2rem;
+      margin: 0.3rem;
+      font-size: 0.9rem;
+      color: #c7d2fe;
+    }
+    .flow-arrow {
+      display: inline-block;
+      color: #6366f1;
+      font-size: 1.5rem;
+      margin: 0 0.3rem;
+      vertical-align: middle;
+    }
+
+    ul { padding-right: 1.5rem; }
+    li { margin-bottom: 0.5rem; color: #cbd5e1; }
+    li strong { color: #a78bfa; }
+
+    .phase-card {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 0.75rem 0;
+      border-right: 4px solid #6366f1;
+    }
+    .phase-card.phase-2 { border-right-color: #8b5cf6; }
+    .phase-card.phase-3 { border-right-color: #a78bfa; }
+    .phase-card.phase-4 { border-right-color: #c4b5fd; }
+    .phase-card .phase-title {
+      font-weight: 700;
+      color: #e0e7ff;
+      margin-bottom: 0.3rem;
+    }
+    .phase-card .phase-desc {
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    .risk-item {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin: 0.5rem 0;
+      border-right: 3px solid #f59e0b;
+    }
+    .risk-item .risk-label {
+      color: #fbbf24;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    .risk-item .risk-solution {
+      color: #94a3b8;
+      font-size: 0.85rem;
+    }
+
+    .stat-row {
+      display: flex;
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+    .stat-box {
+      flex: 1;
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+    .stat-box .stat-number {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #a78bfa;
+    }
+    .stat-box .stat-label {
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+
+    .dedup-tier {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 0.5rem 0;
+    }
+    .tier-badge {
+      display: inline-block;
+      background: #4338ca;
+      color: #e0e7ff;
+      border-radius: 20px;
+      padding: 0.2rem 0.8rem;
+      font-size: 0.8rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .ui-mockup {
+      background: #0a0f1a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 0.75rem 0;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #94a3b8;
+      direction: ltr;
+      text-align: left;
+      white-space: pre;
+    }
+
+    .decision-box {
+      background: linear-gradient(135deg, #1e1b4b, #1e293b);
+      border: 1px solid #6366f1;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 0.75rem 0;
+    }
+    .decision-box .question { color: #c7d2fe; font-weight: 600; }
+    .decision-box .answer { color: #94a3b8; margin-top: 0.3rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <h1>יצירת Skills אוטומטית מתיעוד מצטבר</h1>
+    <div class="subtitle">תוכנית יישום - פיצ'ר חדש לתוסף ClaUi</div>
+
+    <!-- What & Why -->
+    <div class="section">
+      <h2><span class="icon">&#9733;</span> מה ולמה</h2>
+      <p>
+        כיום, לאחר כל משימת פיתוח, נוצר מסמך תיעוד (SR-PTD) באופן אוטומטי.
+        עם הזמן מצטברים עשרות מסמכים כאלה. קיימת כבר מערכת (Python toolkit) שמנתחת את המסמכים
+        ויוצרת מהם Skills עבור Claude -- אבל היום זה דורש הפעלה ידנית.
+      </p>
+      <div class="highlight-box">
+        <strong>הפיצ'ר החדש:</strong> המערכת תספור מסמכים חדשים, תציג מונה ויזואלי,
+        ובהגעה לסף מוגדר -- תריץ את הצנרת בסביבת עבודה מבודדת (staging/workspace),
+        תבצע בדיקות תקינות, תבדוק כפילויות/שדרוג מול Skills קיימים,
+        ותתקין בצורה בטוחה רק את מה שחדש או משודרג.
+      </div>
+    </div>
+
+    <!-- Flow Overview -->
+    <div class="section">
+      <h2><span class="icon">&#8635;</span> זרימת התהליך</h2>
+      <div class="flow-diagram">
+        <div class="flow-step">מסמך SR-PTD חדש נשמר</div>
+        <span class="flow-arrow">&#8592;</span>
+        <div class="flow-step">המונה עולה (18/30)</div>
+        <span class="flow-arrow">&#8592;</span>
+        <div class="flow-step">הגעה לסף?</div>
+        <br><br>
+        <div class="flow-step">Preflight + נעילה + הפעלת צנרת</div>
+        <span class="flow-arrow">&#8592;</span>
+        <div class="flow-step">Pipeline Workspace (extractions/clusters/skills_out)</div>
+        <span class="flow-arrow">&#8592;</span>
+        <div class="flow-step">Sanity + יצירת Skills (staging)</div>
+        <br><br>
+        <div class="flow-step">בדיקת כפילויות/שדרוג (traceability + תוכן)</div>
+        <span class="flow-arrow">&#8592;</span>
+        <div class="flow-step">חדש / שדרוג / דילוג</div>
+        <span class="flow-arrow">&#8592;</span>
+        <div class="flow-step">התקנה אטומית + גיבוי/rollback</div>
+      </div>
+    </div>
+
+    <!-- Key Numbers -->
+    <div class="section">
+      <h2><span class="icon">&#9776;</span> מספרים מרכזיים</h2>
+      <div class="stat-row">
+        <div class="stat-box">
+          <div class="stat-number">7</div>
+          <div class="stat-label">קבצים חדשים</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">8</div>
+          <div class="stat-label">קבצים לעדכון</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">4</div>
+          <div class="stat-label">שלבי יישום</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">12</div>
+          <div class="stat-label">הגדרות חדשות</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Core Components -->
+    <div class="section">
+      <h2><span class="icon">&#9881;</span> רכיבים מרכזיים</h2>
+      <ul>
+        <li>
+          <strong>מונה מסמכים (SkillGenStore)</strong> --
+          לא רק מונה: גם ledger מתמשך של fingerprints למסמכים (path/mtime/size או hash תוכן),
+          סטטוס "ממתין לעיבוד", והיסטוריית הרצות. מאופס/מעודכן רק אחרי install מוצלח.
+        </li>
+        <li>
+          <strong>מנהל הצנרת (SkillGenService)</strong> --
+          הלב של המערכת. סורק מסמכים, בודק סף, מבצע preflight, אוכף נעילה בין חלונות/תהליכים,
+          מפעיל את הצנרת, ומנהל state machine של ריצה (queued/running/failed/succeeded).
+        </li>
+        <li>
+          <strong>מריץ Python (PythonPipelineRunner)</strong> --
+          מריץ את מערכת ה-Python הקיימת כתת-תהליך או דרך Python API. תומך ב-resume (כשמשתמשים
+          ב-<code>run_pipeline.py</code> / <code>.pipeline_progress.json</code>), מנטר התקדמות, timeout וביטול.
+        </li>
+        <li>
+          <strong>מנוע כפילויות (DeduplicationEngine)</strong> --
+          בודק בשלוש רמות האם Skill חדש כבר קיים, דורש שדרוג, או שהוא באמת חדש -- עם עדיפות
+          לבדיקות דטרמיניסטיות (<code>traceability.json</code>/fingerprints) לפני AI.
+        </li>
+        <li>
+          <strong>מתקין (SkillInstaller)</strong> --
+          מתקין מ-staging ליעד בצורה אטומית ככל האפשר, מגבה קיימים לפני שדרוג, ותומך rollback
+          במקרה שכשל באמצע התקנה.
+        </li>
+      </ul>
+    </div>
+
+    <!-- Deduplication -->
+    <div class="section">
+      <h2><span class="icon">&#128270;</span> מנגנון בדיקת כפילויות</h2>
+      <p style="margin-bottom: 0.75rem;">
+        לפני התקנת כל Skill שנוצר ב-<code>skills_out</code> (staging), המערכת בודקת האם כבר קיים Skill דומה/זהה.
+        כדי להימנע מטעויות ועדכונים שגויים, התהליך עובד בשלוש שכבות (דטרמיניסטי קודם, AI אחרון):
+      </p>
+
+      <div class="dedup-tier">
+        <span class="tier-badge">שכבה 1: מקור/Traceability</span>
+        <p>השוואת <code>traceability.json</code>, fingerprint של חבילת ה-Skill, וחפיפת מסמכי מקור. אם זהה -- דילוג מלא (idempotent). אם יש חפיפה חלקית -- מועמד לשדרוג.</p>
+      </div>
+
+      <div class="dedup-tier">
+        <span class="tier-badge">שכבה 2: מטא-דאטה + תוכן</span>
+        <p>השוואת שם, frontmatter, תיאורים, כותרות ומונחים מרכזיים (ללא AI). ספי הדמיון הם התחלתיים בלבד ודורשים כוונון עם נתונים אמיתיים (לא hardcode סופי כברירת מחדל).</p>
+      </div>
+
+      <div class="dedup-tier">
+        <span class="tier-badge">שכבה 3: AI</span>
+        <p>למקרים לא ברורים, שימוש ב-Claude Sonnet לקבלת החלטה:
+        האם מדובר באותו נושא עם יכולות חדשות, או בנושא שונה? החלטת AI לא מוחקת/דורסה Skills בלי גיבוי ובלי traceability תקין.</p>
+      </div>
+    </div>
+
+    <!-- UI Preview -->
+    <div class="section">
+      <h2><span class="icon">&#128187;</span> ממשק משתמש</h2>
+      <p style="margin-bottom: 0.75rem;">
+        שני אלמנטים חדשים בממשק:
+      </p>
+      <ul>
+        <li><strong>מחוון בשורת הסטטוס</strong> -- מראה "18/30 מסמכים" בתחתית המסך (ולא Skills). מהבהב בזהב כשהסף מגיע.</li>
+        <li><strong>פאנל מלא</strong> -- נפתח בלחיצה, מציג התקדמות, היסטוריה, הגדרות, ו"מה השתנה" אחרי כל הרצה.</li>
+      </ul>
+      <div class="ui-mockup">+-------------------------------------------------------+
+|  Skill Generation                              [X]    |
++-------------------------------------------------------+
+|                                                       |
+|  [=========>-----------]  18 / 30 documents           |
+|                                                       |
+|  [Generate Now]                                       |
+|                                                       |
+|  --- Last Run: Feb 20, 2026 ---                       |
+|  Status: Success (4m 32s)                             |
+|  3 new skills, 2 upgraded, 1 skipped                  |
+|                                                       |
+|  --- History ---                                      |
+|  | Date       | Docs | New | Upgraded | Status |     |
+|  | 2026-02-20 |  32  |  3  |    2     | OK     |     |
+|  | 2026-02-01 |  28  |  4  |    1     | OK     |     |
++-------------------------------------------------------+</div>
+    </div>
+
+    <!-- Settings -->
+    <div class="section">
+      <h2><span class="icon">&#9881;</span> הגדרות חדשות</h2>
+      <ul>
+        <li><strong>הפעלה/כיבוי</strong> -- הפעלה או כיבוי של כל הפיצ'ר</li>
+        <li><strong>סף מסמכים</strong> -- כמה מסמכים חדשים לפני הפעלה (ברירת מחדל: 30)</li>
+        <li><strong>תיקיית מסמכים</strong> -- היכן נמצאים מסמכי ה-SR-PTD (כולל דפוסי קבצים נתמכים, למשל <code>SR-PTD*</code>/<code>task_doc*</code>)</li>
+        <li><strong>תיקיית Skills</strong> -- לאן להתקין (נתיב יעד פעיל; הרחבת <code>~</code> ונתיב ברירת מחדל לפי OS/ClaUi)</li>
+        <li><strong>נתיב Python</strong> -- מיקום Python (ברירת מחדל: python)</li>
+        <li><strong>נתיב הכלים</strong> -- מיקום ה-toolkit</li>
+        <li><strong>תיקיית Workspace לצנרת</strong> -- תיקיה מבודדת ל-<code>extractions/</code>, <code>clusters/</code>, <code>skills_out/</code> ולוגים</li>
+        <li><strong>מצב אינטגרציה לצנרת</strong> -- Python API (מועדף) או <code>run_pipeline.py</code> עם Resume; <code>create_skills.py</code> ל-MVP/דיבוג בלבד</li>
+        <li><strong>Resume אחרי כשל</strong> -- שימוש ב-<code>.pipeline_progress.json</code> כשזמין, או התחלה מחדש מה-staging בלי לאבד queue</li>
+        <li><strong>Timeout / ביטול</strong> -- זמן ריצה מקסימלי, ומה קורה בלחיצת Cancel (סיום עדין / עצירה)</li>
+        <li><strong>הרצה אוטומטית</strong> -- הרצה אוטומטית בהגעה לסף, או הודעה בלבד</li>
+        <li><strong>AI לכפילויות</strong> -- שימוש ב-AI לזיהוי כפילויות לא ברורות</li>
+      </ul>
+    </div>
+
+    <!-- Implementation Phases -->
+    <div class="section">
+      <h2><span class="icon">&#9654;</span> שלבי יישום</h2>
+
+      <div class="phase-card">
+        <div class="phase-title">שלב 1: תשתית</div>
+        <div class="phase-desc">
+          מונה + ledger למסמכים, הגדרות, מחוון בממשק, סריקה בסיסית, preflight (Python/toolkit/API key),
+          ונעילה בין תהליכים/חלונות. מניח תשתית בטוחה לכל השאר.
+        </div>
+      </div>
+
+      <div class="phase-card phase-2">
+        <div class="phase-title">שלב 2: אינטגרציית הצנרת</div>
+        <div class="phase-desc">
+          חיבור למערכת Python (עדיפות Python API / <code>run_pipeline.py</code>), Workspace מבודד,
+          תמיכה ב-resume, הצגת התקדמות חיה, ופאנל מלא עם ניהול הרצות והיסטוריה.
+        </div>
+      </div>
+
+      <div class="phase-card phase-3">
+        <div class="phase-title">שלב 3: כפילויות והתקנה</div>
+        <div class="phase-desc">
+          מנוע זיהוי כפילויות (traceability + תוכן + AI אופציונלי), השוואה מול Skills קיימים,
+          התקנה מ-staging ליעד, גיבוי/rollback, וסיכום "מה השתנה".
+        </div>
+      </div>
+
+      <div class="phase-card phase-4">
+        <div class="phase-title">שלב 4: ליטוש</div>
+        <div class="phase-desc">
+          הודעת סף, הרצה אוטומטית, כוונון ספי כפילויות עם נתוני אמת, תיעוד,
+          בדיקות עומס/שגיאות/ביטול ושיפור UX.
+        </div>
+      </div>
+    </div>
+
+    <!-- Risks & Edge Cases -->
+    <div class="section">
+      <h2><span class="icon">&#9888;</span> סיכונים ומקרי קצה</h2>
+
+      <div class="risk-item">
+        <div class="risk-label">Python לא מותקן</div>
+        <div class="risk-solution">בדיקה בהפעלה. אם חסר -- הפיצ'ר מושבת עם הודעה ברורה.</div>
+      </div>
+
+      <div class="risk-item">
+        <div class="risk-label">מפתח API חסר</div>
+        <div class="risk-solution">שלבים דטרמיניסטיים יכולים לרוץ, אבל לא מתבצעת סינתזה/התקנה מלאה. מוצגת הודעה ברורה, וה-queue לא מתאפס.</div>
+      </div>
+
+      <div class="risk-item">
+        <div class="risk-label">כשל באמצע הרצה</div>
+        <div class="risk-solution">שמירת מצב ריצה + ארטיפקטים ב-workspace. אם משתמשים ב-<code>run_pipeline.py</code> -- Resume דרך <code>.pipeline_progress.json</code>; אחרת התחלה מחדש מה-staging. כשל נרשם בהיסטוריה.</div>
+      </div>
+
+      <div class="risk-item">
+        <div class="risk-label">ספירה כפולה של מסמכים</div>
+        <div class="risk-solution">לא להסתמך על hash של שמות קבצים בלבד. להשתמש ב-fingerprint (path יחסי + mtime + size) או hash תוכן, ולעדכן סטטוס רק אחרי עיבוד/התקנה מוצלחים.</div>
+      </div>
+
+      <div class="risk-item">
+        <div class="risk-label">הרצה בו-זמנית ממספר חלונות</div>
+        <div class="risk-solution">נעילה בין-תהליכית (lock file / named mutex) ולא רק <code>isRunning</code> בזיכרון. חלון שני רואה "הרצה בתהליך" וממתין/מציע Retry.</div>
+      </div>
+
+      <div class="risk-item">
+        <div class="risk-label">התקנה חלקית של Skills</div>
+        <div class="risk-solution">התקנה מ-staging עם גיבוי לפני overwrite, כתיבה אטומית ככל האפשר, ו-rollback אם שלב התקנה נכשל באמצע.</div>
+      </div>
+    </div>
+
+    <!-- Decisions -->
+    <div class="section">
+      <h2><span class="icon">&#10067;</span> החלטות פתוחות</h2>
+
+      <div class="decision-box">
+        <div class="question">האם Skills מותקנים אוטומטית או דורשים אישור?</div>
+        <div class="answer">המלצה: ברירת מחדל "אישור נדרש" בהרצות הראשונות + אפשרות לעבור לאוטומטי. בכל מקרה: staging + גיבוי + rollback + סיכום "מה השתנה".</div>
+      </div>
+
+      <div class="decision-box">
+        <div class="question">מתי לסרוק מסמכים חדשים?</div>
+        <div class="answer">המלצה: בהפעלת התוסף + בסיום כל סשן + רענון ידני. בלי file watcher בזמן אמת בגרסה הראשונה (מוריד מורכבות וכשלים).</div>
+      </div>
+
+      <div class="decision-box">
+        <div class="question">איזו נקודת כניסה לצנרת לבחור?</div>
+        <div class="answer">המלצה: אינטגרציה דרך Python API (הכי נשלט) או <code>run_pipeline.py</code> עם Workspace ייעודי ו-Resume. להימנע מ-<code>create_skills.py</code> בפרודקשן בגלל timeout פר-פאזה וללא Resume.</div>
+      </div>
+
+      <div class="decision-box">
+        <div class="question">מתי מאפסים את מונה/תור המסמכים?</div>
+        <div class="answer">המלצה: רק אחרי שריצה + בדיקות + התקנה הושלמו בהצלחה. כשל חלקי לא מוחק מסמכים מהתור.</div>
+      </div>
+    </div>
+
+    <div style="text-align: center; color: #475569; margin-top: 2rem; font-size: 0.85rem;">
+      ClaUi - Auto Skill Generation Plan | February 2026
+    </div>
+
+  </div>
+</body>
+</html>
