@@ -11,6 +11,7 @@ import type {
   SkillGenRunHistoryEntry,
   TurnRecord,
   TurnSemantics,
+  CommunityFriendProfilePayload,
 } from '../../extension/types/webview-messages';
 import type { AdventureBeat } from '../components/Vitals/adventure/types';
 import { deriveTurnHistoryFromMessages } from '../utils/turnVitals';
@@ -142,6 +143,19 @@ export interface AppState {
   achievementPanelOpen: boolean;
   sessionRecap: SessionRecapPayload | null;
 
+  // Community (GitHub sync)
+  communityPanelOpen: boolean;
+  githubSyncStatus: {
+    connected: boolean;
+    username: string;
+    gistId: string;
+    gistUrl: string;
+    lastSyncedAt: string;
+    syncEnabled: boolean;
+  } | null;
+  communityFriends: CommunityFriendProfilePayload[];
+  friendActionPending: boolean;
+
   // Adventure Widget
   adventureEnabled: boolean;
   adventureBeats: AdventureBeat[];
@@ -259,6 +273,10 @@ export interface AppState {
   setAchievementPanelOpen: (open: boolean) => void;
   setSessionRecap: (recap: SessionRecapPayload | null) => void;
   setAchievementGoals: (goals: AchievementGoalPayload[]) => void;
+  setCommunityPanelOpen: (open: boolean) => void;
+  setGithubSyncStatus: (status: { connected: boolean; username: string; gistId: string; gistUrl: string; lastSyncedAt: string; syncEnabled: boolean }) => void;
+  setCommunityFriends: (friends: CommunityFriendProfilePayload[]) => void;
+  setFriendActionPending: (pending: boolean) => void;
   setAdventureEnabled: (enabled: boolean) => void;
   addAdventureBeat: (beat: AdventureBeat) => void;
   markSessionPromptSent: () => void;
@@ -458,6 +476,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   achievementToasts: [],
   achievementPanelOpen: false,
   sessionRecap: null,
+  communityPanelOpen: false,
+  githubSyncStatus: null,
+  communityFriends: [],
+  friendActionPending: false,
   adventureEnabled: false,
   adventureBeats: [],
   dashboardOpen: false,
@@ -477,7 +499,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   sessionActivityRunningSinceMs: null,
 
   // Skill Generation
-  skillGenEnabled: false,
+  skillGenEnabled: true,
   skillGenThreshold: 30,
   skillGenPendingDocs: 0,
   skillGenRunStatus: 'idle' as SkillGenRunStatus,
@@ -1016,6 +1038,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setAchievementPanelOpen: (open) => set({ achievementPanelOpen: open }),
   setSessionRecap: (recap) => set({ sessionRecap: recap }),
   setAchievementGoals: (goals) => set({ achievementGoals: goals }),
+  setCommunityPanelOpen: (open) => set({ communityPanelOpen: open }),
+  setGithubSyncStatus: (status) => set({ githubSyncStatus: status }),
+  setCommunityFriends: (friends) => set({ communityFriends: friends, friendActionPending: false }),
+  setFriendActionPending: (pending) => set({ friendActionPending: pending }),
   setAdventureEnabled: (enabled) => set({ adventureEnabled: enabled }),
 
   addAdventureBeat: (beat) =>
@@ -1149,6 +1175,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       achievementToasts: [],
       achievementPanelOpen: false,
       sessionRecap: null,
+      communityPanelOpen: false,
+      // Note: githubSyncStatus and communityFriends persist across resets
+      friendActionPending: false,
       isEnhancing: false,
       enhancerPopoverOpen: false,
       enhanceComparisonData: null,

@@ -62,6 +62,35 @@ interface AchievementTranslations {
   aiXpBonusLabel: string;
   codingPatternLabel: string;
 
+  // Community / GitHub Sync
+  community: string;
+  share: string;
+  connectGitHub: string;
+  connectGitHubDesc: string;
+  lastSynced: string;
+  publishNow: string;
+  disconnect: string;
+  friends: string;
+  compare: string;
+  addFriend: string;
+  addFriendPlaceholder: string;
+  removeFriend: string;
+  refreshFriends: string;
+  noFriendsYet: string;
+  selectFriendToCompare: string;
+  achievementsLabel: string;
+  you: string;
+  metric: string;
+  sessions: string;
+  bugFixes: string;
+  testsPassed: string;
+  streak: string;
+  copyMarkdownCard: string;
+  copyShieldsBadge: string;
+  copied: string;
+  shareCardTitle: string;
+  shareCardDesc: string;
+
   // --- Original 12 achievements ---
   achNightOwlTitle: string;
   achNightOwlDesc: string;
@@ -256,6 +285,35 @@ const en: AchievementTranslations = {
   aiXpBonusLabel: 'AI Bonus:',
   codingPatternLabel: 'Pattern:',
 
+  // Community / GitHub Sync
+  community: 'Community',
+  share: 'Share',
+  connectGitHub: 'Connect GitHub',
+  connectGitHubDesc: 'Share your achievements with other developers by publishing them to a public GitHub Gist. Other ClaUi users can discover and compare their stats with yours.',
+  lastSynced: 'Last synced',
+  publishNow: 'Publish',
+  disconnect: 'Disconnect',
+  friends: 'Friends',
+  compare: 'Compare',
+  addFriend: 'Add',
+  addFriendPlaceholder: 'GitHub username...',
+  removeFriend: 'Remove',
+  refreshFriends: 'Refresh',
+  noFriendsYet: 'No friends added yet. Add a GitHub username above to compare achievements.',
+  selectFriendToCompare: 'Select a friend from the Friends tab to compare.',
+  achievementsLabel: 'Achievements',
+  you: 'You',
+  metric: 'Metric',
+  sessions: 'Sessions',
+  bugFixes: 'Bug Fixes',
+  testsPassed: 'Tests Passed',
+  streak: 'Streak',
+  copyMarkdownCard: 'Copy Markdown Card',
+  copyShieldsBadge: 'Copy Shields Badge',
+  copied: 'Copied!',
+  shareCardTitle: 'Share Your Achievements',
+  shareCardDesc: 'Copy a markdown card or badges for your GitHub README.',
+
   // --- Original 12 ---
   achNightOwlTitle: 'Night Owl',
   achNightOwlDesc: 'Worked on code after midnight.',
@@ -449,6 +507,35 @@ const he: AchievementTranslations = {
   aiInsightLabel: '\u05EA\u05D5\u05D1\u05E0\u05EA AI',
   aiXpBonusLabel: '\u05D1\u05D5\u05E0\u05D5\u05E1 AI:',
   codingPatternLabel: '\u05D3\u05E4\u05D5\u05E1:',
+
+  // Community / GitHub Sync
+  community: '\u05E7\u05D4\u05D9\u05DC\u05D4',
+  share: '\u05E9\u05D9\u05EA\u05D5\u05E3',
+  connectGitHub: '\u05D7\u05D1\u05E8 GitHub',
+  connectGitHubDesc: '\u05E9\u05EA\u05E3 \u05D0\u05EA \u05D4\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05E9\u05DC\u05DA \u05E2\u05DD \u05DE\u05E4\u05EA\u05D7\u05D9\u05DD \u05D0\u05D7\u05E8\u05D9\u05DD \u05E2\u05DC \u05D9\u05D3\u05D9 \u05E4\u05E8\u05E1\u05D5\u05DD \u05DC-GitHub Gist \u05E6\u05D9\u05D1\u05D5\u05E8\u05D9. \u05DE\u05E9\u05EA\u05DE\u05E9\u05D9 ClaUi \u05D0\u05D7\u05E8\u05D9\u05DD \u05D9\u05D5\u05DB\u05DC\u05D5 \u05DC\u05D2\u05DC\u05D5\u05EA \u05D5\u05DC\u05D4\u05E9\u05D5\u05D5\u05EA \u05D0\u05EA \u05D4\u05E1\u05D8\u05D8\u05D9\u05E1\u05D8\u05D9\u05E7\u05D5\u05EA \u05E9\u05DC\u05D4\u05DD \u05DE\u05D5\u05DC\u05DA.',
+  lastSynced: '\u05E1\u05E0\u05DB\u05E8\u05DF \u05D0\u05D7\u05E8\u05D5\u05DF',
+  publishNow: '\u05E4\u05E8\u05E1\u05DD',
+  disconnect: '\u05E0\u05EA\u05E7',
+  friends: '\u05D7\u05D1\u05E8\u05D9\u05DD',
+  compare: '\u05D4\u05E9\u05D5\u05D5\u05D0\u05D4',
+  addFriend: '\u05D4\u05D5\u05E1\u05E3',
+  addFriendPlaceholder: '\u05E9\u05DD \u05DE\u05E9\u05EA\u05DE\u05E9 GitHub...',
+  removeFriend: '\u05D4\u05E1\u05E8',
+  refreshFriends: '\u05E8\u05E2\u05E0\u05DF',
+  noFriendsYet: '\u05E2\u05D3\u05D9\u05D9\u05DF \u05DC\u05D0 \u05E0\u05D5\u05E1\u05E4\u05D5 \u05D7\u05D1\u05E8\u05D9\u05DD. \u05D4\u05D5\u05E1\u05E3 \u05E9\u05DD \u05DE\u05E9\u05EA\u05DE\u05E9 GitHub \u05DC\u05DE\u05E2\u05DC\u05D4 \u05DB\u05D3\u05D9 \u05DC\u05D4\u05E9\u05D5\u05D5\u05EA \u05D4\u05D9\u05E9\u05D2\u05D9\u05DD.',
+  selectFriendToCompare: '\u05D1\u05D7\u05E8 \u05D7\u05D1\u05E8 \u05DE\u05DC\u05E9\u05D5\u05E0\u05D9\u05EA \u05D4\u05D7\u05D1\u05E8\u05D9\u05DD \u05DC\u05D4\u05E9\u05D5\u05D5\u05D0\u05D4.',
+  achievementsLabel: '\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD',
+  you: '\u05D0\u05EA\u05D4',
+  metric: '\u05DE\u05D3\u05D3',
+  sessions: '\u05E1\u05E9\u05E0\u05D9\u05DD',
+  bugFixes: '\u05EA\u05D9\u05E7\u05D5\u05E0\u05D9 \u05D1\u05D0\u05D2\u05D9\u05DD',
+  testsPassed: '\u05D1\u05D3\u05D9\u05E7\u05D5\u05EA \u05E2\u05D5\u05D1\u05E8\u05D5\u05EA',
+  streak: '\u05E8\u05E6\u05E3',
+  copyMarkdownCard: '\u05D4\u05E2\u05EA\u05E7 \u05DB\u05E8\u05D8\u05D9\u05E1 Markdown',
+  copyShieldsBadge: '\u05D4\u05E2\u05EA\u05E7 \u05EA\u05D2 Shields',
+  copied: '\u05D4\u05D5\u05E2\u05EA\u05E7!',
+  shareCardTitle: '\u05E9\u05EA\u05E3 \u05D0\u05EA \u05D4\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05E9\u05DC\u05DA',
+  shareCardDesc: '\u05D4\u05E2\u05EA\u05E7 \u05DB\u05E8\u05D8\u05D9\u05E1 Markdown \u05D0\u05D5 \u05EA\u05D2\u05D9\u05DD \u05DC-README \u05E9\u05DC\u05DA \u05D1-GitHub.',
 
   // --- Original 12 ---
   achNightOwlTitle: '\u05D9\u05E0\u05E9\u05D5\u05E3 \u05DC\u05D9\u05DC\u05D4',

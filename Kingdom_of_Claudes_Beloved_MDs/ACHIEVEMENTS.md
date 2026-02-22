@@ -14,24 +14,34 @@ Extension (Node.js)                    Webview (React)
 | AchievementCatalog   |               | AchievementPanel     |
 |   65 definitions     |               |   Level/XP/Goals     |
 |   7 categories       |               |   Settings (lang)    |
-+----------------------+               |   Info modal         |
++----------------------+               |   Community + Share  |
 | AchievementStore     |               +----------------------+
-|   globalState persist |               | AchievementToastStack|
-|   8 counters          |               |   Rarity-colored     |
-+----------------------+               |   Auto-dismiss 5s    |
-| AchievementEngine    |               +----------------------+
-|   Game logic/goals   | --postMsg-->  | SessionRecapCard     |
-|   File/lang tracking |               |   Duration, stats    |
-|   Error cycles       |               |   Files, languages   |
-+----------------------+               |   AI insight display |
+|   globalState persist |               | CommunityPanel       |
+|   8 counters          |               |   GitHub Connect     |
++----------------------+               |   Friends list       |
+| AchievementEngine    |               |   Side-by-side compare|
+|   Game logic/goals   | --postMsg-->  +----------------------+
+|   File/lang tracking |               | ShareCard            |
+|   Error cycles       |               |   Profile preview    |
++----------------------+               |   Copy markdown/badge|
 | AchievementService   |               +----------------------+
-|   Lifecycle bridge   |               | achievementI18n.ts   |
-|   Streak tracking    |               |   EN + HE strings    |
-+----------------------+               +----------------------+
-| InsightAnalyzer      |
-|   Sonnet CLI spawn   |
-|   Once per day       |
+|   Lifecycle bridge   |               | AchievementToastStack|
+|   Streak tracking    |               |   Rarity-colored     |
++----------------------+               |   Auto-dismiss 5s    |
+| InsightAnalyzer      |               +----------------------+
+|   Sonnet CLI spawn   |               | SessionRecapCard     |
+|   Once per day       |               |   Duration, stats    |
++----------------------+               |   AI insight display |
+| GitHubSyncService    |               +----------------------+
+|   GitHub Gist CRUD   |               | achievementI18n.ts   |
+|   Friend lookup      |               |   EN + HE strings    |
+|   Badge generation   |               +----------------------+
+|   15min cache        |
 +----------------------+
+              |
+              v
+    GitHub Gist (public)        shields.io
+    claui-achievements.json     Dynamic badges
 ```
 
 ## Key Files
@@ -43,28 +53,33 @@ Extension (Node.js)                    Webview (React)
 | AchievementCatalog.ts | `src/extension/achievements/` | 65 achievement definitions with id, title, description, rarity, category, xp. Categories: debugging, testing, refactor, collaboration, session, architecture, productivity |
 | AchievementStore.ts | `src/extension/achievements/` | Persistence via VS Code `globalState`. Tracks 8 counters: bugFixes, testPasses, sessionsCompleted, totalEdits, consecutiveDays, lastSessionDate, totalSessionMinutes. 25 level thresholds. |
 | AchievementEngine.ts | `src/extension/achievements/` | Core game logic: tracks bug fixes, test passes, streaks, language detection, cancel counts, session goals, file paths, frontend/backend classification, error cycles, config file detection, markdown file counting |
-| AchievementService.ts | `src/extension/achievements/` | Bridge between Engine+Store and webview messaging. Handles daily streaks, cross-session tier achievements (bug-slayer, test-master, edit-veteran, session milestones, time-investor, streak tiers), AI insight integration |
+| AchievementService.ts | `src/extension/achievements/` | Bridge between Engine+Store and webview messaging. Handles daily streaks, cross-session tier achievements (bug-slayer, test-master, edit-veteran, session milestones, time-investor, streak tiers), AI insight integration, auto-sync to GitHub |
 | AchievementInsightAnalyzer.ts | `src/extension/achievements/` | Spawns Sonnet CLI once per day for deeper session analysis. Returns quality, insight, coding pattern, XP bonus |
+| GitHubSyncService.ts | `src/extension/achievements/` | GitHub auth (VS Code authentication API), Gist CRUD (create/update public gist), friend lookup by username convention, badge generation (shields.io + markdown table), 15min friend cache, globalState persistence |
 
 ### Webview Frontend
 
 | File | Path | Purpose |
 |------|------|---------|
-| AchievementPanel.tsx | `src/webview/components/Achievements/` | Panel overlay with level, XP, unlocked count, session goals, language selector, info modal (includes AI insight section) |
+| AchievementPanel.tsx | `src/webview/components/Achievements/` | Panel overlay with level, XP, unlocked count, session goals, language selector, info modal, Community button, Share button |
+| CommunityPanel.tsx | `src/webview/components/Achievements/` | Full overlay panel: GitHub Connect card, sync status bar, Friends tab (list + add/remove), Compare tab (side-by-side stats & achievement grid) |
+| ShareCard.tsx | `src/webview/components/Achievements/` | Modal for sharing: visual profile preview (level, XP bar, achievements), Copy Markdown Card button, Copy Shields Badge button |
 | AchievementToastStack.tsx | `src/webview/components/Achievements/` | Stack of rarity-colored toasts with auto-dismiss and optional sound |
 | SessionRecapCard.tsx | `src/webview/components/Achievements/` | End-of-session summary showing time, bugs, tests, files, languages, badges, XP, AI insight, session quality badge, coding pattern |
-| achievementI18n.ts | `src/webview/components/Achievements/` | All UI strings in English and Hebrew, with helper functions for dynamic lookups |
+| achievementI18n.ts | `src/webview/components/Achievements/` | All UI strings in English and Hebrew, with helper functions for dynamic lookups. Includes ~30 community-related strings |
+| levelThresholds.ts | `src/webview/components/Achievements/` | XP level thresholds (duplicated from AchievementStore for webview use) |
 
 ### Integration Points
 
 | File | Role |
 |------|------|
-| store.ts | Zustand state: `achievementsEnabled`, `achievementsSound`, `achievementLanguage`, `achievementProfile`, `achievementGoals`, `achievementToasts`, `achievementPanelOpen`, `sessionRecap`, `sessionActivityElapsedMs`, `sessionActivityRunningSinceMs` |
-| App.tsx | Renders Panel, ToastStack, RecapCard; Trophy button in StatusBar |
-| useClaudeStream.ts | Dispatches achievement message types from extension |
-| MessageHandler.ts | Calls achievement hooks at every lifecycle point; watches `achievements.aiInsight` config |
-| extension.ts | Creates AchievementInsightAnalyzer, wires to AchievementService |
-| global.css | All achievement CSS classes including quality badges and insight styles |
+| store.ts | Zustand state: `achievementsEnabled`, `achievementsSound`, `achievementLanguage`, `achievementProfile`, `achievementGoals`, `achievementToasts`, `achievementPanelOpen`, `sessionRecap`, `communityPanelOpen`, `githubSyncStatus`, `communityFriends`, `friendActionPending` |
+| App.tsx | Renders Panel, CommunityPanel, ShareCard, ToastStack, RecapCard; Trophy button in StatusBar |
+| useClaudeStream.ts | Dispatches achievement + community message types from extension (`githubSyncStatus`, `communityData`, `friendActionResult`, `shareCardCopied`) |
+| MessageHandler.ts | Calls achievement hooks at every lifecycle point; handles 6 community message types (`githubSync`, `addFriend`, `removeFriend`, `refreshFriends`, `getCommunityData`, `copyShareCard`); watches `achievements.githubSync` config |
+| extension.ts | Creates AchievementInsightAnalyzer + GitHubSyncService, wires both to AchievementService |
+| WebviewProvider.ts | CSP `img-src` includes `https://avatars.githubusercontent.com` for friend avatars |
+| global.css | All achievement + community CSS classes including friend cards, compare view, share card modal |
 
 ## Achievement Catalog (65 achievements)
 
@@ -280,6 +295,7 @@ All UI strings are translated:
 | `claudeMirror.achievements.enabled` | `true` | Master toggle for the achievement system |
 | `claudeMirror.achievements.sound` | `false` | Play sound on achievement toast |
 | `claudeMirror.achievements.aiInsight` | `true` | Enable AI-powered session insights (once per day) |
+| `claudeMirror.achievements.githubSync` | `false` | Auto-sync achievements to GitHub Gist after each session |
 
 ## State Flow
 
@@ -290,3 +306,54 @@ All UI strings are translated:
 5. Webview store updates, UI re-renders (panel, toast, recap)
 6. On session end: daily streak check, session snapshot captured, AI insight spawned (async)
 7. Enriched recap sent to webview when AI insight completes
+8. If GitHub sync enabled: auto-publish `ShareableProfile` to public Gist (silent, best-effort)
+
+## Community / GitHub Sync
+
+Social sharing layer for achievements using GitHub Gists. No backend server needed.
+
+### How It Works
+
+1. **Authentication**: Uses VS Code's built-in `vscode.authentication.getSession('github', ['gist'])` -- prompts user to sign in via GitHub
+2. **Publishing**: Creates/updates a public Gist with description `"ClaUi Developer Achievements"` and filename `claui-achievements.json`
+3. **Discovery**: Friends are found by convention -- `GET /users/{username}/gists` and filter by description
+4. **Auto-sync**: After each session end, if `githubSync` setting is enabled and user is connected
+5. **Badges**: Uses shields.io dynamic badges pointing to the raw Gist URL
+
+### ShareableProfile Schema
+
+```typescript
+interface ShareableProfile {
+  version: 1;
+  username: string;
+  displayName: string;
+  avatarUrl: string;
+  lastUpdated: string;       // ISO 8601
+  totalXp: number;
+  level: number;
+  unlockedIds: string[];
+  stats: {
+    sessionsCompleted: number;
+    totalSessionMinutes: number;
+    bugFixes: number;
+    testPasses: number;
+    consecutiveDays: number;
+    totalEdits: number;
+  };
+}
+```
+
+### Key Design Decisions
+
+- **Opt-in only** -- `githubSync` defaults to `false`; user must explicitly connect
+- **Silent sync** -- Network failures never break the extension; local data is always source of truth
+- **15min cache** -- Friend profiles cached to respect GitHub rate limits (60/hr unauthenticated)
+- **Schema versioning** -- `version: 1` field enables future backward-compatible changes
+- **Discovery by convention** -- Gist description "ClaUi Developer Achievements" eliminates need for a registry
+- **CSP updated** -- `img-src` allows `https://avatars.githubusercontent.com` for friend avatars
+
+### Message Types (10 new)
+
+**Webview -> Extension**: `githubSync`, `addFriend`, `removeFriend`, `refreshFriends`, `getCommunityData`, `copyShareCard`
+
+**Extension -> Webview**: `githubSyncStatus`, `communityData`, `friendActionResult`, `shareCardCopied`

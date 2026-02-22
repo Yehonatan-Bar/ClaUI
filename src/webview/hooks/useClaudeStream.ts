@@ -63,6 +63,9 @@ export function useClaudeStream(): void {
     setSkillGenSettings,
     setSkillGenStatus,
     setSkillGenProgress,
+    setGithubSyncStatus,
+    setCommunityFriends,
+    setFriendActionPending,
   } = useAppStore();
 
   useEffect(() => {
@@ -363,6 +366,30 @@ export function useClaudeStream(): void {
 
         case 'sessionRecap':
           setSessionRecap(msg.recap);
+          break;
+
+        // --- GitHub Sync / Community ---
+        case 'githubSyncStatus':
+          setGithubSyncStatus({
+            connected: msg.connected,
+            username: msg.username,
+            gistId: msg.gistId,
+            gistUrl: msg.gistUrl,
+            lastSyncedAt: msg.lastSyncedAt,
+            syncEnabled: msg.syncEnabled,
+          });
+          break;
+
+        case 'communityData':
+          setCommunityFriends(msg.friends);
+          break;
+
+        case 'friendActionResult':
+          setFriendActionPending(false);
+          break;
+
+        case 'shareCardCopied':
+          // Handled by ShareCard component via event listener
           break;
 
         case 'turnComplete':

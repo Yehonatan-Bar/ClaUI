@@ -181,7 +181,10 @@ After context compaction, the Claude model may call `ExitPlanMode` as a stale ar
 - Set to `true` when `EnterPlanMode` tool is seen in `toolUseStart`
 - Set to `false` when the user responds to ANY ExitPlanMode approval (approve/approveClearBypass/approveManual/reject/feedback)
 - When `ExitPlanMode` is detected but `planModeActive` is `false`, the extension auto-approves silently (`"Yes, proceed with the plan."`) instead of showing the approval bar. This prevents the user from getting stuck on a "Plan Ready for Review" prompt with no actual plan to review.
-- **Safety valve**: A counter (`staleExitPlanModeAutoApproveCount`) tracks consecutive auto-approvals. After 3 consecutive auto-approvals without user interaction, the approval bar is shown to the user so they can intervene (prevents infinite ExitPlanMode loops). The counter resets when the user manually responds to any approval.
+- **Safety valve**: A counter (`staleExitPlanModeAutoApproveCount`) tracks consecutive stale auto-approvals. After 3, the bar is always shown (counter does NOT reset, preventing the loop of: auto-approve 3x, show bar, approve, reset, repeat).
+
+**User-Approved Auto-Approve Path:**
+When the user explicitly approves ExitPlanMode, `autoApproveExitPlanMode` is set to `true`. Subsequent ExitPlanMode calls in the same session are auto-approved via this flag (up to 5 times). This flag is NOT reset in the `result` handler - it persists across CLI turns until the user sends a new message or the session resets. A separate counter (`exitPlanModeAutoApproveCount`) limits auto-approvals to 5, after which the bar is shown again. All counters reset when the user sends a new message or manually interacts with the approval bar.
 
 **Plan Approval Options (CLI-matching):**
 PlanApprovalBar shows 4 options matching the CLI's plan approval UX:

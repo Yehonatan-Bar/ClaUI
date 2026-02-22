@@ -11,6 +11,7 @@ export const AchievementPanel: React.FC = () => {
     achievementLanguage,
     setAchievementLanguage,
     setAchievementPanelOpen,
+    setCommunityPanelOpen,
   } = useAppStore();
 
   const [infoOpen, setInfoOpen] = useState(false);
@@ -44,6 +45,23 @@ export const AchievementPanel: React.FC = () => {
           </button>
         </div>
         <div className="achievement-panel-header-right">
+          <button
+            className="achievement-community-btn"
+            onClick={() => { setCommunityPanelOpen(true); setAchievementPanelOpen(false); }}
+            title={tr.community}
+          >
+            {tr.community}
+          </button>
+          <button
+            className="achievement-share-btn"
+            onClick={() => {
+              useAppStore.getState().setCommunityPanelOpen(false);
+              window.dispatchEvent(new CustomEvent('open-share-card'));
+            }}
+            title={tr.share}
+          >
+            {tr.share}
+          </button>
           <button
             className="achievement-settings-btn"
             onClick={() => setSettingsOpen(!settingsOpen)}
