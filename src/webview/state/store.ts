@@ -6,10 +6,10 @@ import type {
   AchievementGoalPayload,
   AchievementProfilePayload,
   SessionRecapPayload,
-  TurnCategory,
   TurnRecord,
 } from '../../extension/types/webview-messages';
 import type { AdventureBeat } from '../components/Vitals/adventure/types';
+import { deriveTurnHistoryFromMessages } from '../utils/turnVitals';
 
 // --- Message types for the UI ---
 
@@ -335,57 +335,12 @@ function buildContentFromBlocks(blocks: StreamingBlock[]): ContentBlock[] {
   });
 }
 
-/** Tool name sets for Session Vitals turn categorization */
-const CODE_WRITE_TOOLS = new Set(['Write', 'Edit', 'NotebookEdit', 'MultiEdit']);
-const RESEARCH_TOOLS = new Set(['Read', 'Grep', 'Glob', 'WebSearch', 'WebFetch']);
-const COMMAND_TOOLS = new Set(['Bash', 'Terminal']);
-
-function categorizeTurn(toolNames: string[], isError: boolean): TurnCategory {
-  if (isError) return 'error';
-  if (toolNames.length === 0) return 'discussion';
-  const baseNames = toolNames.map((name) => (name.includes('__') ? name.split('__').pop() || name : name));
-  if (baseNames.some((name) => CODE_WRITE_TOOLS.has(name))) return 'code-write';
-  if (baseNames.some((name) => COMMAND_TOOLS.has(name))) return 'command';
-  if (baseNames.some((name) => RESEARCH_TOOLS.has(name))) return 'research';
-  return 'success';
-}
-
 function buildTurnByMessageId(turns: TurnRecord[]): Record<string, TurnRecord> {
   const byId: Record<string, TurnRecord> = {};
   for (const turn of turns) {
     byId[turn.messageId] = turn;
   }
   return byId;
-}
-
-function buildTurnHistoryFromMessages(messages: ChatMessage[]): TurnRecord[] {
-  const turns: TurnRecord[] = [];
-
-  for (const message of messages) {
-    if (message.role !== 'assistant') continue;
-    const content = message.content;
-    const toolNames = content
-      .filter((block) => block.type === 'tool_use')
-      .map((block) => block.name || '')
-      .filter((name): name is string => !!name);
-    const isError = content.some((block) => block.type === 'tool_result' && block.is_error === true);
-
-    turns.push({
-      turnIndex: turns.length,
-      toolNames,
-      toolCount: toolNames.length,
-      durationMs: 0,
-      costUsd: 0,
-      totalCostUsd: 0,
-      isError,
-      category: categorizeTurn(toolNames, isError),
-      timestamp: message.timestamp || Date.now(),
-      messageId: message.id,
-    });
-  }
-
-  if (turns.length <= 200) return turns;
-  return turns.slice(-200).map((turn, index) => ({ ...turn, turnIndex: index }));
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -884,7 +839,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!enabled || state.turnHistory.length > 0) {
         return { vitalsEnabled: enabled };
       }
-      const rebuilt = buildTurnHistoryFromMessages(state.messages);
+      const rebuilt = deriveTurnHistoryFromMessages(state.messages);
       return {
         vitalsEnabled: enabled,
         turnHistory: rebuilt,
@@ -895,7 +850,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   rebuildTurnHistoryFromMessages: (messages) =>
     set((state) => {
-      const rebuilt = buildTurnHistoryFromMessages(messages ?? state.messages);
+      const rebuilt = deriveTurnHistoryFromMessages(messages ?? state.messages);
       return {
         turnHistory: rebuilt,
         turnByMessageId: buildTurnByMessageId(rebuilt),
