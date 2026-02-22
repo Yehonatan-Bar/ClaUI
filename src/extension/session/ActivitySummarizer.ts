@@ -157,7 +157,10 @@ export class ActivitySummarizer {
       'Line 2: One sentence describing specifically what Claude is doing and which files/components are involved\n\n' +
       'Reply with ONLY the two lines.';
 
-    const args = ['-p', '--model', 'claude-haiku-4-5-20251001'];
+    const analysisModel = vscode.workspace
+      .getConfiguration('claudeMirror')
+      .get<string>('analysisModel', 'claude-haiku-4-5-20251001');
+    const args = ['-p', '--model', analysisModel];
 
     // Clean environment to prevent nested-session detection
     const env = { ...process.env };

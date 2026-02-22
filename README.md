@@ -60,9 +60,17 @@ That's it!
 | **`Ctrl+Enter`** | Send your message |
 | **`Enter`** | New line in the input (does NOT send) |
 | **`Escape`** | Cancel the current response |
+| **`Ctrl+Shift+M`** | Toggle Chat/Terminal view |
 | **`Ctrl+Shift+H`** | Open conversation history |
 | **`Ctrl+Alt+Shift+C`** | Send the current file's path to the chat |
 | **`Ctrl+V`** | Paste an image from clipboard into the chat |
+| **`Ctrl+Alt+Q`** | Stop the current session |
+| **`Ctrl+Alt+K`** | Compact context (free up token space) |
+| **`Ctrl+Alt+R`** | Resume a previous session |
+| **`Ctrl+Alt+Enter`** | Send message (via input box) |
+| **`Ctrl+Alt+P`** | Open plan documents |
+| **`Ctrl+Alt+L`** | Open log directory |
+| **`Ctrl+Alt+A`** | Toggle achievements |
 
 > **Mac users**: Replace `Ctrl` with `Cmd` for all shortcuts above.
 >

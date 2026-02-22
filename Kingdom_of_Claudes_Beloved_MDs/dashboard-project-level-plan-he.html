@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaUi - תוכנית: דשבורד ברמת הפרוייקט</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', 'Arial', sans-serif; background: #0d1117; color: #e6edf3; direction: rtl; line-height: 1.7; padding: 40px 20px; }
+  .container { max-width: 860px; margin: 0 auto; }
+  .header { text-align: center; margin-bottom: 40px; padding-bottom: 24px; border-bottom: 1px solid #30363d; }
+  .header h1 { font-size: 1.8rem; color: #58a6ff; margin-bottom: 8px; }
+  .header p { color: #8b949e; font-size: 1rem; }
+  .badge { display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; margin: 4px; }
+  .badge-blue { background: rgba(88, 166, 255, 0.15); color: #58a6ff; border: 1px solid rgba(88, 166, 255, 0.3); }
+  .badge-purple { background: rgba(188, 140, 255, 0.15); color: #bc8cff; border: 1px solid rgba(188, 140, 255, 0.3); }
+  .section { margin-bottom: 28px; background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px; }
+  .section h2 { color: #58a6ff; font-size: 1.2rem; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid #30363d; }
+  .section h3 { color: #bc8cff; font-size: 1rem; margin: 14px 0 8px; }
+  ul { padding-right: 20px; }
+  li { margin: 6px 0; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; margin: 2px; }
+  .tag-blue { background: #58a6ff33; color: #58a6ff; }
+  .tag-green { background: #3fb95033; color: #3fb950; }
+  .tag-purple { background: #bc8cff33; color: #bc8cff; }
+  .tag-amber { background: #e3b34133; color: #e3b341; }
+  .tag-teal { background: #39d35333; color: #39d353; }
+  .tag-orange { background: #f0883e33; color: #f0883e; }
+  .note { border-right: 4px solid #e3b341; background: rgba(227, 179, 65, 0.06); }
+  .highlight { border-right: 4px solid #58a6ff; }
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px; }
+  .summary-card { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 18px; text-align: center; }
+  .summary-card .number { font-size: 1.6rem; font-weight: 700; display: block; margin-bottom: 4px; }
+  .summary-card .label { color: #8b949e; font-size: 0.85rem; }
+  .flow-box { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin: 12px 0; font-family: 'Courier New', monospace; font-size: 13px; direction: ltr; text-align: left; color: #8b949e; line-height: 1.5; }
+  .flow-box .highlight-text { color: #58a6ff; }
+  .flow-box .green-text { color: #3fb950; }
+  .flow-box .purple-text { color: #bc8cff; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>דשבורד ברמת הפרוייקט - תוכנית מימוש</h1>
+    <p>מעקב מצטבר אחר שימוש בקלוד לאורך כל הסשנים בפרוייקט</p>
+    <div style="margin-top: 14px;">
+      <span class="badge badge-blue">תוכנית לאישור</span>
+      <span class="badge badge-purple">5 קבצים חדשים | 8 קבצים לעדכון</span>
+    </div>
+  </div>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <span class="number" style="color: #58a6ff;">5</span>
+      <span class="label">קבצים חדשים</span>
+    </div>
+    <div class="summary-card">
+      <span class="number" style="color: #bc8cff;">8</span>
+      <span class="label">קבצים לעדכון</span>
+    </div>
+    <div class="summary-card">
+      <span class="number" style="color: #3fb950;">4</span>
+      <span class="label">טאבים חדשים בדשבורד</span>
+    </div>
+  </div>
+
+  <!-- What is it -->
+  <div class="section highlight">
+    <h2>מה זה?</h2>
+    <p>כיום הדשבורד מציג נתונים <strong>רק של הסשן הנוכחי</strong> - כשהסשן נגמר, כל הנתונים נעלמים. הדשבורד החדש יאגור נתונים <strong>לאורך כל הסשנים בפרוייקט</strong> ויציג תמונת מצב כוללת:</p>
+    <ul>
+      <li>כמה עלו כל הסשנים בסך הכל?</li>
+      <li>מה קצב העלויות לאורך זמן?</li>
+      <li>אילו כלים הכי נמצאים בשימוש בפרוייקט הזה?</li>
+      <li>מה התפלגות סוגי המשימות?</li>
+      <li>כמה טוקנים נצרכו בסך הכל?</li>
+    </ul>
+    <p style="margin-top: 10px;">הדשבורד הנוכחי (ברמת הסשן) <strong>נשאר כמו שהוא</strong> - אפשר לעבור בין שני המצבים בלחיצה.</p>
+  </div>
+
+  <!-- How it works -->
+  <div class="section">
+    <h2>איך זה עובד?</h2>
+
+    <h3>1. שכבת שמירה חדשה</h3>
+    <p>בכל פעם שסשן מסתיים (בהצלחה או בקריסה), המערכת <strong>שומרת סיכום</strong> של הסשן - עלויות, מספר תורות, כלים שהשתמשו בהם, טוקנים, סוגי משימות, ועוד.</p>
+    <p style="margin-top: 6px;">הסיכום נשמר במאגר הנתונים של VS Code (workspaceState) שמשויך לפרוייקט הנוכחי. הנתונים שורדים הפעלות מחדש.</p>
+
+    <h3>2. מתג סשן/פרוייקט בדשבורד</h3>
+    <p>בדשבורד הקיים יתווסף מתג בראש העמוד: <span class="tag tag-blue">Session</span> <span class="tag tag-purple">Project</span></p>
+    <p style="margin-top: 6px;">לחיצה על "Project" מציגה טאבים עם נתונים מצטברים מכל הסשנים. לחיצה על "Session" מחזירה לדשבורד הנוכחי (ללא שינוי).</p>
+
+    <h3>3. תזרים הנתונים</h3>
+    <div class="flow-box">
+      <span class="highlight-text">CLI result event</span> --> MessageHandler builds TurnRecord<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;--> <span class="green-text">accumulates in extension memory</span><br>
+      <br>
+      <span class="highlight-text">Session ends</span> --> builds SessionSummary from accumulated data<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;--> <span class="green-text">saves to workspaceState (persistent)</span><br>
+      <br>
+      <span class="highlight-text">User opens Project tab</span> --> requests data from extension<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;--> <span class="purple-text">renders charts from saved summaries</span>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="section">
+    <h2>טאבים בדשבורד הפרוייקט</h2>
+
+    <h3><span class="tag tag-blue">Overview</span> סקירה כללית</h3>
+    <ul>
+      <li>כרטיסי מטריקות: סך סשנים, עלות כוללת, סך תורות, עלות ממוצעת לסשן, שיעור שגיאות, סך שימושי כלים, מודל נפוץ, זמן ממוצע</li>
+      <li>גרף מגמת עלויות: עלות לכל סשן לאורך זמן</li>
+      <li>תדירות כלים מצטברת: 15 הכלים הנפוצים ביותר בכל הסשנים</li>
+      <li>התפלגות קטגוריות: תרשים דונאט של כל הקטגוריות מכל הסשנים</li>
+      <li>שימוש במודלים: אילו מודלים שימשו וכמה פעמים</li>
+    </ul>
+
+    <h3><span class="tag tag-purple">Sessions</span> רשימת סשנים</h3>
+    <ul>
+      <li>טבלה ממוינת: שם, תאריך, מודל, תורות, עלות, שגיאות, זמן, כלי מוביל</li>
+      <li>לחיצה על שורה מרחיבה פרטים: תדירות כלים, התפלגות קטגוריות, פירוט טוקנים</li>
+      <li>חיפוש טקסט חופשי לפי שם סשן</li>
+    </ul>
+
+    <h3><span class="tag tag-teal">Tokens</span> טוקנים מצטברים</h3>
+    <ul>
+      <li>כרטיסי סיכום: קלט, פלט, מטמון יצירה, מטמון קריאה, שיעור מטמון</li>
+      <li>גרף עמודות: פירוט טוקנים לכל סשן</li>
+    </ul>
+
+    <h3><span class="tag tag-orange">Tools</span> כלים מצטברים</h3>
+    <ul>
+      <li>תדירות כלים מצטברת מכל הסשנים</li>
+      <li>התפלגות קטגוריות מצטברת</li>
+      <li>התפלגות סוגי משימות (מניתוח סמנטי)</li>
+    </ul>
+  </div>
+
+  <!-- What is saved -->
+  <div class="section">
+    <h2>מה נשמר לכל סשן?</h2>
+    <p>סיכום קומפקטי (~500 בתים) כולל:</p>
+    <ul>
+      <li>מזהה, שם, מודל, זמני התחלה וסיום</li>
+      <li>עלות כוללת, מספר תורות, שגיאות, שימושי כלים</li>
+      <li>סה"כ טוקנים (קלט, פלט, מטמון)</li>
+      <li>מפת תדירות כלים (שם כלי -> מספר פעמים)</li>
+      <li>התפלגות קטגוריות ומשימות</li>
+    </ul>
+    <p style="margin-top: 8px; color: #8b949e;">עד 200 סשנים נשמרים. בנפח של ~100KB - קל מאוד על המערכת.</p>
+  </div>
+
+  <!-- Impact -->
+  <div class="section note">
+    <h2>מה לא משתנה</h2>
+    <p>הדשבורד הקיים (ברמת הסשן) <strong>לא נפגע כלל</strong>. כל 6 הטאבים הנוכחיים (Overview, Tokens, Tools, Timeline, Commands, Context) ממשיכים לעבוד בדיוק כמו קודם.</p>
+    <p style="margin-top: 8px;">ההבדל היחיד: מתג חדש בראש הדשבורד שמאפשר לעבור למצב "Project".</p>
+  </div>
+
+  <!-- Steps -->
+  <div class="section">
+    <h2>שלבי ביצוע</h2>
+    <ol style="padding-right: 20px;">
+      <li style="margin: 8px 0;"><strong>הוספת טיפוסים</strong> - הגדרת מבנה הנתונים של סיכום סשן ופרוטוקול ההודעות</li>
+      <li style="margin: 8px 0;"><strong>שכבת שמירה</strong> - יצירת מאגר נתונים שמנהל סיכומי סשנים ב-workspaceState</li>
+      <li style="margin: 8px 0;"><strong>צבירת נתונים</strong> - אגירת נתוני תורות בצד השרת ושמירת סיכום בסיום סשן</li>
+      <li style="margin: 8px 0;"><strong>חיווט</strong> - העברת נתוני הפרוייקט מהשרת לממשק המשתמש</li>
+      <li style="margin: 8px 0;"><strong>ממשק</strong> - מתג Session/Project + 4 טאבים חדשים עם גרפים</li>
+      <li style="margin: 8px 0;"><strong>בנייה ובדיקה</strong> - בנייה, פריסה, אימות, תיעוד</li>
+    </ol>
+  </div>
+
+</div>
+</body>
+</html>

@@ -5,12 +5,15 @@ import type { StreamDemux } from '../process/StreamDemux';
 import type { SessionNamer } from '../session/SessionNamer';
 import type { ActivitySummarizer, ActivitySummary } from '../session/ActivitySummarizer';
 import type { AdventureInterpreter } from '../session/AdventureInterpreter';
+import type { TurnAnalyzer } from '../session/TurnAnalyzer';
 import type { MessageTranslator } from '../session/MessageTranslator';
 import type { PromptHistoryStore } from '../session/PromptHistoryStore';
+import type { ProjectAnalyticsStore } from '../session/ProjectAnalyticsStore';
 import type { AchievementService } from '../achievements/AchievementService';
 import type {
   AdventureBeatMessage,
   ExtensionToWebviewMessage,
+  TurnSemantics,
   TypingTheme,
   TurnCategory,
   TurnRecord,
@@ -76,6 +79,21 @@ function categorizeTurn(toolNames: string[], isError: boolean): TurnCategory {
   return 'success';
 }
 
+/**
+ * Extract plain text from a CLI content field.
+ * The CLI's `content` may be a plain string OR a ContentBlock[] array (CLI data format gotcha).
+ */
+function extractTextFromContent(content: string | ContentBlock[] | unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((b: any) => b.type === 'text' && typeof b.text === 'string')
+      .map((b: any) => b.text)
+      .join('\n');
+  }
+  return String(content ?? '');
+}
+
 export class MessageHandler {
   private log: (msg: string) => void = () => {};
   private firstMessageSent = false;
@@ -115,6 +133,15 @@ export class MessageHandler {
   private messageTranslator: MessageTranslator | null = null;
   /** Adventure interpreter for dungeon crawler beat generation */
   private adventureInterpreter: AdventureInterpreter | null = null;
+  /** Turn analyzer for semantic analysis (dashboard insights) */
+  private turnAnalyzer: TurnAnalyzer | null = null;
+
+  /** Bash command strings seen in the current assistant message */
+  private currentBashCommands: string[] = [];
+  /** Last user message text (for TurnAnalyzer context) */
+  private lastUserMessageText = '';
+  /** Ring buffer of last 5 user message texts (for bug-repeat detection) */
+  private recentUserMessages: string[] = [];
 
   /** Turn counter for Session Vitals (reset on session clear) */
   private turnIndex = 0;
@@ -122,6 +149,11 @@ export class MessageHandler {
   private adventureBeatIndex = 0;
   /** Last assistant message ID for TurnRecord association */
   private lastMessageId = '';
+
+  /** Extension-side TurnRecord accumulator for project analytics persistence */
+  private turnRecords: TurnRecord[] = [];
+  /** Project analytics store (injected, may be null if not wired) */
+  private projectAnalyticsStore: ProjectAnalyticsStore | null = null;
 
   constructor(
     private readonly tabId: string,
@@ -175,6 +207,24 @@ export class MessageHandler {
   /** Attach an AdventureInterpreter for dungeon crawler beat generation */
   setAdventureInterpreter(interpreter: AdventureInterpreter): void {
     this.adventureInterpreter = interpreter;
+  }
+
+  /** Attach a TurnAnalyzer for semantic analysis (dashboard insights) */
+  setTurnAnalyzer(analyzer: TurnAnalyzer): void {
+    this.turnAnalyzer = analyzer;
+    analyzer.onAnalysisComplete((messageId: string, semantics: TurnSemantics) => {
+      this.webview.postMessage({ type: 'turnSemantics', messageId, semantics });
+    });
+  }
+
+  /** Attach a ProjectAnalyticsStore for persisting session summaries */
+  setProjectAnalyticsStore(store: ProjectAnalyticsStore): void {
+    this.projectAnalyticsStore = store;
+  }
+
+  /** Get accumulated TurnRecords for building a session summary */
+  getTurnRecords(): TurnRecord[] {
+    return this.turnRecords;
   }
 
   /** Wire up all event listeners */
@@ -323,6 +373,7 @@ export class MessageHandler {
           this.firstMessageSent = false;
           this.activitySummarizer?.reset();
           this.adventureInterpreter?.reset();
+          this.turnRecords = [];
           this.log('clearSession - stopping current process and starting fresh');
           this.achievementService.onSessionEnd(this.tabId);
           this.processManager.stop();
@@ -384,6 +435,21 @@ export class MessageHandler {
           break;
         }
 
+        case 'openSettings':
+          this.log(`Opening VS Code Settings with query: ${(msg as any).query}`);
+          vscode.commands.executeCommand('workbench.action.openSettings', (msg as any).query || 'claudeMirror');
+          break;
+
+        case 'setTurnAnalysisEnabled':
+          this.log(`Setting turn analysis to: ${msg.enabled}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('turnAnalysis.enabled', msg.enabled, true);
+          break;
+
+        case 'setAnalysisModel':
+          this.log(`Setting analysis model to: ${msg.model}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('analysisModel', msg.model, true);
+          break;
+
         case 'showHistory':
           this.log('Webview requested history view');
           vscode.commands.executeCommand('claudeMirror.showHistory');
@@ -394,12 +460,23 @@ export class MessageHandler {
           vscode.commands.executeCommand('claudeMirror.openPlanDocs');
           break;
 
+        case 'openFeedback':
+          this.log('Webview requested feedback dialog');
+          vscode.commands.executeCommand('claudeMirror.sendFeedback');
+          break;
+
         case 'planApprovalResponse':
-          this.log(`Plan approval response: action=${msg.action}`);
+          this.log(`Plan approval response: action=${msg.action} toolName=${msg.toolName || '(none)'} pendingTool=${this.pendingApprovalTool || '(none)'}`);
+          {
+          // Use msg.toolName from webview as primary source - it's reliable because
+          // the webview stores it when the approval bar is shown. Fall back to
+          // this.pendingApprovalTool which may have been cleared by a `result` event
+          // that races between showing the approval bar and the user clicking Approve.
+          const effectiveToolName = msg.toolName || this.pendingApprovalTool || '';
           // If user approves an ExitPlanMode, auto-approve subsequent ExitPlanMode
           // calls in the same turn so the user isn't interrupted repeatedly.
-          if (msg.action === 'approve' && this.pendingApprovalTool) {
-            const norm = this.pendingApprovalTool.trim().toLowerCase();
+          if (msg.action === 'approve' && effectiveToolName) {
+            const norm = effectiveToolName.trim().toLowerCase();
             if (norm === 'exitplanmode' || norm.endsWith('.exitplanmode')) {
               this.autoApproveExitPlanMode = true;
               // Plan mode cycle complete - clear the flag
@@ -407,11 +484,12 @@ export class MessageHandler {
             }
           }
           // Rejecting or giving feedback on ExitPlanMode also ends the plan cycle
-          if ((msg.action === 'reject' || msg.action === 'feedback') && this.pendingApprovalTool) {
-            const norm = this.pendingApprovalTool.trim().toLowerCase();
+          if ((msg.action === 'reject' || msg.action === 'feedback') && effectiveToolName) {
+            const norm = effectiveToolName.trim().toLowerCase();
             if (norm === 'exitplanmode' || norm.endsWith('.exitplanmode')) {
               this.planModeActive = false;
             }
+          }
           }
           if (msg.action === 'approve') {
             this.control.sendText('Yes, proceed with the plan.');
@@ -449,6 +527,7 @@ export class MessageHandler {
           this.autoApproveExitPlanMode = false;
           this.firstMessageSent = false;
           this.activitySummarizer?.reset();
+          this.turnRecords = [];
           this.achievementService.onSessionEnd(this.tabId);
           this.webview.postMessage({ type: 'processBusy', busy: true });
           {
@@ -534,6 +613,14 @@ export class MessageHandler {
           this.webview.postMessage(this.achievementService.buildSnapshotMessage(this.tabId));
           break;
 
+        case 'getProjectAnalytics':
+          if (this.projectAnalyticsStore) {
+            const sessions = this.projectAnalyticsStore.getSummaries();
+            this.log(`Sending project analytics: ${sessions.length} sessions`);
+            this.webview.postMessage({ type: 'projectAnalyticsData', sessions });
+          }
+          break;
+
         case 'setTranslationLanguage': {
           const lang = msg.language;
           this.log(`Setting translation language: ${lang}`);
@@ -597,6 +684,8 @@ export class MessageHandler {
           this.sendAdventureWidgetSetting();
           // Send translation language setting
           this.sendTranslationLanguageSetting();
+          // Send turn analysis settings
+          this.sendTurnAnalysisSettings();
           // Send achievement settings/snapshot
           this.webview.postMessage(this.achievementService.buildSettingsMessage());
           this.webview.postMessage(this.achievementService.buildSnapshotMessage(this.tabId));
@@ -808,6 +897,19 @@ export class MessageHandler {
     });
   }
 
+  /** Read turn analysis settings from VS Code config and send to webview */
+  private sendTurnAnalysisSettings(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const enabled = config.get<boolean>('turnAnalysis.enabled', true);
+    const analysisModel = config.get<string>('analysisModel', 'claude-haiku-4-5-20251001');
+    this.log(`Sending turn analysis settings: enabled=${enabled}, model=${analysisModel}`);
+    this.webview.postMessage({
+      type: 'turnAnalysisSettings',
+      enabled,
+      analysisModel,
+    });
+  }
+
   /** Read translation language setting from VS Code config and send to webview */
   private sendTranslationLanguageSetting(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -906,6 +1008,10 @@ export class MessageHandler {
       if (e.affectsConfiguration('claudeMirror.translationLanguage')) {
         this.sendTranslationLanguageSetting();
       }
+      if (e.affectsConfiguration('claudeMirror.turnAnalysis.enabled') ||
+          e.affectsConfiguration('claudeMirror.analysisModel')) {
+        this.sendTurnAnalysisSettings();
+      }
       if (
         e.affectsConfiguration('claudeMirror.achievements.enabled') ||
         e.affectsConfiguration('claudeMirror.achievements.sound')
@@ -926,6 +1032,17 @@ export class MessageHandler {
           type: 'sessionStarted',
           sessionId: event.session_id,
           model: event.model,
+        });
+        // Send session metadata for Context Inspector tab
+        const mcpNames = Array.isArray(event.mcp_servers)
+          ? event.mcp_servers.map((s: any) => String(s.name || s.id || JSON.stringify(s))).filter(Boolean)
+          : [];
+        this.webview.postMessage({
+          type: 'sessionMetadata',
+          tools: event.tools ?? [],
+          model: event.model ?? '',
+          cwd: event.cwd ?? '',
+          mcpServers: mcpNames,
         });
       }
     );
@@ -998,6 +1115,17 @@ export class MessageHandler {
           }
           this.achievementService.onToolUse(this.tabId, toolName, rawInput);
           this.collectAdventureContext(toolName, rawInput);
+          // Extract Bash command strings for dashboard
+          if (toolName === 'Bash') {
+            try {
+              const parsed = JSON.parse(rawInput);
+              if (parsed.command && typeof parsed.command === 'string') {
+                this.currentBashCommands.push(parsed.command.trim());
+              }
+            } catch {
+              // ignore malformed JSON - rawInput may be partial
+            }
+          }
         }
         this.toolBlockNames.delete(data.blockIndex);
         this.toolBlockContexts.delete(data.blockIndex);
@@ -1070,6 +1198,7 @@ export class MessageHandler {
         this.currentAdventureCommandTags.clear();
         this.sawToolBlockStopThisMessage = false;
         this.fallbackToolUseRecordedForMessage = false;
+        this.currentBashCommands = [];
         this.webview.postMessage({
           type: 'messageStart',
           messageId: data.messageId,
@@ -1089,6 +1218,10 @@ export class MessageHandler {
     this.demux.on(
       'userMessage',
       (event: UserMessage) => {
+        // Capture user message text for TurnAnalyzer context
+        const userText = extractTextFromContent(event.message.content).slice(0, 600);
+        this.lastUserMessageText = userText;
+        this.recentUserMessages = [...this.recentUserMessages.slice(-4), userText];
         this.webview.postMessage({
           type: 'userMessage',
           content: event.message.content,
@@ -1099,11 +1232,24 @@ export class MessageHandler {
     this.demux.on(
       'result',
       (event: ResultSuccess | ResultError) => {
-        // Snapshot tool names BEFORE clearing (clearApprovalTracking resets the array)
+        // Snapshot BEFORE clearing (clearApprovalTracking resets the array)
         const toolNamesSnapshot = [...this.currentMessageToolNames];
         const adventureSnapshot = this.snapshotAdventureMetadata();
+        const bashCommandsSnapshot = [...this.currentBashCommands];
+        const messageIdSnapshot = this.lastMessageId;
 
+        // Preserve pendingApprovalTool across the result event if an approval
+        // bar is currently visible in the webview. The `result` event fires
+        // when the CLI turn completes (after ExitPlanMode pauses for input),
+        // but the user hasn't responded yet. Without this, the approval
+        // response handler can't identify which tool was pending and fails
+        // to reset planModeActive / autoApproveExitPlanMode.
+        const savedApprovalTool = this.pendingApprovalTool;
         this.clearApprovalTracking();
+        if (savedApprovalTool) {
+          this.pendingApprovalTool = savedApprovalTool;
+          this.log(`Preserved pendingApprovalTool=${savedApprovalTool} across result event`);
+        }
         this.autoApproveExitPlanMode = false;
         if (event.subtype === 'success') {
           this.achievementService.onResult(this.tabId, true);
@@ -1126,13 +1272,30 @@ export class MessageHandler {
             isError: false,
             category: categorizeTurn(toolNamesSnapshot, false),
             timestamp: Date.now(),
-            messageId: this.lastMessageId,
+            messageId: messageIdSnapshot,
             adventureArtifacts: adventureSnapshot.artifacts,
             adventureIndicators: adventureSnapshot.indicators,
             adventureCommandTags: adventureSnapshot.commandTags,
+            inputTokens: (success as any).usage?.input_tokens ?? 0,
+            outputTokens: (success as any).usage?.output_tokens ?? 0,
+            cacheCreationTokens: (success as any).usage?.cache_creation_input_tokens ?? 0,
+            cacheReadTokens: (success as any).usage?.cache_read_input_tokens ?? 0,
+            bashCommands: bashCommandsSnapshot,
           };
           this.log(`Emitting turnComplete: turn=${successTurn.turnIndex} category=${successTurn.category} tools=[${successTurn.toolNames.join(',')}]`);
           this.webview.postMessage({ type: 'turnComplete', turn: successTurn });
+          this.turnRecords.push(successTurn as TurnRecord);
+          // TurnAnalyzer: fire-and-forget semantic analysis
+          if (this.turnAnalyzer) {
+            void this.turnAnalyzer.analyze({
+              messageId: messageIdSnapshot,
+              userMessage: this.lastUserMessageText,
+              toolNames: toolNamesSnapshot,
+              bashCommands: bashCommandsSnapshot,
+              isError: false,
+              recentUserMessages: this.recentUserMessages.slice(-3),
+            });
+          }
           // Adventure Widget: generate and send beat
           if (this.adventureInterpreter) {
             const beat = this.adventureInterpreter.interpret(successTurn as TurnRecord);
@@ -1156,13 +1319,26 @@ export class MessageHandler {
             isError: true,
             category: 'error' as const,
             timestamp: Date.now(),
-            messageId: this.lastMessageId,
+            messageId: messageIdSnapshot,
             adventureArtifacts: adventureSnapshot.artifacts,
             adventureIndicators: adventureSnapshot.indicators,
             adventureCommandTags: adventureSnapshot.commandTags,
+            bashCommands: bashCommandsSnapshot,
           };
           this.log(`Emitting turnComplete (error): turn=${errorTurn.turnIndex}`);
           this.webview.postMessage({ type: 'turnComplete', turn: errorTurn });
+          this.turnRecords.push(errorTurn as TurnRecord);
+          // TurnAnalyzer: fire-and-forget semantic analysis for error turns
+          if (this.turnAnalyzer) {
+            void this.turnAnalyzer.analyze({
+              messageId: messageIdSnapshot,
+              userMessage: this.lastUserMessageText,
+              toolNames: toolNamesSnapshot,
+              bashCommands: bashCommandsSnapshot,
+              isError: true,
+              recentUserMessages: this.recentUserMessages.slice(-3),
+            });
+          }
           // Adventure Widget: generate and send beat
           if (this.adventureInterpreter) {
             const beat = this.adventureInterpreter.interpret(errorTurn as TurnRecord);

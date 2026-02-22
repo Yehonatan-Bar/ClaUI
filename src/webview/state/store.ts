@@ -6,7 +6,9 @@ import type {
   AchievementGoalPayload,
   AchievementProfilePayload,
   SessionRecapPayload,
+  SessionSummary,
   TurnRecord,
+  TurnSemantics,
 } from '../../extension/types/webview-messages';
 import type { AdventureBeat } from '../components/Vitals/adventure/types';
 import { deriveTurnHistoryFromMessages } from '../utils/turnVitals';
@@ -140,6 +142,27 @@ export interface AppState {
   adventureEnabled: boolean;
   adventureBeats: AdventureBeat[];
 
+  // Dashboard
+  dashboardOpen: boolean;
+  /** Pending semantics by messageId (for late/early arrival merge) */
+  pendingTurnSemanticsByMessageId: Record<string, TurnSemantics>;
+
+  // Turn analysis settings (mirrored from VS Code config)
+  turnAnalysisEnabled: boolean;
+  analysisModel: string;
+
+  // Session metadata (from system/init event) for Context Inspector
+  sessionMetadata: {
+    tools: string[];
+    model: string;
+    cwd: string;
+    mcpServers: string[];
+  } | null;
+
+  // Project-level analytics (cross-session, from workspaceState)
+  projectSessions: SessionSummary[];
+  projectDashboardMode: 'session' | 'project';
+
   // Session activity timer (Claude active processing time only)
   sessionActivityStarted: boolean;
   sessionActivityElapsedMs: number;
@@ -216,6 +239,13 @@ export interface AppState {
   setAdventureEnabled: (enabled: boolean) => void;
   addAdventureBeat: (beat: AdventureBeat) => void;
   markSessionPromptSent: () => void;
+  toggleDashboard: () => void;
+  setDashboardOpen: (open: boolean) => void;
+  applyTurnSemantics: (messageId: string, semantics: TurnSemantics) => void;
+  setTurnAnalysisSettings: (settings: { enabled: boolean; analysisModel: string }) => void;
+  setSessionMetadata: (meta: { tools: string[]; model: string; cwd: string; mcpServers: string[] }) => void;
+  setProjectSessions: (sessions: SessionSummary[]) => void;
+  setProjectDashboardMode: (mode: 'session' | 'project') => void;
   reset: () => void;
 }
 
@@ -390,6 +420,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   sessionRecap: null,
   adventureEnabled: false,
   adventureBeats: [],
+  dashboardOpen: false,
+  pendingTurnSemanticsByMessageId: {},
+  turnAnalysisEnabled: true,
+  analysisModel: 'claude-haiku-4-5-20251001',
+  sessionMetadata: null,
+  projectSessions: [],
+  projectDashboardMode: 'session',
   sessionActivityStarted: false,
   sessionActivityElapsedMs: 0,
   sessionActivityRunningSinceMs: null,
@@ -860,12 +897,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addTurnRecord: (turn) =>
     set((state) => {
-      const existingIndex = state.turnHistory.findIndex((t) => t.messageId === turn.messageId);
+      // Merge pending semantics if they arrived before the turn
+      const pendingSem = state.pendingTurnSemanticsByMessageId[turn.messageId];
+      const mergedTurn = pendingSem && !turn.semantics ? { ...turn, semantics: pendingSem } : turn;
+      const existingIndex = state.turnHistory.findIndex((t) => t.messageId === mergedTurn.messageId);
       let updated = [...state.turnHistory];
       if (existingIndex >= 0) {
-        updated[existingIndex] = { ...turn, turnIndex: existingIndex };
+        updated[existingIndex] = { ...mergedTurn, turnIndex: existingIndex };
       } else {
-        updated.push({ ...turn, turnIndex: updated.length });
+        updated.push({ ...mergedTurn, turnIndex: updated.length });
       }
       if (updated.length > 200) {
         updated = updated.slice(-200);
@@ -936,6 +976,38 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
+  toggleDashboard: () => set((s) => ({ dashboardOpen: !s.dashboardOpen })),
+  setDashboardOpen: (open) => set({ dashboardOpen: open }),
+
+  applyTurnSemantics: (messageId, semantics) =>
+    set((s) => ({
+      turnHistory: s.turnHistory.map((t) =>
+        t.messageId === messageId ? { ...t, semantics } : t
+      ),
+      turnByMessageId: {
+        ...s.turnByMessageId,
+        ...(s.turnByMessageId[messageId]
+          ? { [messageId]: { ...s.turnByMessageId[messageId], semantics } }
+          : {}),
+      },
+      pendingTurnSemanticsByMessageId: {
+        ...s.pendingTurnSemanticsByMessageId,
+        [messageId]: semantics,
+      },
+    })),
+
+  setTurnAnalysisSettings: ({ enabled, analysisModel }) =>
+    set({ turnAnalysisEnabled: enabled, analysisModel }),
+
+  setSessionMetadata: (meta) =>
+    set({ sessionMetadata: meta }),
+
+  setProjectSessions: (sessions) =>
+    set({ projectSessions: sessions }),
+
+  setProjectDashboardMode: (mode) =>
+    set({ projectDashboardMode: mode }),
+
   reset: () =>
     set((state) => ({
       sessionId: null,
@@ -970,6 +1042,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       vitalsEnabled: state.vitalsEnabled,
       adventureEnabled: state.adventureEnabled,
       adventureBeats: [],
+      dashboardOpen: false,
+      pendingTurnSemanticsByMessageId: {},
       turnHistory: [],
       turnByMessageId: {},
       weather: { ...initialWeather },
@@ -980,6 +1054,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       achievementToasts: [],
       achievementPanelOpen: false,
       sessionRecap: null,
+      sessionMetadata: null,
+      projectSessions: [],
       sessionActivityStarted: false,
       sessionActivityElapsedMs: 0,
       sessionActivityRunningSinceMs: null,

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { SessionTab } from './SessionTab';
 import type { SessionStore } from './SessionStore';
+import type { ProjectAnalyticsStore } from './ProjectAnalyticsStore';
 import type { PromptHistoryStore } from './PromptHistoryStore';
 import type { ExtensionToWebviewMessage } from '../types/webview-messages';
 import type { AchievementService } from '../achievements/AchievementService';
@@ -31,6 +32,7 @@ export class TabManager {
     private readonly context: vscode.ExtensionContext,
     private readonly log: (msg: string) => void,
     private readonly sessionStore: SessionStore,
+    private readonly projectAnalyticsStore: ProjectAnalyticsStore,
     private readonly promptHistoryStore: PromptHistoryStore,
     private readonly achievementService: AchievementService,
     private readonly logDir: string | null
@@ -66,6 +68,7 @@ export class TabManager {
         onFocused: (tabId) => this.handleTabFocused(tabId),
       },
       this.sessionStore,
+      this.projectAnalyticsStore,
       this.promptHistoryStore,
       this.achievementService,
       this.logDir

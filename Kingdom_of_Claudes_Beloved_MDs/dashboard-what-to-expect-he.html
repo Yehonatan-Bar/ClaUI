@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClaUi Analytics Dashboard - מה לצפות לראות</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      line-height: 1.7;
+      padding: 0;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #161b22 0%, #0d1117 50%, #1a1e2e 100%);
+      border-bottom: 1px solid #30363d;
+      padding: 48px 40px 36px;
+      text-align: center;
+    }
+
+    .hero h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: #58a6ff;
+      margin-bottom: 8px;
+    }
+
+    .hero .subtitle {
+      font-size: 16px;
+      color: #8b949e;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 40px 60px;
+    }
+
+    /* How to open */
+    .how-to-open {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px 28px;
+      margin-bottom: 36px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .how-to-open .icon {
+      font-size: 36px;
+      flex-shrink: 0;
+    }
+
+    .how-to-open .text h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e6edf3;
+      margin-bottom: 4px;
+    }
+
+    .how-to-open .text p {
+      font-size: 14px;
+      color: #8b949e;
+    }
+
+    .how-to-open .kbd {
+      display: inline-block;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #e6edf3;
+    }
+
+    /* Section */
+    .section {
+      margin-bottom: 40px;
+    }
+
+    .section-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #e6edf3;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #30363d;
+    }
+
+    /* Tab card */
+    .tab-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .tab-card:hover {
+      border-color: #58a6ff40;
+    }
+
+    .tab-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 18px 24px;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .tab-number {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .tab-header h3 {
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .tab-header .tab-name-en {
+      font-size: 13px;
+      color: #8b949e;
+      font-weight: 400;
+      margin-right: 8px;
+    }
+
+    .tab-body {
+      padding: 20px 24px;
+    }
+
+    .tab-body p {
+      font-size: 14px;
+      color: #c9d1d9;
+      margin-bottom: 12px;
+    }
+
+    .feature-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .feature-list li {
+      position: relative;
+      padding: 6px 24px 6px 0;
+      font-size: 14px;
+      color: #c9d1d9;
+    }
+
+    .feature-list li::before {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 14px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* Tab-specific colors */
+    .tab-overview .tab-number { background: #58a6ff20; color: #58a6ff; }
+    .tab-overview .feature-list li::before { background: #58a6ff; }
+
+    .tab-tokens .tab-number { background: #3fb95020; color: #3fb950; }
+    .tab-tokens .feature-list li::before { background: #3fb950; }
+
+    .tab-tools .tab-number { background: #d2a8ff20; color: #d2a8ff; }
+    .tab-tools .feature-list li::before { background: #d2a8ff; }
+
+    .tab-timeline .tab-number { background: #f0883e20; color: #f0883e; }
+    .tab-timeline .feature-list li::before { background: #f0883e; }
+
+    .tab-commands .tab-number { background: #f7840020; color: #f78400; }
+    .tab-commands .feature-list li::before { background: #f78400; }
+
+    /* Visual mockup */
+    .mockup {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+
+    .mockup-label {
+      font-size: 11px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+
+    .metric-cards-mock {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .metric-card-mock {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .metric-card-mock .value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #58a6ff;
+    }
+
+    .metric-card-mock .label {
+      font-size: 10px;
+      color: #8b949e;
+      margin-top: 2px;
+    }
+
+    .chart-placeholder {
+      height: 80px;
+      border-radius: 6px;
+      margin-top: 10px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 4px;
+      padding: 8px;
+    }
+
+    .chart-bar {
+      width: 16px;
+      border-radius: 3px 3px 0 0;
+      min-height: 8px;
+    }
+
+    /* Semantic analysis section */
+    .semantic-section {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px 28px;
+      margin-bottom: 20px;
+    }
+
+    .semantic-section h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #d2a8ff;
+      margin-bottom: 12px;
+    }
+
+    .semantic-section p {
+      font-size: 14px;
+      color: #c9d1d9;
+      margin-bottom: 8px;
+    }
+
+    .mood-dots {
+      display: flex;
+      gap: 6px;
+      margin: 12px 0;
+      flex-wrap: wrap;
+    }
+
+    .mood-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+    }
+
+    .mood-legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .mood-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #8b949e;
+    }
+
+    .mood-legend-item .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    /* Settings */
+    .settings-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+
+    .settings-table th {
+      text-align: right;
+      padding: 8px 12px;
+      font-size: 13px;
+      color: #8b949e;
+      border-bottom: 1px solid #30363d;
+      font-weight: 500;
+    }
+
+    .settings-table td {
+      padding: 8px 12px;
+      font-size: 13px;
+      color: #c9d1d9;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .settings-table td code {
+      background: #21262d;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #f0883e;
+      direction: ltr;
+      unicode-bidi: embed;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-off {
+      background: #da363320;
+      color: #f85149;
+    }
+
+    .badge-on {
+      background: #3fb95020;
+      color: #3fb950;
+    }
+
+    /* Notes */
+    .note {
+      background: #161b22;
+      border-right: 3px solid #58a6ff;
+      padding: 14px 18px;
+      border-radius: 0 8px 8px 0;
+      margin-top: 20px;
+      font-size: 14px;
+      color: #c9d1d9;
+    }
+
+    .note strong {
+      color: #58a6ff;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 24px;
+      color: #8b949e;
+      font-size: 13px;
+      font-style: italic;
+    }
+
+    /* Responsive */
+    @media (max-width: 700px) {
+      .container { padding: 20px; }
+      .metric-cards-mock { grid-template-columns: repeat(2, 1fr); }
+      .hero { padding: 32px 20px 24px; }
+      .hero h1 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="hero">
+    <h1>ClaUi Analytics Dashboard</h1>
+    <div class="subtitle">מה לצפות לראות כשפותחים את הדשבורד</div>
+  </div>
+
+  <div class="container">
+
+    <!-- How to open -->
+    <div class="how-to-open">
+      <div class="icon">&#9881;</div>
+      <div class="text">
+        <h3>איך פותחים את הדשבורד?</h3>
+        <p>
+          לחצו על כפתור <strong>"Dashboard"</strong> בשורת הסטטוס בתחתית חלון הצ'אט.
+          הדשבורד נפתח כשכבת-על מלאה על גבי הצ'אט.
+          לסגירה: לחצו <strong>X</strong> בפינה או <span class="kbd">Esc</span>.
+        </p>
+      </div>
+    </div>
+
+    <!-- Overview of what you'll see -->
+    <div class="section">
+      <div class="section-title">חמשת הלשוניות של הדשבורד</div>
+
+      <!-- Tab 1: Overview -->
+      <div class="tab-card tab-overview">
+        <div class="tab-header">
+          <div class="tab-number">1</div>
+          <h3>סקירה כללית <span class="tab-name-en">(Overview)</span></h3>
+        </div>
+        <div class="tab-body">
+          <p>מבט-על על הסשן הנוכחי. זו הלשונית שנפתחת כברירת מחדל.</p>
+
+          <!-- Mockup: Metric Cards -->
+          <div class="mockup">
+            <div class="mockup-label">8 כרטיסי מדדים</div>
+            <div class="metric-cards-mock">
+              <div class="metric-card-mock">
+                <div class="value">$0.42</div>
+                <div class="label">עלות כוללת</div>
+              </div>
+              <div class="metric-card-mock">
+                <div class="value">12</div>
+                <div class="label">מספר תורות</div>
+              </div>
+              <div class="metric-card-mock">
+                <div class="value">$0.035</div>
+                <div class="label">עלות ממוצעת</div>
+              </div>
+              <div class="metric-card-mock">
+                <div class="value">8.3%</div>
+                <div class="label">אחוז שגיאות</div>
+              </div>
+            </div>
+            <div class="metric-cards-mock" style="margin-top: 8px;">
+              <div class="metric-card-mock">
+                <div class="value" style="color: #3fb950;">48K</div>
+                <div class="label">טוקנים נכנסים</div>
+              </div>
+              <div class="metric-card-mock">
+                <div class="value" style="color: #3fb950;">12K</div>
+                <div class="label">טוקנים יוצאים</div>
+              </div>
+              <div class="metric-card-mock">
+                <div class="value" style="color: #d2a8ff;">72%</div>
+                <div class="label">שיעור Cache</div>
+              </div>
+              <div class="metric-card-mock">
+                <div class="value" style="color: #f0883e;">4.2s</div>
+                <div class="label">זמן ממוצע</div>
+              </div>
+            </div>
+          </div>
+
+          <ul class="feature-list" style="margin-top: 14px;">
+            <li><strong>גרף עלויות</strong> - גרף שטח שמראה עלות מצטברת ועלות לכל תור לאורך הסשן</li>
+            <li><strong>ציר מצב רוח</strong> - נקודות צבעוניות לכל תור שמראות את מצב הרוח (אם הניתוח הסמנטי מופעל)</li>
+            <li><strong>התראת תסכול</strong> - מתריע כאשר 3+ תורות ברצף מסומנים כ"מתוסכל"</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Tab 2: Tokens -->
+      <div class="tab-card tab-tokens">
+        <div class="tab-header">
+          <div class="tab-number">2</div>
+          <h3>טוקנים <span class="tab-name-en">(Tokens)</span></h3>
+        </div>
+        <div class="tab-body">
+          <p>פירוט צריכת הטוקנים לכל תור בסשן.</p>
+
+          <div class="mockup">
+            <div class="mockup-label">גרף עמודות מוערם לכל תור</div>
+            <div class="chart-placeholder">
+              <div class="chart-bar" style="height: 60px; background: linear-gradient(to top, #58a6ff 40%, #3fb950 40% 65%, #d2a8ff 65% 80%, #f0883e 80%);"></div>
+              <div class="chart-bar" style="height: 45px; background: linear-gradient(to top, #58a6ff 35%, #3fb950 35% 55%, #d2a8ff 55% 75%, #f0883e 75%);"></div>
+              <div class="chart-bar" style="height: 70px; background: linear-gradient(to top, #58a6ff 45%, #3fb950 45% 60%, #d2a8ff 60% 82%, #f0883e 82%);"></div>
+              <div class="chart-bar" style="height: 30px; background: linear-gradient(to top, #58a6ff 50%, #3fb950 50% 70%, #d2a8ff 70%);"></div>
+              <div class="chart-bar" style="height: 55px; background: linear-gradient(to top, #58a6ff 38%, #3fb950 38% 58%, #d2a8ff 58% 78%, #f0883e 78%);"></div>
+              <div class="chart-bar" style="height: 40px; background: linear-gradient(to top, #58a6ff 42%, #3fb950 42% 62%, #d2a8ff 62%);"></div>
+              <div class="chart-bar" style="height: 65px; background: linear-gradient(to top, #58a6ff 40%, #3fb950 40% 60%, #d2a8ff 60% 85%, #f0883e 85%);"></div>
+            </div>
+          </div>
+
+          <ul class="feature-list" style="margin-top: 14px;">
+            <li><strong>4 כרטיסי סיכום</strong> - סה"כ טוקנים נכנסים, יוצאים, Cache Created, Cache Read</li>
+            <li><strong>גרף עמודות מוערם</strong> - לכל תור, חלוקה ל-4 סוגי טוקנים בצבעים שונים</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Tab 3: Tools -->
+      <div class="tab-card tab-tools">
+        <div class="tab-header">
+          <div class="tab-number">3</div>
+          <h3>כלים <span class="tab-name-en">(Tools)</span></h3>
+        </div>
+        <div class="tab-body">
+          <p>ניתוח השימוש בכלים השונים של Claude (קריאת קבצים, עריכה, Bash, חיפוש וכו').</p>
+
+          <ul class="feature-list">
+            <li><strong>גרף עמודות אופקי</strong> - תדירות השימוש ב-15 הכלים הנפוצים ביותר</li>
+            <li><strong>גרף עוגה</strong> - חלוקת התורות לפי קטגוריה (קידוד, דיבאג, תשתית, שיחה וכו')</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Tab 4: Timeline -->
+      <div class="tab-card tab-timeline">
+        <div class="tab-header">
+          <div class="tab-number">4</div>
+          <h3>ציר זמן <span class="tab-name-en">(Timeline)</span></h3>
+        </div>
+        <div class="tab-body">
+          <p>מעקב אחר משך הזמן של כל תור וניתוח סוגי משימות.</p>
+
+          <ul class="feature-list">
+            <li><strong>גרף משך זמן</strong> - עמודה לכל תור, צבועה לפי קטגוריה, מראה כמה זמן לקח כל אינטראקציה</li>
+            <li><strong>גרף עוגה - סוגי משימות</strong> - חלוקה לפי: תיקון באג, פיצ'ר קטן, פיצ'ר גדול, דיבאג, רפקטור ועוד (רק עם ניתוח סמנטי)</li>
+            <li><strong>גרף תוצאות</strong> - הצלחה, חלקי, נכשל, בתהליך (רק עם ניתוח סמנטי)</li>
+            <li><strong>טבלת תורות</strong> - טבלה מלאה עם מיון לפי 12 עמודות ודפדוף (15 שורות לעמוד)</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Tab 5: Commands -->
+      <div class="tab-card tab-commands">
+        <div class="tab-header">
+          <div class="tab-number">5</div>
+          <h3>פקודות <span class="tab-name-en">(Commands)</span></h3>
+        </div>
+        <div class="tab-body">
+          <p>כל פקודות ה-Shell (Bash) שהורצו במהלך הסשן, מסוננות ומחולקות לקטגוריות.</p>
+
+          <ul class="feature-list">
+            <li><strong>כפתורי סינון</strong> - לפי קטגוריה: git, npm, test, build, deploy, search, file, other</li>
+            <li><strong>חיפוש חופשי</strong> - שדה טקסט לחיפוש פקודה ספציפית</li>
+            <li><strong>רשימת פקודות</strong> - כל פקודה עם מספר תור, קטגוריה, טקסט הפקודה, וזמן ביצוע</li>
+            <li><strong>סרגל צד - באגים חוזרים</strong> - מראה באגים שמופיעים שוב ושוב (רק עם ניתוח סמנטי)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Semantic Analysis -->
+    <div class="section">
+      <div class="section-title">ניתוח סמנטי (אופציונלי)</div>
+
+      <div class="semantic-section">
+        <h3>מה זה?</h3>
+        <p>
+          מנוע ניתוח רקע שרץ אחרי כל תור ומנתח את האינטראקציה באמצעות מודל AI.
+          הוא מזהה: מצב רוח המשתמש, תוצאת המשימה, סוג המשימה, ובאגים חוזרים.
+        </p>
+        <p>
+          <strong>כבוי כברירת מחדל.</strong> יש להפעיל דרך הגדרות VS Code.
+        </p>
+
+        <div style="margin-top: 16px;">
+          <div class="mockup-label">דוגמה - ציר מצב רוח לאורך הסשן</div>
+          <div class="mood-dots">
+            <div class="mood-dot" style="background: #3fb950;" title="מרוצה"></div>
+            <div class="mood-dot" style="background: #3fb950;" title="מרוצה"></div>
+            <div class="mood-dot" style="background: #8b949e;" title="ניטרלי"></div>
+            <div class="mood-dot" style="background: #f0883e;" title="מבולבל"></div>
+            <div class="mood-dot" style="background: #f85149;" title="מתוסכל"></div>
+            <div class="mood-dot" style="background: #f85149;" title="מתוסכל"></div>
+            <div class="mood-dot" style="background: #3fb950;" title="מרוצה"></div>
+            <div class="mood-dot" style="background: #58a6ff;" title="נרגש"></div>
+            <div class="mood-dot" style="background: #8b949e;" title="ניטרלי"></div>
+            <div class="mood-dot" style="background: #3fb950;" title="מרוצה"></div>
+          </div>
+          <div class="mood-legend">
+            <div class="mood-legend-item"><div class="dot" style="background: #3fb950;"></div> מרוצה</div>
+            <div class="mood-legend-item"><div class="dot" style="background: #f85149;"></div> מתוסכל</div>
+            <div class="mood-legend-item"><div class="dot" style="background: #f0883e;"></div> מבולבל</div>
+            <div class="mood-legend-item"><div class="dot" style="background: #58a6ff;"></div> נרגש</div>
+            <div class="mood-legend-item"><div class="dot" style="background: #8b949e;"></div> ניטרלי</div>
+            <div class="mood-legend-item"><div class="dot" style="background: #da3633;"></div> דחוף</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="section">
+      <div class="section-title">הגדרות</div>
+
+      <p style="font-size: 14px; color: #c9d1d9; margin-bottom: 12px;">
+        ניתן לשנות דרך גלגל השיניים בכותרת הדשבורד, או דרך הגדרות VS Code (חיפוש "claudeMirror").
+      </p>
+
+      <table class="settings-table">
+        <thead>
+          <tr>
+            <th>הגדרה</th>
+            <th>ברירת מחדל</th>
+            <th>הסבר</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>analysisModel</code></td>
+            <td>Haiku</td>
+            <td>המודל שמשמש לניתוח רקע (עלות נמוכה)</td>
+          </tr>
+          <tr>
+            <td><code>turnAnalysis.enabled</code></td>
+            <td><span class="badge badge-off">כבוי</span></td>
+            <td>הפעלת הניתוח הסמנטי</td>
+          </tr>
+          <tr>
+            <td><code>turnAnalysis.maxPerSession</code></td>
+            <td>30</td>
+            <td>מגבלת ניתוחים לכל סשן (חיסכון בעלויות)</td>
+          </tr>
+          <tr>
+            <td><code>turnAnalysis.timeoutMs</code></td>
+            <td>30,000</td>
+            <td>זמן מקסימלי לניתוח בודד (30 שניות)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty state note -->
+    <div class="section">
+      <div class="section-title">מה קורה כשאין נתונים?</div>
+      <p style="font-size: 14px; color: #c9d1d9; margin-bottom: 16px;">
+        כל הגרפים והטבלאות מציגים מצב ריק ברור:
+      </p>
+      <div class="mockup" style="margin-bottom: 12px;">
+        <div class="empty-state">No turns yet - start a session to see analytics</div>
+      </div>
+      <div class="mockup" style="margin-bottom: 12px;">
+        <div class="empty-state">Semantic analysis pending - will appear after first turn completes</div>
+      </div>
+      <div class="mockup">
+        <div class="empty-state">No shell commands recorded yet</div>
+      </div>
+
+      <div class="note" style="margin-top: 20px;">
+        <strong>שימו לב:</strong>
+        הדשבורד מתעדכן בזמן אמת. ברגע שמתחילים אינטראקציה עם Claude, הנתונים זורמים אוטומטית לכל הגרפים והטבלאות.
+        אם הניתוח הסמנטי מופעל, נתוני המצב-רוח והמשימות מגיעים בעיכוב קל (כמה שניות אחרי כל תור).
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

@@ -171,6 +171,11 @@ StreamDemux events are translated to `ExtensionToWebviewMessage` types and sent 
 **Plan Approval Detection:**
 MessageHandler tracks tool names during streaming (`currentMessageToolNames`). When `messageDelta` fires with `stopReason === 'tool_use'` and one of the tools is `ExitPlanMode` or `AskUserQuestion`, it sends a `planApprovalRequired` message to the webview with the `toolName`. The user's response is sent back as a plain text message to the CLI via stdin. For plan approvals: approve/reject/feedback text. For questions: the selected option label(s) or a custom text answer.
 
+**Race condition handling (result vs. approval):**
+The `result` event fires when the CLI turn completes (after `ExitPlanMode` pauses for input), which can happen BEFORE the user clicks Approve. To prevent `clearApprovalTracking()` from clearing `pendingApprovalTool` prematurely:
+1. **toolName in response**: PlanApprovalBar and InputArea include `toolName` in all `planApprovalResponse` messages. The handler uses `msg.toolName || this.pendingApprovalTool` as fallback, so it can identify the tool even if `result` already cleared the tracking.
+2. **Preserved across result**: The `result` handler saves and restores `pendingApprovalTool` if it's set, preventing the race from clearing the tool name.
+
 **Stale Plan Mode Detection (post-compaction):**
 After context compaction, the Claude model may call `ExitPlanMode` as a stale artifact (the compacted context mentions plan mode, but no real plan exists). MessageHandler tracks a `planModeActive` flag:
 - Set to `true` when `EnterPlanMode` tool is seen in `toolUseStart`

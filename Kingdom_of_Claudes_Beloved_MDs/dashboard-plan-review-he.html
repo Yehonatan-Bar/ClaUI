@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>סקירת תוכנית דשבורד - ClaUi</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'Arial', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      direction: rtl;
+      line-height: 1.7;
+      padding: 40px 20px;
+    }
+
+    .container { max-width: 980px; margin: 0 auto; }
+
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid #30363d;
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      color: #58a6ff;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      color: #8b949e;
+      font-size: 1.1rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin: 4px;
+    }
+
+    .badge-green { background: rgba(63, 185, 80, 0.15); color: #3fb950; border: 1px solid rgba(63, 185, 80, 0.3); }
+    .badge-red { background: rgba(248, 81, 73, 0.15); color: #f85149; border: 1px solid rgba(248, 81, 73, 0.3); }
+    .badge-amber { background: rgba(227, 179, 65, 0.15); color: #e3b341; border: 1px solid rgba(227, 179, 65, 0.3); }
+    .badge-blue { background: rgba(88, 166, 255, 0.15); color: #58a6ff; border: 1px solid rgba(88, 166, 255, 0.3); }
+
+    .section {
+      margin-bottom: 40px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 28px;
+    }
+
+    .section h2 {
+      color: #58a6ff;
+      font-size: 1.3rem;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #30363d;
+    }
+
+    .section h3 {
+      color: #bc8cff;
+      font-size: 1.1rem;
+      margin: 20px 0 10px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .summary-card {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .summary-card .number {
+      font-size: 2rem;
+      font-weight: 700;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .summary-card .label {
+      color: #8b949e;
+      font-size: 0.9rem;
+    }
+
+    .issue-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .issue-list li {
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      border-right: 4px solid;
+    }
+
+    .issue-critical {
+      background: rgba(248, 81, 73, 0.08);
+      border-color: #f85149;
+    }
+
+    .issue-medium {
+      background: rgba(227, 179, 65, 0.08);
+      border-color: #e3b341;
+    }
+
+    .issue-minor {
+      background: rgba(88, 166, 255, 0.08);
+      border-color: #58a6ff;
+    }
+
+    .issue-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .issue-desc {
+      color: #8b949e;
+      font-size: 0.9rem;
+    }
+
+    .fix-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-right: 8px;
+    }
+
+    .fix-done { background: rgba(63, 185, 80, 0.2); color: #3fb950; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+
+    th, td {
+      padding: 10px 14px;
+      border: 1px solid #30363d;
+      text-align: right;
+    }
+
+    th {
+      background: #0d1117;
+      color: #58a6ff;
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+
+    .verdict {
+      text-align: center;
+      padding: 32px;
+      margin-top: 32px;
+      background: rgba(63, 185, 80, 0.08);
+      border: 1px solid rgba(63, 185, 80, 0.3);
+      border-radius: 12px;
+    }
+
+    .verdict h2 {
+      color: #3fb950;
+      border: none;
+      font-size: 1.5rem;
+    }
+
+    .verdict p {
+      color: #8b949e;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <h1>סקירת תוכנית דשבורד אנליטיקה</h1>
+      <p>ClaUi - תוסף VS Code לממשק צ'אט עם Claude</p>
+      <div style="margin-top: 16px;">
+        <span class="badge badge-green">התוכנית אושרה עם תיקונים</span>
+        <span class="badge badge-blue">13 תיקונים הוחלו</span>
+      </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span class="number" style="color: #f85149;">6</span>
+        <span class="label">בעיות קריטיות (תוקנו)</span>
+      </div>
+      <div class="summary-card">
+        <span class="number" style="color: #e3b341;">5</span>
+        <span class="label">שיפורי עיצוב (תוקנו)</span>
+      </div>
+      <div class="summary-card">
+        <span class="number" style="color: #3fb950;">22 &rarr; 13</span>
+        <span class="label">קבצים חדשים (צומצמו)</span>
+      </div>
+      <div class="summary-card">
+        <span class="number" style="color: #58a6ff;">~3 ימים</span>
+        <span class="label">הערכת זמן מעודכנת</span>
+      </div>
+    </div>
+
+    <!-- Overall Assessment -->
+    <div class="section">
+      <h2>הערכה כללית</h2>
+      <p>
+        התוכנית מעוצבת היטב ומבוססת על החלטות ארכיטקטוריות נכונות:
+        שימוש בשכבת-על (overlay) במקום פאנל נפרד, חלוקה לשלבים (MVP קודם, אנליזה סמנטית אחר כך),
+        ובקרות בטיחות לניתוח הסמנטי. עם זאת, נמצאו מספר בעיות שהיו גורמות לתקלות בזמן המימוש.
+      </p>
+      <p style="margin-top: 12px;">
+        כל הבעיות תוקנו ישירות בתוך מסמך התוכנית. התוכנית מוכנה למימוש.
+      </p>
+    </div>
+
+    <!-- Critical Issues -->
+    <div class="section">
+      <h2>בעיות קריטיות שתוקנו</h2>
+      <p style="color: #8b949e; margin-bottom: 16px;">בעיות שהיו גורמות לבאגים או קריסות בזמן המימוש</p>
+
+      <ul class="issue-list">
+        <li class="issue-critical">
+          <div class="issue-title">
+            <span class="fix-tag fix-done">תוקן</span>
+            שם משתנה שגוי בחילוץ פקודות Bash
+          </div>
+          <div class="issue-desc">
+            התוכנית השתמשה ב-<code>accumulatedJson</code> אבל הקוד האמיתי משתמש ב-<code>rawInput</code>
+            מתוך <code>toolBlockContexts.get()</code>. שימוש בשם הלא-נכון היה גורם לשגיאת undefined.
+          </div>
+        </li>
+
+        <li class="issue-critical">
+          <div class="issue-title">
+            <span class="fix-tag fix-done">תוקן</span>
+            מיקום איפוס שגוי עבור פקודות Bash
+          </div>
+          <div class="issue-desc">
+            התוכנית הציעה לאפס ב-<code>clearApprovalTracking()</code> שמיועדת רק לאישורים.
+            מצב לכל-הודעה (כמו פקודות) חייב להתאפס ב-<code>messageStart</code> - שם כל המצב הזמני מתאפס.
+          </div>
+        </li>
+
+        <li class="issue-critical">
+          <div class="issue-title">
+            <span class="fix-tag fix-done">תוקן</span>
+            שימוש באימוג'י מפר את כללי הפרויקט
+          </div>
+          <div class="issue-desc">
+            רכיב MoodTimeline השתמש באימוג'י. כללי הפרויקט אוסרים שימוש באימוג'י בגלל קונפליקטים
+            עם קידוד UTF-8 לעברית. הוחלף בתוויות טקסט ועיגולי CSS.
+          </div>
+        </li>
+
+        <li class="issue-critical">
+          <div class="issue-title">
+            <span class="fix-tag fix-done">תוקן</span>
+            חסר התייחסות ל-CSP עבור טעינה עצלה
+          </div>
+          <div class="issue-desc">
+            <code>React.lazy()</code> יוצר קבצי JavaScript נפרדים. מדיניות אבטחת התוכן (CSP) של ה-webview
+            חייבת לאפשר טעינה שלהם. נוספו הנחיות מפורטות עם אפשרויות חלופיות.
+          </div>
+        </li>
+
+        <li class="issue-critical">
+          <div class="issue-title">
+            <span class="fix-tag fix-done">תוקן</span>
+            פונקציית עזר חסרה - extractTextFromContent
+          </div>
+          <div class="issue-desc">
+            התוכנית הפנתה לפונקציה זו מבלי להגדיר אותה. הפונקציה חייבת לטפל גם
+            במחרוזת פשוטה וגם במערך <code>ContentBlock[]</code> (מלכודת ידועה של פרוטוקול ה-CLI).
+          </div>
+        </li>
+
+        <li class="issue-critical">
+          <div class="issue-title">
+            <span class="fix-tag fix-done">תוקן</span>
+            הפניה חיה ל-messageId במקום snapshot
+          </div>
+          <div class="issue-desc">
+            הפעלת TurnAnalyzer השתמשה ב-<code>this.lastMessageId</code> ישירות.
+            כמו <code>toolNamesSnapshot</code>, ה-messageId חייב להישמר לפני שיחזור אסינכרוני מאפס אותו.
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Design Improvements -->
+    <div class="section">
+      <h2>שיפורי עיצוב שהוחלו</h2>
+
+      <ul class="issue-list">
+        <li class="issue-medium">
+          <div class="issue-title">
+            <span class="fix-tag fix-done">תוקן</span>
+            הערכת גודל חבילת Recharts לא מדויקת
+          </div>
+          <div class="issue-desc">
+            התוכנית ציינה ~180KB אבל בפועל ~300KB+ כולל תלויות D3. עודכן.
+          </div>
+        </li>
+
+        <li class="issue-medium">
+          <div class="issue-title">
+            <span class="fix-tag fix-done">תוקן</span>
+            מבנה קבצים מנופח - 22 קבצים חדשים
+          </div>
+          <div class="issue-desc">
+            7 רכיבי תרשימים אוחדו לקובץ אחד (<code>RechartsWrappers.tsx</code>),
+            3 רכיבים סמנטיים אוחדו ל-<code>SemanticWidgets.tsx</code>,
+            ופונקציות משותפות הועברו ל-<code>dashboardUtils.ts</code>.
+            התוצאה: 13 קבצים חדשים במקום 22.
+          </div>
+        </li>
+
+        <li class="issue-medium">
+          <div class="issue-title">
+            <span class="fix-tag fix-done">תוקן</span>
+            SettingsSidebar עם מידע שמתיישן
+          </div>
+          <div class="issue-desc">
+            פאנל הגדרות שמציג עלויות לכל שיחה יתיישן כשמחירי המודלים משתנים.
+            הוחלף בקישור שפותח את הגדרות VS Code ישירות - תמיד מעודכן.
+          </div>
+        </li>
+
+        <li class="issue-medium">
+          <div class="issue-title">
+            <span class="fix-tag fix-done">תוקן</span>
+            חסר אזהרת אסימטריה ב-turnIndex
+          </div>
+          <div class="issue-desc">
+            <code>MessageHandler.turnIndex</code> לעולם לא מתאפס ב-clearSession,
+            בעוד שה-store מאפס את turnHistory. נוספה אזהרה והמלצה.
+          </div>
+        </li>
+
+        <li class="issue-medium">
+          <div class="issue-title">
+            <span class="fix-tag fix-done">תוקן</span>
+            חסרה התייחסות לערכת נושא בהירה
+          </div>
+          <div class="issue-desc">
+            נוספה המלצה: שכבת-העל הכהה מספקת רקע עצמאי, כך שגם משתמשי ערכת נושא בהירה רואים תרשימים קריאים.
+            תמיכה מלאה בערכת נושא בהירה תתווסף בשלב מאוחר יותר לפי דרישה.
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Changes Table -->
+    <div class="section">
+      <h2>סיכום שינויים בקבצים (מעודכן)</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>קובץ</th>
+            <th>סוג</th>
+            <th>תיאור</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>webview-messages.ts</code></td>
+            <td>עריכה</td>
+            <td>הוספת טיפוסי TurnSemantics, TaskType, שדות טוקנים ופקודות</td>
+          </tr>
+          <tr>
+            <td><code>MessageHandler.ts</code></td>
+            <td>עריכה</td>
+            <td>חילוץ פקודות, טוקנים, snapshot, הפעלת TurnAnalyzer, extractTextFromContent</td>
+          </tr>
+          <tr>
+            <td><code>ActivitySummarizer.ts</code></td>
+            <td>עריכה</td>
+            <td>שימוש בהגדרת analysisModel במקום מודל קבוע</td>
+          </tr>
+          <tr>
+            <td><code>SessionNamer.ts</code></td>
+            <td>עריכה</td>
+            <td>שימוש בהגדרת analysisModel במקום מודל קבוע</td>
+          </tr>
+          <tr>
+            <td><code>SessionTab.ts</code></td>
+            <td>עריכה</td>
+            <td>יצירת TurnAnalyzer, חיבור callback, הזרקה ל-MessageHandler</td>
+          </tr>
+          <tr>
+            <td><code>package.json</code></td>
+            <td>עריכה</td>
+            <td>הוספת הגדרות analysisModel ו-turnAnalysis.*</td>
+          </tr>
+          <tr>
+            <td><code>store.ts</code></td>
+            <td>עריכה</td>
+            <td>מצב דשבורד, applyTurnSemantics, מיזוג סמנטיקה ממתינה</td>
+          </tr>
+          <tr>
+            <td><code>useClaudeStream.ts</code></td>
+            <td>עריכה</td>
+            <td>טיפול בהודעת turnSemantics</td>
+          </tr>
+          <tr>
+            <td><code>App.tsx</code></td>
+            <td>עריכה</td>
+            <td>ייבוא DashboardPanel (טעינה עצלה), כפתור בסרגל מצב</td>
+          </tr>
+          <tr>
+            <td><code>TurnAnalyzer.ts</code></td>
+            <td style="color: #3fb950;">חדש</td>
+            <td>ניתוח סמנטי לכל תור (prompt, ניתוח, תור, מכסות)</td>
+          </tr>
+          <tr>
+            <td>13 קבצי Dashboard</td>
+            <td style="color: #3fb950;">חדשים</td>
+            <td>DashboardPanel, 5 לשוניות, RechartsWrappers, SemanticWidgets, MetricsCards, TurnTable, dashboardUtils, index</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Architecture Decision -->
+    <div class="section">
+      <h2>החלטה ארכיטקטונית - למה שכבת-על?</h2>
+      <p>
+        חנות Zustand חיה בתוך ה-webview של הצ'אט. פאנל נפרד של VS Code היה צריך ערוץ נתונים
+        משלו (שליחת כל נתוני התורות מחדש). שכבת-על קוראת ישירות מהחנות - אפס כפילות,
+        תגובתיות מיידית, עקבית עם דפוסים קיימים (AchievementPanel, PromptHistoryPanel).
+      </p>
+      <p style="margin-top: 8px; color: #8b949e;">
+        <strong>פשרה:</strong> מסתיר את הצ'אט כשפתוח. מקובל - המשתמש בחר לפתוח את הדשבורד.
+      </p>
+    </div>
+
+    <!-- Phasing -->
+    <div class="section">
+      <h2>תכנון שלבי</h2>
+
+      <h3>שלב 1 - MVP (נתונים קיימים בלבד)</h3>
+      <p>
+        הדשבורד עובד מ-turnHistory הקיים: עלויות, כלים, משכי זמן, שגיאות.
+        5 לשוניות עם תרשימים בסיסיים. ללא שיחות API נוספות.
+        <strong>זמן משוער: 2 ימים.</strong>
+      </p>
+
+      <h3>שלב 2 - ניתוח סמנטי (אופציונלי, מדורג)</h3>
+      <p>
+        TurnAnalyzer שולח כל תור ל-Claude (מודל Haiku כברירת מחדל) לזיהוי: מצב רוח,
+        סוג משימה, תוצאה, וחזרה על באגים. כבוי כברירת מחדל. מגבלות: 30 ניתוחים לסשן,
+        30 שניות timeout, תור אחד בו-זמנית.
+        <strong>זמן משוער: יום אחד נוסף.</strong>
+      </p>
+    </div>
+
+    <!-- Verdict -->
+    <div class="verdict">
+      <h2>סיכום: התוכנית מאושרת עם כל התיקונים שהוחלו</h2>
+      <p>
+        13 תיקונים הוחלו ישירות במסמך התוכנית.
+        6 בעיות קריטיות נפתרו, 5 שיפורי עיצוב יושמו,
+        מבנה הקבצים צומצם מ-22 ל-13 קבצים חדשים.
+        התוכנית מוכנה למימוש.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>

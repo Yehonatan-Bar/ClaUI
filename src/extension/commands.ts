@@ -55,6 +55,11 @@ If you are in plan mode and creating a plan, then after you create the plan, cre
 2. Written for a manager, meaning without code and tedious names, just a clear and easy-to-understand explanation.
 ---`.trim();
 
+const CLAUI_REPOSITORY_URL = 'https://github.com/Yehonatan-Bar/ClaUI';
+const CLAUI_ISSUES_URL = `${CLAUI_REPOSITORY_URL}/issues`;
+const CLAUI_DISCUSSIONS_URL = `${CLAUI_REPOSITORY_URL}/discussions`;
+const CLAUI_FEEDBACK_EMAIL = 'yonzbar@gmail.com';
+
 /**
  * Prompt the user to activate the Plans feature when no plan documents exist.
  * Offers to inject a plan mode prompt into the project's CLAUDE.md file.
@@ -343,6 +348,93 @@ export function registerCommands(
           'No log directory found yet. Logs will be created when a session starts.'
         );
       }
+    }),
+
+    // Open feedback/reporting options (Issue Reporter, GitHub, or email)
+    vscode.commands.registerCommand('claudeMirror.sendFeedback', async () => {
+      const extensionId = context.extension.id;
+      const extensionVersion = String(
+        ((context.extension.packageJSON as { version?: unknown } | undefined)?.version) ?? 'unknown'
+      );
+
+      const picked = await vscode.window.showQuickPick(
+        [
+          {
+            label: '$(bug) Report Bug',
+            description: 'Open VS Code Issue Reporter (or GitHub Issues fallback)',
+            value: 'bug' as const,
+          },
+          {
+            label: '$(light-bulb) Feature Request',
+            description: 'Open GitHub Discussions for ClaUi',
+            value: 'feature' as const,
+          },
+          {
+            label: '$(mail) Email Feedback',
+            description: `Compose an email to ${CLAUI_FEEDBACK_EMAIL}`,
+            value: 'email' as const,
+          },
+        ],
+        {
+          placeHolder: 'How would you like to send feedback for ClaUi?',
+          ignoreFocusOut: true,
+        }
+      );
+
+      if (!picked) {
+        return;
+      }
+
+      if (picked.value === 'bug') {
+        try {
+          await vscode.commands.executeCommand('vscode.openIssueReporter', {
+            extensionId,
+          });
+          log(`Opened VS Code Issue Reporter for ${extensionId}`);
+          return;
+        } catch (err) {
+          log(`vscode.openIssueReporter failed: ${err}`);
+        }
+
+        try {
+          await vscode.commands.executeCommand('workbench.action.openIssueReporter');
+          log('Opened generic VS Code Issue Reporter');
+          return;
+        } catch (err) {
+          log(`workbench.action.openIssueReporter failed: ${err}`);
+        }
+
+        await vscode.env.openExternal(vscode.Uri.parse(CLAUI_ISSUES_URL));
+        log(`Opened GitHub Issues fallback: ${CLAUI_ISSUES_URL}`);
+        return;
+      }
+
+      if (picked.value === 'feature') {
+        await vscode.env.openExternal(vscode.Uri.parse(CLAUI_DISCUSSIONS_URL));
+        log(`Opened GitHub Discussions: ${CLAUI_DISCUSSIONS_URL}`);
+        return;
+      }
+
+      const mailSubject = encodeURIComponent('ClaUi Feedback');
+      const mailBody = encodeURIComponent(
+        [
+          'Hi,',
+          '',
+          'Feedback for ClaUi:',
+          '',
+          '',
+          `Extension version: ${extensionVersion}`,
+          `VS Code version: ${vscode.version}`,
+          '',
+          '(Optional) Steps to reproduce / context:',
+          '',
+        ].join('\n')
+      );
+      const mailtoUri = vscode.Uri.parse(
+        `mailto:${CLAUI_FEEDBACK_EMAIL}?subject=${mailSubject}&body=${mailBody}`
+      );
+      await vscode.env.openExternal(mailtoUri);
+      log(`Opened feedback email draft to ${CLAUI_FEEDBACK_EMAIL}`);
     }),
 
     // Toggle achievements globally (full hide + full disable)
