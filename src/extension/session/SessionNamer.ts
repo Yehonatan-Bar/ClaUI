@@ -31,9 +31,12 @@ export class SessionNamer {
 
     // Use -p without inline prompt; pipe the prompt via stdin to avoid
     // shell escaping issues with quotes, newlines, and Hebrew chars.
+    const analysisModel = vscode.workspace
+      .getConfiguration('claudeMirror')
+      .get<string>('analysisModel', 'claude-haiku-4-5-20251001');
     const args = [
       '-p',
-      '--model', 'claude-haiku-4-5-20251001',
+      '--model', analysisModel,
     ];
 
     // Clean environment to prevent nested-session detection

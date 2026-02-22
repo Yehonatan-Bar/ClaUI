@@ -8,10 +8,12 @@ import { SessionNamer } from './SessionNamer';
 import { MessageTranslator } from './MessageTranslator';
 import { ActivitySummarizer } from './ActivitySummarizer';
 import { AdventureInterpreter } from './AdventureInterpreter';
+import { TurnAnalyzer } from './TurnAnalyzer';
 import { ConversationReader } from './ConversationReader';
 import { FileLogger } from './FileLogger';
 import type { AchievementService } from '../achievements/AchievementService';
 import type { SessionStore } from './SessionStore';
+import type { ProjectAnalyticsStore } from './ProjectAnalyticsStore';
 import type { PromptHistoryStore } from './PromptHistoryStore';
 import { MessageHandler, type WebviewBridge } from '../webview/MessageHandler';
 import { buildWebviewHtml } from '../webview/WebviewProvider';
@@ -20,6 +22,8 @@ import type {
   ExtensionToWebviewMessage,
   WebviewToExtensionMessage,
   SerializedChatMessage,
+  SessionSummary,
+  TurnRecord,
 } from '../types/webview-messages';
 
 export interface SessionTabCallbacks {
@@ -76,6 +80,7 @@ export class SessionTab implements WebviewBridge {
     private readonly statusBarItem: vscode.StatusBarItem,
     private readonly callbacks: SessionTabCallbacks,
     private readonly sessionStore: SessionStore,
+    private readonly projectAnalyticsStore: ProjectAnalyticsStore,
     private readonly promptHistoryStore: PromptHistoryStore,
     private readonly achievementService: AchievementService,
     logDir: string | null
@@ -97,6 +102,7 @@ export class SessionTab implements WebviewBridge {
       this.achievementService
     );
     this.messageHandler.setSessionNameGetter(() => this.baseTitle);
+    this.messageHandler.setProjectAnalyticsStore(this.projectAnalyticsStore);
 
     // Create per-tab file logger if file logging is enabled
     if (logDir) {
@@ -167,6 +173,11 @@ export class SessionTab implements WebviewBridge {
     const adventureInterpreter = new AdventureInterpreter();
     adventureInterpreter.setLogger(tabLog);
     this.messageHandler.setAdventureInterpreter(adventureInterpreter);
+
+    // Wire turn analyzer for semantic analysis (dashboard insights)
+    const turnAnalyzer = new TurnAnalyzer();
+    turnAnalyzer.setLogger(tabLog);
+    this.messageHandler.setTurnAnalyzer(turnAnalyzer);
 
     // Create webview panel in the specified column
     this.baseTitle = `ClaUi ${tabNumber}`;
@@ -623,6 +634,7 @@ export class SessionTab implements WebviewBridge {
       const currentSessionId = this.processManager.currentSessionId;
 
       if (info.code !== 0 && info.code !== null) {
+        this.saveProjectAnalytics();
         this.achievementService.onSessionCrash(this.id);
         this.achievementService.onSessionEnd(this.id);
         this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
@@ -658,6 +670,7 @@ export class SessionTab implements WebviewBridge {
         }
       } else {
         tabLog('Process completed normally');
+        this.saveProjectAnalytics();
         this.achievementService.onSessionEnd(this.id);
         this.postMessage({ type: 'sessionEnded', reason: 'completed' });
       }
@@ -680,6 +693,84 @@ export class SessionTab implements WebviewBridge {
       this.postMessage({ type: 'error', message: `Process error: ${err.message}` });
       this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
     });
+  }
+
+  /** Build and persist a SessionSummary from accumulated TurnRecords */
+  private saveProjectAnalytics(): void {
+    const turnRecords = this.messageHandler.getTurnRecords();
+    if (turnRecords.length === 0) {
+      this.log(`[ProjectAnalytics] No turns to save`);
+      return;
+    }
+
+    const sessionId = this.processManager.currentSessionId || this.id;
+    const now = new Date().toISOString();
+
+    // Aggregate metrics
+    let totalCostUsd = 0;
+    let totalErrors = 0;
+    let totalToolUses = 0;
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let totalCacheCreationTokens = 0;
+    let totalCacheReadTokens = 0;
+    let totalBashCommands = 0;
+    let totalDurationMs = 0;
+    const toolFrequency: Record<string, number> = {};
+    const categoryDistribution: Record<string, number> = {};
+    const taskTypeDistribution: Record<string, number> = {};
+
+    for (const turn of turnRecords) {
+      totalCostUsd += turn.costUsd ?? 0;
+      if (turn.isError) totalErrors++;
+      totalToolUses += turn.toolCount ?? 0;
+      totalInputTokens += turn.inputTokens ?? 0;
+      totalOutputTokens += turn.outputTokens ?? 0;
+      totalCacheCreationTokens += turn.cacheCreationTokens ?? 0;
+      totalCacheReadTokens += turn.cacheReadTokens ?? 0;
+      totalBashCommands += turn.bashCommands?.length ?? 0;
+      totalDurationMs += turn.durationMs ?? 0;
+
+      for (const name of turn.toolNames) {
+        const base = name.includes('__') ? name.split('__').pop()! : name;
+        toolFrequency[base] = (toolFrequency[base] ?? 0) + 1;
+      }
+
+      categoryDistribution[turn.category] = (categoryDistribution[turn.category] ?? 0) + 1;
+
+      if (turn.semantics?.taskType) {
+        const tt = turn.semantics.taskType;
+        taskTypeDistribution[tt] = (taskTypeDistribution[tt] ?? 0) + 1;
+      }
+    }
+
+    const totalTurns = turnRecords.length;
+    const summary: SessionSummary = {
+      sessionId,
+      sessionName: this.baseTitle || `Session ${this.tabNumber}`,
+      model: this.currentModel || 'unknown',
+      startedAt: this.sessionStartedAt || now,
+      endedAt: now,
+      durationMs: totalDurationMs,
+      totalCostUsd,
+      totalTurns,
+      totalErrors,
+      totalToolUses,
+      totalInputTokens,
+      totalOutputTokens,
+      totalCacheCreationTokens,
+      totalCacheReadTokens,
+      totalBashCommands,
+      toolFrequency,
+      categoryDistribution,
+      taskTypeDistribution,
+      avgCostPerTurn: totalTurns > 0 ? totalCostUsd / totalTurns : 0,
+      avgDurationMs: totalTurns > 0 ? totalDurationMs / totalTurns : 0,
+      errorRate: totalTurns > 0 ? (totalErrors / totalTurns) * 100 : 0,
+    };
+
+    this.log(`[ProjectAnalytics] Saving summary: session=${sessionId} turns=${totalTurns} cost=$${totalCostUsd.toFixed(4)}`);
+    void this.projectAnalyticsStore.saveSummary(summary);
   }
 
   private wireDemuxStatusBar(): void {

@@ -19,6 +19,7 @@ Reads exclusively from the existing Zustand store — no new IPC, no new Webview
 
 ## Plan Review — Applied Upgrades
 
+### Round 1 (original revision)
 This revision keeps the original direction, but fixes several implementation risks:
 
 1. Split delivery into **MVP dashboard (existing turn data)** and **Phase 2 semantic analyzer** to reduce scope risk.
@@ -27,6 +28,23 @@ This revision keeps the original direction, but fixes several implementation ris
 4. Fix the `useClaudeStream` example to call the store action correctly (`applyTurnSemantics(...)`).
 5. Add a merge strategy for async semantics when they arrive before/after turn creation (resume/fork/history timing).
 6. Require lazy-loading for the dashboard/charts to avoid unnecessary webview bundle growth.
+
+### Round 2 (post-codebase validation)
+After cross-referencing every plan step against the actual codebase, the following fixes were applied:
+
+7. **Fixed wrong variable name** in Step 2b: `accumulatedJson` -> `rawInput` (from `toolBlockContexts.get()`).
+8. **Fixed wrong reset location**: `currentBashCommands` must reset in `messageStart` handler (where per-message state is cleared), NOT in `clearApprovalTracking()` (which is approval-specific).
+9. **Added `extractTextFromContent` utility definition**: The plan referenced it without defining it. Now includes implementation that handles both string and ContentBlock[] formats (CLI data format gotcha).
+10. **Fixed messageId snapshot**: TurnAnalyzer trigger now snapshots `this.lastMessageId` before async fire (same pattern as `toolNamesSnapshot`).
+11. **Removed all emoji characters**: MoodTimeline now uses CSS-styled text labels/dots instead of emoji, per project encoding rules (Hebrew UTF-8 conflicts).
+12. **Fixed Recharts bundle size estimate**: 180KB -> 300KB+ (includes D3 sub-dependencies).
+13. **Added CSP and webpack guidance for lazy loading**: `React.lazy()` creates code-split chunks that need CSP allowance in the webview. Documented the options and fallback strategy.
+14. **Consolidated file structure**: 22 new files -> 13 new files. Merged 7 chart components into `RechartsWrappers.tsx`, 3 semantic widgets into `SemanticWidgets.tsx`, extracted shared utils to `dashboardUtils.ts`.
+15. **Replaced SettingsSidebar with settings link**: A read-only sidebar duplicating VS Code Settings is fragile (pricing changes, model updates). Now uses a gear icon that opens VS Code Settings filtered to `claudeMirror`.
+16. **Added `(success as any)` note for token fields**: The `usage` field is not typed in `stream-json.ts`. Documents the existing `as any` pattern and shows how to add proper types later.
+17. **Added turnIndex reset asymmetry warning**: `MessageHandler.turnIndex` never resets on clearSession. Dashboard should use array position, not raw turnIndex.
+18. **Added light theme recommendation**: Keep dark overlay for MVP (it controls its own background). Document as follow-up.
+19. **Enhanced post-implementation checklist**: Added ESC close, clear-session reset, 50+ turn performance, and settings link verification.
 
 ---
 
@@ -126,10 +144,21 @@ export interface TurnSemanticsMessage {
 **2a — Token fields** (lines 1118–1133, inside `'result'` handler, `successTurn` object):
 
 ```typescript
-inputTokens: success.usage?.input_tokens ?? 0,
-outputTokens: success.usage?.output_tokens ?? 0,
-cacheCreationTokens: success.usage?.cache_creation_input_tokens ?? 0,
-cacheReadTokens: success.usage?.cache_read_input_tokens ?? 0,
+inputTokens: (success as any).usage?.input_tokens ?? 0,
+outputTokens: (success as any).usage?.output_tokens ?? 0,
+cacheCreationTokens: (success as any).usage?.cache_creation_input_tokens ?? 0,
+cacheReadTokens: (success as any).usage?.cache_read_input_tokens ?? 0,
+```
+
+**NOTE:** The `success` object's `usage` field is not currently typed in `stream-json.ts`. The existing code already uses `(success as any).duration_ms` for the duration field. Follow the same `as any` pattern for `usage` until the types are updated. If you want to add proper types later, extend the `ResultSuccess` interface in `src/extension/types/stream-json.ts` with:
+
+```typescript
+usage?: {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+};
 ```
 
 **2b — Bash command extraction**
@@ -141,48 +170,53 @@ Add a new private field to `MessageHandler`:
 private currentBashCommands: string[] = [];
 ```
 
-When a `Bash` tool block completes (in `blockStop` handler, where `toolBlockContexts` is used for enrichment), extract the `command` field:
+When a `Bash` tool block completes (in `blockStop` handler), extract the `command` field from the accumulated tool input stored in `toolBlockContexts`:
 
 ```typescript
-// After toolBlockContexts accumulation is finalized for a Bash block:
+// In the blockStop handler, after existing enrichment logic:
+// NOTE: the variable is `rawInput` from `this.toolBlockContexts.get(data.blockIndex)`
 if (toolName === 'Bash') {
   try {
-    const parsed = JSON.parse(accumulatedJson);
+    const parsed = JSON.parse(rawInput);
     if (parsed.command && typeof parsed.command === 'string') {
       this.currentBashCommands.push(parsed.command.trim());
     }
   } catch {
-    // ignore malformed JSON
+    // ignore malformed JSON — rawInput may be partial
   }
 }
 ```
 
-Then in `successTurn`:
+Then in the `result` handler, snapshot BEFORE building `successTurn`:
 
 ```typescript
-// Snapshot BEFORE any reset/clear logic runs in the result handler
+// Snapshot BEFORE any reset/clear logic — same pattern as toolNamesSnapshot
 const bashCommandsSnapshot = [...this.currentBashCommands];
-// ...
+// ...inside successTurn object:
 bashCommands: bashCommandsSnapshot,
 ```
 
-Reset in `clearApprovalTracking()` (or alongside `currentMessageToolNames`):
+Reset in the `messageStart` handler (lines 1058-1079), alongside the other per-message state clears (NOT in `clearApprovalTracking`, which is approval-specific):
 
 ```typescript
+// In messageStart handler, add alongside existing clears:
 this.currentBashCommands = [];
 ```
 
-Important: reset only after the result handler snapshots per-turn state. If the code clears tracking before snapshotting, the dashboard will miss commands for that turn.
+Important: `clearApprovalTracking()` only resets `currentMessageToolNames` and `pendingApprovalTool`. Per-message state like bash commands MUST be reset in `messageStart`, which is where `toolBlockNames`, `toolBlockContexts`, adventure sets, and other per-message state are cleared.
 
 Also mirror this extraction in any assistant-message fallback tool parser (if the codebase uses one), and dedupe repeated command strings within the same turn.
 
 **2c — Trigger TurnAnalyzer** (after the `postMessage({ type: 'turnComplete' })` call):
 
 ```typescript
+// IMPORTANT: use snapshotted messageId, not the live this.lastMessageId
+// (same reason toolNamesSnapshot exists — messageStart may clear it before async fires)
+const messageIdSnapshot = this.lastMessageId;
 if (this.turnAnalyzer) {
   // fire-and-forget; result arrives via async callback
   void this.turnAnalyzer.analyze({
-    messageId: this.lastMessageId,
+    messageId: messageIdSnapshot,
     userMessage: this.lastUserMessageText,
     toolNames: toolNamesSnapshot,
     bashCommands: bashCommandsSnapshot,
@@ -207,6 +241,23 @@ Populate them in the `'userMessage'` event handler:
 this.lastUserMessageText = extractTextFromContent(event.message.content).slice(0, 600);
 this.recentUserMessages = [...this.recentUserMessages.slice(-4), this.lastUserMessageText];
 ```
+
+**Helper utility — `extractTextFromContent`:** The CLI's `content` field may be a plain string OR a `ContentBlock[]` array (see CLI Data Format Gotchas in CLAUDE.md). This utility must handle both:
+
+```typescript
+function extractTextFromContent(content: string | ContentBlock[] | unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((b: any) => b.type === 'text' && typeof b.text === 'string')
+      .map((b: any) => b.text)
+      .join('\n');
+  }
+  return String(content ?? '');
+}
+```
+
+Place this in `MessageHandler.ts` as a private method or top-level helper (it parallels the content normalization already done in `addUserMessage` in the store).
 
 ---
 
@@ -523,65 +574,76 @@ setDashboardOpen: (open: boolean) => set({ dashboardOpen: open }),
 npm install recharts
 ```
 
-Recharts is a D3-backed React chart library. Pure React, tree-shakeable, dark-theme friendly via inline color props. Adds ~180KB minified — acceptable for a dev tool.
+Recharts is a D3-backed React chart library. Pure React, tree-shakeable, dark-theme friendly via inline color props. Adds ~300KB+ minified (including D3 sub-dependencies: d3-scale, d3-shape, d3-interpolate, etc.) — acceptable for a dev tool but must be lazy-loaded.
 
 ---
 
+### Lazy-loading: CSP and Webpack considerations
+
 Implementation requirement: lazy-load the dashboard (or at minimum the chart-heavy tabs) so the default chat webview path does not pay the chart bundle cost on every session open.
+
+**Critical: VS Code webview CSP restriction.** `React.lazy()` + dynamic `import()` creates code-split chunks (separate `.js` files). The webview's Content Security Policy in `buildWebviewHtml()` must be updated to allow loading these additional script chunks. Specifically:
+
+1. **Webpack config** (`webpack.config.js`): Configure `output.chunkFilename` for the webview target to output chunks alongside `webview.js` (e.g., `dist/webview-[name].chunk.js`).
+
+2. **CSP update** (`WebviewProvider.ts` → `buildWebviewHtml()`): The `script-src` directive already allows the webview's local resource URI via nonce. Dynamic chunks should be served from the same origin, so this should work — but **verify** that chunks loaded via `import()` inherit the nonce. If not, use a `script-src` with the webview resource URI instead of nonce-only.
+
+3. **Alternative approach**: If CSP issues prove difficult, bundle the dashboard as a single entry but behind a conditional `require()` or use `React.lazy` with a Suspense boundary that catches CSP errors gracefully.
+
+**Fallback**: If code splitting is too complex for the first iteration, accept the larger initial bundle and add a TODO to split later. The chat webview already bundles ~170KB; adding ~300KB is noticeable but not catastrophic for a dev tool.
 
 ### Step 9 — Dashboard component architecture
 
 **New directory:** `src/webview/components/Dashboard/`
 
-#### File structure
+#### File structure (consolidated — 13 new files instead of 22)
 
 ```
 src/webview/components/Dashboard/
-├── DashboardPanel.tsx          # Root overlay — tab nav, close button, settings sidebar
+├── DashboardPanel.tsx          # Root overlay — tab nav, close button, Esc handler
 ├── tabs/
-│   ├── OverviewTab.tsx         # Metric cards + cost area chart + mood strip
+│   ├── OverviewTab.tsx         # Metric cards + cost chart + mood strip + frustration alert
 │   ├── TokensTab.tsx           # Stacked token bar + cache efficiency cards
 │   ├── ToolsTab.tsx            # Tool frequency bar + category donut
-│   ├── TimelineTab.tsx         # Duration bar + sortable turn table (with semantics cols)
-│   └── CommandsTab.tsx         # Bash command history timeline
-├── semantic/
-│   ├── MoodTimeline.tsx        # Per-turn mood icon strip (over session)
-│   ├── TaskTypeDonut.tsx       # Donut of task type distribution
-│   ├── OutcomeBar.tsx          # Stacked bar: success/partial/failed per turn
-│   ├── FrustrationAlert.tsx    # Warning card when 3+ frustrated turns detected
-│   └── BugRepeatTracker.tsx    # List of turns where same bug recurred
+│   ├── TimelineTab.tsx         # Duration bar + semantic charts + sortable turn table
+│   └── CommandsTab.tsx         # Bash command timeline + bug repeat sidebar
 ├── charts/
-│   ├── CostAreaChart.tsx       # Cumulative + per-turn cost over turns
-│   ├── TokenStackedBar.tsx     # Input / output / cache per turn
-│   ├── DurationBar.tsx         # API duration per turn, colored by category
-│   ├── ToolFrequencyBar.tsx    # Horizontal bar — tool usage count
-│   └── CategoryDonut.tsx       # Donut — TurnCategory distribution
+│   ├── RechartsWrappers.tsx    # All Recharts chart components in one file:
+│   │                           #   CostAreaChart, TokenStackedBar, DurationBar,
+│   │                           #   ToolFrequencyBar, CategoryDonut, TaskTypeDonut, OutcomeBar
+│   └── SemanticWidgets.tsx     # MoodTimeline strip, FrustrationAlert, BugRepeatTracker
 ├── MetricsCards.tsx            # 8-card summary row
-├── TurnTable.tsx               # Sortable table of all turns + semantics columns
-├── CommandsTimeline.tsx        # Categorized command list with turn attribution
-├── SettingsSidebar.tsx         # Shows analysis model setting (read-only, informational)
-└── index.ts                    # Re-exports DashboardPanel
+├── TurnTable.tsx               # Sortable paginated turn table with optional semantic columns
+├── dashboardUtils.ts           # Shared types, color constants, categorizeCommand(), helpers
+└── index.ts                    # Re-exports DashboardPanel (lazy-loadable)
 ```
+
+**Rationale for consolidation:**
+- **`RechartsWrappers.tsx`**: All chart components share the same Recharts imports (BarChart, PieChart, ComposedChart, etc.). Splitting each into its own file means 7 files that all import the same library. One file = one import tree, simpler maintenance.
+- **`SemanticWidgets.tsx`**: MoodTimeline, FrustrationAlert, and BugRepeatTracker are small, tightly related, and only rendered when semantic data exists. They can share state derivation logic.
+- **`dashboardUtils.ts`**: Color constants, `categorizeCommand()`, shared types (CommandEntry, etc.) extracted to avoid duplication across tabs.
+- **SettingsSidebar removed**: The original was read-only info that duplicates what VS Code Settings already shows. A "Settings" link in the dashboard header that opens `vscode.commands.executeCommand('workbench.action.openSettings', 'claudeMirror')` is simpler and always up-to-date.
 
 ---
 
 #### DashboardPanel.tsx — layout
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│  ClaUi Analytics Dashboard                           [⚙] [×] close  │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
-│  [ Overview ] [ Tokens ] [ Tools ] [ Timeline ] [ Commands ]         │
-│  ─────────────────────────────────────────────────────────────────   │
-│  <active tab content>                                                │
-└──────────────────────────────────────────────────────────────────────┘
++----------------------------------------------------------------------+
+|  ClaUi Analytics Dashboard    [analysis: haiku] [gear] [x] close     |
+|  ================================================================    |
+|  [ Overview ] [ Tokens ] [ Tools ] [ Timeline ] [ Commands ]         |
+|  --------------------------------------------------------------------+
+|  <active tab content, scrollable>                                    |
++----------------------------------------------------------------------+
 ```
 
 - Full-screen overlay: `position: fixed; inset: 0; z-index: 1000`
-- Background: `rgba(13, 17, 23, 0.97)`
-- Header: title left, gear icon (opens SettingsSidebar) + close (×) right
-- Tab bar: 5 tabs
+- Background: `rgba(13, 17, 23, 0.97)` (always dark, even in light VS Code theme)
+- Header: title left, optional inline badge showing current analysis model + enabled status, gear icon (opens VS Code Settings filtered to `claudeMirror`) + close (x) right
+- Tab bar: 5 tabs with active indicator
 - Content area: scrollable, padded
+- ESC key closes the dashboard (same pattern as `PromptHistoryPanel` — `useEffect` with `keydown` listener)
 
 ---
 
@@ -745,15 +807,20 @@ Below: Command timeline list — each row:
 A horizontal strip below the cost chart in OverviewTab.
 One colored dot or icon per turn that has `semantics`.
 
-Mood → icon + color:
-- `frustrated` → 😤 red `#f85149`
-- `satisfied` → 😊 green `#3fb950`
-- `confused` → 🤔 amber `#e3b341`
-- `excited` → 🚀 blue `#58a6ff`
-- `urgent` → ⚡ orange `#f0883e`
-- `neutral` → ⬜ muted `#8b949e`
+Mood indicator + color (use CSS-styled text labels or inline SVG icons — NO emojis to avoid Hebrew UTF-8 encoding conflicts):
 
-Turns without semantics: small gray placeholder dot.
+| Mood | Label | Color | CSS dot/icon |
+|------|-------|-------|-------------|
+| `frustrated` | FRS | `#f85149` (red) | Filled circle with `!` |
+| `satisfied` | OK | `#3fb950` (green) | Filled circle with checkmark |
+| `confused` | `?` | `#e3b341` (amber) | Filled circle with `?` |
+| `excited` | `++` | `#58a6ff` (blue) | Filled circle with `^` arrow |
+| `urgent` | URG | `#f0883e` (orange) | Filled circle with `!!` |
+| `neutral` | `-` | `#8b949e` (muted) | Hollow circle |
+
+Implementation: use `<span>` with `border-radius: 50%`, `background-color`, and a single-character inner text. Avoid emoji characters entirely per project encoding rules.
+
+Turns without semantics: small gray hollow dot (`border: 1px solid #8b949e`).
 
 Hovering shows tooltip: `Turn N | <taskType> | <outcome> | confidence: X%`
 
@@ -764,11 +831,11 @@ Hovering shows tooltip: `Turn N | <taskType> | <outcome> | confidence: X%`
 Conditionally rendered when any 3 consecutive turns share `userMood === 'frustrated'`.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  ⚠  Frustration pattern detected                        │
-│  Turns 4, 5, 6 all indicate frustrated user mood.       │
-│  Consider checking: same bug repeated? blocking issue?  │
-└─────────────────────────────────────────────────────────┘
++-----------------------------------------------------------+
+|  [!] Frustration pattern detected                         |
+|  Turns 4, 5, 6 all indicate frustrated user mood.         |
+|  Consider checking: same bug repeated? blocking issue?    |
++-----------------------------------------------------------+
 ```
 
 Red border, amber background at 10% opacity.
@@ -791,26 +858,21 @@ Colored by severity: amber (second), red (third+).
 
 ---
 
-#### SettingsSidebar.tsx
+#### Settings link (replaces SettingsSidebar)
 
-A slide-in panel (from the right edge of the dashboard) opened via the gear icon.
-Read-only display of relevant settings — user goes to VS Code Settings to change them.
+Instead of a full sidebar panel, add a gear icon in the dashboard header that opens VS Code Settings filtered to `claudeMirror`:
 
-Content:
+```typescript
+onClick={() => vscodeApi.postMessage({
+  type: 'openSettings',
+  query: 'claudeMirror'
+})}
+// Extension side: vscode.commands.executeCommand('workbench.action.openSettings', 'claudeMirror')
 ```
-Analysis Model
-  Currently: claude-haiku-4-5-20251001
-  Cost: ~$0.0003 / analysis call
-  [Change in VS Code Settings]
 
-Semantic Analysis
-  Active: yes (model responds within ~5s)
-  Calls per session: estimated 1 per turn
+**Rationale:** A read-only sidebar duplicating VS Code Settings adds maintenance burden (must track setting changes, model pricing changes, etc.). Linking directly to the actual settings is always accurate and reduces new-file count.
 
-Activity Summary
-  Enabled: yes
-  Threshold: 3 tool uses
-```
+The dashboard header can optionally show the current analysis model name and `turnAnalysis.enabled` status as inline badges — derived from extension config sent via a `dashboardConfig` postMessage on dashboard open.
 
 ---
 
@@ -898,10 +960,12 @@ Semantic charts additionally handle `turnHistory.filter(t => t.semantics).length
 ## Risks & Mitigations
 
 1. **Cost blow-up (semantic analyzer):** Keep `turnAnalysis.enabled=false` by default, add per-session cap and timeout.
-2. **Bundle growth / slower webview startup:** Lazy-load dashboard or chart-heavy tabs; avoid loading charts on normal chat open.
+2. **Bundle growth / slower webview startup:** Lazy-load dashboard or chart-heavy tabs; avoid loading charts on normal chat open. See CSP considerations above.
 3. **Race conditions (async semantics vs turn creation):** Persist pending semantics by `messageId` and merge during turn insertion/backfill.
 4. **Command capture gaps:** Extract commands from both standard tool-finalization and fallback assistant parsing paths; dedupe per turn.
 5. **History/resume variance:** Dashboard must tolerate missing `durationMs`, token fields, or commands on older turns.
+6. **turnIndex asymmetry:** `MessageHandler.turnIndex` is never reset on `clearSession` or `editAndResend` — it only resets when a new MessageHandler is constructed. The webview store's `reset()` clears `turnHistory` though. This means after a clear-session, extension-side turn indices start from where they left off while the webview starts fresh. The dashboard should use the webview's `turnHistory` array index (position), not the raw `turnIndex` field, for display ordering. Consider adding `this.turnIndex = 0` in the MessageHandler's clearSession path.
+7. **Light theme support:** The color palette is designed for dark themes. If VS Code is using a light theme, the dashboard should either (a) always use dark background (current design — `rgba(13, 17, 23, 0.97)` overlay), or (b) detect `document.body.classList` for `vscode-light` and swap to a light palette. **Recommendation:** Keep the dark overlay (option a) for MVP — it's a full-screen overlay that controls its own background, so light-theme users still get readable charts. Add light theme support in a follow-up if requested.
 
 ---
 
@@ -917,61 +981,54 @@ Semantic charts additionally handle `turnHistory.filter(t => t.semantics).length
 
 ---
 
-## File Change Summary
+## File Change Summary (Revised — Consolidated)
 
 | File | Type | Description |
 |------|------|-------------|
-| `src/extension/types/webview-messages.ts` | Edit | Add `TurnSemantics`, `TaskType`, token+command+semantics fields to `TurnRecord`, add `TurnSemanticsMessage` |
-| `src/extension/webview/MessageHandler.ts` | Edit | Token fields, Bash command extraction, `lastUserMessageText`, trigger `TurnAnalyzer` |
-| `src/extension/session/ActivitySummarizer.ts` | Edit | Read `analysisModel` setting instead of hardcoded Haiku |
-| `src/extension/session/SessionNamer.ts` | Edit | Read `analysisModel` setting instead of hardcoded Haiku |
-| `src/extension/session/SessionTab.ts` | Edit | Instantiate `TurnAnalyzer`, wire callback, inject into `MessageHandler` |
+| `src/extension/types/webview-messages.ts` | Edit | Add `TurnSemantics`, `TaskType`, token+command+semantics fields to `TurnRecord`, add `TurnSemanticsMessage` to union |
+| `src/extension/webview/MessageHandler.ts` | Edit | Token fields, Bash command extraction in `blockStop`, `extractTextFromContent`, `lastUserMessageText` + `recentUserMessages`, snapshot+trigger `TurnAnalyzer`, reset `currentBashCommands` in `messageStart` |
+| `src/extension/session/ActivitySummarizer.ts` | Edit | Read `analysisModel` setting instead of hardcoded Haiku (line 160) |
+| `src/extension/session/SessionNamer.ts` | Edit | Read `analysisModel` setting instead of hardcoded Haiku (line 36) |
+| `src/extension/session/SessionTab.ts` | Edit | Instantiate `TurnAnalyzer` (local const, same pattern as sessionNamer), wire callback, inject into `MessageHandler` |
 | `package.json` | Edit | Add `claudeMirror.analysisModel` plus `turnAnalysis.*` safety settings |
-| `src/webview/state/store.ts` | Edit | Add dashboard UI state, `applyTurnSemantics`, and pending-semantics merge handling |
-| `src/webview/hooks/useClaudeStream.ts` | Edit | Handle `'turnSemantics'` message |
-| `src/webview/App.tsx` | Edit | Import + render `DashboardPanel`, add status-bar dashboard button (prefer lazy load) |
-| `src/extension/session/TurnAnalyzer.ts` | **New** | Per-turn semantic LLM analysis |
-| `src/webview/components/Dashboard/DashboardPanel.tsx` | **New** | Root overlay — tabs + gear |
-| `src/webview/components/Dashboard/MetricsCards.tsx` | **New** | 8-card summary |
-| `src/webview/components/Dashboard/TurnTable.tsx` | **New** | Sortable turn table |
-| `src/webview/components/Dashboard/CommandsTimeline.tsx` | **New** | Flat command list |
-| `src/webview/components/Dashboard/SettingsSidebar.tsx` | **New** | Analysis model info panel |
-| `src/webview/components/Dashboard/tabs/OverviewTab.tsx` | **New** | Cards + cost + mood strip |
-| `src/webview/components/Dashboard/tabs/TokensTab.tsx` | **New** | Stacked token bar |
-| `src/webview/components/Dashboard/tabs/ToolsTab.tsx` | **New** | Tool frequency + category |
-| `src/webview/components/Dashboard/tabs/TimelineTab.tsx` | **New** | Duration + semantics + table |
-| `src/webview/components/Dashboard/tabs/CommandsTab.tsx` | **New** | Bash command visualization |
-| `src/webview/components/Dashboard/semantic/MoodTimeline.tsx` | **New** | Mood icon strip |
-| `src/webview/components/Dashboard/semantic/TaskTypeDonut.tsx` | **New** | Task type distribution |
-| `src/webview/components/Dashboard/semantic/OutcomeBar.tsx` | **New** | Success/fail per turn |
-| `src/webview/components/Dashboard/semantic/FrustrationAlert.tsx` | **New** | 3-consecutive-frustrated warning |
-| `src/webview/components/Dashboard/semantic/BugRepeatTracker.tsx` | **New** | Repeated bug list |
-| `src/webview/components/Dashboard/charts/CostAreaChart.tsx` | **New** | Recharts ComposedChart |
-| `src/webview/components/Dashboard/charts/TokenStackedBar.tsx` | **New** | Recharts stacked BarChart |
-| `src/webview/components/Dashboard/charts/DurationBar.tsx` | **New** | Recharts BarChart with Cell colors |
-| `src/webview/components/Dashboard/charts/ToolFrequencyBar.tsx` | **New** | Recharts horizontal BarChart |
-| `src/webview/components/Dashboard/charts/CategoryDonut.tsx` | **New** | Recharts PieChart |
-| `src/webview/components/Dashboard/index.ts` | **New** | Re-exports |
+| `src/webview/state/store.ts` | Edit | Add `dashboardOpen` + `toggleDashboard`, `applyTurnSemantics`, `pendingTurnSemanticsByMessageId`, merge logic in `addTurnRecord` |
+| `src/webview/hooks/useClaudeStream.ts` | Edit | Handle `'turnSemantics'` message case |
+| `src/webview/App.tsx` | Edit | Import + render `DashboardPanel` (lazy-loaded), add status-bar dashboard button |
+| `src/extension/session/TurnAnalyzer.ts` | **New** | Per-turn semantic LLM analysis (prompt, parse, spawn, queue, caps, timeout) |
+| `src/webview/components/Dashboard/DashboardPanel.tsx` | **New** | Root overlay — tab nav, close button, ESC handler, settings link |
+| `src/webview/components/Dashboard/tabs/OverviewTab.tsx` | **New** | Metric cards + cost chart + mood strip + frustration alert |
+| `src/webview/components/Dashboard/tabs/TokensTab.tsx` | **New** | Mini stat cards + stacked token bar |
+| `src/webview/components/Dashboard/tabs/ToolsTab.tsx` | **New** | Tool frequency bar + category donut |
+| `src/webview/components/Dashboard/tabs/TimelineTab.tsx` | **New** | Duration bar + semantic charts + sortable turn table |
+| `src/webview/components/Dashboard/tabs/CommandsTab.tsx` | **New** | Command timeline + category filters + bug repeat tracker |
+| `src/webview/components/Dashboard/charts/RechartsWrappers.tsx` | **New** | All 7 Recharts chart components (CostArea, TokenStacked, Duration, ToolFreq, CategoryDonut, TaskTypeDonut, OutcomeBar) |
+| `src/webview/components/Dashboard/charts/SemanticWidgets.tsx` | **New** | MoodTimeline strip, FrustrationAlert card, BugRepeatTracker list |
+| `src/webview/components/Dashboard/MetricsCards.tsx` | **New** | 8-card summary row |
+| `src/webview/components/Dashboard/TurnTable.tsx` | **New** | Sortable paginated turn table with optional semantic columns |
+| `src/webview/components/Dashboard/dashboardUtils.ts` | **New** | Color palette, `categorizeCommand()`, shared types, helper functions |
+| `src/webview/components/Dashboard/index.ts` | **New** | Re-exports DashboardPanel |
 
-**Total:** ~9-11 edited files, ~22 new files (exact count depends on lazy-load helpers/shared utils)
+**Total:** ~9 edited files, ~13 new files (down from 22 — consolidated charts, semantics, and removed SettingsSidebar)
 
 ---
 
-## Effort Estimate
+## Effort Estimate (Revised)
 
 | Phase | Work |
 |-------|------|
-| Data types + TurnRecord extension | ~30 min |
+| Data types + TurnRecord extension + `extractTextFromContent` | ~30 min |
 | `TurnAnalyzer` class (prompt + parse + spawn + queue/caps) | ~3 hours |
 | `ActivitySummarizer` + `SessionNamer` model setting | ~30 min |
-| `package.json` setting + store + stream hook | ~45 min |
-| Dashboard UI: base + Overview + Tokens + Tools tabs | ~4 hours |
-| Dashboard UI: Timeline tab + TurnTable | ~2 hours |
-| Dashboard UI: Commands tab | ~2 hours |
-| Dashboard UI: Semantic components | ~3 hours |
-| Styling, empty states, responsiveness, lazy-load wiring | ~2 hours |
+| `package.json` settings + store actions + stream hook + CSP | ~1 hour |
+| Dashboard UI: DashboardPanel + Overview + Tokens + Tools tabs | ~3.5 hours |
+| Dashboard UI: Timeline tab + TurnTable (paginated, sortable) | ~2 hours |
+| Dashboard UI: Commands tab + dashboardUtils | ~1.5 hours |
+| RechartsWrappers + SemanticWidgets (consolidated) | ~2.5 hours |
+| Styling, empty states, responsive grid, lazy-load wiring | ~1.5 hours |
 | Integration testing (resume/fork/history + async semantics races) | ~2 hours |
-| **Total** | **~3-4 development days (safer estimate)** |
+| **Total** | **~3 development days** |
+
+Consolidation saves ~0.5-1 day vs. original estimate by reducing file count and eliminating the SettingsSidebar.
 
 ---
 
@@ -979,10 +1036,15 @@ Semantic charts additionally handle `turnHistory.filter(t => t.semantics).length
 
 1. `npm run deploy:local` + reload VS Code
 2. Open a session, run several prompts (with tool use and Bash commands)
-3. Click the "Dashboard" button → verify panel opens
-4. Verify all 5 tabs render correctly
-5. Verify `turnSemantics` arrives (check Output → ClaUi for `[TurnAnalyzer]` logs)
-6. Verify Bash commands appear in Commands tab
-7. Change `claudeMirror.analysisModel` to Sonnet → verify session namer and activity summarizer pick it up
-8. Verify empty states show before any turns
-9. `npm run verify:installed`
+3. Click the "Dashboard" button -> verify panel opens and closes cleanly (including ESC key)
+4. Verify all 5 tabs render correctly (with and without semantic data)
+5. Verify `turnSemantics` arrives (check Output -> ClaUi for `[TurnAnalyzer]` logs)
+6. Verify Bash commands appear in Commands tab and are linked to the correct turns
+7. Disable `claudeMirror.turnAnalysis.enabled` -> verify semantic widgets show disabled/pending states without errors
+8. Resume an old session + fork a session -> verify dashboard renders without waiting for new turns
+9. Change `claudeMirror.analysisModel` to Sonnet -> verify session namer and activity summarizer pick it up
+10. Verify empty states show before any turns
+11. Verify gear icon in dashboard header opens VS Code Settings filtered to `claudeMirror`
+12. Clear session -> open dashboard -> verify turnHistory is reset (no stale data from previous session)
+13. Test with ~50+ turns to verify no rendering lag (especially TurnTable pagination and chart responsiveness)
+14. `npm run verify:installed`

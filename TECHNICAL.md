@@ -62,8 +62,10 @@ claude-code-mirror/
 |   |   |   +-- MessageTranslator.ts      #   Translates assistant messages to Hebrew via Sonnet CLI call
 |   |   |   +-- FileLogger.ts             #   Per-session file logging with rotation and rename
 |   |   |   +-- SessionStore.ts           #   Persists session metadata in globalState
+|   |   |   +-- ProjectAnalyticsStore.ts  #   Persists SessionSummary in workspaceState (per-project)
 |   |   |   +-- ConversationReader.ts     #   Reads conversation history from Claude's session JSONL files
 |   |   |   +-- PromptHistoryStore.ts     #   Persists prompt history (project + global scope)
+|   |   |   +-- TurnAnalyzer.ts           #   Semantic turn analysis via Claude (mood, task type, outcome)
 |   |   |   +-- SessionFork.ts            #   Phase 3 stub (rewind)
 |   |   +-- terminal/                     #   Phase 2 stubs
 |   |   +-- auth/                         #   Phase 5 stub
@@ -109,6 +111,26 @@ claude-code-mirror/
 |       |   |       +-- sprites.ts       #     Palette, 4x4 mini sprites, drawSprite()
 |       |   |       +-- dungeon.ts       #     Maze class: generation, BFS, wall rendering, camera
 |       |   |       +-- AdventureEngine.ts #   State machine, animation loop, renderer
+|       |   +-- Dashboard/
+|       |   |   +-- DashboardPanel.tsx    #   Root overlay (tab nav, close, Esc, Session/Project toggle)
+|       |   |   +-- MetricsCards.tsx      #   8-card summary row
+|       |   |   +-- TurnTable.tsx         #   Sortable paginated turn table
+|       |   |   +-- dashboardUtils.ts     #   Colors, helpers, command categorization
+|       |   |   +-- index.ts             #   Re-exports DashboardPanel
+|       |   |   +-- tabs/
+|       |   |   |   +-- OverviewTab.tsx   #     Session: Metrics + cost/duration charts + tools + mood
+|       |   |   |   +-- TokensTab.tsx     #     Session: Token breakdown per turn
+|       |   |   |   +-- ToolsTab.tsx      #     Session: Tool frequency + category donut
+|       |   |   |   +-- TimelineTab.tsx   #     Session: Duration bar + task type + turn table
+|       |   |   |   +-- CommandsTab.tsx   #     Session: Bash command timeline + filters
+|       |   |   |   +-- ContextTab.tsx    #     Session: Metadata + conversation inspector
+|       |   |   |   +-- ProjectOverviewTab.tsx  #  Project: Aggregated metrics + charts across sessions
+|       |   |   |   +-- ProjectSessionsTab.tsx  #  Project: Sortable/filterable session table
+|       |   |   |   +-- ProjectTokensTab.tsx    #  Project: Aggregated token breakdown
+|       |   |   |   +-- ProjectToolsTab.tsx     #  Project: Aggregated tool/category/task type
+|       |   |   +-- charts/
+|       |   |       +-- RechartsWrappers.tsx  # 7 Recharts chart components
+|       |   |       +-- SemanticWidgets.tsx   # MoodTimeline, FrustrationAlert, BugRepeatTracker
 |       |   +-- TextSettingsBar/
 |       |       +-- TextSettingsBar.tsx   #   Font size/family/theme controls
 |       +-- styles/
@@ -221,6 +243,12 @@ claude-code-mirror/
 **Adventure Widget** - Pixel-art dungeon crawler that visualizes session activity as a thin-wall maze grid. Each CLI turn extends the maze and maps to an encounter: scrolls (Read), anvils (Edit), traps (errors), dragons (3+ errors), treasure (recovery). Canvas 2D engine with 4x4 mini sprites on a 40x40 cell maze, PICO-8 palette, BFS pathfinding, state machine (IDLE/WALKING/ENCOUNTER/RESOLUTION). Extension-side `AdventureInterpreter` converts `TurnRecord` to `AdventureBeat` via deterministic rules. Toggleable separately from main vitals.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ADVENTURE_WIDGET.md`
 
+**Analytics Dashboard** - Full-screen overlay with two modes: **Session** (6 tabs: Overview, Tokens, Tools, Timeline, Commands, Context) and **Project** (4 tabs: Overview, Sessions, Tokens, Tools). Session mode shows current-session analytics from Zustand `turnHistory`. Project mode aggregates `SessionSummary` records across all past sessions in the workspace, persisted in `ProjectAnalyticsStore` (VS Code `workspaceState`). A pill toggle in the header switches modes. Session summaries are auto-saved when a session ends; project data is loaded on demand. Session mode: 8 metric cards, cost/duration charts, tool frequency, category donut, mood timeline, frustration alerts, conversation inspector. Project mode: 8 aggregated metrics, cost/turns per session charts, aggregated tool frequency, category distribution, model usage, sortable session table with expandable details, aggregated token breakdown.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ANALYTICS_DASHBOARD.md`
+
+**TurnAnalyzer** - Background semantic analysis engine (enabled by default). After each turn completes, spawns a one-shot Claude CLI process (using `claudeMirror.analysisModel`) to classify user mood, task type, outcome, and bug repetition. Results arrive asynchronously and merge into `turnHistory` via `turnSemantics` postMessage. Includes queue (max 20), per-session cap, timeout, and enable flag for cost control.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ANALYTICS_DASHBOARD.md`
+
 **File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/DRAG_AND_DROP_CHALLENGE.md`
 
@@ -245,6 +273,13 @@ claude-code-mirror/
 | `claudeMirror.logDirectory` | `""` | Directory for log files (empty = extension's default storage) |
 | `claudeMirror.sessionVitals` | `false` | Show Session Vitals dashboard (timeline, weather, cost bar, turn borders) |
 | `claudeMirror.adventureWidget` | `false` | Show pixel-art dungeon crawler adventure widget |
+| `claudeMirror.analysisModel` | `"claude-haiku-4-5-20251001"` | Model for background analysis (session naming, summaries, semantic turn analysis) |
+| `claudeMirror.turnAnalysis.enabled` | `false` | Enable background semantic analysis for dashboard insights |
+| `claudeMirror.turnAnalysis.maxPerSession` | `30` | Max semantic analysis calls per session tab |
+| `claudeMirror.turnAnalysis.timeoutMs` | `30000` | Timeout for a single semantic analysis call |
+
+> **Note:** `turnAnalysis.enabled` and `analysisModel` are also configurable inline via the Vitals gear button in the StatusBar. Changes sync bidirectionally with VS Code settings.
+
 | `claudeMirror.gitPush.enabled` | `true` | Whether git push is configured and ready to use via the Git button |
 | `claudeMirror.gitPush.scriptPath` | `"scripts/git-push.ps1"` | Path to the git push script (relative to workspace root) |
 | `claudeMirror.gitPush.commitMessageTemplate` | `"{sessionName}"` | Commit message template ({sessionName} = tab name) |
@@ -260,6 +295,7 @@ claude-code-mirror/
 | zustand 4 | Lightweight state management |
 | marked | Markdown-to-HTML parser (GFM support) |
 | dompurify | HTML sanitizer for XSS prevention |
+| recharts 3 | D3-backed React chart library (analytics dashboard) |
 | webpack 5 | Bundling (dual-target) |
 | ts-loader | TypeScript compilation in webpack |
 | css-loader + style-loader | CSS bundling for webview |

@@ -89,14 +89,19 @@ export const PlanApprovalBar: React.FC = () => {
 
   if (!pendingApproval) return null;
 
+  // The tool name that triggered this approval - sent back to the extension
+  // so it can identify the tool even if the `result` event already cleared
+  // `pendingApprovalTool` (race condition fix).
+  const approvalToolName = pendingApproval.toolName;
+
   // --- Plan approval handlers ---
   const handleApprove = () => {
-    postToExtension({ type: 'planApprovalResponse', action: 'approve' });
+    postToExtension({ type: 'planApprovalResponse', action: 'approve', toolName: approvalToolName });
     setPendingApproval(null);
   };
 
   const handleReject = () => {
-    postToExtension({ type: 'planApprovalResponse', action: 'reject' });
+    postToExtension({ type: 'planApprovalResponse', action: 'reject', toolName: approvalToolName });
     setPendingApproval(null);
   };
 
@@ -106,6 +111,7 @@ export const PlanApprovalBar: React.FC = () => {
       type: 'planApprovalResponse',
       action: 'feedback',
       feedback: feedbackText.trim(),
+      toolName: approvalToolName,
     });
     setPendingApproval(null);
     setFeedbackText('');
@@ -137,6 +143,7 @@ export const PlanApprovalBar: React.FC = () => {
         type: 'planApprovalResponse',
         action: 'questionAnswer',
         selectedOptions: [label],
+        toolName: approvalToolName,
       });
       setPendingApproval(null);
     }
@@ -148,6 +155,7 @@ export const PlanApprovalBar: React.FC = () => {
       type: 'planApprovalResponse',
       action: 'questionAnswer',
       selectedOptions: Array.from(selectedOptions),
+      toolName: approvalToolName,
     });
     setPendingApproval(null);
     setSelectedOptions(new Set());
@@ -159,6 +167,7 @@ export const PlanApprovalBar: React.FC = () => {
       type: 'planApprovalResponse',
       action: 'questionAnswer',
       selectedOptions: [feedbackText.trim()],
+      toolName: approvalToolName,
     });
     setPendingApproval(null);
     setFeedbackText('');

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaUi - שדרוג דשבורד הניתוח</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', 'Arial', sans-serif; background: #0d1117; color: #e6edf3; direction: rtl; line-height: 1.7; padding: 40px 20px; }
+  .container { max-width: 860px; margin: 0 auto; }
+  .header { text-align: center; margin-bottom: 40px; padding-bottom: 24px; border-bottom: 1px solid #30363d; }
+  .header h1 { font-size: 1.8rem; color: #58a6ff; margin-bottom: 8px; }
+  .header p { color: #8b949e; font-size: 1rem; }
+  .badge { display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; margin: 4px; }
+  .badge-green { background: rgba(63, 185, 80, 0.15); color: #3fb950; border: 1px solid rgba(63, 185, 80, 0.3); }
+  .section { margin-bottom: 32px; background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px; }
+  .section h2 { color: #58a6ff; font-size: 1.2rem; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid #30363d; }
+  .section h3 { color: #bc8cff; font-size: 1rem; margin: 16px 0 8px; }
+  ul { padding-right: 20px; }
+  li { margin: 6px 0; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; margin: 2px; }
+  .tag-blue { background: #58a6ff33; color: #58a6ff; }
+  .tag-green { background: #3fb95033; color: #3fb950; }
+  .tag-purple { background: #bc8cff33; color: #bc8cff; }
+  .tag-amber { background: #e3b34133; color: #e3b341; }
+  .tag-teal { background: #39d35333; color: #39d353; }
+  .tag-orange { background: #f0883e33; color: #f0883e; }
+  .note { border-right: 4px solid #e3b341; background: rgba(227, 179, 65, 0.06); }
+  .done { border-right: 4px solid #3fb950; }
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px; }
+  .summary-card { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 18px; text-align: center; }
+  .summary-card .number { font-size: 1.6rem; font-weight: 700; display: block; margin-bottom: 4px; }
+  .summary-card .label { color: #8b949e; font-size: 0.85rem; }
+  .verdict { text-align: center; padding: 28px; margin-top: 24px; background: rgba(63, 185, 80, 0.08); border: 1px solid rgba(63, 185, 80, 0.3); border-radius: 12px; }
+  .verdict h2 { color: #3fb950; font-size: 1.3rem; }
+  .verdict p { color: #8b949e; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>שדרוג דשבורד הניתוח - סיכום</h1>
+    <p>3 שינויים שבוצעו לפי בקשה | ClaUi v0.1.15</p>
+    <div style="margin-top: 14px;">
+      <span class="badge badge-green">בוצע בהצלחה</span>
+    </div>
+  </div>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <span class="number" style="color: #3fb950;">1</span>
+      <span class="label">קובץ חדש</span>
+    </div>
+    <div class="summary-card">
+      <span class="number" style="color: #58a6ff;">10</span>
+      <span class="label">קבצים שעודכנו</span>
+    </div>
+    <div class="summary-card">
+      <span class="number" style="color: #bc8cff;">6</span>
+      <span class="label">טאבים בדשבורד</span>
+    </div>
+  </div>
+
+  <!-- Change 1 -->
+  <div class="section done">
+    <h2>1. ניתוח סמנטי - מופעל כברירת מחדל</h2>
+    <p>הניתוח הסמנטי שמזהה מצב רוח, סוג משימה, תוצאה, ובאגים חוזרים <strong>מופעל עכשיו אוטומטית</strong> מרגע ההתקנה.</p>
+    <p style="margin-top: 8px;">קודם היה צריך להפעיל ידנית דרך ההגדרות - עכשיו זה עובד מייד. אפשר לכבות בכל רגע דרך כפתור ההגדרות (גלגל השיניים ליד Vitals) או דרך הגדרות VS Code.</p>
+    <p style="margin-top: 8px; color: #8b949e;">מה שונה: ברירת מחדל בארבעה מקומות (הגדרת התוסף, מנתח הסמנטי, מנהל ההודעות, חנות המצב).</p>
+  </div>
+
+  <!-- Change 2 -->
+  <div class="section done">
+    <h2>2. דף הבית (Overview) - יותר נתונים, בלי טוקנים</h2>
+
+    <h3>כרטיסי מטריקות חדשים</h3>
+    <p>3 כרטיסים שקשורים לטוקנים הוסרו והוחלפו:</p>
+    <ul>
+      <li><span class="tag tag-teal">סך שימושי כלים</span> - כמה פעמים השתמש קלוד בכלים בסה"כ</li>
+      <li><span class="tag tag-purple">הכלי הנפוץ ביותר</span> - שם הכלי + מספר הפעמים</li>
+      <li><span class="tag tag-orange">פקודות Shell</span> - כמה פקודות Bash הורצו</li>
+    </ul>
+    <p style="margin-top: 10px;">נשארו: עלות כוללת, מספר תורות, עלות ממוצעת, שיעור שגיאות, משך ממוצע.</p>
+
+    <h3>גרפים חדשים</h3>
+    <p>דף הבית מציג עכשיו <strong>4 גרפים</strong> במקום 2:</p>
+    <ul>
+      <li><span class="tag tag-blue">עלות לתור</span> - כמו קודם (מצטבר + לתור)</li>
+      <li><span class="tag tag-green">משך זמן לתור</span> - <strong>חדש</strong> - צבעוני לפי קטגוריה (כתיבה, מחקר, פקודה, שגיאה, דיון)</li>
+      <li><span class="tag tag-purple">תדירות כלים</span> - <strong>חדש</strong> - 15 הכלים הנפוצים ביותר בגרף אופקי</li>
+      <li><span class="tag tag-amber">התפלגות קטגוריות</span> - <strong>חדש</strong> - תרשים דונאט עם אחוזים</li>
+    </ul>
+    <p style="margin-top: 10px;">פס מצב רוח והתראת תסכול נשארים כמו שהיו.</p>
+  </div>
+
+  <!-- Change 3 -->
+  <div class="section done">
+    <h2>3. טאב חדש: בודק הקשר (Context)</h2>
+    <p>טאב שישי חדש בדשבורד שמראה את <strong>כל התקשורת עם מודל השפה</strong>.</p>
+
+    <h3>מטא-דאטה של הסשן</h3>
+    <p>מוצג בראש הטאב כרטיס עם:</p>
+    <ul>
+      <li>מזהה סשן</li>
+      <li>שם המודל הפעיל (צבעוני)</li>
+      <li>תיקיית עבודה</li>
+      <li>שרתי MCP מחוברים (בתגיות סגולות)</li>
+      <li>רשימת כלים זמינים (כל הכלים שהמודל יכול להשתמש בהם)</li>
+    </ul>
+
+    <h3>מציג שיחות מלא</h3>
+    <p>כל הודעה ניתנת להרחבה בלחיצה. כשמורחבת, מציגה:</p>
+    <ul>
+      <li><span class="tag tag-blue">טקסט</span> - תוכן הטקסט של ההודעה</li>
+      <li><span class="tag tag-amber">קריאת כלי</span> - שם הכלי + קלט מלא בפורמט JSON</li>
+      <li><span class="tag tag-teal">תוצאת כלי</span> - פלט הכלי כולל סטטוס שגיאה</li>
+      <li>תמונות מסומנות בהתאם</li>
+    </ul>
+
+    <h3>יכולות סינון וחיפוש</h3>
+    <ul>
+      <li>סינון לפי תפקיד: הכל / משתמש / עוזר</li>
+      <li>חיפוש טקסט חופשי בתוכן הודעות, שמות כלים, קלט כלים</li>
+      <li>כפתורי "הרחב הכל" / "כווץ הכל"</li>
+      <li>סרגל סטטיסטיקה: מספר הודעות, בלוקי תוכן, קריאות כלים</li>
+    </ul>
+  </div>
+
+  <!-- Note -->
+  <div class="section note">
+    <h2>הערה חשובה: פרומפט מערכת</h2>
+    <p>פרומפט המערכת (System Prompt) <strong>לא זמין</strong> דרך פרוטוקול ה-CLI של קלוד. זו מגבלה של הפרוטוקול עצמו.</p>
+    <p style="margin-top: 6px;">הטאב מציג את כל מה שכן זמין: מטא-דאטה מאירוע האתחול (כלים, מודל, תיקייה, שרתי MCP) ואת כל הודעות השיחה עם כל בלוקי התוכן.</p>
+    <p style="margin-top: 6px; color: #8b949e;">לעומת כלי כמו llm-visuals שעובד כפרוקסי הפוך ויכול ליירט את הפרומפט, ClaUi עובד מעל CLI קיים ורואה רק את מה שהפרוטוקול חושף.</p>
+  </div>
+
+  <!-- Verdict -->
+  <div class="verdict">
+    <h2>כל השינויים בוצעו בהצלחה</h2>
+    <p>TypeScript נקי | בנייה מוצלחת | פריסה מוצלחת | אימות תקין</p>
+    <p>יש לבצע Reload Window ב-VS Code כדי לראות את השינויים.</p>
+  </div>
+
+</div>
+</body>
+</html>

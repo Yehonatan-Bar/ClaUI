@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { TabManager } from './session/TabManager';
 import { SessionStore } from './session/SessionStore';
+import { ProjectAnalyticsStore } from './session/ProjectAnalyticsStore';
 import { PromptHistoryStore } from './session/PromptHistoryStore';
 import { FileLogger } from './session/FileLogger';
 import { AchievementService } from './achievements/AchievementService';
@@ -49,11 +50,17 @@ export function activate(context: vscode.ExtensionContext): void {
   const promptHistoryStore = new PromptHistoryStore(context.globalState, context.workspaceState);
   const achievementService = new AchievementService(context.globalState, log);
 
+  // Create project analytics store for cross-session dashboard data (workspace-scoped)
+  const projectAnalyticsStore = new ProjectAnalyticsStore(context.workspaceState);
+  const storedAnalytics = projectAnalyticsStore.getSummaries();
+  log(`[ProjectAnalytics] Found ${storedAnalytics.length} stored session summaries on activation`);
+
   // Create the tab manager that owns all session tabs
   tabManager = new TabManager(
     context,
     log,
     sessionStore,
+    projectAnalyticsStore,
     promptHistoryStore,
     achievementService,
     enableFileLogging ? logDir : null

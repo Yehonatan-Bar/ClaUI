@@ -883,7 +883,8 @@ html, body, #root {
 }
 
 /* History button in status bar - always visible */
-.status-bar-history-btn {
+.status-bar-history-btn,
+.status-bar-feedback-btn {
   background: none;
   border: 1px solid var(--vscode-panel-border, #333);
   border-radius: 3px;
@@ -895,7 +896,8 @@ html, body, #root {
   line-height: 1.4;
 }
 
-.status-bar-history-btn:hover {
+.status-bar-history-btn:hover,
+.status-bar-feedback-btn:hover {
   background: var(--vscode-toolbar-hoverBackground);
   color: var(--vscode-editor-foreground);
 }

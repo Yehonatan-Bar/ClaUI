@@ -54,6 +54,10 @@ export function useClaudeStream(): void {
     setAdventureEnabled,
     addTurnRecord,
     addAdventureBeat,
+    applyTurnSemantics,
+    setTurnAnalysisSettings,
+    setSessionMetadata,
+    setProjectSessions,
   } = useAppStore();
 
   useEffect(() => {
@@ -371,6 +375,22 @@ export function useClaudeStream(): void {
         case 'adventureBeat':
           addAdventureBeat(msg.beat as import('../components/Vitals/adventure/types').AdventureBeat);
           break;
+
+        case 'turnSemantics':
+          applyTurnSemantics(msg.messageId, msg.semantics);
+          break;
+
+        case 'turnAnalysisSettings':
+          setTurnAnalysisSettings({ enabled: msg.enabled, analysisModel: msg.analysisModel });
+          break;
+
+        case 'sessionMetadata':
+          setSessionMetadata({ tools: msg.tools, model: msg.model, cwd: msg.cwd, mcpServers: msg.mcpServers });
+          break;
+
+        case 'projectAnalyticsData':
+          setProjectSessions(msg.sessions);
+          break;
       }
     }
 
@@ -424,6 +444,10 @@ export function useClaudeStream(): void {
     setAdventureEnabled,
     addTurnRecord,
     addAdventureBeat,
+    applyTurnSemantics,
+    setTurnAnalysisSettings,
+    setSessionMetadata,
+    setProjectSessions,
   ]);
 }
 

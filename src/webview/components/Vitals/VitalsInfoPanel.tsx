@@ -7,6 +7,12 @@ const LANGUAGE_OPTIONS = [
   'German', 'Portuguese', 'Chinese', 'Japanese', 'Korean',
 ];
 
+const MODEL_OPTIONS = [
+  { value: 'claude-haiku-4-5-20251001', label: 'Haiku (fastest, cheapest)' },
+  { value: 'claude-sonnet-4-6', label: 'Sonnet (balanced)' },
+  { value: 'claude-opus-4-6', label: 'Opus (most capable)' },
+];
+
 interface VitalsInfoPanelProps {
   onClose: () => void;
 }
@@ -18,6 +24,8 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
   const setAdventureEnabled = useAppStore((s) => s.setAdventureEnabled);
   const translationLanguage = useAppStore((s) => s.translationLanguage);
   const setTranslationLanguage = useAppStore((s) => s.setTranslationLanguage);
+  const turnAnalysisEnabled = useAppStore((s) => s.turnAnalysisEnabled);
+  const analysisModel = useAppStore((s) => s.analysisModel);
 
   const handleToggle = () => {
     const next = !vitalsEnabled;
@@ -34,6 +42,17 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
   const handleLanguageChange = (language: string) => {
     setTranslationLanguage(language);
     postToExtension({ type: 'setTranslationLanguage', language });
+  };
+
+  const handleTurnAnalysisToggle = () => {
+    const next = !turnAnalysisEnabled;
+    useAppStore.getState().setTurnAnalysisSettings({ enabled: next, analysisModel });
+    postToExtension({ type: 'setTurnAnalysisEnabled', enabled: next });
+  };
+
+  const handleAnalysisModelChange = (model: string) => {
+    useAppStore.getState().setTurnAnalysisSettings({ enabled: turnAnalysisEnabled, analysisModel: model });
+    postToExtension({ type: 'setAnalysisModel', model });
   };
 
   return (
@@ -111,6 +130,29 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
         >
           <span className="vitals-toggle-knob" />
         </button>
+      </div>
+
+      <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
+        <span>Semantic Analysis</span>
+        <button
+          className={`vitals-info-toggle-btn ${turnAnalysisEnabled ? 'on' : 'off'}`}
+          onClick={handleTurnAnalysisToggle}
+        >
+          <span className="vitals-toggle-knob" />
+        </button>
+      </div>
+
+      <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
+        <span>Analysis Model</span>
+        <select
+          className="vitals-info-language-select"
+          value={analysisModel}
+          onChange={(e) => handleAnalysisModelChange(e.target.value)}
+        >
+          {MODEL_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
       </div>
 
       <div className="vitals-info-toggle-row">

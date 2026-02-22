@@ -14,6 +14,7 @@ import { SessionRecapCard } from './components/Achievements/SessionRecapCard';
 import { VitalsContainer } from './components/Vitals/VitalsContainer';
 import { SessionTimeline } from './components/Vitals/SessionTimeline';
 import { VitalsInfoPanel } from './components/Vitals/VitalsInfoPanel';
+import { DashboardPanel } from './components/Dashboard';
 import { postToExtension } from './hooks/useClaudeStream';
 import { detectRtl } from './hooks/useRtlDetection';
 import { deriveTurnHistoryFromMessages } from './utils/turnVitals';
@@ -47,6 +48,7 @@ export const App: React.FC = () => {
     achievementPanelOpen,
     vitalsEnabled,
     turnHistory,
+    dashboardOpen,
   } = useAppStore();
   const forkInit = useAppStore((s) => s.forkInit);
   const hasMessages = messages.length > 0 || streamingMessageId !== null;
@@ -98,6 +100,7 @@ export const App: React.FC = () => {
       {/* Prompt history panel overlay */}
       {promptHistoryPanelOpen && <PromptHistoryPanel />}
       {achievementsEnabled && achievementPanelOpen && <AchievementPanel />}
+      {dashboardOpen && <DashboardPanel />}
 
       {/* Error banner */}
       {lastError && (
@@ -248,6 +251,7 @@ const StatusBar: React.FC<{
     setAchievementPanelOpen,
     vitalsEnabled,
     setVitalsEnabled,
+    toggleDashboard,
     sessionActivityStarted,
     sessionActivityElapsedMs,
     sessionActivityRunningSinceMs,
@@ -280,6 +284,10 @@ const StatusBar: React.FC<{
 
   const handleOpenPlans = () => {
     postToExtension({ type: 'openPlanDocs' });
+  };
+
+  const handleFeedback = () => {
+    postToExtension({ type: 'openFeedback' });
   };
 
   const handleGitPush = () => {
@@ -333,6 +341,9 @@ const StatusBar: React.FC<{
       <button className="status-bar-plans-btn" onClick={handleOpenPlans} title="Open plan document in browser">
         Plans
       </button>
+      <button className="status-bar-feedback-btn" onClick={handleFeedback} title="Send feedback or report a bug">
+        Feedback
+      </button>
       <div className="status-bar-git-group">
         <button
           className={`status-bar-git-btn ${gitPushSettings?.enabled ? '' : 'not-configured'}`}
@@ -353,6 +364,23 @@ const StatusBar: React.FC<{
       <ModelSelector />
       <PermissionModeSelector />
       <TextSettingsBar />
+      <button
+        className="status-bar-dashboard-btn"
+        title="Analytics Dashboard"
+        aria-label="Open analytics dashboard"
+        onClick={toggleDashboard}
+        style={{
+          background: 'none',
+          border: '1px solid rgba(255,255,255,0.15)',
+          color: '#e6edf3',
+          cursor: 'pointer',
+          padding: '2px 8px',
+          borderRadius: '4px',
+          fontSize: '12px',
+        }}
+      >
+        Dashboard
+      </button>
       <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
         <div className="status-bar-vitals-controls">
           <button

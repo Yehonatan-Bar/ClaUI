@@ -14,6 +14,11 @@
     "url": "https://github.com/Yehonatan-Bar/ClaUI"
   },
   "homepage": "https://github.com/Yehonatan-Bar/ClaUI#readme",
+  "bugs": {
+    "url": "https://github.com/Yehonatan-Bar/ClaUI/issues",
+    "email": "yonzbar@gmail.com"
+  },
+  "qna": "https://github.com/Yehonatan-Bar/ClaUI/discussions",
   "categories": [
     "AI",
     "Chat"
@@ -69,6 +74,10 @@
       {
         "command": "claudeMirror.toggleAchievements",
         "title": "ClaUi: Toggle Achievements"
+      },
+      {
+        "command": "claudeMirror.sendFeedback",
+        "title": "ClaUi: Send Feedback"
       }
     ],
     "configuration": {
@@ -217,6 +226,38 @@
           "default": false,
           "description": "Show the Adventure Widget - a pixel-art dungeon crawler that visualizes Claude's tool activity as a roguelike adventure"
         },
+        "claudeMirror.analysisModel": {
+          "type": "string",
+          "default": "claude-haiku-4-5-20251001",
+          "enum": [
+            "claude-haiku-4-5-20251001",
+            "claude-sonnet-4-6",
+            "claude-opus-4-6"
+          ],
+          "enumDescriptions": [
+            "Haiku - fastest and cheapest, good for quick summaries (recommended)",
+            "Sonnet - higher quality analysis, moderate cost",
+            "Opus - highest quality, slower and more expensive"
+          ],
+          "description": "Model used for background analysis: session naming, activity summaries, and semantic turn analysis"
+        },
+        "claudeMirror.turnAnalysis.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable background semantic analysis for dashboard insights (adds extra Claude calls)"
+        },
+        "claudeMirror.turnAnalysis.maxPerSession": {
+          "type": "number",
+          "default": 30,
+          "minimum": 0,
+          "description": "Maximum number of semantic analysis calls per session tab"
+        },
+        "claudeMirror.turnAnalysis.timeoutMs": {
+          "type": "number",
+          "default": 30000,
+          "minimum": 5000,
+          "description": "Timeout for a single semantic analysis call"
+        },
         "claudeMirror.achievements.enabled": {
           "type": "boolean",
           "default": true,
@@ -255,6 +296,41 @@
         "command": "claudeMirror.cancelRequest",
         "key": "escape",
         "when": "activeWebviewPanelId == 'claudeMirror.chat'"
+      },
+      {
+        "command": "claudeMirror.stopSession",
+        "key": "ctrl+alt+q",
+        "mac": "cmd+alt+q"
+      },
+      {
+        "command": "claudeMirror.compact",
+        "key": "ctrl+alt+k",
+        "mac": "cmd+alt+k"
+      },
+      {
+        "command": "claudeMirror.resumeSession",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r"
+      },
+      {
+        "command": "claudeMirror.sendMessage",
+        "key": "ctrl+alt+enter",
+        "mac": "cmd+alt+enter"
+      },
+      {
+        "command": "claudeMirror.openPlanDocs",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p"
+      },
+      {
+        "command": "claudeMirror.openLogDirectory",
+        "key": "ctrl+alt+l",
+        "mac": "cmd+alt+l"
+      },
+      {
+        "command": "claudeMirror.toggleAchievements",
+        "key": "ctrl+alt+a",
+        "mac": "cmd+alt+a"
       }
     ],
     "menus": {
@@ -278,6 +354,14 @@
         },
         {
           "command": "claudeMirror.toggleAchievements"
+        },
+        {
+          "command": "claudeMirror.sendFeedback"
+        }
+      ],
+      "issue/reporter": [
+        {
+          "command": "claudeMirror.sendFeedback"
         }
       ]
     }
@@ -309,6 +393,7 @@
     "marked": "^17.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "recharts": "^3.7.0",
     "zustand": "^4.5.0"
   }
 }

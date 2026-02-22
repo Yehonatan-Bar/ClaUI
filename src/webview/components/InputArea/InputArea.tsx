@@ -142,6 +142,7 @@ export const InputArea: React.FC = () => {
         action: isQuestion ? 'questionAnswer' : 'feedback',
         feedback: trimmed,
         selectedOptions: isQuestion ? [trimmed] : undefined,
+        toolName: pendingApproval.toolName,
       });
       setPendingApproval(null);
     } else if (pendingImages.length > 0) {

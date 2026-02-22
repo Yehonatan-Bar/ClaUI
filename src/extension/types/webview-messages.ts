@@ -82,6 +82,10 @@ export interface PlanApprovalResponseMessage {
   type: 'planApprovalResponse';
   action: 'approve' | 'reject' | 'feedback' | 'questionAnswer';
   feedback?: string;
+  /** The tool that triggered the approval (ExitPlanMode / AskUserQuestion).
+   *  Sent by the webview so the handler can identify the tool even if the
+   *  `result` event already cleared `pendingApprovalTool`. */
+  toolName?: string;
   /** Selected option label(s) when answering AskUserQuestion */
   selectedOptions?: string[];
 }
@@ -94,6 +98,10 @@ export interface OpenFileRequest {
 export interface OpenUrlRequest {
   type: 'openUrl';
   url: string;
+}
+
+export interface OpenFeedbackRequest {
+  type: 'openFeedback';
 }
 
 export interface GetPromptHistoryRequest {
@@ -182,6 +190,24 @@ export interface GetAchievementsSnapshotRequest {
   type: 'getAchievementsSnapshot';
 }
 
+export interface OpenSettingsRequest {
+  type: 'openSettings';
+  query: string;
+}
+
+export interface SetTurnAnalysisEnabledRequest {
+  type: 'setTurnAnalysisEnabled';
+  enabled: boolean;
+}
+
+export interface SetAnalysisModelRequest {
+  type: 'setAnalysisModel';
+  model: string;
+}
+
+export interface GetProjectAnalyticsRequest {
+  type: 'getProjectAnalytics';
+}
 
 export type WebviewToExtensionMessage =
   | SendTextMessage
@@ -202,6 +228,7 @@ export type WebviewToExtensionMessage =
   | PlanApprovalResponseMessage
   | OpenFileRequest
   | OpenUrlRequest
+  | OpenFeedbackRequest
   | GetPromptHistoryRequest
   | EditAndResendRequest
   | ForkFromMessageRequest
@@ -216,7 +243,11 @@ export type WebviewToExtensionMessage =
   | SetVitalsEnabledRequest
   | SetAdventureWidgetEnabledRequest
   | SetTranslationLanguageRequest
-  | AdventureDebugLogMessage;
+  | AdventureDebugLogMessage
+  | OpenSettingsRequest
+  | SetTurnAnalysisEnabledRequest
+  | SetAnalysisModelRequest
+  | GetProjectAnalyticsRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -467,6 +498,37 @@ export type TurnCategory =
   | 'research'      // Orange - Read, Grep, Glob, WebSearch, WebFetch
   | 'command';      // Cyan - Bash tool usage
 
+/** Semantic analysis signals for a turn, populated asynchronously by TurnAnalyzer */
+export interface TurnSemantics {
+  /** User's inferred emotional state this turn */
+  userMood: 'frustrated' | 'satisfied' | 'confused' | 'excited' | 'neutral' | 'urgent';
+  /** Whether the stated task appears to be resolved */
+  taskOutcome: 'success' | 'partial' | 'failed' | 'in-progress' | 'unknown';
+  /** Classification of the task the user is working on */
+  taskType: TaskType;
+  /** Is this a repeated mention of the same bug? */
+  bugRepeat: 'none' | 'first' | 'second' | 'third-plus';
+  /** Model's confidence in these signals (0-1) */
+  confidence: number;
+}
+
+export type TaskType =
+  | 'bug-fix'
+  | 'feature-small'
+  | 'feature-large'
+  | 'exploration'
+  | 'refactor'
+  | 'new-app'
+  | 'planning'
+  | 'code-review'
+  | 'debugging'
+  | 'testing'
+  | 'documentation'
+  | 'devops'
+  | 'question'
+  | 'configuration'
+  | 'unknown';
+
 export interface TurnRecord {
   turnIndex: number;
   toolNames: string[];
@@ -482,6 +544,15 @@ export interface TurnRecord {
   adventureArtifacts?: string[];
   adventureIndicators?: string[];
   adventureCommandTags?: string[];
+  /** Per-turn token breakdown */
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheCreationTokens?: number;
+  cacheReadTokens?: number;
+  /** Bash command strings run this turn */
+  bashCommands?: string[];
+  /** Async semantic analysis (arrives after turnComplete) */
+  semantics?: TurnSemantics;
 }
 
 export interface TurnCompleteMessage {
@@ -497,6 +568,26 @@ export interface VitalsSettingMessage {
 export interface AdventureWidgetSettingMessage {
   type: 'adventureWidgetSetting';
   enabled: boolean;
+}
+
+export interface TurnSemanticsMessage {
+  type: 'turnSemantics';
+  messageId: string;
+  semantics: TurnSemantics;
+}
+
+export interface TurnAnalysisSettingsMessage {
+  type: 'turnAnalysisSettings';
+  enabled: boolean;
+  analysisModel: string;
+}
+
+export interface SessionMetadataMessage {
+  type: 'sessionMetadata';
+  tools: string[];
+  model: string;
+  cwd: string;
+  mcpServers: string[];
 }
 
 export interface AdventureBeatMessage {
@@ -523,6 +614,38 @@ export interface ConversationHistoryMessage {
   type: 'conversationHistory';
   /** Full conversation history loaded from Claude's session storage */
   messages: SerializedChatMessage[];
+}
+
+// --- Project-Level Analytics ---
+
+/** Pre-aggregated summary of a completed session, persisted in workspaceState */
+export interface SessionSummary {
+  sessionId: string;
+  sessionName: string;
+  model: string;
+  startedAt: string;   // ISO date
+  endedAt: string;     // ISO date
+  durationMs: number;
+  totalCostUsd: number;
+  totalTurns: number;
+  totalErrors: number;
+  totalToolUses: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCacheCreationTokens: number;
+  totalCacheReadTokens: number;
+  totalBashCommands: number;
+  toolFrequency: Record<string, number>;
+  categoryDistribution: Record<string, number>;
+  taskTypeDistribution: Record<string, number>;
+  avgCostPerTurn: number;
+  avgDurationMs: number;
+  errorRate: number;
+}
+
+export interface ProjectAnalyticsDataMessage {
+  type: 'projectAnalyticsData';
+  sessions: SessionSummary[];
 }
 
 /** Serializable chat message for passing between webview instances (e.g. fork) */
@@ -571,4 +694,8 @@ export type ExtensionToWebviewMessage =
   | TurnCompleteMessage
   | VitalsSettingMessage
   | AdventureWidgetSettingMessage
-  | AdventureBeatMessage;
+  | AdventureBeatMessage
+  | TurnSemanticsMessage
+  | TurnAnalysisSettingsMessage
+  | SessionMetadataMessage
+  | ProjectAnalyticsDataMessage;
