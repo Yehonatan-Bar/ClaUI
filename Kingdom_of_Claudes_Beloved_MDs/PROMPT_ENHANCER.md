@@ -42,7 +42,7 @@ The meta-prompt instructs Claude to:
 7. Match the language of the original prompt (Hebrew stays Hebrew)
 8. Output only the enhanced text, no meta-commentary
 
-Input is truncated to 4000 characters. Timeout is 30 seconds.
+Input is truncated to 4000 characters. Backend timeout is 30 seconds. Client-side safety timeout is 35 seconds (resets `isEnhancing` if backend result never arrives).
 
 ## UX Flows
 
@@ -109,12 +109,12 @@ The auto-enhance flow uses `autoSendAfterEnhanceRef` (a React ref, not state) to
 
 The original text is captured in `originalTextBeforeEnhanceRef` when `handleEnhancePrompt()` fires.
 
-If enhancement fails (`prompt-enhance-failed` event) and auto-send was pending, the original text is sent as fallback.
+If enhancement fails (`prompt-enhance-failed` event) and auto-send was pending, the original text is sent as fallback. In manual mode, the enhance button flashes red for 2 seconds (`.enhance-error` CSS class) to indicate failure.
 
 ## CSS Components
 
 - `.enhance-button-group` - flex container for the split button
-- `.enhance-button` - sparkles icon, spins when enhancing, blue border when auto mode active
+- `.enhance-button` - sparkles icon, spins when enhancing, blue border when auto mode active, `.enhance-error` flashes red on failure
 - `.enhance-gear-button` - gear icon, opens popover
 - `.enhance-popover` - absolute-positioned settings panel with pop-in animation
 - `.textarea-container.enhancing` - dims textarea, shows pulsing border + overlay
@@ -125,6 +125,18 @@ If enhancement fails (`prompt-enhance-failed` event) and auto-send was pending, 
 - `.enhance-comparison-section` - vertical section for each text (original / enhanced)
 - `.enhance-comparison-text` - read-only scrollable text area, `.enhanced` variant has dashed accent border
 - `.enhance-comparison-btn` - action buttons: `.original` (ghost) and `.enhanced` (primary)
+
+## Reliability Safeguards
+
+### Client-Side Safety Timeout
+A 35-second timeout in InputArea resets `isEnhancing` to false if the backend never sends `enhancePromptResult`. This prevents the UI from getting permanently stuck in "Enhancing..." state. Both the manual enhance and auto-enhance paths set this timeout, and both the `prompt-enhanced` and `prompt-enhance-failed` event handlers clear it.
+
+### Windows Process Kill
+On Windows with `shell: true`, `child.kill('SIGTERM')` only kills the `cmd.exe` wrapper, leaving the actual `claude` CLI process orphaned. PromptEnhancer uses `taskkill /F /T /PID` (same pattern as ClaudeProcessManager) to kill the entire process tree on timeout.
+
+### Error Feedback
+- Auto-enhance failure: falls back to sending the original text (user doesn't notice)
+- Manual enhance failure: enhance button flashes red for 2 seconds via `.enhance-error` CSS class
 
 ## Keyboard Shortcut
 

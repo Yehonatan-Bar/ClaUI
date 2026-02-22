@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { spawn } from 'child_process';
+import { spawn, exec } from 'child_process';
 
 const ENHANCER_SYSTEM_PROMPT = `You are an expert prompt engineer. Your job is to take a user's raw prompt and rewrite it to be maximally effective for a frontier AI coding assistant (Claude).
 
@@ -82,10 +82,20 @@ export class PromptEnhancer {
         return;
       }
 
+      // Kill the entire process tree (Windows shell:true workaround)
+      const killTree = () => {
+        if (!child.pid) return;
+        if (process.platform === 'win32') {
+          exec(`taskkill /F /T /PID ${child.pid}`, () => {});
+        } else {
+          child.kill('SIGTERM');
+        }
+      };
+
       // 30-second timeout
       const timer = setTimeout(() => {
         this.log('[PromptEnhancer] timeout (30s), killing process');
-        child.kill('SIGTERM');
+        killTree();
         finish(null);
       }, 30_000);
 

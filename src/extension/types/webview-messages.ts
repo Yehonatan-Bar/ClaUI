@@ -80,7 +80,7 @@ export interface OpenPlanDocsRequest {
 
 export interface PlanApprovalResponseMessage {
   type: 'planApprovalResponse';
-  action: 'approve' | 'reject' | 'feedback' | 'questionAnswer';
+  action: 'approve' | 'approveClearBypass' | 'approveManual' | 'reject' | 'feedback' | 'questionAnswer';
   feedback?: string;
   /** The tool that triggered the approval (ExitPlanMode / AskUserQuestion).
    *  Sent by the webview so the handler can identify the tool even if the
@@ -441,7 +441,7 @@ export interface TranslationLanguageSettingMessage {
 }
 
 export type AchievementRarity = 'common' | 'rare' | 'epic' | 'legendary';
-export type AchievementCategory = 'debugging' | 'testing' | 'refactor' | 'collaboration' | 'session';
+export type AchievementCategory = 'debugging' | 'testing' | 'refactor' | 'collaboration' | 'session' | 'architecture' | 'productivity';
 
 export interface AchievementProfilePayload {
   totalXp: number;
@@ -476,6 +476,12 @@ export interface SessionRecapPayload {
   newAchievements: string[];
   xpEarned: number;
   level: number;
+  filesTouched?: number;
+  languagesUsed?: string[];
+  aiInsight?: string;
+  sessionQuality?: string;
+  codingPattern?: string;
+  aiXpBonus?: number;
 }
 
 export interface AchievementsSettingsMessage {

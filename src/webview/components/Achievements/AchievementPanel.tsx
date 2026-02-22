@@ -101,6 +101,11 @@ export const AchievementPanel: React.FC = () => {
             <p>{tr.infoLevelsDesc}</p>
           </div>
 
+          <div className="achievement-info-section">
+            <strong>{tr.infoAiInsight}</strong>
+            <p>{tr.infoAiInsightDesc}</p>
+          </div>
+
           <button className="achievement-info-dismiss-btn" onClick={() => setInfoOpen(false)}>
             {tr.gotIt}
           </button>

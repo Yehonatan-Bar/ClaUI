@@ -106,11 +106,21 @@ Pre-aggregated session analytics (~500 bytes per session) stored in `ProjectAnal
 Session runtime:
   MessageHandler accumulates TurnRecord[] (extension-side copy)
 
-Session ends (process exit):
+Session ends (any exit path):
   SessionTab.saveProjectAnalytics()
-    -> Builds SessionSummary from accumulated TurnRecords
+    -> MessageHandler.flushTurnRecords() (atomic get + clear)
+    -> Builds SessionSummary from flushed TurnRecords
     -> ProjectAnalyticsStore.saveSummary()
     -> Persisted in workspaceState (auto-scoped per workspace)
+    -> analyticsSaved flag prevents duplicate saves
+
+Analytics save is triggered from ALL exit paths:
+  1. Normal process exit (exit handler)
+  2. Process crash (exit handler)
+  3. Tab close / panel dispose (onDidDispose handler)
+  4. Extension deactivate (dispose() method)
+  5. Session clear (MessageHandler calls saveProjectAnalyticsNow before clearing)
+  6. Edit-and-resend (MessageHandler calls saveProjectAnalyticsNow before clearing)
 
 Dashboard opens in Project mode:
   DashboardPanel sends postMessage({ type: 'getProjectAnalytics' })
@@ -189,4 +199,3 @@ Fields added to `TurnRecord` for the dashboard:
 - Dark theme only (the overlay controls its own background). Light theme support is a follow-up.
 - `turnIndex` from MessageHandler never resets on clearSession; dashboard uses array position instead.
 - System prompt is not available in the Context tab (CLI limitation).
-- Project analytics only captures sessions that end normally or crash. Sessions killed via VS Code close (without process exit) may not be captured.

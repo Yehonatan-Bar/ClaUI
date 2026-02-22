@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
+import { resetAdventureWidgetPosition } from './AdventureWidget';
 
 const LANGUAGE_OPTIONS = [
   'Hebrew', 'Arabic', 'Russian', 'Spanish', 'French',
@@ -124,12 +125,24 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
         <span>Adventure Widget</span>
-        <button
-          className={`vitals-info-toggle-btn ${adventureEnabled ? 'on' : 'off'}`}
-          onClick={handleAdventureToggle}
-        >
-          <span className="vitals-toggle-knob" />
-        </button>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {adventureEnabled && (
+            <button
+              className="vitals-info-close"
+              onClick={() => { resetAdventureWidgetPosition(); }}
+              title="Reset widget position to default"
+              style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}
+            >
+              Reset
+            </button>
+          )}
+          <button
+            className={`vitals-info-toggle-btn ${adventureEnabled ? 'on' : 'off'}`}
+            onClick={handleAdventureToggle}
+          >
+            <span className="vitals-toggle-knob" />
+          </button>
+        </div>
       </div>
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>

@@ -289,6 +289,11 @@
           "type": "boolean",
           "default": false,
           "description": "Play short sound effects for achievement toasts."
+        },
+        "claudeMirror.achievements.aiInsight": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable AI-powered session insights at the end of each session (once per day). Uses Claude Sonnet for deeper analysis of your coding patterns."
         }
       }
     },

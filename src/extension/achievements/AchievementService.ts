@@ -9,8 +9,23 @@ import type {
 import { getAchievementDefinition } from './AchievementCatalog';
 import { AchievementEngine, type AchievementAward } from './AchievementEngine';
 import { AchievementStore, levelFromXp, type AchievementProfile } from './AchievementStore';
+import type { AchievementInsightAnalyzer } from './AchievementInsightAnalyzer';
 
 type WebviewSender = (msg: ExtensionToWebviewMessage) => void;
+
+/** Helper to create an AchievementAward from a catalog definition */
+function awardFromDef(def: ReturnType<typeof getAchievementDefinition>): AchievementAward | null {
+  if (!def) return null;
+  return {
+    id: def.id,
+    title: def.title,
+    description: def.description,
+    rarity: def.rarity,
+    category: def.category,
+    xp: def.xp,
+    hidden: def.hidden,
+  };
+}
 
 export class AchievementService {
   private readonly store: AchievementStore;
@@ -20,10 +35,15 @@ export class AchievementService {
   private readonly sessionAwards = new Map<string, string[]>();
   private readonly sessionXp = new Map<string, number>();
   private readonly lastCrashAt = new Map<string, number>();
+  private insightAnalyzer: AchievementInsightAnalyzer | null = null;
 
   constructor(globalState: vscode.Memento, private readonly log: (msg: string) => void) {
     this.store = new AchievementStore(globalState);
     this.profile = this.store.getProfile();
+  }
+
+  setInsightAnalyzer(analyzer: AchievementInsightAnalyzer): void {
+    this.insightAnalyzer = analyzer;
   }
 
   registerTab(tabId: string, sender: WebviewSender): void {
@@ -61,17 +81,9 @@ export class AchievementService {
 
     const crashAt = this.lastCrashAt.get(tabId);
     if (crashAt && Date.now() - crashAt <= 2 * 60 * 1000) {
-      const phoenix = getAchievementDefinition('phoenix');
-      if (phoenix) {
-        void this.applyAwards(tabId, [{
-          id: phoenix.id,
-          title: phoenix.title,
-          description: phoenix.description,
-          rarity: phoenix.rarity,
-          category: phoenix.category,
-          xp: phoenix.xp,
-          hidden: phoenix.hidden,
-        }]);
+      const award = awardFromDef(getAchievementDefinition('phoenix'));
+      if (award) {
+        void this.applyAwards(tabId, [award]);
       }
     }
     this.lastCrashAt.delete(tabId);
@@ -81,18 +93,107 @@ export class AchievementService {
     if (!this.isEnabled()) return;
     if (!this.engine.hasSession(tabId)) return;
 
+    // Capture session snapshot BEFORE endSession deletes the session
+    const snapshot = this.engine.getSessionSnapshot(tabId);
+
     this.profile.counters.sessionsCompleted += 1;
+
+    // --- Daily streak tracking ---
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
+    const lastDate = this.profile.counters.lastSessionDate;
+    if (lastDate !== today) {
+      if (lastDate) {
+        const lastMs = new Date(lastDate + 'T00:00:00').getTime();
+        const todayMs = new Date(today + 'T00:00:00').getTime();
+        const diffDays = Math.round((todayMs - lastMs) / (24 * 60 * 60 * 1000));
+        if (diffDays === 1) {
+          this.profile.counters.consecutiveDays += 1;
+        } else {
+          this.profile.counters.consecutiveDays = 1;
+        }
+      } else {
+        this.profile.counters.consecutiveDays = 1;
+      }
+      this.profile.counters.lastSessionDate = today;
+    }
+
+    // Session duration tracking
+    if (snapshot) {
+      this.profile.counters.totalSessionMinutes += Math.floor(snapshot.sessionDurationMs / 60_000);
+    }
+
     const sessionAwardTitles = this.sessionAwards.get(tabId) || [];
     const end = this.engine.endSession(tabId, sessionAwardTitles);
+
     void this.handleEngineResult(tabId, end).then(async () => {
+      // --- Cross-session achievements ---
+      const crossAwards: AchievementAward[] = [];
+
+      // Centurion: 100 sessions
+      if (this.profile.counters.sessionsCompleted >= 100) {
+        const a = awardFromDef(getAchievementDefinition('centurion'));
+        if (a) crossAwards.push(a);
+      }
+
+      // Daily streak achievements
+      if (this.profile.counters.consecutiveDays >= 3) {
+        const a = awardFromDef(getAchievementDefinition('daily-streak-3'));
+        if (a) crossAwards.push(a);
+      }
+      if (this.profile.counters.consecutiveDays >= 7) {
+        const a = awardFromDef(getAchievementDefinition('daily-streak-7'));
+        if (a) crossAwards.push(a);
+      }
+
+      if (crossAwards.length > 0) {
+        await this.applyAwards(tabId, crossAwards);
+      }
+
+      // --- Build and send recap ---
       if (end.recap) {
         const recap: SessionRecapPayload = {
           ...end.recap,
           xpEarned: this.sessionXp.get(tabId) || 0,
           level: this.profile.level,
         };
+
+        // Send recap immediately (AI insight will update it later if available)
         this.send(tabId, { type: 'sessionRecap', recap });
+
+        // --- AI Insight (async, best-effort) ---
+        if (this.insightAnalyzer && snapshot && this.isInsightEnabled()) {
+          this.log('[Achievements] Attempting AI session insight...');
+          this.insightAnalyzer.analyzeSession(snapshot).then(async (insight) => {
+            if (insight) {
+              this.log(`[Achievements] AI insight: quality=${insight.sessionQuality} pattern=${insight.codingPattern} bonus=${insight.xpBonus}`);
+
+              // Apply XP bonus
+              if (insight.xpBonus > 0) {
+                this.profile.totalXp += insight.xpBonus;
+                this.profile.level = levelFromXp(this.profile.totalXp);
+                this.sessionXp.set(tabId, (this.sessionXp.get(tabId) || 0) + insight.xpBonus);
+                await this.persistProfile();
+              }
+
+              // Send updated recap with AI data
+              const enrichedRecap: SessionRecapPayload = {
+                ...recap,
+                xpEarned: this.sessionXp.get(tabId) || 0,
+                level: this.profile.level,
+                aiInsight: insight.insight,
+                sessionQuality: insight.sessionQuality,
+                codingPattern: insight.codingPattern,
+                aiXpBonus: insight.xpBonus,
+              };
+              this.send(tabId, { type: 'sessionRecap', recap: enrichedRecap });
+              this.broadcastSnapshots();
+            }
+          }).catch((err) => {
+            this.log(`[Achievements] AI insight error: ${err}`);
+          });
+        }
       }
+
       await this.persistProfile();
       this.sessionAwards.delete(tabId);
       this.sessionXp.delete(tabId);
@@ -170,6 +271,7 @@ export class AchievementService {
       }[];
       bugFixesDelta: number;
       testsDelta: number;
+      editsDelta?: number;
     }
   ): Promise<void> {
     if (!this.isEnabled()) return;
@@ -180,52 +282,42 @@ export class AchievementService {
     if (result.testsDelta > 0) {
       this.profile.counters.testPasses += result.testsDelta;
     }
+    if (result.editsDelta && result.editsDelta > 0) {
+      this.profile.counters.totalEdits += result.editsDelta;
+    }
 
-    const bugTierAwards: AchievementAward[] = [];
+    // --- Tiered cross-session achievements ---
+    const tierAwards: AchievementAward[] = [];
+
+    // Bug Slayer tiers
     if (this.profile.counters.bugFixes >= 5) {
-      const a = getAchievementDefinition('bug-slayer-i');
-      if (a) {
-        bugTierAwards.push({
-          id: a.id,
-          title: a.title,
-          description: a.description,
-          rarity: a.rarity,
-          category: a.category,
-          xp: a.xp,
-          hidden: a.hidden,
-        });
-      }
+      const a = awardFromDef(getAchievementDefinition('bug-slayer-i'));
+      if (a) tierAwards.push(a);
     }
     if (this.profile.counters.bugFixes >= 25) {
-      const a = getAchievementDefinition('bug-slayer-ii');
-      if (a) {
-        bugTierAwards.push({
-          id: a.id,
-          title: a.title,
-          description: a.description,
-          rarity: a.rarity,
-          category: a.category,
-          xp: a.xp,
-          hidden: a.hidden,
-        });
-      }
+      const a = awardFromDef(getAchievementDefinition('bug-slayer-ii'));
+      if (a) tierAwards.push(a);
     }
     if (this.profile.counters.bugFixes >= 100) {
-      const a = getAchievementDefinition('bug-slayer-iii');
-      if (a) {
-        bugTierAwards.push({
-          id: a.id,
-          title: a.title,
-          description: a.description,
-          rarity: a.rarity,
-          category: a.category,
-          xp: a.xp,
-          hidden: a.hidden,
-        });
-      }
+      const a = awardFromDef(getAchievementDefinition('bug-slayer-iii'));
+      if (a) tierAwards.push(a);
     }
 
-    await this.applyAwards(tabId, [...result.awards, ...bugTierAwards]);
+    // Test Master tiers
+    if (this.profile.counters.testPasses >= 25) {
+      const a = awardFromDef(getAchievementDefinition('test-master-i'));
+      if (a) tierAwards.push(a);
+    }
+    if (this.profile.counters.testPasses >= 100) {
+      const a = awardFromDef(getAchievementDefinition('test-master-ii'));
+      if (a) tierAwards.push(a);
+    }
+    if (this.profile.counters.testPasses >= 500) {
+      const a = awardFromDef(getAchievementDefinition('test-master-iii'));
+      if (a) tierAwards.push(a);
+    }
+
+    await this.applyAwards(tabId, [...result.awards, ...tierAwards]);
     this.send(tabId, { type: 'achievementProgress', goals: this.toGoalPayloads(result.goals) });
     await this.persistProfile();
     this.broadcastSnapshots();
@@ -290,6 +382,11 @@ export class AchievementService {
   private isSoundEnabled(): boolean {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     return config.get<boolean>('achievements.sound', false);
+  }
+
+  private isInsightEnabled(): boolean {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    return config.get<boolean>('achievements.aiInsight', true);
   }
 
   private toProfilePayload(): AchievementProfilePayload {

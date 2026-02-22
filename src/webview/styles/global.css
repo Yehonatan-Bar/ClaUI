@@ -1478,6 +1478,72 @@ html, body, #root {
   margin-bottom: 4px;
 }
 
+.session-recap-ai-bonus {
+  color: var(--vscode-charts-yellow, #cca700);
+  font-weight: 600;
+}
+
+.session-recap-insight {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--vscode-focusBorder, #007fd4) 10%, var(--vscode-editor-background));
+  border-left: 3px solid var(--vscode-focusBorder, #007fd4);
+}
+
+.session-recap-insight-header {
+  font-weight: 600;
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.session-recap-insight-text {
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.session-recap-pattern {
+  margin-top: 3px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.session-quality-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.session-quality-badge.quality-exceptional {
+  background: color-mix(in srgb, #ffd700 25%, transparent);
+  color: #ffd700;
+}
+
+.session-quality-badge.quality-productive {
+  background: color-mix(in srgb, #4caf50 25%, transparent);
+  color: #4caf50;
+}
+
+.session-quality-badge.quality-steady {
+  background: color-mix(in srgb, #2196f3 25%, transparent);
+  color: #2196f3;
+}
+
+.session-quality-badge.quality-exploratory {
+  background: color-mix(in srgb, #9c27b0 25%, transparent);
+  color: #ce93d8;
+}
+
+.session-quality-badge.quality-struggling {
+  background: color-mix(in srgb, #f44336 25%, transparent);
+  color: #ef9a9a;
+}
+
 @keyframes summaryFadeIn {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
@@ -1676,11 +1742,20 @@ html, body, #root {
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
 }
 
+.plan-approval-header {
+  margin-bottom: 10px;
+}
+
 .plan-approval-title {
   font-size: 12px;
   font-weight: 600;
-  margin-bottom: 8px;
   color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.plan-approval-subtitle {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #808080);
+  margin-top: 2px;
 }
 
 /* Allowed prompts (ExitPlanMode permission requests) */
@@ -1733,6 +1808,56 @@ html, body, #root {
   color: var(--vscode-editor-foreground);
 }
 
+.plan-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.plan-option-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  color: var(--vscode-editor-foreground);
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.plan-option-row:hover,
+.plan-option-row.hovered {
+  background: color-mix(in srgb, var(--vscode-textLink-foreground, #3794ff) 10%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-textLink-foreground, #3794ff) 30%, transparent);
+}
+
+.plan-option-indicator {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-weight: 700;
+  color: var(--vscode-textLink-foreground, #3794ff);
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.plan-option-number {
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground, #808080);
+  flex-shrink: 0;
+  min-width: 16px;
+}
+
+.plan-option-label {
+  color: var(--vscode-editor-foreground);
+}
+
+/* Legacy buttons kept for backward compat */
 .plan-approval-buttons {
   display: flex;
   gap: 8px;
@@ -2981,6 +3106,17 @@ html, body, #root {
 .enhance-button.auto-active {
   color: var(--vscode-textLink-foreground, #3794ff);
   border-color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.enhance-button.enhance-error {
+  color: var(--vscode-errorForeground, #f44747);
+  border-color: var(--vscode-errorForeground, #f44747);
+  animation: enhanceErrorFlash 0.3s ease 3;
+}
+
+@keyframes enhanceErrorFlash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 
 .enhance-gear-button {

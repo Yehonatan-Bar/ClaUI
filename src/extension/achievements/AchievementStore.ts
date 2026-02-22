@@ -6,6 +6,10 @@ export interface AchievementCounters {
   bugFixes: number;
   testPasses: number;
   sessionsCompleted: number;
+  totalEdits: number;
+  consecutiveDays: number;
+  lastSessionDate: string;
+  totalSessionMinutes: number;
 }
 
 export interface AchievementProfile {
@@ -15,7 +19,7 @@ export interface AchievementProfile {
   counters: AchievementCounters;
 }
 
-export const LEVEL_THRESHOLDS = [0, 100, 250, 450, 700, 1000, 1400, 1850, 2350, 2900];
+export const LEVEL_THRESHOLDS = [0, 100, 250, 450, 700, 1000, 1400, 1850, 2350, 2900, 3500, 4200, 5000, 5900, 6900];
 
 function defaultProfile(): AchievementProfile {
   return {
@@ -26,6 +30,10 @@ function defaultProfile(): AchievementProfile {
       bugFixes: 0,
       testPasses: 0,
       sessionsCompleted: 0,
+      totalEdits: 0,
+      consecutiveDays: 0,
+      lastSessionDate: '',
+      totalSessionMinutes: 0,
     },
   };
 }
@@ -57,6 +65,10 @@ export class AchievementStore {
         bugFixes: raw.counters?.bugFixes || 0,
         testPasses: raw.counters?.testPasses || 0,
         sessionsCompleted: raw.counters?.sessionsCompleted || 0,
+        totalEdits: raw.counters?.totalEdits || 0,
+        consecutiveDays: raw.counters?.consecutiveDays || 0,
+        lastSessionDate: raw.counters?.lastSessionDate || '',
+        totalSessionMinutes: raw.counters?.totalSessionMinutes || 0,
       },
     };
   }
