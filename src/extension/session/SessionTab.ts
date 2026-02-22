@@ -18,6 +18,7 @@ import type { ProjectAnalyticsStore } from './ProjectAnalyticsStore';
 import type { PromptHistoryStore } from './PromptHistoryStore';
 import { MessageHandler, type WebviewBridge } from '../webview/MessageHandler';
 import { buildWebviewHtml } from '../webview/WebviewProvider';
+import type { SkillGenService } from '../skillgen/SkillGenService';
 import type { CliOutputEvent, AssistantMessage } from '../types/stream-json';
 import type {
   ExtensionToWebviewMessage,
@@ -86,7 +87,8 @@ export class SessionTab implements WebviewBridge {
     private readonly projectAnalyticsStore: ProjectAnalyticsStore,
     private readonly promptHistoryStore: PromptHistoryStore,
     private readonly achievementService: AchievementService,
-    logDir: string | null
+    logDir: string | null,
+    private readonly skillGenService?: SkillGenService
   ) {
     this.tabNumber = tabNumber;
     this.id = `tab-${tabNumber}`;
@@ -102,7 +104,8 @@ export class SessionTab implements WebviewBridge {
       this.control,
       this.demux,
       this.promptHistoryStore,
-      this.achievementService
+      this.achievementService,
+      this.skillGenService
     );
     this.messageHandler.setSessionNameGetter(() => this.baseTitle);
     this.messageHandler.setProjectAnalyticsStore(this.projectAnalyticsStore);
@@ -208,6 +211,8 @@ export class SessionTab implements WebviewBridge {
 
     this.panel.webview.html = buildWebviewHtml(this.panel.webview, context);
     this.achievementService.registerTab(this.id, (msg) => this.postMessage(msg));
+    // Register with skill gen service for broadcast status updates
+    this.skillGenService?.registerTab(this.id, (msg) => this.postMessage(msg as ExtensionToWebviewMessage));
     this.wireWebviewEvents();
     this.wireProcessEvents(tabLog);
     this.wireDemuxStatusBar();
@@ -414,6 +419,7 @@ export class SessionTab implements WebviewBridge {
     this.saveProjectAnalytics();
     this.achievementService.onSessionEnd(this.id);
     this.achievementService.unregisterTab(this.id);
+    this.skillGenService?.unregisterTab(this.id);
     this.processManager.stop();
     this.fileLogger?.dispose();
     this.panel.dispose();
@@ -569,6 +575,7 @@ export class SessionTab implements WebviewBridge {
         this.saveProjectAnalytics();
         this.achievementService.onSessionEnd(this.id);
         this.achievementService.unregisterTab(this.id);
+        this.skillGenService?.unregisterTab(this.id);
         this.processManager.stop();
         this.fileLogger?.dispose();
       } finally {

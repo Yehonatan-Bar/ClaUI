@@ -44,10 +44,27 @@ const modeToggleBase: React.CSSProperties = {
 };
 
 export const DashboardPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const { turnHistory, cost, setDashboardOpen, projectSessions, projectDashboardMode, setProjectDashboardMode } = useAppStore();
+  const [activeTab, setActiveTab] = useState<DashboardTab>(
+    projectDashboardMode === 'project' ? 'p-overview' : 'overview'
+  );
   const totalCostUsd = cost?.totalCostUsd ?? 0;
   const mode = projectDashboardMode;
+
+  // Normalize local tab state to the persisted mode on mount / reopen.
+  // Without this, reopening the dashboard in Project mode can still render the
+  // Session "overview" tab content (which may look like "no data").
+  useEffect(() => {
+    setActiveTab((prev) => {
+      if (mode === 'project' && !prev.startsWith('p-')) {
+        return 'p-overview';
+      }
+      if (mode === 'session' && prev.startsWith('p-')) {
+        return 'overview';
+      }
+      return prev;
+    });
+  }, [mode]);
 
   // Request project analytics when switching to project mode
   useEffect(() => {
@@ -201,17 +218,17 @@ export const DashboardPanel: React.FC = () => {
         padding: '20px',
       }}>
         {/* Session tabs */}
-        {activeTab === 'overview' && <OverviewTab turnHistory={turnHistory} totalCostUsd={totalCostUsd} />}
-        {activeTab === 'tokens' && <TokensTab turnHistory={turnHistory} />}
-        {activeTab === 'tools' && <ToolsTab turnHistory={turnHistory} />}
-        {activeTab === 'timeline' && <TimelineTab turnHistory={turnHistory} />}
-        {activeTab === 'commands' && <CommandsTab turnHistory={turnHistory} />}
-        {activeTab === 'context' && <ContextTab />}
+        {mode === 'session' && activeTab === 'overview' && <OverviewTab turnHistory={turnHistory} totalCostUsd={totalCostUsd} />}
+        {mode === 'session' && activeTab === 'tokens' && <TokensTab turnHistory={turnHistory} />}
+        {mode === 'session' && activeTab === 'tools' && <ToolsTab turnHistory={turnHistory} />}
+        {mode === 'session' && activeTab === 'timeline' && <TimelineTab turnHistory={turnHistory} />}
+        {mode === 'session' && activeTab === 'commands' && <CommandsTab turnHistory={turnHistory} />}
+        {mode === 'session' && activeTab === 'context' && <ContextTab />}
         {/* Project tabs */}
-        {activeTab === 'p-overview' && <ProjectOverviewTab sessions={projectSessions} />}
-        {activeTab === 'p-sessions' && <ProjectSessionsTab sessions={projectSessions} />}
-        {activeTab === 'p-tokens' && <ProjectTokensTab sessions={projectSessions} />}
-        {activeTab === 'p-tools' && <ProjectToolsTab sessions={projectSessions} />}
+        {mode === 'project' && activeTab === 'p-overview' && <ProjectOverviewTab sessions={projectSessions} />}
+        {mode === 'project' && activeTab === 'p-sessions' && <ProjectSessionsTab sessions={projectSessions} />}
+        {mode === 'project' && activeTab === 'p-tokens' && <ProjectTokensTab sessions={projectSessions} />}
+        {mode === 'project' && activeTab === 'p-tools' && <ProjectToolsTab sessions={projectSessions} />}
       </div>
     </div>
   );

@@ -7,6 +7,8 @@ import type {
   AchievementProfilePayload,
   SessionRecapPayload,
   SessionSummary,
+  SkillGenRunStatus,
+  SkillGenRunHistoryEntry,
   TurnRecord,
   TurnSemantics,
 } from '../../extension/types/webview-messages';
@@ -177,6 +179,17 @@ export interface AppState {
   sessionActivityElapsedMs: number;
   sessionActivityRunningSinceMs: number | null;
 
+  // Skill Generation
+  skillGenEnabled: boolean;
+  skillGenThreshold: number;
+  skillGenPendingDocs: number;
+  skillGenRunStatus: SkillGenRunStatus;
+  skillGenProgress: number;
+  skillGenProgressLabel: string;
+  skillGenLastRun: SkillGenRunHistoryEntry | null;
+  skillGenHistory: SkillGenRunHistoryEntry[];
+  skillGenPanelOpen: boolean;
+
   // Actions
   setSession: (sessionId: string, model: string) => void;
   endSession: (reason: string) => void;
@@ -262,6 +275,10 @@ export interface AppState {
   setSessionMetadata: (meta: { tools: string[]; model: string; cwd: string; mcpServers: string[] }) => void;
   setProjectSessions: (sessions: SessionSummary[]) => void;
   setProjectDashboardMode: (mode: 'session' | 'project') => void;
+  setSkillGenSettings: (settings: { enabled: boolean; threshold: number }) => void;
+  setSkillGenStatus: (status: { pendingDocs: number; threshold: number; runStatus: SkillGenRunStatus; progress: number; progressLabel: string; lastRun: SkillGenRunHistoryEntry | null; history: SkillGenRunHistoryEntry[] }) => void;
+  setSkillGenProgress: (update: { runStatus: SkillGenRunStatus; progress: number; progressLabel: string }) => void;
+  setSkillGenPanelOpen: (open: boolean) => void;
   reset: () => void;
 }
 
@@ -458,6 +475,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   sessionActivityStarted: false,
   sessionActivityElapsedMs: 0,
   sessionActivityRunningSinceMs: null,
+
+  // Skill Generation
+  skillGenEnabled: false,
+  skillGenThreshold: 30,
+  skillGenPendingDocs: 0,
+  skillGenRunStatus: 'idle' as SkillGenRunStatus,
+  skillGenProgress: 0,
+  skillGenProgressLabel: '',
+  skillGenLastRun: null,
+  skillGenHistory: [],
+  skillGenPanelOpen: false,
 
   // Actions
   setSession: (sessionId, model) =>
@@ -1048,6 +1076,31 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setProjectDashboardMode: (mode) =>
     set({ projectDashboardMode: mode }),
+
+  // Skill Generation actions
+  setSkillGenSettings: (settings) =>
+    set({ skillGenEnabled: settings.enabled, skillGenThreshold: settings.threshold }),
+
+  setSkillGenStatus: (status) =>
+    set({
+      skillGenPendingDocs: status.pendingDocs,
+      skillGenThreshold: status.threshold,
+      skillGenRunStatus: status.runStatus,
+      skillGenProgress: status.progress,
+      skillGenProgressLabel: status.progressLabel,
+      skillGenLastRun: status.lastRun,
+      skillGenHistory: status.history,
+    }),
+
+  setSkillGenProgress: (update) =>
+    set({
+      skillGenRunStatus: update.runStatus,
+      skillGenProgress: update.progress,
+      skillGenProgressLabel: update.progressLabel,
+    }),
+
+  setSkillGenPanelOpen: (open) =>
+    set({ skillGenPanelOpen: open }),
 
   reset: () =>
     set((state) => ({

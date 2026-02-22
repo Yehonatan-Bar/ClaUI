@@ -60,6 +60,9 @@ export function useClaudeStream(): void {
     setProjectSessions,
     setIsEnhancing,
     setPromptEnhancerSettings,
+    setSkillGenSettings,
+    setSkillGenStatus,
+    setSkillGenProgress,
   } = useAppStore();
 
   useEffect(() => {
@@ -413,6 +416,36 @@ export function useClaudeStream(): void {
             enhancerModel: msg.enhancerModel,
           });
           break;
+
+        // --- Skill Generation ---
+        case 'skillGenSettings':
+          setSkillGenSettings({ enabled: msg.enabled, threshold: msg.threshold });
+          break;
+
+        case 'skillGenStatus':
+          setSkillGenStatus({
+            pendingDocs: msg.pendingDocs,
+            threshold: msg.threshold,
+            runStatus: msg.runStatus,
+            progress: msg.progress,
+            progressLabel: msg.progressLabel,
+            lastRun: msg.lastRun,
+            history: msg.history,
+          });
+          break;
+
+        case 'skillGenProgress':
+          setSkillGenProgress({
+            runStatus: msg.runStatus,
+            progress: msg.progress,
+            progressLabel: msg.progressLabel,
+          });
+          break;
+
+        case 'skillGenComplete':
+          // Progress is updated via skillGenProgress; also refresh status
+          // The extension sends a skillGenStatus right after skillGenComplete
+          break;
       }
     }
 
@@ -472,6 +505,9 @@ export function useClaudeStream(): void {
     setProjectSessions,
     setIsEnhancing,
     setPromptEnhancerSettings,
+    setSkillGenSettings,
+    setSkillGenStatus,
+    setSkillGenProgress,
   ]);
 }
 

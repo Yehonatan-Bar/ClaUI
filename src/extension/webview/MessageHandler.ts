@@ -11,6 +11,7 @@ import type { PromptEnhancer } from '../session/PromptEnhancer';
 import type { PromptHistoryStore } from '../session/PromptHistoryStore';
 import type { ProjectAnalyticsStore } from '../session/ProjectAnalyticsStore';
 import type { AchievementService } from '../achievements/AchievementService';
+import type { SkillGenService } from '../skillgen/SkillGenService';
 import type {
   AdventureBeatMessage,
   ExtensionToWebviewMessage,
@@ -118,6 +119,8 @@ export class MessageHandler {
   private autoApproveExitPlanMode = false;
   /** Tracks whether EnterPlanMode was called in this session (prevents stale ExitPlanMode after compaction) */
   private planModeActive = false;
+  /** Safety counter: consecutive auto-approvals of stale ExitPlanMode. Prevents infinite loops. */
+  private staleExitPlanModeAutoApproveCount = 0;
 
   /** Activity summarizer: periodically summarizes tool activity via Haiku */
   private activitySummarizer: ActivitySummarizer | null = null;
@@ -140,6 +143,8 @@ export class MessageHandler {
   private turnAnalyzer: TurnAnalyzer | null = null;
   /** Prompt enhancer for AI-powered prompt improvement */
   private promptEnhancer: PromptEnhancer | null = null;
+  /** Skill generation service (global, shared across tabs) */
+  private skillGenService: SkillGenService | null = null;
 
   /** Bash command strings seen in the current assistant message */
   private currentBashCommands: string[] = [];
@@ -167,8 +172,13 @@ export class MessageHandler {
     private readonly control: ControlProtocol,
     private readonly demux: StreamDemux,
     private readonly promptHistoryStore: PromptHistoryStore,
-    private readonly achievementService: AchievementService
-  ) {}
+    private readonly achievementService: AchievementService,
+    skillGenServiceParam?: SkillGenService
+  ) {
+    if (skillGenServiceParam) {
+      this.skillGenService = skillGenServiceParam;
+    }
+  }
 
   setLogger(logger: (msg: string) => void): void {
     this.log = logger;
@@ -217,6 +227,11 @@ export class MessageHandler {
   /** Attach a PromptEnhancer for AI-powered prompt improvement */
   setPromptEnhancer(enhancer: PromptEnhancer): void {
     this.promptEnhancer = enhancer;
+  }
+
+  /** Attach the global SkillGenService */
+  setSkillGenService(service: SkillGenService): void {
+    this.skillGenService = service;
   }
 
   /** Attach a TurnAnalyzer for semantic analysis (dashboard insights) */
@@ -516,6 +531,32 @@ export class MessageHandler {
           vscode.workspace.getConfiguration('claudeMirror').update('promptEnhancer.model', msg.model, true);
           break;
 
+        // --- Skill Generation ---
+        case 'setSkillGenEnabled':
+          this.log(`Setting skillGen enabled: ${msg.enabled}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('skillGen.enabled', msg.enabled, true);
+          break;
+
+        case 'skillGenTrigger':
+          this.log('Skill generation triggered from webview');
+          if (this.skillGenService) {
+            void this.skillGenService.scanDocuments().then(() => {
+              void this.skillGenService!.triggerPipeline();
+            });
+          }
+          break;
+
+        case 'skillGenCancel':
+          this.log('Skill generation cancel requested from webview');
+          this.skillGenService?.cancelPipeline();
+          break;
+
+        case 'getSkillGenStatus':
+          if (this.skillGenService) {
+            this.webview.postMessage(this.skillGenService.getStatus());
+          }
+          break;
+
         case 'showHistory':
           this.log('Webview requested history view');
           vscode.commands.executeCommand('claudeMirror.showHistory');
@@ -533,6 +574,8 @@ export class MessageHandler {
 
         case 'planApprovalResponse':
           this.log(`Plan approval response: action=${msg.action} toolName=${msg.toolName || '(none)'} pendingTool=${this.pendingApprovalTool || '(none)'}`);
+          // User manually responded - reset the stale auto-approve counter
+          this.staleExitPlanModeAutoApproveCount = 0;
           {
           // Use msg.toolName from webview as primary source - it's reliable because
           // the webview stores it when the approval bar is shown. Fall back to
@@ -561,13 +604,12 @@ export class MessageHandler {
             // "Yes, and bypass permissions" - proceed with full-access mode
             this.control.sendText('Yes, proceed with the plan.');
           } else if (msg.action === 'approveClearBypass') {
-            // "Yes, clear context and bypass permissions" - compact then proceed
-            this.log('Plan approval: clearing context (compact) before proceeding');
+            // "Yes, clear context and bypass permissions" - approve first, then compact.
+            // Sending approval BEFORE compact ensures the CLI processes the plan approval
+            // in the right state. Compaction runs asynchronously afterward.
+            this.log('Plan approval: approving plan, then clearing context (compact)');
+            this.control.sendText('Yes, proceed with the plan. Please compact context to free up space.');
             this.control.compact();
-            // Brief delay to let compaction start before sending approval
-            setTimeout(() => {
-              this.control.sendText('Yes, proceed with the plan.');
-            }, 200);
           } else if (msg.action === 'approveManual') {
             // "Yes, manually approve edits" - switch to supervised mode then proceed
             this.log('Plan approval: switching to supervised mode for manual edit approval');
@@ -698,9 +740,16 @@ export class MessageHandler {
 
         case 'getProjectAnalytics':
           if (this.projectAnalyticsStore) {
-            const sessions = this.projectAnalyticsStore.getSummaries();
-            this.log(`Sending project analytics: ${sessions.length} sessions`);
-            this.webview.postMessage({ type: 'projectAnalyticsData', sessions });
+            void this.projectAnalyticsStore
+              .getSummariesAfterPendingWrites()
+              .then((sessions) => {
+                this.log(`Sending project analytics: ${sessions.length} sessions`);
+                this.webview.postMessage({ type: 'projectAnalyticsData', sessions });
+              })
+              .catch((err) => {
+                this.log(`Failed to load project analytics: ${err instanceof Error ? err.message : String(err)}`);
+                this.webview.postMessage({ type: 'projectAnalyticsData', sessions: [] });
+              });
           }
           break;
 
@@ -771,6 +820,9 @@ export class MessageHandler {
           this.sendTurnAnalysisSettings();
           // Send prompt enhancer settings
           this.sendPromptEnhancerSettings();
+          // Send skill generation settings and status
+          this.sendSkillGenSettings();
+          this.sendSkillGenStatus();
           // Send achievement settings/snapshot
           this.webview.postMessage(this.achievementService.buildSettingsMessage());
           this.webview.postMessage(this.achievementService.buildSnapshotMessage(this.tabId));
@@ -1008,6 +1060,25 @@ export class MessageHandler {
     });
   }
 
+  /** Read skill generation settings and send to webview */
+  private sendSkillGenSettings(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    this.webview.postMessage({
+      type: 'skillGenSettings',
+      enabled: config.get<boolean>('skillGen.enabled', false),
+      threshold: config.get<number>('skillGen.threshold', 30),
+      docsDirectory: config.get<string>('skillGen.docsDirectory', ''),
+      autoRun: config.get<boolean>('skillGen.autoRun', false),
+    });
+  }
+
+  /** Send current skill generation status to webview */
+  private sendSkillGenStatus(): void {
+    if (this.skillGenService) {
+      this.webview.postMessage(this.skillGenService.getStatus());
+    }
+  }
+
   /** Read translation language setting from VS Code config and send to webview */
   private sendTranslationLanguageSetting(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -1112,6 +1183,9 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.promptEnhancer')) {
         this.sendPromptEnhancerSettings();
+      }
+      if (e.affectsConfiguration('claudeMirror.skillGen')) {
+        this.sendSkillGenSettings();
       }
       if (
         e.affectsConfiguration('claudeMirror.achievements.enabled') ||
@@ -1572,11 +1646,20 @@ export class MessageHandler {
     // Auto-approve stale ExitPlanMode after context compaction: if EnterPlanMode
     // was never called in this session, ExitPlanMode is a stale artifact from
     // compacted context. Auto-approve to prevent the user from getting stuck.
+    // Safety valve: after 3 consecutive auto-approvals, show the bar to the user
+    // to prevent infinite loops where the model keeps calling ExitPlanMode.
     if (isExitPlanMode && !this.planModeActive) {
-      this.log(`Auto-approving stale ExitPlanMode (no EnterPlanMode seen in session)`);
-      this.approvalResponseProcessed = true;
-      this.control.sendText('Yes, proceed with the plan.');
-      return;
+      this.staleExitPlanModeAutoApproveCount++;
+      if (this.staleExitPlanModeAutoApproveCount > 3) {
+        this.log(`WARNING: ${this.staleExitPlanModeAutoApproveCount} consecutive stale ExitPlanMode auto-approvals - showing bar to user`);
+        this.staleExitPlanModeAutoApproveCount = 0;
+        // Fall through to show the approval bar so the user can intervene
+      } else {
+        this.log(`Auto-approving stale ExitPlanMode #${this.staleExitPlanModeAutoApproveCount} (no EnterPlanMode seen in session)`);
+        this.approvalResponseProcessed = true;
+        this.control.sendText('Yes, proceed with the plan.');
+        return;
+      }
     }
     this.log(`Plan approval required: tool=${toolName}`);
     this.pendingApprovalTool = toolName;

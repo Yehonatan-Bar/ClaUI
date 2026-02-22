@@ -126,6 +126,78 @@ interface AchievementTranslations {
   achDailyStreak7Title: string;
   achDailyStreak7Desc: string;
 
+  // --- 35 expansion achievements ---
+  achLunchBreakTitle: string;
+  achLunchBreakDesc: string;
+  achSprintTitle: string;
+  achSprintDesc: string;
+  achHalfCenturyTitle: string;
+  achHalfCenturyDesc: string;
+  achIronWillTitle: string;
+  achIronWillDesc: string;
+  achDoubleCenturionTitle: string;
+  achDoubleCenturionDesc: string;
+  achZeroDayTitle: string;
+  achZeroDayDesc: string;
+  achBugSquasherTitle: string;
+  achBugSquasherDesc: string;
+  achErrorWhispererTitle: string;
+  achErrorWhispererDesc: string;
+  achComebackKidTitle: string;
+  achComebackKidDesc: string;
+  achBugSlayerIVTitle: string;
+  achBugSlayerIVDesc: string;
+  achTestMarathonTitle: string;
+  achTestMarathonDesc: string;
+  achTestDrivenDevTitle: string;
+  achTestDrivenDevDesc: string;
+  achQualityGateTitle: string;
+  achQualityGateDesc: string;
+  achGreenStreakTitle: string;
+  achGreenStreakDesc: string;
+  achTestMasterIVTitle: string;
+  achTestMasterIVDesc: string;
+  achTidyUpTitle: string;
+  achTidyUpDesc: string;
+  achMegaRefactorTitle: string;
+  achMegaRefactorDesc: string;
+  achEditVeteranITitle: string;
+  achEditVeteranIDesc: string;
+  achEditVeteranIITitle: string;
+  achEditVeteranIIDesc: string;
+  achEditVeteranIIITitle: string;
+  achEditVeteranIIIDesc: string;
+  achSingleFileFocusTitle: string;
+  achSingleFileFocusDesc: string;
+  achConfigWranglerTitle: string;
+  achConfigWranglerDesc: string;
+  achWideReachTitle: string;
+  achWideReachDesc: string;
+  achCrossStackTitle: string;
+  achCrossStackDesc: string;
+  achProjectArchitectTitle: string;
+  achProjectArchitectDesc: string;
+  achBilingualTitle: string;
+  achBilingualDesc: string;
+  achMarkdownAuthorTitle: string;
+  achMarkdownAuthorDesc: string;
+  achDocsFirstTitle: string;
+  achDocsFirstDesc: string;
+  achLanguageCollectorITitle: string;
+  achLanguageCollectorIDesc: string;
+  achLanguageCollectorIITitle: string;
+  achLanguageCollectorIIDesc: string;
+  achTimeInvestorITitle: string;
+  achTimeInvestorIDesc: string;
+  achTimeInvestorIITitle: string;
+  achTimeInvestorIIDesc: string;
+  achTimeInvestorIIITitle: string;
+  achTimeInvestorIIIDesc: string;
+  achDailyStreak14Title: string;
+  achDailyStreak14Desc: string;
+  achDailyStreak30Title: string;
+  achDailyStreak30Desc: string;
+
   // Goal names (original + new)
   goalShipItSprint: string;
   goalRuntimeRescuer: string;
@@ -151,17 +223,17 @@ const en: AchievementTranslations = {
 
   aboutAchievements: 'About Achievements',
   infoWhatAre: 'What are Achievements?',
-  infoWhatAreDesc: 'Achievements are badges you earn by reaching milestones while coding with Claude. They track your productivity, debugging skills, testing habits, and session patterns.',
+  infoWhatAreDesc: 'Achievements are badges you unlock by reaching coding milestones while working with Claude. There are 65 achievements across 7 categories: Session, Debugging, Testing, Refactoring, Architecture, Collaboration, and Productivity. Each achievement awards XP that contributes to your level. Your progress is saved automatically and persists across sessions.',
   infoHowEarn: 'How do I earn them?',
-  infoHowEarnDesc: 'Achievements are awarded automatically based on your activity: fixing bugs, passing tests, coding at night, long sessions, using multiple languages, daily consistency, and more. Some are hidden until you discover them!',
+  infoHowEarnDesc: 'Achievements are awarded automatically as you work. For example: fix bugs to earn Bug Slayer tiers, pass tests in a row for Green Wave, code after midnight for Night Owl, or maintain a daily streak. The system tracks bug fixes, test results, files edited, languages used, session duration, time of day, and more. Some achievements are hidden and only revealed when you unlock them.',
   infoRarities: 'Rarity Levels',
-  infoRaritiesDesc: 'Common (10-25 XP) - Basic milestones. Rare (25-80 XP) - Requires dedication. Epic (45-70 XP) - Impressive feats. Legendary (180-200 XP) - Master-level accomplishments.',
+  infoRaritiesDesc: 'Each achievement has a rarity that reflects its difficulty. Common (10-25 XP): basic milestones like fixing your first few bugs. Rare (25-80 XP): requires consistent effort, such as 25 bug fixes or a 3-day streak. Epic (45-70 XP): impressive feats like 3 bug fixes in 10 minutes or 5 consecutive test passes. Legendary (150-250 XP): master-level accomplishments like 100 bug fixes or 500 test passes.',
   infoGoals: 'Session Goals',
-  infoGoalsDesc: 'Each session generates 3-4 goals based on the session context. Goals reset between sessions and give you short-term targets to aim for.',
+  infoGoalsDesc: 'At the start of each session, 2-3 random goals are generated from a pool of 7 goal types (e.g., "Fix 2 bugs", "Pass 5 tests", "Touch 8 files"). Goals show a progress bar and reset between sessions. Completing all goals in a single session unlocks the "All Goals Met" achievement.',
   infoLevels: 'Leveling Up',
-  infoLevelsDesc: 'XP earned from achievements contributes to your level. There are 15 levels total, each requiring progressively more XP.',
+  infoLevelsDesc: 'Every achievement and AI bonus awards XP, which accumulates toward your level. There are 25 levels with increasing XP thresholds (Level 1 at 100 XP up to Level 25 at 14,500 XP). Your level, total XP, and unlocked achievements are saved globally and carry over between sessions and projects.',
   infoAiInsight: 'AI Session Insights',
-  infoAiInsightDesc: 'Once per day, an AI analysis provides deeper insights about your coding session - quality rating, coding pattern detection, and bonus XP.',
+  infoAiInsightDesc: 'Once per day, when a session ends, an AI analyzes your session metrics and provides a personalized insight. This includes a quality rating (exceptional, productive, steady, exploratory, or struggling), a detected coding pattern (deep-dive, breadth-first, iterative, planning-heavy, or test-driven), and an XP bonus of up to 25 points. The insight appears in your Session Recap card.',
   gotIt: 'Got it',
 
   rarityCommon: 'Common',
@@ -248,6 +320,78 @@ const en: AchievementTranslations = {
   achDailyStreak7Title: 'Daily Streak 7',
   achDailyStreak7Desc: 'Coded 7 consecutive days.',
 
+  // --- 35 expansion achievements ---
+  achLunchBreakTitle: 'Lunch Break',
+  achLunchBreakDesc: 'Started a session between 12pm and 1pm.',
+  achSprintTitle: 'Sprint',
+  achSprintDesc: 'Session under 15 minutes with 3+ edits.',
+  achHalfCenturyTitle: 'Half Century',
+  achHalfCenturyDesc: 'Completed 50 sessions overall.',
+  achIronWillTitle: 'Iron Will',
+  achIronWillDesc: '3+ hour session with 10+ edits.',
+  achDoubleCenturionTitle: 'Double Centurion',
+  achDoubleCenturionDesc: 'Completed 200 sessions overall.',
+  achZeroDayTitle: 'Zero Day',
+  achZeroDayDesc: 'Fixed a bug within 2 minutes of session start.',
+  achBugSquasherTitle: 'Bug Squasher',
+  achBugSquasherDesc: 'Fixed 3+ bugs in one session.',
+  achErrorWhispererTitle: 'Error Whisperer',
+  achErrorWhispererDesc: 'Fixed a bug on the very first edit after an error.',
+  achComebackKidTitle: 'Comeback Kid',
+  achComebackKidDesc: '5+ runtime fixes in one session.',
+  achBugSlayerIVTitle: 'Bug Slayer IV',
+  achBugSlayerIVDesc: 'Fixed 250 bugs overall.',
+  achTestMarathonTitle: 'Test Marathon',
+  achTestMarathonDesc: '10+ test passes in one session.',
+  achTestDrivenDevTitle: 'Test Driven Dev',
+  achTestDrivenDevDesc: 'Bug fix + test pass within 3 minutes.',
+  achQualityGateTitle: 'Quality Gate',
+  achQualityGateDesc: 'Session with more test passes than bug fixes (min 2 tests).',
+  achGreenStreakTitle: 'Green Streak',
+  achGreenStreakDesc: '10 consecutive test passes.',
+  achTestMasterIVTitle: 'Test Master IV',
+  achTestMasterIVDesc: '1,000 total test passes.',
+  achTidyUpTitle: 'Tidy Up',
+  achTidyUpDesc: '5+ edits with zero runtime errors.',
+  achMegaRefactorTitle: 'Mega Refactor',
+  achMegaRefactorDesc: '25+ edits in one session.',
+  achEditVeteranITitle: 'Edit Veteran I',
+  achEditVeteranIDesc: '500 total edits overall.',
+  achEditVeteranIITitle: 'Edit Veteran II',
+  achEditVeteranIIDesc: '2,000 total edits overall.',
+  achEditVeteranIIITitle: 'Edit Veteran III',
+  achEditVeteranIIIDesc: '5,000 total edits overall.',
+  achSingleFileFocusTitle: 'Single File Focus',
+  achSingleFileFocusDesc: '5+ edits all in one file.',
+  achConfigWranglerTitle: 'Config Wrangler',
+  achConfigWranglerDesc: 'Edited a config file.',
+  achWideReachTitle: 'Wide Reach',
+  achWideReachDesc: 'Touched 20+ files in one session.',
+  achCrossStackTitle: 'Cross Stack',
+  achCrossStackDesc: 'Frontend + backend + config files in one session.',
+  achProjectArchitectTitle: 'Project Architect',
+  achProjectArchitectDesc: 'Touched 30+ files in one session.',
+  achBilingualTitle: 'Bilingual',
+  achBilingualDesc: '2+ programming languages in one session.',
+  achMarkdownAuthorTitle: 'Markdown Author',
+  achMarkdownAuthorDesc: 'Edited 3+ Markdown files.',
+  achDocsFirstTitle: 'Docs First',
+  achDocsFirstDesc: 'First file edited was a .md file.',
+  achLanguageCollectorITitle: 'Language Collector I',
+  achLanguageCollectorIDesc: '7+ languages in one session.',
+  achLanguageCollectorIITitle: 'Language Collector II',
+  achLanguageCollectorIIDesc: '10+ languages in one session.',
+  achTimeInvestorITitle: 'Time Investor I',
+  achTimeInvestorIDesc: '500 total session minutes.',
+  achTimeInvestorIITitle: 'Time Investor II',
+  achTimeInvestorIIDesc: '2,000 total session minutes.',
+  achTimeInvestorIIITitle: 'Time Investor III',
+  achTimeInvestorIIIDesc: '5,000 total session minutes.',
+  achDailyStreak14Title: 'Daily Streak 14',
+  achDailyStreak14Desc: 'Coded 14 consecutive days.',
+  achDailyStreak30Title: 'Daily Streak 30',
+  achDailyStreak30Desc: 'Coded 30 consecutive days.',
+
   // Goals
   goalShipItSprint: 'Ship It Sprint',
   goalRuntimeRescuer: 'Runtime Rescuer',
@@ -273,17 +417,17 @@ const he: AchievementTranslations = {
 
   aboutAchievements: '\u05D0\u05D5\u05D3\u05D5\u05EA \u05D4\u05D9\u05E9\u05D2\u05D9\u05DD',
   infoWhatAre: '\u05DE\u05D4\u05DD \u05D4\u05D9\u05E9\u05D2\u05D9\u05DD?',
-  infoWhatAreDesc: '\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05D4\u05DD \u05EA\u05D2\u05D9\u05DD \u05E9\u05DE\u05E8\u05D5\u05D5\u05D9\u05D7\u05D9\u05DD \u05DB\u05E9\u05DE\u05D2\u05D9\u05E2\u05D9\u05DD \u05DC\u05D0\u05D1\u05E0\u05D9 \u05D3\u05E8\u05DA \u05D1\u05E2\u05D1\u05D5\u05D3\u05D4 \u05E2\u05DD Claude. \u05D4\u05DD \u05E2\u05D5\u05E7\u05D1\u05D9\u05DD \u05D0\u05D7\u05E8 \u05D4\u05E4\u05E8\u05D5\u05D3\u05D5\u05E7\u05D8\u05D9\u05D1\u05D9\u05D5\u05EA, \u05DB\u05D9\u05E9\u05D5\u05E8\u05D9 \u05D3\u05D9\u05D1\u05D0\u05D2, \u05D4\u05E8\u05D2\u05DC\u05D9 \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA \u05D5\u05D3\u05E4\u05D5\u05E1\u05D9 \u05E1\u05E9\u05DF.',
+  infoWhatAreDesc: '\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05D4\u05DD \u05EA\u05D2\u05D9\u05DD \u05E9\u05E0\u05E4\u05EA\u05D7\u05D9\u05DD \u05DB\u05E9\u05DE\u05D2\u05D9\u05E2\u05D9\u05DD \u05DC\u05D0\u05D1\u05E0\u05D9 \u05D3\u05E8\u05DA \u05D1\u05E7\u05D9\u05D3\u05D5\u05D3 \u05E2\u05DD Claude. \u05D9\u05E9 65 \u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05D1-7 \u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA: \u05E1\u05E9\u05DF, \u05D3\u05D9\u05D1\u05D0\u05D2, \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA, \u05E8\u05D9\u05E4\u05E7\u05D8\u05D5\u05E8, \u05D0\u05E8\u05DB\u05D9\u05D8\u05E7\u05D8\u05D5\u05E8\u05D4, \u05E9\u05D9\u05EA\u05D5\u05E3 \u05E4\u05E2\u05D5\u05DC\u05D4 \u05D5\u05E4\u05E8\u05D5\u05D3\u05D5\u05E7\u05D8\u05D9\u05D1\u05D9\u05D5\u05EA. \u05DB\u05DC \u05D4\u05D9\u05E9\u05D2 \u05DE\u05E2\u05E0\u05D9\u05E7 XP \u05E9\u05EA\u05D5\u05E8\u05DD \u05DC\u05E8\u05DE\u05D4 \u05E9\u05DC\u05DA. \u05D4\u05D4\u05EA\u05E7\u05D3\u05DE\u05D5\u05EA \u05E0\u05E9\u05DE\u05E8\u05EA \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05D5\u05E0\u05E9\u05DE\u05E8\u05EA \u05D1\u05D9\u05DF \u05E1\u05E9\u05E0\u05D9\u05DD.',
   infoHowEarn: '\u05D0\u05D9\u05DA \u05DE\u05E8\u05D5\u05D5\u05D9\u05D7\u05D9\u05DD?',
-  infoHowEarnDesc: '\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05E0\u05D9\u05EA\u05E0\u05D9\u05DD \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05DC\u05E4\u05D9 \u05D4\u05E4\u05E2\u05D9\u05DC\u05D5\u05EA: \u05EA\u05D9\u05E7\u05D5\u05DF \u05D1\u05D0\u05D2\u05D9\u05DD, \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA \u05E2\u05D5\u05D1\u05E8\u05D5\u05EA, \u05E7\u05D9\u05D3\u05D5\u05D3 \u05D1\u05DC\u05D9\u05DC\u05D4, \u05E1\u05E9\u05E0\u05D9\u05DD \u05D0\u05E8\u05D5\u05DB\u05D9\u05DD, \u05E9\u05D9\u05DE\u05D5\u05E9 \u05D1\u05DE\u05E1\u05E4\u05E8 \u05E9\u05E4\u05D5\u05EA, \u05E2\u05E7\u05D1\u05D9\u05D5\u05EA \u05D9\u05D5\u05DE\u05D9\u05EA \u05D5\u05E2\u05D5\u05D3. \u05D7\u05DC\u05E7\u05DD \u05E0\u05E1\u05EA\u05E8\u05D9\u05DD \u05E2\u05D3 \u05E9\u05EA\u05D2\u05DC\u05D5!',
+  infoHowEarnDesc: '\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05E0\u05D9\u05EA\u05E0\u05D9\u05DD \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05EA \u05EA\u05D5\u05DA \u05DB\u05D3\u05D9 \u05E2\u05D1\u05D5\u05D3\u05D4. \u05DC\u05D3\u05D5\u05D2\u05DE\u05D4: \u05EA\u05E7\u05E0\u05D5 \u05D1\u05D0\u05D2\u05D9\u05DD \u05DB\u05D3\u05D9 \u05DC\u05D4\u05E8\u05D5\u05D5\u05D9\u05D7 \u05D3\u05E8\u05D2\u05D5\u05EA \u05E9\u05DC "\u05E6\u05D9\u05D9\u05D3 \u05D1\u05D0\u05D2\u05D9\u05DD", \u05E2\u05D1\u05E8\u05D5 \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA \u05D1\u05E8\u05E6\u05E3 \u05DC"\u05D2\u05DC \u05D9\u05E8\u05D5\u05E7", \u05E7\u05D3\u05D3\u05D5 \u05D0\u05D7\u05E8\u05D9 \u05D7\u05E6\u05D5\u05EA \u05DC"\u05D9\u05E0\u05E9\u05D5\u05E3 \u05DC\u05D9\u05DC\u05D4", \u05D0\u05D5 \u05E9\u05DE\u05E8\u05D5 \u05E2\u05DC \u05E8\u05E6\u05E3 \u05D9\u05D5\u05DE\u05D9. \u05D4\u05DE\u05E2\u05E8\u05DB\u05EA \u05E2\u05D5\u05E7\u05D1\u05EA \u05D0\u05D7\u05E8 \u05EA\u05D9\u05E7\u05D5\u05E0\u05D9 \u05D1\u05D0\u05D2\u05D9\u05DD, \u05EA\u05D5\u05E6\u05D0\u05D5\u05EA \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA, \u05E7\u05D1\u05E6\u05D9\u05DD \u05E9\u05E0\u05E2\u05E8\u05DB\u05D5, \u05E9\u05E4\u05D5\u05EA \u05EA\u05DB\u05E0\u05D5\u05EA, \u05DE\u05E9\u05DA \u05E1\u05E9\u05DF, \u05E9\u05E2\u05D4 \u05D1\u05D9\u05D5\u05DD \u05D5\u05E2\u05D5\u05D3. \u05D7\u05DC\u05E7 \u05DE\u05D4\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05E0\u05E1\u05EA\u05E8\u05D9\u05DD \u05D5\u05E0\u05D7\u05E9\u05E4\u05D9\u05DD \u05E8\u05E7 \u05DB\u05E9\u05DE\u05E9\u05D9\u05D2\u05D9\u05DD \u05D0\u05D5\u05EA\u05DD!',
   infoRarities: '\u05E8\u05DE\u05D5\u05EA \u05E0\u05D3\u05D9\u05E8\u05D5\u05EA',
-  infoRaritiesDesc: '\u05E8\u05D2\u05D9\u05DC (10-25 XP) - \u05D0\u05D1\u05E0\u05D9 \u05D3\u05E8\u05DA \u05D1\u05E1\u05D9\u05E1\u05D9\u05D9\u05DD. \u05E0\u05D3\u05D9\u05E8 (25-80 XP) - \u05D3\u05D5\u05E8\u05E9 \u05DE\u05E1\u05D9\u05E8\u05D5\u05EA. \u05D0\u05E4\u05D9 (45-70 XP) - \u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05DE\u05E8\u05E9\u05D9\u05DE\u05D9\u05DD. \u05D0\u05D2\u05D3\u05D9 (180-200 XP) - \u05D4\u05D9\u05E9\u05D2\u05D9 \u05DE\u05D0\u05E1\u05D8\u05E8.',
+  infoRaritiesDesc: '\u05DC\u05DB\u05DC \u05D4\u05D9\u05E9\u05D2 \u05D9\u05E9 \u05D3\u05E8\u05D2\u05EA \u05E0\u05D3\u05D9\u05E8\u05D5\u05EA \u05E9\u05DE\u05E9\u05E7\u05E4\u05EA \u05D0\u05EA \u05D4\u05E7\u05D5\u05E9\u05D9. \u05E8\u05D2\u05D9\u05DC (10-25 XP): \u05D0\u05D1\u05E0\u05D9 \u05D3\u05E8\u05DA \u05D1\u05E1\u05D9\u05E1\u05D9\u05D9\u05DD \u05DB\u05DE\u05D5 \u05EA\u05D9\u05E7\u05D5\u05DF \u05D4\u05D1\u05D0\u05D2\u05D9\u05DD \u05D4\u05E8\u05D0\u05E9\u05D5\u05E0\u05D9\u05DD. \u05E0\u05D3\u05D9\u05E8 (25-80 XP): \u05D3\u05D5\u05E8\u05E9 \u05DE\u05D0\u05DE\u05E5 \u05E2\u05E7\u05D1\u05D9, \u05DB\u05DE\u05D5 25 \u05EA\u05D9\u05E7\u05D5\u05E0\u05D9 \u05D1\u05D0\u05D2\u05D9\u05DD \u05D0\u05D5 \u05E8\u05E6\u05E3 \u05E9\u05DC 3 \u05D9\u05DE\u05D9\u05DD. \u05D0\u05E4\u05D9 (45-70 XP): \u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05DE\u05E8\u05E9\u05D9\u05DE\u05D9\u05DD \u05DB\u05DE\u05D5 3 \u05EA\u05D9\u05E7\u05D5\u05E0\u05D9 \u05D1\u05D0\u05D2\u05D9\u05DD \u05D1-10 \u05D3\u05E7\u05D5\u05EA \u05D0\u05D5 5 \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA \u05E2\u05D5\u05D1\u05E8\u05D5\u05EA \u05D1\u05E8\u05E6\u05E3. \u05D0\u05D2\u05D3\u05D9 (150-250 XP): \u05D4\u05D9\u05E9\u05D2\u05D9 \u05DE\u05D0\u05E1\u05D8\u05E8 \u05DB\u05DE\u05D5 100 \u05EA\u05D9\u05E7\u05D5\u05E0\u05D9 \u05D1\u05D0\u05D2\u05D9\u05DD \u05D0\u05D5 500 \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA \u05E2\u05D5\u05D1\u05E8\u05D5\u05EA.',
   infoGoals: '\u05D9\u05E2\u05D3\u05D9 \u05E1\u05E9\u05DF',
-  infoGoalsDesc: '\u05DB\u05DC \u05E1\u05E9\u05DF \u05DE\u05D9\u05D9\u05E6\u05E8 3-4 \u05D9\u05E2\u05D3\u05D9\u05DD \u05DC\u05E4\u05D9 \u05D4\u05D4\u05E7\u05E9\u05E8. \u05D4\u05D9\u05E2\u05D3\u05D9\u05DD \u05DE\u05EA\u05D0\u05E4\u05E1\u05D9\u05DD \u05D1\u05D9\u05DF \u05E1\u05E9\u05E0\u05D9\u05DD \u05D5\u05E0\u05D5\u05EA\u05E0\u05D9\u05DD \u05DC\u05DA \u05DE\u05D8\u05E8\u05D5\u05EA \u05DC\u05D8\u05D5\u05D5\u05D7 \u05E7\u05E6\u05E8.',
+  infoGoalsDesc: '\u05D1\u05EA\u05D7\u05D9\u05DC\u05EA \u05DB\u05DC \u05E1\u05E9\u05DF \u05E0\u05D1\u05D7\u05E8\u05D9\u05DD 2-3 \u05D9\u05E2\u05D3\u05D9\u05DD \u05D0\u05E7\u05E8\u05D0\u05D9\u05D9\u05DD \u05DE\u05EA\u05D5\u05DA 7 \u05E1\u05D5\u05D2\u05D9\u05DD (\u05DC\u05DE\u05E9\u05DC: "\u05EA\u05E7\u05DF 2 \u05D1\u05D0\u05D2\u05D9\u05DD", "\u05E2\u05D1\u05D5\u05E8 5 \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA", "\u05D2\u05E2 \u05D1-8 \u05E7\u05D1\u05E6\u05D9\u05DD"). \u05DB\u05DC \u05D9\u05E2\u05D3 \u05DE\u05E6\u05D9\u05D2 \u05E4\u05E1 \u05D4\u05EA\u05E7\u05D3\u05DE\u05D5\u05EA \u05D5\u05DE\u05EA\u05D0\u05E4\u05E1 \u05D1\u05D9\u05DF \u05E1\u05E9\u05E0\u05D9\u05DD. \u05D4\u05E9\u05DC\u05DE\u05EA \u05DB\u05DC \u05D4\u05D9\u05E2\u05D3\u05D9\u05DD \u05D1\u05E1\u05E9\u05DF \u05D0\u05D7\u05D3 \u05DE\u05E2\u05E0\u05D9\u05E7\u05D4 \u05D0\u05EA \u05D4\u05D4\u05D9\u05E9\u05D2 "\u05DB\u05DC \u05D4\u05D9\u05E2\u05D3\u05D9\u05DD \u05D4\u05D5\u05E9\u05D2\u05D5".',
   infoLevels: '\u05E2\u05DC\u05D9\u05D9\u05D4 \u05D1\u05E8\u05DE\u05D4',
-  infoLevelsDesc: 'XP \u05DE\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05EA\u05D5\u05E8\u05DD \u05DC\u05E8\u05DE\u05D4 \u05E9\u05DC\u05DA. \u05D9\u05E9 15 \u05E8\u05DE\u05D5\u05EA \u05D1\u05E1\u05DA \u05D4\u05DB\u05DC, \u05DB\u05DC \u05D0\u05D7\u05EA \u05D3\u05D5\u05E8\u05E9\u05EA \u05D9\u05D5\u05EA\u05E8 XP.',
+  infoLevelsDesc: '\u05DB\u05DC \u05D4\u05D9\u05E9\u05D2 \u05D5\u05D1\u05D5\u05E0\u05D5\u05E1 AI \u05DE\u05E2\u05E0\u05D9\u05E7\u05D9\u05DD XP, \u05E9\u05E0\u05E6\u05D1\u05E8 \u05DC\u05E7\u05E8\u05D0\u05EA \u05E8\u05DE\u05D4. \u05D9\u05E9 25 \u05E8\u05DE\u05D5\u05EA \u05E2\u05DD \u05E1\u05E4\u05D9\u05DD \u05E2\u05D5\u05DC\u05D9\u05DD (\u05E8\u05DE\u05D4 1 \u05D1-100 XP \u05E2\u05D3 \u05E8\u05DE\u05D4 25 \u05D1-14,500 XP). \u05D4\u05E8\u05DE\u05D4, \u05D4-XP \u05D4\u05DB\u05D5\u05DC\u05DC \u05D5\u05D4\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05E9\u05E0\u05E4\u05EA\u05D7\u05D5 \u05E0\u05E9\u05DE\u05E8\u05D9\u05DD \u05D2\u05DC\u05D5\u05D1\u05DC\u05D9\u05EA \u05D5\u05E2\u05D5\u05D1\u05E8\u05D9\u05DD \u05D1\u05D9\u05DF \u05E1\u05E9\u05E0\u05D9\u05DD \u05D5\u05E4\u05E8\u05D5\u05D9\u05E7\u05D8\u05D9\u05DD.',
   infoAiInsight: '\u05EA\u05D5\u05D1\u05E0\u05D5\u05EA AI \u05DC\u05E1\u05E9\u05DF',
-  infoAiInsightDesc: '\u05E4\u05E2\u05DD \u05D1\u05D9\u05D5\u05DD, \u05E0\u05D9\u05EA\u05D5\u05D7 AI \u05DE\u05E1\u05E4\u05E7 \u05EA\u05D5\u05D1\u05E0\u05D5\u05EA \u05DE\u05E2\u05DE\u05D9\u05E7\u05D5\u05EA \u05E2\u05DC \u05E1\u05E9\u05DF \u05D4\u05E7\u05D9\u05D3\u05D5\u05D3 - \u05D3\u05D9\u05E8\u05D5\u05D2 \u05D0\u05D9\u05DB\u05D5\u05EA, \u05D6\u05D9\u05D4\u05D5\u05D9 \u05D3\u05E4\u05D5\u05E1\u05D9\u05DD \u05D5\u05D1\u05D5\u05E0\u05D5\u05E1 XP.',
+  infoAiInsightDesc: '\u05E4\u05E2\u05DD \u05D1\u05D9\u05D5\u05DD, \u05D1\u05E1\u05D9\u05D5\u05DD \u05E1\u05E9\u05DF, AI \u05DE\u05E0\u05EA\u05D7 \u05D0\u05EA \u05DE\u05D3\u05D3\u05D9 \u05D4\u05E1\u05E9\u05DF \u05D5\u05DE\u05E1\u05E4\u05E7 \u05EA\u05D5\u05D1\u05E0\u05D4 \u05D0\u05D9\u05E9\u05D9\u05EA. \u05D4\u05EA\u05D5\u05D1\u05E0\u05D4 \u05DB\u05D5\u05DC\u05DC\u05EA \u05D3\u05D9\u05E8\u05D5\u05D2 \u05D0\u05D9\u05DB\u05D5\u05EA (\u05D9\u05D5\u05E6\u05D0 \u05DE\u05DF \u05D4\u05DB\u05DC\u05DC, \u05E4\u05E8\u05D5\u05D3\u05D5\u05E7\u05D8\u05D9\u05D1\u05D9, \u05D9\u05E6\u05D9\u05D1, \u05D7\u05E7\u05E8\u05E0\u05D9 \u05D0\u05D5 \u05DE\u05EA\u05E7\u05E9\u05D4), \u05D6\u05D9\u05D4\u05D5\u05D9 \u05D3\u05E4\u05D5\u05E1 \u05E7\u05D9\u05D3\u05D5\u05D3 (\u05E6\u05DC\u05D9\u05DC\u05D4 \u05DC\u05E2\u05D5\u05DE\u05E7, \u05E8\u05D5\u05D7\u05D1\u05D9, \u05D0\u05D9\u05D8\u05E8\u05D8\u05D9\u05D1\u05D9, \u05EA\u05DB\u05E0\u05D5\u05DF-\u05DB\u05D1\u05D3 \u05D0\u05D5 \u05DE\u05D5\u05E0\u05D7\u05D4-\u05D1\u05D3\u05D9\u05E7\u05D5\u05EA), \u05D5\u05D1\u05D5\u05E0\u05D5\u05E1 XP \u05E9\u05DC \u05E2\u05D3 25 \u05E0\u05E7\u05D5\u05D3\u05D5\u05EA. \u05D4\u05EA\u05D5\u05D1\u05E0\u05D4 \u05DE\u05D5\u05E4\u05D9\u05E2\u05D4 \u05D1\u05DB\u05E8\u05D8\u05D9\u05E1 \u05E1\u05D9\u05DB\u05D5\u05DD \u05D4\u05E1\u05E9\u05DF.',
   gotIt: '\u05D4\u05D1\u05E0\u05EA\u05D9',
 
   rarityCommon: '\u05E8\u05D2\u05D9\u05DC',
@@ -370,6 +514,78 @@ const he: AchievementTranslations = {
   achDailyStreak7Title: '\u05E8\u05E6\u05E3 \u05D9\u05D5\u05DE\u05D9 7',
   achDailyStreak7Desc: '\u05E7\u05D9\u05D3\u05D3\u05EA 7 \u05D9\u05DE\u05D9\u05DD \u05E8\u05E6\u05D5\u05E4\u05D9\u05DD.',
 
+  // --- 35 expansion achievements ---
+  achLunchBreakTitle: '\u05D4\u05E4\u05E1\u05E7\u05EA \u05E6\u05D4\u05E8\u05D9\u05D9\u05DD',
+  achLunchBreakDesc: '\u05D4\u05EA\u05D7\u05DC\u05EA \u05E1\u05E9\u05DF \u05D1\u05D9\u05DF 12 \u05DC-1 \u05D1\u05E6\u05D4\u05E8\u05D9\u05D9\u05DD.',
+  achSprintTitle: '\u05E1\u05E4\u05E8\u05D9\u05E0\u05D8',
+  achSprintDesc: '\u05E1\u05E9\u05DF \u05DE\u05D4\u05D9\u05E8 \u05E9\u05DC \u05E4\u05D7\u05D5\u05EA \u05DE-15 \u05D3\u05E7\u05D5\u05EA \u05E2\u05DD 3+ \u05E2\u05E8\u05D9\u05DB\u05D5\u05EA.',
+  achHalfCenturyTitle: '\u05D7\u05E6\u05D9 \u05DE\u05D0\u05D4',
+  achHalfCenturyDesc: '\u05D4\u05E9\u05DC\u05DE\u05EA 50 \u05E1\u05E9\u05E0\u05D9\u05DD \u05D1\u05E1\u05DA \u05D4\u05DB\u05DC.',
+  achIronWillTitle: '\u05E8\u05E6\u05D5\u05DF \u05D1\u05E8\u05D6\u05DC',
+  achIronWillDesc: '\u05E1\u05E9\u05DF \u05E9\u05DC 3+ \u05E9\u05E2\u05D5\u05EA \u05E2\u05DD 10+ \u05E2\u05E8\u05D9\u05DB\u05D5\u05EA.',
+  achDoubleCenturionTitle: '\u05E7\u05E0\u05D8\u05D5\u05E8\u05D9\u05D5\u05DF \u05DB\u05E4\u05D5\u05DC',
+  achDoubleCenturionDesc: '\u05D4\u05E9\u05DC\u05DE\u05EA 200 \u05E1\u05E9\u05E0\u05D9\u05DD \u05D1\u05E1\u05DA \u05D4\u05DB\u05DC.',
+  achZeroDayTitle: '\u05D9\u05D5\u05DD \u05D0\u05E4\u05E1',
+  achZeroDayDesc: '\u05EA\u05D9\u05E7\u05D5\u05DF \u05D1\u05D0\u05D2 \u05EA\u05D5\u05DA 2 \u05D3\u05E7\u05D5\u05EA \u05DE\u05EA\u05D7\u05D9\u05DC\u05EA \u05D4\u05E1\u05E9\u05DF.',
+  achBugSquasherTitle: '\u05DE\u05D5\u05D7\u05E5 \u05D1\u05D0\u05D2\u05D9\u05DD',
+  achBugSquasherDesc: '\u05EA\u05D9\u05E7\u05E0\u05EA 3+ \u05D1\u05D0\u05D2\u05D9\u05DD \u05D1\u05E1\u05E9\u05DF \u05D0\u05D7\u05D3.',
+  achErrorWhispererTitle: '\u05DC\u05D5\u05D7\u05E9 \u05E9\u05D2\u05D9\u05D0\u05D5\u05EA',
+  achErrorWhispererDesc: '\u05EA\u05D9\u05E7\u05E0\u05EA \u05D1\u05D0\u05D2 \u05D1\u05E2\u05E8\u05D9\u05DB\u05D4 \u05D4\u05E8\u05D0\u05E9\u05D5\u05E0\u05D4 \u05D0\u05D7\u05E8\u05D9 \u05E9\u05D2\u05D9\u05D0\u05D4.',
+  achComebackKidTitle: '\u05D9\u05DC\u05D3 \u05D4\u05D7\u05D6\u05E8\u05D4',
+  achComebackKidDesc: '5+ \u05EA\u05D9\u05E7\u05D5\u05E0\u05D9 \u05E9\u05D2\u05D9\u05D0\u05D5\u05EA \u05E8\u05D9\u05E6\u05D4 \u05D1\u05E1\u05E9\u05DF \u05D0\u05D7\u05D3.',
+  achBugSlayerIVTitle: '\u05E6\u05D9\u05D9\u05D3 \u05D1\u05D0\u05D2\u05D9\u05DD IV',
+  achBugSlayerIVDesc: '\u05EA\u05D9\u05E7\u05E0\u05EA 250 \u05D1\u05D0\u05D2\u05D9\u05DD \u05D1\u05E1\u05DA \u05D4\u05DB\u05DC.',
+  achTestMarathonTitle: '\u05DE\u05E8\u05EA\u05D5\u05DF \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA',
+  achTestMarathonDesc: '10+ \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA \u05E2\u05D5\u05D1\u05E8\u05D5\u05EA \u05D1\u05E1\u05E9\u05DF \u05D0\u05D7\u05D3.',
+  achTestDrivenDevTitle: '\u05E4\u05D9\u05EA\u05D5\u05D7 \u05DE\u05D1\u05D5\u05E1\u05E1 \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA',
+  achTestDrivenDevDesc: '\u05EA\u05D9\u05E7\u05D5\u05DF \u05D1\u05D0\u05D2 + \u05D1\u05D3\u05D9\u05E7\u05D4 \u05E2\u05D5\u05D1\u05E8\u05EA \u05EA\u05D5\u05DA 3 \u05D3\u05E7\u05D5\u05EA.',
+  achQualityGateTitle: '\u05E9\u05E2\u05E8 \u05D0\u05D9\u05DB\u05D5\u05EA',
+  achQualityGateDesc: '\u05E1\u05E9\u05DF \u05E2\u05DD \u05D9\u05D5\u05EA\u05E8 \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA \u05DE\u05D1\u05D0\u05D2\u05D9\u05DD (\u05DE\u05D9\u05E0\u05D9\u05DE\u05D5\u05DD 2).',
+  achGreenStreakTitle: '\u05E8\u05E6\u05E3 \u05D9\u05E8\u05D5\u05E7',
+  achGreenStreakDesc: '10 \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA \u05E2\u05D5\u05D1\u05E8\u05D5\u05EA \u05D1\u05E8\u05E6\u05E3.',
+  achTestMasterIVTitle: '\u05DE\u05D0\u05E1\u05D8\u05E8 \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA IV',
+  achTestMasterIVDesc: '1,000 \u05D1\u05D3\u05D9\u05E7\u05D5\u05EA \u05E2\u05D5\u05D1\u05E8\u05D5\u05EA \u05D1\u05E1\u05DA \u05D4\u05DB\u05DC.',
+  achTidyUpTitle: '\u05E1\u05D9\u05D3\u05D5\u05E8',
+  achTidyUpDesc: '5+ \u05E2\u05E8\u05D9\u05DB\u05D5\u05EA \u05D5\u05D0\u05E4\u05E1 \u05E9\u05D2\u05D9\u05D0\u05D5\u05EA \u05E8\u05D9\u05E6\u05D4.',
+  achMegaRefactorTitle: '\u05DE\u05D2\u05D4 \u05E8\u05D9\u05E4\u05E7\u05D8\u05D5\u05E8',
+  achMegaRefactorDesc: '25+ \u05E2\u05E8\u05D9\u05DB\u05D5\u05EA \u05D1\u05E1\u05E9\u05DF \u05D0\u05D7\u05D3.',
+  achEditVeteranITitle: '\u05D5\u05EA\u05D9\u05E7 \u05E2\u05E8\u05D9\u05DB\u05D5\u05EA I',
+  achEditVeteranIDesc: '500 \u05E2\u05E8\u05D9\u05DB\u05D5\u05EA \u05D1\u05E1\u05DA \u05D4\u05DB\u05DC.',
+  achEditVeteranIITitle: '\u05D5\u05EA\u05D9\u05E7 \u05E2\u05E8\u05D9\u05DB\u05D5\u05EA II',
+  achEditVeteranIIDesc: '2,000 \u05E2\u05E8\u05D9\u05DB\u05D5\u05EA \u05D1\u05E1\u05DA \u05D4\u05DB\u05DC.',
+  achEditVeteranIIITitle: '\u05D5\u05EA\u05D9\u05E7 \u05E2\u05E8\u05D9\u05DB\u05D5\u05EA III',
+  achEditVeteranIIIDesc: '5,000 \u05E2\u05E8\u05D9\u05DB\u05D5\u05EA \u05D1\u05E1\u05DA \u05D4\u05DB\u05DC.',
+  achSingleFileFocusTitle: '\u05DE\u05D9\u05E7\u05D5\u05D3 \u05D1\u05E7\u05D5\u05D1\u05E5 \u05D0\u05D7\u05D3',
+  achSingleFileFocusDesc: '5+ \u05E2\u05E8\u05D9\u05DB\u05D5\u05EA \u05D1\u05E7\u05D5\u05D1\u05E5 \u05D9\u05D7\u05D9\u05D3.',
+  achConfigWranglerTitle: '\u05D0\u05DC\u05D5\u05E3 \u05E7\u05D5\u05E0\u05E4\u05D9\u05D2\u05D5\u05E8\u05E6\u05D9\u05D4',
+  achConfigWranglerDesc: '\u05E2\u05E8\u05D9\u05DB\u05EA \u05E7\u05D5\u05D1\u05E5 \u05E7\u05D5\u05E0\u05E4\u05D9\u05D2\u05D5\u05E8\u05E6\u05D9\u05D4.',
+  achWideReachTitle: '\u05D8\u05D5\u05D5\u05D7 \u05E8\u05D7\u05D1',
+  achWideReachDesc: '\u05E0\u05D2\u05E2\u05EA \u05D1-20+ \u05E7\u05D1\u05E6\u05D9\u05DD \u05D1\u05E1\u05E9\u05DF \u05D0\u05D7\u05D3.',
+  achCrossStackTitle: '\u05D7\u05D5\u05E6\u05D4 \u05E9\u05DB\u05D1\u05D5\u05EA',
+  achCrossStackDesc: '\u05E2\u05E8\u05D9\u05DB\u05EA \u05E4\u05E8\u05D5\u05E0\u05D8 + \u05D1\u05E7\u05D0\u05E0\u05D3 + \u05E7\u05D5\u05E0\u05E4\u05D9\u05D2\u05D5\u05E8\u05E6\u05D9\u05D4 \u05D1\u05E1\u05E9\u05DF \u05D0\u05D7\u05D3.',
+  achProjectArchitectTitle: '\u05D0\u05E8\u05DB\u05D9\u05D8\u05E7\u05D8 \u05E4\u05E8\u05D5\u05D9\u05E7\u05D8',
+  achProjectArchitectDesc: '\u05E0\u05D2\u05E2\u05EA \u05D1-30+ \u05E7\u05D1\u05E6\u05D9\u05DD \u05D1\u05E1\u05E9\u05DF \u05D0\u05D7\u05D3.',
+  achBilingualTitle: '\u05D3\u05D5-\u05DC\u05E9\u05D5\u05E0\u05D9',
+  achBilingualDesc: '\u05E9\u05D9\u05DE\u05D5\u05E9 \u05D1-2+ \u05E9\u05E4\u05D5\u05EA \u05EA\u05DB\u05E0\u05D5\u05EA \u05D1\u05E1\u05E9\u05DF \u05D0\u05D7\u05D3.',
+  achMarkdownAuthorTitle: '\u05DB\u05D5\u05EA\u05D1 \u05DE\u05D0\u05E8\u05E7\u05D3\u05D0\u05D5\u05DF',
+  achMarkdownAuthorDesc: '\u05E2\u05E8\u05D9\u05DB\u05EA 3+ \u05E7\u05D1\u05E6\u05D9 Markdown.',
+  achDocsFirstTitle: '\u05EA\u05D9\u05E2\u05D5\u05D3 \u05E7\u05D5\u05D3\u05DD',
+  achDocsFirstDesc: '\u05D4\u05E7\u05D5\u05D1\u05E5 \u05D4\u05E8\u05D0\u05E9\u05D5\u05DF \u05E9\u05E0\u05E2\u05E8\u05DA \u05D4\u05D9\u05D4 \u05E7\u05D5\u05D1\u05E5 .md.',
+  achLanguageCollectorITitle: '\u05D0\u05E1\u05E4\u05DF \u05E9\u05E4\u05D5\u05EA I',
+  achLanguageCollectorIDesc: '7+ \u05E9\u05E4\u05D5\u05EA \u05EA\u05DB\u05E0\u05D5\u05EA \u05D1\u05E1\u05E9\u05DF \u05D0\u05D7\u05D3.',
+  achLanguageCollectorIITitle: '\u05D0\u05E1\u05E4\u05DF \u05E9\u05E4\u05D5\u05EA II',
+  achLanguageCollectorIIDesc: '10+ \u05E9\u05E4\u05D5\u05EA \u05EA\u05DB\u05E0\u05D5\u05EA \u05D1\u05E1\u05E9\u05DF \u05D0\u05D7\u05D3.',
+  achTimeInvestorITitle: '\u05DE\u05E9\u05E7\u05D9\u05E2 \u05D6\u05DE\u05DF I',
+  achTimeInvestorIDesc: '500 \u05D3\u05E7\u05D5\u05EA \u05E1\u05E9\u05DF \u05D1\u05E1\u05DA \u05D4\u05DB\u05DC.',
+  achTimeInvestorIITitle: '\u05DE\u05E9\u05E7\u05D9\u05E2 \u05D6\u05DE\u05DF II',
+  achTimeInvestorIIDesc: '2,000 \u05D3\u05E7\u05D5\u05EA \u05E1\u05E9\u05DF \u05D1\u05E1\u05DA \u05D4\u05DB\u05DC.',
+  achTimeInvestorIIITitle: '\u05DE\u05E9\u05E7\u05D9\u05E2 \u05D6\u05DE\u05DF III',
+  achTimeInvestorIIIDesc: '5,000 \u05D3\u05E7\u05D5\u05EA \u05E1\u05E9\u05DF \u05D1\u05E1\u05DA \u05D4\u05DB\u05DC.',
+  achDailyStreak14Title: '\u05E8\u05E6\u05E3 \u05D9\u05D5\u05DE\u05D9 14',
+  achDailyStreak14Desc: '\u05E7\u05D9\u05D3\u05D3\u05EA 14 \u05D9\u05DE\u05D9\u05DD \u05E8\u05E6\u05D5\u05E4\u05D9\u05DD.',
+  achDailyStreak30Title: '\u05E8\u05E6\u05E3 \u05D9\u05D5\u05DE\u05D9 30',
+  achDailyStreak30Desc: '\u05E7\u05D9\u05D3\u05D3\u05EA 30 \u05D9\u05DE\u05D9\u05DD \u05E8\u05E6\u05D5\u05E4\u05D9\u05DD.',
+
   // Goals
   goalShipItSprint: '\u05E1\u05E4\u05E8\u05D9\u05E0\u05D8 \u05E9\u05D9\u05DC\u05D5\u05D7',
   goalRuntimeRescuer: '\u05DE\u05E6\u05D9\u05DC \u05E8\u05D9\u05E6\u05D4',
@@ -419,6 +635,42 @@ const ACH_TITLE_MAP: Record<string, keyof AchievementTranslations> = {
   'all-goals-met': 'achAllGoalsMetTitle',
   'daily-streak-3': 'achDailyStreak3Title',
   'daily-streak-7': 'achDailyStreak7Title',
+  // Expansion
+  'lunch-break': 'achLunchBreakTitle',
+  'sprint': 'achSprintTitle',
+  'half-century': 'achHalfCenturyTitle',
+  'iron-will': 'achIronWillTitle',
+  'double-centurion': 'achDoubleCenturionTitle',
+  'zero-day': 'achZeroDayTitle',
+  'bug-squasher': 'achBugSquasherTitle',
+  'error-whisperer': 'achErrorWhispererTitle',
+  'comeback-kid': 'achComebackKidTitle',
+  'bug-slayer-iv': 'achBugSlayerIVTitle',
+  'test-marathon': 'achTestMarathonTitle',
+  'test-driven-dev': 'achTestDrivenDevTitle',
+  'quality-gate': 'achQualityGateTitle',
+  'green-streak': 'achGreenStreakTitle',
+  'test-master-iv': 'achTestMasterIVTitle',
+  'tidy-up': 'achTidyUpTitle',
+  'mega-refactor': 'achMegaRefactorTitle',
+  'edit-veteran-i': 'achEditVeteranITitle',
+  'edit-veteran-ii': 'achEditVeteranIITitle',
+  'edit-veteran-iii': 'achEditVeteranIIITitle',
+  'single-file-focus': 'achSingleFileFocusTitle',
+  'config-wrangler': 'achConfigWranglerTitle',
+  'wide-reach': 'achWideReachTitle',
+  'cross-stack': 'achCrossStackTitle',
+  'project-architect': 'achProjectArchitectTitle',
+  'bilingual': 'achBilingualTitle',
+  'markdown-author': 'achMarkdownAuthorTitle',
+  'docs-first': 'achDocsFirstTitle',
+  'language-collector-i': 'achLanguageCollectorITitle',
+  'language-collector-ii': 'achLanguageCollectorIITitle',
+  'time-investor-i': 'achTimeInvestorITitle',
+  'time-investor-ii': 'achTimeInvestorIITitle',
+  'time-investor-iii': 'achTimeInvestorIIITitle',
+  'daily-streak-14': 'achDailyStreak14Title',
+  'daily-streak-30': 'achDailyStreak30Title',
 };
 
 const ACH_DESC_MAP: Record<string, keyof AchievementTranslations> = {
@@ -453,6 +705,42 @@ const ACH_DESC_MAP: Record<string, keyof AchievementTranslations> = {
   'all-goals-met': 'achAllGoalsMetDesc',
   'daily-streak-3': 'achDailyStreak3Desc',
   'daily-streak-7': 'achDailyStreak7Desc',
+  // Expansion
+  'lunch-break': 'achLunchBreakDesc',
+  'sprint': 'achSprintDesc',
+  'half-century': 'achHalfCenturyDesc',
+  'iron-will': 'achIronWillDesc',
+  'double-centurion': 'achDoubleCenturionDesc',
+  'zero-day': 'achZeroDayDesc',
+  'bug-squasher': 'achBugSquasherDesc',
+  'error-whisperer': 'achErrorWhispererDesc',
+  'comeback-kid': 'achComebackKidDesc',
+  'bug-slayer-iv': 'achBugSlayerIVDesc',
+  'test-marathon': 'achTestMarathonDesc',
+  'test-driven-dev': 'achTestDrivenDevDesc',
+  'quality-gate': 'achQualityGateDesc',
+  'green-streak': 'achGreenStreakDesc',
+  'test-master-iv': 'achTestMasterIVDesc',
+  'tidy-up': 'achTidyUpDesc',
+  'mega-refactor': 'achMegaRefactorDesc',
+  'edit-veteran-i': 'achEditVeteranIDesc',
+  'edit-veteran-ii': 'achEditVeteranIIDesc',
+  'edit-veteran-iii': 'achEditVeteranIIIDesc',
+  'single-file-focus': 'achSingleFileFocusDesc',
+  'config-wrangler': 'achConfigWranglerDesc',
+  'wide-reach': 'achWideReachDesc',
+  'cross-stack': 'achCrossStackDesc',
+  'project-architect': 'achProjectArchitectDesc',
+  'bilingual': 'achBilingualDesc',
+  'markdown-author': 'achMarkdownAuthorDesc',
+  'docs-first': 'achDocsFirstDesc',
+  'language-collector-i': 'achLanguageCollectorIDesc',
+  'language-collector-ii': 'achLanguageCollectorIIDesc',
+  'time-investor-i': 'achTimeInvestorIDesc',
+  'time-investor-ii': 'achTimeInvestorIIDesc',
+  'time-investor-iii': 'achTimeInvestorIIIDesc',
+  'daily-streak-14': 'achDailyStreak14Desc',
+  'daily-streak-30': 'achDailyStreak30Desc',
 };
 
 const GOAL_TITLE_MAP: Record<string, keyof AchievementTranslations> = {

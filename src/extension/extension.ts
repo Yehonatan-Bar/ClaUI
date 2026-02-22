@@ -7,6 +7,7 @@ import { PromptHistoryStore } from './session/PromptHistoryStore';
 import { FileLogger } from './session/FileLogger';
 import { AchievementService } from './achievements/AchievementService';
 import { AchievementInsightAnalyzer } from './achievements/AchievementInsightAnalyzer';
+import { SkillGenService } from './skillgen/SkillGenService';
 import { registerCommands } from './commands';
 
 let tabManager: TabManager;
@@ -59,6 +60,17 @@ export function activate(context: vscode.ExtensionContext): void {
   const storedAnalytics = projectAnalyticsStore.getSummaries();
   log(`[ProjectAnalytics] Found ${storedAnalytics.length} stored session summaries on activation`);
 
+  // Create skill generation service (global, cross-session)
+  const skillGenService = new SkillGenService(context.globalState);
+  skillGenService.setLogger(log);
+  // Initial document scan on activation
+  const skillGenConfig = vscode.workspace.getConfiguration('claudeMirror');
+  if (skillGenConfig.get<boolean>('skillGen.enabled', false)) {
+    void skillGenService.scanDocuments().then(pending => {
+      log(`[SkillGen] Initial scan: ${pending} pending documents`);
+    });
+  }
+
   // Create the tab manager that owns all session tabs
   tabManager = new TabManager(
     context,
@@ -67,7 +79,8 @@ export function activate(context: vscode.ExtensionContext): void {
     projectAnalyticsStore,
     promptHistoryStore,
     achievementService,
-    enableFileLogging ? logDir : null
+    enableFileLogging ? logDir : null,
+    skillGenService
   );
 
   // Register commands routed through the tab manager

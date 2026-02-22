@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaUi - תוכנית שיתוף הישגים</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 40px 20px;
+    line-height: 1.7;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 2rem;
+    color: #818cf8;
+    margin-bottom: 8px;
+    border-bottom: 2px solid #334155;
+    padding-bottom: 12px;
+  }
+  .subtitle {
+    color: #94a3b8;
+    font-size: 1.1rem;
+    margin-bottom: 32px;
+  }
+  h2 {
+    font-size: 1.4rem;
+    color: #60a5fa;
+    margin-top: 36px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2 .phase-num {
+    background: #818cf8;
+    color: #0f172a;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+  }
+  .card {
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    border: 1px solid #334155;
+  }
+  .card.highlight {
+    border-color: #818cf8;
+    background: linear-gradient(135deg, #1e293b 0%, #1e1b4b 100%);
+  }
+  .card h3 {
+    color: #f1f5f9;
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+  }
+  .card p {
+    color: #cbd5e1;
+    margin-bottom: 10px;
+  }
+  ul {
+    padding-right: 24px;
+    margin-bottom: 12px;
+  }
+  li {
+    color: #cbd5e1;
+    margin-bottom: 8px;
+  }
+  li strong {
+    color: #e2e8f0;
+  }
+  .why-box {
+    background: #172554;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-right: 4px solid #3b82f6;
+  }
+  .why-box .label {
+    color: #60a5fa;
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+  .benefit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .benefit-item {
+    background: #1e293b;
+    border-radius: 8px;
+    padding: 16px;
+    border: 1px solid #334155;
+    text-align: center;
+  }
+  .benefit-item .icon {
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+  }
+  .benefit-item .title {
+    color: #818cf8;
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  .benefit-item .desc {
+    color: #94a3b8;
+    font-size: 0.9rem;
+  }
+  .flow-diagram {
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+    text-align: center;
+    border: 1px solid #334155;
+  }
+  .flow-steps {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .flow-step {
+    background: #334155;
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: #e2e8f0;
+    font-size: 0.9rem;
+    min-width: 120px;
+  }
+  .flow-arrow {
+    color: #818cf8;
+    font-size: 1.4rem;
+    transform: scaleX(-1);
+  }
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+  }
+  .summary-table th {
+    background: #334155;
+    color: #e2e8f0;
+    padding: 10px 16px;
+    text-align: right;
+  }
+  .summary-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid #334155;
+    color: #cbd5e1;
+  }
+  .summary-table tr:hover td {
+    background: rgba(129, 140, 248, 0.05);
+  }
+  .tag {
+    display: inline-block;
+    background: #334155;
+    color: #818cf8;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin-left: 4px;
+  }
+  .tag.green { background: #064e3b; color: #6ee7b7; }
+  .tag.yellow { background: #713f12; color: #fcd34d; }
+  .tag.blue { background: #1e3a5f; color: #93c5fd; }
+  .footer {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #334155;
+    color: #64748b;
+    font-size: 0.9rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>ClaUi - שיתוף הישגים בין מפתחים</h1>
+<p class="subtitle">הפיכת מערכת ההישגים של ClaUi לפלטפורמה חברתית שבה מפתחים יכולים לשתף, להשוות ולהתהדר בהישגיהם</p>
+
+<div class="card highlight">
+  <h3>הרעיון בקצרה</h3>
+  <p>
+    מפתחים שמשתמשים ב-ClaUi צוברים הישגים (30 הישגים, 7 קטגוריות, 15 רמות). כרגע - הכל מקומי ופרטי.
+    התוכנית הזו הופכת את ההישגים לפומביים: מפתח יוכל <strong>לפרסם את ההישגים שלו ב-GitHub</strong>,
+    <strong>לצפות בהישגים של מפתחים אחרים</strong> מתוך הממשק,
+    ו<strong>להציג תגי הישגים בפרופיל GitHub שלו</strong>.
+  </p>
+</div>
+
+<div class="why-box">
+  <div class="label">למה דווקא GitHub?</div>
+  <p>
+    כל מפתח כבר יש לו חשבון GitHub. VS Code כולל חיבור מובנה ל-GitHub (בלי תוספים חיצוניים).
+    GitHub Gist מספק אחסון JSON חינמי ופומבי שכל אחד יכול לקרוא.
+    הדפוס הזה מוכח - כלים כמו github-readme-stats (מעל 70,000 כוכבים) עובדים באותו עיקרון.
+    <strong>לא צריך שרת בכלל</strong> - הכל עובד ישירות מול GitHub.
+  </p>
+</div>
+
+<div class="benefit-grid">
+  <div class="benefit-item">
+    <div class="title">ללא שרת</div>
+    <div class="desc">הכל עובד דרך GitHub Gist - אפס עלות תחזוקה</div>
+  </div>
+  <div class="benefit-item">
+    <div class="title">הצטרפות רצונית</div>
+    <div class="desc">רק מפתחים שרוצים לשתף מחברים את GitHub שלהם</div>
+  </div>
+  <div class="benefit-item">
+    <div class="title">תגים לפרופיל</div>
+    <div class="desc">תגים דינמיים שמתעדכנים אוטומטית בפרופיל GitHub</div>
+  </div>
+  <div class="benefit-item">
+    <div class="title">השוואה בין חברים</div>
+    <div class="desc">צפייה והשוואת הישגים עם מפתחים אחרים מתוך ClaUi</div>
+  </div>
+</div>
+
+<h2><span class="flow-diagram" style="background:transparent;border:none;padding:0;">איך זה עובד?</span></h2>
+
+<div class="flow-diagram">
+  <div class="flow-steps">
+    <div class="flow-step">מפתח מחבר<br>את GitHub שלו</div>
+    <div class="flow-arrow">&larr;</div>
+    <div class="flow-step">ההישגים מתפרסמים<br>אוטומטית כ-Gist</div>
+    <div class="flow-arrow">&larr;</div>
+    <div class="flow-step">מפתחים אחרים<br>יכולים לחפש ולצפות</div>
+    <div class="flow-arrow">&larr;</div>
+    <div class="flow-step">תגים דינמיים<br>בפרופיל GitHub</div>
+  </div>
+</div>
+
+<!-- Phase 1 -->
+<h2><span class="phase-num">1</span> חיבור GitHub וסנכרון אוטומטי</h2>
+<div class="card">
+  <p>השלב הבסיסי - חיבור חשבון GitHub ופרסום הישגים אוטומטי.</p>
+  <ul>
+    <li><strong>חיבור GitHub:</strong> המפתח לוחץ "Connect GitHub" בממשק ההישגים. VS Code מבקש הרשאת גישה (מובנית, בלי ספריות חיצוניות).</li>
+    <li><strong>פרסום אוטומטי:</strong> בסיום כל סשן עבודה, ההישגים המעודכנים מתפרסמים כקובץ JSON ב-GitHub Gist (פומבי, חינמי).</li>
+    <li><strong>גילוי מפתחים:</strong> כשמחפשים מפתח לפי שם המשתמש שלו ב-GitHub, המערכת מוצאת אוטומטית את ה-Gist של ההישגים שלו.</li>
+    <li><strong>עמידות:</strong> אם אין חיבור לאינטרנט, הסנכרון נכשל בשקט - שום דבר לא נשבר. הנתונים המקומיים תמיד המקור האמיתי.</li>
+  </ul>
+  <p><span class="tag green">ברירת מחדל: כבוי</span> <span class="tag">הגדרה חדשה</span></p>
+</div>
+
+<!-- Phase 2 -->
+<h2><span class="phase-num">2</span> קהילה - חברים והשוואה</h2>
+<div class="card">
+  <p>ממשק חברתי מלא בתוך ClaUi לצפייה והשוואת הישגים.</p>
+  <ul>
+    <li><strong>הוספת חברים:</strong> הזנת שם משתמש GitHub - המערכת מוצאת את ההישגים שלו ומוסיפה לרשימת חברים.</li>
+    <li><strong>רשימת חברים:</strong> תצוגת כל החברים עם תמונת פרופיל, רמה, XP, מספר הישגים.</li>
+    <li><strong>השוואה מול חבר:</strong> תצוגה זה-לצד-זה - רמה מול רמה, הישג מול הישג, סטטיסטיקות מול סטטיסטיקות. אפשר לראות בדיוק אילו הישגים יש לך ואילו לחבר.</li>
+    <li><strong>כפתור "קהילה":</strong> כפתור חדש בראש פאנל ההישגים שפותח את לוח הקהילה.</li>
+  </ul>
+  <p><span class="tag blue">פאנל חדש</span> <span class="tag">תמיכה בעברית ואנגלית</span></p>
+</div>
+
+<!-- Phase 3 -->
+<h2><span class="phase-num">3</span> כרטיס הישגים לפרופיל GitHub</h2>
+<div class="card">
+  <p>יצירת תגים ו"כרטיס הישגים" שאפשר להטמיע בפרופיל GitHub.</p>
+  <ul>
+    <li><strong>תגי Shields.io דינמיים:</strong> תגים שמושכים נתונים ישירות מה-Gist ומתעדכנים אוטומטית - רמה, XP, מספר הישגים. ניתן להדביק ב-README של הפרופיל.</li>
+    <li><strong>כרטיס Markdown:</strong> טבלה מעוצבת עם כל הסטטיסטיקות - רמה, XP, הישגים אחרונים, תיקוני באגים, בדיקות שעברו, רצף ימים.</li>
+    <li><strong>כפתור "שיתוף":</strong> לחיצה אחת מעתיקה את ה-Markdown ללוח - פשוט להדביק בפרופיל.</li>
+    <li><strong>תצוגה מקדימה:</strong> לפני ההעתקה, אפשר לראות איך הכרטיס ייראה.</li>
+  </ul>
+  <p><span class="tag yellow">Shields.io</span> <span class="tag">בלי שרת</span></p>
+</div>
+
+<h2>מה זה כולל מבחינה טכנית</h2>
+<table class="summary-table">
+  <thead>
+    <tr>
+      <th>פריט</th>
+      <th>פירוט</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>קבצים חדשים</td>
+      <td>3 קבצים - שירות סנכרון, לוח קהילה, כרטיס שיתוף</td>
+    </tr>
+    <tr>
+      <td>קבצים שעוברים שינוי</td>
+      <td>כ-10 קבצים קיימים (הוספת כפתורים, הודעות, מצב, תרגומים)</td>
+    </tr>
+    <tr>
+      <td>תלויות חיצוניות חדשות</td>
+      <td>אפס - הכל מובנה ב-VS Code וב-Node.js</td>
+    </tr>
+    <tr>
+      <td>שרת / תשתית</td>
+      <td>לא נדרש - הכל עובד דרך GitHub API</td>
+    </tr>
+    <tr>
+      <td>עלות תפעול</td>
+      <td>אפס - GitHub Gist חינמי, Shields.io חינמי</td>
+    </tr>
+    <tr>
+      <td>פרטיות</td>
+      <td>הצטרפות רצונית בלבד. נשמרות רק סטטיסטיקות מצטברות, לא תוכן עבודה</td>
+    </tr>
+    <tr>
+      <td>תמיכה בשפות</td>
+      <td>עברית ואנגלית (כמו שאר ההישגים)</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="card highlight">
+  <h3>סיכום</h3>
+  <p>
+    הפיצ'ר הזה הופך את מערכת ההישגים של ClaUi מכלי מקומי לפלטפורמה חברתית בינלאומית.
+    מפתחים יוכלו להתחרות, להשוות ולהתהדר - הכל בתוך הכלי שהם כבר משתמשים בו.
+    הארכיטקטורה פשוטה (ללא שרת), ללא עלות, ומבוססת על כלים שכל מפתח כבר מכיר.
+  </p>
+</div>
+
+<div class="footer">
+  ClaUi Achievement Sharing Plan | February 2026
+</div>
+
+</div>
+</body>
+</html>

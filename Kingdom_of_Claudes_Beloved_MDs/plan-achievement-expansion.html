@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>תוכנית הרחבת מערכת ההישגים</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0d1117; color: #c9d1d9; line-height: 1.7; padding: 40px 20px; }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { color: #58a6ff; font-size: 2em; margin-bottom: 10px; border-bottom: 2px solid #21262d; padding-bottom: 15px; }
+  h2 { color: #f0883e; font-size: 1.4em; margin-top: 35px; margin-bottom: 15px; }
+  h3 { color: #7ee787; font-size: 1.15em; margin-top: 20px; margin-bottom: 10px; }
+  .subtitle { color: #8b949e; font-size: 1.1em; margin-bottom: 30px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin: 20px 0; }
+  .stat-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 20px; text-align: center; }
+  .stat-card .number { font-size: 2.2em; font-weight: 700; color: #58a6ff; }
+  .stat-card .label { color: #8b949e; font-size: 0.9em; margin-top: 5px; }
+  .arrow { color: #7ee787; font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; margin: 15px 0; background: #161b22; border-radius: 8px; overflow: hidden; }
+  th { background: #21262d; color: #f0883e; padding: 12px 15px; text-align: right; font-weight: 600; }
+  td { padding: 10px 15px; border-bottom: 1px solid #21262d; }
+  tr:last-child td { border-bottom: none; }
+  .rarity-common { color: #8b949e; }
+  .rarity-rare { color: #58a6ff; }
+  .rarity-epic { color: #bc8cff; }
+  .rarity-legendary { color: #f0883e; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 600; }
+  .badge-common { background: #21262d; color: #8b949e; }
+  .badge-rare { background: #0d419d33; color: #58a6ff; }
+  .badge-epic { background: #6e40c933; color: #bc8cff; }
+  .badge-legendary { background: #9e6a0333; color: #f0883e; }
+  .category-tag { display: inline-block; padding: 3px 12px; border-radius: 6px; font-size: 0.85em; margin: 3px; background: #21262d; color: #c9d1d9; }
+  .steps { list-style: none; counter-reset: step; }
+  .steps li { counter-increment: step; padding: 12px 15px; margin: 8px 0; background: #161b22; border-radius: 8px; border-right: 3px solid #58a6ff; }
+  .steps li::before { content: counter(step); display: inline-block; width: 28px; height: 28px; background: #58a6ff; color: #0d1117; border-radius: 50%; text-align: center; line-height: 28px; font-weight: 700; margin-left: 12px; font-size: 0.85em; }
+  .highlight { background: #388bfd1a; border: 1px solid #388bfd; border-radius: 8px; padding: 15px 20px; margin: 15px 0; }
+  .note { color: #8b949e; font-style: italic; font-size: 0.9em; margin-top: 10px; }
+  .divider { border: none; border-top: 1px solid #21262d; margin: 30px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>תוכנית הרחבת מערכת ההישגים</h1>
+<p class="subtitle">הרחבה משמעותית של חווית המשחוק (Gamification) ב-ClaUi</p>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="number">30 <span class="arrow">-></span> 65</div>
+    <div class="label">הישגים</div>
+  </div>
+  <div class="stat-card">
+    <div class="number">15 <span class="arrow">-></span> 25</div>
+    <div class="label">רמות התקדמות</div>
+  </div>
+  <div class="stat-card">
+    <div class="number">35</div>
+    <div class="label">הישגים חדשים</div>
+  </div>
+  <div class="stat-card">
+    <div class="number">7</div>
+    <div class="label">קטגוריות (ללא שינוי)</div>
+  </div>
+</div>
+
+<h2>מה משתנה?</h2>
+
+<div class="highlight">
+  <strong>עיקרון מנחה:</strong> ההרחבה מוסיפה תוכן חדש בלבד - בלי לשנות מבנים קיימים, בלי לשבור תאימות לאחור. כל ההישגים הקיימים ממשיכים לעבוד כרגיל. משתמשים קיימים לא מאבדים שום התקדמות.
+</div>
+
+<h2>הישגים חדשים לפי קטגוריה</h2>
+
+<h3>סשן (5 חדשים, סה"כ 11)</h3>
+<table>
+  <tr><th>שם</th><th>נדירות</th><th>XP</th><th>איך מרוויחים</th></tr>
+  <tr><td>Lunch Break</td><td><span class="badge badge-common">רגיל</span></td><td>10</td><td>התחלת סשן בין 12 ל-1 בצהריים</td></tr>
+  <tr><td>Sprint</td><td><span class="badge badge-rare">נדיר</span></td><td>30</td><td>סשן פרודוקטיבי של פחות מ-15 דקות עם 3+ עריכות</td></tr>
+  <tr><td>Half Century</td><td><span class="badge badge-rare">נדיר</span></td><td>40</td><td>השלמת 50 סשנים בסך הכל</td></tr>
+  <tr><td>Iron Will</td><td><span class="badge badge-epic">אפי</span></td><td>70</td><td>סשן של 3+ שעות עם 10+ עריכות</td></tr>
+  <tr><td>Double Centurion</td><td><span class="badge badge-legendary">אגדי</span></td><td>250</td><td>השלמת 200 סשנים בסך הכל</td></tr>
+</table>
+
+<h3>דיבאג (5 חדשים, סה"כ 11)</h3>
+<table>
+  <tr><th>שם</th><th>נדירות</th><th>XP</th><th>איך מרוויחים</th></tr>
+  <tr><td>Zero Day</td><td><span class="badge badge-rare">נדיר</span></td><td>35</td><td>תיקון באג תוך 2 דקות מתחילת הסשן</td></tr>
+  <tr><td>Bug Squasher</td><td><span class="badge badge-rare">נדיר</span></td><td>35</td><td>3+ באגים תוקנו בסשן אחד</td></tr>
+  <tr><td>Error Whisperer</td><td><span class="badge badge-epic">אפי</span></td><td>55</td><td>תיקון באג בעריכה ראשונה בלבד אחרי השגיאה</td></tr>
+  <tr><td>Comeback Kid</td><td><span class="badge badge-rare">נדיר</span></td><td>35</td><td>5+ תיקוני שגיאות בסשן אחד (נסתר)</td></tr>
+  <tr><td>Bug Slayer IV</td><td><span class="badge badge-legendary">אגדי</span></td><td>220</td><td>250 באגים תוקנו בסך הכל</td></tr>
+</table>
+
+<h3>בדיקות (5 חדשים, סה"כ 10)</h3>
+<table>
+  <tr><th>שם</th><th>נדירות</th><th>XP</th><th>איך מרוויחים</th></tr>
+  <tr><td>Test Marathon</td><td><span class="badge badge-rare">נדיר</span></td><td>35</td><td>10+ בדיקות עוברות בסשן אחד</td></tr>
+  <tr><td>Test Driven Dev</td><td><span class="badge badge-rare">נדיר</span></td><td>40</td><td>תיקון באג + בדיקה עוברת תוך 3 דקות</td></tr>
+  <tr><td>Quality Gate</td><td><span class="badge badge-rare">נדיר</span></td><td>30</td><td>יותר בדיקות עוברות מאשר באגים שתוקנו</td></tr>
+  <tr><td>Green Streak</td><td><span class="badge badge-epic">אפי</span></td><td>65</td><td>10 בדיקות עוברות ברצף ללא כישלון</td></tr>
+  <tr><td>Test Master IV</td><td><span class="badge badge-legendary">אגדי</span></td><td>250</td><td>1,000 בדיקות עוברות בסך הכל</td></tr>
+</table>
+
+<h3>ריפקטור (5 חדשים, סה"כ 8)</h3>
+<table>
+  <tr><th>שם</th><th>נדירות</th><th>XP</th><th>איך מרוויחים</th></tr>
+  <tr><td>Tidy Up</td><td><span class="badge badge-common">רגיל</span></td><td>20</td><td>5+ עריכות בלי שום שגיאת ריצה</td></tr>
+  <tr><td>Mega Refactor</td><td><span class="badge badge-epic">אפי</span></td><td>55</td><td>25+ עריכות בסשן אחד</td></tr>
+  <tr><td>Edit Veteran I</td><td><span class="badge badge-rare">נדיר</span></td><td>40</td><td>500 עריכות בסך הכל</td></tr>
+  <tr><td>Edit Veteran II</td><td><span class="badge badge-epic">אפי</span></td><td>65</td><td>2,000 עריכות בסך הכל</td></tr>
+  <tr><td>Edit Veteran III</td><td><span class="badge badge-legendary">אגדי</span></td><td>200</td><td>5,000 עריכות בסך הכל</td></tr>
+</table>
+
+<h3>ארכיטקטורה (5 חדשים, סה"כ 7)</h3>
+<table>
+  <tr><th>שם</th><th>נדירות</th><th>XP</th><th>איך מרוויחים</th></tr>
+  <tr><td>Single File Focus</td><td><span class="badge badge-common">רגיל</span></td><td>15</td><td>5+ עריכות בקובץ אחד בלבד</td></tr>
+  <tr><td>Config Wrangler</td><td><span class="badge badge-common">רגיל</span></td><td>10</td><td>עריכת קובץ קונפיגורציה (JSON/YAML/TOML)</td></tr>
+  <tr><td>Cross Stack</td><td><span class="badge badge-rare">נדיר</span></td><td>40</td><td>עריכת קבצי פרונט + בקאנד + קונפיגורציה בסשן אחד</td></tr>
+  <tr><td>Wide Reach</td><td><span class="badge badge-epic">אפי</span></td><td>50</td><td>20+ קבצים נגעו בסשן אחד</td></tr>
+  <tr><td>Project Architect</td><td><span class="badge badge-epic">אפי</span></td><td>75</td><td>30+ קבצים נגעו בסשן אחד</td></tr>
+</table>
+
+<h3>שיתוף פעולה (5 חדשים, סה"כ 7)</h3>
+<table>
+  <tr><th>שם</th><th>נדירות</th><th>XP</th><th>איך מרוויחים</th></tr>
+  <tr><td>Bilingual</td><td><span class="badge badge-common">רגיל</span></td><td>15</td><td>שימוש ב-2+ שפות תכנות בסשן</td></tr>
+  <tr><td>Markdown Author</td><td><span class="badge badge-common">רגיל</span></td><td>15</td><td>עריכת 3+ קבצי Markdown</td></tr>
+  <tr><td>Docs First</td><td><span class="badge badge-rare">נדיר</span></td><td>25</td><td>הקובץ הראשון שנערך היה Markdown (נסתר)</td></tr>
+  <tr><td>Language Collector I</td><td><span class="badge badge-epic">אפי</span></td><td>70</td><td>7+ שפות תכנות בסשן אחד</td></tr>
+  <tr><td>Language Collector II</td><td><span class="badge badge-epic">אפי</span></td><td>75</td><td>10+ שפות תכנות בסשן אחד</td></tr>
+</table>
+
+<h3>פרודוקטיביות (5 חדשים, סה"כ 8)</h3>
+<table>
+  <tr><th>שם</th><th>נדירות</th><th>XP</th><th>איך מרוויחים</th></tr>
+  <tr><td>Time Investor I</td><td><span class="badge badge-common">רגיל</span></td><td>20</td><td>500 דקות סשנים מצטברות</td></tr>
+  <tr><td>Time Investor II</td><td><span class="badge badge-rare">נדיר</span></td><td>45</td><td>2,000 דקות סשנים מצטברות</td></tr>
+  <tr><td>Time Investor III</td><td><span class="badge badge-epic">אפי</span></td><td>65</td><td>5,000 דקות סשנים מצטברות</td></tr>
+  <tr><td>Daily Streak 14</td><td><span class="badge badge-epic">אפי</span></td><td>75</td><td>14 ימים רצופים של קידוד</td></tr>
+  <tr><td>Daily Streak 30</td><td><span class="badge badge-legendary">אגדי</span></td><td>200</td><td>30 ימים רצופים של קידוד</td></tr>
+</table>
+
+<hr class="divider">
+
+<h2>מערכת הרמות החדשה</h2>
+
+<div class="highlight">
+  <strong>רמות 1-15 נשארות ללא שינוי</strong> - תאימות לאחור מלאה. רמות 16-25 מתווספות עם ספי XP הולכים וגדלים. הרמה הגבוהה ביותר (25) דורשת 14,500 XP - יעד שאפתני למשתמשים מסורים.
+</div>
+
+<table>
+  <tr><th>רמה</th><th>XP נדרש</th><th>סטטוס</th></tr>
+  <tr><td>1-15</td><td>0 - 6,900</td><td>קיים, ללא שינוי</td></tr>
+  <tr><td>16</td><td>8,000</td><td style="color: #7ee787;">חדש</td></tr>
+  <tr><td>17</td><td>9,200</td><td style="color: #7ee787;">חדש</td></tr>
+  <tr><td>18</td><td>10,500</td><td style="color: #7ee787;">חדש</td></tr>
+  <tr><td>19</td><td>11,500</td><td style="color: #7ee787;">חדש</td></tr>
+  <tr><td>20</td><td>12,200</td><td style="color: #7ee787;">חדש</td></tr>
+  <tr><td>21</td><td>12,800</td><td style="color: #7ee787;">חדש</td></tr>
+  <tr><td>22</td><td>13,300</td><td style="color: #7ee787;">חדש</td></tr>
+  <tr><td>23</td><td>13,700</td><td style="color: #7ee787;">חדש</td></tr>
+  <tr><td>24</td><td>14,000</td><td style="color: #7ee787;">חדש</td></tr>
+  <tr><td>25</td><td>14,500</td><td style="color: #7ee787;">חדש</td></tr>
+</table>
+
+<hr class="divider">
+
+<h2>שלבי ביצוע</h2>
+<ol class="steps">
+  <li>הוספת 35 הגדרות הישגים חדשות לקטלוג</li>
+  <li>הרחבת מערך הרמות מ-15 ל-25 רמות</li>
+  <li>הוספת לוגיקת הפעלה במנוע ההישגים (זיהוי מתי כל הישג מתקיים)</li>
+  <li>הוספת בדיקות חוצות-סשן בשירות ההישגים (ספירות מצטברות)</li>
+  <li>הוספת 70 תרגומים (35 כותרות + 35 תיאורים) באנגלית ובעברית, עדכון טקסטים בחלון המידע</li>
+  <li>עדכון תיעוד טכני</li>
+  <li>בנייה, התקנה ובדיקה</li>
+</ol>
+
+<hr class="divider">
+
+<h2>נקודות חשובות</h2>
+<ul style="padding-right: 20px; margin-top: 10px;">
+  <li><strong>אין שינויים שוברים:</strong> כל ההישגים הקיימים ממשיכים לפעול, כל ההתקדמות נשמרת</li>
+  <li><strong>אין מעקב חדש:</strong> כל ההישגים מבוססים על נתונים שכבר נאספים</li>
+  <li><strong>7 קטגוריות קיימות:</strong> סשן, דיבאג, בדיקות, ריפקטור, ארכיטקטורה, שיתוף פעולה, פרודוקטיביות</li>
+  <li><strong>4 הישגים נסתרים:</strong> מתגלים רק כשמשיגים אותם (הפתעה)</li>
+  <li><strong>XP כולל מ-65 הישגים:</strong> ~3,915 XP</li>
+</ul>
+
+<p class="note" style="margin-top: 30px; text-align: center;">5 קבצים ישתנו | 0 קבצים חדשים | תאימות לאחור מלאה</p>
+
+</div>
+</body>
+</html>

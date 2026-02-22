@@ -16,6 +16,7 @@ import { AdventureWidget } from './components/Vitals/AdventureWidget';
 import { SessionTimeline } from './components/Vitals/SessionTimeline';
 import { VitalsInfoPanel } from './components/Vitals/VitalsInfoPanel';
 import { DashboardPanel } from './components/Dashboard';
+import { SkillGenPanel } from './components/SkillGen';
 import { postToExtension } from './hooks/useClaudeStream';
 import { t as tAch } from './components/Achievements/achievementI18n';
 import { detectRtl } from './hooks/useRtlDetection';
@@ -52,6 +53,7 @@ export const App: React.FC = () => {
     adventureEnabled,
     turnHistory,
     dashboardOpen,
+    skillGenPanelOpen,
   } = useAppStore();
   const forkInit = useAppStore((s) => s.forkInit);
   const hasMessages = messages.length > 0 || streamingMessageId !== null;
@@ -104,6 +106,7 @@ export const App: React.FC = () => {
       {promptHistoryPanelOpen && <PromptHistoryPanel />}
       {achievementsEnabled && achievementPanelOpen && <AchievementPanel />}
       {dashboardOpen && <DashboardPanel />}
+      {skillGenPanelOpen && <SkillGenPanel />}
 
       {/* Error banner */}
       {lastError && (
@@ -261,6 +264,11 @@ const StatusBar: React.FC<{
     sessionActivityStarted,
     sessionActivityElapsedMs,
     sessionActivityRunningSinceMs,
+    skillGenEnabled,
+    skillGenPendingDocs,
+    skillGenThreshold,
+    skillGenRunStatus,
+    setSkillGenPanelOpen,
   } = useAppStore();
 
   useEffect(() => {
@@ -387,6 +395,18 @@ const StatusBar: React.FC<{
       >
         Dashboard
       </button>
+      {skillGenEnabled && (
+        <button
+          className={`status-bar-skillgen-btn ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''} ${skillGenRunStatus !== 'idle' && skillGenRunStatus !== 'succeeded' && skillGenRunStatus !== 'failed' ? 'running' : ''}`}
+          title={`Skill Gen: ${skillGenPendingDocs}/${skillGenThreshold} docs${skillGenRunStatus !== 'idle' ? ` (${skillGenRunStatus})` : ''}`}
+          onClick={() => {
+            postToExtension({ type: 'getSkillGenStatus' });
+            setSkillGenPanelOpen(true);
+          }}
+        >
+          Skills {skillGenPendingDocs}/{skillGenThreshold}
+        </button>
+      )}
       <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
         <div className="status-bar-vitals-controls">
           <button

@@ -122,6 +122,7 @@ const EDIT_TOOLS = new Set(['edit', 'multiedit', 'write']);
 
 const FRONTEND_EXTENSIONS = new Set(['.tsx', '.jsx', '.html', '.css', '.scss', '.vue', '.svelte']);
 const BACKEND_EXTENSIONS = new Set(['.py', '.go', '.rs', '.java', '.cs', '.rb', '.php']);
+const CONFIG_EXTENSIONS = new Set(['.json', '.yaml', '.yml', '.toml', '.ini', '.env', '.config']);
 
 function normalizeToolName(name: string): string {
   return name.trim().toLowerCase().split('.').pop() || name.trim().toLowerCase();
@@ -187,6 +188,27 @@ function classifyFileType(filePath: string): 'frontend' | 'backend' | 'unknown' 
   }
 
   return 'unknown';
+}
+
+function isConfigFile(filePath: string): boolean {
+  const lower = filePath.toLowerCase();
+  const ext = '.' + (lower.split('.').pop() || '');
+  return CONFIG_EXTENSIONS.has(ext);
+}
+
+function hasConfigFile(filesTouched: Set<string>): boolean {
+  for (const f of filesTouched) {
+    if (isConfigFile(f)) return true;
+  }
+  return false;
+}
+
+function countMarkdownFiles(filesTouched: Set<string>): number {
+  let count = 0;
+  for (const f of filesTouched) {
+    if (f.toLowerCase().endsWith('.md')) count++;
+  }
+  return count;
 }
 
 function makeGoals(templates: GoalTemplate[]): SessionGoalState[] {
@@ -320,6 +342,10 @@ export class AchievementEngine {
     }
 
     // Language-based achievements
+    if (session.languages.size >= 2) {
+      const bilingual = this.createAward('bilingual');
+      if (bilingual) awards.push(bilingual);
+    }
     if (session.languages.size >= 3) {
       const award = this.createAward('polyglot');
       if (award) awards.push(award);
@@ -328,10 +354,32 @@ export class AchievementEngine {
       const award = this.createAward('multilingual-master');
       if (award) awards.push(award);
     }
+    if (session.languages.size >= 7) {
+      const award = this.createAward('language-collector-i');
+      if (award) awards.push(award);
+    }
+    if (session.languages.size >= 10) {
+      const award = this.createAward('language-collector-ii');
+      if (award) awards.push(award);
+    }
 
     // File-based achievements
     if (session.filesTouched.size >= 10) {
       const award = this.createAward('file-explorer');
+      if (award) awards.push(award);
+    }
+    if (session.filesTouched.size >= 20) {
+      const award = this.createAward('wide-reach');
+      if (award) awards.push(award);
+    }
+    if (session.filesTouched.size >= 30) {
+      const award = this.createAward('project-architect');
+      if (award) awards.push(award);
+    }
+
+    // Config file detection
+    if (filePath && isConfigFile(filePath)) {
+      const award = this.createAward('config-wrangler');
       if (award) awards.push(award);
     }
 
@@ -359,12 +407,24 @@ export class AchievementEngine {
       session.languages.add(lang);
     }
     const awards: AchievementAward[] = [];
+    if (session.languages.size >= 2) {
+      const bilingual = this.createAward('bilingual');
+      if (bilingual) awards.push(bilingual);
+    }
     if (session.languages.size >= 3) {
       const award = this.createAward('polyglot');
       if (award) awards.push(award);
     }
     if (session.languages.size >= 5) {
       const award = this.createAward('multilingual-master');
+      if (award) awards.push(award);
+    }
+    if (session.languages.size >= 7) {
+      const award = this.createAward('language-collector-i');
+      if (award) awards.push(award);
+    }
+    if (session.languages.size >= 10) {
+      const award = this.createAward('language-collector-ii');
       if (award) awards.push(award);
     }
     return {
@@ -439,6 +499,18 @@ export class AchievementEngine {
           if (award) awards.push(award);
         }
 
+        // Error Whisperer: fixed on very first edit after the error
+        if (editCount === 1) {
+          const award = this.createAward('error-whisperer');
+          if (award) awards.push(award);
+        }
+
+        // Zero Day: bug fix within 2 minutes of session start
+        if (session.bugFixes >= 1 && (now - session.startedAtMs) <= 2 * 60 * 1000) {
+          const award = this.createAward('zero-day');
+          if (award) awards.push(award);
+        }
+
         // Reset error cycles on successful fix
         session.errorCycles = 0;
       }
@@ -449,11 +521,21 @@ export class AchievementEngine {
           const speedPatch = this.createAward('speed-patch');
           if (speedPatch) awards.push(speedPatch);
         }
+        // Test Driven Dev: bug fix + test pass within 3 minutes
+        if (delta <= 3 * 60 * 1000) {
+          const tdd = this.createAward('test-driven-dev');
+          if (tdd) awards.push(tdd);
+        }
       }
     }
 
     if (session.consecutivePassingTests >= 5) {
       const award = this.createAward('green-wave');
+      if (award) awards.push(award);
+    }
+    // Green Streak: 10 consecutive test passes
+    if (session.consecutivePassingTests >= 10) {
+      const award = this.createAward('green-streak');
       if (award) awards.push(award);
     }
 
@@ -514,6 +596,12 @@ export class AchievementEngine {
     // Early Bird: 5am to 7am
     if (hour >= 5 && hour < 7) {
       const award = this.createAward('early-bird');
+      if (award) awards.push(award);
+    }
+
+    // Lunch Break: 12pm to 1pm
+    if (hour >= 12 && hour < 13) {
+      const award = this.createAward('lunch-break');
       if (award) awards.push(award);
     }
 
@@ -583,6 +671,81 @@ export class AchievementEngine {
         (session.firstEditAtMs === null || session.firstTestAtMs < session.firstEditAtMs)) {
       const award = this.createAward('test-first');
       if (award) awards.push(award);
+    }
+
+    // Sprint: short but productive session (< 15 min, 3+ edits)
+    if (durationMs < 15 * 60 * 1000 && session.meaningfulEdits >= 3) {
+      const award = this.createAward('sprint');
+      if (award) awards.push(award);
+    }
+
+    // Iron Will: 3+ hour session with 10+ edits
+    if (durationMs >= 3 * 60 * 60 * 1000 && session.meaningfulEdits >= 10) {
+      const award = this.createAward('iron-will');
+      if (award) awards.push(award);
+    }
+
+    // Bug Squasher: 3+ bugs in one session
+    if (session.bugFixes >= 3) {
+      const award = this.createAward('bug-squasher');
+      if (award) awards.push(award);
+    }
+
+    // Comeback Kid: 5+ runtime fixes in one session (hidden)
+    if (session.runtimeFixes >= 5) {
+      const award = this.createAward('comeback-kid');
+      if (award) awards.push(award);
+    }
+
+    // Test Marathon: 10+ test passes in one session
+    if (session.passingTests >= 10) {
+      const award = this.createAward('test-marathon');
+      if (award) awards.push(award);
+    }
+
+    // Quality Gate: more test passes than bug fixes (min 2 tests)
+    if (session.passingTests > session.bugFixes && session.passingTests >= 2) {
+      const award = this.createAward('quality-gate');
+      if (award) awards.push(award);
+    }
+
+    // Tidy Up: 5+ edits, zero runtime errors
+    if (!session.hadRuntimeError && session.meaningfulEdits >= 5) {
+      const award = this.createAward('tidy-up');
+      if (award) awards.push(award);
+    }
+
+    // Mega Refactor: 25+ edits in one session
+    if (session.meaningfulEdits >= 25) {
+      const award = this.createAward('mega-refactor');
+      if (award) awards.push(award);
+    }
+
+    // Single File Focus: 5+ edits all in one file
+    if (session.filesTouched.size === 1 && session.meaningfulEdits >= 5) {
+      const award = this.createAward('single-file-focus');
+      if (award) awards.push(award);
+    }
+
+    // Cross Stack: frontend + backend + config files
+    if (session.frontendEdits && session.backendEdits && hasConfigFile(session.filesTouched)) {
+      const award = this.createAward('cross-stack');
+      if (award) awards.push(award);
+    }
+
+    // Markdown Author: 3+ markdown files edited
+    if (countMarkdownFiles(session.filesTouched) >= 3) {
+      const award = this.createAward('markdown-author');
+      if (award) awards.push(award);
+    }
+
+    // Docs First: first file edited was a markdown file (hidden)
+    if (session.filesTouched.size > 0) {
+      const firstFile = Array.from(session.filesTouched)[0];
+      if (firstFile.toLowerCase().endsWith('.md')) {
+        const award = this.createAward('docs-first');
+        if (award) awards.push(award);
+      }
     }
 
     // All Goals Met: every session goal completed

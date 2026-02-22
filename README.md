@@ -123,6 +123,13 @@ All settings are under `claudeMirror.*` in VS Code Settings (`Ctrl+,`).
 | `enableFileLogging` | `true` | Write session logs to disk |
 | `logDirectory` | `""` | Directory for log files (empty = default) |
 
+## Feedback & Suggestions
+
+Have an idea, found a bug, or want to suggest a feature? Reach out:
+
+- **Email**: [yonzbar@gmail.com](mailto:yonzbar@gmail.com)
+- **GitHub Issues**: [ClaUI Issues](https://github.com/Yehonatan-Bar/ClaUI/issues)
+
 ## Contributing
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for build instructions, architecture overview, and development setup.

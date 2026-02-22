@@ -225,6 +225,25 @@ export interface SetEnhancerModelRequest {
   model: string;
 }
 
+// --- Skill Generation (Webview -> Extension) ---
+
+export interface SetSkillGenEnabledRequest {
+  type: 'setSkillGenEnabled';
+  enabled: boolean;
+}
+
+export interface SkillGenTriggerRequest {
+  type: 'skillGenTrigger';
+}
+
+export interface SkillGenCancelRequest {
+  type: 'skillGenCancel';
+}
+
+export interface GetSkillGenStatusRequest {
+  type: 'getSkillGenStatus';
+}
+
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
@@ -266,7 +285,11 @@ export type WebviewToExtensionMessage =
   | GetProjectAnalyticsRequest
   | EnhancePromptRequest
   | SetAutoEnhanceRequest
-  | SetEnhancerModelRequest;
+  | SetEnhancerModelRequest
+  | SetSkillGenEnabledRequest
+  | SkillGenTriggerRequest
+  | SkillGenCancelRequest
+  | GetSkillGenStatusRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -686,6 +709,62 @@ export interface PromptEnhancerSettingsMessage {
   enhancerModel: string;
 }
 
+// --- Skill Generation (Extension -> Webview) ---
+
+export type SkillGenRunStatus = 'idle' | 'scanning' | 'preflight' | 'running' | 'installing' | 'succeeded' | 'failed' | 'cancelled';
+
+export interface SkillGenDocumentInfo {
+  relativePath: string;
+  fingerprint: string;
+  status: 'pending' | 'processed';
+}
+
+export interface SkillGenRunHistoryEntry {
+  date: string;           // ISO date
+  docsProcessed: number;
+  newSkills: number;
+  upgradedSkills: number;
+  skippedSkills: number;
+  status: 'succeeded' | 'failed' | 'cancelled';
+  durationMs: number;
+}
+
+export interface SkillGenSettingsMessage {
+  type: 'skillGenSettings';
+  enabled: boolean;
+  threshold: number;
+  docsDirectory: string;
+  autoRun: boolean;
+}
+
+export interface SkillGenStatusMessage {
+  type: 'skillGenStatus';
+  pendingDocs: number;
+  threshold: number;
+  runStatus: SkillGenRunStatus;
+  progress: number;        // 0-100 percent
+  progressLabel: string;   // e.g. "Extracting patterns (3/5)..."
+  lastRun: SkillGenRunHistoryEntry | null;
+  history: SkillGenRunHistoryEntry[];
+}
+
+export interface SkillGenProgressMessage {
+  type: 'skillGenProgress';
+  runStatus: SkillGenRunStatus;
+  progress: number;
+  progressLabel: string;
+}
+
+export interface SkillGenCompleteMessage {
+  type: 'skillGenComplete';
+  success: boolean;
+  newSkills: number;
+  upgradedSkills: number;
+  skippedSkills: number;
+  durationMs: number;
+  error?: string;
+}
+
 /** Serializable chat message for passing between webview instances (e.g. fork) */
 export interface SerializedChatMessage {
   id: string;
@@ -738,4 +817,8 @@ export type ExtensionToWebviewMessage =
   | SessionMetadataMessage
   | ProjectAnalyticsDataMessage
   | EnhancePromptResultMessage
-  | PromptEnhancerSettingsMessage;
+  | PromptEnhancerSettingsMessage
+  | SkillGenSettingsMessage
+  | SkillGenStatusMessage
+  | SkillGenProgressMessage
+  | SkillGenCompleteMessage;
