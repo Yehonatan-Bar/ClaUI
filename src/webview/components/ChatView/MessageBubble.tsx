@@ -8,6 +8,7 @@ import { ToolUseBlock } from './ToolUseBlock';
 import { MarkdownContent } from './MarkdownContent';
 import { renderTextWithFileLinks } from './filePathLinks';
 import { postToExtension } from '../../hooks/useClaudeStream';
+import { deriveTurnFromAssistantMessage } from '../../utils/turnVitals';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -53,6 +54,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   // Session Vitals: turn intensity border
   const vitalsEnabled = useAppStore((s) => s.vitalsEnabled);
   const turnData = useAppStore((s) => s.turnByMessageId[message.id]);
+  const resolvedTurnData = useMemo(
+    () => turnData || deriveTurnFromAssistantMessage(message, 0) || undefined,
+    [turnData, message]
+  );
 
   // Category colors with alpha variants for intensity: [full, medium, light]
   const INTENSITY_COLORS: Record<TurnCategory, [string, string, string]> = {
@@ -65,14 +70,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   };
 
   const vitalsBorderStyle = useMemo((): React.CSSProperties | undefined => {
-    if (!vitalsEnabled || !turnData || isUser) return undefined;
-    const colors = INTENSITY_COLORS[turnData.category];
-    const count = turnData.toolCount;
+    if (!vitalsEnabled || !resolvedTurnData || isUser) return undefined;
+    const colors = INTENSITY_COLORS[resolvedTurnData.category];
+    const count = resolvedTurnData.toolCount;
     // 0 tools = thin/light, 1-3 = medium, 4+ = thick/full
     const width = count === 0 ? 2 : count <= 3 ? 3 : 4;
     const color = count === 0 ? colors[2] : count <= 3 ? colors[1] : colors[0];
     return { borderLeft: `${width}px solid ${color}` };
-  }, [vitalsEnabled, turnData, isUser]);
+  }, [vitalsEnabled, resolvedTurnData, isUser]);
 
   const handleTranslate = useCallback(() => {
     if (hasTranslation) {

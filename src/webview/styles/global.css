@@ -1556,6 +1556,56 @@ html, body, #root {
   color: var(--vscode-textLink-foreground, #3794ff);
 }
 
+/* Allowed prompts (ExitPlanMode permission requests) */
+.plan-allowed-prompts {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--vscode-textLink-foreground, #3794ff) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--vscode-textLink-foreground, #3794ff) 25%, transparent);
+  border-radius: 4px;
+}
+
+.plan-allowed-prompts-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground, #808080);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.plan-allowed-prompts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.plan-allowed-prompt-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--vscode-editor-foreground);
+}
+
+.plan-allowed-prompt-tool {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vscode-textLink-foreground, #3794ff);
+  background: color-mix(in srgb, var(--vscode-textLink-foreground, #3794ff) 12%, transparent);
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.plan-allowed-prompt-desc {
+  color: var(--vscode-editor-foreground);
+}
+
 .plan-approval-buttons {
   display: flex;
   gap: 8px;

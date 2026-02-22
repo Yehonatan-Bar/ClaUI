@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>תכנון דשבורד אנליטיקה — ClaUi</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'Arial', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      direction: rtl;
+      line-height: 1.7;
+      padding: 40px 20px;
+    }
+
+    .container { max-width: 980px; margin: 0 auto; }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid #30363d;
+    }
+
+    .header-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #1f6feb, #388bfd);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+    }
+
+    h1 { font-size: 34px; font-weight: 700; color: #f0f6fc; margin-bottom: 12px; line-height: 1.3; }
+    .header-subtitle { font-size: 15px; color: #8b949e; max-width: 640px; margin: 0 auto; }
+
+    h2 {
+      font-size: 21px;
+      font-weight: 700;
+      color: #f0f6fc;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h2::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 22px;
+      background: linear-gradient(180deg, #58a6ff, #3fb950);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    h3 { font-size: 15px; font-weight: 600; color: #e6edf3; margin-bottom: 8px; }
+
+    /* Sections */
+    .section {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 28px 32px;
+      margin-bottom: 24px;
+    }
+    .section-lead { font-size: 14px; color: #8b949e; margin-bottom: 22px; margin-top: -6px; }
+
+    /* Feature grid */
+    .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 8px; }
+    .feature-card {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 18px 20px;
+    }
+    .feature-card .icon { font-size: 24px; margin-bottom: 8px; }
+    .feature-card h3 { font-size: 14px; margin-bottom: 5px; }
+    .feature-card p { font-size: 13px; color: #8b949e; line-height: 1.5; }
+
+    /* Tabs preview */
+    .tabs-preview { display: flex; gap: 4px; margin-bottom: 18px; flex-wrap: wrap; }
+    .tab-chip { padding: 6px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; border: 1px solid #30363d; cursor: default; }
+    .tab-chip.active { background: #1f6feb; border-color: #388bfd; color: #fff; }
+    .tab-chip:not(.active) { background: #161b22; color: #8b949e; }
+
+    /* Big feature highlight cards */
+    .highlight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .highlight-card {
+      background: #0d1117;
+      border-radius: 10px;
+      padding: 20px 22px;
+      position: relative;
+      overflow: hidden;
+    }
+    .highlight-card::before {
+      content: '';
+      position: absolute;
+      top: 0; right: 0; left: 0;
+      height: 3px;
+    }
+    .highlight-card.blue::before { background: linear-gradient(90deg, #1f6feb, #58a6ff); border: 1px solid #1f6feb44; }
+    .highlight-card.green::before { background: linear-gradient(90deg, #2ea043, #3fb950); border: 1px solid #2ea04344; }
+    .highlight-card.purple::before { background: linear-gradient(90deg, #8957e5, #bc8cff); border: 1px solid #8957e544; }
+    .highlight-card.amber::before { background: linear-gradient(90deg, #9e6a03, #e3b341); border: 1px solid #9e6a0344; }
+    .highlight-card { border: 1px solid #30363d; }
+    .highlight-card .num { font-size: 36px; font-weight: 800; margin-bottom: 6px; }
+    .blue .num { color: #58a6ff; }
+    .green .num { color: #3fb950; }
+    .purple .num { color: #bc8cff; }
+    .amber .num { color: #e3b341; }
+    .highlight-card p { font-size: 13px; color: #8b949e; line-height: 1.5; }
+
+    /* Steps */
+    .steps { margin-top: 4px; }
+    .step { display: flex; gap: 16px; margin-bottom: 18px; align-items: flex-start; }
+    .step-num {
+      min-width: 32px; height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1f6feb, #388bfd);
+      color: #fff; font-weight: 700; font-size: 14px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .step-body { flex: 1; }
+    .step-body h3 { margin-bottom: 3px; }
+    .step-body p { font-size: 13px; color: #8b949e; }
+
+    /* Semantic signals */
+    .signals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 8px; }
+    .signal-card { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; }
+    .signal-card .label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #8b949e; margin-bottom: 8px; }
+    .signal-card .values { display: flex; flex-wrap: wrap; gap: 5px; }
+    .val-chip {
+      font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600;
+    }
+    .v-frust { background: #f8514922; color: #f85149; border: 1px solid #f8514944; }
+    .v-sat { background: #3fb95022; color: #3fb950; border: 1px solid #3fb95044; }
+    .v-conf { background: #e3b34122; color: #e3b341; border: 1px solid #e3b34144; }
+    .v-exc { background: #58a6ff22; color: #58a6ff; border: 1px solid #58a6ff44; }
+    .v-urg { background: #f0883e22; color: #f0883e; border: 1px solid #f0883e44; }
+    .v-neu { background: #30363d; color: #8b949e; }
+    .v-suc { background: #3fb95022; color: #3fb950; border: 1px solid #3fb95044; }
+    .v-part { background: #e3b34122; color: #e3b341; border: 1px solid #e3b34144; }
+    .v-fail { background: #f8514922; color: #f85149; border: 1px solid #f8514944; }
+    .v-prog { background: #58a6ff22; color: #58a6ff; border: 1px solid #58a6ff44; }
+    .v-task { background: #bc8cff22; color: #bc8cff; border: 1px solid #bc8cff44; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    th { text-align: right; padding: 9px 12px; background: #0d1117; color: #8b949e; font-weight: 600; border-bottom: 1px solid #30363d; }
+    td { padding: 9px 12px; border-bottom: 1px solid #21262d; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+
+    /* Tags */
+    .tag { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .tag-blue { background: #1f6feb22; color: #58a6ff; border: 1px solid #1f6feb44; }
+    .tag-green { background: #2ea04322; color: #3fb950; border: 1px solid #2ea04344; }
+    .tag-amber { background: #e3b34122; color: #e3b341; border: 1px solid #e3b34144; }
+    .tag-new { background: #8957e522; color: #bc8cff; border: 1px solid #8957e544; }
+
+    /* Effort */
+    .effort-box { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 8px; }
+    .effort-card { background: #0d1117; border: 1px solid #30363d; border-radius: 10px; padding: 16px; text-align: center; }
+    .effort-card .value { font-size: 30px; font-weight: 800; background: linear-gradient(135deg, #58a6ff, #3fb950); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 4px; }
+    .effort-card .label { font-size: 12px; color: #8b949e; }
+
+    /* Alert box preview */
+    .alert-preview {
+      background: rgba(248, 81, 73, 0.06);
+      border: 1px solid rgba(248, 81, 73, 0.3);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+    .alert-preview strong { color: #f85149; }
+
+    /* CTA */
+    .cta {
+      text-align: center; padding: 28px;
+      background: linear-gradient(135deg, #1f6feb11, #3fb95011);
+      border: 1px solid #1f6feb33; border-radius: 12px; margin-top: 28px;
+    }
+    .cta h2 { justify-content: center; }
+    .cta h2::before { display: none; }
+    .cta p { color: #8b949e; font-size: 14px; margin-top: 10px; }
+
+    @media (max-width: 640px) {
+      .feature-grid, .highlight-grid, .signals-grid, .effort-box { grid-template-columns: 1fr; }
+      h1 { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-badge">תכנון פיצ'ר — גרסה 2</div>
+    <h1>דשבורד אנליטיקה — ClaUi</h1>
+    <p class="header-subtitle">
+      ויזואליזציה חיה של הסשן: עלויות, טוקנים, פקודות שהורצו, ואנליזה סמנטית של כל פנייה —
+      כולל זיהוי תסכול, סוג משימה ובאגים חוזרים — ישירות בממשק, ללא תלות חיצונית.
+    </p>
+  </div>
+
+  <!-- 4 additions summary -->
+  <div class="section">
+    <h2>מה חדש בתכנון המעודכן</h2>
+    <p class="section-lead">על גבי הדשבורד הבסיסי (גרפים, טוקנים, כלים, ציר זמן) הוספנו 4 יכולות משמעותיות:</p>
+    <div class="highlight-grid">
+      <div class="highlight-card blue">
+        <div class="num">A</div>
+        <h3>בחירת מודל לניתוח</h3>
+        <p>הגדרה חדשה ב-VS Code לבחור איזה מודל שפה מבצע את הסיכומים: Haiku (מהיר וזול), Sonnet (איכות גבוהה), או Opus.</p>
+      </div>
+      <div class="highlight-card green">
+        <div class="num">B</div>
+        <h3>ויזואליזציה של פקודות</h3>
+        <p>לשונית "פקודות" חדשה שמציגה כל פקודת Bash שקלוד קוד הריץ — מקוטגרת לפי סוג (git, npm, test, build, deploy, וכו').</p>
+      </div>
+      <div class="highlight-card purple">
+        <div class="num">C</div>
+        <h3>ניתוח סמנטי לכל פנייה</h3>
+        <p>מנגנון חדש שמריץ את המודל הנבחר אחרי כל פנייה ומחזיר אותות לא-דטרמיניסטיים: מצב רגשי, סוג משימה, תוצאה, ובאגים חוזרים.</p>
+      </div>
+      <div class="highlight-card amber">
+        <div class="num">D</div>
+        <h3>אזהרת תסכול</h3>
+        <p>זיהוי אוטומטי כשמזוהה דפוס תסכול (3+ פניות ברצף עם מצב "מתוסכל") — מוצגת כרטיסיית אזהרה בדשבורד.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feature A: Model setting -->
+  <div class="section">
+    <h2>A — בחירת מודל לניתוח</h2>
+    <p class="section-lead">
+      כיום, שני הרכיבים שמשתמשים במודל שפה ברקע (מתן שם לטאב וסיכום פעילות) משתמשים ב-Haiku — hard-coded.
+      הפיצ'ר הזה הופך את זה לניתן להגדרה.
+    </p>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="icon">⚙️</div>
+        <h3>הגדרה ב-VS Code Settings</h3>
+        <p>
+          הגדרה חדשה: <strong>Analysis Model</strong><br />
+          אפשרויות: Haiku (ברירת מחדל, מהיר וזול), Sonnet (איכות גבוהה), Opus (הכי עמוק, הכי יקר).
+          <br /><br />
+          כל המנגנונים שמשתמשים במודל ברקע — שם הטאב, סיכום פעילות, וניתוח סמנטי (חדש) — יקראו הגדרה זו.
+        </p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📊</div>
+        <h3>הצגה בדשבורד</h3>
+        <p>
+          בפאנל הגדרות (לחצן גלגל שיניים בדשבורד) — הצגה של איזה מודל פעיל כרגע, כמה עולה בממוצע קריאת ניתוח, ומספר הקריאות שבוצעו בסשן הנוכחי.
+          <br /><br />
+          שינוי מתבצע ב-VS Code Settings — לא בתוך הדשבורד.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feature B: Command visualization -->
+  <div class="section">
+    <h2>B — ויזואליזציה של פקודות</h2>
+    <p class="section-lead">
+      קלוד קוד מריץ פקודות Bash כחלק מהעבודה — git, npm, בדיקות, build ועוד.
+      עד כה לא היה ניתן לראות אותן בצורה מרוכזת. הלשונית החדשה "פקודות" פותרת את זה.
+    </p>
+    <div class="tabs-preview">
+      <div class="tab-chip">סקירה כללית</div>
+      <div class="tab-chip">טוקנים</div>
+      <div class="tab-chip">כלים</div>
+      <div class="tab-chip">ציר זמן</div>
+      <div class="tab-chip active">פקודות ← חדש</div>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="icon">🔍</div>
+        <h3>קטגוריזציה אוטומטית</h3>
+        <p>
+          כל פקודה מסווגת לאחת מ-7 קטגוריות:
+          <strong>git, npm/yarn, בדיקות, build, deploy, חיפוש, קבצים, אחר.</strong>
+          <br /><br />
+          כפתורי סינון בראש הלשונית — לחיצה מסננת את הרשימה לפי קטגוריה.
+        </p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📋</div>
+        <h3>ציר זמן של פקודות</h3>
+        <p>
+          רשימה כרונולוגית של כל הפקודות שהורצו, עם:
+          מספר הפנייה שבה הורצה, שעת הריצה, הפקודה עצמה (גופן monospace), ותג צבעוני לפי קטגוריה.
+          <br /><br />
+          שדה חיפוש לסינון לפי טקסט חופשי.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feature C: Semantic analyzer -->
+  <div class="section">
+    <h2>C — ניתוח סמנטי לכל פנייה</h2>
+    <p class="section-lead">
+      מנגנון חדש — <strong>TurnAnalyzer</strong> — מריץ את המודל הנבחר בסיום כל פנייה ומחלץ אותות שדורשים הבנה של שפה טבעית.
+      המודל מקבל: הודעת המשתמש, הכלים שנוצלו, הפקודות שהורצו, ו-3 הפניות האחרונות לזיהוי חזרה על בעיות.
+    </p>
+
+    <h3 style="margin-bottom: 12px;">האותות שמוחזרים בכל פנייה</h3>
+    <div class="signals-grid">
+      <div class="signal-card">
+        <div class="label">מצב רגשי של המשתמש</div>
+        <div class="values">
+          <span class="val-chip v-frust">מתוסכל</span>
+          <span class="val-chip v-sat">מרוצה</span>
+          <span class="val-chip v-conf">מבולבל</span>
+          <span class="val-chip v-exc">נרגש</span>
+          <span class="val-chip v-urg">דחוף</span>
+          <span class="val-chip v-neu">נייטרלי</span>
+        </div>
+      </div>
+      <div class="signal-card">
+        <div class="label">תוצאת המשימה</div>
+        <div class="values">
+          <span class="val-chip v-suc">הצלחה</span>
+          <span class="val-chip v-part">חלקי</span>
+          <span class="val-chip v-fail">כישלון</span>
+          <span class="val-chip v-prog">בתהליך</span>
+          <span class="val-chip v-neu">לא ידוע</span>
+        </div>
+      </div>
+      <div class="signal-card">
+        <div class="label">חזרה על באג</div>
+        <div class="values">
+          <span class="val-chip v-neu">ללא</span>
+          <span class="val-chip v-conf">דיווח ראשון</span>
+          <span class="val-chip v-urg">דיווח שני</span>
+          <span class="val-chip v-frust">3+ פעמים</span>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin: 20px 0 12px;">סוגי משימות שהמודל מזהה</h3>
+    <div class="values" style="display: flex; flex-wrap: wrap; gap: 7px;">
+      <span class="val-chip v-task">תיקון באג</span>
+      <span class="val-chip v-task">פיצ'ר קטן</span>
+      <span class="val-chip v-task">פיצ'ר גדול</span>
+      <span class="val-chip v-task">תיחקור קוד</span>
+      <span class="val-chip v-task">ריפקטורינג</span>
+      <span class="val-chip v-task">אפליקציה חדשה</span>
+      <span class="val-chip v-task">תכנון ועיצוב</span>
+      <span class="val-chip v-task">סקירת קוד</span>
+      <span class="val-chip v-task">דיבאגינג</span>
+      <span class="val-chip v-task">כתיבת בדיקות</span>
+      <span class="val-chip v-task">תיעוד</span>
+      <span class="val-chip v-task">DevOps</span>
+      <span class="val-chip v-task">שאלה/הסבר</span>
+      <span class="val-chip v-task">קונפיגורציה</span>
+    </div>
+
+    <div class="alert-preview">
+      <strong>⚠ דוגמה לאזהרת תסכול:</strong><br />
+      פניות 4, 5, 6 — כולן זוהו כ"מתוסכל". ייתכן שיש בעיה חוזרת שלא נפתרה.
+      בדוק: האם אותו באג מדווח שוב? האם יש חסם שלא זוהה?
+    </div>
+  </div>
+
+  <!-- How it works technically -->
+  <div class="section">
+    <h2>איך זה עובד מאחורי הקלעים</h2>
+    <p class="section-lead">5 שלבים עיקריים במימוש — מהנתונים עד לממשק.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>הרחבת מבנה הנתונים</h3>
+          <p>כל "רשומת פנייה" (TurnRecord) מקבלת שדות חדשים: טוקנים לפנייה, פקודות Bash שהורצו, ותוצאת הניתוח הסמנטי (מגיעה אסינכרונית אחרי הפנייה).</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>יחידת ניתוח חדשה — TurnAnalyzer</h3>
+          <p>מחלקה חדשה שמופעלת בסיום כל פנייה. מריצה את המודל הנבחר עם פרומפט מובנה ומחלצת JSON מהתשובה. זמן ריצה: 5–15 שניות. מגיעה בצורה אסינכרונית — הגרפים מתעדכנים לאחר קבלתה.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>עדכון ה-ActivitySummarizer וה-SessionNamer</h3>
+          <p>שני הרכיבים הקיימים שמשתמשים ב-Haiku — סיכום הפעילות ומתן שם לטאב — יעברו לקרוא את ההגדרה החדשה "Analysis Model" במקום להשתמש ב-Haiku hard-coded.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>שמירת פקודות Bash בזמן אמת</h3>
+          <p>כל פעם שקלוד מריץ כלי Bash, הפקודה עצמה (הטקסט) נשמרת לרשומת הפנייה. בלשונית "פקודות" בדשבורד ניתן לראות את כולן בצורה מסודרת.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <h3>הדשבורד — 5 לשוניות + פאנל הגדרות</h3>
+          <p>ממשק React מלא הנפתח כשכבת-על מעל הצ'אט. מתעדכן חי עם כל פנייה חדשה. כפתור "גלגל שיניים" פותח פאנל מידע על מודל הניתוח הפעיל.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard tabs overview -->
+  <div class="section">
+    <h2>5 הלשוניות של הדשבורד</h2>
+    <p class="section-lead">כל לשונית מציגה זווית שונה של הסשן.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>לשונית</th>
+          <th>מה מוצג</th>
+          <th>מה חדש</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>סקירה כללית</strong></td>
+          <td>8 כרטיסי מדדים + גרף עלות מצטברת</td>
+          <td><span class="tag tag-new">חדש</span> רצועת מצב-רגשי לפי פנייה + אזהרת תסכול</td>
+        </tr>
+        <tr>
+          <td><strong>טוקנים</strong></td>
+          <td>גרף עמודות מוערמות: input/output/cache לכל פנייה</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><strong>כלים</strong></td>
+          <td>גרף כלים נפוצים + עוגת קטגוריות</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><strong>ציר זמן</strong></td>
+          <td>גרף משכי פניות + טבלה מלאה</td>
+          <td><span class="tag tag-new">חדש</span> עמודות סוג-משימה ומצב-רגשי בטבלה</td>
+        </tr>
+        <tr>
+          <td><strong>פקודות</strong></td>
+          <td>—</td>
+          <td><span class="tag tag-new">חדש לגמרי</span> ציר זמן של פקודות Bash, סינון לפי קטגוריה, חיפוש</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Effort estimate -->
+  <div class="section">
+    <h2>הערכת השקעה</h2>
+    <div class="effort-box">
+      <div class="effort-card">
+        <div class="value">9</div>
+        <div class="label">קבצים קיימים לעריכה</div>
+      </div>
+      <div class="effort-card">
+        <div class="value">22</div>
+        <div class="label">קבצים חדשים ליצירה</div>
+      </div>
+      <div class="effort-card">
+        <div class="value">~2</div>
+        <div class="label">ימי פיתוח</div>
+      </div>
+      <div class="effort-card">
+        <div class="value">0</div>
+        <div class="label">תלויות חיצוניות נוספות</div>
+      </div>
+    </div>
+    <p style="color: #8b949e; font-size: 13px; margin-top: 14px;">
+      TurnAnalyzer (המנגנון הסמנטי החדש) לוקח כ-2 שעות. שאר הזמן — ממשק הדשבורד ו-5 הלשוניות.
+      אין שינויים ארכיטקטוניים. אין סיכון לשבור פונקציונאליות קיימת.
+    </p>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta">
+    <h2>מוכן לביצוע</h2>
+    <p>
+      התכנון המלא נשמר ב: <code style="color: #58a6ff;">Kingdom_of_Claudes_Beloved_MDs/DASHBOARD_PLAN.md</code>
+      <br />
+      כולל: ממשקי TypeScript, פרומפטים מלאים למודל, לוגיקת פרסור JSON, ורשימת קבצים מלאה.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

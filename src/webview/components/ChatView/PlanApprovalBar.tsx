@@ -16,6 +16,12 @@ interface ParsedQuestion {
   multiSelect: boolean;
 }
 
+/** Parsed permission prompt from ExitPlanMode tool input */
+interface AllowedPrompt {
+  tool: string;
+  prompt: string;
+}
+
 /**
  * Parse the AskUserQuestion tool input JSON to extract questions and options.
  * Returns the first question found (Claude typically asks one at a time).
@@ -39,6 +45,26 @@ function parseQuestionData(planText: string): ParsedQuestion | null {
 }
 
 /**
+ * Parse the ExitPlanMode tool input JSON to extract allowedPrompts.
+ * These describe permissions the plan needs (e.g., Bash commands to run).
+ */
+function parseAllowedPrompts(planText: string): AllowedPrompt[] {
+  if (!planText) return [];
+  try {
+    const data = JSON.parse(planText);
+    if (!Array.isArray(data.allowedPrompts)) return [];
+    return data.allowedPrompts.filter(
+      (p: unknown): p is AllowedPrompt =>
+        !!p && typeof p === 'object' &&
+        typeof (p as AllowedPrompt).tool === 'string' &&
+        typeof (p as AllowedPrompt).prompt === 'string'
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Approval/question bar shown when Claude pauses for:
  * - Plan approval (ExitPlanMode) -> Approve/Reject/Feedback buttons
  * - Question (AskUserQuestion) -> Option buttons + free-text input
@@ -53,6 +79,11 @@ export const PlanApprovalBar: React.FC = () => {
 
   const questionData = useMemo(
     () => (isQuestion && pendingApproval ? parseQuestionData(pendingApproval.planText) : null),
+    [isQuestion, pendingApproval]
+  );
+
+  const allowedPrompts = useMemo(
+    () => (!isQuestion && pendingApproval ? parseAllowedPrompts(pendingApproval.planText) : []),
     [isQuestion, pendingApproval]
   );
 
@@ -208,10 +239,23 @@ export const PlanApprovalBar: React.FC = () => {
     );
   }
 
-  // --- Render plan approval UI (unchanged) ---
+  // --- Render plan approval UI ---
   return (
     <div className="plan-approval-bar">
       <div className="plan-approval-title">Plan Ready for Review</div>
+      {allowedPrompts.length > 0 && (
+        <div className="plan-allowed-prompts">
+          <div className="plan-allowed-prompts-label">Requested permissions:</div>
+          <ul className="plan-allowed-prompts-list">
+            {allowedPrompts.map((p, i) => (
+              <li key={i} className="plan-allowed-prompt-item">
+                <span className="plan-allowed-prompt-tool">{p.tool}</span>
+                <span className="plan-allowed-prompt-desc">{p.prompt}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="plan-approval-buttons">
         <button className="plan-approve-btn" onClick={handleApprove}>
           Approve

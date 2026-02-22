@@ -16,6 +16,7 @@ import { SessionTimeline } from './components/Vitals/SessionTimeline';
 import { VitalsInfoPanel } from './components/Vitals/VitalsInfoPanel';
 import { postToExtension } from './hooks/useClaudeStream';
 import { detectRtl } from './hooks/useRtlDetection';
+import { deriveTurnHistoryFromMessages } from './utils/turnVitals';
 
 function formatDuration(durationMs: number): string {
   const totalSec = Math.max(0, Math.floor(durationMs / 1000));
@@ -52,6 +53,10 @@ export const App: React.FC = () => {
   const [scrollFraction, setScrollFraction] = React.useState(0);
   const activityText = activitySummary ? `${activitySummary.shortLabel} ${activitySummary.fullSummary}` : '';
   const activityDir: 'rtl' | 'ltr' = activityText && detectRtl(activityText) ? 'rtl' : 'ltr';
+  const resolvedTurnHistory = useMemo(
+    () => (turnHistory.length > 0 ? turnHistory : deriveTurnHistoryFromMessages(messages)),
+    [turnHistory, messages]
+  );
 
   const handleTimelineTurnClick = React.useCallback((messageId: string) => {
     const el = document.querySelector(`[data-message-id="${messageId}"]`);
@@ -115,9 +120,9 @@ export const App: React.FC = () => {
       {hasMessages ? (
         <div className="chat-area-wrapper">
           <MessageList onScrollFractionChange={setScrollFraction} />
-          {vitalsEnabled && turnHistory.length > 0 && (
+          {vitalsEnabled && resolvedTurnHistory.length > 0 && (
             <SessionTimeline
-              turnHistory={turnHistory}
+              turnHistory={resolvedTurnHistory}
               scrollFraction={scrollFraction}
               onTurnClick={handleTimelineTurnClick}
             />
