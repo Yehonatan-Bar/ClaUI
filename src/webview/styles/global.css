@@ -782,6 +782,12 @@ html, body, #root {
   opacity: 1;
 }
 
+.textarea-container {
+  position: relative;
+  flex: 1;
+  display: flex;
+}
+
 .input-textarea {
   flex: 1;
   min-height: 40px;
@@ -1217,11 +1223,130 @@ html, body, #root {
   margin-bottom: 8px;
 }
 
+.achievement-panel-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.achievement-panel-header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .achievement-panel-close {
   background: none;
   border: none;
   color: var(--vscode-descriptionForeground);
   cursor: pointer;
+}
+
+.achievement-info-btn {
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #444);
+  color: var(--vscode-textLink-foreground, #3794ff);
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.achievement-info-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.achievement-settings-btn {
+  background: none;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+}
+
+.achievement-settings-btn:hover {
+  color: var(--vscode-editor-foreground);
+}
+
+.achievement-settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0 6px 0;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--vscode-panel-border, #333);
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.achievement-lang-select {
+  background: var(--vscode-dropdown-background, #3c3c3c);
+  color: var(--vscode-dropdown-foreground, #ccc);
+  border: 1px solid var(--vscode-dropdown-border, #555);
+  border-radius: 3px;
+  padding: 2px 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.achievement-info-modal {
+  margin-bottom: 8px;
+  padding: 8px;
+  border: 1px solid var(--vscode-panel-border, #444);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--vscode-textLink-foreground, #3794ff) 6%, var(--vscode-editor-background));
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.achievement-info-modal-title {
+  font-weight: 700;
+  font-size: 12px;
+  margin-bottom: 6px;
+  color: var(--vscode-editor-foreground);
+}
+
+.achievement-info-section {
+  margin-bottom: 6px;
+}
+
+.achievement-info-section strong {
+  display: block;
+  font-size: 11px;
+  color: var(--vscode-editor-foreground);
+  margin-bottom: 2px;
+}
+
+.achievement-info-section p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--vscode-descriptionForeground);
+}
+
+.achievement-info-dismiss-btn {
+  margin-top: 4px;
+  width: 100%;
+  padding: 4px 8px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.achievement-info-dismiss-btn:hover {
+  background: var(--vscode-button-hoverBackground);
 }
 
 .achievement-panel-profile {
@@ -2766,4 +2891,328 @@ html, body, #root {
   text-overflow: ellipsis;
   text-align: center;
   pointer-events: none;
+}
+
+/* ============================== */
+/* Prompt Enhancer                */
+/* ============================== */
+
+.textarea-container.enhancing .input-textarea {
+  opacity: 0.5;
+  pointer-events: none;
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+  animation: autoEnhanceBorder 1.5s ease-in-out infinite;
+}
+
+@keyframes autoEnhanceBorder {
+  0%, 100% { border-color: var(--vscode-textLink-foreground, #3794ff); }
+  50% { border-color: var(--vscode-input-border, #3c3c3c); }
+}
+
+.enhance-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vscode-input-background);
+  opacity: 0.85;
+  border-radius: 6px;
+  z-index: 2;
+}
+
+.enhance-overlay-text {
+  color: var(--vscode-textLink-foreground, #3794ff);
+  font-size: 12px;
+  font-weight: 600;
+  animation: enhancePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes enhancePulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.enhance-button-group {
+  position: relative;
+  display: flex;
+  gap: 0;
+  align-items: flex-end;
+}
+
+.enhance-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 6px 0 0 6px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background 0.15s, color 0.15s;
+}
+
+.enhance-button:hover:not(:disabled) {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-textLink-foreground, #3794ff);
+  border-color: var(--vscode-focusBorder);
+}
+
+.enhance-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.enhance-button.enhancing {
+  color: var(--vscode-textLink-foreground, #3794ff);
+  animation: enhanceSpin 1s linear infinite;
+}
+
+@keyframes enhanceSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.enhance-button.auto-active {
+  color: var(--vscode-textLink-foreground, #3794ff);
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.enhance-gear-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 32px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.enhance-gear-button:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+
+.enhance-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  width: 220px;
+  background: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  animation: enhancePopIn 0.15s ease-out;
+}
+
+@keyframes enhancePopIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.enhance-popover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.enhance-popover-row + .enhance-popover-row {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--vscode-panel-border, #333);
+}
+
+.enhance-popover-label {
+  font-size: 12px;
+  color: var(--vscode-editor-foreground);
+}
+
+.enhance-toggle-btn {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+}
+
+.enhance-toggle-btn.on {
+  background: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.enhance-toggle-btn.off {
+  background: var(--vscode-panel-border, #555);
+}
+
+.enhance-toggle-knob {
+  position: absolute;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.2s;
+}
+
+.enhance-toggle-btn.on .enhance-toggle-knob {
+  left: 18px;
+}
+
+.enhance-toggle-btn.off .enhance-toggle-knob {
+  left: 2px;
+}
+
+.enhance-model-select {
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  outline: none;
+}
+
+.enhance-model-select:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+/* ---- Prompt Enhancer: Comparison Panel ---- */
+
+.enhance-comparison-panel {
+  background: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  animation: enhancePopIn 0.2s ease-out;
+}
+
+.enhance-comparison-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border, #333);
+  background: var(--vscode-sideBarSectionHeader-background, #252526);
+}
+
+.enhance-comparison-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vscode-editor-foreground);
+}
+
+.enhance-comparison-close {
+  background: none;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.enhance-comparison-close:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+
+.enhance-comparison-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--vscode-panel-border, #333);
+}
+
+.enhance-comparison-section {
+  background: var(--vscode-editorWidget-background, var(--vscode-sideBar-background));
+  padding: 8px 12px;
+}
+
+.enhance-comparison-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 4px;
+}
+
+.enhance-comparison-text {
+  font-family: var(--chat-font-family, inherit);
+  font-size: var(--chat-font-size, 13px);
+  line-height: 1.5;
+  color: var(--vscode-editor-foreground);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 150px;
+  overflow-y: auto;
+  user-select: text;
+  cursor: text;
+  padding: 6px 8px;
+  background: var(--vscode-input-background);
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+
+.enhance-comparison-text.enhanced {
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+  border-style: dashed;
+}
+
+.enhance-comparison-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--vscode-panel-border, #333);
+  justify-content: flex-end;
+}
+
+.enhance-comparison-btn {
+  padding: 5px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.enhance-comparison-btn.original {
+  background: none;
+  color: var(--vscode-descriptionForeground);
+}
+
+.enhance-comparison-btn.original:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+
+.enhance-comparison-btn.enhanced {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border-color: var(--vscode-button-background);
+}
+
+.enhance-comparison-btn.enhanced:hover {
+  background: var(--vscode-button-hoverBackground);
 }

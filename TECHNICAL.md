@@ -66,9 +66,15 @@ claude-code-mirror/
 |   |   |   +-- ConversationReader.ts     #   Reads conversation history from Claude's session JSONL files
 |   |   |   +-- PromptHistoryStore.ts     #   Persists prompt history (project + global scope)
 |   |   |   +-- TurnAnalyzer.ts           #   Semantic turn analysis via Claude (mood, task type, outcome)
+|   |   |   +-- PromptEnhancer.ts         #   AI-powered prompt rewriting via one-shot CLI call
 |   |   |   +-- SessionFork.ts            #   Phase 3 stub (rewind)
 |   |   +-- terminal/                     #   Phase 2 stubs
 |   |   +-- auth/                         #   Phase 5 stub
+|   |   +-- achievements/
+|   |   |   +-- AchievementCatalog.ts     #   12 achievement definitions (id, title, rarity, xp)
+|   |   |   +-- AchievementStore.ts       #   Persistence via VS Code globalState
+|   |   |   +-- AchievementEngine.ts      #   Game logic (bug fixes, streaks, goals)
+|   |   |   +-- AchievementService.ts     #   Lifecycle bridge to webview messaging
 |   |   +-- types/
 |   |       +-- stream-json.ts            #   CLI protocol type definitions
 |   |       +-- webview-messages.ts       #   postMessage contract
@@ -111,6 +117,11 @@ claude-code-mirror/
 |       |   |       +-- sprites.ts       #     Palette, 4x4 mini sprites, drawSprite()
 |       |   |       +-- dungeon.ts       #     Maze class: generation, BFS, wall rendering, camera
 |       |   |       +-- AdventureEngine.ts #   State machine, animation loop, renderer
+|       |   +-- Achievements/
+|       |   |   +-- AchievementPanel.tsx    #   Panel overlay (level, XP, goals, settings, info modal)
+|       |   |   +-- AchievementToastStack.tsx #  Toast notifications for earned achievements
+|       |   |   +-- SessionRecapCard.tsx     #   End-of-session summary card
+|       |   |   +-- achievementI18n.ts       #   i18n translations (EN/HE) for all achievement UI
 |       |   +-- Dashboard/
 |       |   |   +-- DashboardPanel.tsx    #   Root overlay (tab nav, close, Esc, Session/Project toggle)
 |       |   |   +-- MetricsCards.tsx      #   8-card summary row
@@ -150,6 +161,7 @@ claude-code-mirror/
     +-- SESSION_NAMER.md                  #   Auto-naming feature (data flow, gotchas, debugging)
     +-- SESSION_VITALS.md                 #   Session health dashboard (timeline, weather, cost bar)
     +-- STREAM_JSON_PROTOCOL.md           #   CLI protocol reference
+    +-- PROMPT_ENHANCER.md               #   AI prompt enhancement feature
 ```
 
 ---
@@ -243,11 +255,17 @@ claude-code-mirror/
 **Adventure Widget** - Pixel-art dungeon crawler that visualizes session activity as a thin-wall maze grid. Each CLI turn extends the maze and maps to an encounter: scrolls (Read), anvils (Edit), traps (errors), dragons (3+ errors), treasure (recovery). Canvas 2D engine with 4x4 mini sprites on a 40x40 cell maze, PICO-8 palette, BFS pathfinding, state machine (IDLE/WALKING/ENCOUNTER/RESOLUTION). Extension-side `AdventureInterpreter` converts `TurnRecord` to `AdventureBeat` via deterministic rules. Toggleable separately from main vitals.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ADVENTURE_WIDGET.md`
 
+**Achievements / Trophy** - Gamification system that awards badges for coding milestones (debugging, testing, session patterns). Features: 12 achievements across 4 rarities (common/rare/epic/legendary), XP-based leveling (10 tiers), per-session goals, toast notifications with optional sound, session recap card, and full i18n support (English + Hebrew). Language is selectable via the settings gear in the Achievement panel and persisted to localStorage. An info icon (i) in the panel header opens a scrollable explanation modal describing all achievement mechanics. Backend: `AchievementEngine` (game logic), `AchievementCatalog` (definitions), `AchievementStore` (VS Code globalState persistence), `AchievementService` (lifecycle bridge). Frontend: `AchievementPanel`, `AchievementToastStack`, `SessionRecapCard`, `achievementI18n.ts`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ACHIEVEMENTS.md`
+
 **Analytics Dashboard** - Full-screen overlay with two modes: **Session** (6 tabs: Overview, Tokens, Tools, Timeline, Commands, Context) and **Project** (4 tabs: Overview, Sessions, Tokens, Tools). Session mode shows current-session analytics from Zustand `turnHistory`. Project mode aggregates `SessionSummary` records across all past sessions in the workspace, persisted in `ProjectAnalyticsStore` (VS Code `workspaceState`). A pill toggle in the header switches modes. Session summaries are auto-saved when a session ends; project data is loaded on demand. Session mode: 8 metric cards, cost/duration charts, tool frequency, category donut, mood timeline, frustration alerts, conversation inspector. Project mode: 8 aggregated metrics, cost/turns per session charts, aggregated tool frequency, category distribution, model usage, sortable session table with expandable details, aggregated token breakdown.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ANALYTICS_DASHBOARD.md`
 
 **TurnAnalyzer** - Background semantic analysis engine (enabled by default). After each turn completes, spawns a one-shot Claude CLI process (using `claudeMirror.analysisModel`) to classify user mood, task type, outcome, and bug repetition. Results arrive asynchronously and merge into `turnHistory` via `turnSemantics` postMessage. Includes queue (max 20), per-session cap, timeout, and enable flag for cost control.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ANALYTICS_DASHBOARD.md`
+
+**Prompt Enhancer** - AI-powered prompt rewriting that improves user prompts before sending. Uses a one-shot `claude -p` CLI call with a meta-prompt applying advanced prompt engineering (scaffolding, structure, context cues). Manual mode: sparkles button or Ctrl+Shift+E opens a comparison panel showing original and enhanced prompts stacked vertically for side-by-side review. Auto mode: intercepts Send, enhances, then auto-sends (falls back to original on failure). Gear popover with auto-enhance toggle and model selector. Configurable via `claudeMirror.promptEnhancer.*` settings.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/PROMPT_ENHANCER.md`
 
 **File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/DRAG_AND_DROP_CHALLENGE.md`
@@ -280,6 +298,8 @@ claude-code-mirror/
 
 > **Note:** `turnAnalysis.enabled` and `analysisModel` are also configurable inline via the Vitals gear button in the StatusBar. Changes sync bidirectionally with VS Code settings.
 
+| `claudeMirror.promptEnhancer.autoEnhance` | `false` | Automatically enhance prompts before sending |
+| `claudeMirror.promptEnhancer.model` | `"claude-sonnet-4-6"` | Model used for prompt enhancement (Haiku/Sonnet 4.6/Sonnet 4.5/Opus 4.6) |
 | `claudeMirror.gitPush.enabled` | `true` | Whether git push is configured and ready to use via the Git button |
 | `claudeMirror.gitPush.scriptPath` | `"scripts/git-push.ps1"` | Path to the git push script (relative to workspace root) |
 | `claudeMirror.gitPush.commitMessageTemplate` | `"{sessionName}"` | Commit message template ({sessionName} = tab name) |

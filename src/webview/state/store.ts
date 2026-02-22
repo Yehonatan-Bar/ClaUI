@@ -12,6 +12,7 @@ import type {
 } from '../../extension/types/webview-messages';
 import type { AdventureBeat } from '../components/Vitals/adventure/types';
 import { deriveTurnHistoryFromMessages } from '../utils/turnVitals';
+import type { AchievementLang } from '../components/Achievements/achievementI18n';
 
 // --- Message types for the UI ---
 
@@ -132,6 +133,7 @@ export interface AppState {
   // Achievements
   achievementsEnabled: boolean;
   achievementsSound: boolean;
+  achievementLanguage: AchievementLang;
   achievementProfile: AchievementProfilePayload;
   achievementGoals: AchievementGoalPayload[];
   achievementToasts: AchievementToast[];
@@ -146,6 +148,13 @@ export interface AppState {
   dashboardOpen: boolean;
   /** Pending semantics by messageId (for late/early arrival merge) */
   pendingTurnSemanticsByMessageId: Record<string, TurnSemantics>;
+
+  // Prompt Enhancer
+  isEnhancing: boolean;
+  autoEnhanceEnabled: boolean;
+  enhancerModel: string;
+  enhancerPopoverOpen: boolean;
+  enhanceComparisonData: { originalText: string; enhancedText: string } | null;
 
   // Turn analysis settings (mirrored from VS Code config)
   turnAnalysisEnabled: boolean;
@@ -229,6 +238,7 @@ export interface AppState {
   setVitalsEnabled: (enabled: boolean) => void;
   rebuildTurnHistoryFromMessages: (messages?: ChatMessage[]) => void;
   addTurnRecord: (turn: TurnRecord) => void;
+  setAchievementLanguage: (lang: AchievementLang) => void;
   setAchievementsSettings: (settings: { enabled: boolean; sound: boolean }) => void;
   setAchievementsSnapshot: (snapshot: { profile: AchievementProfilePayload; goals: AchievementGoalPayload[] }) => void;
   addAchievementToast: (toast: AchievementAwardPayload, profile: AchievementProfilePayload) => void;
@@ -242,6 +252,12 @@ export interface AppState {
   toggleDashboard: () => void;
   setDashboardOpen: (open: boolean) => void;
   applyTurnSemantics: (messageId: string, semantics: TurnSemantics) => void;
+  setIsEnhancing: (enhancing: boolean) => void;
+  setAutoEnhanceEnabled: (enabled: boolean) => void;
+  setEnhancerModel: (model: string) => void;
+  setEnhancerPopoverOpen: (open: boolean) => void;
+  setEnhanceComparisonData: (data: { originalText: string; enhancedText: string } | null) => void;
+  setPromptEnhancerSettings: (settings: { autoEnhance: boolean; enhancerModel: string }) => void;
   setTurnAnalysisSettings: (settings: { enabled: boolean; analysisModel: string }) => void;
   setSessionMetadata: (meta: { tools: string[]; model: string; cwd: string; mcpServers: string[] }) => void;
   setProjectSessions: (sessions: SessionSummary[]) => void;
@@ -413,6 +429,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   weather: { ...initialWeather },
   achievementsEnabled: true,
   achievementsSound: false,
+  achievementLanguage: (() => {
+    try {
+      const stored = localStorage.getItem('claui-achievement-lang');
+      if (stored === 'he' || stored === 'en') return stored;
+    } catch { /* webview localStorage may not be available */ }
+    return 'en' as AchievementLang;
+  })(),
   achievementProfile: { ...initialAchievementProfile },
   achievementGoals: [],
   achievementToasts: [],
@@ -422,6 +445,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   adventureBeats: [],
   dashboardOpen: false,
   pendingTurnSemanticsByMessageId: {},
+  isEnhancing: false,
+  autoEnhanceEnabled: false,
+  enhancerModel: 'claude-sonnet-4-6',
+  enhancerPopoverOpen: false,
+  enhanceComparisonData: null,
   turnAnalysisEnabled: true,
   analysisModel: 'claude-haiku-4-5-20251001',
   sessionMetadata: null,
@@ -920,6 +948,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
+  setAchievementLanguage: (lang) => {
+    try { localStorage.setItem('claui-achievement-lang', lang); } catch { /* ignore */ }
+    set({ achievementLanguage: lang });
+  },
+
   setAchievementsSettings: ({ enabled, sound }) =>
     set((state) => ({
       achievementsEnabled: enabled,
@@ -996,6 +1029,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     })),
 
+  setIsEnhancing: (enhancing) => set({ isEnhancing: enhancing }),
+  setAutoEnhanceEnabled: (enabled) => set({ autoEnhanceEnabled: enabled }),
+  setEnhancerModel: (model) => set({ enhancerModel: model }),
+  setEnhancerPopoverOpen: (open) => set({ enhancerPopoverOpen: open }),
+  setEnhanceComparisonData: (data) => set({ enhanceComparisonData: data }),
+  setPromptEnhancerSettings: ({ autoEnhance, enhancerModel }) =>
+    set({ autoEnhanceEnabled: autoEnhance, enhancerModel }),
+
   setTurnAnalysisSettings: ({ enabled, analysisModel }) =>
     set({ turnAnalysisEnabled: enabled, analysisModel }),
 
@@ -1049,11 +1090,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       weather: { ...initialWeather },
       achievementsEnabled: state.achievementsEnabled,
       achievementsSound: state.achievementsSound,
+      achievementLanguage: state.achievementLanguage,
       achievementProfile: state.achievementProfile,
       achievementGoals: [],
       achievementToasts: [],
       achievementPanelOpen: false,
       sessionRecap: null,
+      isEnhancing: false,
+      enhancerPopoverOpen: false,
+      enhanceComparisonData: null,
+      autoEnhanceEnabled: state.autoEnhanceEnabled,
+      enhancerModel: state.enhancerModel,
       sessionMetadata: null,
       projectSessions: [],
       sessionActivityStarted: false,

@@ -57,7 +57,23 @@ If you are in plan mode and creating a plan, then after you create the plan, cre
 
 const CLAUI_REPOSITORY_URL = 'https://github.com/Yehonatan-Bar/ClaUI';
 const CLAUI_ISSUES_URL = `${CLAUI_REPOSITORY_URL}/issues`;
-const CLAUI_DISCUSSIONS_URL = `${CLAUI_REPOSITORY_URL}/discussions`;
+const CLAUI_FEATURE_REQUEST_URL =
+  `${CLAUI_REPOSITORY_URL}/issues/new` +
+  '?labels=enhancement' +
+  '&title=Feature%20request%3A%20' +
+  '&body=' +
+  encodeURIComponent(
+    [
+      '## What would you like to see?',
+      '',
+      '',
+      '## Why is it useful?',
+      '',
+      '',
+      '## Additional context / screenshots',
+      '',
+    ].join('\n')
+  );
 const CLAUI_FEEDBACK_EMAIL = 'yonzbar@gmail.com';
 
 /**
@@ -366,7 +382,7 @@ export function registerCommands(
           },
           {
             label: '$(light-bulb) Feature Request',
-            description: 'Open GitHub Discussions for ClaUi',
+            description: 'Open GitHub Issues (feature request template)',
             value: 'feature' as const,
           },
           {
@@ -410,8 +426,8 @@ export function registerCommands(
       }
 
       if (picked.value === 'feature') {
-        await vscode.env.openExternal(vscode.Uri.parse(CLAUI_DISCUSSIONS_URL));
-        log(`Opened GitHub Discussions: ${CLAUI_DISCUSSIONS_URL}`);
+        await vscode.env.openExternal(vscode.Uri.parse(CLAUI_FEATURE_REQUEST_URL));
+        log(`Opened GitHub feature request page: ${CLAUI_FEATURE_REQUEST_URL}`);
         return;
       }
 

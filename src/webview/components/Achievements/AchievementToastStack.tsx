@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useAppStore } from '../../state/store';
+import { tAchTitle, tAchDesc } from './achievementI18n';
 
 const RARITY_CLASS: Record<string, string> = {
   common: 'achievement-toast-common',
@@ -36,9 +37,10 @@ function playToastSound(rarity: string): void {
 }
 
 export const AchievementToastStack: React.FC = () => {
-  const { achievementToasts, achievementsSound, dismissAchievementToast } = useAppStore();
+  const { achievementToasts, achievementsSound, achievementLanguage, dismissAchievementToast } = useAppStore();
   const scheduled = useRef(new Set<string>());
   const sounded = useRef(new Set<string>());
+  const lang = achievementLanguage;
 
   useEffect(() => {
     for (const toast of achievementToasts) {
@@ -66,8 +68,8 @@ export const AchievementToastStack: React.FC = () => {
       {achievementToasts.map((toast) => (
         <div key={toast.toastId} className={`achievement-toast ${RARITY_CLASS[toast.rarity] || ''}`}>
           <div className="achievement-toast-main">
-            <strong>{toast.title}</strong>
-            <span>{toast.description}</span>
+            <strong>{tAchTitle(lang, toast.id, toast.title)}</strong>
+            <span>{tAchDesc(lang, toast.id, toast.description)}</span>
           </div>
           <div className="achievement-toast-meta">+{toast.xp} XP</div>
           <button

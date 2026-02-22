@@ -7,6 +7,7 @@ import type { ActivitySummarizer, ActivitySummary } from '../session/ActivitySum
 import type { AdventureInterpreter } from '../session/AdventureInterpreter';
 import type { TurnAnalyzer } from '../session/TurnAnalyzer';
 import type { MessageTranslator } from '../session/MessageTranslator';
+import type { PromptEnhancer } from '../session/PromptEnhancer';
 import type { PromptHistoryStore } from '../session/PromptHistoryStore';
 import type { ProjectAnalyticsStore } from '../session/ProjectAnalyticsStore';
 import type { AchievementService } from '../achievements/AchievementService';
@@ -135,6 +136,8 @@ export class MessageHandler {
   private adventureInterpreter: AdventureInterpreter | null = null;
   /** Turn analyzer for semantic analysis (dashboard insights) */
   private turnAnalyzer: TurnAnalyzer | null = null;
+  /** Prompt enhancer for AI-powered prompt improvement */
+  private promptEnhancer: PromptEnhancer | null = null;
 
   /** Bash command strings seen in the current assistant message */
   private currentBashCommands: string[] = [];
@@ -207,6 +210,11 @@ export class MessageHandler {
   /** Attach an AdventureInterpreter for dungeon crawler beat generation */
   setAdventureInterpreter(interpreter: AdventureInterpreter): void {
     this.adventureInterpreter = interpreter;
+  }
+
+  /** Attach a PromptEnhancer for AI-powered prompt improvement */
+  setPromptEnhancer(enhancer: PromptEnhancer): void {
+    this.promptEnhancer = enhancer;
   }
 
   /** Attach a TurnAnalyzer for semantic analysis (dashboard insights) */
@@ -450,6 +458,49 @@ export class MessageHandler {
           vscode.workspace.getConfiguration('claudeMirror').update('analysisModel', msg.model, true);
           break;
 
+        case 'enhancePrompt': {
+          this.log(`Enhance prompt request (${msg.text.length} chars)`);
+          if (!this.promptEnhancer) {
+            this.webview.postMessage({
+              type: 'enhancePromptResult',
+              enhancedText: null,
+              success: false,
+              error: 'Prompt enhancer not available',
+            });
+            break;
+          }
+          this.promptEnhancer
+            .enhance(msg.text, msg.model)
+            .then((enhanced) => {
+              this.webview.postMessage({
+                type: 'enhancePromptResult',
+                enhancedText: enhanced,
+                success: !!enhanced,
+                error: enhanced ? undefined : 'Enhancement failed',
+              });
+            })
+            .catch((err) => {
+              this.log(`Prompt enhancement error: ${err}`);
+              this.webview.postMessage({
+                type: 'enhancePromptResult',
+                enhancedText: null,
+                success: false,
+                error: `Enhancement error: ${err.message}`,
+              });
+            });
+          break;
+        }
+
+        case 'setAutoEnhance':
+          this.log(`Setting auto-enhance to: ${msg.enabled}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('promptEnhancer.autoEnhance', msg.enabled, true);
+          break;
+
+        case 'setEnhancerModel':
+          this.log(`Setting enhancer model to: ${msg.model}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('promptEnhancer.model', msg.model, true);
+          break;
+
         case 'showHistory':
           this.log('Webview requested history view');
           vscode.commands.executeCommand('claudeMirror.showHistory');
@@ -686,6 +737,8 @@ export class MessageHandler {
           this.sendTranslationLanguageSetting();
           // Send turn analysis settings
           this.sendTurnAnalysisSettings();
+          // Send prompt enhancer settings
+          this.sendPromptEnhancerSettings();
           // Send achievement settings/snapshot
           this.webview.postMessage(this.achievementService.buildSettingsMessage());
           this.webview.postMessage(this.achievementService.buildSnapshotMessage(this.tabId));
@@ -910,6 +963,19 @@ export class MessageHandler {
     });
   }
 
+  /** Read prompt enhancer settings from VS Code config and send to webview */
+  private sendPromptEnhancerSettings(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const autoEnhance = config.get<boolean>('promptEnhancer.autoEnhance', false);
+    const enhancerModel = config.get<string>('promptEnhancer.model', 'claude-sonnet-4-6');
+    this.log(`Sending prompt enhancer settings: auto=${autoEnhance}, model=${enhancerModel}`);
+    this.webview.postMessage({
+      type: 'promptEnhancerSettings',
+      autoEnhance,
+      enhancerModel,
+    });
+  }
+
   /** Read translation language setting from VS Code config and send to webview */
   private sendTranslationLanguageSetting(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -1011,6 +1077,9 @@ export class MessageHandler {
       if (e.affectsConfiguration('claudeMirror.turnAnalysis.enabled') ||
           e.affectsConfiguration('claudeMirror.analysisModel')) {
         this.sendTurnAnalysisSettings();
+      }
+      if (e.affectsConfiguration('claudeMirror.promptEnhancer')) {
+        this.sendPromptEnhancerSettings();
       }
       if (
         e.affectsConfiguration('claudeMirror.achievements.enabled') ||
