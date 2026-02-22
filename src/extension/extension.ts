@@ -56,8 +56,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const insightAnalyzer = new AchievementInsightAnalyzer(context.globalState);
   insightAnalyzer.setLogger(log);
   achievementService.setInsightAnalyzer(insightAnalyzer);
-  const githubSyncService = new GitHubSyncService(context.globalState, log);
+  const githubSyncService = new GitHubSyncService(context.globalState, context.secrets, log);
   achievementService.setSyncService(githubSyncService);
+  // Auto-reconnect GitHub if PAT exists in SecretStorage (fire-and-forget)
+  void githubSyncService.tryAutoReconnect();
 
   // Create project analytics store for cross-session dashboard data (workspace-scoped)
   const projectAnalyticsStore = new ProjectAnalyticsStore(context.workspaceState);

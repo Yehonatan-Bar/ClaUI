@@ -49,6 +49,7 @@ const STATE_KEY_GIST_ID = 'claui.githubSync.gistId';
 const STATE_KEY_FRIENDS = 'claui.githubSync.friends';
 const STATE_KEY_FRIEND_CACHE = 'claui.githubSync.friendCache';
 const STATE_KEY_LAST_SYNCED = 'claui.githubSync.lastSyncedAt';
+const SECRET_KEY_PAT = 'claui.githubSync.pat';
 
 export class GitHubSyncService {
   private gistId: string;
@@ -62,6 +63,7 @@ export class GitHubSyncService {
 
   constructor(
     private readonly globalState: vscode.Memento,
+    private readonly secrets: vscode.SecretStorage,
     private readonly log: (msg: string) => void
   ) {
     this.gistId = globalState.get<string>(STATE_KEY_GIST_ID, '');
@@ -77,25 +79,58 @@ export class GitHubSyncService {
 
   async connect(): Promise<{ success: boolean; username?: string; error?: string }> {
     try {
-      const session = await vscode.authentication.getSession('github', ['gist'], { createIfNone: true });
-      if (!session) {
-        return { success: false, error: 'GitHub authentication was cancelled' };
-      }
-      this.token = session.accessToken;
+      // Prompt user for a Personal Access Token (minimal permissions: gist scope only)
+      const pat = await vscode.window.showInputBox({
+        title: 'Connect GitHub - Personal Access Token',
+        prompt: 'Paste a GitHub PAT with "gist" scope. Create one at: https://github.com/settings/tokens/new?scopes=gist&description=ClaUi',
+        password: true,
+        placeHolder: 'ghp_xxxxxxxxxxxxxxxxxxxx',
+        ignoreFocusOut: true,
+        validateInput: (value) => {
+          if (!value.trim()) return 'Token cannot be empty';
+          if (!value.startsWith('ghp_') && !value.startsWith('github_pat_')) {
+            return 'Token should start with ghp_ (classic) or github_pat_ (fine-grained)';
+          }
+          return null;
+        },
+      });
 
-      // Fetch user info
+      if (!pat) {
+        return { success: false, error: 'PAT entry was cancelled' };
+      }
+
+      const trimmedPat = pat.trim();
+      this.token = trimmedPat;
+
+      // Validate the PAT by calling GET /user
       const userRes = await this.githubApi('GET', '/user');
       if (!userRes.ok) {
+        this.token = '';
+        if (userRes.status === 401) {
+          return { success: false, error: 'Invalid token. Check that your PAT is correct and not expired.' };
+        }
         return { success: false, error: `GitHub API error: ${userRes.status}` };
       }
+
+      // Verify the token has gist scope
+      const scopes = userRes.headers.get('x-oauth-scopes') || '';
+      if (!scopes.split(',').map((s: string) => s.trim()).includes('gist')) {
+        this.token = '';
+        return { success: false, error: 'Token is missing "gist" scope. Create a new PAT with the gist scope enabled.' };
+      }
+
       const userData = await userRes.json();
       this.username = userData.login;
       this.displayName = userData.name || userData.login;
       this.avatarUrl = userData.avatar_url || '';
 
+      // Store PAT securely in VS Code SecretStorage
+      await this.secrets.store(SECRET_KEY_PAT, trimmedPat);
+
       this.log(`[GitHubSync] Connected as @${this.username}`);
       return { success: true, username: this.username };
     } catch (err: unknown) {
+      this.token = '';
       const msg = err instanceof Error ? err.message : String(err);
       this.log(`[GitHubSync] Connect error: ${msg}`);
       return { success: false, error: msg };
@@ -107,6 +142,7 @@ export class GitHubSyncService {
     this.username = '';
     this.gistId = '';
     this.lastSyncedAt = '';
+    await this.secrets.delete(SECRET_KEY_PAT);
     await this.globalState.update(STATE_KEY_GIST_ID, '');
     await this.globalState.update(STATE_KEY_LAST_SYNCED, '');
     this.log('[GitHubSync] Disconnected');
@@ -114,6 +150,35 @@ export class GitHubSyncService {
 
   isConnected(): boolean {
     return !!this.token && !!this.username;
+  }
+
+  /** Restore connection from stored PAT on extension activation. Fire-and-forget. */
+  async tryAutoReconnect(): Promise<void> {
+    const storedPat = await this.secrets.get(SECRET_KEY_PAT);
+    if (!storedPat) return;
+
+    this.token = storedPat;
+
+    try {
+      const userRes = await this.githubApi('GET', '/user');
+      if (!userRes.ok) {
+        // Token revoked or expired - clear it
+        this.log(`[GitHubSync] Auto-reconnect failed: API returned ${userRes.status}`);
+        this.token = '';
+        await this.secrets.delete(SECRET_KEY_PAT);
+        return;
+      }
+      const userData = await userRes.json();
+      this.username = userData.login;
+      this.displayName = userData.name || userData.login;
+      this.avatarUrl = userData.avatar_url || '';
+      this.log(`[GitHubSync] Auto-reconnected as @${this.username}`);
+    } catch (err: unknown) {
+      // Network error - keep the PAT (user might be offline), just clear in-memory token
+      const msg = err instanceof Error ? err.message : String(err);
+      this.log(`[GitHubSync] Auto-reconnect network error: ${msg}`);
+      this.token = '';
+    }
   }
 
   // --- Publish ---
