@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>ClaUi - Plan: Minimize GitHub Permissions</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 20px;
+      line-height: 1.7;
+      color: #1a1a2e;
+      background: #f8f9fa;
+    }
+    h1 { color: #16213e; border-bottom: 3px solid #0f3460; padding-bottom: 10px; }
+    h2 { color: #0f3460; margin-top: 30px; }
+    .problem { background: #fff3cd; border-right: 4px solid #ffc107; padding: 15px; border-radius: 6px; margin: 15px 0; }
+    .solution { background: #d4edda; border-right: 4px solid #28a745; padding: 15px; border-radius: 6px; margin: 15px 0; }
+    .bonus { background: #d1ecf1; border-right: 4px solid #17a2b8; padding: 15px; border-radius: 6px; margin: 15px 0; }
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    th, td { border: 1px solid #dee2e6; padding: 10px; text-align: right; }
+    th { background: #0f3460; color: white; }
+    tr:nth-child(even) { background: #f2f2f2; }
+    .step { display: flex; align-items: flex-start; gap: 12px; margin: 10px 0; }
+    .step-num { background: #0f3460; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: bold; }
+    .impact { font-weight: bold; color: #28a745; }
+  </style>
+</head>
+<body>
+
+<h1>תוכנית: צמצום הרשאות GitHub לפיצ'ר הקהילה</h1>
+
+<h2>הבעיה</h2>
+<div class="problem">
+  כשמשתמש מתחבר ל-GitHub דרך פיצ'ר הקהילה, מוצגת לו רשימת הרשאות מוגזמת: שליטה מלאה על ריפוזיטוריז פרטיים, גישה ל-Codespaces, עדכון Workflows ועוד. הסיבה היא שהתוסף משתמש במנגנון ההתחברות המובנה של VS Code, שרשום עם כלל ההרשאות של כל התוספים. בפועל, הפיצ'ר שלנו צריך רק הרשאה אחת: יצירת Gist.
+</div>
+
+<h2>הפתרון</h2>
+<div class="solution">
+  במקום להשתמש במנגנון ההתחברות המובנה של VS Code, המשתמש ייצור <strong>Personal Access Token (PAT)</strong> ב-GitHub עם הרשאה אחת בלבד: <strong>gist</strong>. הטוקן יאוחסן בצורה מוצפנת ומאובטחת בתוך VS Code, ויישאר שמור גם אחרי הפעלה מחדש.
+</div>
+
+<h2>חוויית המשתמש החדשה</h2>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div>המשתמש לוחץ "התחבר עם טוקן" בפאנל הקהילה</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div>לינק נוח מפנה אותו ליצירת טוקן ב-GitHub (עם ההרשאה הנכונה כבר מסומנת)</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div>המשתמש מדביק את הטוקן בתיבת קלט מוסתרת (כמו סיסמה)</div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div>המערכת מוודאת שהטוקן תקין ושיש לו את ההרשאה הנדרשת</div>
+</div>
+<div class="step">
+  <div class="step-num">5</div>
+  <div>הטוקן נשמר בצורה מוצפנת - אין צורך להתחבר שוב אחרי הפעלה מחדש</div>
+</div>
+
+<h2>השוואה: לפני ואחרי</h2>
+<table>
+  <tr>
+    <th>נושא</th>
+    <th>לפני (OAuth)</th>
+    <th>אחרי (PAT)</th>
+  </tr>
+  <tr>
+    <td>הרשאות נדרשות</td>
+    <td>ריפוזיטוריז, Codespaces, Workflows, אימייל, פרופיל</td>
+    <td><span class="impact">gist בלבד</span></td>
+  </tr>
+  <tr>
+    <td>שקיפות למשתמש</td>
+    <td>לא ברור מה באמת נדרש</td>
+    <td><span class="impact">המשתמש רואה ובוחר בדיוק מה לאפשר</span></td>
+  </tr>
+  <tr>
+    <td>שמירה בין הפעלות</td>
+    <td>לא - צריך להתחבר מחדש אחרי כל הפעלה</td>
+    <td><span class="impact">כן - התחברות אוטומטית</span></td>
+  </tr>
+  <tr>
+    <td>אבטחה</td>
+    <td>טוקן רחב עם גישה לריפוזיטוריז</td>
+    <td><span class="impact">טוקן מצומצם, מוצפן, ניתן לביטול בכל רגע</span></td>
+  </tr>
+</table>
+
+<h2>היקף השינוי</h2>
+<table>
+  <tr>
+    <th>פריט</th>
+    <th>פירוט</th>
+  </tr>
+  <tr>
+    <td>קבצים שמשתנים</td>
+    <td>4 קבצים בלבד</td>
+  </tr>
+  <tr>
+    <td>קבצים שלא משתנים</td>
+    <td>מנגנון השיתוף, רשימת חברים, השוואה, הודעות - הכל נשאר כמו שהוא</td>
+  </tr>
+  <tr>
+    <td>סיכון</td>
+    <td>נמוך - השינוי מוגבל לשכבת ההתחברות בלבד</td>
+  </tr>
+</table>
+
+<div class="bonus">
+  <strong>בונוס:</strong> בגרסה הנוכחית, ההתחברות נעלמת בכל פעם ש-VS Code נסגר ונפתח מחדש. בגרסה החדשה, הטוקן נשמר בצורה מוצפנת ומאובטחת - כך שהמשתמש מתחבר פעם אחת ונשאר מחובר.
+</div>
+
+</body>
+</html>

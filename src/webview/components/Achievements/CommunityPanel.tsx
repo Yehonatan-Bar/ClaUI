@@ -95,6 +95,22 @@ export const CommunityPanel: React.FC = () => {
         <div className="community-connect-card">
           <div className="community-connect-title">{tr.connectGitHub}</div>
           <p className="community-connect-desc">{tr.connectGitHubDesc}</p>
+          <p className="community-connect-pat-help">
+            {tr.connectPatHelp}{' '}
+            <a
+              href="#"
+              className="community-pat-link"
+              onClick={(e) => {
+                e.preventDefault();
+                postToExtension({
+                  type: 'openUrl',
+                  url: 'https://github.com/settings/tokens/new?scopes=gist&description=ClaUi',
+                });
+              }}
+            >
+              {tr.connectPatLink}
+            </a>
+          </p>
           <button className="community-connect-btn" onClick={handleConnect}>
             {tr.connectGitHub}
           </button>

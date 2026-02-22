@@ -68,6 +68,8 @@ interface AchievementTranslations {
   share: string;
   connectGitHub: string;
   connectGitHubDesc: string;
+  connectPatHelp: string;
+  connectPatLink: string;
   lastSynced: string;
   publishNow: string;
   disconnect: string;
@@ -290,8 +292,10 @@ const en: AchievementTranslations = {
   enableGithubSync: 'GitHub Sync',
   community: 'Community',
   share: 'Share',
-  connectGitHub: 'Connect GitHub',
-  connectGitHubDesc: 'Share your achievements with other developers by publishing them to a public GitHub Gist. Other ClaUi users can discover and compare their stats with yours.',
+  connectGitHub: 'Connect with Token',
+  connectGitHubDesc: 'Share your achievements by publishing them to a public GitHub Gist. Create a Personal Access Token (PAT) with only "gist" scope for minimal permissions.',
+  connectPatHelp: 'Create a token with gist scope:',
+  connectPatLink: 'Create PAT on GitHub',
   lastSynced: 'Last synced',
   publishNow: 'Publish',
   disconnect: 'Disconnect',
@@ -514,8 +518,10 @@ const he: AchievementTranslations = {
   enableGithubSync: '\u05E1\u05E0\u05DB\u05E8\u05D5\u05DF GitHub',
   community: '\u05E7\u05D4\u05D9\u05DC\u05D4',
   share: '\u05E9\u05D9\u05EA\u05D5\u05E3',
-  connectGitHub: '\u05D7\u05D1\u05E8 GitHub',
-  connectGitHubDesc: '\u05E9\u05EA\u05E3 \u05D0\u05EA \u05D4\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05E9\u05DC\u05DA \u05E2\u05DD \u05DE\u05E4\u05EA\u05D7\u05D9\u05DD \u05D0\u05D7\u05E8\u05D9\u05DD \u05E2\u05DC \u05D9\u05D3\u05D9 \u05E4\u05E8\u05E1\u05D5\u05DD \u05DC-GitHub Gist \u05E6\u05D9\u05D1\u05D5\u05E8\u05D9. \u05DE\u05E9\u05EA\u05DE\u05E9\u05D9 ClaUi \u05D0\u05D7\u05E8\u05D9\u05DD \u05D9\u05D5\u05DB\u05DC\u05D5 \u05DC\u05D2\u05DC\u05D5\u05EA \u05D5\u05DC\u05D4\u05E9\u05D5\u05D5\u05EA \u05D0\u05EA \u05D4\u05E1\u05D8\u05D8\u05D9\u05E1\u05D8\u05D9\u05E7\u05D5\u05EA \u05E9\u05DC\u05D4\u05DD \u05DE\u05D5\u05DC\u05DA.',
+  connectGitHub: '\u05D4\u05EA\u05D7\u05D1\u05E8 \u05E2\u05DD \u05D8\u05D5\u05E7\u05DF',
+  connectGitHubDesc: '\u05E9\u05EA\u05E3 \u05D0\u05EA \u05D4\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05E9\u05DC\u05DA \u05E2\u05DC \u05D9\u05D3\u05D9 \u05E4\u05E8\u05E1\u05D5\u05DD \u05DC-GitHub Gist \u05E6\u05D9\u05D1\u05D5\u05E8\u05D9. \u05E6\u05D5\u05E8 Personal Access Token (PAT) \u05E2\u05DD \u05D4\u05E8\u05E9\u05D0\u05EA "gist" \u05D1\u05DC\u05D1\u05D3 \u05DC\u05D4\u05E8\u05E9\u05D0\u05D5\u05EA \u05DE\u05D9\u05E0\u05D9\u05DE\u05DC\u05D9\u05D5\u05EA.',
+  connectPatHelp: '\u05E6\u05D5\u05E8 \u05D8\u05D5\u05E7\u05DF \u05E2\u05DD \u05D4\u05E8\u05E9\u05D0\u05EA gist:',
+  connectPatLink: '\u05E6\u05D5\u05E8 PAT \u05D1-GitHub',
   lastSynced: '\u05E1\u05E0\u05DB\u05E8\u05DF \u05D0\u05D7\u05E8\u05D5\u05DF',
   publishNow: '\u05E4\u05E8\u05E1\u05DD',
   disconnect: '\u05E0\u05EA\u05E7',

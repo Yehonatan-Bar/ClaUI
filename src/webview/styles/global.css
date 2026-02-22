@@ -3750,6 +3750,22 @@ html, body, #root {
   background: var(--vscode-button-hoverBackground, #1177bb);
 }
 
+.community-connect-pat-help {
+  font-size: 12px;
+  opacity: 0.6;
+  margin: 0 auto 16px;
+}
+
+.community-pat-link {
+  color: var(--vscode-textLink-foreground, #3794ff);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.community-pat-link:hover {
+  text-decoration: underline;
+}
+
 /* Sync status bar */
 .community-sync-bar {
   display: flex;
