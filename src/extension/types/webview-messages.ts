@@ -244,6 +244,11 @@ export interface GetSkillGenStatusRequest {
   type: 'getSkillGenStatus';
 }
 
+export interface SetGitHubSyncEnabledRequest {
+  type: 'setGitHubSyncEnabled';
+  enabled: boolean;
+}
+
 // --- GitHub Sync (Webview -> Extension) ---
 
 export interface GitHubSyncRequest {
@@ -320,6 +325,7 @@ export type WebviewToExtensionMessage =
   | SkillGenTriggerRequest
   | SkillGenCancelRequest
   | GetSkillGenStatusRequest
+  | SetGitHubSyncEnabledRequest
   | GitHubSyncRequest
   | AddFriendRequest
   | RemoveFriendRequest

@@ -12,6 +12,7 @@ export const AchievementPanel: React.FC = () => {
     setAchievementLanguage,
     setAchievementPanelOpen,
     setCommunityPanelOpen,
+    githubSyncStatus,
   } = useAppStore();
 
   const [infoOpen, setInfoOpen] = useState(false);
@@ -76,17 +77,30 @@ export const AchievementPanel: React.FC = () => {
       </div>
 
       {settingsOpen && (
-        <div className="achievement-settings-row">
-          <span>{tr.language}</span>
-          <select
-            className="achievement-lang-select"
-            value={lang}
-            onChange={(e) => setAchievementLanguage(e.target.value as AchievementLang)}
-          >
-            {ACHIEVEMENT_LANG_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+        <div className="achievement-settings-dropdown">
+          <div className="achievement-settings-row">
+            <span>{tr.language}</span>
+            <select
+              className="achievement-lang-select"
+              value={lang}
+              onChange={(e) => setAchievementLanguage(e.target.value as AchievementLang)}
+            >
+              {ACHIEVEMENT_LANG_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="achievement-settings-row">
+            <span>{tr.enableGithubSync}</span>
+            <label className="achievement-toggle">
+              <input
+                type="checkbox"
+                checked={githubSyncStatus?.syncEnabled ?? false}
+                onChange={(e) => postToExtension({ type: 'setGitHubSyncEnabled', enabled: e.target.checked })}
+              />
+              <span className="achievement-toggle-slider" />
+            </label>
+          </div>
         </div>
       )}
 

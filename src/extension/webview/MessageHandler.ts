@@ -748,6 +748,10 @@ export class MessageHandler {
           this.webview.postMessage(this.achievementService.buildSnapshotMessage(this.tabId));
           break;
 
+        case 'setGitHubSyncEnabled':
+          vscode.workspace.getConfiguration('claudeMirror').update('achievements.githubSync', msg.enabled, true);
+          break;
+
         case 'githubSync': {
           const syncService = this.achievementService.getSyncService();
           if (!syncService) break;

@@ -10,7 +10,7 @@ const PERMISSION_OPTIONS = [
 
 /**
  * Permission mode selector dropdown.
- * "Full Access" = all tools auto-approved (current default with -p).
+ * "Full Access" = all tools auto-approved (--permission-mode bypassPermissions).
  * "Supervised" = only read-only tools allowed; write tools are denied.
  * Changes take effect on the next session start.
  */

@@ -1277,15 +1277,63 @@ html, body, #root {
   color: var(--vscode-editor-foreground);
 }
 
+.achievement-settings-dropdown {
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--vscode-panel-border, #333);
+}
+
 .achievement-settings-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 4px 0 6px 0;
-  margin-bottom: 6px;
-  border-bottom: 1px solid var(--vscode-panel-border, #333);
   font-size: 11px;
   color: var(--vscode-descriptionForeground);
+}
+
+.achievement-toggle {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.achievement-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.achievement-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--vscode-input-background, #3c3c3c);
+  border: 1px solid var(--vscode-input-border, #555);
+  border-radius: 9px;
+  transition: background 0.2s;
+}
+
+.achievement-toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  left: 2px;
+  bottom: 2px;
+  background: var(--vscode-descriptionForeground, #999);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.achievement-toggle input:checked + .achievement-toggle-slider {
+  background: var(--vscode-textLink-foreground, #3794ff);
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.achievement-toggle input:checked + .achievement-toggle-slider::before {
+  transform: translateX(14px);
+  background: #fff;
 }
 
 .achievement-lang-select {

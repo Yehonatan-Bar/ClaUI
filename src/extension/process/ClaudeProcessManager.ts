@@ -63,8 +63,11 @@ export class ClaudeProcessManager extends EventEmitter {
       '--replay-user-messages',
     ];
 
-    // In supervised mode, restrict to read-only tools via --allowedTools
-    if (permissionMode === 'supervised') {
+    // Full Access: bypass all permission checks so tools run without approval
+    // Supervised: restrict to read-only tools via --allowedTools
+    if (permissionMode === 'full-access') {
+      args.push('--permission-mode', 'bypassPermissions');
+    } else if (permissionMode === 'supervised') {
       args.push(
         '--allowedTools',
         'Read,Grep,Glob,LS,Task,WebFetch,WebSearch,TodoRead,TodoWrite,AskUserQuestion,ExitPlanMode'

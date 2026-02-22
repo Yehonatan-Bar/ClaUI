@@ -63,6 +63,7 @@ interface AchievementTranslations {
   codingPatternLabel: string;
 
   // Community / GitHub Sync
+  enableGithubSync: string;
   community: string;
   share: string;
   connectGitHub: string;
@@ -286,6 +287,7 @@ const en: AchievementTranslations = {
   codingPatternLabel: 'Pattern:',
 
   // Community / GitHub Sync
+  enableGithubSync: 'GitHub Sync',
   community: 'Community',
   share: 'Share',
   connectGitHub: 'Connect GitHub',
@@ -509,6 +511,7 @@ const he: AchievementTranslations = {
   codingPatternLabel: '\u05D3\u05E4\u05D5\u05E1:',
 
   // Community / GitHub Sync
+  enableGithubSync: '\u05E1\u05E0\u05DB\u05E8\u05D5\u05DF GitHub',
   community: '\u05E7\u05D4\u05D9\u05DC\u05D4',
   share: '\u05E9\u05D9\u05EA\u05D5\u05E3',
   connectGitHub: '\u05D7\u05D1\u05E8 GitHub',
