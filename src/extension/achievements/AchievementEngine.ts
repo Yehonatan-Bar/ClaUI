@@ -10,20 +10,29 @@ export interface AchievementAward {
   hidden?: boolean;
 }
 
+export type GoalMetric =
+  | 'bugFixes'
+  | 'passingTests'
+  | 'meaningfulEdits'
+  | 'runtimeFixes'
+  | 'filesTouched'
+  | 'errorFreeResults'
+  | 'languages';
+
 export interface SessionGoalState {
   id: string;
   title: string;
   current: number;
   target: number;
   completed: boolean;
-  metric: 'bugFixes' | 'passingTests' | 'meaningfulEdits' | 'runtimeFixes';
+  metric: GoalMetric;
 }
 
 interface GoalTemplate {
   id: string;
   title: string;
   target: number;
-  metric: SessionGoalState['metric'];
+  metric: GoalMetric;
 }
 
 interface SessionState {
@@ -46,6 +55,14 @@ interface SessionState {
   firstPromptClassified: boolean;
   goals: SessionGoalState[];
   recapSent: boolean;
+  // --- New fields for enhanced tracking ---
+  filesTouched: Set<string>;
+  frontendEdits: boolean;
+  backendEdits: boolean;
+  firstEditAtMs: number | null;
+  firstTestAtMs: number | null;
+  errorCycles: number;
+  errorFreeResults: number;
 }
 
 export interface SessionRecap {
@@ -56,6 +73,20 @@ export interface SessionRecap {
   newAchievements: string[];
   xpEarned: number;
   level: number;
+  filesTouched: number;
+  languagesUsed: string[];
+}
+
+export interface SessionSnapshot {
+  toolNames: string[];
+  filesTouched: string[];
+  bugsFixed: number;
+  testsPassed: number;
+  errorCount: number;
+  sessionDurationMs: number;
+  editCount: number;
+  languages: string[];
+  cancelCount: number;
 }
 
 export interface EngineResult {
@@ -64,18 +95,21 @@ export interface EngineResult {
   recap?: SessionRecap;
   bugFixesDelta: number;
   testsDelta: number;
+  editsDelta: number;
 }
 
 const DEBUG_GOALS: GoalTemplate[] = [
   { id: 'ship-it-sprint', title: 'Ship It Sprint', metric: 'bugFixes', target: 2 },
   { id: 'runtime-rescuer', title: 'Runtime Rescuer', metric: 'runtimeFixes', target: 2 },
   { id: 'test-tactician', title: 'Test Tactician', metric: 'passingTests', target: 5 },
+  { id: 'error-free', title: 'Error Free', metric: 'errorFreeResults', target: 3 },
 ];
 
 const FEATURE_GOALS: GoalTemplate[] = [
   { id: 'test-tactician', title: 'Test Tactician', metric: 'passingTests', target: 5 },
   { id: 'refactor-ritual', title: 'Refactor Ritual', metric: 'meaningfulEdits', target: 3 },
-  { id: 'ship-it-sprint', title: 'Ship It Sprint', metric: 'bugFixes', target: 2 },
+  { id: 'file-hopper', title: 'File Hopper', metric: 'filesTouched', target: 8 },
+  { id: 'language-sampler', title: 'Language Sampler', metric: 'languages', target: 2 },
 ];
 
 const DEFAULT_GOALS: GoalTemplate[] = [
@@ -85,6 +119,9 @@ const DEFAULT_GOALS: GoalTemplate[] = [
 ];
 
 const EDIT_TOOLS = new Set(['edit', 'multiedit', 'write']);
+
+const FRONTEND_EXTENSIONS = new Set(['.tsx', '.jsx', '.html', '.css', '.scss', '.vue', '.svelte']);
+const BACKEND_EXTENSIONS = new Set(['.py', '.go', '.rs', '.java', '.cs', '.rb', '.php']);
 
 function normalizeToolName(name: string): string {
   return name.trim().toLowerCase().split('.').pop() || name.trim().toLowerCase();
@@ -123,6 +160,35 @@ function parseCodeFenceLanguages(text: string): string[] {
   return Array.from(found);
 }
 
+/** Extract a file path from tool input JSON (best-effort) */
+function extractFilePath(rawInput: string): string | null {
+  try {
+    const obj = JSON.parse(rawInput);
+    return obj.file_path || obj.path || obj.filePath || null;
+  } catch {
+    // Try regex extraction for file_path in non-JSON inputs
+    const match = rawInput.match(/["']?(?:file_path|path)["']?\s*[:=]\s*["']([^"']+)["']/);
+    return match ? match[1] : null;
+  }
+}
+
+/** Classify a file extension as frontend, backend, or unknown */
+function classifyFileType(filePath: string): 'frontend' | 'backend' | 'unknown' {
+  const lower = filePath.toLowerCase();
+  const ext = '.' + (lower.split('.').pop() || '');
+
+  if (FRONTEND_EXTENSIONS.has(ext)) return 'frontend';
+  if (BACKEND_EXTENSIONS.has(ext)) return 'backend';
+
+  // .ts files: check path-based heuristics
+  if (ext === '.ts') {
+    if (/(?:component|page|view|ui|widget|layout|style)/i.test(lower)) return 'frontend';
+    if (/(?:server|api|route|controller|service|middleware|handler|model|migration)/i.test(lower)) return 'backend';
+  }
+
+  return 'unknown';
+}
+
 function makeGoals(templates: GoalTemplate[]): SessionGoalState[] {
   return templates.map((g) => ({
     id: g.id,
@@ -134,11 +200,15 @@ function makeGoals(templates: GoalTemplate[]): SessionGoalState[] {
   }));
 }
 
-function goalCurrent(metric: SessionGoalState['metric'], session: SessionState): number {
+function goalCurrent(metric: GoalMetric, session: SessionState): number {
   if (metric === 'bugFixes') return session.bugFixes;
   if (metric === 'passingTests') return session.passingTests;
   if (metric === 'meaningfulEdits') return session.meaningfulEdits;
-  return session.runtimeFixes;
+  if (metric === 'runtimeFixes') return session.runtimeFixes;
+  if (metric === 'filesTouched') return session.filesTouched.size;
+  if (metric === 'errorFreeResults') return session.errorFreeResults;
+  if (metric === 'languages') return session.languages.size;
+  return 0;
 }
 
 export class AchievementEngine {
@@ -166,6 +236,14 @@ export class AchievementEngine {
       firstPromptClassified: false,
       goals: makeGoals(DEFAULT_GOALS),
       recapSent: false,
+      // New fields
+      filesTouched: new Set<string>(),
+      frontendEdits: false,
+      backendEdits: false,
+      firstEditAtMs: null,
+      firstTestAtMs: null,
+      errorCycles: 0,
+      errorFreeResults: 0,
     };
 
     this.sessions.set(tabId, session);
@@ -200,19 +278,33 @@ export class AchievementEngine {
   ): EngineResult {
     const session = this.sessions.get(tabId);
     if (!session) {
-      return { awards: [], goals: [], bugFixesDelta: 0, testsDelta: 0 };
+      return { awards: [], goals: [], bugFixesDelta: 0, testsDelta: 0, editsDelta: 0 };
     }
 
     const awards: AchievementAward[] = [];
     const normalized = normalizeToolName(toolName);
     const lowerInput = rawInput.toLowerCase();
+    let editsDelta = 0;
 
     for (const lang of parseLanguageSignals(rawInput)) {
       session.languages.add(lang);
     }
 
+    // Track file paths from tool inputs
+    const filePath = extractFilePath(rawInput);
+    if (filePath) {
+      session.filesTouched.add(filePath);
+      const fileType = classifyFileType(filePath);
+      if (fileType === 'frontend') session.frontendEdits = true;
+      if (fileType === 'backend') session.backendEdits = true;
+    }
+
     if (EDIT_TOOLS.has(normalized)) {
       session.meaningfulEdits += 1;
+      editsDelta = 1;
+      if (session.firstEditAtMs === null) {
+        session.firstEditAtMs = Date.now();
+      }
       if (session.pendingErrorFix) {
         session.editsSinceError += 1;
       }
@@ -221,11 +313,31 @@ export class AchievementEngine {
     if (normalized === 'bash' || normalized === 'terminal' || normalized === 'run') {
       if (includesAny(lowerInput, ['test', 'pytest', 'vitest', 'jest', 'mocha', 'go test', 'cargo test', 'npm run test'])) {
         session.pendingTestRun = true;
+        if (session.firstTestAtMs === null) {
+          session.firstTestAtMs = Date.now();
+        }
       }
     }
 
+    // Language-based achievements
     if (session.languages.size >= 3) {
       const award = this.createAward('polyglot');
+      if (award) awards.push(award);
+    }
+    if (session.languages.size >= 5) {
+      const award = this.createAward('multilingual-master');
+      if (award) awards.push(award);
+    }
+
+    // File-based achievements
+    if (session.filesTouched.size >= 10) {
+      const award = this.createAward('file-explorer');
+      if (award) awards.push(award);
+    }
+
+    // Full-stack detection
+    if (session.frontendEdits && session.backendEdits) {
+      const award = this.createAward('full-stack');
       if (award) awards.push(award);
     }
 
@@ -234,13 +346,14 @@ export class AchievementEngine {
       goals: this.progressGoals(session),
       bugFixesDelta: 0,
       testsDelta: 0,
+      editsDelta,
     };
   }
 
   recordAssistantText(tabId: string, contentText: string): EngineResult {
     const session = this.sessions.get(tabId);
     if (!session) {
-      return { awards: [], goals: [], bugFixesDelta: 0, testsDelta: 0 };
+      return { awards: [], goals: [], bugFixesDelta: 0, testsDelta: 0, editsDelta: 0 };
     }
     for (const lang of parseCodeFenceLanguages(contentText)) {
       session.languages.add(lang);
@@ -250,11 +363,16 @@ export class AchievementEngine {
       const award = this.createAward('polyglot');
       if (award) awards.push(award);
     }
+    if (session.languages.size >= 5) {
+      const award = this.createAward('multilingual-master');
+      if (award) awards.push(award);
+    }
     return {
       awards,
       goals: this.progressGoals(session),
       bugFixesDelta: 0,
       testsDelta: 0,
+      editsDelta: 0,
     };
   }
 
@@ -264,7 +382,7 @@ export class AchievementEngine {
   ): EngineResult {
     const session = this.sessions.get(tabId);
     if (!session) {
-      return { awards: [], goals: [], bugFixesDelta: 0, testsDelta: 0 };
+      return { awards: [], goals: [], bugFixesDelta: 0, testsDelta: 0, editsDelta: 0 };
     }
 
     const now = Date.now();
@@ -278,7 +396,11 @@ export class AchievementEngine {
       session.pendingErrorFix = true;
       session.editsSinceError = 0;
       session.consecutivePassingTests = 0;
+      session.errorCycles += 1;
     } else {
+      // Track error-free results for goal
+      session.errorFreeResults += 1;
+
       if (session.pendingTestRun) {
         session.pendingTestRun = false;
         session.passingTests += 1;
@@ -289,6 +411,7 @@ export class AchievementEngine {
 
       if (session.pendingErrorFix && session.editsSinceError > 0) {
         // Anti-cheese: bug fix requires meaningful edit after a real error.
+        const editCount = session.editsSinceError;
         session.pendingErrorFix = false;
         session.editsSinceError = 0;
         session.bugFixes += 1;
@@ -297,6 +420,27 @@ export class AchievementEngine {
         session.lastBugFixAtMs = now;
         session.bugFixTimes.push(now);
         session.bugFixTimes = session.bugFixTimes.filter((ts) => now - ts <= 10 * 60 * 1000);
+
+        // First blood: first bug fix within 5 minutes of session start
+        if (session.bugFixes === 1 && (now - session.startedAtMs) <= 5 * 60 * 1000) {
+          const award = this.createAward('first-blood');
+          if (award) awards.push(award);
+        }
+
+        // Persistence: fix after 3+ error cycles
+        if (session.errorCycles >= 3) {
+          const award = this.createAward('persistence');
+          if (award) awards.push(award);
+        }
+
+        // Surgeon: 1-2 precise edits fixed the error
+        if (editCount >= 1 && editCount <= 2) {
+          const award = this.createAward('surgeon');
+          if (award) awards.push(award);
+        }
+
+        // Reset error cycles on successful fix
+        session.errorCycles = 0;
       }
 
       if (session.lastBugFixAtMs && session.lastTestPassAtMs) {
@@ -328,37 +472,76 @@ export class AchievementEngine {
       goals: this.progressGoals(session),
       bugFixesDelta,
       testsDelta,
+      editsDelta: 0,
     };
   }
 
   recordLocalError(tabId: string): EngineResult {
     const session = this.sessions.get(tabId);
     if (!session) {
-      return { awards: [], goals: [], bugFixesDelta: 0, testsDelta: 0 };
+      return { awards: [], goals: [], bugFixesDelta: 0, testsDelta: 0, editsDelta: 0 };
     }
     session.hadRuntimeError = true;
     session.runtimeErrors += 1;
     session.pendingErrorFix = true;
     session.editsSinceError = 0;
     session.consecutivePassingTests = 0;
+    session.errorCycles += 1;
     return {
       awards: [],
       goals: this.progressGoals(session),
       bugFixesDelta: 0,
       testsDelta: 0,
+      editsDelta: 0,
     };
   }
 
   collectSessionStartAwards(tabId: string): AchievementAward[] {
     const session = this.sessions.get(tabId);
     if (!session) return [];
+
+    const awards: AchievementAward[] = [];
     const now = new Date();
     const hour = now.getHours();
+    const day = now.getDay(); // 0=Sunday, 6=Saturday
+
+    // Night Owl: midnight to 5am
     if (hour >= 0 && hour < 5) {
       const award = this.createAward('night-owl');
-      return award ? [award] : [];
+      if (award) awards.push(award);
     }
-    return [];
+
+    // Early Bird: 5am to 7am
+    if (hour >= 5 && hour < 7) {
+      const award = this.createAward('early-bird');
+      if (award) awards.push(award);
+    }
+
+    // Weekend Warrior: Saturday or Sunday
+    if (day === 0 || day === 6) {
+      const award = this.createAward('weekend-warrior');
+      if (award) awards.push(award);
+    }
+
+    return awards;
+  }
+
+  /** Capture session data for AI insight analysis before endSession deletes it */
+  getSessionSnapshot(tabId: string): SessionSnapshot | null {
+    const session = this.sessions.get(tabId);
+    if (!session) return null;
+
+    return {
+      toolNames: [], // Will be populated by service from turn records
+      filesTouched: Array.from(session.filesTouched),
+      bugsFixed: session.bugFixes,
+      testsPassed: session.passingTests,
+      errorCount: session.runtimeErrors,
+      sessionDurationMs: Date.now() - session.startedAtMs,
+      editCount: session.meaningfulEdits,
+      languages: Array.from(session.languages),
+      cancelCount: session.cancelCount,
+    };
   }
 
   endSession(
@@ -367,7 +550,7 @@ export class AchievementEngine {
   ): EngineResult {
     const session = this.sessions.get(tabId);
     if (!session || session.recapSent) {
-      return { awards: [], goals: [], bugFixesDelta: 0, testsDelta: 0 };
+      return { awards: [], goals: [], bugFixesDelta: 0, testsDelta: 0, editsDelta: 0 };
     }
 
     const now = Date.now();
@@ -382,16 +565,45 @@ export class AchievementEngine {
       if (clean) awards.push(clean);
     }
 
+    // Deep Focus: 60+ min, 0 cancels, 5+ edits
+    const durationMs = now - session.startedAtMs;
+    if (durationMs >= 60 * 60 * 1000 && session.cancelCount === 0 && session.meaningfulEdits >= 5) {
+      const award = this.createAward('deep-focus');
+      if (award) awards.push(award);
+    }
+
+    // Heavy Refactor: 10+ edits
+    if (session.meaningfulEdits >= 10) {
+      const award = this.createAward('heavy-refactor');
+      if (award) awards.push(award);
+    }
+
+    // Test First: tests ran before any edit
+    if (session.firstTestAtMs !== null &&
+        (session.firstEditAtMs === null || session.firstTestAtMs < session.firstEditAtMs)) {
+      const award = this.createAward('test-first');
+      if (award) awards.push(award);
+    }
+
+    // All Goals Met: every session goal completed
+    const allGoals = this.progressGoals(session);
+    if (allGoals.length > 0 && allGoals.every((g) => g.completed)) {
+      const award = this.createAward('all-goals-met');
+      if (award) awards.push(award);
+    }
+
     session.recapSent = true;
 
     const recap: SessionRecap = {
-      durationMs: now - session.startedAtMs,
+      durationMs,
       bugsFixed: session.bugFixes,
       passingTests: session.passingTests,
       highestStreak: session.bugFixTimes.length,
       newAchievements: awardedInSession,
       xpEarned: 0,
       level: 1,
+      filesTouched: session.filesTouched.size,
+      languagesUsed: Array.from(session.languages),
     };
 
     this.sessions.delete(tabId);
@@ -403,6 +615,7 @@ export class AchievementEngine {
       },
       bugFixesDelta: 0,
       testsDelta: 0,
+      editsDelta: 0,
     };
   }
 

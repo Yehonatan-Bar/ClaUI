@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaUi - Review Last Edit</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    line-height: 1.7;
+    padding: 40px 20px;
+  }
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 28px;
+    color: #58a6ff;
+    border-bottom: 2px solid #21262d;
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+  }
+  h2 {
+    font-size: 20px;
+    color: #79c0ff;
+    margin: 28px 0 12px 0;
+    padding-right: 12px;
+    border-right: 3px solid #58a6ff;
+  }
+  h3 {
+    font-size: 16px;
+    color: #d2a8ff;
+    margin: 16px 0 8px 0;
+  }
+  p {
+    margin-bottom: 12px;
+    color: #c9d1d9;
+  }
+  .highlight {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+  }
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 12px 0;
+  }
+  .flow-number {
+    background: #58a6ff;
+    color: #0d1117;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .flow-text {
+    flex: 1;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+  }
+  th, td {
+    border: 1px solid #30363d;
+    padding: 10px 14px;
+    text-align: right;
+  }
+  th {
+    background: #161b22;
+    color: #79c0ff;
+    font-weight: 600;
+  }
+  td {
+    color: #c9d1d9;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge-new { background: #238636; color: #fff; }
+  .badge-modify { background: #1f6feb; color: #fff; }
+  .file-count {
+    color: #8b949e;
+    font-size: 14px;
+    margin-top: 4px;
+  }
+  .summary-box {
+    background: linear-gradient(135deg, #161b22 0%, #1c2333 100%);
+    border: 1px solid #58a6ff;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+  }
+  .summary-box p {
+    font-size: 16px;
+    color: #e6edf3;
+  }
+  .error-table td:first-child {
+    color: #f85149;
+    font-weight: 500;
+  }
+  .error-table td:last-child {
+    color: #7ee787;
+  }
+  footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid #21262d;
+    color: #484f58;
+    font-size: 13px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>ClaUi - כפתור סקירת עריכה אחרונה</h1>
+
+<div class="summary-box">
+  <p>
+    <strong>בקצרה:</strong> כפתור חדש בשורת הסטטוס של ClaUi שבלחיצה אחת שולח את השינויים האחרונים שבוצעו בקובץ לקלוד לסקירת קוד אוטומטית. הכפתור עוקב אחרי כל שמירת קובץ ובלחיצה מבצע השוואה מול הגרסה האחרונה ב-Git.
+  </p>
+</div>
+
+<h2>מה הפיצ'ר עושה?</h2>
+
+<div class="highlight">
+  <div class="flow-step">
+    <div class="flow-number">1</div>
+    <div class="flow-text">
+      <strong>מעקב אוטומטי</strong> - המערכת עוקבת ברקע אחרי כל שמירת קובץ בפרויקט ומזהה את הקובץ האחרון שנערך.
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-number">2</div>
+    <div class="flow-text">
+      <strong>לחיצה על כפתור "Review"</strong> - כפתור חדש בשורת הסטטוס (ליד כפתור ה-Git הקיים). מציג בטולטיפ את שם הקובץ הנוכחי שנעקב.
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-number">3</div>
+    <div class="flow-text">
+      <strong>חילוץ הבדלים</strong> - המערכת מריצה פקודת Git שמשווה את הקובץ הנוכחי מול הגרסה האחרונה השמורה ב-Git (HEAD).
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-number">4</div>
+    <div class="flow-text">
+      <strong>סקירת קוד אוטומטית</strong> - ההבדלים נשלחים לקלוד עם בקשה מפורטת לסקירה: באגים, בעיות אבטחה, ביצועים וסגנון קוד.
+    </div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-number">5</div>
+    <div class="flow-text">
+      <strong>תשובה בצ'אט</strong> - קלוד מגיב ישירות בצ'אט עם משוב מפורט ומעשי על השינויים.
+    </div>
+  </div>
+</div>
+
+<h2>חוויית המשתמש</h2>
+
+<p>
+  הכפתור מופיע מעומעם כשעדיין לא נשמר קובץ. ברגע שנשמר קובץ כלשהו - הכפתור הופך לפעיל ומציג את שם הקובץ בטולטיפ. בזמן הסקירה מוצג "..." והכפתור מושבת למניעת לחיצות כפולות. הודעת טוסט מאשרת את תחילת הסקירה או מציגה שגיאה.
+</p>
+
+<h2>טיפול בשגיאות</h2>
+
+<table class="error-table">
+  <tr>
+    <th>מצב</th>
+    <th>מה המשתמש רואה</th>
+  </tr>
+  <tr>
+    <td>לא נשמר קובץ עדיין</td>
+    <td>כפתור מעומעם עם טולטיפ "שמור קובץ קודם"</td>
+  </tr>
+  <tr>
+    <td>אין תיקיית עבודה פתוחה</td>
+    <td>הודעת טוסט: "אין תיקיית עבודה פתוחה"</td>
+  </tr>
+  <tr>
+    <td>לא מאגר Git</td>
+    <td>הודעת טוסט: "זו לא תיקיית Git"</td>
+  </tr>
+  <tr>
+    <td>אין שינויים בקובץ</td>
+    <td>הודעת טוסט: "אין שינויים שלא נשמרו ב-Git"</td>
+  </tr>
+  <tr>
+    <td>כשל ב-Git</td>
+    <td>הודעת טוסט עם פירוט השגיאה</td>
+  </tr>
+</table>
+
+<h2>היקף השינויים</h2>
+
+<table>
+  <tr>
+    <th>קובץ</th>
+    <th>סוג שינוי</th>
+    <th>תיאור</th>
+  </tr>
+  <tr>
+    <td>הגדרות הודעות</td>
+    <td><span class="badge badge-modify">עדכון</span></td>
+    <td>הוספת 3 סוגי הודעות חדשים לתקשורת בין הממשק למערכת</td>
+  </tr>
+  <tr>
+    <td>מנהל ההודעות</td>
+    <td><span class="badge badge-modify">עדכון</span></td>
+    <td>לוגיקה מרכזית: מעקב קבצים, הרצת Git, בניית בקשת הסקירה</td>
+  </tr>
+  <tr>
+    <td>חנות המצב</td>
+    <td><span class="badge badge-modify">עדכון</span></td>
+    <td>3 שדות חדשים למצב הכפתור, תוצאות והקובץ הנעקב</td>
+  </tr>
+  <tr>
+    <td>מנהל הזרם</td>
+    <td><span class="badge badge-modify">עדכון</span></td>
+    <td>חיווט הודעות מהמערכת לחנות המצב</td>
+  </tr>
+  <tr>
+    <td>ממשק ראשי</td>
+    <td><span class="badge badge-modify">עדכון</span></td>
+    <td>כפתור "Review" בשורת הסטטוס</td>
+  </tr>
+  <tr>
+    <td>אזור הקלט</td>
+    <td><span class="badge badge-modify">עדכון</span></td>
+    <td>הודעת טוסט לתוצאות</td>
+  </tr>
+  <tr>
+    <td>עיצוב</td>
+    <td><span class="badge badge-modify">עדכון</span></td>
+    <td>סגנון CSS לכפתור החדש</td>
+  </tr>
+</table>
+<p class="file-count">סה"כ: 7 קבצים מעודכנים, 0 קבצים חדשים</p>
+
+<h2>דפוס עיצובי</h2>
+
+<p>
+  הפיצ'ר בנוי בדיוק לפי הדפוס של כפתור ה-Git Push הקיים במערכת - אותו זרימת הודעות, אותו סגנון כפתור, ואותו מנגנון טוסט. זה מבטיח עקביות בחוויית המשתמש ומפחית סיכון טכני כי הדפוס כבר מוכח ועובד.
+</p>
+
+<h2>אימות</h2>
+
+<div class="highlight">
+  <div class="flow-step">
+    <div class="flow-number">1</div>
+    <div class="flow-text">בנייה והתקנה מקומית</div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-number">2</div>
+    <div class="flow-text">אימות שהכפתור מופיע מעומעם בהתחלה</div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-number">3</div>
+    <div class="flow-text">שמירת קובץ ואימות שהכפתור הופך פעיל</div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-number">4</div>
+    <div class="flow-text">לחיצה על הכפתור ואימות שקלוד מקבל את ההבדלים ומגיב</div>
+  </div>
+  <div class="flow-step">
+    <div class="flow-number">5</div>
+    <div class="flow-text">בדיקת מקרי שגיאה (קובץ ללא שינויים, תיקייה ללא Git)</div>
+  </div>
+</div>
+
+<footer>
+  ClaUi - Review Last Edit Feature Plan | 2026-02-22
+</footer>
+
+</div>
+</body>
+</html>

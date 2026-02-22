@@ -64,16 +64,20 @@ function parseAllowedPrompts(planText: string): AllowedPrompt[] {
   }
 }
 
+/** Max context window tokens for percentage calculation */
+const MAX_CONTEXT_TOKENS = 200_000;
+
 /**
  * Approval/question bar shown when Claude pauses for:
- * - Plan approval (ExitPlanMode) -> Approve/Reject/Feedback buttons
+ * - Plan approval (ExitPlanMode) -> 4 CLI-matching options
  * - Question (AskUserQuestion) -> Option buttons + free-text input
  */
 export const PlanApprovalBar: React.FC = () => {
-  const { pendingApproval, setPendingApproval } = useAppStore();
+  const { pendingApproval, setPendingApproval, cost } = useAppStore();
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [selectedOptions, setSelectedOptions] = useState<Set<string>>(new Set());
+  const [hoveredOption, setHoveredOption] = useState<number | null>(null);
 
   const isQuestion = pendingApproval?.toolName === 'AskUserQuestion';
 
@@ -87,21 +91,30 @@ export const PlanApprovalBar: React.FC = () => {
     [isQuestion, pendingApproval]
   );
 
+  // Calculate context usage percentage from token data
+  const contextPercent = useMemo(() => {
+    const tokens = cost?.inputTokens ?? 0;
+    if (tokens <= 0) return 0;
+    return Math.min(100, Math.round((tokens / MAX_CONTEXT_TOKENS) * 100));
+  }, [cost?.inputTokens]);
+
   if (!pendingApproval) return null;
 
-  // The tool name that triggered this approval - sent back to the extension
-  // so it can identify the tool even if the `result` event already cleared
-  // `pendingApprovalTool` (race condition fix).
   const approvalToolName = pendingApproval.toolName;
 
-  // --- Plan approval handlers ---
-  const handleApprove = () => {
+  // --- Plan approval handlers (4 CLI-matching options) ---
+  const handleApproveClearBypass = () => {
+    postToExtension({ type: 'planApprovalResponse', action: 'approveClearBypass', toolName: approvalToolName });
+    setPendingApproval(null);
+  };
+
+  const handleApproveBypass = () => {
     postToExtension({ type: 'planApprovalResponse', action: 'approve', toolName: approvalToolName });
     setPendingApproval(null);
   };
 
-  const handleReject = () => {
-    postToExtension({ type: 'planApprovalResponse', action: 'reject', toolName: approvalToolName });
+  const handleApproveManual = () => {
+    postToExtension({ type: 'planApprovalResponse', action: 'approveManual', toolName: approvalToolName });
     setPendingApproval(null);
   };
 
@@ -123,6 +136,10 @@ export const PlanApprovalBar: React.FC = () => {
       e.preventDefault();
       handleSendFeedback();
     }
+    if (e.key === 'Escape') {
+      setShowFeedback(false);
+      setFeedbackText('');
+    }
   };
 
   // --- Question answer handlers ---
@@ -138,7 +155,6 @@ export const PlanApprovalBar: React.FC = () => {
         return next;
       });
     } else {
-      // Single select: send immediately
       postToExtension({
         type: 'planApprovalResponse',
         action: 'questionAnswer',
@@ -248,10 +264,37 @@ export const PlanApprovalBar: React.FC = () => {
     );
   }
 
-  // --- Render plan approval UI ---
+  // --- Plan approval option definitions (matching CLI) ---
+  const planOptions = [
+    {
+      key: 1,
+      label: `Yes, clear context${contextPercent > 0 ? ` (${contextPercent}% used)` : ''} and bypass permissions`,
+      handler: handleApproveClearBypass,
+    },
+    {
+      key: 2,
+      label: 'Yes, and bypass permissions',
+      handler: handleApproveBypass,
+    },
+    {
+      key: 3,
+      label: 'Yes, manually approve edits',
+      handler: handleApproveManual,
+    },
+    {
+      key: 4,
+      label: 'Type here to tell Claude what to change',
+      handler: () => setShowFeedback(!showFeedback),
+    },
+  ];
+
+  // --- Render plan approval UI (CLI-style) ---
   return (
     <div className="plan-approval-bar">
-      <div className="plan-approval-title">Plan Ready for Review</div>
+      <div className="plan-approval-header">
+        <div className="plan-approval-title">Plan Ready for Review</div>
+        <div className="plan-approval-subtitle">Would you like to proceed?</div>
+      </div>
       {allowedPrompts.length > 0 && (
         <div className="plan-allowed-prompts">
           <div className="plan-allowed-prompts-label">Requested permissions:</div>
@@ -265,19 +308,22 @@ export const PlanApprovalBar: React.FC = () => {
           </ul>
         </div>
       )}
-      <div className="plan-approval-buttons">
-        <button className="plan-approve-btn" onClick={handleApprove}>
-          Approve
-        </button>
-        <button className="plan-reject-btn" onClick={handleReject}>
-          Reject
-        </button>
-        <button
-          className="plan-feedback-btn"
-          onClick={() => setShowFeedback(!showFeedback)}
-        >
-          {showFeedback ? 'Cancel' : 'Give Feedback'}
-        </button>
+      <div className="plan-options-list">
+        {planOptions.map((opt) => (
+          <button
+            key={opt.key}
+            className={`plan-option-row ${hoveredOption === opt.key ? 'hovered' : ''}`}
+            onClick={opt.handler}
+            onMouseEnter={() => setHoveredOption(opt.key)}
+            onMouseLeave={() => setHoveredOption(null)}
+          >
+            <span className="plan-option-indicator">
+              {hoveredOption === opt.key ? '>' : ' '}
+            </span>
+            <span className="plan-option-number">{opt.key}.</span>
+            <span className="plan-option-label">{opt.label}</span>
+          </button>
+        ))}
       </div>
       {showFeedback && (
         <div className="plan-feedback-area">
@@ -286,7 +332,7 @@ export const PlanApprovalBar: React.FC = () => {
             value={feedbackText}
             onChange={(e) => setFeedbackText(e.target.value)}
             onKeyDown={handleFeedbackKeyDown}
-            placeholder="Type your feedback..."
+            placeholder="Type your feedback or changes..."
             rows={3}
             autoFocus
           />

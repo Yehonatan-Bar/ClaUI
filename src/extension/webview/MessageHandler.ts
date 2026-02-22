@@ -42,6 +42,8 @@ export interface WebviewBridge {
   setSuppressNextExit?(suppress: boolean): void;
   /** Switch the running session to a different model (stop + resume with new --model flag) */
   switchModel?(model: string): Promise<void>;
+  /** Save project analytics immediately (called before session clear/reset to avoid data loss) */
+  saveProjectAnalyticsNow?(): void;
 }
 
 /**
@@ -235,6 +237,16 @@ export class MessageHandler {
     return this.turnRecords;
   }
 
+  /**
+   * Return accumulated TurnRecords and clear the internal buffer.
+   * Used by SessionTab before clearing/restarting so analytics are captured.
+   */
+  flushTurnRecords(): TurnRecord[] {
+    const records = this.turnRecords;
+    this.turnRecords = [];
+    return records;
+  }
+
   /** Wire up all event listeners */
   initialize(): void {
     this.bindWebviewMessages();
@@ -378,6 +390,8 @@ export class MessageHandler {
           break;
 
         case 'clearSession':
+          // Save analytics for the current session BEFORE clearing records
+          this.webview.saveProjectAnalyticsNow?.();
           this.firstMessageSent = false;
           this.activitySummarizer?.reset();
           this.adventureInterpreter?.reset();
@@ -472,6 +486,7 @@ export class MessageHandler {
           this.promptEnhancer
             .enhance(msg.text, msg.model)
             .then((enhanced) => {
+              this.log(`Prompt enhancement result: success=${!!enhanced}, length=${enhanced?.length ?? 0}`);
               this.webview.postMessage({
                 type: 'enhancePromptResult',
                 enhancedText: enhanced,
@@ -524,9 +539,9 @@ export class MessageHandler {
           // this.pendingApprovalTool which may have been cleared by a `result` event
           // that races between showing the approval bar and the user clicking Approve.
           const effectiveToolName = msg.toolName || this.pendingApprovalTool || '';
-          // If user approves an ExitPlanMode, auto-approve subsequent ExitPlanMode
-          // calls in the same turn so the user isn't interrupted repeatedly.
-          if (msg.action === 'approve' && effectiveToolName) {
+          // Any approval action on ExitPlanMode: auto-approve subsequent calls
+          const isApproveAction = msg.action === 'approve' || msg.action === 'approveClearBypass' || msg.action === 'approveManual';
+          if (isApproveAction && effectiveToolName) {
             const norm = effectiveToolName.trim().toLowerCase();
             if (norm === 'exitplanmode' || norm.endsWith('.exitplanmode')) {
               this.autoApproveExitPlanMode = true;
@@ -543,6 +558,21 @@ export class MessageHandler {
           }
           }
           if (msg.action === 'approve') {
+            // "Yes, and bypass permissions" - proceed with full-access mode
+            this.control.sendText('Yes, proceed with the plan.');
+          } else if (msg.action === 'approveClearBypass') {
+            // "Yes, clear context and bypass permissions" - compact then proceed
+            this.log('Plan approval: clearing context (compact) before proceeding');
+            this.control.compact();
+            // Brief delay to let compaction start before sending approval
+            setTimeout(() => {
+              this.control.sendText('Yes, proceed with the plan.');
+            }, 200);
+          } else if (msg.action === 'approveManual') {
+            // "Yes, manually approve edits" - switch to supervised mode then proceed
+            this.log('Plan approval: switching to supervised mode for manual edit approval');
+            vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', 'supervised', true);
+            this.webview.postMessage({ type: 'permissionModeSetting', mode: 'supervised' });
             this.control.sendText('Yes, proceed with the plan.');
           } else if (msg.action === 'reject') {
             this.control.sendText('No, I reject this plan. Please revise it.');
@@ -574,6 +604,8 @@ export class MessageHandler {
 
         case 'editAndResend':
           this.log(`Edit-and-resend: stopping session and restarting with edited prompt`);
+          // Save analytics for the current session BEFORE clearing records
+          this.webview.saveProjectAnalyticsNow?.();
           this.clearApprovalTracking();
           this.autoApproveExitPlanMode = false;
           this.firstMessageSent = false;
@@ -1083,7 +1115,8 @@ export class MessageHandler {
       }
       if (
         e.affectsConfiguration('claudeMirror.achievements.enabled') ||
-        e.affectsConfiguration('claudeMirror.achievements.sound')
+        e.affectsConfiguration('claudeMirror.achievements.sound') ||
+        e.affectsConfiguration('claudeMirror.achievements.aiInsight')
       ) {
         this.achievementService.onConfigChanged();
       }

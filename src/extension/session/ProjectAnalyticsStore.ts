@@ -14,7 +14,14 @@ export class ProjectAnalyticsStore {
 
   /** Get all stored session summaries, sorted by endedAt descending */
   getSummaries(): SessionSummary[] {
-    const sessions = this.workspaceState.get<SessionSummary[]>(STORAGE_KEY, []);
+    const raw = this.workspaceState.get<SessionSummary[]>(STORAGE_KEY, []);
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    // Filter out corrupt entries that lack required fields
+    const sessions = raw.filter(
+      (s) => s && typeof s.sessionId === 'string' && typeof s.endedAt === 'string'
+    );
     return sessions.sort(
       (a, b) => new Date(b.endedAt).getTime() - new Date(a.endedAt).getTime()
     );
@@ -22,8 +29,9 @@ export class ProjectAnalyticsStore {
 
   /** Save or update a session summary */
   async saveSummary(summary: SessionSummary): Promise<void> {
-    const sessions = this.workspaceState.get<SessionSummary[]>(STORAGE_KEY, []);
-    const existingIndex = sessions.findIndex(s => s.sessionId === summary.sessionId);
+    const raw = this.workspaceState.get<SessionSummary[]>(STORAGE_KEY, []);
+    const sessions = Array.isArray(raw) ? raw : [];
+    const existingIndex = sessions.findIndex(s => s?.sessionId === summary.sessionId);
 
     if (existingIndex >= 0) {
       sessions[existingIndex] = summary;

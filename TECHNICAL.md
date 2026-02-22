@@ -71,10 +71,11 @@ claude-code-mirror/
 |   |   +-- terminal/                     #   Phase 2 stubs
 |   |   +-- auth/                         #   Phase 5 stub
 |   |   +-- achievements/
-|   |   |   +-- AchievementCatalog.ts     #   12 achievement definitions (id, title, rarity, xp)
-|   |   |   +-- AchievementStore.ts       #   Persistence via VS Code globalState
-|   |   |   +-- AchievementEngine.ts      #   Game logic (bug fixes, streaks, goals)
-|   |   |   +-- AchievementService.ts     #   Lifecycle bridge to webview messaging
+|   |   |   +-- AchievementCatalog.ts     #   30 achievement definitions, 7 categories
+|   |   |   +-- AchievementStore.ts       #   Persistence via VS Code globalState (8 counters, 15 levels)
+|   |   |   +-- AchievementEngine.ts      #   Game logic (files, languages, error cycles, goals)
+|   |   |   +-- AchievementService.ts     #   Lifecycle bridge, streaks, tiers, AI insight wiring
+|   |   |   +-- AchievementInsightAnalyzer.ts #  Sonnet CLI spawn for session analysis (once/day)
 |   |   +-- types/
 |   |       +-- stream-json.ts            #   CLI protocol type definitions
 |   |       +-- webview-messages.ts       #   postMessage contract
@@ -92,7 +93,7 @@ claude-code-mirror/
 |       |   |   +-- MessageBubble.tsx     #   Single message with content blocks
 |       |   |   +-- StreamingText.tsx     #   In-progress text with cursor
 |       |   |   +-- ToolUseBlock.tsx      #   Tool use display (collapsible, plan-aware)
-|       |   |   +-- PlanApprovalBar.tsx  #   Dual-mode bar: plan approval (Approve/Reject/Feedback) or question UI (option buttons + custom answer)
+|       |   |   +-- PlanApprovalBar.tsx  #   CLI-matching plan approval (4 options: clear+bypass, bypass, manual, feedback) or question UI (option buttons + custom answer)
 |       |   |   +-- PromptHistoryPanel.tsx #  3-tab prompt history overlay (session/project/global)
 |       |   |   +-- CodeBlock.tsx         #   Syntax block with copy button
 |       |   |   +-- MarkdownContent.tsx  #   Markdown rendering with sanitization and link detection
@@ -237,7 +238,7 @@ claude-code-mirror/
 **File Mention (@)** - Inline autocomplete triggered by typing `@` in the chat textarea. Searches workspace files via `vscode.workspace.findFiles()` with 150ms debounce, showing results in a popup above the input. Navigate with ArrowUp/Down, select with Enter/Tab/click. Replaces `@query` with the relative file path. Uses custom DOM events for extension-to-webview communication (same pattern as prompt history). All state is local to the `useFileMention` hook (not in Zustand).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/FILE_MENTION.md`
 
-**Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the CLI pauses waiting for stdin input. The extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'`, shows an approval bar with Approve/Reject/Feedback buttons, and sends the user's response back to the CLI. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON. Stale `ExitPlanMode` calls after context compaction (where no `EnterPlanMode` was seen) are auto-approved silently via the `planModeActive` flag.
+**Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the CLI pauses waiting for stdin input. The extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'`, shows a CLI-matching 4-option approval bar: (1) clear context + bypass permissions, (2) bypass permissions, (3) manually approve edits, (4) type feedback. Option 1 triggers context compaction before proceeding. Option 3 switches to supervised permission mode. Context usage percentage is shown when token data is available. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON. Stale `ExitPlanMode` calls after context compaction (where no `EnterPlanMode` was seen) are auto-approved silently via the `planModeActive` flag.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Open Plan Docs** - "Plans" button in the status bar that opens HTML plan documents from `Kingdom_of_Claudes_Beloved_MDs/` in the default browser. Single file opens directly; multiple files show a QuickPick sorted by modification time. When no plan documents exist, offers to activate the Plans feature by injecting a "Plan mode" prompt into the project's `CLAUDE.md` (with Hebrew or English language choice). Also available via Command Palette (`claudeMirror.openPlanDocs`).
@@ -255,10 +256,10 @@ claude-code-mirror/
 **Adventure Widget** - Pixel-art dungeon crawler that visualizes session activity as a thin-wall maze grid. Each CLI turn extends the maze and maps to an encounter: scrolls (Read), anvils (Edit), traps (errors), dragons (3+ errors), treasure (recovery). Canvas 2D engine with 4x4 mini sprites on a 40x40 cell maze, PICO-8 palette, BFS pathfinding, state machine (IDLE/WALKING/ENCOUNTER/RESOLUTION). Extension-side `AdventureInterpreter` converts `TurnRecord` to `AdventureBeat` via deterministic rules. Toggleable separately from main vitals.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ADVENTURE_WIDGET.md`
 
-**Achievements / Trophy** - Gamification system that awards badges for coding milestones (debugging, testing, session patterns). Features: 12 achievements across 4 rarities (common/rare/epic/legendary), XP-based leveling (10 tiers), per-session goals, toast notifications with optional sound, session recap card, and full i18n support (English + Hebrew). Language is selectable via the settings gear in the Achievement panel and persisted to localStorage. An info icon (i) in the panel header opens a scrollable explanation modal describing all achievement mechanics. Backend: `AchievementEngine` (game logic), `AchievementCatalog` (definitions), `AchievementStore` (VS Code globalState persistence), `AchievementService` (lifecycle bridge). Frontend: `AchievementPanel`, `AchievementToastStack`, `SessionRecapCard`, `achievementI18n.ts`.
+**Achievements / Trophy** - Gamification system that awards badges for coding milestones. Features: 30 achievements across 7 categories (debugging, testing, refactor, collaboration, session, architecture, productivity), 4 rarities, XP-based leveling (15 tiers), per-session goals (7 templates), daily streaks, file/language tracking, frontend/backend classification, error cycle detection, toast notifications with optional sound, session recap card with AI insights, and full i18n (EN+HE). AI Session Insight: spawns Sonnet CLI once per day at session end for deeper analysis (quality, pattern, XP bonus). Backend: `AchievementEngine`, `AchievementCatalog`, `AchievementStore`, `AchievementService`, `AchievementInsightAnalyzer`. Frontend: `AchievementPanel`, `AchievementToastStack`, `SessionRecapCard`, `achievementI18n.ts`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ACHIEVEMENTS.md`
 
-**Analytics Dashboard** - Full-screen overlay with two modes: **Session** (6 tabs: Overview, Tokens, Tools, Timeline, Commands, Context) and **Project** (4 tabs: Overview, Sessions, Tokens, Tools). Session mode shows current-session analytics from Zustand `turnHistory`. Project mode aggregates `SessionSummary` records across all past sessions in the workspace, persisted in `ProjectAnalyticsStore` (VS Code `workspaceState`). A pill toggle in the header switches modes. Session summaries are auto-saved when a session ends; project data is loaded on demand. Session mode: 8 metric cards, cost/duration charts, tool frequency, category donut, mood timeline, frustration alerts, conversation inspector. Project mode: 8 aggregated metrics, cost/turns per session charts, aggregated tool frequency, category distribution, model usage, sortable session table with expandable details, aggregated token breakdown.
+**Analytics Dashboard** - Full-screen overlay with two modes: **Session** (6 tabs: Overview, Tokens, Tools, Timeline, Commands, Context) and **Project** (4 tabs: Overview, Sessions, Tokens, Tools). Session mode shows current-session analytics from Zustand `turnHistory`. Project mode aggregates `SessionSummary` records across all past sessions in the workspace, persisted in `ProjectAnalyticsStore` (VS Code `workspaceState`, survives restarts). A pill toggle in the header switches modes. Session summaries are auto-saved from ALL exit paths (normal exit, crash, tab close, VS Code close, session clear, edit-and-resend) via `flushTurnRecords()` + `analyticsSaved` guard to prevent data loss and double-save. Project data is loaded on demand.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ANALYTICS_DASHBOARD.md`
 
 **TurnAnalyzer** - Background semantic analysis engine (enabled by default). After each turn completes, spawns a one-shot Claude CLI process (using `claudeMirror.analysisModel`) to classify user mood, task type, outcome, and bug repetition. Results arrive asynchronously and merge into `turnHistory` via `turnSemantics` postMessage. Includes queue (max 20), per-session cap, timeout, and enable flag for cost control.

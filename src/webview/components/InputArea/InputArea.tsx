@@ -111,6 +111,8 @@ export const InputArea: React.FC = () => {
   const autoSendAfterEnhanceRef = useRef(false);
   // Ref: captures original text before enhancement for comparison view
   const originalTextBeforeEnhanceRef = useRef('');
+  // Ref: client-side safety timeout to reset isEnhancing if result never arrives
+  const enhanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Seed prompt history from existing user messages on mount (covers messages
   // sent before this feature was deployed or before a reload)
@@ -141,6 +143,12 @@ export const InputArea: React.FC = () => {
     if (!trimmed || isEnhancing || !isConnected) return;
     originalTextBeforeEnhanceRef.current = trimmed;
     setIsEnhancing(true);
+    // Safety timeout: reset isEnhancing if result never arrives (35s > backend 30s timeout)
+    if (enhanceTimeoutRef.current) clearTimeout(enhanceTimeoutRef.current);
+    enhanceTimeoutRef.current = setTimeout(() => {
+      setIsEnhancing(false);
+      enhanceTimeoutRef.current = null;
+    }, 35_000);
     postToExtension({ type: 'enhancePrompt', text: trimmed } as any);
   }, [text, isEnhancing, isConnected, setIsEnhancing]);
 
@@ -204,6 +212,14 @@ export const InputArea: React.FC = () => {
     if (autoEnhanceEnabled && trimmed && !isEnhancing && pendingImages.length === 0 && !pendingApproval) {
       setIsEnhancing(true);
       autoSendAfterEnhanceRef.current = true;
+      originalTextBeforeEnhanceRef.current = trimmed;
+      // Safety timeout: reset isEnhancing if result never arrives
+      if (enhanceTimeoutRef.current) clearTimeout(enhanceTimeoutRef.current);
+      enhanceTimeoutRef.current = setTimeout(() => {
+        setIsEnhancing(false);
+        autoSendAfterEnhanceRef.current = false;
+        enhanceTimeoutRef.current = null;
+      }, 35_000);
       postToExtension({ type: 'enhancePrompt', text: trimmed } as any);
       return;
     }
@@ -596,6 +612,12 @@ export const InputArea: React.FC = () => {
     const handler = (e: Event) => {
       const enhanced = (e as CustomEvent<string>).detail;
 
+      // Clear safety timeout since result arrived
+      if (enhanceTimeoutRef.current) {
+        clearTimeout(enhanceTimeoutRef.current);
+        enhanceTimeoutRef.current = null;
+      }
+
       // If auto-enhance triggered this, send immediately (no comparison)
       if (autoSendAfterEnhanceRef.current) {
         autoSendAfterEnhanceRef.current = false;
@@ -624,10 +646,24 @@ export const InputArea: React.FC = () => {
   // Listen for prompt enhancement failures
   useEffect(() => {
     const handler = () => {
+      // Clear safety timeout since result arrived (even if failure)
+      if (enhanceTimeoutRef.current) {
+        clearTimeout(enhanceTimeoutRef.current);
+        enhanceTimeoutRef.current = null;
+      }
+
       // Auto-send was pending but enhancement failed -- send original text
       if (autoSendAfterEnhanceRef.current) {
         autoSendAfterEnhanceRef.current = false;
         sendMessage();
+        return;
+      }
+
+      // Manual enhance failed: briefly flash the enhance button red
+      const btn = document.querySelector('.enhance-button');
+      if (btn) {
+        btn.classList.add('enhance-error');
+        setTimeout(() => btn.classList.remove('enhance-error'), 2000);
       }
     };
     window.addEventListener('prompt-enhance-failed', handler);

@@ -53,6 +53,8 @@ export class SessionTab implements WebviewBridge {
   private disposed = false;
   private currentModel = '';
   private sessionStartedAt = '';
+  /** Guard to prevent saving project analytics twice (e.g. dispose + exit handler) */
+  private analyticsSaved = false;
   /** First line of the user's first prompt (persisted to session history) */
   private firstPrompt = '';
   /** When true, the next process exit should NOT send sessionEnded (edit-and-resend restart) */
@@ -246,6 +248,10 @@ export class SessionTab implements WebviewBridge {
     this.suppressNextExit = suppress;
   }
 
+  saveProjectAnalyticsNow(): void {
+    this.saveProjectAnalytics();
+  }
+
   async switchModel(model: string): Promise<void> {
     const sessionToResume = this.processManager.currentSessionId;
     if (!sessionToResume) {
@@ -404,6 +410,8 @@ export class SessionTab implements WebviewBridge {
     }
     this.disposed = true;
     this.stopThinkingAnimation();
+    // Save analytics BEFORE stopping the process to ensure data is persisted
+    this.saveProjectAnalytics();
     this.achievementService.onSessionEnd(this.id);
     this.achievementService.unregisterTab(this.id);
     this.processManager.stop();
@@ -557,6 +565,8 @@ export class SessionTab implements WebviewBridge {
       this.disposed = true;
       try {
         this.stopThinkingAnimation();
+        // Save analytics BEFORE stopping the process to ensure data is persisted
+        this.saveProjectAnalytics();
         this.achievementService.onSessionEnd(this.id);
         this.achievementService.unregisterTab(this.id);
         this.processManager.stop();
@@ -703,11 +713,16 @@ export class SessionTab implements WebviewBridge {
 
   /** Build and persist a SessionSummary from accumulated TurnRecords */
   private saveProjectAnalytics(): void {
-    const turnRecords = this.messageHandler.getTurnRecords();
+    if (this.analyticsSaved) {
+      this.log(`[ProjectAnalytics] Already saved for this session, skipping`);
+      return;
+    }
+    const turnRecords = this.messageHandler.flushTurnRecords();
     if (turnRecords.length === 0) {
       this.log(`[ProjectAnalytics] No turns to save`);
       return;
     }
+    this.analyticsSaved = true;
 
     const sessionId = this.processManager.currentSessionId || this.id;
     const now = new Date().toISOString();
@@ -810,6 +825,7 @@ export class SessionTab implements WebviewBridge {
     this.demux.on('init', (event: import('../types/stream-json').SystemInitEvent) => {
       this.currentModel = event.model;
       this.sessionStartedAt = new Date().toISOString();
+      this.analyticsSaved = false;
 
       // Restore existing metadata for resumed sessions (preserve name + firstPrompt)
       const existing = this.sessionStore.getSession(event.session_id);

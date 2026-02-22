@@ -4,10 +4,20 @@ import { AdventureEngine } from './adventure/AdventureEngine';
 
 const STORAGE_KEY = 'adventure-widget-position';
 const ACTIVITY_GRACE_MS = 2500;
+const WIDGET_SIZE = 120;
 
 interface WidgetPosition {
   left: number;
   top: number;
+}
+
+function clampPosition(pos: WidgetPosition): WidgetPosition {
+  const maxLeft = Math.max(0, window.innerWidth - WIDGET_SIZE);
+  const maxTop = Math.max(0, window.innerHeight - WIDGET_SIZE);
+  return {
+    left: Math.max(0, Math.min(pos.left, maxLeft)),
+    top: Math.max(0, Math.min(pos.top, maxTop)),
+  };
 }
 
 function loadPosition(): WidgetPosition | null {
@@ -15,13 +25,20 @@ function loadPosition(): WidgetPosition | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const pos = JSON.parse(raw);
-    if (typeof pos.left === 'number' && typeof pos.top === 'number') return pos;
+    if (typeof pos.left === 'number' && typeof pos.top === 'number') {
+      return clampPosition(pos);
+    }
   } catch { /* ignore */ }
   return null;
 }
 
 function savePosition(pos: WidgetPosition): void {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(pos)); } catch { /* ignore */ }
+}
+
+/** Reset saved position so widget returns to CSS default (top-right corner) */
+export function resetAdventureWidgetPosition(): void {
+  try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
 }
 
 /**
@@ -46,12 +63,26 @@ export const AdventureWidget: React.FC = React.memo(() => {
   const dragOffset = useRef({ x: 0, y: 0 });
   const widgetRef = useRef<HTMLDivElement>(null);
 
+  // Re-clamp position when viewport resizes
+  useEffect(() => {
+    const handleResize = () => {
+      setPosition((prev) => prev ? clampPosition(prev) : null);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Initialize engine on mount
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    engineRef.current = new AdventureEngine(canvas);
+    try {
+      engineRef.current = new AdventureEngine(canvas);
+    } catch {
+      // Canvas context unavailable - widget renders as dark box but won't crash
+      engineRef.current = null;
+    }
 
     return () => {
       engineRef.current?.destroy();
@@ -133,6 +164,12 @@ export const AdventureWidget: React.FC = React.memo(() => {
     };
   }, [dragging]);
 
+  // Double-click resets position to default (top-right)
+  const handleDoubleClick = useCallback(() => {
+    resetAdventureWidgetPosition();
+    setPosition(null);
+  }, []);
+
   // Tooltip on hover (only when not dragging)
   const handleMouseMove = () => {
     if (dragging) return;
@@ -155,9 +192,10 @@ export const AdventureWidget: React.FC = React.memo(() => {
       className={`adventure-widget${dragging ? ' adventure-widget--dragging' : ''}`}
       style={positionStyle}
       onMouseDown={handleMouseDown}
+      onDoubleClick={handleDoubleClick}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      title={tooltip ?? undefined}
+      title={tooltip ?? 'Double-click to reset position'}
     >
       <canvas
         ref={canvasRef}
@@ -171,15 +209,5 @@ export const AdventureWidget: React.FC = React.memo(() => {
     </div>
   );
 });
-
-function clampPosition(pos: WidgetPosition): WidgetPosition {
-  const w = 120, h = 120;
-  const maxLeft = window.innerWidth - w;
-  const maxTop = window.innerHeight - h;
-  return {
-    left: Math.max(0, Math.min(pos.left, maxLeft)),
-    top: Math.max(0, Math.min(pos.top, maxTop)),
-  };
-}
 
 AdventureWidget.displayName = 'AdventureWidget';

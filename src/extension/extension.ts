@@ -6,6 +6,7 @@ import { ProjectAnalyticsStore } from './session/ProjectAnalyticsStore';
 import { PromptHistoryStore } from './session/PromptHistoryStore';
 import { FileLogger } from './session/FileLogger';
 import { AchievementService } from './achievements/AchievementService';
+import { AchievementInsightAnalyzer } from './achievements/AchievementInsightAnalyzer';
 import { registerCommands } from './commands';
 
 let tabManager: TabManager;
@@ -49,6 +50,9 @@ export function activate(context: vscode.ExtensionContext): void {
   // Create prompt history store for cross-session prompt persistence
   const promptHistoryStore = new PromptHistoryStore(context.globalState, context.workspaceState);
   const achievementService = new AchievementService(context.globalState, log);
+  const insightAnalyzer = new AchievementInsightAnalyzer(context.globalState);
+  insightAnalyzer.setLogger(log);
+  achievementService.setInsightAnalyzer(insightAnalyzer);
 
   // Create project analytics store for cross-session dashboard data (workspace-scoped)
   const projectAnalyticsStore = new ProjectAnalyticsStore(context.workspaceState);

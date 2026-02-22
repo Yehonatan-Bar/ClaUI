@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaUi - Achievements System Enhancement Plan</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 40px 20px;
+    direction: rtl;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  h1 {
+    text-align: center;
+    font-size: 2.2rem;
+    margin-bottom: 10px;
+    background: linear-gradient(90deg, #f7971e, #ffd200);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    text-align: center;
+    color: #8888aa;
+    margin-bottom: 40px;
+    font-size: 1.1rem;
+  }
+  .phase {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    transition: transform 0.2s;
+  }
+  .phase:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.2);
+  }
+  .phase-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .phase-num {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .phase h2 {
+    color: #c0c0ff;
+    font-size: 1.3rem;
+  }
+  .phase p {
+    color: #b0b0c0;
+    line-height: 1.7;
+    margin-bottom: 12px;
+  }
+  .highlight {
+    color: #ffd200;
+    font-weight: 600;
+  }
+  .achievement-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 10px;
+    margin: 16px 0;
+  }
+  .ach-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+  }
+  .ach-card .name {
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .ach-card .desc {
+    color: #8888aa;
+    font-size: 0.82rem;
+  }
+  .rarity-common { border-right: 3px solid #8fbc8f; }
+  .rarity-rare { border-right: 3px solid #6495ed; }
+  .rarity-epic { border-right: 3px solid #dda0dd; }
+  .rarity-legendary { border-right: 3px solid #ffd700; }
+  .stats-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+  }
+  .stat-box {
+    background: rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 16px 20px;
+    text-align: center;
+    flex: 1;
+    min-width: 120px;
+  }
+  .stat-box .num {
+    font-size: 2rem;
+    font-weight: bold;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .stat-box .label {
+    color: #8888aa;
+    font-size: 0.85rem;
+    margin-top: 4px;
+  }
+  .ai-section {
+    background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15));
+    border: 1px solid rgba(102,126,234,0.3);
+  }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    margin: 2px;
+  }
+  .tag-new { background: rgba(76,175,80,0.2); color: #81c784; }
+  .tag-extend { background: rgba(33,150,243,0.2); color: #64b5f6; }
+  .tag-ai { background: rgba(156,39,176,0.2); color: #ce93d8; }
+  ul {
+    list-style: none;
+    padding: 0;
+  }
+  ul li {
+    padding: 6px 0;
+    padding-right: 20px;
+    position: relative;
+    color: #b0b0c0;
+    line-height: 1.6;
+  }
+  ul li::before {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 14px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #667eea;
+  }
+  .summary-box {
+    background: linear-gradient(135deg, rgba(247,151,30,0.1), rgba(255,210,0,0.1));
+    border: 1px solid rgba(255,210,0,0.2);
+    border-radius: 12px;
+    padding: 24px;
+    margin-top: 24px;
+  }
+  .summary-box h2 {
+    color: #ffd200;
+    margin-bottom: 12px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>ClaUi - Achievements System Enhancement</h1>
+<p class="subtitle">Plan for review - Enhanced Achievement System with AI Insights</p>
+
+<div class="stats-row">
+  <div class="stat-box">
+    <div class="num">30</div>
+    <div class="label">Total achievements (from 12)</div>
+  </div>
+  <div class="stat-box">
+    <div class="num">7</div>
+    <div class="label">Categories (from 5)</div>
+  </div>
+  <div class="stat-box">
+    <div class="num">15</div>
+    <div class="label">Levels (from 10)</div>
+  </div>
+  <div class="stat-box">
+    <div class="num">AI</div>
+    <div class="label">Sonnet daily insights</div>
+  </div>
+</div>
+
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-num">1</div>
+    <h2>Data Foundations - Counters, Levels, Session Tracking</h2>
+  </div>
+  <p>
+    Building the foundation for the enhanced system. Adding new tracking counters that persist across sessions:
+    <span class="highlight">total edits, consecutive days streak, last session date, total session minutes</span>.
+  </p>
+  <p>
+    Expanding the level system from <span class="highlight">10 to 15 levels</span> with higher XP thresholds
+    to accommodate the increased number of achievements and XP rewards.
+  </p>
+  <p>
+    Enriching session state tracking with: <span class="highlight">files touched, frontend/backend classification,
+    first edit/test timestamps, error cycles count, error-free results</span>.
+  </p>
+</div>
+
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-num">2</div>
+    <h2>18 New Achievements</h2>
+  </div>
+  <p>Adding 18 new achievements across 7 categories, bringing the total from 12 to 30:</p>
+
+  <h3 style="color:#8fbc8f;margin:12px 0 8px;">Session <span class="tag tag-extend">Extended</span></h3>
+  <div class="achievement-grid">
+    <div class="ach-card rarity-common">
+      <div class="name">Early Bird</div>
+      <div class="desc">Session started between 5-7am</div>
+    </div>
+    <div class="ach-card rarity-common">
+      <div class="name">Weekend Warrior</div>
+      <div class="desc">Coded on Saturday or Sunday</div>
+    </div>
+    <div class="ach-card rarity-rare">
+      <div class="name">Deep Focus</div>
+      <div class="desc">60+ min, zero cancels, 5+ edits</div>
+    </div>
+    <div class="ach-card rarity-legendary">
+      <div class="name">Centurion</div>
+      <div class="desc">100th session overall</div>
+    </div>
+  </div>
+
+  <h3 style="color:#ff7043;margin:12px 0 8px;">Debugging <span class="tag tag-extend">Extended</span></h3>
+  <div class="achievement-grid">
+    <div class="ach-card rarity-epic">
+      <div class="name">Persistence</div>
+      <div class="desc">Fixed a bug after 3+ error cycles</div>
+    </div>
+    <div class="ach-card rarity-rare">
+      <div class="name">First Blood</div>
+      <div class="desc">Bug fix within 5 minutes of session start</div>
+    </div>
+  </div>
+
+  <h3 style="color:#66bb6a;margin:12px 0 8px;">Testing <span class="tag tag-extend">Extended</span></h3>
+  <div class="achievement-grid">
+    <div class="ach-card rarity-common">
+      <div class="name">Test Master I</div>
+      <div class="desc">25 lifetime test passes</div>
+    </div>
+    <div class="ach-card rarity-rare">
+      <div class="name">Test Master II</div>
+      <div class="desc">100 lifetime test passes</div>
+    </div>
+    <div class="ach-card rarity-legendary">
+      <div class="name">Test Master III</div>
+      <div class="desc">500 lifetime test passes</div>
+    </div>
+    <div class="ach-card rarity-rare">
+      <div class="name">Test First</div>
+      <div class="desc">Tests before any edit in a session</div>
+    </div>
+  </div>
+
+  <h3 style="color:#ab47bc;margin:12px 0 8px;">Refactor <span class="tag tag-extend">Extended</span></h3>
+  <div class="achievement-grid">
+    <div class="ach-card rarity-rare">
+      <div class="name">Heavy Refactor</div>
+      <div class="desc">10+ edits in one session</div>
+    </div>
+    <div class="ach-card rarity-epic">
+      <div class="name">Surgeon</div>
+      <div class="desc">1-2 precise edits fixed an error</div>
+    </div>
+  </div>
+
+  <h3 style="color:#42a5f5;margin:12px 0 8px;">Architecture <span class="tag tag-new">New</span></h3>
+  <div class="achievement-grid">
+    <div class="ach-card rarity-rare">
+      <div class="name">Full Stack</div>
+      <div class="desc">Edited frontend + backend files</div>
+    </div>
+    <div class="ach-card rarity-rare">
+      <div class="name">File Explorer</div>
+      <div class="desc">Touched 10+ files in a session</div>
+    </div>
+  </div>
+
+  <h3 style="color:#ef5350;margin:12px 0 8px;">Collaboration <span class="tag tag-extend">Extended</span></h3>
+  <div class="achievement-grid">
+    <div class="ach-card rarity-epic">
+      <div class="name">Multilingual Master</div>
+      <div class="desc">5+ languages in one session</div>
+    </div>
+  </div>
+
+  <h3 style="color:#ffa726;margin:12px 0 8px;">Productivity <span class="tag tag-new">New</span></h3>
+  <div class="achievement-grid">
+    <div class="ach-card rarity-epic">
+      <div class="name">All Goals Met</div>
+      <div class="desc">Completed all session goals</div>
+    </div>
+    <div class="ach-card rarity-rare">
+      <div class="name">Daily Streak 3</div>
+      <div class="desc">3 consecutive days with sessions</div>
+    </div>
+    <div class="ach-card rarity-epic">
+      <div class="name">Daily Streak 7</div>
+      <div class="desc">7 consecutive days with sessions</div>
+    </div>
+  </div>
+</div>
+
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-num">3</div>
+    <h2>Detection Logic - Smarter Tracking</h2>
+  </div>
+  <p>
+    Implementing intelligent detection for each new achievement. Key capabilities:
+  </p>
+  <ul>
+    <li><span class="highlight">File path extraction</span> from tool inputs - tracking which files were touched and classifying them as frontend/backend</li>
+    <li><span class="highlight">Error cycle counting</span> - detecting when a developer persists through multiple error-fix-error cycles before succeeding</li>
+    <li><span class="highlight">Edit precision analysis</span> - detecting "surgical" fixes where 1-2 targeted edits resolve an error</li>
+    <li><span class="highlight">Test-before-edit detection</span> - comparing timestamps of first test run vs first edit to award test-first methodology</li>
+    <li><span class="highlight">Daily streak tracking</span> - comparing session dates across days to maintain consecutive day counts</li>
+    <li><span class="highlight">Goal completion monitoring</span> - checking if all session goals are met for the "All Goals Met" achievement</li>
+  </ul>
+</div>
+
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-num">4</div>
+    <h2>Cross-Session Intelligence</h2>
+  </div>
+  <p>
+    Building on the persisted profile counters to award long-term achievements:
+  </p>
+  <ul>
+    <li><span class="highlight">Test Master tiers</span> - Similar to Bug Slayer (I/II/III), rewarding cumulative test passes at 25/100/500</li>
+    <li><span class="highlight">Centurion</span> - Celebrating the 100th session, a milestone of dedication</li>
+    <li><span class="highlight">Daily streaks</span> - Tracking consecutive days and awarding at 3-day and 7-day milestones</li>
+    <li><span class="highlight">Cumulative session time</span> - Tracking total minutes spent coding with Claude</li>
+  </ul>
+</div>
+
+<div class="phase ai-section">
+  <div class="phase-header">
+    <div class="phase-num" style="background:linear-gradient(135deg,#9c27b0,#e91e63);">AI</div>
+    <h2>AI Session Insights (Sonnet) <span class="tag tag-ai">AI-Powered</span></h2>
+  </div>
+  <p>
+    The headline feature: <span class="highlight">once per day</span>, at session end, the system spawns a
+    <span class="highlight">Claude Sonnet</span> analysis of the session. This provides:
+  </p>
+  <ul>
+    <li><span class="highlight">Session Quality Rating</span> - Exceptional / Productive / Steady / Exploratory / Struggling</li>
+    <li><span class="highlight">Insight Text</span> - 1-2 sentence AI-generated observation about the session's coding patterns</li>
+    <li><span class="highlight">Coding Pattern</span> - Deep-dive / Breadth-first / Iterative / Planning-heavy / Test-driven</li>
+    <li><span class="highlight">XP Bonus</span> - 0-25 bonus XP awarded based on session quality assessment</li>
+  </ul>
+  <p>
+    The insight text and quality rating appear in the <span class="highlight">Session Recap card</span> at session end.
+    Rate-limited to once per calendar day to manage costs. The feature is best-effort - if the analysis
+    fails or times out, the session recap shows normally without AI data.
+  </p>
+</div>
+
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-num">5</div>
+    <h2>Enhanced Session Recap</h2>
+  </div>
+  <p>
+    The session recap card at session end is enriched with new data:
+  </p>
+  <ul>
+    <li><span class="highlight">Files touched</span> - Count of unique files modified during the session</li>
+    <li><span class="highlight">Languages used</span> - List of programming languages detected</li>
+    <li><span class="highlight">AI insight</span> - The Sonnet-generated observation (when available)</li>
+    <li><span class="highlight">Session quality</span> - Visual quality badge from AI analysis</li>
+    <li><span class="highlight">Coding pattern</span> - What kind of work pattern was detected</li>
+    <li><span class="highlight">AI XP bonus</span> - Extra XP awarded by the AI assessment</li>
+  </ul>
+</div>
+
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-num">6</div>
+    <h2>Translations & New Goals</h2>
+  </div>
+  <p>
+    Full Hebrew and English translations for all 18 new achievements, 3 new session goals,
+    and the enhanced recap labels. Updated info modal to reflect 15 levels and AI insights.
+  </p>
+  <p>
+    3 new session goal templates:
+    <span class="highlight">File Hopper</span> (touch 8 files),
+    <span class="highlight">Error Free</span> (3 error-free results),
+    <span class="highlight">Language Sampler</span> (2+ languages).
+  </p>
+</div>
+
+<div class="summary-box">
+  <h2>Summary</h2>
+  <p style="color:#b0b0c0;line-height:1.8;">
+    This enhancement transforms the achievement system from a basic 12-achievement tracker into
+    a comprehensive 30-achievement system with AI-powered insights. The system will track
+    deeper coding patterns (file operations, frontend/backend work, error persistence, daily consistency),
+    offer 15 progression levels, and provide daily AI-generated session analysis via Sonnet.
+    All changes maintain backward compatibility with existing profiles and are fully translated to Hebrew.
+  </p>
+  <div class="stats-row" style="margin-top:16px;">
+    <div class="stat-box">
+      <div class="num">11</div>
+      <div class="label">Files modified</div>
+    </div>
+    <div class="stat-box">
+      <div class="num">1</div>
+      <div class="label">New file created</div>
+    </div>
+    <div class="stat-box">
+      <div class="num">8</div>
+      <div class="label">Implementation phases</div>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
