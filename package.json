@@ -2,7 +2,7 @@
   "name": "claude-code-mirror",
   "displayName": "ClaUi",
   "description": "Rich chat UI for Claude Code - multiple tabs, model selection, file sending, image paste, and more",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "publisher": "JhonBar",
   "icon": "images/icon.png",
   "engines": {
@@ -350,7 +350,11 @@
         "claudeMirror.skillGen.pipelineMode": {
           "type": "string",
           "default": "run_pipeline",
-          "enum": ["run_pipeline", "python_api", "create_skills"],
+          "enum": [
+            "run_pipeline",
+            "python_api",
+            "create_skills"
+          ],
           "enumDescriptions": [
             "run_pipeline.py with resume support (recommended)",
             "Python API - direct module import (most controlled)",
