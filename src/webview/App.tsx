@@ -11,6 +11,8 @@ import { PromptHistoryPanel } from './components/ChatView/PromptHistoryPanel';
 import { AchievementPanel } from './components/Achievements/AchievementPanel';
 import { AchievementToastStack } from './components/Achievements/AchievementToastStack';
 import { SessionRecapCard } from './components/Achievements/SessionRecapCard';
+import { CommunityPanel } from './components/Achievements/CommunityPanel';
+import { ShareCard } from './components/Achievements/ShareCard';
 import { VitalsContainer } from './components/Vitals/VitalsContainer';
 import { AdventureWidget } from './components/Vitals/AdventureWidget';
 import { SessionTimeline } from './components/Vitals/SessionTimeline';
@@ -54,6 +56,7 @@ export const App: React.FC = () => {
     turnHistory,
     dashboardOpen,
     skillGenPanelOpen,
+    communityPanelOpen,
   } = useAppStore();
   const forkInit = useAppStore((s) => s.forkInit);
   const hasMessages = messages.length > 0 || streamingMessageId !== null;
@@ -105,6 +108,8 @@ export const App: React.FC = () => {
       {/* Prompt history panel overlay */}
       {promptHistoryPanelOpen && <PromptHistoryPanel />}
       {achievementsEnabled && achievementPanelOpen && <AchievementPanel />}
+      {achievementsEnabled && communityPanelOpen && <CommunityPanel />}
+      {achievementsEnabled && <ShareCard />}
       {dashboardOpen && <DashboardPanel />}
       {skillGenPanelOpen && <SkillGenPanel />}
 

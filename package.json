@@ -295,9 +295,19 @@
           "default": true,
           "description": "Enable AI-powered session insights at the end of each session (once per day). Uses Claude Sonnet for deeper analysis of your coding patterns."
         },
-        "claudeMirror.skillGen.enabled": {
+        "claudeMirror.achievements.githubSync": {
           "type": "boolean",
           "default": false,
+          "description": "Automatically sync achievements to a public GitHub Gist after each session. Enables the Community feature for sharing and comparing achievements with other developers."
+        },
+        "claudeMirror.srPtdAutoInject": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically inject SR-PTD documentation instructions into the project CLAUDE.md and install the sr-ptd-skill"
+        },
+        "claudeMirror.skillGen.enabled": {
+          "type": "boolean",
+          "default": true,
           "description": "Enable automatic skill generation from SR-PTD documents"
         },
         "claudeMirror.skillGen.threshold": {

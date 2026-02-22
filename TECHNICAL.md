@@ -76,12 +76,14 @@ claude-code-mirror/
 |   |   |   +-- PythonPipelineRunner.ts   #   Python subprocess execution with progress monitoring
 |   |   |   +-- DeduplicationEngine.ts    #   3-tier dedup (traceability, metadata similarity, AI placeholder)
 |   |   |   +-- SkillInstaller.ts         #   Atomic skill installation with backup/rollback
+|   |   |   +-- SrPtdBootstrap.ts         #   Auto-install SR-PTD skill + inject CLAUDE.md instructions
 |   |   +-- achievements/
 |   |   |   +-- AchievementCatalog.ts     #   30 achievement definitions, 7 categories
 |   |   |   +-- AchievementStore.ts       #   Persistence via VS Code globalState (8 counters, 15 levels)
 |   |   |   +-- AchievementEngine.ts      #   Game logic (files, languages, error cycles, goals)
-|   |   |   +-- AchievementService.ts     #   Lifecycle bridge, streaks, tiers, AI insight wiring
+|   |   |   +-- AchievementService.ts     #   Lifecycle bridge, streaks, tiers, AI insight wiring, GitHub auto-sync
 |   |   |   +-- AchievementInsightAnalyzer.ts #  Sonnet CLI spawn for session analysis (once/day)
+|   |   |   +-- GitHubSyncService.ts     #   GitHub auth, Gist CRUD, friend lookup, badge generation, 15min cache
 |   |   +-- types/
 |   |       +-- stream-json.ts            #   CLI protocol type definitions
 |   |       +-- webview-messages.ts       #   postMessage contract
@@ -125,10 +127,13 @@ claude-code-mirror/
 |       |   |       +-- dungeon.ts       #     Maze class: generation, BFS, wall rendering, camera
 |       |   |       +-- AdventureEngine.ts #   State machine, animation loop, renderer
 |       |   +-- Achievements/
-|       |   |   +-- AchievementPanel.tsx    #   Panel overlay (level, XP, goals, settings, info modal)
+|       |   |   +-- AchievementPanel.tsx    #   Panel overlay (level, XP, goals, settings, Community + Share buttons)
+|       |   |   +-- CommunityPanel.tsx      #   GitHub sync, friends list, side-by-side comparison
+|       |   |   +-- ShareCard.tsx           #   Profile preview modal, copy markdown/shields badge
 |       |   |   +-- AchievementToastStack.tsx #  Toast notifications for earned achievements
 |       |   |   +-- SessionRecapCard.tsx     #   End-of-session summary card
-|       |   |   +-- achievementI18n.ts       #   i18n translations (EN/HE) for all achievement UI
+|       |   |   +-- achievementI18n.ts       #   i18n translations (EN/HE) for all achievement + community UI
+|       |   |   +-- levelThresholds.ts       #   XP level thresholds (shared with webview)
 |       |   +-- SkillGen/
 |       |   |   +-- SkillGenPanel.tsx     #   Full overlay panel (toggle, progress, history, actions)
 |       |   |   +-- index.ts             #   Barrel export
@@ -158,6 +163,14 @@ claude-code-mirror/
 |           +-- global.css                #   VS Code theme variables
 |           +-- markdown.css              #   Markdown element styles (headers, lists, tables, etc.)
 |           +-- rtl.css                   #   RTL-specific overrides (includes Markdown RTL rules)
++-- sr-ptd-skill/                         # Bundled SR-PTD skill (installed to ~/.claude/skills/)
+|   +-- SKILL.md                          #   Main skill instructions (949 lines)
+|   +-- CLAUDE_MD_INSTRUCTIONS.md         #   Template for CLAUDE.md injection
+|   +-- assets/
+|   |   +-- full-template.md              #   Full SR-PTD template (Sections A-J)
+|   |   +-- quick-template.md             #   Quick capture template
+|   +-- references/
+|       +-- example-completed.md          #   Worked example
 +-- Kingdom_of_Claudes_Beloved_MDs/       # Detailed component documentation
     +-- ARCHITECTURE.md                   #   Data flow and component interaction
     +-- ACTIVITY_SUMMARIZER.md            #   Periodic activity summary via Haiku
@@ -266,7 +279,7 @@ claude-code-mirror/
 **Adventure Widget** - Pixel-art dungeon crawler that visualizes session activity as a thin-wall maze grid. Each CLI turn extends the maze and maps to an encounter: scrolls (Read), anvils (Edit), traps (errors), dragons (3+ errors), treasure (recovery). Canvas 2D engine with 4x4 mini sprites on a 40x40 cell maze, PICO-8 palette, BFS pathfinding, state machine (IDLE/WALKING/ENCOUNTER/RESOLUTION). Extension-side `AdventureInterpreter` converts `TurnRecord` to `AdventureBeat` via deterministic rules. Toggleable separately from main vitals.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ADVENTURE_WIDGET.md`
 
-**Achievements / Trophy** - Gamification system that awards badges for coding milestones. Features: 30 achievements across 7 categories (debugging, testing, refactor, collaboration, session, architecture, productivity), 4 rarities, XP-based leveling (15 tiers), per-session goals (7 templates), daily streaks, file/language tracking, frontend/backend classification, error cycle detection, toast notifications with optional sound, session recap card with AI insights, and full i18n (EN+HE). AI Session Insight: spawns Sonnet CLI once per day at session end for deeper analysis (quality, pattern, XP bonus). Backend: `AchievementEngine`, `AchievementCatalog`, `AchievementStore`, `AchievementService`, `AchievementInsightAnalyzer`. Frontend: `AchievementPanel`, `AchievementToastStack`, `SessionRecapCard`, `achievementI18n.ts`.
+**Achievements / Trophy** - Gamification system that awards badges for coding milestones. Features: 30 achievements across 7 categories (debugging, testing, refactor, collaboration, session, architecture, productivity), 4 rarities, XP-based leveling (15 tiers), per-session goals (7 templates), daily streaks, file/language tracking, frontend/backend classification, error cycle detection, toast notifications with optional sound, session recap card with AI insights, and full i18n (EN+HE). AI Session Insight: spawns Sonnet CLI once per day at session end for deeper analysis (quality, pattern, XP bonus). **Community / GitHub Sync**: Publish achievements to a public GitHub Gist, discover and compare with other developers via friend lookup, generate shields.io dynamic badges and markdown profile cards for GitHub README. Backend: `AchievementEngine`, `AchievementCatalog`, `AchievementStore`, `AchievementService`, `AchievementInsightAnalyzer`, `GitHubSyncService`. Frontend: `AchievementPanel`, `CommunityPanel`, `ShareCard`, `AchievementToastStack`, `SessionRecapCard`, `achievementI18n.ts`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ACHIEVEMENTS.md`
 
 **Analytics Dashboard** - Full-screen overlay with two modes: **Session** (6 tabs: Overview, Tokens, Tools, Timeline, Commands, Context) and **Project** (4 tabs: Overview, Sessions, Tokens, Tools). Session mode shows current-session analytics from Zustand `turnHistory`. Project mode aggregates `SessionSummary` records across all past sessions in the workspace, persisted in `ProjectAnalyticsStore` (VS Code `workspaceState`, survives restarts). A pill toggle in the header switches modes. Session summaries are auto-saved from ALL exit paths (normal exit, crash, tab close, VS Code close, session clear, edit-and-resend) via `flushTurnRecords()` + `analyticsSaved` guard to prevent data loss and double-save. Project data is loaded on demand.
@@ -276,6 +289,9 @@ claude-code-mirror/
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ANALYTICS_DASHBOARD.md`
 
 **Auto Skill Generation** - Automatically generates Claude skills from accumulated SR-PTD documentation files. Scans a configurable docs directory, maintains a persistent document ledger (fingerprint-based change detection), and triggers a Python skill-generation pipeline when the pending document count reaches a configurable threshold. Features 3-tier deduplication (traceability fingerprint, metadata similarity via trigram matching, AI placeholder), atomic skill installation with backup/rollback, cross-process locking, and a full webview panel with progress bar, history table, and Generate Now/Cancel controls. Status bar indicator shows pending/threshold count with pulse animation when threshold is reached. Backend: `SkillGenStore`, `SkillGenService`, `PythonPipelineRunner`, `DeduplicationEngine`, `SkillInstaller`. Frontend: `SkillGenPanel`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/SKILL_GENERATION.md`
+
+**SR-PTD Bootstrap** - On activation, automatically installs the bundled SR-PTD skill to `~/.claude/skills/sr-ptd-skill/` and injects post-task documentation instructions into the project-level `CLAUDE.md`. Skill files are only overwritten when the bundled version changes (size comparison). CLAUDE.md injection uses marker-based duplicate detection (`MANDATORY: Post-Task Documentation (SR-PTD)`). The docs save path in the template uses the configured `claudeMirror.skillGen.docsDirectory` value. Enabled by default, can be disabled via `claudeMirror.srPtdAutoInject`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SKILL_GENERATION.md`
 
 **Prompt Enhancer** - AI-powered prompt rewriting that improves user prompts before sending. Uses a one-shot `claude -p` CLI call with a meta-prompt applying advanced prompt engineering (scaffolding, structure, context cues). Manual mode: sparkles button or Ctrl+Shift+E opens a comparison panel showing original and enhanced prompts stacked vertically for side-by-side review. Auto mode: intercepts Send, enhances, then auto-sends (falls back to original on failure). Gear popover with auto-enhance toggle and model selector. Configurable via `claudeMirror.promptEnhancer.*` settings.
@@ -317,7 +333,8 @@ claude-code-mirror/
 | `claudeMirror.gitPush.enabled` | `true` | Whether git push is configured and ready to use via the Git button |
 | `claudeMirror.gitPush.scriptPath` | `"scripts/git-push.ps1"` | Path to the git push script (relative to workspace root) |
 | `claudeMirror.gitPush.commitMessageTemplate` | `"{sessionName}"` | Commit message template ({sessionName} = tab name) |
-| `claudeMirror.skillGen.enabled` | `false` | Enable auto skill generation feature |
+| `claudeMirror.srPtdAutoInject` | `true` | Automatically inject SR-PTD instructions into project CLAUDE.md and install sr-ptd-skill |
+| `claudeMirror.skillGen.enabled` | `true` | Enable auto skill generation feature (toggleable via gear icon in UI) |
 | `claudeMirror.skillGen.threshold` | `5` | Number of new SR-PTD docs to trigger generation (1-50) |
 | `claudeMirror.skillGen.docsDirectory` | `"C:\\projects\\Skills\\Dev_doc_for_skills"` | Directory containing SR-PTD documents |
 | `claudeMirror.skillGen.docsPattern` | `"SR-PTD_*.md"` | Glob pattern for SR-PTD files |

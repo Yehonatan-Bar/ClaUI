@@ -10,6 +10,7 @@ import { getAchievementDefinition } from './AchievementCatalog';
 import { AchievementEngine, type AchievementAward } from './AchievementEngine';
 import { AchievementStore, levelFromXp, type AchievementProfile } from './AchievementStore';
 import type { AchievementInsightAnalyzer } from './AchievementInsightAnalyzer';
+import type { GitHubSyncService, ShareableProfile } from './GitHubSyncService';
 
 type WebviewSender = (msg: ExtensionToWebviewMessage) => void;
 
@@ -36,6 +37,7 @@ export class AchievementService {
   private readonly sessionXp = new Map<string, number>();
   private readonly lastCrashAt = new Map<string, number>();
   private insightAnalyzer: AchievementInsightAnalyzer | null = null;
+  private syncService: GitHubSyncService | null = null;
 
   constructor(globalState: vscode.Memento, private readonly log: (msg: string) => void) {
     this.store = new AchievementStore(globalState);
@@ -44,6 +46,37 @@ export class AchievementService {
 
   setInsightAnalyzer(analyzer: AchievementInsightAnalyzer): void {
     this.insightAnalyzer = analyzer;
+  }
+
+  setSyncService(service: GitHubSyncService): void {
+    this.syncService = service;
+  }
+
+  getSyncService(): GitHubSyncService | null {
+    return this.syncService;
+  }
+
+  /** Build a ShareableProfile from the current achievement state */
+  getCurrentProfile(): ShareableProfile | null {
+    if (!this.syncService?.isConnected()) return null;
+    return {
+      version: 1,
+      username: this.syncService.getUsername(),
+      displayName: this.syncService.getDisplayName(),
+      avatarUrl: this.syncService.getAvatarUrl(),
+      lastUpdated: new Date().toISOString(),
+      totalXp: this.profile.totalXp,
+      level: this.profile.level,
+      unlockedIds: [...this.profile.unlockedIds],
+      stats: {
+        sessionsCompleted: this.profile.counters.sessionsCompleted,
+        totalSessionMinutes: this.profile.counters.totalSessionMinutes,
+        bugFixes: this.profile.counters.bugFixes,
+        testPasses: this.profile.counters.testPasses,
+        consecutiveDays: this.profile.counters.consecutiveDays,
+        totalEdits: this.profile.counters.totalEdits,
+      },
+    };
   }
 
   registerTab(tabId: string, sender: WebviewSender): void {
@@ -228,6 +261,12 @@ export class AchievementService {
       this.sessionAwards.delete(tabId);
       this.sessionXp.delete(tabId);
       this.broadcastSnapshots();
+
+      // Auto-sync to GitHub (silent, best-effort)
+      const shareableProfile = this.getCurrentProfile();
+      if (shareableProfile && this.syncService) {
+        this.syncService.syncIfNeeded(shareableProfile).catch(() => {});
+      }
     });
   }
 

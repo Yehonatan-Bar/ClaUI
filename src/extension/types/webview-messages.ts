@@ -244,6 +244,36 @@ export interface GetSkillGenStatusRequest {
   type: 'getSkillGenStatus';
 }
 
+// --- GitHub Sync (Webview -> Extension) ---
+
+export interface GitHubSyncRequest {
+  type: 'githubSync';
+  action: 'connect' | 'publish' | 'disconnect';
+}
+
+export interface AddFriendRequest {
+  type: 'addFriend';
+  username: string;
+}
+
+export interface RemoveFriendRequest {
+  type: 'removeFriend';
+  username: string;
+}
+
+export interface RefreshFriendsRequest {
+  type: 'refreshFriends';
+}
+
+export interface GetCommunityDataRequest {
+  type: 'getCommunityData';
+}
+
+export interface CopyShareCardRequest {
+  type: 'copyShareCard';
+  format: 'markdown' | 'shields-badge';
+}
+
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
@@ -289,7 +319,13 @@ export type WebviewToExtensionMessage =
   | SetSkillGenEnabledRequest
   | SkillGenTriggerRequest
   | SkillGenCancelRequest
-  | GetSkillGenStatusRequest;
+  | GetSkillGenStatusRequest
+  | GitHubSyncRequest
+  | AddFriendRequest
+  | RemoveFriendRequest
+  | RefreshFriendsRequest
+  | GetCommunityDataRequest
+  | CopyShareCardRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -765,6 +801,56 @@ export interface SkillGenCompleteMessage {
   error?: string;
 }
 
+// --- GitHub Sync (Extension -> Webview) ---
+
+export interface CommunityFriendProfilePayload {
+  username: string;
+  displayName: string;
+  avatarUrl: string;
+  totalXp: number;
+  level: number;
+  unlockedIds: string[];
+  stats: {
+    sessionsCompleted: number;
+    totalSessionMinutes: number;
+    bugFixes: number;
+    testPasses: number;
+    consecutiveDays: number;
+    totalEdits: number;
+  };
+  lastUpdated: string;
+}
+
+export interface GitHubSyncStatusMessage {
+  type: 'githubSyncStatus';
+  connected: boolean;
+  username: string;
+  gistId: string;
+  gistUrl: string;
+  lastSyncedAt: string;
+  syncEnabled: boolean;
+}
+
+export interface CommunityDataMessage {
+  type: 'communityData';
+  friends: CommunityFriendProfilePayload[];
+}
+
+export interface FriendActionResultMessage {
+  type: 'friendActionResult';
+  action: 'add' | 'remove' | 'refresh';
+  username: string;
+  success: boolean;
+  error?: string;
+  profile?: CommunityFriendProfilePayload;
+}
+
+export interface ShareCardCopiedMessage {
+  type: 'shareCardCopied';
+  success: boolean;
+  format: 'markdown' | 'shields-badge';
+}
+
 /** Serializable chat message for passing between webview instances (e.g. fork) */
 export interface SerializedChatMessage {
   id: string;
@@ -821,4 +907,8 @@ export type ExtensionToWebviewMessage =
   | SkillGenSettingsMessage
   | SkillGenStatusMessage
   | SkillGenProgressMessage
-  | SkillGenCompleteMessage;
+  | SkillGenCompleteMessage
+  | GitHubSyncStatusMessage
+  | CommunityDataMessage
+  | FriendActionResultMessage
+  | ShareCardCopiedMessage;

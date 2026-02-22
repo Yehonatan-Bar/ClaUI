@@ -13,6 +13,17 @@ Automatically generates Claude skills from accumulated SR-PTD (post-task documen
 | `src/extension/skillgen/PythonPipelineRunner.ts` | Python subprocess execution with progress monitoring |
 | `src/extension/skillgen/DeduplicationEngine.ts` | 3-tier deduplication engine |
 | `src/extension/skillgen/SkillInstaller.ts` | Atomic skill installation with backup/rollback |
+| `src/extension/skillgen/SrPtdBootstrap.ts` | Auto-install SR-PTD skill + inject CLAUDE.md instructions |
+
+### Bundled Skill Files
+
+| File | Purpose |
+|------|---------|
+| `sr-ptd-skill/SKILL.md` | Main skill instructions (949 lines) |
+| `sr-ptd-skill/CLAUDE_MD_INSTRUCTIONS.md` | Template for CLAUDE.md injection |
+| `sr-ptd-skill/assets/full-template.md` | Full SR-PTD template (Sections A-J) |
+| `sr-ptd-skill/assets/quick-template.md` | Quick capture template |
+| `sr-ptd-skill/references/example-completed.md` | Worked example |
 
 ### Webview (React)
 
@@ -162,6 +173,10 @@ A button in the status bar showing `Skills N/T` where N = pending docs, T = thre
 - `.threshold-reached` - Pulse animation when N >= T
 - `.running` - Visual indicator during pipeline execution
 
+### Settings Gear Toggle
+
+The Vitals settings panel (gear icon next to the "Vitals" button) includes a "Skill Generation" toggle. This allows enabling/disabling SkillGen directly from the UI without opening VS Code settings. The toggle sends `setSkillGenEnabled` to the extension, which updates `claudeMirror.skillGen.enabled`.
+
 ### SkillGenPanel
 
 Full overlay panel (same pattern as AchievementPanel and DashboardPanel):
@@ -203,7 +218,7 @@ All settings under `claudeMirror.skillGen.*` in `package.json`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `enabled` | `false` | Enable the feature |
+| `enabled` | `true` | Enable the feature |
 | `threshold` | `5` | Pending docs count to trigger generation |
 | `docsDirectory` | `"C:\\projects\\Skills\\Dev_doc_for_skills"` | SR-PTD documents directory |
 | `docsPattern` | `"SR-PTD_*.md"` | Glob pattern for document files |
@@ -215,3 +230,34 @@ All settings under `claudeMirror.skillGen.*` in `package.json`:
 | `autoRun` | `true` | Auto-trigger on threshold |
 | `timeoutMs` | `300000` | Pipeline timeout (5 min) |
 | `aiDeduplication` | `false` | Enable AI dedup (Tier 3) |
+
+**Additional setting:**
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `claudeMirror.srPtdAutoInject` | `true` | Auto-install SR-PTD skill and inject instructions into project CLAUDE.md |
+
+---
+
+## SR-PTD Bootstrap
+
+On extension activation, `SrPtdBootstrap.ts` performs two automatic actions:
+
+### 1. Skill Installation
+
+Copies the bundled `sr-ptd-skill/` directory to `~/.claude/skills/sr-ptd-skill/`. This makes the SR-PTD skill available to Claude Code CLI in any project.
+
+- Skips if target `SKILL.md` already exists with the same file size
+- Overwrites if the bundled version has changed (size differs)
+- Creates all directories as needed
+- Errors are logged but never surfaced to the user
+
+### 2. CLAUDE.md Injection
+
+Appends SR-PTD documentation instructions to the project-level `CLAUDE.md` (workspace root).
+
+- Marker-based duplicate detection: checks for `MANDATORY: Post-Task Documentation (SR-PTD)`
+- If marker not found: appends the instruction block (or creates the file)
+- The docs save path uses the configured `claudeMirror.skillGen.docsDirectory` value
+- Follows the same pattern as the Plans feature injection in `commands.ts`
+- Gated by `claudeMirror.srPtdAutoInject` setting (default: `true`)

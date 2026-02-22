@@ -18,6 +18,19 @@ const tooltipStyle = {
   fontSize: '12px',
 };
 
+const tooltipCursor = {
+  fill: 'rgba(88, 166, 255, 0.08)',
+  stroke: 'rgba(88, 166, 255, 0.20)',
+};
+
+const tooltipLabelStyle = {
+  color: DASH_COLORS.text,
+};
+
+const tooltipItemStyle = {
+  color: DASH_COLORS.textMuted,
+};
+
 // --- 1. CostAreaChart ---
 interface CostAreaChartProps {
   turnHistory: TurnRecord[];
@@ -38,7 +51,13 @@ export const CostAreaChart: React.FC<CostAreaChartProps> = ({ turnHistory }) => 
         <CartesianGrid strokeDasharray="3 3" stroke={DASH_COLORS.border} />
         <XAxis dataKey="turn" stroke={DASH_COLORS.textMuted} tick={{ fontSize: 11 }} />
         <YAxis stroke={DASH_COLORS.textMuted} tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v.toFixed(3)}`} />
-        <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => formatCost(Number(v ?? 0))} />
+        <Tooltip
+          contentStyle={tooltipStyle}
+          cursor={tooltipCursor}
+          labelStyle={tooltipLabelStyle}
+          itemStyle={tooltipItemStyle}
+          formatter={(v: any) => formatCost(Number(v ?? 0))}
+        />
         <Area type="monotone" dataKey="cumulative" fill={DASH_COLORS.blue} fillOpacity={0.15} stroke={DASH_COLORS.blue} name="Cumulative" />
         <Bar dataKey="cost" fill={DASH_COLORS.green} fillOpacity={0.7} name="Per Turn" />
       </ComposedChart>
@@ -68,7 +87,12 @@ export const TokenStackedBar: React.FC<TokenStackedBarProps> = ({ turnHistory })
         <CartesianGrid strokeDasharray="3 3" stroke={DASH_COLORS.border} />
         <XAxis dataKey="turn" stroke={DASH_COLORS.textMuted} tick={{ fontSize: 11 }} />
         <YAxis stroke={DASH_COLORS.textMuted} tick={{ fontSize: 11 }} />
-        <Tooltip contentStyle={tooltipStyle} />
+        <Tooltip
+          contentStyle={tooltipStyle}
+          cursor={tooltipCursor}
+          labelStyle={tooltipLabelStyle}
+          itemStyle={tooltipItemStyle}
+        />
         <Legend />
         <Bar dataKey="input" stackId="a" fill={TOKEN_COLORS.input} name="Input" />
         <Bar dataKey="output" stackId="a" fill={TOKEN_COLORS.output} name="Output" />
@@ -99,7 +123,13 @@ export const DurationBar: React.FC<DurationBarProps> = ({ turnHistory }) => {
         <CartesianGrid strokeDasharray="3 3" stroke={DASH_COLORS.border} />
         <XAxis dataKey="turn" stroke={DASH_COLORS.textMuted} tick={{ fontSize: 11 }} />
         <YAxis stroke={DASH_COLORS.textMuted} tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}s`} />
-        <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => formatDuration(Number(v ?? 0) * 1000)} />
+        <Tooltip
+          contentStyle={tooltipStyle}
+          cursor={tooltipCursor}
+          labelStyle={tooltipLabelStyle}
+          itemStyle={tooltipItemStyle}
+          formatter={(v: any) => formatDuration(Number(v ?? 0) * 1000)}
+        />
         <Bar dataKey="duration" name="Duration">
           {data.map((entry, idx) => (
             <Cell key={idx} fill={CATEGORY_COLORS[entry.category as TurnCategory] || DASH_COLORS.textMuted} />
@@ -136,7 +166,12 @@ export const ToolFrequencyBar: React.FC<ToolFrequencyBarProps> = ({ turnHistory 
         <CartesianGrid strokeDasharray="3 3" stroke={DASH_COLORS.border} />
         <XAxis type="number" stroke={DASH_COLORS.textMuted} tick={{ fontSize: 11 }} />
         <YAxis dataKey="name" type="category" width={120} stroke={DASH_COLORS.textMuted} tick={{ fontSize: 11 }} />
-        <Tooltip contentStyle={tooltipStyle} />
+        <Tooltip
+          contentStyle={tooltipStyle}
+          cursor={tooltipCursor}
+          labelStyle={tooltipLabelStyle}
+          itemStyle={tooltipItemStyle}
+        />
         <Bar dataKey="count" fill={DASH_COLORS.purple} name="Uses" />
       </BarChart>
     </ResponsiveContainer>
@@ -175,7 +210,11 @@ export const CategoryDonut: React.FC<CategoryDonutProps> = ({ turnHistory }) => 
             <Cell key={entry.name} fill={CATEGORY_COLORS[entry.name as TurnCategory] || DASH_COLORS.textMuted} />
           ))}
         </Pie>
-        <Tooltip contentStyle={tooltipStyle} />
+        <Tooltip
+          contentStyle={tooltipStyle}
+          labelStyle={tooltipLabelStyle}
+          itemStyle={tooltipItemStyle}
+        />
       </PieChart>
     </ResponsiveContainer>
   );
@@ -234,7 +273,11 @@ export const TaskTypeDonut: React.FC<TaskTypeDonutProps> = ({ turnHistory }) => 
             <Cell key={entry.name} fill={TASK_TYPE_COLORS[entry.name] || DASH_COLORS.textMuted} />
           ))}
         </Pie>
-        <Tooltip contentStyle={tooltipStyle} />
+        <Tooltip
+          contentStyle={tooltipStyle}
+          labelStyle={tooltipLabelStyle}
+          itemStyle={tooltipItemStyle}
+        />
       </PieChart>
     </ResponsiveContainer>
   );
@@ -276,7 +319,12 @@ export const OutcomeBar: React.FC<OutcomeBarProps> = ({ turnHistory }) => {
         <CartesianGrid strokeDasharray="3 3" stroke={DASH_COLORS.border} />
         <XAxis dataKey="name" stroke={DASH_COLORS.textMuted} tick={{ fontSize: 11 }} />
         <YAxis stroke={DASH_COLORS.textMuted} tick={{ fontSize: 11 }} />
-        <Tooltip contentStyle={tooltipStyle} />
+        <Tooltip
+          contentStyle={tooltipStyle}
+          cursor={tooltipCursor}
+          labelStyle={tooltipLabelStyle}
+          itemStyle={tooltipItemStyle}
+        />
         <Bar dataKey="value" name="Count">
           {barData.map((entry) => (
             <Cell key={entry.name} fill={OUTCOME_COLORS[entry.name] || DASH_COLORS.textMuted} />

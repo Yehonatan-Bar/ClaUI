@@ -121,6 +121,9 @@ export class MessageHandler {
   private planModeActive = false;
   /** Safety counter: consecutive auto-approvals of stale ExitPlanMode. Prevents infinite loops. */
   private staleExitPlanModeAutoApproveCount = 0;
+  /** Counter for auto-approvals via the user-approved path (autoApproveExitPlanMode flag).
+   *  Hard limit prevents infinite loops even when the user approved ExitPlanMode. */
+  private exitPlanModeAutoApproveCount = 0;
 
   /** Activity summarizer: periodically summarizes tool activity via Haiku */
   private activitySummarizer: ActivitySummarizer | null = null;
@@ -281,6 +284,8 @@ export class MessageHandler {
           // If there was a pending approval, the user's message implicitly responds to it
           this.clearApprovalTracking();
           this.autoApproveExitPlanMode = false;
+          this.exitPlanModeAutoApproveCount = 0;
+          this.staleExitPlanModeAutoApproveCount = 0;
           this.achievementService.onUserPrompt(this.tabId, msg.text);
           this.control.sendText(msg.text);
           this.webview.postMessage({ type: 'processBusy', busy: true });
@@ -294,6 +299,8 @@ export class MessageHandler {
           // If there was a pending approval, the user's message implicitly responds to it
           this.clearApprovalTracking();
           this.autoApproveExitPlanMode = false;
+          this.exitPlanModeAutoApproveCount = 0;
+          this.staleExitPlanModeAutoApproveCount = 0;
           if (msg.text.trim()) {
             this.achievementService.onUserPrompt(this.tabId, msg.text);
           }
@@ -574,8 +581,9 @@ export class MessageHandler {
 
         case 'planApprovalResponse':
           this.log(`Plan approval response: action=${msg.action} toolName=${msg.toolName || '(none)'} pendingTool=${this.pendingApprovalTool || '(none)'}`);
-          // User manually responded - reset the stale auto-approve counter
+          // User manually responded - reset all auto-approve counters
           this.staleExitPlanModeAutoApproveCount = 0;
+          this.exitPlanModeAutoApproveCount = 0;
           {
           // Use msg.toolName from webview as primary source - it's reliable because
           // the webview stores it when the approval bar is shown. Fall back to
@@ -650,6 +658,8 @@ export class MessageHandler {
           this.webview.saveProjectAnalyticsNow?.();
           this.clearApprovalTracking();
           this.autoApproveExitPlanMode = false;
+          this.exitPlanModeAutoApproveCount = 0;
+          this.staleExitPlanModeAutoApproveCount = 0;
           this.firstMessageSent = false;
           this.activitySummarizer?.reset();
           this.turnRecords = [];
@@ -737,6 +747,116 @@ export class MessageHandler {
           this.webview.postMessage(this.achievementService.buildSettingsMessage());
           this.webview.postMessage(this.achievementService.buildSnapshotMessage(this.tabId));
           break;
+
+        case 'githubSync': {
+          const syncService = this.achievementService.getSyncService();
+          if (!syncService) break;
+          if (msg.action === 'connect') {
+            void syncService.connect().then((result) => {
+              if (result.success) {
+                this.sendGitHubSyncStatus();
+              } else {
+                this.webview.postMessage({
+                  type: 'friendActionResult',
+                  action: 'add',
+                  username: '',
+                  success: false,
+                  error: result.error || 'Connection failed',
+                });
+              }
+              this.sendGitHubSyncStatus();
+            });
+          } else if (msg.action === 'publish') {
+            const profile = this.achievementService.getCurrentProfile();
+            if (profile) {
+              void syncService.publish(profile).then(() => {
+                this.sendGitHubSyncStatus();
+              });
+            }
+          } else if (msg.action === 'disconnect') {
+            void syncService.disconnect().then(() => {
+              this.sendGitHubSyncStatus();
+            });
+          }
+          break;
+        }
+
+        case 'addFriend': {
+          const syncSvc = this.achievementService.getSyncService();
+          if (!syncSvc) break;
+          void syncSvc.addFriend(msg.username).then((result) => {
+            this.webview.postMessage({
+              type: 'friendActionResult',
+              action: 'add',
+              username: msg.username,
+              success: result.success,
+              error: result.error,
+              profile: result.profile ? {
+                username: result.profile.username,
+                displayName: result.profile.displayName,
+                avatarUrl: result.profile.avatarUrl,
+                totalXp: result.profile.totalXp,
+                level: result.profile.level,
+                unlockedIds: result.profile.unlockedIds,
+                stats: result.profile.stats,
+                lastUpdated: result.profile.lastUpdated,
+              } : undefined,
+            });
+            this.sendCommunityData();
+          });
+          break;
+        }
+
+        case 'removeFriend': {
+          const syncSvc2 = this.achievementService.getSyncService();
+          if (!syncSvc2) break;
+          void syncSvc2.removeFriend(msg.username).then(() => {
+            this.webview.postMessage({
+              type: 'friendActionResult',
+              action: 'remove',
+              username: msg.username,
+              success: true,
+            });
+            this.sendCommunityData();
+          });
+          break;
+        }
+
+        case 'refreshFriends': {
+          const syncSvc3 = this.achievementService.getSyncService();
+          if (!syncSvc3) break;
+          void syncSvc3.refreshFriends().then(() => {
+            this.sendCommunityData();
+          });
+          break;
+        }
+
+        case 'getCommunityData':
+          this.sendGitHubSyncStatus();
+          this.sendCommunityData();
+          break;
+
+        case 'copyShareCard': {
+          const syncSvc4 = this.achievementService.getSyncService();
+          if (!syncSvc4) break;
+          let text = '';
+          if (msg.format === 'shields-badge') {
+            text = syncSvc4.generateShieldsBadges();
+          } else {
+            const profile = this.achievementService.getCurrentProfile();
+            if (profile) {
+              text = syncSvc4.generateProfileCard(profile);
+            }
+          }
+          if (text) {
+            void vscode.env.clipboard.writeText(text).then(() => {
+              this.webview.postMessage({ type: 'shareCardCopied', success: true, format: msg.format });
+            });
+          } else {
+            this.webview.postMessage({ type: 'shareCardCopied', success: false, format: msg.format });
+          }
+          break;
+        }
 
         case 'getProjectAnalytics':
           if (this.projectAnalyticsStore) {
@@ -826,6 +946,8 @@ export class MessageHandler {
           // Send achievement settings/snapshot
           this.webview.postMessage(this.achievementService.buildSettingsMessage());
           this.webview.postMessage(this.achievementService.buildSnapshotMessage(this.tabId));
+          // Send GitHub sync status
+          this.sendGitHubSyncStatus();
           // If process is already running, tell the webview
           if (this.processManager.isRunning && this.processManager.currentSessionId) {
             this.log('Sending existing session info to webview');
@@ -1065,7 +1187,7 @@ export class MessageHandler {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     this.webview.postMessage({
       type: 'skillGenSettings',
-      enabled: config.get<boolean>('skillGen.enabled', false),
+      enabled: config.get<boolean>('skillGen.enabled', true),
       threshold: config.get<number>('skillGen.threshold', 30),
       docsDirectory: config.get<string>('skillGen.docsDirectory', ''),
       autoRun: config.get<boolean>('skillGen.autoRun', false),
@@ -1077,6 +1199,49 @@ export class MessageHandler {
     if (this.skillGenService) {
       this.webview.postMessage(this.skillGenService.getStatus());
     }
+  }
+
+  /** Send current GitHub sync status to webview */
+  private sendGitHubSyncStatus(): void {
+    const syncService = this.achievementService.getSyncService();
+    if (!syncService) {
+      this.webview.postMessage({
+        type: 'githubSyncStatus',
+        connected: false,
+        username: '',
+        gistId: '',
+        gistUrl: '',
+        lastSyncedAt: '',
+        syncEnabled: false,
+      });
+      return;
+    }
+    const status = syncService.getStatus();
+    this.webview.postMessage({ type: 'githubSyncStatus', ...status });
+  }
+
+  /** Send community friends data to webview */
+  private sendCommunityData(): void {
+    const syncService = this.achievementService.getSyncService();
+    if (!syncService) {
+      this.webview.postMessage({ type: 'communityData', friends: [] });
+      return;
+    }
+    void syncService.getCommunityFriends().then((friends) => {
+      this.webview.postMessage({
+        type: 'communityData',
+        friends: friends.map((f) => ({
+          username: f.username,
+          displayName: f.displayName,
+          avatarUrl: f.avatarUrl,
+          totalXp: f.totalXp,
+          level: f.level,
+          unlockedIds: f.unlockedIds,
+          stats: f.stats,
+          lastUpdated: f.lastUpdated,
+        })),
+      });
+    });
   }
 
   /** Read translation language setting from VS Code config and send to webview */
@@ -1193,6 +1358,9 @@ export class MessageHandler {
         e.affectsConfiguration('claudeMirror.achievements.aiInsight')
       ) {
         this.achievementService.onConfigChanged();
+      }
+      if (e.affectsConfiguration('claudeMirror.achievements.githubSync')) {
+        this.sendGitHubSyncStatus();
       }
     });
   }
@@ -1426,7 +1594,11 @@ export class MessageHandler {
           this.pendingApprovalTool = savedApprovalTool;
           this.log(`Preserved pendingApprovalTool=${savedApprovalTool} across result event`);
         }
-        this.autoApproveExitPlanMode = false;
+        // NOTE: Do NOT reset autoApproveExitPlanMode here. The result event fires
+        // after each CLI turn completes. If the user approved ExitPlanMode, that
+        // approval should persist across turns so subsequent ExitPlanMode calls
+        // (e.g. model re-enters plan mode) are auto-approved. The flag is reset
+        // when the user sends a new message (sendMessage handler) or on editAndResend.
         if (event.subtype === 'success') {
           this.achievementService.onResult(this.tabId, true);
           const success = event as ResultSuccess;
@@ -1633,27 +1805,35 @@ export class MessageHandler {
       return;
     }
     // Auto-approve subsequent ExitPlanMode calls after user already approved one
-    // in this turn. This prevents repeated approval prompts when Claude re-enters
-    // plan mode during implementation.
+    // in this session. This prevents repeated approval prompts when Claude re-enters
+    // plan mode during implementation. Hard limit prevents infinite loops.
     const norm = toolName.trim().toLowerCase();
     const isExitPlanMode = norm === 'exitplanmode' || norm.endsWith('.exitplanmode');
     if (isExitPlanMode && this.autoApproveExitPlanMode) {
-      this.log(`Auto-approving subsequent ExitPlanMode (user already approved in this turn)`);
-      this.approvalResponseProcessed = true; // suppress fallback events for this message
-      this.control.sendText('Yes, proceed with the plan.');
-      return;
+      this.exitPlanModeAutoApproveCount++;
+      if (this.exitPlanModeAutoApproveCount > 5) {
+        this.log(`WARNING: ${this.exitPlanModeAutoApproveCount} auto-approvals of ExitPlanMode via user-approved path - disabling auto-approve, showing bar`);
+        this.autoApproveExitPlanMode = false;
+        // Fall through to show the approval bar so the user can break the loop
+      } else {
+        this.log(`Auto-approving subsequent ExitPlanMode #${this.exitPlanModeAutoApproveCount} (user already approved)`);
+        this.approvalResponseProcessed = true; // suppress fallback events for this message
+        this.control.sendText('Yes, proceed with the plan.');
+        return;
+      }
     }
     // Auto-approve stale ExitPlanMode after context compaction: if EnterPlanMode
     // was never called in this session, ExitPlanMode is a stale artifact from
     // compacted context. Auto-approve to prevent the user from getting stuck.
     // Safety valve: after 3 consecutive auto-approvals, show the bar to the user
     // to prevent infinite loops where the model keeps calling ExitPlanMode.
+    // NOTE: Counter is NOT reset after showing the bar - once exceeded, always show bar.
     if (isExitPlanMode && !this.planModeActive) {
       this.staleExitPlanModeAutoApproveCount++;
       if (this.staleExitPlanModeAutoApproveCount > 3) {
-        this.log(`WARNING: ${this.staleExitPlanModeAutoApproveCount} consecutive stale ExitPlanMode auto-approvals - showing bar to user`);
-        this.staleExitPlanModeAutoApproveCount = 0;
-        // Fall through to show the approval bar so the user can intervene
+        this.log(`WARNING: ${this.staleExitPlanModeAutoApproveCount} stale ExitPlanMode auto-approvals - showing bar to user`);
+        // Don't reset counter - keep showing bar for all future stale calls
+        // to prevent the infinite loop of: auto-approve 3x → show bar → approve → reset → repeat
       } else {
         this.log(`Auto-approving stale ExitPlanMode #${this.staleExitPlanModeAutoApproveCount} (no EnterPlanMode seen in session)`);
         this.approvalResponseProcessed = true;

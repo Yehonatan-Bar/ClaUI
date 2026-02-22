@@ -27,6 +27,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
   const setTranslationLanguage = useAppStore((s) => s.setTranslationLanguage);
   const turnAnalysisEnabled = useAppStore((s) => s.turnAnalysisEnabled);
   const analysisModel = useAppStore((s) => s.analysisModel);
+  const skillGenEnabled = useAppStore((s) => s.skillGenEnabled);
 
   const handleToggle = () => {
     const next = !vitalsEnabled;
@@ -54,6 +55,10 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
   const handleAnalysisModelChange = (model: string) => {
     useAppStore.getState().setTurnAnalysisSettings({ enabled: turnAnalysisEnabled, analysisModel: model });
     postToExtension({ type: 'setAnalysisModel', model });
+  };
+
+  const handleSkillGenToggle = () => {
+    postToExtension({ type: 'setSkillGenEnabled', enabled: !skillGenEnabled });
   };
 
   return (
@@ -166,6 +171,16 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
+      </div>
+
+      <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
+        <span>Skill Generation</span>
+        <button
+          className={`vitals-info-toggle-btn ${skillGenEnabled ? 'on' : 'off'}`}
+          onClick={handleSkillGenToggle}
+        >
+          <span className="vitals-toggle-knob" />
+        </button>
       </div>
 
       <div className="vitals-info-toggle-row">

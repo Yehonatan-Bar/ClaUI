@@ -3618,3 +3618,526 @@ html, body, #root {
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   color: var(--vscode-editor-foreground, #e6edf3);
 }
+
+/* ============================
+   Community Panel (GitHub Sync)
+   ============================ */
+
+.community-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+  background: var(--vscode-editor-background, #1e1e1e);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  overflow-y: auto;
+}
+
+.community-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.community-panel-header strong {
+  font-size: 16px;
+}
+
+.community-panel-close {
+  background: none;
+  border: none;
+  color: var(--vscode-editor-foreground, #e6edf3);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  opacity: 0.7;
+}
+
+.community-panel-close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Connect card */
+.community-connect-card {
+  text-align: center;
+  padding: 32px 16px;
+  margin: 24px 0;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.community-connect-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.community-connect-desc {
+  font-size: 13px;
+  opacity: 0.7;
+  max-width: 400px;
+  margin: 0 auto 16px;
+  line-height: 1.5;
+}
+
+.community-connect-btn {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+  border: none;
+  padding: 8px 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.community-connect-btn:hover {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+/* Sync status bar */
+.community-sync-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.community-sync-user {
+  font-weight: 600;
+  color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.community-sync-time {
+  opacity: 0.6;
+}
+
+.community-sync-publish-btn,
+.community-sync-disconnect-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--vscode-editor-foreground, #e6edf3);
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.community-sync-publish-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.community-sync-disconnect-btn {
+  border-color: rgba(244, 67, 54, 0.3);
+  color: #ef9a9a;
+}
+
+.community-sync-disconnect-btn:hover {
+  background: rgba(244, 67, 54, 0.1);
+}
+
+/* Tabs */
+.community-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--vscode-panel-border, #333);
+  padding-bottom: 2px;
+}
+
+.community-tab {
+  background: none;
+  border: none;
+  color: var(--vscode-editor-foreground, #e6edf3);
+  padding: 6px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0.6;
+  border-bottom: 2px solid transparent;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+
+.community-tab.active {
+  opacity: 1;
+  border-bottom-color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.community-tab:hover {
+  opacity: 0.9;
+}
+
+/* Add friend row */
+.community-add-friend {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.community-add-input {
+  flex: 1;
+  background: var(--vscode-input-background, #3c3c3c);
+  border: 1px solid var(--vscode-input-border, #555);
+  color: var(--vscode-input-foreground, #e6edf3);
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.community-add-btn,
+.community-refresh-btn {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+  border: none;
+  padding: 4px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.community-add-btn:disabled,
+.community-refresh-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.community-refresh-btn {
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--vscode-editor-foreground, #e6edf3);
+}
+
+.community-add-error {
+  color: #ef5350;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.community-empty {
+  text-align: center;
+  padding: 24px;
+  opacity: 0.5;
+  font-size: 13px;
+}
+
+/* Friends list */
+.community-friends-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.community-friend-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.community-friend-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.community-friend-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.community-friend-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.community-friend-meta {
+  font-size: 11px;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+.community-friend-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.community-compare-btn {
+  background: none;
+  border: 1px solid rgba(55, 148, 255, 0.4);
+  color: var(--vscode-textLink-foreground, #3794ff);
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.community-compare-btn:hover {
+  background: rgba(55, 148, 255, 0.1);
+}
+
+.community-remove-btn {
+  background: none;
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  color: #ef9a9a;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.community-remove-btn:hover {
+  background: rgba(244, 67, 54, 0.1);
+}
+
+/* Compare view */
+.community-compare-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.compare-header-row,
+.compare-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.compare-header-row {
+  border-bottom: 1px solid var(--vscode-panel-border, #333);
+  margin-bottom: 4px;
+}
+
+.compare-col {
+  text-align: center;
+}
+
+.compare-col-you {
+  text-align: right;
+}
+
+.compare-col-friend {
+  text-align: left;
+}
+
+.compare-col-metric {
+  min-width: 100px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+.compare-winning {
+  color: #4caf50;
+  font-weight: 600;
+}
+
+.compare-achievements-title {
+  margin-top: 12px;
+  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.compare-achievement-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.compare-achievement-cell {
+  display: grid;
+  grid-template-columns: 24px 1fr 24px;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  align-items: center;
+}
+
+.compare-achievement-id {
+  text-align: center;
+  opacity: 0.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-unlocked {
+  color: #4caf50;
+  text-align: center;
+}
+
+.compare-locked {
+  color: #f44336;
+  opacity: 0.4;
+  text-align: center;
+}
+
+/* Achievement panel community & share buttons */
+.achievement-community-btn,
+.achievement-share-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--vscode-editor-foreground, #e6edf3);
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s;
+}
+
+.achievement-community-btn:hover,
+.achievement-share-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Share Card Modal */
+.share-card-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 250;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.share-card-modal {
+  background: var(--vscode-editor-background, #1e1e1e);
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 8px;
+  padding: 20px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.share-card-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.share-card-modal-header strong {
+  font-size: 16px;
+}
+
+.share-card-close {
+  background: none;
+  border: none;
+  color: var(--vscode-editor-foreground, #e6edf3);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  opacity: 0.7;
+}
+
+.share-card-close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.share-card-preview {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.share-card-preview-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.share-card-preview-label {
+  opacity: 0.7;
+}
+
+.share-card-preview-value {
+  font-weight: 600;
+}
+
+.share-card-xp-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  margin: 8px 0;
+  overflow: hidden;
+}
+
+.share-card-xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3794ff, #8b5cf6);
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.share-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.share-card-copy-btn {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  flex: 1;
+  min-width: 140px;
+}
+
+.share-card-copy-btn:hover {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+.share-card-copy-btn.copied {
+  background: #388e3c;
+}
+
+.share-card-preview-markdown {
+  margin-top: 12px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 120px;
+  overflow-y: auto;
+  color: var(--vscode-editor-foreground, #e6edf3);
+  opacity: 0.7;
+}

@@ -7,7 +7,9 @@ import { PromptHistoryStore } from './session/PromptHistoryStore';
 import { FileLogger } from './session/FileLogger';
 import { AchievementService } from './achievements/AchievementService';
 import { AchievementInsightAnalyzer } from './achievements/AchievementInsightAnalyzer';
+import { GitHubSyncService } from './achievements/GitHubSyncService';
 import { SkillGenService } from './skillgen/SkillGenService';
+import { installSkillFiles, injectClaudeMdInstructions } from './skillgen/SrPtdBootstrap';
 import { registerCommands } from './commands';
 
 let tabManager: TabManager;
@@ -54,6 +56,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const insightAnalyzer = new AchievementInsightAnalyzer(context.globalState);
   insightAnalyzer.setLogger(log);
   achievementService.setInsightAnalyzer(insightAnalyzer);
+  const githubSyncService = new GitHubSyncService(context.globalState, log);
+  achievementService.setSyncService(githubSyncService);
 
   // Create project analytics store for cross-session dashboard data (workspace-scoped)
   const projectAnalyticsStore = new ProjectAnalyticsStore(context.workspaceState);
@@ -65,10 +69,20 @@ export function activate(context: vscode.ExtensionContext): void {
   skillGenService.setLogger(log);
   // Initial document scan on activation
   const skillGenConfig = vscode.workspace.getConfiguration('claudeMirror');
-  if (skillGenConfig.get<boolean>('skillGen.enabled', false)) {
+  if (skillGenConfig.get<boolean>('skillGen.enabled', true)) {
     void skillGenService.scanDocuments().then(pending => {
       log(`[SkillGen] Initial scan: ${pending} pending documents`);
     });
+  }
+
+  // Auto-install SR-PTD skill and inject CLAUDE.md instructions
+  void installSkillFiles(context.extensionPath, log);
+  if (config.get<boolean>('srPtdAutoInject', true)) {
+    const docsDir = skillGenConfig.get<string>(
+      'skillGen.docsDirectory',
+      'C:\\projects\\Skills\\Dev_doc_for_skills'
+    );
+    void injectClaudeMdInstructions(docsDir, log);
   }
 
   // Create the tab manager that owns all session tabs

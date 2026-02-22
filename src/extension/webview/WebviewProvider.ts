@@ -31,7 +31,7 @@ export function buildWebviewHtml(
     content="default-src 'none';
              style-src ${webview.cspSource} 'unsafe-inline';
              script-src 'nonce-${nonce}';
-             img-src ${webview.cspSource} data:;
+             img-src ${webview.cspSource} data: https://avatars.githubusercontent.com;
              font-src ${webview.cspSource};"
   />
   <title>ClaUi</title>
