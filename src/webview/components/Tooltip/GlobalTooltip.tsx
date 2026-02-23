@@ -68,8 +68,8 @@ export const GlobalTooltip: React.FC<GlobalTooltipProps> = ({ delay = 400 }) => 
       const text = target.getAttribute('data-tooltip');
       if (!text) return;
 
-      // Same trigger - do nothing
-      if (triggerRef.current === target && state.visible) return;
+      // Same trigger and already tracking (timer running or tooltip visible) - do nothing
+      if (triggerRef.current === target && (state.visible || timerRef.current)) return;
 
       clearTimer();
 

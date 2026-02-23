@@ -106,7 +106,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
       {/* Show streaming content for the in-progress message */}
       {streamingMessageId && streamingBlocks.length > 0 && (
         <div className="message message-assistant">
-          <div className="message-role">Assistant</div>
+          <div className="message-role">
+            Assistant
+            <span className="message-timestamp">
+              {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
           {streamingBlocks.map((block) =>
             block.type === 'text' ? (
               <StreamingText key={block.blockIndex} text={block.text} />

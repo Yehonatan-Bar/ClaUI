@@ -48,6 +48,18 @@ export function deriveTurnFromAssistantMessage(message: MessageLike, turnIndex: 
     .filter((name): name is string => !!name);
   const isError = blocks.some((block) => block.type === 'tool_result' && block.is_error === true);
 
+  // Extract bash commands from tool_use blocks so rebuilt turn history
+  // populates the Dashboard Commands tab.
+  const bashCommands: string[] = [];
+  for (const block of blocks) {
+    if (block.type === 'tool_use' && block.name === 'Bash') {
+      const input = block.input as Record<string, unknown> | undefined;
+      if (input && typeof input.command === 'string' && input.command.trim()) {
+        bashCommands.push(input.command.trim());
+      }
+    }
+  }
+
   return {
     turnIndex,
     toolNames,
@@ -59,6 +71,7 @@ export function deriveTurnFromAssistantMessage(message: MessageLike, turnIndex: 
     category: categorizeTurn(toolNames, isError),
     timestamp: typeof message.timestamp === 'number' ? message.timestamp : Date.now(),
     messageId: message.id,
+    bashCommands: bashCommands.length > 0 ? bashCommands : undefined,
   };
 }
 

@@ -80,6 +80,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
     return { borderLeft: `${width}px solid ${color}` };
   }, [vitalsEnabled, resolvedTurnData, isUser]);
 
+  const intensityTooltip = useMemo((): string | undefined => {
+    if (!vitalsBorderStyle || !resolvedTurnData) return undefined;
+    const catLabels: Record<TurnCategory, string> = {
+      success: 'Success', error: 'Error', discussion: 'Discussion',
+      'code-write': 'Code-write', research: 'Research', command: 'Command',
+    };
+    const cat = catLabels[resolvedTurnData.category];
+    const n = resolvedTurnData.toolCount;
+    const w = n === 0 ? 'thin' : n <= 3 ? 'medium' : 'thick';
+    return `Intensity Border: ${cat} turn, ${n} tools (${w})\n\nColors:\nGreen = success\nRed = error\nBlue = discussion (no tools)\nPurple = code-write\nOrange = research\nCyan = command\n\nWidth: thin = 0 tools, medium = 1-3, thick = 4+`;
+  }, [vitalsBorderStyle, resolvedTurnData]);
+
   const handleTranslate = useCallback(() => {
     if (hasTranslation) {
       toggleTranslationView(message.id);
@@ -152,8 +164,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
 
   return (
     <div className={`message ${isUser ? 'message-user' : 'message-assistant'}`} data-message-id={message.id} style={vitalsBorderStyle}>
+      {vitalsBorderStyle && (
+        <div
+          className="intensity-border-zone"
+          data-tooltip={intensityTooltip}
+        />
+      )}
       <div className="message-role">
         {isUser ? 'You' : 'Assistant'}
+        {message.timestamp && (
+          <span className="message-timestamp">
+            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
         {message.model && (
           <span style={{ marginLeft: 8, fontWeight: 400, opacity: 0.7 }}>
             {message.model}

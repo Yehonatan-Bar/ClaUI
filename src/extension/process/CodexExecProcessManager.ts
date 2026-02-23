@@ -43,6 +43,7 @@ export class CodexExecProcessManager extends EventEmitter {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const cliPath = config.get<string>('codex.cliPath', 'codex');
     const selectedModel = options.model ?? config.get<string>('codex.model', '');
+    const selectedReasoningEffort = config.get<string>('codex.reasoningEffort', '').trim();
     const cwd =
       options.cwd ||
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
@@ -52,6 +53,7 @@ export class CodexExecProcessManager extends EventEmitter {
       threadId: options.threadId,
       cwd,
       model: selectedModel,
+      reasoningEffort: selectedReasoningEffort || undefined,
     });
 
     this._cancelledByUser = false;
@@ -79,6 +81,7 @@ export class CodexExecProcessManager extends EventEmitter {
     });
 
     child.on('exit', (code, signal) => {
+      this.flushRemainingStdoutBuffer();
       this.emit('exit', { code, signal } as CodexProcessExitInfo);
       if (this.process === child) {
         this.process = null;
@@ -137,11 +140,14 @@ export class CodexExecProcessManager extends EventEmitter {
     return this._cancelledByUser;
   }
 
-  private buildArgs(opts: { threadId?: string; cwd?: string; model?: string }): string[] {
+  private buildArgs(opts: { threadId?: string; cwd?: string; model?: string; reasoningEffort?: string }): string[] {
     if (opts.threadId) {
       const args = ['exec', 'resume', '--json'];
       if (opts.model) {
         args.push('--model', opts.model);
+      }
+      if (opts.reasoningEffort) {
+        args.push('-c', `model_reasoning_effort=${opts.reasoningEffort}`);
       }
       args.push(opts.threadId, '-');
       return args;
@@ -154,6 +160,9 @@ export class CodexExecProcessManager extends EventEmitter {
     if (opts.model) {
       args.push('--model', opts.model);
     }
+    if (opts.reasoningEffort) {
+      args.push('-c', `model_reasoning_effort=${opts.reasoningEffort}`);
+    }
     args.push('-');
     return args;
   }
@@ -164,16 +173,30 @@ export class CodexExecProcessManager extends EventEmitter {
     this.stdoutBuffer = lines.pop() || '';
 
     for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        continue;
-      }
-      try {
-        const event = JSON.parse(trimmed) as CodexExecJsonEvent;
-        this.emit('event', event);
-      } catch {
-        this.emit('raw', trimmed);
-      }
+      this.parseOutputLine(line);
+    }
+  }
+
+  private flushRemainingStdoutBuffer(): void {
+    const remaining = this.stdoutBuffer;
+    this.stdoutBuffer = '';
+    if (!remaining.trim()) {
+      return;
+    }
+    this.log('Flushing trailing Codex stdout buffer on exit');
+    this.parseOutputLine(remaining);
+  }
+
+  private parseOutputLine(line: string): void {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      return;
+    }
+    try {
+      const event = JSON.parse(trimmed) as CodexExecJsonEvent;
+      this.emit('event', event);
+    } catch {
+      this.emit('raw', trimmed);
     }
   }
 
@@ -198,4 +221,3 @@ export class CodexExecProcessManager extends EventEmitter {
     }
   }
 }
-

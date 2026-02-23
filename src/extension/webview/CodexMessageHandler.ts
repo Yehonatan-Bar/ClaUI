@@ -6,6 +6,7 @@ import type { AchievementService } from '../achievements/AchievementService';
 import type { WebviewBridge } from './MessageHandler';
 import type { ContentBlock } from '../types/stream-json';
 import type {
+  CodexReasoningEffort,
   ProviderCapabilities,
   ProviderId,
   TurnRecord,
@@ -27,6 +28,18 @@ export interface CodexSessionController {
 
 function codexTurnCategory(hasCommands: boolean): TurnCategory {
   return hasCommands ? 'command' : 'discussion';
+}
+
+function isExpectedNonFatalCommandExit(command: string, exitCode: number | null): boolean {
+  if (exitCode !== 1) {
+    return false;
+  }
+  const normalized = command.toLowerCase();
+  // ripgrep returns exit 1 when no matches are found (not a runtime failure).
+  if (/\brg(\.exe)?\b/.test(normalized)) {
+    return true;
+  }
+  return false;
 }
 
 const CODEX_PROVIDER_CAPABILITIES: ProviderCapabilities = {
@@ -55,6 +68,7 @@ export class CodexMessageHandler {
   private lastMessageId = '';
   private currentTurnStartedAt = 0;
   private currentTurnCommands: string[] = [];
+  private currentTurnHadAgentMessage = false;
   private messageCounter = 0;
 
   constructor(
@@ -123,6 +137,7 @@ export class CodexMessageHandler {
           break;
 
         case 'sendMessage':
+          this.log(`Codex sendMessage requested: len=${msg.text.length} preview="${msg.text.slice(0, 80).replace(/\s+/g, ' ')}"`);
           this.achievementService.onUserPrompt(this.tabId, msg.text);
           void this.promptHistoryStore.addPrompt(msg.text);
           this.webview.postMessage({
@@ -131,6 +146,7 @@ export class CodexMessageHandler {
           });
           this.webview.postMessage({ type: 'processBusy', busy: true });
           void this.session.sendText(msg.text).catch((err) => {
+            this.log(`Codex sendText failed: ${this.errMsg(err)}`);
             this.webview.postMessage({ type: 'processBusy', busy: false });
             this.webview.postMessage({ type: 'error', message: `Failed to send Codex message: ${this.errMsg(err)}` });
           });
@@ -143,12 +159,50 @@ export class CodexMessageHandler {
           break;
 
         case 'setProvider':
-          void vscode.workspace.getConfiguration('claudeMirror').update('provider', msg.provider, true);
+          this.log(`Setting provider to: "${msg.provider}" (Codex handler)`);
+          void vscode.workspace.getConfiguration('claudeMirror').update('provider', msg.provider, true)
+            .then(() => {
+              const saved = vscode.workspace.getConfiguration('claudeMirror').get<ProviderId>('provider', 'claude');
+              this.log(`Provider setting saved (Codex handler): "${saved}" (requested "${msg.provider}")`);
+              this.webview.postMessage({ type: 'providerSetting', provider: saved });
+            }, (err: unknown) => {
+              const message = err instanceof Error ? err.message : String(err);
+              this.log(`Failed to save provider setting "${msg.provider}" (Codex handler): ${message}`);
+              this.webview.postMessage({ type: 'error', message: `Failed to save provider setting: ${message}` });
+            });
+          break;
+
+        case 'openProviderTab':
+          this.log(`Open provider tab requested: "${msg.provider}" (Codex handler)`);
+          void vscode.workspace.getConfiguration('claudeMirror').update('provider', msg.provider, true)
+            .then(() => {
+              const saved = vscode.workspace.getConfiguration('claudeMirror').get<ProviderId>('provider', 'claude');
+              this.log(`Provider setting saved before opening tab (Codex handler): "${saved}" (requested "${msg.provider}")`);
+              this.webview.postMessage({ type: 'providerSetting', provider: saved });
+              void vscode.commands.executeCommand('claudeMirror.startSession').then(
+                () => this.log(`Requested new provider tab via command (Codex handler): provider="${msg.provider}"`),
+                (err: unknown) => {
+                  const message = err instanceof Error ? err.message : String(err);
+                  this.log(`Failed to open provider tab "${msg.provider}" (Codex handler): ${message}`);
+                  this.webview.postMessage({ type: 'error', message: `Failed to open ${msg.provider} tab: ${message}` });
+                }
+              );
+            }, (err: unknown) => {
+              const message = err instanceof Error ? err.message : String(err);
+              this.log(`Failed to save provider setting before opening tab "${msg.provider}" (Codex handler): ${message}`);
+              this.webview.postMessage({ type: 'error', message: `Failed to open ${msg.provider} tab: ${message}` });
+            });
           break;
 
         case 'setModel':
           void vscode.workspace.getConfiguration('claudeMirror').update('codex.model', msg.model, true);
           this.webview.postMessage({ type: 'modelSetting', model: msg.model });
+          break;
+
+        case 'setCodexReasoningEffort':
+          this.log(`Setting Codex reasoning effort to: "${msg.effort || '(default)'}"`);
+          void vscode.workspace.getConfiguration('claudeMirror').update('codex.reasoningEffort', msg.effort, true);
+          this.webview.postMessage({ type: 'codexReasoningEffortSetting', effort: msg.effort });
           break;
 
         case 'setTypingTheme':
@@ -217,11 +271,13 @@ export class CodexMessageHandler {
     this.demux.on('turnStarted', () => {
       this.currentTurnStartedAt = Date.now();
       this.currentTurnCommands = [];
+      this.currentTurnHadAgentMessage = false;
       this.log('Codex turn.started');
       this.webview.postMessage({ type: 'processBusy', busy: true });
     });
 
     this.demux.on('agentMessage', (data: { id: string; text: string }) => {
+      this.currentTurnHadAgentMessage = true;
       const messageId = data.id || this.nextMessageId();
       this.lastMessageId = messageId;
       const model = this.getConfiguredCodexModelLabel();
@@ -249,7 +305,9 @@ export class CodexMessageHandler {
       if (command) {
         this.currentTurnCommands.push(command);
       }
-      if (data.exitCode !== null && data.exitCode !== 0) {
+      if (isExpectedNonFatalCommandExit(command || data.command, data.exitCode)) {
+        this.log(`Codex command non-fatal exit ignored: exit=${data.exitCode} cmd=${command || data.command}`);
+      } else if (data.exitCode !== null && data.exitCode !== 0) {
         this.webview.postMessage({
           type: 'error',
           message: `Command failed (exit ${data.exitCode}): ${command || data.command}`,
@@ -263,6 +321,13 @@ export class CodexMessageHandler {
       const hasCommands = this.currentTurnCommands.length > 0;
       const category = codexTurnCategory(hasCommands);
       const toolNames = hasCommands ? ['Bash'] : [];
+      if (!this.currentTurnHadAgentMessage) {
+        this.log(`Codex turn.completed without agent_message (tokens out=${data.usage.outputTokens})`);
+        this.webview.postMessage({
+          type: 'error',
+          message: 'Codex completed the turn but no assistant message was received. Check Codex logs/JSON events.',
+        });
+      }
       const turn: TurnRecord = {
         turnIndex: this.turnIndex++,
         toolNames,
@@ -293,6 +358,7 @@ export class CodexMessageHandler {
       this.webview.postMessage({ type: 'processBusy', busy: false });
       this.currentTurnCommands = [];
       this.currentTurnStartedAt = 0;
+      this.currentTurnHadAgentMessage = false;
     });
 
     this.demux.on('error', (data: { message: string }) => {
@@ -321,10 +387,14 @@ export class CodexMessageHandler {
         this.sendTypingThemeSetting();
       }
       if (e.affectsConfiguration('claudeMirror.provider')) {
+        this.log('Configuration changed: claudeMirror.provider (Codex handler)');
         this.sendProviderSetting();
       }
       if (e.affectsConfiguration('claudeMirror.codex.model')) {
         this.sendCodexModelSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.codex.reasoningEffort')) {
+        this.sendCodexReasoningEffortSetting();
       }
     });
   }
@@ -335,6 +405,7 @@ export class CodexMessageHandler {
     this.sendProviderSetting();
     this.sendProviderCapabilities();
     this.sendCodexModelSetting();
+    this.sendCodexReasoningEffortSetting();
   }
 
   private sendTextSettings(): void {
@@ -356,9 +427,11 @@ export class CodexMessageHandler {
 
   private sendProviderSetting(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
+    const provider = config.get<ProviderId>('provider', 'claude');
+    this.log(`Sending provider setting (Codex handler): "${provider}"`);
     this.webview.postMessage({
       type: 'providerSetting',
-      provider: config.get<ProviderId>('provider', 'claude'),
+      provider,
     });
   }
 
@@ -374,6 +447,15 @@ export class CodexMessageHandler {
     this.webview.postMessage({
       type: 'modelSetting',
       model: config.get<string>('codex.model', ''),
+    });
+  }
+
+  private sendCodexReasoningEffortSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const effort = config.get<CodexReasoningEffort>('codex.reasoningEffort', '');
+    this.webview.postMessage({
+      type: 'codexReasoningEffortSetting',
+      effort,
     });
   }
 

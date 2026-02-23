@@ -82,7 +82,6 @@ export const InputArea: React.FC = () => {
     setPendingFilePaths,
     promptHistory,
     addToPromptHistory,
-    setPromptHistoryPanelOpen,
     pendingApproval,
     setPendingApproval,
     gitPushResult,
@@ -690,9 +689,6 @@ export const InputArea: React.FC = () => {
   }, [enhancerPopoverOpen, setEnhancerPopoverOpen]);
 
   /** Toggle the prompt history panel */
-  const handleToggleHistory = useCallback(() => {
-    setPromptHistoryPanelOpen(true);
-  }, [setPromptHistoryPanelOpen]);
 
   // Auto-dismiss git push result toast after 5 seconds
   useEffect(() => {
@@ -827,14 +823,6 @@ export const InputArea: React.FC = () => {
           data-tooltip="Browse files to paste their paths"
         >
           +
-        </button>
-        <button
-          className="prompt-history-button"
-          onClick={handleToggleHistory}
-          disabled={!isConnected}
-          data-tooltip="Prompt history"
-        >
-          H
         </button>
         <div className={`textarea-container${isEnhancing ? ' enhancing' : ''}`}>
           <textarea

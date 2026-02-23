@@ -57,17 +57,43 @@ export class PythonPipelineRunner {
     const startTime = Date.now();
 
     // Ensure workspace subdirectories exist
+    const srptdRawDir = path.join(workspaceDir, 'srptd_raw');
     const extractionsDir = path.join(workspaceDir, 'extractions');
     const clustersDir = path.join(workspaceDir, 'clusters');
     const skillsOutDir = path.join(workspaceDir, 'skills_out');
     const logsDir = path.join(workspaceDir, 'logs');
 
-    for (const dir of [extractionsDir, clustersDir, skillsOutDir, logsDir]) {
+    for (const dir of [srptdRawDir, extractionsDir, clustersDir, skillsOutDir, logsDir]) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
     this.emitProgress('running', 5, 'Preparing pipeline workspace...');
     this.log(`[SkillGen:Pipeline][INFO] Preparing workspace | docsDir=${docsDirectory} docCount=${pendingDocPaths.length} mode=${pipelineMode} timeoutMs=${timeoutMs}`);
+
+    // Copy pending SR-PTD docs into the workspace srptd_raw/ directory
+    // (run_pipeline.py reads from <project>/srptd_raw/)
+    for (const docName of pendingDocPaths) {
+      const srcPath = path.join(docsDirectory, docName);
+      const destPath = path.join(srptdRawDir, docName);
+      try {
+        fs.copyFileSync(srcPath, destPath);
+      } catch (err) {
+        this.log(`[SkillGen:Pipeline][WARNING] Failed to copy doc | src=${srcPath} error=${err}`);
+      }
+    }
+    this.log(`[SkillGen:Pipeline][INFO] Copied ${pendingDocPaths.length} docs to srptd_raw/`);
+
+    // Copy .env from toolkit directory to workspace (for ANTHROPIC_API_KEY)
+    const toolkitEnv = path.join(toolkitPath, '.env');
+    const workspaceEnv = path.join(workspaceDir, '.env');
+    if (fs.existsSync(toolkitEnv) && !fs.existsSync(workspaceEnv)) {
+      try {
+        fs.copyFileSync(toolkitEnv, workspaceEnv);
+        this.log('[SkillGen:Pipeline][INFO] Copied .env from toolkit to workspace');
+      } catch (err) {
+        this.log(`[SkillGen:Pipeline][WARNING] Failed to copy .env | error=${err}`);
+      }
+    }
 
     // Write the list of pending docs to a manifest file
     const manifestPath = path.join(workspaceDir, 'pending_docs.json');
@@ -144,11 +170,11 @@ export class PythonPipelineRunner {
 
       switch (pipelineMode) {
         case 'run_pipeline':
+          // run_pipeline.py expects: --project <dir> where docs are in <dir>/srptd_raw/
+          // and outputs skills to <dir>/skills_out/
           args = [
             path.join(toolkitPath, 'run_pipeline.py'),
-            '--input-dir', docsDirectory,
-            '--output-dir', skillsOutDir,
-            '--workspace', workspaceDir,
+            '--project', workspaceDir,
             '--resume',
           ];
           break;
@@ -191,6 +217,11 @@ export class PythonPipelineRunner {
 
       this.childProcess = child;
       this.log(`[SkillGen:Pipeline][INFO] Subprocess started | pid=${child.pid}`);
+
+      // Auto-answer any interactive prompts (e.g. "Continue anyway? [y/N]:")
+      // to prevent the subprocess from hanging on stdin
+      child.stdin?.write('y\n');
+      child.stdin?.end();
 
       let stdout = '';
       let stderr = '';

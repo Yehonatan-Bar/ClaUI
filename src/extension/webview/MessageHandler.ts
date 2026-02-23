@@ -462,7 +462,38 @@ export class MessageHandler {
 
         case 'setProvider':
           this.log(`Setting provider to: "${msg.provider}"`);
-          vscode.workspace.getConfiguration('claudeMirror').update('provider', msg.provider, true);
+          void vscode.workspace.getConfiguration('claudeMirror').update('provider', msg.provider, true)
+            .then(() => {
+              const saved = vscode.workspace.getConfiguration('claudeMirror').get<ProviderId>('provider', 'claude');
+              this.log(`Provider setting saved: "${saved}" (requested "${msg.provider}")`);
+              this.webview.postMessage({ type: 'providerSetting', provider: saved });
+            }, (err: unknown) => {
+              const message = err instanceof Error ? err.message : String(err);
+              this.log(`Failed to save provider setting "${msg.provider}": ${message}`);
+              this.webview.postMessage({ type: 'error', message: `Failed to save provider setting: ${message}` });
+            });
+          break;
+
+        case 'openProviderTab':
+          this.log(`Open provider tab requested: "${msg.provider}"`);
+          void vscode.workspace.getConfiguration('claudeMirror').update('provider', msg.provider, true)
+            .then(() => {
+              const saved = vscode.workspace.getConfiguration('claudeMirror').get<ProviderId>('provider', 'claude');
+              this.log(`Provider setting saved before opening tab: "${saved}" (requested "${msg.provider}")`);
+              this.webview.postMessage({ type: 'providerSetting', provider: saved });
+              void vscode.commands.executeCommand('claudeMirror.startSession').then(
+                () => this.log(`Requested new provider tab via command: provider="${msg.provider}"`),
+                (err: unknown) => {
+                  const message = err instanceof Error ? err.message : String(err);
+                  this.log(`Failed to open provider tab "${msg.provider}": ${message}`);
+                  this.webview.postMessage({ type: 'error', message: `Failed to open ${msg.provider} tab: ${message}` });
+                }
+              );
+            }, (err: unknown) => {
+              const message = err instanceof Error ? err.message : String(err);
+              this.log(`Failed to save provider setting before opening tab "${msg.provider}": ${message}`);
+              this.webview.postMessage({ type: 'error', message: `Failed to open ${msg.provider} tab: ${message}` });
+            });
           break;
 
         case 'setTypingTheme':
@@ -1433,6 +1464,7 @@ export class MessageHandler {
         this.sendModelSetting();
       }
       if (e.affectsConfiguration('claudeMirror.provider')) {
+        this.log('Configuration changed: claudeMirror.provider');
         this.sendProviderSetting();
       }
       if (e.affectsConfiguration('claudeMirror.typingTheme')) {

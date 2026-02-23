@@ -6,6 +6,7 @@ import type { ContentBlock } from './stream-json';
 
 export type TypingTheme = 'terminal-hacker' | 'retro' | 'zen';
 export type ProviderId = 'claude' | 'codex';
+export type CodexReasoningEffort = '' | 'low' | 'medium' | 'high' | 'xhigh';
 
 export interface ProviderCapabilities {
   supportsPlanApproval: boolean;
@@ -84,6 +85,16 @@ export interface SetModelRequest {
 export interface SetProviderRequest {
   type: 'setProvider';
   provider: ProviderId;
+}
+
+export interface OpenProviderTabRequest {
+  type: 'openProviderTab';
+  provider: ProviderId;
+}
+
+export interface SetCodexReasoningEffortRequest {
+  type: 'setCodexReasoningEffort';
+  effort: CodexReasoningEffort;
 }
 
 export interface SetTypingThemeRequest {
@@ -326,6 +337,8 @@ export type WebviewToExtensionMessage =
   | ClearSessionRequest
   | SetModelRequest
   | SetProviderRequest
+  | OpenProviderTabRequest
+  | SetCodexReasoningEffortRequest
   | SetTypingThemeRequest
   | ShowHistoryRequest
   | OpenPlanDocsRequest
@@ -487,6 +500,11 @@ export interface ProviderSettingMessage {
 export interface ProviderCapabilitiesMessage {
   type: 'providerCapabilities';
   capabilities: ProviderCapabilities;
+}
+
+export interface CodexReasoningEffortSettingMessage {
+  type: 'codexReasoningEffortSetting';
+  effort: CodexReasoningEffort;
 }
 
 export interface PlanApprovalRequiredMessage {
@@ -934,6 +952,7 @@ export type ExtensionToWebviewMessage =
   | ModelSettingMessage
   | ProviderSettingMessage
   | ProviderCapabilitiesMessage
+  | CodexReasoningEffortSettingMessage
   | PlanApprovalRequiredMessage
   | PromptHistoryResponseMessage
   | ActivitySummaryMessage
