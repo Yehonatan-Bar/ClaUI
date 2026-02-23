@@ -32,7 +32,7 @@ export const PermissionModeSelector: React.FC = () => {
         className="permission-mode-select"
         value={permissionMode}
         onChange={handleChange}
-        title={isConnected
+        data-tooltip={isConnected
           ? `Active: ${activeLabel} (change takes effect on next session)`
           : 'Select permission mode for next session'}
       >

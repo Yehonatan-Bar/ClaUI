@@ -437,6 +437,7 @@ export class SessionTab implements WebviewBridge {
       sessionId: sid,
       name: name || existing?.name || `Session ${this.tabNumber}`,
       model: this.currentModel,
+      provider: 'claude',
       startedAt: existing?.startedAt || this.sessionStartedAt || new Date().toISOString(),
       lastActiveAt: new Date().toISOString(),
       firstPrompt: this.firstPrompt || existing?.firstPrompt,
@@ -775,6 +776,7 @@ export class SessionTab implements WebviewBridge {
     const totalTurns = turnRecords.length;
     const summary: SessionSummary = {
       sessionId,
+      provider: 'claude',
       sessionName: this.baseTitle || `Session ${this.tabNumber}`,
       model: this.currentModel || 'unknown',
       startedAt: this.sessionStartedAt || now,

@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import type { TurnRecord } from '../../../extension/types/webview-messages';
-import { DASH_COLORS, CATEGORY_COLORS, MOOD_COLORS, formatCost, formatTokens, formatDuration, formatTime } from './dashboardUtils';
+import { DASH_COLORS, CATEGORY_COLORS, MOOD_COLORS, formatTokens, formatDuration, formatTime } from './dashboardUtils';
 
 const PAGE_SIZE = 15;
 
-type SortKey = 'turn' | 'time' | 'category' | 'taskType' | 'mood' | 'outcome' | 'tools' | 'duration' | 'cost' | 'tokensIn' | 'tokensOut' | 'cache';
+type SortKey = 'turn' | 'time' | 'category' | 'taskType' | 'mood' | 'outcome' | 'tools' | 'duration' | 'tokensIn' | 'tokensOut' | 'cache';
 type SortDir = 'asc' | 'desc';
 
 interface TurnTableProps {
@@ -32,7 +32,6 @@ export const TurnTable: React.FC<TurnTableProps> = ({ turnHistory }) => {
         case 'outcome': av = a.semantics?.taskOutcome ?? ''; bv = b.semantics?.taskOutcome ?? ''; break;
         case 'tools': av = a.toolCount; bv = b.toolCount; break;
         case 'duration': av = a.durationMs; bv = b.durationMs; break;
-        case 'cost': av = a.costUsd; bv = b.costUsd; break;
         case 'tokensIn': av = a.inputTokens ?? 0; bv = b.inputTokens ?? 0; break;
         case 'tokensOut': av = a.outputTokens ?? 0; bv = b.outputTokens ?? 0; break;
         case 'cache': av = a.cacheReadTokens ?? 0; bv = b.cacheReadTokens ?? 0; break;
@@ -106,7 +105,6 @@ export const TurnTable: React.FC<TurnTableProps> = ({ turnHistory }) => {
               {hasSemantics && renderHeader('Outcome', 'outcome')}
               {renderHeader('Tools', 'tools')}
               {renderHeader('Duration', 'duration')}
-              {renderHeader('Cost', 'cost')}
               {renderHeader('Tokens In', 'tokensIn')}
               {renderHeader('Tokens Out', 'tokensOut')}
               {renderHeader('Cache', 'cache')}
@@ -145,7 +143,6 @@ export const TurnTable: React.FC<TurnTableProps> = ({ turnHistory }) => {
                 )}
                 <td style={tdStyle}>{turn.toolCount}</td>
                 <td style={tdStyle}>{formatDuration(turn.durationMs)}</td>
-                <td style={tdStyle}>{formatCost(turn.costUsd)}</td>
                 <td style={tdStyle}>{formatTokens(turn.inputTokens ?? 0)}</td>
                 <td style={tdStyle}>{formatTokens(turn.outputTokens ?? 0)}</td>
                 <td style={tdStyle}>{formatTokens(turn.cacheReadTokens ?? 0)}</td>

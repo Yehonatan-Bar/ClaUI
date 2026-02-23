@@ -36,7 +36,7 @@ export const ModelSelector: React.FC = () => {
         className="model-selector-select"
         value={selectedModel}
         onChange={handleChange}
-        title={isConnected && activeModelLabel
+        data-tooltip={isConnected && activeModelLabel
           ? `Active: ${activeModelLabel} (change takes effect on next session)`
           : 'Select model for next session'}
       >
@@ -47,7 +47,7 @@ export const ModelSelector: React.FC = () => {
         ))}
       </select>
       {isConnected && activeModelLabel && (
-        <span className="model-selector-active" title="Currently active model">
+        <span className="model-selector-active" data-tooltip="Currently active model">
           {activeModelLabel}
         </span>
       )}

@@ -128,18 +128,18 @@ export const CommunityPanel: React.FC = () => {
           <div className="community-sync-bar">
             <span className="community-sync-user">@{githubSyncStatus?.username}</span>
             <span className="community-sync-time">{tr.lastSynced}: {lastSyncedText}</span>
-            <button className="community-sync-publish-btn" onClick={handlePublish} title={tr.publishNow}>
+            <button className="community-sync-publish-btn" onClick={handlePublish} data-tooltip={tr.publishNow}>
               {tr.publishNow}
             </button>
             <button
               className="community-sync-publish-btn"
               onClick={handleOpenPublishedProfile}
-              title={tr.openPublishedProfile}
+              data-tooltip={tr.openPublishedProfile}
               disabled={!githubSyncStatus?.gistUrl}
             >
               {tr.openPublishedProfile}
             </button>
-            <button className="community-sync-disconnect-btn" onClick={handleDisconnect} title={tr.disconnect}>
+            <button className="community-sync-disconnect-btn" onClick={handleDisconnect} data-tooltip={tr.disconnect}>
               {tr.disconnect}
             </button>
           </div>
@@ -189,7 +189,7 @@ export const CommunityPanel: React.FC = () => {
                   className="community-refresh-btn"
                   onClick={handleRefresh}
                   disabled={friendActionPending}
-                  title={tr.refreshFriends}
+                  data-tooltip={tr.refreshFriends}
                 >
                   {'\u21BB'}
                 </button>
@@ -219,14 +219,14 @@ export const CommunityPanel: React.FC = () => {
                         <button
                           className="community-compare-btn"
                           onClick={() => handleCompare(friend)}
-                          title={tr.compare}
+                          data-tooltip={tr.compare}
                         >
                           {tr.compare}
                         </button>
                         <button
                           className="community-remove-btn"
                           onClick={() => handleRemoveFriend(friend.username)}
-                          title={tr.removeFriend}
+                          data-tooltip={tr.removeFriend}
                         >
                           x
                         </button>
@@ -347,7 +347,7 @@ const CompareView: React.FC<{
           const myHas = myProfile.unlockedIds.includes(id);
           const friendHas = friend.unlockedIds.includes(id);
           return (
-            <div key={id} className="compare-achievement-cell" title={id}>
+            <div key={id} className="compare-achievement-cell" data-tooltip={id}>
               <span className={myHas ? 'compare-unlocked' : 'compare-locked'}>
                 {myHas ? '\u2713' : '\u2717'}
               </span>

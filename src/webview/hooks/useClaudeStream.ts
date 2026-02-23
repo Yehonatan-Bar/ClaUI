@@ -31,6 +31,9 @@ export function useClaudeStream(): void {
     setPendingFilePaths,
     setTextSettings,
     setTypingTheme,
+    setProvider,
+    setSelectedProvider,
+    setProviderCapabilities,
     setSelectedModel,
     setResuming,
     setPendingApproval,
@@ -108,6 +111,7 @@ export function useClaudeStream(): void {
 
       switch (msg.type) {
         case 'sessionStarted':
+          setProvider(msg.provider ?? 'claude');
           setSession(msg.sessionId, msg.model);
           if (msg.isResume) {
             setResuming(true);
@@ -120,19 +124,26 @@ export function useClaudeStream(): void {
           logState('after sessionEnded');
           break;
 
-        case 'messageStart':
+        case 'messageStart': {
           logState('before messageStart');
-          // NOTE: Do NOT clear pendingApproval here. After ExitPlanMode, the CLI
-          // may emit additional empty message turns (message_start -> message_delta
-          // -> message_stop -> result) before the user has a chance to interact
-          // with the approval bar. Clearing here would hide Approve/Reject buttons.
-          // The approval bar is already properly cleared by:
-          //   - processBusy: true (sent when user sends a message or approval response)
-          //   - PlanApprovalBar button handlers (setPendingApproval(null))
-          //   - InputArea handler (when user types during pending approval)
+          // Clear stale ExitPlanMode approval bars. When the CLI auto-approves
+          // ExitPlanMode and the model starts a new turn (implementation), the
+          // approval bar was informational only. Leaving it visible allows the
+          // user to accidentally type text that gets routed as plan feedback,
+          // which sends a new user message to the CLI and can re-trigger the
+          // ExitPlanMode infinite loop.
+          //
+          // AskUserQuestion bars are NOT cleared here because the CLI truly
+          // pauses and waits for user input - no new messageStart should arrive
+          // until the user responds.
+          const currentApproval = useAppStore.getState().pendingApproval;
+          if (currentApproval && currentApproval.toolName !== 'AskUserQuestion') {
+            setPendingApproval(null);
+          }
           handleMessageStart(msg.messageId, msg.model);
           logState('after messageStart');
           break;
+        }
 
         case 'streamingText':
           appendStreamingText(msg.messageId, msg.blockIndex, msg.text);
@@ -234,6 +245,14 @@ export function useClaudeStream(): void {
 
         case 'modelSetting':
           setSelectedModel(msg.model);
+          break;
+
+        case 'providerSetting':
+          setSelectedProvider(msg.provider);
+          break;
+
+        case 'providerCapabilities':
+          setProviderCapabilities(msg.capabilities);
           break;
 
         case 'typingThemeSetting':
@@ -503,6 +522,9 @@ export function useClaudeStream(): void {
     setPendingFilePaths,
     setTextSettings,
     setTypingTheme,
+    setProvider,
+    setSelectedProvider,
+    setProviderCapabilities,
     setSelectedModel,
     setResuming,
     setPendingApproval,

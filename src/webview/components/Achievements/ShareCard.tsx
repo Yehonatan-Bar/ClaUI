@@ -85,7 +85,7 @@ export const ShareCard: React.FC = () => {
             className={`share-card-copy-btn ${copiedFormat === 'markdown' ? 'copied' : ''}`}
             onClick={() => handleCopy('markdown')}
             disabled={!connected}
-            title={!connected ? 'Connect GitHub first' : ''}
+            data-tooltip={!connected ? 'Connect GitHub first' : 'Copy as Markdown card'}
           >
             {copiedFormat === 'markdown' ? tr.copied : tr.copyMarkdownCard}
           </button>
@@ -93,7 +93,7 @@ export const ShareCard: React.FC = () => {
             className={`share-card-copy-btn ${copiedFormat === 'shields-badge' ? 'copied' : ''}`}
             onClick={() => handleCopy('shields-badge')}
             disabled={!connected}
-            title={!connected ? 'Connect GitHub first' : ''}
+            data-tooltip={!connected ? 'Connect GitHub first' : 'Copy as Shields.io badge'}
           >
             {copiedFormat === 'shields-badge' ? tr.copied : tr.copyShieldsBadge}
           </button>

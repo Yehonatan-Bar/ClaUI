@@ -99,7 +99,7 @@ export class SkillGenService {
       docsPattern: config.get<string>('skillGen.docsPattern', 'SR-PTD*.md'),
       skillsDirectory: config.get<string>('skillGen.skillsDirectory', '') || this.defaultSkillsDir(),
       pythonPath: config.get<string>('skillGen.pythonPath', 'python'),
-      toolkitPath: config.get<string>('skillGen.toolkitPath', ''),
+      toolkitPath: config.get<string>('skillGen.toolkitPath', '') || this.defaultToolkitPath(),
       workspaceDir: config.get<string>('skillGen.workspaceDir', '') || this.defaultWorkspaceDir(),
       pipelineMode: config.get<string>('skillGen.pipelineMode', 'run_pipeline') as 'run_pipeline' | 'python_api' | 'create_skills',
       autoRun: config.get<boolean>('skillGen.autoRun', false),
@@ -114,6 +114,13 @@ export class SkillGenService {
 
   private defaultWorkspaceDir(): string {
     return path.join(os.tmpdir(), 'claui-skillgen-workspace');
+  }
+
+  private defaultToolkitPath(): string {
+    // Default to the toolkit bundled alongside the SR-PTD docs directory
+    const docsDir = vscode.workspace.getConfiguration('claudeMirror')
+      .get<string>('skillGen.docsDirectory', 'C:/projects/Skills/Dev_doc_for_skills');
+    return path.join(docsDir, 'used', 'skills_from_docs_toolkit');
   }
 
   // ─── Public API ────────────────────────────────────────────
@@ -392,9 +399,22 @@ export class SkillGenService {
       return { ok: false, error: `Python not found at: ${config.pythonPath}` };
     }
 
-    // Check toolkit path
-    if (config.toolkitPath && !fs.existsSync(config.toolkitPath)) {
-      return { ok: false, error: `Toolkit path not found: ${config.toolkitPath}` };
+    // Check toolkit path exists
+    if (!config.toolkitPath || !fs.existsSync(config.toolkitPath)) {
+      return { ok: false, error: `Toolkit path not found: ${config.toolkitPath || '(not configured)'}. Set claudeMirror.skillGen.toolkitPath to your skill generation toolkit directory.` };
+    }
+
+    // Check pipeline script exists at the resolved path
+    const scriptMap: Record<string, string> = {
+      run_pipeline: 'run_pipeline.py',
+      create_skills: 'create_skills.py',
+    };
+    const expectedScript = scriptMap[config.pipelineMode];
+    if (expectedScript) {
+      const scriptPath = path.join(config.toolkitPath, expectedScript);
+      if (!fs.existsSync(scriptPath)) {
+        return { ok: false, error: `Pipeline script not found: ${scriptPath}` };
+      }
     }
 
     // Check docs directory

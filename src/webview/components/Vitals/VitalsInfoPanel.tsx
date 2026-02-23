@@ -65,7 +65,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
     <div className="vitals-info-panel">
       <div className="vitals-info-header">
         <span className="vitals-info-title">Session Vitals</span>
-        <button className="vitals-info-close" onClick={onClose} title="Close">x</button>
+        <button className="vitals-info-close" onClick={onClose} data-tooltip="Close">x</button>
       </div>
 
       <div className="vitals-info-items">
@@ -135,7 +135,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
             <button
               className="vitals-info-close"
               onClick={() => { resetAdventureWidgetPosition(); }}
-              title="Reset widget position to default"
+              data-tooltip="Reset widget position to default"
               style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}
             >
               Reset

@@ -75,7 +75,7 @@ export const AchievementToastStack: React.FC = () => {
           <button
             className="achievement-toast-dismiss"
             onClick={() => dismissAchievementToast(toast.toastId)}
-            title="Dismiss"
+            data-tooltip="Dismiss"
           >
             x
           </button>

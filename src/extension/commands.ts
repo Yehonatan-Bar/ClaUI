@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { TabManager } from './session/TabManager';
 import type { SessionStore } from './session/SessionStore';
-import type { SerializedChatMessage } from './types/webview-messages';
+import type { ProviderId, SerializedChatMessage } from './types/webview-messages';
 
 function collectUrisFromArgs(args: unknown[]): vscode.Uri[] {
   const uris: vscode.Uri[] = [];
@@ -152,17 +152,21 @@ export function registerCommands(
   log: (msg: string) => void,
   logDir: string
 ): void {
+  const getConfiguredProvider = (): ProviderId =>
+    vscode.workspace.getConfiguration('claudeMirror').get<ProviderId>('provider', 'claude');
+
   context.subscriptions.push(
     // Start a NEW session in a new tab
     vscode.commands.registerCommand('claudeMirror.startSession', async () => {
-      const tab = tabManager.createTab();
+      const provider = getConfiguredProvider();
+      const tab = tabManager.createTabForProvider(provider);
       try {
         await tab.startSession();
-        log('New tab session started');
+        log(`New ${provider} tab session started`);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         vscode.window.showErrorMessage(
-          `Failed to start Claude session: ${errorMessage}`
+          `Failed to start ${provider === 'codex' ? 'Codex' : 'Claude'} session: ${errorMessage}`
         );
       }
     }),
@@ -193,7 +197,7 @@ export function registerCommands(
       if (tab) {
         tab.reveal();
       } else {
-        tabManager.createTab();
+        tabManager.createTabForProvider(getConfiguredProvider());
       }
     }),
 
@@ -202,7 +206,7 @@ export function registerCommands(
       const tab = tabManager.getActiveTab();
       if (!tab || !tab.isRunning) {
         vscode.window.showWarningMessage(
-          'No active Claude session. Start one first.'
+          'No active session. Start one first.'
         );
         return;
       }
@@ -222,7 +226,7 @@ export function registerCommands(
       const tab = tabManager.getActiveTab();
       if (!tab || !tab.isRunning) {
         vscode.window.showWarningMessage(
-          'No active Claude session. Start one first.'
+          'No active session. Start one first.'
         );
         return;
       }
@@ -238,13 +242,15 @@ export function registerCommands(
       });
 
       if (sessionId) {
-        const tab = tabManager.createTab();
+        const stored = sessionStore.getSession(sessionId);
+        const provider = stored?.provider ?? getConfiguredProvider();
+        const tab = tabManager.createTabForProvider(provider);
         try {
           await tab.startSession({ resume: sessionId });
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err);
           vscode.window.showErrorMessage(
-            `Failed to resume session: ${errorMessage}`
+            `Failed to resume ${provider === 'codex' ? 'Codex' : 'Claude'} session: ${errorMessage}`
           );
         }
       }
@@ -262,9 +268,10 @@ export function registerCommands(
 
       const items = sessions.map(s => ({
         label: s.name || `Session ${s.sessionId.slice(0, 8)}`,
-        description: `${s.model || ''}  ${formatRelativeTime(s.lastActiveAt)}`,
+        description: `${s.provider === 'codex' ? 'Codex' : 'Claude'} | ${s.model || 'unknown'}  ${formatRelativeTime(s.lastActiveAt)}`,
         detail: s.firstPrompt || undefined,
         sessionId: s.sessionId,
+        provider: s.provider,
       }));
 
       const picked = await vscode.window.showQuickPick(items, {
@@ -274,14 +281,14 @@ export function registerCommands(
       });
 
       if (picked) {
-        log(`Resuming session from history: ${picked.sessionId}`);
-        const tab = tabManager.createTab();
+        log(`Resuming ${picked.provider} session from history: ${picked.sessionId}`);
+        const tab = tabManager.createTabForProvider(picked.provider);
         try {
           await tab.startSession({ resume: picked.sessionId });
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err);
           vscode.window.showErrorMessage(
-            `Failed to resume session: ${errorMessage}`
+            `Failed to resume ${picked.provider === 'codex' ? 'Codex' : 'Claude'} session: ${errorMessage}`
           );
         }
       }

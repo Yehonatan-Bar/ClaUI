@@ -15,6 +15,8 @@ import type { SkillGenService } from '../skillgen/SkillGenService';
 import type {
   AdventureBeatMessage,
   ExtensionToWebviewMessage,
+  ProviderCapabilities,
+  ProviderId,
   TurnSemantics,
   TypingTheme,
   TurnCategory,
@@ -73,6 +75,21 @@ const CODE_WRITE_TOOLS = ['Write', 'Edit', 'NotebookEdit', 'MultiEdit'];
 const RESEARCH_TOOLS = ['Read', 'Grep', 'Glob', 'WebSearch', 'WebFetch'];
 const COMMAND_TOOLS = ['Bash', 'Terminal'];
 
+const CLAUDE_PROVIDER_CAPABILITIES: ProviderCapabilities = {
+  supportsPlanApproval: true,
+  supportsCompact: true,
+  supportsFork: true,
+  supportsImages: true,
+  supportsGitPush: true,
+  supportsTranslation: true,
+  supportsPromptEnhancer: true,
+  supportsCodexConsult: true,
+  supportsPermissionModeSelector: true,
+  supportsLiveTextStreaming: true,
+  supportsConversationDiskReplay: true,
+  supportsCostUsd: true,
+};
+
 function categorizeTurn(toolNames: string[], isError: boolean): TurnCategory {
   if (isError) return 'error';
   if (toolNames.length === 0) return 'discussion';
@@ -117,6 +134,11 @@ export class MessageHandler {
   private approvalResponseProcessed = false;
   /** Tracks whether EnterPlanMode was called in this session */
   private planModeActive = false;
+  /** Tracks whether an ExitPlanMode approval cycle completed in this session.
+   *  Set true when the user responds to ExitPlanMode (any action: approve/reject/feedback).
+   *  Reset to false when EnterPlanMode is detected (new plan cycle starts).
+   *  Used to suppress stale re-triggers from late assistantMessage events or replayed sessions. */
+  private exitPlanModeProcessed = false;
 
   /** Activity summarizer: periodically summarizes tool activity via Haiku */
   private activitySummarizer: ActivitySummarizer | null = null;
@@ -330,6 +352,7 @@ export class MessageHandler {
               type: 'sessionStarted',
               sessionId: this.processManager.currentSessionId || 'active',
               model: 'connected',
+              provider: 'claude',
             });
             break;
           }
@@ -342,6 +365,7 @@ export class MessageHandler {
                 type: 'sessionStarted',
                 sessionId: this.processManager.currentSessionId || 'pending',
                 model: 'connecting...',
+                provider: 'claude',
               });
             })
             .catch((err) => {
@@ -420,6 +444,7 @@ export class MessageHandler {
                 type: 'sessionStarted',
                 sessionId: this.processManager.currentSessionId || 'pending',
                 model: 'connecting...',
+                provider: 'claude',
               });
             })
             .catch((err) => {
@@ -433,6 +458,11 @@ export class MessageHandler {
         case 'setModel':
           this.log(`Setting model to: "${msg.model}"`);
           vscode.workspace.getConfiguration('claudeMirror').update('model', msg.model, true);
+          break;
+
+        case 'setProvider':
+          this.log(`Setting provider to: "${msg.provider}"`);
+          vscode.workspace.getConfiguration('claudeMirror').update('provider', msg.provider, true);
           break;
 
         case 'setTypingTheme':
@@ -595,15 +625,18 @@ export class MessageHandler {
           if (isExitPlanMode) {
             // Plan mode cycle complete
             this.planModeActive = false;
+            this.exitPlanModeProcessed = true;
           }
 
-          // ExitPlanMode approve: DO NOT send a user message to the CLI.
+          // ExitPlanMode: DO NOT send user messages to the CLI for ANY action.
           // The CLI already auto-approves ExitPlanMode (via bypassPermissions or
           // allowedTools). Sending a user message creates a spurious conversation
           // turn that causes the model to call ExitPlanMode again → infinite loop.
-          // Only send messages for reject/feedback (to tell the model to revise).
-          if (isExitPlanMode && isApproveAction) {
-            this.log('ExitPlanMode approved - closing bar without sending user message (CLI auto-approves)');
+          // This applies to approve, reject, AND feedback actions. By the time the
+          // user interacts with the bar, the CLI has already moved on. The user can
+          // still redirect the model by typing a new message (regular sendMessage path).
+          if (isExitPlanMode) {
+            this.log(`ExitPlanMode ${msg.action} - closing bar without sending user message (CLI auto-approves)`);
             if (msg.action === 'approveClearBypass') {
               this.log('Plan approval: also compacting context');
               this.control.compact();
@@ -659,6 +692,7 @@ export class MessageHandler {
           this.webview.saveProjectAnalyticsNow?.();
           this.clearApprovalTracking();
           this.planModeActive = false;
+          this.exitPlanModeProcessed = false;
           this.firstMessageSent = false;
           this.activitySummarizer?.reset();
           this.turnRecords = [];
@@ -678,6 +712,7 @@ export class MessageHandler {
                   type: 'sessionStarted',
                   sessionId: this.processManager.currentSessionId || 'pending',
                   model: 'connecting...',
+                  provider: 'claude',
                 });
                 // Send the edited message immediately - don't wait for system/init.
                 // The CLI in pipe mode only emits init AFTER receiving the first message,
@@ -975,6 +1010,10 @@ export class MessageHandler {
           this.sendTypingThemeSetting();
           // Send model setting
           this.sendModelSetting();
+          // Send default provider setting for new sessions
+          this.sendProviderSetting();
+          // Send current tab/provider capability flags for UI gating
+          this.sendProviderCapabilities();
           // Send permission mode setting
           this.sendPermissionModeSetting();
           // Send git push settings
@@ -1004,6 +1043,7 @@ export class MessageHandler {
               type: 'sessionStarted',
               sessionId: this.processManager.currentSessionId,
               model: 'unknown',
+              provider: 'claude',
             });
           }
           break;
@@ -1154,6 +1194,25 @@ export class MessageHandler {
     this.webview.postMessage({
       type: 'modelSetting',
       model,
+    });
+  }
+
+  /** Read default provider setting from VS Code config and send to webview */
+  private sendProviderSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const provider = config.get<ProviderId>('provider', 'claude');
+    this.log(`Sending provider setting: "${provider}"`);
+    this.webview.postMessage({
+      type: 'providerSetting',
+      provider,
+    });
+  }
+
+  /** Send per-provider feature support flags so the webview can hide unsupported UI */
+  private sendProviderCapabilities(): void {
+    this.webview.postMessage({
+      type: 'providerCapabilities',
+      capabilities: CLAUDE_PROVIDER_CAPABILITIES,
     });
   }
 
@@ -1373,6 +1432,9 @@ export class MessageHandler {
       if (e.affectsConfiguration('claudeMirror.model')) {
         this.sendModelSetting();
       }
+      if (e.affectsConfiguration('claudeMirror.provider')) {
+        this.sendProviderSetting();
+      }
       if (e.affectsConfiguration('claudeMirror.typingTheme')) {
         this.sendTypingThemeSetting();
       }
@@ -1425,6 +1487,7 @@ export class MessageHandler {
           type: 'sessionStarted',
           sessionId: event.session_id,
           model: event.model,
+          provider: 'claude',
         });
         // Send session metadata for Context Inspector tab
         const mcpNames = Array.isArray(event.mcp_servers)
@@ -1466,6 +1529,7 @@ export class MessageHandler {
         // Track plan mode: EnterPlanMode sets the flag so ExitPlanMode knows it's legitimate
         if (isEnterPlanModeTool(data.toolName)) {
           this.planModeActive = true;
+          this.exitPlanModeProcessed = false;
           this.log('Plan mode activated (EnterPlanMode detected)');
         }
         // Track for activity summarizer enrichment
@@ -1857,6 +1921,16 @@ export class MessageHandler {
     // fallback) can race with clearApprovalTracking and re-trigger. Suppress them.
     if (this.approvalResponseProcessed) {
       this.log(`Suppressing stale plan approval notification for ${toolName} - already responded`);
+      return;
+    }
+    // Suppress stale ExitPlanMode notifications when an ExitPlanMode cycle already
+    // completed in this session. This prevents re-triggers from late assistantMessage
+    // events, replayed sessions, or the fallback detection path after messageStart
+    // resets other guards. Only reset when EnterPlanMode starts a new plan cycle.
+    const norm = toolName.trim().toLowerCase();
+    const isExitPlanMode = norm === 'exitplanmode' || norm.endsWith('.exitplanmode');
+    if (isExitPlanMode && this.exitPlanModeProcessed) {
+      this.log(`Suppressing stale ExitPlanMode notification - already processed in this plan cycle`);
       return;
     }
     // NOTE: We intentionally do NOT auto-approve ExitPlanMode by sending user

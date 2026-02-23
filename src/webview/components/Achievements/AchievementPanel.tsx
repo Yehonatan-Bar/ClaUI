@@ -40,7 +40,7 @@ export const AchievementPanel: React.FC = () => {
           <button
             className="achievement-info-btn"
             onClick={() => setInfoOpen(!infoOpen)}
-            title={tr.aboutAchievements}
+            data-tooltip={tr.aboutAchievements}
           >
             {'\u2139'}
           </button>
@@ -49,7 +49,7 @@ export const AchievementPanel: React.FC = () => {
           <button
             className="achievement-community-btn"
             onClick={() => { setCommunityPanelOpen(true); setAchievementPanelOpen(false); }}
-            title={tr.community}
+            data-tooltip={tr.community}
           >
             {tr.community}
           </button>
@@ -59,18 +59,18 @@ export const AchievementPanel: React.FC = () => {
               useAppStore.getState().setCommunityPanelOpen(false);
               window.dispatchEvent(new CustomEvent('open-share-card'));
             }}
-            title={tr.share}
+            data-tooltip={tr.share}
           >
             {tr.share}
           </button>
           <button
             className="achievement-settings-btn"
             onClick={() => setSettingsOpen(!settingsOpen)}
-            title="Settings"
+            data-tooltip="Settings"
           >
             {'\u2699'}
           </button>
-          <button className="achievement-panel-close" onClick={() => setAchievementPanelOpen(false)} title={tr.close}>
+          <button className="achievement-panel-close" onClick={() => setAchievementPanelOpen(false)} data-tooltip={tr.close}>
             x
           </button>
         </div>

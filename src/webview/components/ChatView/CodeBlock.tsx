@@ -58,7 +58,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
           <button
             className="copy-button"
             onClick={handleCopy}
-            title="Copy to clipboard"
+            data-tooltip="Copy to clipboard"
           >
             {copied ? 'Copied!' : 'Copy'}
           </button>
@@ -71,6 +71,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
         <button
           className="code-block-toggle"
           onClick={() => setExpanded(!expanded)}
+          data-tooltip={expanded ? 'Collapse code block' : 'Expand code block'}
         >
           {expanded ? 'Show less' : `Show ${hiddenLineCount} more lines`}
         </button>

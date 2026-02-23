@@ -44,11 +44,10 @@ const modeToggleBase: React.CSSProperties = {
 };
 
 export const DashboardPanel: React.FC = () => {
-  const { turnHistory, cost, setDashboardOpen, projectSessions, projectDashboardMode, setProjectDashboardMode } = useAppStore();
+  const { turnHistory, setDashboardOpen, projectSessions, projectDashboardMode, setProjectDashboardMode } = useAppStore();
   const [activeTab, setActiveTab] = useState<DashboardTab>(
     projectDashboardMode === 'project' ? 'p-overview' : 'overview'
   );
-  const totalCostUsd = cost?.totalCostUsd ?? 0;
   const mode = projectDashboardMode;
 
   // Normalize local tab state to the persisted mode on mount / reopen.
@@ -151,7 +150,7 @@ export const DashboardPanel: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             onClick={handleOpenSettings}
-            title="Open ClaUi settings"
+            data-tooltip="Open ClaUi settings"
             style={{
               background: 'none',
               border: 'none',
@@ -165,7 +164,7 @@ export const DashboardPanel: React.FC = () => {
           </button>
           <button
             onClick={() => setDashboardOpen(false)}
-            title="Close dashboard (Esc)"
+            data-tooltip="Close dashboard (Esc)"
             style={{
               background: 'none',
               border: 'none',
@@ -218,7 +217,7 @@ export const DashboardPanel: React.FC = () => {
         padding: '20px',
       }}>
         {/* Session tabs */}
-        {mode === 'session' && activeTab === 'overview' && <OverviewTab turnHistory={turnHistory} totalCostUsd={totalCostUsd} />}
+        {mode === 'session' && activeTab === 'overview' && <OverviewTab turnHistory={turnHistory} />}
         {mode === 'session' && activeTab === 'tokens' && <TokensTab turnHistory={turnHistory} />}
         {mode === 'session' && activeTab === 'tools' && <ToolsTab turnHistory={turnHistory} />}
         {mode === 'session' && activeTab === 'timeline' && <TimelineTab turnHistory={turnHistory} />}

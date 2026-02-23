@@ -77,6 +77,7 @@ export const InputArea: React.FC = () => {
   const {
     isBusy,
     isConnected,
+    providerCapabilities,
     pendingFilePaths,
     setPendingFilePaths,
     promptHistory,
@@ -140,7 +141,7 @@ export const InputArea: React.FC = () => {
   /** Trigger prompt enhancement via the extension host */
   const handleEnhancePrompt = useCallback(() => {
     const trimmed = text.trim();
-    if (!trimmed || isEnhancing || !isConnected) return;
+    if (!providerCapabilities.supportsPromptEnhancer || !trimmed || isEnhancing || !isConnected) return;
     originalTextBeforeEnhanceRef.current = trimmed;
     setIsEnhancing(true);
     // Safety timeout: reset isEnhancing if result never arrives (35s > backend 30s timeout)
@@ -150,7 +151,7 @@ export const InputArea: React.FC = () => {
       enhanceTimeoutRef.current = null;
     }, 35_000);
     postToExtension({ type: 'enhancePrompt', text: trimmed } as any);
-  }, [text, isEnhancing, isConnected, setIsEnhancing]);
+  }, [text, isEnhancing, isConnected, setIsEnhancing, providerCapabilities.supportsPromptEnhancer]);
 
   /** Toggle the enhancer settings popover */
   const handleToggleEnhancerPopover = useCallback(() => {
@@ -209,7 +210,7 @@ export const InputArea: React.FC = () => {
     if ((!trimmed && pendingImages.length === 0) || !isConnected) return;
 
     // Auto-enhance: intercept send, enhance first, then auto-send
-    if (autoEnhanceEnabled && trimmed && !isEnhancing && pendingImages.length === 0 && !pendingApproval) {
+    if (providerCapabilities.supportsPromptEnhancer && autoEnhanceEnabled && trimmed && !isEnhancing && pendingImages.length === 0 && !pendingApproval) {
       setIsEnhancing(true);
       autoSendAfterEnhanceRef.current = true;
       originalTextBeforeEnhanceRef.current = trimmed;
@@ -257,7 +258,7 @@ export const InputArea: React.FC = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [text, pendingImages, isConnected, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing]);
+  }, [text, pendingImages, isConnected, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer]);
 
   /** Cancel the in-flight request */
   const cancelRequest = useCallback(() => {
@@ -360,7 +361,9 @@ export const InputArea: React.FC = () => {
       // Ctrl+Shift+E: enhance prompt
       if (e.key === 'e' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
         e.preventDefault();
-        handleEnhancePrompt();
+        if (providerCapabilities.supportsPromptEnhancer) {
+          handleEnhancePrompt();
+        }
         return;
       }
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -440,7 +443,7 @@ export const InputArea: React.FC = () => {
         }
       }
     },
-    [sendMessage, isBusy, cancelRequest, text, resizeTextarea, undoMgr, fileMention, applyMentionInsert, handleEnhancePrompt, enhanceComparisonData, handleUseOriginal]
+    [sendMessage, isBusy, cancelRequest, text, resizeTextarea, undoMgr, fileMention, applyMentionInsert, handleEnhancePrompt, enhanceComparisonData, handleUseOriginal, providerCapabilities.supportsPromptEnhancer]
   );
 
   /** Auto-resize textarea to fit content, reset history browsing on manual edits */
@@ -492,6 +495,9 @@ export const InputArea: React.FC = () => {
 
   /** Handle paste events - extract images from clipboard */
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (!providerCapabilities.supportsImages) {
+      return;
+    }
     const items = e.clipboardData?.items;
     if (!items) return;
 
@@ -525,7 +531,7 @@ export const InputArea: React.FC = () => {
       };
       reader.readAsDataURL(file);
     }
-  }, []);
+  }, [providerCapabilities.supportsImages]);
 
   /** Remove a pending image by index */
   const removePendingImage = useCallback((index: number) => {
@@ -720,7 +726,7 @@ export const InputArea: React.FC = () => {
               <button
                 className="pending-image-remove"
                 onClick={() => removePendingImage(i)}
-                title="Remove image"
+                data-tooltip="Remove image"
               >
                 x
               </button>
@@ -732,7 +738,7 @@ export const InputArea: React.FC = () => {
       {gitPushResult && (
         <div className={`git-push-toast ${gitPushResult.success ? 'success' : 'error'}`}>
           <span>{gitPushResult.success ? 'Git push successful' : gitPushResult.output}</span>
-          <button className="git-push-toast-dismiss" onClick={() => setGitPushResult(null)}>x</button>
+          <button className="git-push-toast-dismiss" onClick={() => setGitPushResult(null)} data-tooltip="Dismiss">x</button>
         </div>
       )}
 
@@ -742,14 +748,14 @@ export const InputArea: React.FC = () => {
       )}
 
       {/* Prompt enhancement comparison panel */}
-      {enhanceComparisonData && (
+      {providerCapabilities.supportsPromptEnhancer && enhanceComparisonData && (
         <div className="enhance-comparison-panel">
           <div className="enhance-comparison-header">
             <span className="enhance-comparison-title">Prompt Comparison</span>
             <button
               className="enhance-comparison-close"
               onClick={handleUseOriginal}
-              title="Dismiss and keep original"
+              data-tooltip="Dismiss and keep original"
             >
               x
             </button>
@@ -810,7 +816,7 @@ export const InputArea: React.FC = () => {
           className="clear-session-button"
           onClick={handleClearSession}
           disabled={!isConnected}
-          title="Clear session and start fresh"
+          data-tooltip="Clear session and start fresh"
         >
           Clear
         </button>
@@ -818,7 +824,7 @@ export const InputArea: React.FC = () => {
           className="browse-button"
           onClick={handleBrowseFiles}
           disabled={!isConnected}
-          title="Browse files to paste their paths"
+          data-tooltip="Browse files to paste their paths"
         >
           +
         </button>
@@ -826,7 +832,7 @@ export const InputArea: React.FC = () => {
           className="prompt-history-button"
           onClick={handleToggleHistory}
           disabled={!isConnected}
-          title="Prompt history"
+          data-tooltip="Prompt history"
         >
           H
         </button>
@@ -859,54 +865,57 @@ export const InputArea: React.FC = () => {
           )}
         </div>
         <div className="input-buttons">
-          <div className="enhance-button-group">
-            <button
-              className={`enhance-button${isEnhancing ? ' enhancing' : ''}${autoEnhanceEnabled ? ' auto-active' : ''}`}
-              onClick={handleEnhancePrompt}
-              disabled={!text.trim() || isEnhancing || !isConnected}
-              title={autoEnhanceEnabled ? 'Auto-enhance is ON (Ctrl+Shift+E)' : 'Enhance prompt (Ctrl+Shift+E)'}
-            >
-              {isEnhancing ? '\u21BB' : '\u2728'}
-            </button>
-            <button
-              className="enhance-gear-button"
-              onClick={handleToggleEnhancerPopover}
-              title="Enhancer settings"
-            >
-              {'\u2699'}
-            </button>
-            {enhancerPopoverOpen && (
-              <div className="enhance-popover">
-                <div className="enhance-popover-row">
-                  <span className="enhance-popover-label">Auto-enhance</span>
-                  <button
-                    className={`enhance-toggle-btn ${autoEnhanceEnabled ? 'on' : 'off'}`}
-                    onClick={handleAutoEnhanceToggle}
-                  >
-                    <span className="enhance-toggle-knob" />
-                  </button>
+          {providerCapabilities.supportsPromptEnhancer && (
+            <div className="enhance-button-group">
+              <button
+                className={`enhance-button${isEnhancing ? ' enhancing' : ''}${autoEnhanceEnabled ? ' auto-active' : ''}`}
+                onClick={handleEnhancePrompt}
+                disabled={!text.trim() || isEnhancing || !isConnected}
+                data-tooltip={autoEnhanceEnabled ? 'Auto-enhance is ON (Ctrl+Shift+E)' : 'Enhance prompt (Ctrl+Shift+E)'}
+              >
+                {isEnhancing ? '\u21BB' : '\u2728'}
+              </button>
+              <button
+                className="enhance-gear-button"
+                onClick={handleToggleEnhancerPopover}
+                data-tooltip="Enhancer settings"
+              >
+                {'\u2699'}
+              </button>
+              {enhancerPopoverOpen && (
+                <div className="enhance-popover">
+                  <div className="enhance-popover-row">
+                    <span className="enhance-popover-label">Auto-enhance</span>
+                    <button
+                      className={`enhance-toggle-btn ${autoEnhanceEnabled ? 'on' : 'off'}`}
+                      onClick={handleAutoEnhanceToggle}
+                      data-tooltip={autoEnhanceEnabled ? 'Disable auto-enhance' : 'Enable auto-enhance'}
+                    >
+                      <span className="enhance-toggle-knob" />
+                    </button>
+                  </div>
+                  <div className="enhance-popover-row">
+                    <span className="enhance-popover-label">Model</span>
+                    <select
+                      className="enhance-model-select"
+                      value={enhancerModel}
+                      onChange={(e) => handleEnhancerModelChange(e.target.value)}
+                    >
+                      <option value="claude-haiku-4-5-20251001">Haiku</option>
+                      <option value="claude-sonnet-4-6">Sonnet 4.6</option>
+                      <option value="claude-sonnet-4-5-20250929">Sonnet 4.5</option>
+                      <option value="claude-opus-4-6">Opus 4.6</option>
+                    </select>
+                  </div>
                 </div>
-                <div className="enhance-popover-row">
-                  <span className="enhance-popover-label">Model</span>
-                  <select
-                    className="enhance-model-select"
-                    value={enhancerModel}
-                    onChange={(e) => handleEnhancerModelChange(e.target.value)}
-                  >
-                    <option value="claude-haiku-4-5-20251001">Haiku</option>
-                    <option value="claude-sonnet-4-6">Sonnet 4.6</option>
-                    <option value="claude-sonnet-4-5-20250929">Sonnet 4.5</option>
-                    <option value="claude-opus-4-6">Opus 4.6</option>
-                  </select>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
           {isBusy && (
             <button
               className="cancel-button"
               onClick={cancelRequest}
-              title="Cancel current response (Esc)"
+              data-tooltip="Cancel current response (Esc)"
             >
               Cancel
             </button>
@@ -915,6 +924,7 @@ export const InputArea: React.FC = () => {
             className="send-button"
             onClick={sendMessage}
             disabled={(!text.trim() && pendingImages.length === 0) || !isConnected || isEnhancing || !!enhanceComparisonData}
+            data-tooltip="Send message (Ctrl+Enter)"
           >
             Send
           </button>

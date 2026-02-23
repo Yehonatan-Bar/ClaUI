@@ -33,7 +33,7 @@ export const CodexConsultPanel: React.FC<{ onClose: () => void }> = ({ onClose }
     <div className="codex-consult-panel">
       <div className="codex-consult-header">
         <span className="codex-consult-title">Consult Codex Expert</span>
-        <button className="codex-consult-close" onClick={onClose} title="Close">
+        <button className="codex-consult-close" onClick={onClose} data-tooltip="Close">
           x
         </button>
       </div>
@@ -55,7 +55,7 @@ export const CodexConsultPanel: React.FC<{ onClose: () => void }> = ({ onClose }
           className="codex-consult-send-btn"
           onClick={handleSend}
           disabled={!question.trim() || !isConnected || isBusy}
-          title="Send consultation (Ctrl+Enter)"
+          data-tooltip="Send consultation (Ctrl+Enter)"
         >
           Consult
         </button>

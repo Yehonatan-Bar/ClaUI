@@ -1,13 +1,11 @@
 import React from 'react';
 import {
-  AreaChart, Area,
   BarChart, Bar,
   PieChart, Pie, Cell,
-  ComposedChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import type { TurnRecord, TurnCategory } from '../../../../extension/types/webview-messages';
-import { DASH_COLORS, CATEGORY_COLORS, TOKEN_COLORS, formatCost, formatDuration } from '../dashboardUtils';
+import { DASH_COLORS, CATEGORY_COLORS, TOKEN_COLORS, formatDuration } from '../dashboardUtils';
 
 // --- Shared tooltip style ---
 const tooltipStyle = {
@@ -31,41 +29,7 @@ const tooltipItemStyle = {
   color: DASH_COLORS.textMuted,
 };
 
-// --- 1. CostAreaChart ---
-interface CostAreaChartProps {
-  turnHistory: TurnRecord[];
-}
-
-export const CostAreaChart: React.FC<CostAreaChartProps> = ({ turnHistory }) => {
-  const data = turnHistory.map((t, i) => ({
-    turn: i + 1,
-    cost: t.costUsd,
-    cumulative: turnHistory.slice(0, i + 1).reduce((s, x) => s + x.costUsd, 0),
-  }));
-
-  if (data.length === 0) return <EmptyChart label="No turns yet" />;
-
-  return (
-    <ResponsiveContainer width="100%" height={250}>
-      <ComposedChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke={DASH_COLORS.border} />
-        <XAxis dataKey="turn" stroke={DASH_COLORS.textMuted} tick={{ fontSize: 11 }} />
-        <YAxis stroke={DASH_COLORS.textMuted} tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v.toFixed(3)}`} />
-        <Tooltip
-          contentStyle={tooltipStyle}
-          cursor={tooltipCursor}
-          labelStyle={tooltipLabelStyle}
-          itemStyle={tooltipItemStyle}
-          formatter={(v: any) => formatCost(Number(v ?? 0))}
-        />
-        <Area type="monotone" dataKey="cumulative" fill={DASH_COLORS.blue} fillOpacity={0.15} stroke={DASH_COLORS.blue} name="Cumulative" />
-        <Bar dataKey="cost" fill={DASH_COLORS.green} fillOpacity={0.7} name="Per Turn" />
-      </ComposedChart>
-    </ResponsiveContainer>
-  );
-};
-
-// --- 2. TokenStackedBar ---
+// --- 1. TokenStackedBar ---
 interface TokenStackedBarProps {
   turnHistory: TurnRecord[];
 }

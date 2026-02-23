@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../../state/store';
 import { TextSettingsBar } from '../TextSettingsBar/TextSettingsBar';
 import { ModelSelector } from '../ModelSelector/ModelSelector';
+import { CodexModelSelector } from '../ModelSelector/CodexModelSelector';
+import { ProviderSelector } from '../ProviderSelector/ProviderSelector';
 import { PermissionModeSelector } from '../PermissionModeSelector/PermissionModeSelector';
 import { VitalsInfoPanel } from '../Vitals/VitalsInfoPanel';
 import { postToExtension } from '../../hooks/useClaudeStream';
@@ -44,6 +46,11 @@ export const StatusBar: React.FC<{
     skillGenRunStatus,
     setSkillGenPanelOpen,
     isConnected,
+    isBusy,
+    provider,
+    selectedProvider,
+    providerCapabilities,
+    setSelectedProvider,
     setCodexConsultPanelOpen,
   } = useAppStore();
 
@@ -128,12 +135,32 @@ export const StatusBar: React.FC<{
     setVitalsInfoOpen(false);
   };
 
+  const handleSetCodexProvider = () => {
+    if (selectedProvider === 'codex' || isBusy) {
+      return;
+    }
+    setSelectedProvider('codex');
+    postToExtension({ type: 'setProvider', provider: 'codex' });
+  };
+
+  const codexButtonTitle = selectedProvider === 'codex'
+    ? `Codex is the selected default provider${provider ? ` (current tab: ${provider === 'codex' ? 'Codex' : 'Claude'})` : ''}`
+    : 'Switch default provider to Codex for new sessions/tabs';
+
+  const isCodexUi = provider === 'codex' || !providerCapabilities.supportsPermissionModeSelector;
+  const modelSelectorElement = isCodexUi ? <CodexModelSelector /> : <ModelSelector />;
+  const permissionSelectorElement = providerCapabilities.supportsPermissionModeSelector
+    ? <PermissionModeSelector />
+    : null;
+  const showGitPush = providerCapabilities.supportsGitPush;
+  const showCodexConsult = providerCapabilities.supportsCodexConsult;
+
   // --- Shared elements ---
 
   const clockElement = (
     <div
       className={`status-bar-session-clock ${sessionActivityRunningSinceMs ? 'running' : ''}`}
-      title="Claude active processing time (starts after first prompt)"
+      data-tooltip="Claude active processing time (starts after first prompt)"
     >
       Active: {sessionActivityStarted ? formatDuration(activityMs) : '00:00:00'}
     </div>
@@ -145,14 +172,14 @@ export const StatusBar: React.FC<{
         className={`status-bar-git-btn ${gitPushSettings?.enabled ? '' : 'not-configured'}`}
         onClick={handleGitPush}
         disabled={gitPushRunning}
-        title={gitPushSettings?.enabled ? 'Git: add, commit & push' : 'Git push (setup needed)'}
+        data-tooltip={gitPushSettings?.enabled ? 'Git: add, commit & push' : 'Git push (setup needed)'}
       >
         {gitPushRunning ? '...' : 'Git'}
       </button>
       <button
         className="status-bar-git-config-btn"
         onClick={handleToggleGitConfig}
-        title="Git push settings"
+        data-tooltip="Git push settings"
       >
         *
       </button>
@@ -173,28 +200,41 @@ export const StatusBar: React.FC<{
         {clockElement}
 
         <StatusBarGroupButton label="More" isOpen={navOpen} onToggle={handleNavToggle}>
-          <button className="status-bar-group-dropdown-item" onClick={handleFeedback}>
+          <button className="status-bar-group-dropdown-item" onClick={handleFeedback} data-tooltip="Send feedback or report a bug">
             Feedback
           </button>
-          <button className="status-bar-group-dropdown-item" onClick={handleOpenPlans}>
+          <button className="status-bar-group-dropdown-item" onClick={handleOpenPlans} data-tooltip="Open plan document in browser">
             Plans
           </button>
-          <button className="status-bar-group-dropdown-item" onClick={handleHistory}>
+          <button className="status-bar-group-dropdown-item" onClick={handleHistory} data-tooltip="Conversation History (Ctrl+Shift+H)">
             History
           </button>
           <div className="status-bar-group-dropdown-separator" />
           <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-            <ModelSelector />
+            <ProviderSelector />
           </div>
+          <button
+            className={`status-bar-group-dropdown-item ${selectedProvider === 'codex' ? 'active' : ''}`}
+            onClick={handleSetCodexProvider}
+            disabled={isBusy}
+            data-tooltip={codexButtonTitle}
+          >
+            Codex
+          </button>
           <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-            <PermissionModeSelector />
+            {modelSelectorElement}
           </div>
+          {permissionSelectorElement && (
+            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+              {permissionSelectorElement}
+            </div>
+          )}
           <div className="status-bar-group-dropdown-separator" />
-          <button className="status-bar-group-dropdown-item" onClick={toggleDashboard}>
+          <button className="status-bar-group-dropdown-item" onClick={toggleDashboard} data-tooltip="Analytics Dashboard">
             Dashboard
           </button>
-          {isConnected && (
-            <button className="status-bar-group-dropdown-item" onClick={() => setCodexConsultPanelOpen(true)}>
+          {isConnected && showCodexConsult && (
+            <button className="status-bar-group-dropdown-item" onClick={() => setCodexConsultPanelOpen(true)} data-tooltip="Consult Codex GPT expert">
               Consult Codex
             </button>
           )}
@@ -222,14 +262,14 @@ export const StatusBar: React.FC<{
             <button
               className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
               onClick={handleToggleVitals}
-              title={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
+              data-tooltip={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
             >
               Vitals
             </button>
             <button
               className="status-bar-vitals-settings-btn"
               onClick={() => setVitalsInfoOpen((prev) => !prev)}
-              title="Vitals settings"
+              data-tooltip="Vitals settings"
               aria-label="Vitals settings"
             >
               {'\u2699'}
@@ -238,7 +278,7 @@ export const StatusBar: React.FC<{
           </div>
         </StatusBarGroupButton>
 
-        {gitGroup}
+        {showGitPush && gitGroup}
         <TextSettingsBar />
         {tokensElement}
       </div>
@@ -253,36 +293,45 @@ export const StatusBar: React.FC<{
         <button
           className="status-bar-achievements-btn"
           onClick={handleAchievements}
-          title={tAch(achievementLanguage).achievements}
+          data-tooltip={tAch(achievementLanguage).achievements}
         >
           {tAch(achievementLanguage).trophy} {achievementProfile.totalAchievements}
         </button>
       )}
-      <button className="status-bar-history-btn" onClick={handleHistory} title="Conversation History (Ctrl+Shift+H)">
+      <button className="status-bar-history-btn" onClick={handleHistory} data-tooltip="Conversation History (Ctrl+Shift+H)">
         History
       </button>
-      <button className="status-bar-plans-btn" onClick={handleOpenPlans} title="Open plan document in browser">
+      <button className="status-bar-plans-btn" onClick={handleOpenPlans} data-tooltip="Open plan document in browser">
         Plans
       </button>
-      <button className="status-bar-feedback-btn" onClick={handleFeedback} title="Send feedback or report a bug">
+      <button className="status-bar-feedback-btn" onClick={handleFeedback} data-tooltip="Send feedback or report a bug">
         Feedback
       </button>
-      {isConnected && (
+      {isConnected && showCodexConsult && (
         <button
           className="status-bar-consult-btn"
           onClick={() => setCodexConsultPanelOpen(true)}
-          title="Consult Codex GPT expert"
+          data-tooltip="Consult Codex GPT expert"
         >
           Consult
         </button>
       )}
-      {gitGroup}
-      <ModelSelector />
-      <PermissionModeSelector />
+      {showGitPush && gitGroup}
+      <button
+        className={`status-bar-codex-btn ${selectedProvider === 'codex' ? 'active' : ''}`}
+        onClick={handleSetCodexProvider}
+        disabled={isBusy}
+        data-tooltip={codexButtonTitle}
+      >
+        Codex
+      </button>
+      <ProviderSelector />
+      {modelSelectorElement}
+      {permissionSelectorElement}
       <TextSettingsBar />
       <button
         className="status-bar-dashboard-btn"
-        title="Analytics Dashboard"
+        data-tooltip="Analytics Dashboard"
         aria-label="Open analytics dashboard"
         onClick={toggleDashboard}
         style={{
@@ -300,7 +349,7 @@ export const StatusBar: React.FC<{
       {skillGenEnabled && (
         <button
           className={`status-bar-skillgen-btn ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''} ${skillGenRunStatus !== 'idle' && skillGenRunStatus !== 'succeeded' && skillGenRunStatus !== 'failed' ? 'running' : ''}`}
-          title={`SkillDocs: ${skillGenPendingDocs}/${skillGenThreshold} pending${skillGenRunStatus !== 'idle' ? ` (${skillGenRunStatus})` : ''}`}
+          data-tooltip={`SkillDocs: ${skillGenPendingDocs}/${skillGenThreshold} pending${skillGenRunStatus !== 'idle' ? ` (${skillGenRunStatus})` : ''}`}
           onClick={() => {
             postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'panelOpened', data: { source: 'statusbar-expanded', pendingDocs: skillGenPendingDocs, threshold: skillGenThreshold, runStatus: skillGenRunStatus } });
             postToExtension({ type: 'getSkillGenStatus' });
@@ -315,14 +364,14 @@ export const StatusBar: React.FC<{
           <button
             className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
             onClick={handleToggleVitals}
-            title={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
+            data-tooltip={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
           >
             Vitals
           </button>
           <button
             className="status-bar-vitals-settings-btn"
             onClick={() => setVitalsInfoOpen((prev) => !prev)}
-            title="Vitals settings"
+            data-tooltip="Vitals settings"
             aria-label="Vitals settings"
           >
             {'\u2699'}

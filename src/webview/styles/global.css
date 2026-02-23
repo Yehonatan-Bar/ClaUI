@@ -1191,6 +1191,7 @@ html, body, #root {
 }
 
 .status-bar-group-dropdown-item .model-selector,
+.status-bar-group-dropdown-item .provider-selector,
 .status-bar-group-dropdown-item .permission-mode-selector {
   width: 100%;
 }
@@ -1931,6 +1932,7 @@ html, body, #root {
 }
 
 /* Model selector */
+.provider-selector,
 .model-selector {
   display: flex;
   align-items: center;
@@ -1939,10 +1941,12 @@ html, body, #root {
   color: var(--vscode-descriptionForeground);
 }
 
+.provider-selector-label,
 .model-selector-label {
   font-weight: 600;
 }
 
+.provider-selector-select,
 .model-selector-select {
   background: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
@@ -1954,8 +1958,35 @@ html, body, #root {
   cursor: pointer;
 }
 
+.provider-selector-select:focus,
 .model-selector-select:focus {
   border-color: var(--vscode-focusBorder);
+}
+
+.status-bar-codex-btn {
+  background: linear-gradient(180deg, rgba(88, 166, 255, 0.12), rgba(88, 166, 255, 0.04));
+  color: var(--vscode-foreground);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.status-bar-codex-btn:hover:not(:disabled) {
+  border-color: rgba(88, 166, 255, 0.6);
+  background: linear-gradient(180deg, rgba(88, 166, 255, 0.2), rgba(88, 166, 255, 0.08));
+}
+
+.status-bar-codex-btn.active {
+  color: var(--vscode-button-foreground, #fff);
+  background: var(--vscode-button-background, #0e639c);
+  border-color: var(--vscode-button-background, #0e639c);
+}
+
+.status-bar-codex-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .model-selector-active {
@@ -4535,4 +4566,41 @@ html, body, #root {
   overflow-y: auto;
   color: var(--vscode-editor-foreground, #e6edf3);
   opacity: 0.7;
+}
+
+/* ============================================================
+   Global Tooltip (event-delegated via data-tooltip attribute)
+   ============================================================ */
+
+.global-tooltip {
+  position: fixed;
+  z-index: 10000;
+  max-width: 250px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  pointer-events: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  color: var(--vscode-editorWidget-foreground, #cccccc);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.global-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.global-tooltip.placement-bottom {
+  transform: translateY(-4px);
+}
+
+.global-tooltip.placement-bottom.visible {
+  transform: translateY(0);
 }

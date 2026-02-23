@@ -26,7 +26,7 @@ export const GitPushPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     <div className="git-push-panel">
       <div className="git-push-panel-header">
         <span className="git-push-panel-title">Git Push Configuration</span>
-        <button className="git-push-panel-close" onClick={onClose} title="Close">
+        <button className="git-push-panel-close" onClick={onClose} data-tooltip="Close">
           x
         </button>
       </div>
@@ -56,7 +56,7 @@ export const GitPushPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => 
           className="git-push-config-send"
           onClick={handleSendConfig}
           disabled={!instruction.trim() || !isConnected}
-          title="Send to Claude (Ctrl+Enter)"
+          data-tooltip="Send to Claude (Ctrl+Enter)"
         >
           Ask Claude
         </button>
