@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { spawn, ChildProcess } from 'child_process';
 import type { TurnSemantics } from '../types/webview-messages';
+import { buildClaudeCliEnv } from '../process/envUtils';
 
 export interface TurnAnalysisInput {
   messageId: string;
@@ -25,6 +26,11 @@ export class TurnAnalyzer {
   private analysesCompleted = 0;
   private maxPerSession = 30;
   private callback: ((messageId: string, semantics: TurnSemantics) => void) | null = null;
+  private apiKey: string | undefined;
+
+  setApiKey(key: string | undefined): void {
+    this.apiKey = key;
+  }
 
   setLogger(logger: (msg: string) => void): void {
     this.log = logger;
@@ -142,10 +148,7 @@ export class TurnAnalyzer {
 
     const args = ['-p', '--model', analysisModel];
 
-    // Clean environment to prevent nested-session detection
-    const env = { ...process.env };
-    delete env.CLAUDECODE;
-    delete env.CLAUDE_CODE_ENTRYPOINT;
+    const env = buildClaudeCliEnv(this.apiKey);
 
     this.log(`[TurnAnalyzer] Spawning analysis for messageId=${input.messageId}`);
 

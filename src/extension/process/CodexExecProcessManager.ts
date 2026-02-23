@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ChildProcess, exec, spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import type { CodexExecJsonEvent } from '../types/codex-exec-json';
+import { buildSanitizedEnv } from './envUtils';
 
 export interface CodexRunTurnOptions {
   prompt: string;
@@ -64,7 +65,7 @@ export class CodexExecProcessManager extends EventEmitter {
 
     const child = spawn(cliPath, args, {
       cwd,
-      env: { ...process.env },
+      env: buildSanitizedEnv(),
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: true,
     });

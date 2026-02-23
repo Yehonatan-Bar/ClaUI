@@ -28,6 +28,11 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
   const turnAnalysisEnabled = useAppStore((s) => s.turnAnalysisEnabled);
   const analysisModel = useAppStore((s) => s.analysisModel);
   const skillGenEnabled = useAppStore((s) => s.skillGenEnabled);
+  const hasApiKey = useAppStore((s) => s.hasApiKey);
+  const maskedApiKey = useAppStore((s) => s.maskedApiKey);
+
+  const [showApiKeyInput, setShowApiKeyInput] = React.useState(false);
+  const [apiKeyDraft, setApiKeyDraft] = React.useState('');
 
   const handleToggle = () => {
     const next = !vitalsEnabled;
@@ -59,6 +64,18 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
 
   const handleSkillGenToggle = () => {
     postToExtension({ type: 'setSkillGenEnabled', enabled: !skillGenEnabled });
+  };
+
+  const handleSaveApiKey = () => {
+    if (apiKeyDraft.trim()) {
+      postToExtension({ type: 'setApiKey', apiKey: apiKeyDraft.trim() });
+      setApiKeyDraft('');
+      setShowApiKeyInput(false);
+    }
+  };
+
+  const handleClearApiKey = () => {
+    postToExtension({ type: 'setApiKey', apiKey: '' });
   };
 
   return (
@@ -113,6 +130,72 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
             <span>Pixel-art dungeon crawler. Each turn = a room: scrolls (read), anvils (edit), traps (errors), dragons (3+ errors), treasure (recovery).</span>
           </div>
         </div>
+      </div>
+
+      <div className="vitals-info-toggle-row" style={{ marginBottom: 6, flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>API Key</span>
+          {hasApiKey ? (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ fontFamily: 'monospace', fontSize: 11, opacity: 0.7 }}>{maskedApiKey}</span>
+              <button
+                className="vitals-info-close"
+                onClick={handleClearApiKey}
+                style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}
+                data-tooltip="Remove stored API key"
+              >
+                Clear
+              </button>
+            </div>
+          ) : !showApiKeyInput ? (
+            <button
+              className="vitals-info-close"
+              onClick={() => setShowApiKeyInput(true)}
+              style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}
+              data-tooltip="Set an Anthropic API key for this extension"
+            >
+              Set
+            </button>
+          ) : null}
+        </div>
+        {showApiKeyInput && !hasApiKey && (
+          <div style={{ display: 'flex', gap: 4 }}>
+            <input
+              type="password"
+              value={apiKeyDraft}
+              onChange={(e) => setApiKeyDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveApiKey(); if (e.key === 'Escape') { setShowApiKeyInput(false); setApiKeyDraft(''); } }}
+              placeholder="sk-ant-..."
+              style={{
+                flex: 1,
+                background: 'var(--vscode-input-background)',
+                color: 'var(--vscode-input-foreground)',
+                border: '1px solid var(--vscode-input-border, transparent)',
+                borderRadius: 3,
+                padding: '2px 6px',
+                fontSize: 11,
+                fontFamily: 'monospace',
+              }}
+              autoFocus
+            />
+            <button
+              className="vitals-info-close"
+              onClick={handleSaveApiKey}
+              style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}
+              data-tooltip="Save API key to OS keychain"
+            >
+              Save
+            </button>
+            <button
+              className="vitals-info-close"
+              onClick={() => { setShowApiKeyInput(false); setApiKeyDraft(''); }}
+              style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}
+              data-tooltip="Cancel"
+            >
+              x
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>

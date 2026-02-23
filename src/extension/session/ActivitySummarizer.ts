@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
+import { buildClaudeCliEnv } from '../process/envUtils';
 
 export interface ActivitySummary {
   /** Short label for the tab title (3-6 words) */
@@ -39,6 +40,12 @@ export class ActivitySummarizer {
 
   /** Callback when a new summary is generated */
   private summaryCallback: ((summary: ActivitySummary) => void) | null = null;
+
+  private apiKey: string | undefined;
+
+  setApiKey(key: string | undefined): void {
+    this.apiKey = key;
+  }
 
   constructor(options?: { threshold?: number; debounceMs?: number; timeoutMs?: number }) {
     this.threshold = options?.threshold ?? 3;
@@ -162,10 +169,7 @@ export class ActivitySummarizer {
       .get<string>('analysisModel', 'claude-haiku-4-5-20251001');
     const args = ['-p', '--model', analysisModel];
 
-    // Clean environment to prevent nested-session detection
-    const env = { ...process.env };
-    delete env.CLAUDECODE;
-    delete env.CLAUDE_CODE_ENTRYPOINT;
+    const env = buildClaudeCliEnv(this.apiKey);
 
     this.log(`[ActivitySummarizer] Spawning Haiku with ${toolNames.length} tools`);
 

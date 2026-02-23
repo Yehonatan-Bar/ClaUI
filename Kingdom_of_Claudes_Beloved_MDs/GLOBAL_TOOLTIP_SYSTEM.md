@@ -40,7 +40,7 @@ Portal renders <div role="tooltip"> at document.body with CSS transitions
 | Behavior | Detail |
 |----------|--------|
 | Hover delay | 400ms (configurable via `delay` prop) |
-| Position | Centered above trigger, 6px gap. Flips to bottom if near top edge |
+| Position | Centered above trigger, 6px gap. Flips to bottom if near top edge. Tall triggers (>100px) anchor near mouse cursor |
 | Horizontal shift | Stays within viewport with 8px margin |
 | Post-render adjust | After tooltip renders, measures actual size and repositions if overflowing |
 | Hide triggers | mouseout, scroll (any scrollable ancestor), new mouseover on different element |
@@ -58,7 +58,7 @@ border: 1px solid var(--vscode-editorWidget-border, #454545);
 color: var(--vscode-editorWidget-foreground, #cccccc);
 ```
 
-Fixed position, z-index 10000, max-width 250px, 4px 8px padding, 4px border-radius, 11px font-size.
+Fixed position, z-index 10000, max-width 320px, 4px 8px padding, 4px border-radius, 11px font-size.
 
 ## Migrated Components
 
@@ -98,7 +98,7 @@ All component files use `data-tooltip` instead of `title`:
 |------|--------|
 | `ChatView/MarkdownContent.tsx` | Generates HTML strings via `marked` renderer, not JSX |
 | `ChatView/filePathLinks.tsx` | Functional "Ctrl+Click to open" titles during streaming |
-| `SessionTimeline.tsx` | Has its own rich custom tooltip (multi-line, instant, segment-relative) |
+| `SessionTimeline.tsx` | Per-segment tooltips use their own inline system; the container has a `data-tooltip` for the overall legend |
 | Recharts `<Tooltip>` components | Entirely different chart data tooltip system |
 
 ## Usage
@@ -116,3 +116,15 @@ Dynamic tooltips work too:
 ```
 
 No imports, no wrapping components, no registration needed.
+
+## Tall Trigger Anchoring
+
+Elements taller than 100px (e.g., `.session-timeline`) use mouse-cursor-based positioning instead of element-center positioning. When the tooltip timer fires, a synthetic 20px-tall `DOMRect` is created at the mouse's Y position. This prevents the tooltip from being positioned off-screen when the trigger spans the full viewport height.
+
+## Intensity Border Zone
+
+The `.intensity-border-zone` is a thin (10px) absolutely-positioned div on the left edge of assistant messages. It carries a `data-tooltip` explaining the border color/width meaning. This avoids showing the tooltip when hovering anywhere on the message body.
+
+## Multiline Tooltip Text
+
+Tooltips support `\n` for line breaks via `white-space: pre-wrap` in CSS. Use this for detailed explanatory tooltips (e.g., color legends, feature descriptions).

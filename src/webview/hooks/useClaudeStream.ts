@@ -36,6 +36,7 @@ export function useClaudeStream(): void {
     setProviderCapabilities,
     setSelectedModel,
     setSelectedCodexReasoningEffort,
+    setCodexModelOptions,
     setResuming,
     setPendingApproval,
     setProjectPromptHistory,
@@ -70,6 +71,7 @@ export function useClaudeStream(): void {
     setGithubSyncStatus,
     setCommunityFriends,
     setFriendActionPending,
+    setApiKeySetting,
   } = useAppStore();
 
   useEffect(() => {
@@ -258,6 +260,10 @@ export function useClaudeStream(): void {
 
         case 'codexReasoningEffortSetting':
           setSelectedCodexReasoningEffort(msg.effort);
+          break;
+
+        case 'codexModelOptions':
+          setCodexModelOptions(msg.options);
           break;
 
         case 'typingThemeSetting':
@@ -497,6 +503,10 @@ export function useClaudeStream(): void {
           // Progress is updated via skillGenProgress; also refresh status
           // The extension sends a skillGenStatus right after skillGenComplete
           break;
+
+        case 'apiKeySetting':
+          setApiKeySetting(msg.hasKey, msg.maskedKey);
+          break;
       }
     }
 
@@ -532,6 +542,7 @@ export function useClaudeStream(): void {
     setProviderCapabilities,
     setSelectedModel,
     setSelectedCodexReasoningEffort,
+    setCodexModelOptions,
     setResuming,
     setPendingApproval,
     setProjectPromptHistory,
@@ -563,6 +574,7 @@ export function useClaudeStream(): void {
     setSkillGenSettings,
     setSkillGenStatus,
     setSkillGenProgress,
+    setApiKeySetting,
   ]);
 }
 

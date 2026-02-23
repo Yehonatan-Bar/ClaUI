@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
+import { buildClaudeCliEnv } from '../process/envUtils';
 
 /** RTL languages that need dir="rtl" when displaying translations */
 export const RTL_LANGUAGES = new Set(['Hebrew', 'Arabic']);
@@ -22,7 +23,7 @@ export class MessageTranslator {
    * @param language Target language (defaults to config setting, then Hebrew)
    * Returns the translated text, or null on failure.
    */
-  async translate(textContent: string, language?: string): Promise<string | null> {
+  async translate(textContent: string, language?: string, apiKey?: string): Promise<string | null> {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const cliPath = config.get<string>('cliPath', 'claude');
     const targetLang = language || config.get<string>('translationLanguage', 'Hebrew');
@@ -46,10 +47,7 @@ export class MessageTranslator {
 
     const args = ['-p', '--model', 'claude-sonnet-4-6'];
 
-    // Clean environment to prevent nested-session detection
-    const env = { ...process.env };
-    delete env.CLAUDECODE;
-    delete env.CLAUDE_CODE_ENTRYPOINT;
+    const env = buildClaudeCliEnv(apiKey);
 
     this.log(`[MessageTranslator] Spawning CLI for translation to ${targetLang} (${textContent.length} chars)`);
 

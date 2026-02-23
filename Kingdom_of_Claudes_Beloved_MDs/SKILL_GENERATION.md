@@ -1,6 +1,6 @@
 # Auto Skill Generation
 
-Automatically generates Claude skills from accumulated SR-PTD (post-task documentation) files. When the number of new/changed documents reaches a configurable threshold, a Python skill-generation pipeline runs in an isolated workspace, deduplicates against existing skills, and installs new/upgraded skills atomically with backup and rollback.
+Automatically generates Claude skills from accumulated SR-PTD (post-task documentation) files. When the number of new/changed documents reaches a configurable threshold, a phase-orchestrated pipeline runs in an isolated workspace -- non-AI phases use Python subprocesses, AI phases use Claude Code CLI one-shot calls (no API key required). Generated skills are deduplicated against existing ones and installed atomically with backup and rollback.
 
 ## Key Files
 
@@ -10,7 +10,14 @@ Automatically generates Claude skills from accumulated SR-PTD (post-task documen
 |------|---------|
 | `src/extension/skillgen/SkillGenStore.ts` | Document ledger persistence via `globalState` |
 | `src/extension/skillgen/SkillGenService.ts` | Main orchestrator (scan, preflight, lock, pipeline, dedup, install) |
-| `src/extension/skillgen/PythonPipelineRunner.ts` | Python subprocess execution with progress monitoring |
+| `src/extension/skillgen/PhaseOrchestrator.ts` | Phase-by-phase pipeline execution (replaced PythonPipelineRunner) |
+| `src/extension/skillgen/ClaudeCliCaller.ts` | Shared one-shot Claude CLI utility for AI phases |
+| `src/extension/skillgen/phases/types.ts` | Shared types: PhaseId enum, PhaseResult, progress ranges |
+| `src/extension/skillgen/phases/PythonPhaseRunner.ts` | Runs non-AI Python scripts (B, C.0-C.1, C.5, sanity) |
+| `src/extension/skillgen/phases/PhaseC2TagEnrichment.ts` | AI tag enrichment via Claude CLI |
+| `src/extension/skillgen/phases/PhaseC3IncrementalClustering.ts` | AI incremental clustering via Claude CLI |
+| `src/extension/skillgen/phases/PhaseC4CrossBucketMerge.ts` | AI cross-bucket merging via Claude CLI |
+| `src/extension/skillgen/phases/PhaseDSkillSynthesis.ts` | AI skill synthesis via Claude CLI (parallelized, max 3 concurrent) |
 | `src/extension/skillgen/DeduplicationEngine.ts` | 3-tier deduplication engine |
 | `src/extension/skillgen/SkillInstaller.ts` | Atomic skill installation with backup/rollback |
 | `src/extension/skillgen/SrPtdBootstrap.ts` | Auto-install SR-PTD skill + inject CLAUDE.md instructions |
@@ -24,6 +31,7 @@ Automatically generates Claude skills from accumulated SR-PTD (post-task documen
 | `sr-ptd-skill/assets/full-template.md` | Full SR-PTD template (Sections A-J) |
 | `sr-ptd-skill/assets/quick-template.md` | Quick capture template |
 | `sr-ptd-skill/references/example-completed.md` | Worked example |
+| `sr-ptd-skill/assets/skills-pipeline-guide.html` | Visual guide: how docs become skills (opens in browser) |
 
 ### Webview (React)
 
@@ -36,13 +44,64 @@ Automatically generates Claude skills from accumulated SR-PTD (post-task documen
 
 | File | Purpose |
 |------|---------|
-| `src/extension/types/webview-messages.ts` | Message contract (4 webview->ext, 4 ext->webview) |
-| `src/webview/state/store.ts` | Zustand state (9 fields, 4 actions) |
+| `src/extension/types/webview-messages.ts` | Message contract (5 webview->ext, 4 ext->webview) |
+| `src/webview/state/store.ts` | Zustand state (10 fields, 5 actions) |
 | `src/webview/hooks/useClaudeStream.ts` | Message dispatch for skillGen events |
 
 ---
 
 ## Architecture
+
+### Pipeline Phase Architecture
+
+```
+SkillGenService (unchanged orchestration: scan, preflight, lock, dedup, install)
+  |
+  v
+PhaseOrchestrator (runs phases individually, supports resume)
+  |
+  +-- PythonPhaseRunner (non-AI phases: Python subprocess per phase)
+  |     |-- Phase B: layer1_extractor.py
+  |     |-- Phase C.0-C.1: phase_c_clustering.py
+  |     |-- Phase C.5: phase_c5_representatives.py
+  |     +-- Sanity: sanity_check.py
+  |
+  +-- ClaudeCliCaller (shared one-shot `claude -p --model` utility)
+  |
+  +-- AI Phase Handlers (TypeScript, use ClaudeCliCaller)
+        |-- PhaseC2TagEnrichment.ts     (Sonnet, 30s/call, sequential)
+        |-- PhaseC3IncrementalClustering.ts  (Sonnet, 30s/call, sequential per bucket)
+        |-- PhaseC4CrossBucketMerge.ts       (Sonnet, 60s/call, one per rollup group)
+        +-- PhaseDSkillSynthesis.ts          (Opus, 300s/call, 3 concurrent)
+```
+
+### Phase Execution Order
+
+| Phase | Name | Type | Model | Description |
+|-------|------|------|-------|-------------|
+| B | Layer 1 Extraction | Python | N/A | Extracts structured data from SR-PTD markdown |
+| C.0-C.1 | Doc Cards & Bucketing | Python | N/A | Creates doc cards and initial buckets |
+| C.2 | AI Tag Enrichment | CLI | Sonnet | Enriches cards with missing domain/pattern tags |
+| C.3 | Incremental Clustering | CLI | Sonnet | Sequential within-bucket clustering |
+| C.4 | Cross-Bucket Merge | CLI | Sonnet | Groups clusters by domain rollup, AI merge decisions |
+| C.5 | Representative Selection | Python | N/A | Selects representative docs per cluster |
+| sanity | Sanity Check | Python | N/A | Validates pipeline output consistency |
+| D | Skill Synthesis | CLI | Opus | Generates SKILL.md + supporting files (parallelized) |
+
+### Progress Mapping
+
+Each phase is allocated a progress range (0-100%):
+
+| Phase | Start% | End% |
+|-------|--------|------|
+| B | 5 | 15 |
+| C.0-C.1 | 15 | 25 |
+| C.2 | 25 | 40 |
+| C.3 | 40 | 55 |
+| C.4 | 55 | 65 |
+| C.5 | 65 | 70 |
+| sanity | 70 | 72 |
+| D | 72 | 95 |
 
 ### Data Flow
 
@@ -56,7 +115,10 @@ Automatically generates Claude skills from accumulated SR-PTD (post-task documen
 [SkillGenService]  -- preflight checks -->  lock acquisition -->  workspace setup
        |
        v
-[PythonPipelineRunner]  -- subprocess with progress stdout parsing
+[PhaseOrchestrator]  -- runs 8 phases sequentially (resume via .pipeline_progress.json)
+       |
+       +-- Non-AI phases: PythonPhaseRunner (subprocess per phase)
+       +-- AI phases: ClaudeCliCaller -> Claude Code CLI one-shot calls
        |
        v  (skills_out/ directory)
 [DeduplicationEngine]  -- 3-tier comparison against existing skills
@@ -84,25 +146,86 @@ SkillGenService is a singleton created in `extension.ts`. It uses a `registerTab
 
 ## Components
 
+### ClaudeCliCaller
+
+Shared utility for making one-shot Claude CLI calls. Used by all AI phases to replace direct Anthropic SDK calls.
+
+**Pattern:** Spawns `claude -p --model <model>`, pipes prompt to stdin, collects stdout. Based on the same pattern as `PromptEnhancer.ts`.
+
+**Key behaviors:**
+- Environment cleanup: deletes `CLAUDECODE` and `CLAUDE_CODE_ENTRYPOINT` to prevent nested-session detection
+- Windows process tree kill: `taskkill /F /T /PID` for proper cleanup
+- Configurable timeout per call
+- `callJson<T>()` method: strips markdown code fences before JSON parsing
+- Uses `claudeMirror.cliPath` setting for the CLI executable path
+
+### PhaseOrchestrator
+
+Replaces the former `PythonPipelineRunner`. Runs all 8 pipeline phases individually.
+
+**Key behaviors:**
+- Implements same interface as the old runner (`run()`, `cancel()`, progress callbacks)
+- Dispatches non-AI phases to `PythonPhaseRunner`, AI phases to their TypeScript handlers
+- Resume support: reads/writes `.pipeline_progress.json` (same format as Python)
+- Cancel propagation: kills active Python subprocess or sets abort flag for AI phase loops
+- Progress mapping: each phase gets a progress range within 0-100%
+
+### PythonPhaseRunner
+
+Runs individual non-AI Python scripts as subprocesses.
+
+**Phase-to-script mapping:**
+- B: `scripts/layer1_extractor.py` with `[srptd_raw_dir, -o, extractions_dir]`
+- C.0-C.1: `scripts/phase_c_clustering.py` with `[--input-dir, extractions_dir, --output-dir, clusters_dir]`
+- C.5: `scripts/phase_c5_representatives.py` (no args, uses SRPTD_PROJECT_ROOT env)
+- sanity: `scripts/sanity_check.py` (no args, uses SRPTD_PROJECT_ROOT env)
+
+**Environment:** Sets `PYTHONUNBUFFERED=1` and `SRPTD_PROJECT_ROOT=<workspaceDir>`.
+
+### PhaseC2TagEnrichment
+
+AI tag enrichment for doc cards with missing domain/pattern tags.
+
+- Reads from `{clusters_dir}/doc_cards/*.json`
+- Filters cards needing enrichment (missing/unknown domains or patterns)
+- For each card: builds prompt with allowed vocabularies, calls ClaudeCliCaller
+- Validates response against hardcoded domain/pattern vocabularies (~70 terms total)
+- Writes enriched cards to `doc_cards_enriched/` and regenerated buckets to `buckets_enriched/`
+- Writes `_enrichment_summary.json`
+
+### PhaseC3IncrementalClustering
+
+Incremental within-bucket clustering.
+
+- Reads buckets from `buckets_enriched/`, doc cards from `doc_cards_enriched/`
+- For each bucket, processes docs sequentially (order matters -- clusters build incrementally)
+- Two prompt variants: first-doc-in-bucket (create initial cluster) vs subsequent-doc (assign or create new)
+- Writes per-bucket cluster files to `clusters_incremental/`
+- Writes `_incremental_clustering_summary.json`
+
+### PhaseC4CrossBucketMerge
+
+Cross-bucket merging using domain rollups.
+
+- Groups clusters by domain rollup (hardcoded mapping: pdf-processing, data-analysis, frontend, etc.)
+- One CLI call per rollup group (far fewer calls than C.2/C.3)
+- AI decides: merge_all (one skill) or split (2-3 sub-skills)
+- Writes to `clusters_final/`, `doc_to_cluster_map_final.json`, `_merge_summary.json`
+
+### PhaseDSkillSynthesis
+
+Skill synthesis from cluster representatives.
+
+- Uses Opus model (heavy synthesis, up to 32K token output)
+- 300s timeout per call
+- Parallelized with concurrency limiter (max 3 concurrent CLI processes)
+- Each cluster is independent -- no sequential dependency
+- Parses large JSON response, creates skill directory structure (SKILL.md, references/, scripts/, assets/, traceability.json)
+- Writes `_phase_d_synthesis_summary.json`
+
 ### SkillGenStore
 
 Persistent document ledger stored via VS Code `globalState` (key: `skillGen.ledger`).
-
-**Ledger structure:**
-```typescript
-interface SkillGenLedger {
-  documents: Record<string, DocumentFingerprint>;
-  runHistory: SkillGenRunHistoryEntry[];
-  lastRunAt?: string;
-}
-
-interface DocumentFingerprint {
-  relativePath: string;
-  size: number;
-  mtimeMs: number;
-  status: 'pending' | 'processed';
-}
-```
 
 **Key methods:**
 - `updateFromScan(files)` - Compares disk files against stored fingerprints, marks new/changed as pending
@@ -115,27 +238,12 @@ interface DocumentFingerprint {
 Central orchestrator. Coordinates the full pipeline: scan -> preflight -> lock -> pipeline -> dedup -> install.
 
 **Key behaviors:**
-- Preflight checks: verifies Python exists, toolkit path valid, pipeline script exists at resolved path, docs directory exists
+- Preflight checks: verifies Python exists, toolkit path valid with scripts/ directory, docs directory exists
+- No API key check needed (AI phases use Claude Code CLI which is authenticated via the user's Claude account)
 - Default toolkit path: auto-resolves to `<docsDirectory>/used/skills_from_docs_toolkit` when `toolkitPath` setting is empty
 - Cross-process locking via lock files (stale detection after 2 hours)
 - Auto-run mode: triggers pipeline automatically when threshold reached
-- Notification mode: just broadcasts status, user triggers manually
 - Records run history with status, duration, skills generated count
-
-**Run statuses:** `idle` | `scanning` | `preflight` | `running` | `deduplicating` | `installing` | `succeeded` | `failed`
-
-### PythonPipelineRunner
-
-Spawns a Python child process to run the skill generation toolkit.
-
-**Pipeline modes:**
-- `run_pipeline` - Full pipeline via toolkit script
-- `python_api` - Python API call
-- `create_skills` - Direct skill creation
-
-**Progress monitoring:** Parses stdout lines matching `[PROGRESS] <percent> <label>` format. Broadcasts progress to webview via `skillGenProgress` messages.
-
-**Platform handling:** On Windows, uses `taskkill /F /T /PID` to kill the entire process tree (same pattern as `ClaudeProcessManager`).
 
 ### DeduplicationEngine
 
@@ -145,12 +253,9 @@ Spawns a Python child process to run the skill generation toolkit.
 
 **Tier 2 - Metadata:** Compares skill names, descriptions, and keywords using trigram-based string similarity (Jaccard coefficient). Flags skills with >0.7 similarity as potential upgrades.
 
-**Tier 3 - AI (placeholder):** Reserved for Claude Sonnet-based semantic comparison. Currently returns `null` (no verdict), falling through to Tier 2 results.
+**Tier 3 - AI (placeholder):** Reserved for Claude Sonnet-based semantic comparison. Currently returns `null` (no verdict).
 
-**Verdicts per skill:**
-- `new` - No existing skill matches, install fresh
-- `upgrade` - Matches an existing skill with improvements, overwrite
-- `skip` - Duplicate of existing skill, do not install
+**Verdicts per skill:** `new`, `upgrade`, `skip`.
 
 ### SkillInstaller
 
@@ -168,8 +273,6 @@ Atomic installation with safety guarantees.
 
 ## Logging
 
-Comprehensive categorized logging covers the full SkillGen flow from UI button click through pipeline completion.
-
 ### Log Categories
 
 | Category | Layer | Purpose | Default Level |
@@ -179,9 +282,15 @@ Comprehensive categorized logging covers the full SkillGen flow from UI button c
 | `[SkillGen:Scan]` | SkillGenService | Document scan lifecycle, threshold decisions | INFO |
 | `[SkillGen:Preflight]` | SkillGenService | Python/toolkit/docs checks | INFO/ERROR |
 | `[SkillGen:Lock]` | SkillGenService | Cross-process lock acquire/release/stale | INFO/WARNING |
-| `[SkillGen:Pipeline]` | SkillGenService + PythonPipelineRunner | Subprocess spawn/exit, progress stages | INFO/ERROR |
-| `[SkillGen:Dedup]` | DeduplicationEngine | Dedup verdict summary, tier counts | INFO (summary), DEBUG (per-skill) |
-| `[SkillGen:Install]` | SkillInstaller | Install plan/result, rollback | INFO (summary), DEBUG (per-skill) |
+| `[SkillGen:Pipeline]` | SkillGenService + PhaseOrchestrator | Phase execution, progress stages | INFO/ERROR |
+| `[PhaseC2]` | PhaseC2TagEnrichment | Per-card enrichment progress | INFO |
+| `[PhaseC3]` | PhaseC3IncrementalClustering | Per-bucket clustering progress | INFO |
+| `[PhaseC4]` | PhaseC4CrossBucketMerge | Per-rollup merge decisions | INFO |
+| `[PhaseD]` | PhaseDSkillSynthesis | Per-cluster synthesis progress | INFO |
+| `[ClaudeCliCaller]` | ClaudeCliCaller | CLI spawn/exit, timeouts | INFO |
+| `[PythonPhaseRunner]` | PythonPhaseRunner | Python subprocess spawn/exit | INFO |
+| `[SkillGen:Dedup]` | DeduplicationEngine | Dedup verdict summary | INFO |
+| `[SkillGen:Install]` | SkillInstaller | Install plan/result, rollback | INFO |
 | `[SkillGen:Store]` | SkillGenStore | Ledger persistence, history | DEBUG |
 | `[SkillGen:WebviewTx]` | SkillGenService | Tab register/unregister, broadcast | DEBUG |
 
@@ -191,15 +300,8 @@ Comprehensive categorized logging covers the full SkillGen flow from UI button c
 
 ### Correlation IDs
 
-- **runId**: 8-char hex ID generated at the start of each pipeline run. Appears in all pipeline/preflight/lock/install logs for end-to-end tracing.
-- **scanId**: 8-char hex ID generated at the start of each document scan.
-
-### Webview UI Logging Bridge
-
-Since `console.log` is stripped in production builds, the webview sends a `skillGenUiLog` message to the extension, which writes it to the output channel:
-- Message type: `skillGenUiLog` with fields `level`, `event`, `data`
-- Extension-side handler formats as `[SkillGen:UI][LEVEL] event | key=value`
-- Logged UI events: `panelOpened`, `generateClicked`, `cancelClicked`, `toggleEnabled`, `panelClosed`
+- **runId**: 8-char hex ID generated at the start of each pipeline run
+- **scanId**: 8-char hex ID generated at the start of each document scan
 
 ### Viewing Logs
 
@@ -215,13 +317,16 @@ A button in the status bar showing `SkillDocs N/T` where N = pending docs, T = t
 - `.threshold-reached` - Pulse animation when N >= T
 - `.running` - Visual indicator during pipeline execution
 
+An `!` info button (`.skillgen-info-btn`) appears next to SkillDocs in both expanded and collapsed status bar modes. Clicking it opens the SkillGenPanel with the info section auto-expanded (via `skillGenShowInfo` store flag).
+
 ### Settings Gear Toggle
 
-The Vitals settings panel (gear icon next to the "Vitals" button) includes a "Skill Generation" toggle. This allows enabling/disabling SkillGen directly from the UI without opening VS Code settings. The toggle sends `setSkillGenEnabled` to the extension, which updates `claudeMirror.skillGen.enabled`.
+The Vitals settings panel includes a "Skill Generation" toggle for enabling/disabling SkillGen directly from the UI.
 
 ### SkillGenPanel
 
-Full overlay panel (same pattern as AchievementPanel and DashboardPanel):
+Full overlay panel:
+- **Info button** (`!` in header) -- toggles collapsible explanation of how documentation becomes skills, with a "Open full visual guide" link that opens `sr-ptd-skill/assets/skills-pipeline-guide.html` in the browser via `openSkillGenGuide` message
 - Enable/disable toggle
 - Current status display with run status badge
 - Progress bar with shimmer animation during pipeline runs
@@ -243,6 +348,7 @@ Full overlay panel (same pattern as AchievementPanel and DashboardPanel):
 | `skillGenCancel` | Cancel running pipeline |
 | `getSkillGenStatus` | Request current status snapshot |
 | `skillGenUiLog` | UI interaction log (bridged to extension output channel) |
+| `openSkillGenGuide` | Open the skills pipeline HTML guide in the browser |
 
 ### Extension -> Webview
 
@@ -269,7 +375,7 @@ All settings under `claudeMirror.skillGen.*` in `package.json`:
 | `pythonPath` | `"python"` | Python executable path |
 | `toolkitPath` | `""` (auto-resolves to `<docsDir>/used/skills_from_docs_toolkit`) | Skill generation toolkit path |
 | `workspaceDir` | `""` | Isolated pipeline workspace |
-| `pipelineMode` | `"run_pipeline"` | Pipeline execution mode |
+| `pipelineMode` | `"run_pipeline"` | Legacy setting (ignored by PhaseOrchestrator) |
 | `autoRun` | `true` | Auto-trigger on threshold |
 | `timeoutMs` | `300000` | Pipeline timeout (5 min) |
 | `aiDeduplication` | `false` | Enable AI dedup (Tier 3) |
@@ -288,19 +394,15 @@ On extension activation, `SrPtdBootstrap.ts` performs two automatic actions:
 
 ### 1. Skill Installation
 
-Copies the bundled `sr-ptd-skill/` directory to `~/.claude/skills/sr-ptd-skill/`. This makes the SR-PTD skill available to Claude Code CLI in any project.
+Copies the bundled `sr-ptd-skill/` directory to `~/.claude/skills/sr-ptd-skill/`.
 
 - Skips if target `SKILL.md` already exists with the same file size
 - Overwrites if the bundled version has changed (size differs)
-- Creates all directories as needed
-- Errors are logged but never surfaced to the user
 
 ### 2. CLAUDE.md Injection
 
-Appends SR-PTD documentation instructions to the project-level `CLAUDE.md` (workspace root).
+Appends SR-PTD documentation instructions to the project-level `CLAUDE.md`.
 
 - Marker-based duplicate detection: checks for `MANDATORY: Post-Task Documentation (SR-PTD)`
-- If marker not found: appends the instruction block (or creates the file)
 - The docs save path uses the configured `claudeMirror.skillGen.docsDirectory` value
-- Follows the same pattern as the Plans feature injection in `commands.ts`
 - Gated by `claudeMirror.srPtdAutoInject` setting (default: `true`)

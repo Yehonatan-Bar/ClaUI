@@ -55,6 +55,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const achievementService = new AchievementService(context.globalState, log);
   const insightAnalyzer = new AchievementInsightAnalyzer(context.globalState);
   insightAnalyzer.setLogger(log);
+  insightAnalyzer.setSecrets(context.secrets);
   achievementService.setInsightAnalyzer(insightAnalyzer);
   const githubSyncService = new GitHubSyncService(context.globalState, context.secrets, log);
   achievementService.setSyncService(githubSyncService);
@@ -69,6 +70,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Create skill generation service (global, cross-session)
   const skillGenService = new SkillGenService(context.globalState);
   skillGenService.setLogger(log);
+  skillGenService.setSecrets(context.secrets);
   // Initial document scan on activation
   const skillGenConfig = vscode.workspace.getConfiguration('claudeMirror');
   if (skillGenConfig.get<boolean>('skillGen.enabled', true)) {

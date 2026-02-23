@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { spawn, exec } from 'child_process';
+import { buildClaudeCliEnv } from '../process/envUtils';
 
 export interface ClaudeCliCallOptions {
   prompt: string;
@@ -16,6 +17,11 @@ export interface ClaudeCliCallOptions {
  */
 export class ClaudeCliCaller {
   private log: (msg: string) => void = () => {};
+  private apiKey: string | undefined;
+
+  setApiKey(key: string | undefined): void {
+    this.apiKey = key;
+  }
 
   setLogger(logger: (msg: string) => void): void {
     this.log = logger;
@@ -34,10 +40,7 @@ export class ClaudeCliCaller {
 
     const args = ['-p', '--model', model];
 
-    // Clean environment to prevent nested-session detection
-    const env = { ...process.env };
-    delete env.CLAUDECODE;
-    delete env.CLAUDE_CODE_ENTRYPOINT;
+    const env = buildClaudeCliEnv(this.apiKey);
 
     this.log(`[ClaudeCliCaller] Spawning CLI | model=${model} promptLen=${prompt.length} timeoutMs=${timeoutMs}`);
 

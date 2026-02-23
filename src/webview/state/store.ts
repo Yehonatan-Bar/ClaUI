@@ -5,6 +5,7 @@ import type {
   AchievementAwardPayload,
   AchievementGoalPayload,
   AchievementProfilePayload,
+  CodexModelOption,
   SessionRecapPayload,
   SessionSummary,
   SkillGenRunStatus,
@@ -71,6 +72,7 @@ export interface AppState {
   providerCapabilities: ProviderCapabilities;
   selectedModel: string;  // model chosen by user for next session
   selectedCodexReasoningEffort: CodexReasoningEffort;
+  codexModelOptions: CodexModelOption[];
   isConnected: boolean;
   isBusy: boolean;
   lastActivityAt: number;
@@ -197,6 +199,11 @@ export interface AppState {
   sessionActivityElapsedMs: number;
   sessionActivityRunningSinceMs: number | null;
 
+  // API Key
+  hasApiKey: boolean;
+  maskedApiKey: string;
+  setApiKeySetting: (hasKey: boolean, maskedKey: string) => void;
+
   // Codex Consultation
   codexConsultPanelOpen: boolean;
   setCodexConsultPanelOpen: (open: boolean) => void;
@@ -211,6 +218,7 @@ export interface AppState {
   skillGenLastRun: SkillGenRunHistoryEntry | null;
   skillGenHistory: SkillGenRunHistoryEntry[];
   skillGenPanelOpen: boolean;
+  skillGenShowInfo: boolean;
 
   // Actions
   setSession: (sessionId: string, model: string) => void;
@@ -258,6 +266,7 @@ export interface AppState {
   setResuming: (resuming: boolean) => void;
   setSelectedModel: (model: string) => void;
   setSelectedCodexReasoningEffort: (effort: CodexReasoningEffort) => void;
+  setCodexModelOptions: (options: CodexModelOption[]) => void;
   setPendingApproval: (approval: { toolName: string; planText: string } | null) => void;
   truncateFromMessage: (messageId: string) => void;
   setActivitySummary: (summary: { shortLabel: string; fullSummary: string } | null) => void;
@@ -309,6 +318,7 @@ export interface AppState {
   setSkillGenStatus: (status: { pendingDocs: number; threshold: number; runStatus: SkillGenRunStatus; progress: number; progressLabel: string; lastRun: SkillGenRunHistoryEntry | null; history: SkillGenRunHistoryEntry[] }) => void;
   setSkillGenProgress: (update: { runStatus: SkillGenRunStatus; progress: number; progressLabel: string }) => void;
   setSkillGenPanelOpen: (open: boolean) => void;
+  setSkillGenShowInfo: (show: boolean) => void;
   reset: () => void;
 }
 
@@ -460,6 +470,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   providerCapabilities: { ...DEFAULT_PROVIDER_CAPABILITIES },
   selectedModel: '',
   selectedCodexReasoningEffort: '',
+  codexModelOptions: [],
   isConnected: false,
   isBusy: false,
   lastActivityAt: 0,
@@ -529,6 +540,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   sessionActivityElapsedMs: 0,
   sessionActivityRunningSinceMs: null,
 
+  // API Key
+  hasApiKey: false,
+  maskedApiKey: '',
+  setApiKeySetting: (hasKey, maskedKey) => set({ hasApiKey: hasKey, maskedApiKey: maskedKey }),
+
   // Codex Consultation
   codexConsultPanelOpen: false,
   setCodexConsultPanelOpen: (open) => set({ codexConsultPanelOpen: open }),
@@ -543,6 +559,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   skillGenLastRun: null,
   skillGenHistory: [],
   skillGenPanelOpen: false,
+  skillGenShowInfo: false,
 
   // Actions
   setSession: (sessionId, model) =>
@@ -911,6 +928,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setSelectedCodexReasoningEffort: (effort) => set({ selectedCodexReasoningEffort: effort }),
 
+  setCodexModelOptions: (options) => set({ codexModelOptions: options }),
+
   setPendingApproval: (approval) => set({ pendingApproval: approval }),
 
   truncateFromMessage: (messageId) =>
@@ -1171,6 +1190,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSkillGenPanelOpen: (open) =>
     set({ skillGenPanelOpen: open }),
 
+  setSkillGenShowInfo: (show) =>
+    set({ skillGenShowInfo: show }),
+
   reset: () =>
     set((state) => ({
       sessionId: null,
@@ -1235,5 +1257,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       sessionActivityStarted: false,
       sessionActivityElapsedMs: 0,
       sessionActivityRunningSinceMs: null,
+      // API Key: reset to defaults (key still lives in SecretStorage;
+      // the extension will re-push the setting on the next 'ready' event)
+      hasApiKey: false,
+      maskedApiKey: '',
     })),
 }));

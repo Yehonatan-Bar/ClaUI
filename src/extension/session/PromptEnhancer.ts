@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { spawn, exec } from 'child_process';
+import { buildClaudeCliEnv } from '../process/envUtils';
 
 const ENHANCER_SYSTEM_PROMPT = `You are an expert prompt engineer. Your job is to take a user's raw prompt and rewrite it to be maximally effective for a frontier AI coding assistant (Claude).
 
@@ -39,7 +40,7 @@ export class PromptEnhancer {
    * Enhance a user prompt using Claude CLI one-shot call.
    * Returns the enhanced prompt text, or null on failure.
    */
-  async enhance(rawPrompt: string, model?: string): Promise<string | null> {
+  async enhance(rawPrompt: string, model?: string, apiKey?: string): Promise<string | null> {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const cliPath = config.get<string>('cliPath', 'claude');
     const enhancerModel = model ||
@@ -51,10 +52,7 @@ export class PromptEnhancer {
 
     const args = ['-p', '--model', enhancerModel];
 
-    // Clean environment to prevent nested-session detection
-    const env = { ...process.env };
-    delete env.CLAUDECODE;
-    delete env.CLAUDE_CODE_ENTRYPOINT;
+    const env = buildClaudeCliEnv(apiKey);
 
     this.log(`[PromptEnhancer] Spawning CLI with model=${enhancerModel} (${truncated.length} chars)`);
 

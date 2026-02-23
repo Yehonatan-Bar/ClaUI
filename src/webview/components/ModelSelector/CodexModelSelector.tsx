@@ -1,20 +1,17 @@
 import React, { useCallback, useMemo } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
-import type { CodexReasoningEffort } from '../../../extension/types/webview-messages';
 
-const CODEX_MODEL_OPTIONS = [
+const CODEX_MODEL_OPTIONS_FALLBACK = [
   { label: 'Default', value: '' },
-  { label: 'GPT-5 Codex', value: 'gpt-5-codex' },
-  { label: 'GPT-5', value: 'gpt-5' },
-];
-
-const CODEX_REASONING_EFFORT_OPTIONS: Array<{ label: string; value: CodexReasoningEffort }> = [
-  { label: 'Default', value: '' },
-  { label: 'Low', value: 'low' },
-  { label: 'Medium', value: 'medium' },
-  { label: 'High', value: 'high' },
-  { label: 'Extra High', value: 'xhigh' },
+  { label: 'GPT-5.3-Codex', value: 'gpt-5.3-codex' },
+  { label: 'GPT-5.2-Codex', value: 'gpt-5.2-codex' },
+  { label: 'GPT-5.1-Codex-Max', value: 'gpt-5.1-codex-max' },
+  { label: 'GPT-5.2', value: 'gpt-5.2' },
+  { label: 'GPT-5.1-Codex-Mini', value: 'gpt-5.1-codex-mini' },
+  // Keep older aliases for compatibility with existing configs.
+  { label: 'GPT-5 Codex (Legacy)', value: 'gpt-5-codex' },
+  { label: 'GPT-5 (Legacy)', value: 'gpt-5' },
 ];
 
 /**
@@ -24,34 +21,32 @@ const CODEX_REASONING_EFFORT_OPTIONS: Array<{ label: string; value: CodexReasoni
 export const CodexModelSelector: React.FC = () => {
   const {
     selectedModel,
-    selectedCodexReasoningEffort,
     model,
     isConnected,
+    codexModelOptions,
     setSelectedModel,
-    setSelectedCodexReasoningEffort,
   } = useAppStore();
 
   const options = useMemo(() => {
-    if (!selectedModel || CODEX_MODEL_OPTIONS.some((opt) => opt.value === selectedModel)) {
-      return CODEX_MODEL_OPTIONS;
+    const baseOptions = [
+      CODEX_MODEL_OPTIONS_FALLBACK[0],
+      ...(codexModelOptions.length > 0 ? codexModelOptions : CODEX_MODEL_OPTIONS_FALLBACK.slice(1)),
+    ];
+
+    if (!selectedModel || baseOptions.some((opt) => opt.value === selectedModel)) {
+      return baseOptions;
     }
     return [
-      ...CODEX_MODEL_OPTIONS,
+      ...baseOptions,
       { label: `Custom (${selectedModel})`, value: selectedModel },
     ];
-  }, [selectedModel]);
+  }, [selectedModel, codexModelOptions]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const newModel = e.target.value;
     setSelectedModel(newModel);
     postToExtension({ type: 'setModel', model: newModel });
   }, [setSelectedModel]);
-
-  const handleEffortChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const effort = e.target.value as CodexReasoningEffort;
-    setSelectedCodexReasoningEffort(effort);
-    postToExtension({ type: 'setCodexReasoningEffort', effort });
-  }, [setSelectedCodexReasoningEffort]);
 
   const activeModelLabel = model && model !== 'connecting...' && model !== 'connected' && model !== 'unknown'
     ? model
@@ -79,19 +74,6 @@ export const CodexModelSelector: React.FC = () => {
           {activeModelLabel}
         </span>
       )}
-      <span className="model-selector-label">Reasoning</span>
-      <select
-        className="model-selector-select"
-        value={selectedCodexReasoningEffort}
-        onChange={handleEffortChange}
-        data-tooltip="Codex reasoning effort (applies next turn)"
-      >
-        {CODEX_REASONING_EFFORT_OPTIONS.map((opt) => (
-          <option key={opt.value || 'default'} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
     </div>
   );
 };

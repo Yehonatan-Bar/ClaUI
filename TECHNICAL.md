@@ -48,6 +48,8 @@ claude-code-mirror/
 |   |   +-- commands.ts                   #   VS Code command handlers (routes via TabManager)
 |   |   +-- process/
 |   |   |   +-- ClaudeProcessManager.ts   #   Spawns and manages CLI process
+|   |   |   +-- CodexExecProcessManager.ts #  Spawns and manages Codex exec processes
+|   |   |   +-- envUtils.ts               #   Shared env sanitization & API key management
 |   |   |   +-- StreamDemux.ts            #   Parses JSON lines, routes events
 |   |   |   +-- ControlProtocol.ts        #   Higher-level command API
 |   |   +-- webview/
@@ -73,10 +75,18 @@ claude-code-mirror/
 |   |   +-- skillgen/
 |   |   |   +-- SkillGenStore.ts          #   Document ledger persistence (globalState)
 |   |   |   +-- SkillGenService.ts        #   Main orchestrator (scan, preflight, lock, pipeline, dedup, install)
-|   |   |   +-- PythonPipelineRunner.ts   #   Python subprocess execution with progress monitoring
+|   |   |   +-- PhaseOrchestrator.ts      #   Phase-by-phase pipeline execution (replaces PythonPipelineRunner)
+|   |   |   +-- ClaudeCliCaller.ts        #   Shared one-shot Claude CLI utility for AI phases
 |   |   |   +-- DeduplicationEngine.ts    #   3-tier dedup (traceability, metadata similarity, AI placeholder)
 |   |   |   +-- SkillInstaller.ts         #   Atomic skill installation with backup/rollback
 |   |   |   +-- SrPtdBootstrap.ts         #   Auto-install SR-PTD skill + inject CLAUDE.md instructions
+|   |   |   +-- phases/
+|   |   |   |   +-- types.ts              #   Shared types (PhaseId, PhaseResult, progress ranges)
+|   |   |   |   +-- PythonPhaseRunner.ts  #   Runs non-AI Python scripts (B, C.0-C.1, C.5, sanity)
+|   |   |   |   +-- PhaseC2TagEnrichment.ts      #   AI tag enrichment via Claude CLI
+|   |   |   |   +-- PhaseC3IncrementalClustering.ts  #   AI incremental clustering via Claude CLI
+|   |   |   |   +-- PhaseC4CrossBucketMerge.ts       #   AI cross-bucket merging via Claude CLI
+|   |   |   |   +-- PhaseDSkillSynthesis.ts          #   AI skill synthesis via Claude CLI (parallelized)
 |   |   +-- achievements/
 |   |   |   +-- AchievementCatalog.ts     #   30 achievement definitions, 7 categories
 |   |   |   +-- AchievementStore.ts       #   Persistence via VS Code globalState (8 counters, 15 levels)
@@ -177,6 +187,7 @@ claude-code-mirror/
 |   +-- references/
 |       +-- example-completed.md          #   Worked example
 +-- Kingdom_of_Claudes_Beloved_MDs/       # Detailed component documentation
+    +-- API_KEY_MANAGEMENT.md             #   Environment sanitization & API key management
     +-- ARCHITECTURE.md                   #   Data flow and component interaction
     +-- ACTIVITY_SUMMARIZER.md            #   Periodic activity summary via Haiku
     +-- ADVENTURE_WIDGET.md              #   Pixel-art dungeon crawler session visualizer
@@ -203,8 +214,11 @@ claude-code-mirror/
 **TabManager** - Manages all SessionTab instances. Tracks the active (focused) tab, provides create/close/closeAll methods, shares a single status bar item, assigns distinct colors from an 8-color palette, and groups tabs in the same editor column.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**ClaudeProcessManager** - Spawns the Claude CLI child process with stream-json flags, handles stdin/stdout piping, process lifecycle, and crash detection. Uses `taskkill /F /T` on Windows to kill the entire process tree (required because `shell: true` creates a cmd.exe wrapper that SIGTERM alone cannot penetrate). Instantiated per-tab by SessionTab.
+**ClaudeProcessManager** - Spawns the Claude CLI child process with stream-json flags, handles stdin/stdout piping, process lifecycle, and crash detection. Uses `taskkill /F /T` on Windows to kill the entire process tree (required because `shell: true` creates a cmd.exe wrapper that SIGTERM alone cannot penetrate). Reads the user's API key from SecretStorage before each spawn and passes it via `buildClaudeCliEnv()`. Instantiated per-tab by SessionTab.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**Environment Sanitization & API Key Management** - Shared utility (`envUtils.ts`) that sanitizes inherited environment variables for all spawned CLI processes. Strips `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, and `ANTHROPIC_API_KEY` (case-insensitive on Windows) from the inherited env. Two modes: `buildSanitizedEnv()` for Codex processes (no key injection), `buildClaudeCliEnv(apiKey?)` for Claude CLI processes (optional key injection). API key is stored in VS Code SecretStorage (OS keychain) and managed through the Settings panel UI. Used by all 9 CLI spawn points.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/API_KEY_MANAGEMENT.md`
 
 **StreamDemux** - Receives raw CLI JSON events and demultiplexes them into typed, semantic events (textDelta, toolUseStart, messageDelta, assistantMessage, etc.) for UI consumers. Instantiated per-tab.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
@@ -300,7 +314,7 @@ claude-code-mirror/
 **TurnAnalyzer** - Background semantic analysis engine (enabled by default). After each turn completes, spawns a one-shot Claude CLI process (using `claudeMirror.analysisModel`) to classify user mood, task type, outcome, and bug repetition. Results arrive asynchronously and merge into `turnHistory` via `turnSemantics` postMessage. Includes queue (max 20), per-session cap, timeout, and enable flag for cost control.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ANALYTICS_DASHBOARD.md`
 
-**Auto Skill Generation** - Automatically generates Claude skills from accumulated SR-PTD documentation files. Scans a configurable docs directory, maintains a persistent document ledger (fingerprint-based change detection), and triggers a Python skill-generation pipeline when the pending document count reaches a configurable threshold. Features 3-tier deduplication (traceability fingerprint, metadata similarity via trigram matching, AI placeholder), atomic skill installation with backup/rollback, cross-process locking, and a full webview panel with progress bar, history table, and Generate Now/Cancel controls. Status bar indicator shows pending/threshold count with pulse animation when threshold is reached. Backend: `SkillGenStore`, `SkillGenService`, `PythonPipelineRunner`, `DeduplicationEngine`, `SkillInstaller`. Frontend: `SkillGenPanel`.
+**Auto Skill Generation** - Automatically generates Claude skills from accumulated SR-PTD documentation files. Scans a configurable docs directory, maintains a persistent document ledger (fingerprint-based change detection), and triggers a phase-orchestrated pipeline when the pending document count reaches a configurable threshold. The pipeline runs 8 phases: non-AI phases (B, C.0-C.1, C.5, sanity) execute as Python subprocesses, while AI phases (C.2 tag enrichment, C.3 incremental clustering, C.4 cross-bucket merge, D skill synthesis) use Claude Code CLI one-shot calls -- no API key required. Features 3-tier deduplication (traceability fingerprint, metadata similarity via trigram matching, AI placeholder), atomic skill installation with backup/rollback, cross-process locking, resume support via `.pipeline_progress.json`, and a full webview panel with progress bar, history table, and Generate Now/Cancel controls. Status bar indicator shows pending/threshold count with pulse animation when threshold is reached. Backend: `SkillGenStore`, `SkillGenService`, `PhaseOrchestrator`, `ClaudeCliCaller`, `phases/*`, `DeduplicationEngine`, `SkillInstaller`. Frontend: `SkillGenPanel`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SKILL_GENERATION.md`
 
 **SR-PTD Bootstrap** - On activation, automatically installs the bundled SR-PTD skill to `~/.claude/skills/sr-ptd-skill/` and injects post-task documentation instructions into the project-level `CLAUDE.md`. Skill files are only overwritten when the bundled version changes (size comparison). CLAUDE.md injection uses marker-based duplicate detection (`MANDATORY: Post-Task Documentation (SR-PTD)`). The docs save path in the template uses the configured `claudeMirror.skillGen.docsDirectory` value. Enabled by default, can be disabled via `claudeMirror.srPtdAutoInject`.
@@ -357,7 +371,7 @@ claude-code-mirror/
 | `claudeMirror.skillGen.pythonPath` | `"python"` | Path to Python executable |
 | `claudeMirror.skillGen.toolkitPath` | `""` | Path to skill generation toolkit |
 | `claudeMirror.skillGen.workspaceDir` | `""` | Isolated workspace directory for pipeline |
-| `claudeMirror.skillGen.pipelineMode` | `"run_pipeline"` | Pipeline mode: run_pipeline, python_api, or create_skills |
+| `claudeMirror.skillGen.pipelineMode` | `"run_pipeline"` | Pipeline mode (legacy, ignored by PhaseOrchestrator) |
 | `claudeMirror.skillGen.autoRun` | `true` | Automatically run pipeline when threshold reached |
 | `claudeMirror.skillGen.timeoutMs` | `300000` | Pipeline timeout in milliseconds (5 min default) |
 | `claudeMirror.skillGen.aiDeduplication` | `false` | Enable AI-powered deduplication (Tier 3) |

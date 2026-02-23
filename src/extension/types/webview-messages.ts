@@ -7,6 +7,11 @@ import type { ContentBlock } from './stream-json';
 export type TypingTheme = 'terminal-hacker' | 'retro' | 'zen';
 export type ProviderId = 'claude' | 'codex';
 export type CodexReasoningEffort = '' | 'low' | 'medium' | 'high' | 'xhigh';
+export interface CodexModelOption {
+  label: string;
+  value: string;
+  supportedReasoningEfforts?: CodexReasoningEffort[];
+}
 
 export interface ProviderCapabilities {
   supportsPlanApproval: boolean;
@@ -283,6 +288,10 @@ export interface SkillGenUiLogMessage {
   data?: Record<string, unknown>;
 }
 
+export interface OpenSkillGenGuideRequest {
+  type: 'openSkillGenGuide';
+}
+
 export interface SetGitHubSyncEnabledRequest {
   type: 'setGitHubSyncEnabled';
   enabled: boolean;
@@ -321,6 +330,11 @@ export interface CopyShareCardRequest {
 export interface CodexConsultRequest {
   type: 'codexConsult';
   question: string;
+}
+
+export interface SetApiKeyRequest {
+  type: 'setApiKey';
+  apiKey: string;  // empty string = clear the key
 }
 
 export type WebviewToExtensionMessage =
@@ -373,6 +387,7 @@ export type WebviewToExtensionMessage =
   | SkillGenCancelRequest
   | GetSkillGenStatusRequest
   | SkillGenUiLogMessage
+  | OpenSkillGenGuideRequest
   | SetGitHubSyncEnabledRequest
   | GitHubSyncRequest
   | AddFriendRequest
@@ -380,7 +395,8 @@ export type WebviewToExtensionMessage =
   | RefreshFriendsRequest
   | GetCommunityDataRequest
   | CopyShareCardRequest
-  | CodexConsultRequest;
+  | CodexConsultRequest
+  | SetApiKeyRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -505,6 +521,11 @@ export interface ProviderCapabilitiesMessage {
 export interface CodexReasoningEffortSettingMessage {
   type: 'codexReasoningEffortSetting';
   effort: CodexReasoningEffort;
+}
+
+export interface CodexModelOptionsMessage {
+  type: 'codexModelOptions';
+  options: CodexModelOption[];
 }
 
 export interface PlanApprovalRequiredMessage {
@@ -923,6 +944,12 @@ export interface ShareCardCopiedMessage {
   format: 'markdown' | 'shields-badge';
 }
 
+export interface ApiKeySettingMessage {
+  type: 'apiKeySetting';
+  hasKey: boolean;
+  maskedKey: string;  // e.g. "****abcd" or "" if no key
+}
+
 /** Serializable chat message for passing between webview instances (e.g. fork) */
 export interface SerializedChatMessage {
   id: string;
@@ -953,6 +980,7 @@ export type ExtensionToWebviewMessage =
   | ProviderSettingMessage
   | ProviderCapabilitiesMessage
   | CodexReasoningEffortSettingMessage
+  | CodexModelOptionsMessage
   | PlanApprovalRequiredMessage
   | PromptHistoryResponseMessage
   | ActivitySummaryMessage
@@ -986,4 +1014,5 @@ export type ExtensionToWebviewMessage =
   | GitHubSyncStatusMessage
   | CommunityDataMessage
   | FriendActionResultMessage
-  | ShareCardCopiedMessage;
+  | ShareCardCopiedMessage
+  | ApiKeySettingMessage;

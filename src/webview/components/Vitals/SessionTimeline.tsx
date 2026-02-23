@@ -58,7 +58,7 @@ export const SessionTimeline: React.FC<SessionTimelineProps> = React.memo(
     if (turnHistory.length === 0) return null;
 
     return (
-      <div className="session-timeline" ref={containerRef} data-tooltip={"Session Timeline\n\nEach segment = one completed Claude turn\n\nColors:\nGreen = success\nRed = error\nBlue = discussion (no tools)\nPurple = code-write (Write/Edit)\nOrange = research (Read/Grep/Glob)\nCyan = command (Bash)\n\nTaller blocks = longer turns\nBrighter = longer API calls\nClick a block to jump to that turn"}>
+      <div className="session-timeline" ref={containerRef} data-tooltip={"Session Timeline\nEach segment = one Claude turn\nGreen=success  Red=error  Blue=discussion\nPurple=code-write  Orange=research  Cyan=command\nTaller=longer turns  Brighter=longer API calls\nClick a block to jump to that turn"}>
         {/* Info trigger with legend tooltip */}
         <div
           className="timeline-info-trigger"

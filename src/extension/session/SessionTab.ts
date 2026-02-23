@@ -109,6 +109,7 @@ export class SessionTab implements WebviewBridge {
     );
     this.messageHandler.setSessionNameGetter(() => this.baseTitle);
     this.messageHandler.setProjectAnalyticsStore(this.projectAnalyticsStore);
+    this.messageHandler.setSecrets(context.secrets);
 
     // Create per-tab file logger if file logging is enabled
     if (logDir) {

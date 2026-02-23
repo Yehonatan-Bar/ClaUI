@@ -3,6 +3,7 @@ import { useAppStore } from '../../state/store';
 import { TextSettingsBar } from '../TextSettingsBar/TextSettingsBar';
 import { ModelSelector } from '../ModelSelector/ModelSelector';
 import { CodexModelSelector } from '../ModelSelector/CodexModelSelector';
+import { CodexReasoningEffortSelector } from '../ModelSelector/CodexReasoningEffortSelector';
 import { ProviderSelector } from '../ProviderSelector/ProviderSelector';
 import { PermissionModeSelector } from '../PermissionModeSelector/PermissionModeSelector';
 import { VitalsInfoPanel } from '../Vitals/VitalsInfoPanel';
@@ -45,6 +46,7 @@ export const StatusBar: React.FC<{
     skillGenThreshold,
     skillGenRunStatus,
     setSkillGenPanelOpen,
+    setSkillGenShowInfo,
     isConnected,
     isBusy,
     provider,
@@ -193,6 +195,7 @@ export const StatusBar: React.FC<{
 
   const isCodexUi = provider === 'codex' || !providerCapabilities.supportsPermissionModeSelector;
   const modelSelectorElement = isCodexUi ? <CodexModelSelector /> : <ModelSelector />;
+  const codexReasoningSelectorElement = isCodexUi ? <CodexReasoningEffortSelector /> : null;
   const permissionSelectorElement = providerCapabilities.supportsPermissionModeSelector
     ? <PermissionModeSelector />
     : null;
@@ -279,6 +282,11 @@ export const StatusBar: React.FC<{
           <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
             {modelSelectorElement}
           </div>
+          {codexReasoningSelectorElement && (
+            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+              {codexReasoningSelectorElement}
+            </div>
+          )}
           {permissionSelectorElement && (
             <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
               {permissionSelectorElement}
@@ -297,16 +305,30 @@ export const StatusBar: React.FC<{
 
         <StatusBarGroupButton label="Tools" isOpen={toolsOpen} onToggle={handleToolsToggle} alignRight>
           {skillGenEnabled && (
-            <button
-              className={`status-bar-group-dropdown-item ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''}`}
-              onClick={() => {
-                postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'panelOpened', data: { source: 'statusbar-collapsed', pendingDocs: skillGenPendingDocs, threshold: skillGenThreshold } });
-                postToExtension({ type: 'getSkillGenStatus' });
-                setSkillGenPanelOpen(true);
-              }}
-            >
-              SkillDocs {skillGenPendingDocs}/{skillGenThreshold}
-            </button>
+            <div className="status-bar-group-dropdown-item-row">
+              <button
+                className={`status-bar-group-dropdown-item ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''}`}
+                onClick={() => {
+                  postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'panelOpened', data: { source: 'statusbar-collapsed', pendingDocs: skillGenPendingDocs, threshold: skillGenThreshold } });
+                  postToExtension({ type: 'getSkillGenStatus' });
+                  setSkillGenPanelOpen(true);
+                }}
+              >
+                SkillDocs {skillGenPendingDocs}/{skillGenThreshold}
+              </button>
+              <button
+                className="skillgen-info-btn"
+                data-tooltip="How Skills work"
+                onClick={() => {
+                  postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'infoOpened', data: { source: 'statusbar-collapsed' } });
+                  postToExtension({ type: 'getSkillGenStatus' });
+                  setSkillGenShowInfo(true);
+                  setSkillGenPanelOpen(true);
+                }}
+              >
+                !
+              </button>
+            </div>
           )}
           {achievementsEnabled && (
             <button className="status-bar-group-dropdown-item" onClick={handleAchievements}>
@@ -393,6 +415,7 @@ export const StatusBar: React.FC<{
       </button>
       <ProviderSelector />
       {modelSelectorElement}
+      {codexReasoningSelectorElement}
       {permissionSelectorElement}
       <TextSettingsBar />
       <button
@@ -413,17 +436,31 @@ export const StatusBar: React.FC<{
         Dashboard
       </button>
       {skillGenEnabled && (
-        <button
-          className={`status-bar-skillgen-btn ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''} ${skillGenRunStatus !== 'idle' && skillGenRunStatus !== 'succeeded' && skillGenRunStatus !== 'failed' ? 'running' : ''}`}
-          data-tooltip={`SkillDocs: ${skillGenPendingDocs}/${skillGenThreshold} pending${skillGenRunStatus !== 'idle' ? ` (${skillGenRunStatus})` : ''}`}
-          onClick={() => {
-            postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'panelOpened', data: { source: 'statusbar-expanded', pendingDocs: skillGenPendingDocs, threshold: skillGenThreshold, runStatus: skillGenRunStatus } });
-            postToExtension({ type: 'getSkillGenStatus' });
-            setSkillGenPanelOpen(true);
-          }}
-        >
-          SkillDocs {skillGenPendingDocs}/{skillGenThreshold}
-        </button>
+        <>
+          <button
+            className={`status-bar-skillgen-btn ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''} ${skillGenRunStatus !== 'idle' && skillGenRunStatus !== 'succeeded' && skillGenRunStatus !== 'failed' ? 'running' : ''}`}
+            data-tooltip={`SkillDocs: ${skillGenPendingDocs}/${skillGenThreshold} pending${skillGenRunStatus !== 'idle' ? ` (${skillGenRunStatus})` : ''}`}
+            onClick={() => {
+              postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'panelOpened', data: { source: 'statusbar-expanded', pendingDocs: skillGenPendingDocs, threshold: skillGenThreshold, runStatus: skillGenRunStatus } });
+              postToExtension({ type: 'getSkillGenStatus' });
+              setSkillGenPanelOpen(true);
+            }}
+          >
+            SkillDocs {skillGenPendingDocs}/{skillGenThreshold}
+          </button>
+          <button
+            className="skillgen-info-btn"
+            data-tooltip="How Skills work"
+            onClick={() => {
+              postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'infoOpened', data: { source: 'statusbar-expanded' } });
+              postToExtension({ type: 'getSkillGenStatus' });
+              setSkillGenShowInfo(true);
+              setSkillGenPanelOpen(true);
+            }}
+          >
+            !
+          </button>
+        </>
       )}
       <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
         <div className="status-bar-vitals-controls">

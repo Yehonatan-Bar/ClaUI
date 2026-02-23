@@ -40,6 +40,7 @@ export const GlobalTooltip: React.FC<GlobalTooltipProps> = ({ delay = 400 }) => 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const anchorRectRef = useRef<DOMRect | null>(null);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -54,6 +55,7 @@ export const GlobalTooltip: React.FC<GlobalTooltipProps> = ({ delay = 400 }) => 
       triggerRef.current.removeAttribute('aria-describedby');
       triggerRef.current = null;
     }
+    anchorRectRef.current = null;
     setState(prev => ({ ...prev, visible: false }));
   }, [clearTimer]);
 
@@ -80,9 +82,19 @@ export const GlobalTooltip: React.FC<GlobalTooltipProps> = ({ delay = 400 }) => 
 
       triggerRef.current = target;
 
+      // Capture mouse position for anchoring tall triggers
+      const mouseX = e.clientX;
+      const mouseY = e.clientY;
+
       timerRef.current = setTimeout(() => {
         const rect = target.getBoundingClientRect();
-        const pos = calculatePosition(rect);
+        // For tall triggers (e.g., session-timeline), create a small anchor
+        // rect near the mouse cursor instead of using the full element rect
+        const effectiveRect = rect.height > 100
+          ? new DOMRect(rect.left, mouseY - 10, rect.width, 20)
+          : rect;
+        anchorRectRef.current = effectiveRect;
+        const pos = calculatePosition(effectiveRect);
         setState({ text, ...pos, visible: true });
         target.setAttribute('aria-describedby', 'claui-global-tooltip');
       }, delay);
@@ -119,7 +131,8 @@ export const GlobalTooltip: React.FC<GlobalTooltipProps> = ({ delay = 400 }) => 
 
     const tooltip = tooltipRef.current;
     const tooltipRect = tooltip.getBoundingClientRect();
-    const triggerRect = triggerRef.current.getBoundingClientRect();
+    // Use stored anchor rect (handles tall triggers) or fall back to trigger rect
+    const triggerRect = anchorRectRef.current || triggerRef.current.getBoundingClientRect();
 
     let adjustedX = state.x - tooltipRect.width / 2;
     let adjustedY = state.y;
