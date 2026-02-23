@@ -231,3 +231,40 @@ Remaining manual QA to run in VS Code before merge (interactive):
 - Codex start/send/cancel/resume/history
 - mixed history migration (SessionStore + analytics data)
 - dashboard/vitals stability with mixed Claude/Codex summaries
+
+## 2026-02-23 - Post-Stage 5 follow-up (Codex UX + Runtime Hardening + Reasoning Effort)
+
+Follow-up changes implemented after Stage 5 based on interactive VS Code testing:
+
+- Provider quick buttons (`Claude` / `Codex`) in the status bar now open a **new tab** for the selected provider (not just change the default provider setting):
+  - added `openProviderTab` webview -> extension message
+  - extension handlers update `claudeMirror.provider` and then execute `claudeMirror.startSession`
+  - button behavior prevents tab spam when the current tab is already that provider
+- Added focused diagnostics/logging for provider switching and Codex startup debugging:
+  - webview button click diagnostics (`diag`) for provider quick buttons
+  - extension-side logs for provider setting save success/failure and config change propagation
+  - webview debug logging for selected outbound messages (`setProvider`, `openProviderTab`, `startSession`)
+
+Codex runtime hardening (observed during manual testing):
+
+- Fixed a false-positive Codex error in UI for `rg` commands with `exit 1` (ripgrep "no matches found"):
+  - `rg`/`rg.exe` exit code `1` is now treated as non-fatal in Codex command telemetry mapping
+- Added stdout tail flush on Codex process exit:
+  - if the final JSONL event arrives without a trailing newline, it is now parsed on process exit instead of being dropped
+- Added extra Codex turn diagnostics:
+  - logs outbound `sendMessage` preview/length in `CodexMessageHandler`
+  - surfaces an explicit error if `turn.completed` arrives without any `agent_message` event (instead of silent no-response)
+
+Codex reasoning effort support (new user-facing capability):
+
+- Added Codex reasoning effort setting + UI selector (`Low` / `Medium` / `High` / `Extra High`, plus `Default`)
+- New VS Code setting:
+  - `claudeMirror.codex.reasoningEffort` (`'' | low | medium | high | xhigh`)
+- Codex webview handler now syncs this setting to/from the webview (`setCodexReasoningEffort` / `codexReasoningEffortSetting`)
+- `CodexExecProcessManager` now forwards reasoning effort to the Codex CLI using:
+  - `-c model_reasoning_effort=<value>`
+  - applied to both first-turn (`codex exec`) and follow-up (`codex exec resume`) runs
+
+Verification note:
+
+- `npm run build` passed after these follow-up changes (extension + webview).
