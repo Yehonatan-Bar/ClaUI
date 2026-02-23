@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import type { ClaudeProcessManager } from '../process/ClaudeProcessManager';
 import type { ControlProtocol } from '../process/ControlProtocol';
 import type { StreamDemux } from '../process/StreamDemux';
@@ -12,6 +13,7 @@ import type { PromptHistoryStore } from '../session/PromptHistoryStore';
 import type { ProjectAnalyticsStore } from '../session/ProjectAnalyticsStore';
 import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
+import { getStoredApiKey, setStoredApiKey, maskApiKey } from '../process/envUtils';
 import type {
   AdventureBeatMessage,
   ExtensionToWebviewMessage,
@@ -185,6 +187,7 @@ export class MessageHandler {
   private turnRecords: TurnRecord[] = [];
   /** Project analytics store (injected, may be null if not wired) */
   private projectAnalyticsStore: ProjectAnalyticsStore | null = null;
+  private secrets: vscode.SecretStorage | null = null;
 
   constructor(
     private readonly tabId: string,
@@ -266,6 +269,38 @@ export class MessageHandler {
   /** Attach a ProjectAnalyticsStore for persisting session summaries */
   setProjectAnalyticsStore(store: ProjectAnalyticsStore): void {
     this.projectAnalyticsStore = store;
+  }
+
+  /** Provide SecretStorage for API key management */
+  setSecrets(secrets: vscode.SecretStorage): void {
+    this.secrets = secrets;
+  }
+
+  /** Read the API key from SecretStorage (returns undefined if no key set) */
+  private async getApiKey(): Promise<string | undefined> {
+    if (!this.secrets) return undefined;
+    return getStoredApiKey(this.secrets);
+  }
+
+  /** Send current API key status to the webview */
+  private async sendApiKeySetting(): Promise<void> {
+    if (!this.secrets) {
+      this.webview.postMessage({ type: 'apiKeySetting', hasKey: false, maskedKey: '' });
+      return;
+    }
+    const key = await this.secrets.get('claudeMirror.anthropicApiKey');
+    this.webview.postMessage({
+      type: 'apiKeySetting',
+      hasKey: !!key,
+      maskedKey: maskApiKey(key ?? undefined),
+    });
+  }
+
+  /** Update API key for all scheduler-based spawners (TurnAnalyzer, ActivitySummarizer) */
+  private async refreshSchedulerApiKeys(): Promise<void> {
+    const key = await this.getApiKey();
+    this.turnAnalyzer?.setApiKey(key);
+    this.activitySummarizer?.setApiKey(key);
   }
 
   /** Get accumulated TurnRecords for building a session summary */
@@ -556,8 +591,8 @@ export class MessageHandler {
             });
             break;
           }
-          this.promptEnhancer
-            .enhance(msg.text, msg.model)
+          this.getApiKey().then((apiKey) => this.promptEnhancer!
+            .enhance(msg.text, msg.model, apiKey))
             .then((enhanced) => {
               this.log(`Prompt enhancement result: success=${!!enhanced}, length=${enhanced?.length ?? 0}`);
               this.webview.postMessage({
@@ -623,6 +658,13 @@ export class MessageHandler {
         case 'skillGenUiLog': {
           const dataStr = msg.data ? ' | ' + Object.entries(msg.data).map(([k, v]) => `${k}=${v}`).join(' ') : '';
           this.log(`[SkillGen:UI][${msg.level}] ${msg.event}${dataStr}`);
+          break;
+        }
+
+        case 'openSkillGenGuide': {
+          const guidePath = path.join(__dirname, '..', 'sr-ptd-skill', 'assets', 'skills-pipeline-guide.html');
+          this.log(`[SkillGen:UI][INFO] openSkillGenGuide | path=${guidePath}`);
+          void vscode.env.openExternal(vscode.Uri.file(guidePath));
           break;
         }
 
@@ -963,8 +1005,8 @@ export class MessageHandler {
             });
             break;
           }
-          this.messageTranslator
-            .translate(msg.textContent, targetLang)
+          this.getApiKey().then((apiKey) => this.messageTranslator!
+            .translate(msg.textContent, targetLang, apiKey))
             .then((translatedText) => {
               this.webview.postMessage({
                 type: 'translationResult',
@@ -1033,6 +1075,20 @@ export class MessageHandler {
           break;
         }
 
+        case 'setApiKey': {
+          if (!this.secrets) {
+            this.log('setApiKey: no secrets available');
+            break;
+          }
+          void setStoredApiKey(this.secrets, msg.apiKey).then(async () => {
+            this.log(`API key ${msg.apiKey.trim() ? 'saved' : 'cleared'}`);
+            void this.sendApiKeySetting();
+            // Push fresh key to all scheduler-based spawners across this tab
+            await this.refreshSchedulerApiKeys();
+          });
+          break;
+        }
+
         case 'ready':
           this.log('Webview ready');
           // Send text display settings
@@ -1065,6 +1121,10 @@ export class MessageHandler {
           // Send achievement settings/snapshot
           this.webview.postMessage(this.achievementService.buildSettingsMessage());
           this.webview.postMessage(this.achievementService.buildSnapshotMessage(this.tabId));
+          // Send API key status
+          void this.sendApiKeySetting();
+          // Refresh API key for scheduler-based spawners
+          void this.refreshSchedulerApiKeys();
           // Send GitHub sync status
           this.sendGitHubSyncStatus();
           // If process is already running, tell the webview
@@ -2347,8 +2407,8 @@ export class MessageHandler {
 
     this.log('[SessionNaming] Launching generateName...');
 
-    this.sessionNamer
-      .generateName(userText)
+    this.getApiKey().then((apiKey) => this.sessionNamer!
+      .generateName(userText, apiKey))
       .then((name) => {
         this.log(`[SessionNaming] generateName returned: "${name}"`);
         if (name && this.titleCallback) {

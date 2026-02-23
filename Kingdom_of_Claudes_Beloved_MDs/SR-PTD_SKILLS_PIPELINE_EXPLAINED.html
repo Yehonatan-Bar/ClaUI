@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How Documentation Becomes Skills - The SR-PTD Pipeline</title>
+    <style>
+        :root {
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --primary: #2563eb;
+            --primary-light: #dbeafe;
+            --accent: #f59e0b;
+            --accent-light: #fef3c7;
+            --success: #10b981;
+            --success-light: #d1fae5;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.05);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            padding: 0;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 50%, #3b82f6 100%);
+            color: white;
+            padding: 60px 40px;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 2.4rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            letter-spacing: -0.5px;
+        }
+
+        .hero .subtitle {
+            font-size: 1.15rem;
+            opacity: 0.9;
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.8;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .section {
+            margin-bottom: 48px;
+        }
+
+        .section h2 {
+            font-size: 1.6rem;
+            color: var(--primary);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid var(--primary-light);
+        }
+
+        .section h3 {
+            font-size: 1.15rem;
+            color: var(--text);
+            margin-bottom: 12px;
+            margin-top: 24px;
+        }
+
+        p { margin-bottom: 14px; }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 28px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .card.highlight {
+            border-left: 5px solid var(--primary);
+        }
+
+        .card.accent {
+            border-left: 5px solid var(--accent);
+            background: var(--accent-light);
+        }
+
+        .card.success {
+            border-left: 5px solid var(--success);
+            background: var(--success-light);
+        }
+
+        .card h3 {
+            margin-top: 0;
+            font-size: 1.2rem;
+        }
+
+        /* The Big Picture Flow */
+        .flow-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            margin: 30px 0;
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            position: relative;
+        }
+
+        .flow-number {
+            width: 56px;
+            height: 56px;
+            min-width: 56px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            font-weight: 700;
+            position: relative;
+            z-index: 2;
+        }
+
+        .flow-content {
+            flex: 1;
+            padding-bottom: 32px;
+            border-left: 3px solid var(--primary-light);
+            padding-left: 24px;
+            margin-left: -31px;
+            padding-top: 4px;
+        }
+
+        .flow-step:last-child .flow-content {
+            border-left: 3px solid transparent;
+            padding-bottom: 0;
+        }
+
+        .flow-content h3 {
+            margin-top: 0;
+            font-size: 1.15rem;
+            color: var(--primary);
+        }
+
+        .flow-content p {
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        /* Mapping Table */
+        .mapping-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            margin: 20px 0;
+        }
+
+        .mapping-table thead th {
+            background: var(--primary);
+            color: white;
+            padding: 14px 18px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .mapping-table tbody td {
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.95rem;
+        }
+
+        .mapping-table tbody tr:nth-child(even) {
+            background: #f8fafc;
+        }
+
+        .mapping-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .arrow {
+            display: inline-block;
+            color: var(--primary);
+            font-weight: 700;
+            margin: 0 6px;
+        }
+
+        /* Visual Pipeline */
+        .pipeline-visual {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 36px;
+            margin: 30px 0;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .pipeline-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+        }
+
+        .pipeline-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .pipeline-box {
+            padding: 14px 22px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-align: center;
+            min-width: 140px;
+        }
+
+        .pipeline-box.blue {
+            background: var(--primary-light);
+            color: #1e40af;
+            border: 2px solid #93c5fd;
+        }
+
+        .pipeline-box.amber {
+            background: var(--accent-light);
+            color: #92400e;
+            border: 2px solid #fcd34d;
+        }
+
+        .pipeline-box.green {
+            background: var(--success-light);
+            color: #065f46;
+            border: 2px solid #6ee7b7;
+        }
+
+        .pipeline-box.purple {
+            background: #ede9fe;
+            color: #5b21b6;
+            border: 2px solid #c4b5fd;
+        }
+
+        .pipeline-arrow {
+            font-size: 1.6rem;
+            color: var(--text-muted);
+        }
+
+        .pipeline-arrow.down {
+            display: block;
+            text-align: center;
+            margin: -12px 0;
+            font-size: 2rem;
+        }
+
+        /* Scoring */
+        .score-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 10px 0;
+        }
+
+        .score-label {
+            width: 120px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .score-track {
+            flex: 1;
+            height: 12px;
+            background: #e2e8f0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .score-fill {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.3s ease;
+        }
+
+        .score-fill.low { background: #94a3b8; width: 40%; }
+        .score-fill.medium { background: var(--accent); width: 65%; }
+        .score-fill.high { background: var(--success); width: 85%; }
+
+        .score-value {
+            font-weight: 700;
+            width: 40px;
+            text-align: right;
+            font-size: 0.9rem;
+        }
+
+        /* Skill Structure */
+        .folder-tree {
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 24px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.8;
+            margin: 16px 0;
+        }
+
+        .folder-tree .folder { color: #60a5fa; }
+        .folder-tree .file { color: #fbbf24; }
+        .folder-tree .comment { color: #64748b; font-style: italic; }
+
+        /* Summary Box */
+        .summary-box {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border: 2px solid #93c5fd;
+            border-radius: 16px;
+            padding: 32px;
+            margin: 30px 0;
+        }
+
+        .summary-box h3 {
+            color: var(--primary);
+            font-size: 1.3rem;
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+
+        .summary-box ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .summary-box ul li {
+            padding: 8px 0;
+            padding-left: 28px;
+            position: relative;
+            font-size: 1.05rem;
+        }
+
+        .summary-box ul li::before {
+            content: "\2713";
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .badge.blue { background: var(--primary-light); color: #1e40af; }
+        .badge.amber { background: var(--accent-light); color: #92400e; }
+        .badge.green { background: var(--success-light); color: #065f46; }
+
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+            margin-top: 40px;
+        }
+
+        @media (max-width: 700px) {
+            .hero { padding: 40px 20px; }
+            .hero h1 { font-size: 1.7rem; }
+            .pipeline-row { flex-direction: column; gap: 8px; }
+            .pipeline-arrow { transform: rotate(90deg); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="hero">
+    <h1>How Documentation Becomes Skills</h1>
+    <p class="subtitle">
+        Every development task generates structured documentation (SR-PTD).
+        Over time, these documents are analyzed, clustered, and transformed
+        into reusable Skills that make AI assistants smarter and more specialized.
+    </p>
+</div>
+
+<div class="container">
+
+    <!-- Section 1: The Big Idea -->
+    <div class="section">
+        <h2>The Core Idea</h2>
+        <div class="card highlight">
+            <h3>Documentation as Investment, Not Overhead</h3>
+            <p>
+                Traditional documentation is written once and forgotten. Our approach is different:
+                every task a developer completes is documented in a <strong>skill-oriented format</strong> (called SR-PTD).
+                This documentation isn't just for record-keeping -- it's raw material that gets
+                <strong>refined into reusable Skills</strong> that teach AI assistants how to handle similar tasks in the future.
+            </p>
+            <p>
+                Think of it like this: the first time you solve a problem, you document <em>how</em> you solved it.
+                After solving similar problems 3-5 times, those documents are merged into a
+                <strong>Skill</strong> -- a reusable knowledge package that handles the task automatically next time.
+            </p>
+        </div>
+    </div>
+
+    <!-- Section 2: Visual Pipeline -->
+    <div class="section">
+        <h2>The Pipeline at a Glance</h2>
+
+        <div class="pipeline-visual">
+            <div class="pipeline-row">
+                <div class="pipeline-box blue">Developer<br>Completes Task</div>
+                <div class="pipeline-arrow">&rarr;</div>
+                <div class="pipeline-box amber">SR-PTD Document<br>Created</div>
+                <div class="pipeline-arrow">&rarr;</div>
+                <div class="pipeline-box blue">Stored in<br>Documentation Folder</div>
+            </div>
+
+            <div class="pipeline-arrow down">&darr;</div>
+            <p style="text-align:center; color: var(--text-muted); font-style: italic; margin: -4px 0 12px;">
+                Documents accumulate over time...
+            </p>
+
+            <div class="pipeline-row">
+                <div class="pipeline-box purple">Similar SR-PTDs<br>Clustered (3-5)</div>
+                <div class="pipeline-arrow">&rarr;</div>
+                <div class="pipeline-box amber">Common Patterns<br>Extracted</div>
+                <div class="pipeline-arrow">&rarr;</div>
+                <div class="pipeline-box green">Reusable Skill<br>Created</div>
+            </div>
+
+            <div class="pipeline-arrow down">&darr;</div>
+
+            <div class="pipeline-row">
+                <div class="pipeline-box green" style="min-width: 300px;">
+                    AI Assistant uses Skill automatically<br>
+                    for future similar tasks
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 3: Step by Step -->
+    <div class="section">
+        <h2>How It Works, Step by Step</h2>
+
+        <div class="flow-container">
+            <div class="flow-step">
+                <div class="flow-number">1</div>
+                <div class="flow-content">
+                    <h3>Task Completion Triggers Documentation</h3>
+                    <p>
+                        After completing any development task (feature, bug fix, refactor),
+                        the developer creates an SR-PTD document. This is mandatory -- no task is
+                        considered complete without its documentation.
+                    </p>
+                </div>
+            </div>
+
+            <div class="flow-step">
+                <div class="flow-number">2</div>
+                <div class="flow-content">
+                    <h3>Skill-Oriented Structure</h3>
+                    <p>
+                        The SR-PTD format is not a generic report. Each section maps directly
+                        to a future Skill component:
+                    </p>
+                    <table class="mapping-table" style="margin-top: 12px;">
+                        <thead>
+                            <tr>
+                                <th>What's Documented</th>
+                                <th></th>
+                                <th>What It Becomes in a Skill</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>What triggered the task</td>
+                                <td class="arrow">&rarr;</td>
+                                <td>When should the skill activate?</td>
+                            </tr>
+                            <tr>
+                                <td>Steps taken to complete it</td>
+                                <td class="arrow">&rarr;</td>
+                                <td>Step-by-step instructions</td>
+                            </tr>
+                            <tr>
+                                <td>Knowledge needed (APIs, schemas)</td>
+                                <td class="arrow">&rarr;</td>
+                                <td>Reference materials</td>
+                            </tr>
+                            <tr>
+                                <td>Code written during the task</td>
+                                <td class="arrow">&rarr;</td>
+                                <td>Reusable scripts</td>
+                            </tr>
+                            <tr>
+                                <td>Output formats produced</td>
+                                <td class="arrow">&rarr;</td>
+                                <td>Templates and assets</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="flow-step">
+                <div class="flow-number">3</div>
+                <div class="flow-content">
+                    <h3>Skill Potential Is Scored</h3>
+                    <p>
+                        Each document receives a reusability score (1-25) across five dimensions.
+                        This score determines priority for skill extraction.
+                    </p>
+                    <div style="background: white; border-radius: 10px; padding: 16px; margin-top: 12px; border: 1px solid var(--border);">
+                        <div class="score-bar">
+                            <span class="score-label">Frequency</span>
+                            <div class="score-track"><div class="score-fill high"></div></div>
+                            <span class="score-value">4/5</span>
+                        </div>
+                        <div class="score-bar">
+                            <span class="score-label">Consistency</span>
+                            <div class="score-track"><div class="score-fill medium"></div></div>
+                            <span class="score-value">3/5</span>
+                        </div>
+                        <div class="score-bar">
+                            <span class="score-label">Complexity</span>
+                            <div class="score-track"><div class="score-fill high"></div></div>
+                            <span class="score-value">5/5</span>
+                        </div>
+                        <div class="score-bar">
+                            <span class="score-label">Codifiability</span>
+                            <div class="score-track"><div class="score-fill high"></div></div>
+                            <span class="score-value">4/5</span>
+                        </div>
+                        <div class="score-bar">
+                            <span class="score-label">Tool-ability</span>
+                            <div class="score-track"><div class="score-fill medium"></div></div>
+                            <span class="score-value">3/5</span>
+                        </div>
+                        <div style="text-align: right; font-weight: 700; font-size: 1.1rem; margin-top: 8px; color: var(--primary);">
+                            Total: 19/25 <span class="badge amber">Medium Priority</span>
+                        </div>
+                    </div>
+                    <p style="margin-top: 12px;">
+                        <span class="badge green">20+ = High Priority</span> &nbsp;
+                        <span class="badge amber">12-19 = Medium</span> &nbsp;
+                        <span class="badge blue">Below 12 = Reference Only</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="flow-step">
+                <div class="flow-number">4</div>
+                <div class="flow-content">
+                    <h3>Similar Documents Are Clustered</h3>
+                    <p>
+                        After 3-5 SR-PTD documents accumulate for similar types of tasks,
+                        they are grouped together. Common patterns are extracted:
+                    </p>
+                    <ul style="padding-left: 20px; margin-top: 8px;">
+                        <li>What steps appear in <em>every</em> instance?</li>
+                        <li>What varies between instances and why?</li>
+                        <li>What code was reused or rewritten each time?</li>
+                        <li>What knowledge was needed every time?</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="flow-step">
+                <div class="flow-number">5</div>
+                <div class="flow-content">
+                    <h3>A Reusable Skill Is Built</h3>
+                    <p>
+                        The clustered patterns are assembled into a formal Skill -- a self-contained
+                        package with instructions, scripts, references, and templates.
+                    </p>
+                    <div class="folder-tree">
+                        <span class="folder">my-skill/</span><br>
+                        &nbsp;&nbsp;<span class="file">SKILL.md</span> <span class="comment">&larr; Core instructions (from workflow patterns)</span><br>
+                        &nbsp;&nbsp;<span class="folder">scripts/</span> <span class="comment">&larr; Reusable code (from documented code snippets)</span><br>
+                        &nbsp;&nbsp;<span class="folder">references/</span> <span class="comment">&larr; Knowledge base (from documented APIs, schemas)</span><br>
+                        &nbsp;&nbsp;<span class="folder">assets/</span> <span class="comment">&larr; Templates (from documented output formats)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flow-step">
+                <div class="flow-number">6</div>
+                <div class="flow-content">
+                    <h3>The Skill Works Automatically</h3>
+                    <p>
+                        Once a Skill exists, the AI assistant detects when a new task matches
+                        the Skill's trigger pattern and activates it automatically.
+                        Instead of solving the problem from scratch, the assistant uses the
+                        documented best practices, scripts, and references.
+                    </p>
+                    <p>
+                        Skills also evolve: when a task reveals a gap or improvement,
+                        the Skill is updated through a validated change process.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 4: What Makes This Different -->
+    <div class="section">
+        <h2>What Makes This Approach Different</h2>
+
+        <div class="card accent">
+            <h3>Traditional Documentation</h3>
+            <p>
+                Written for humans to read. Sits in a wiki. Gets outdated.
+                Provides background information but doesn't <em>do</em> anything.
+            </p>
+        </div>
+
+        <div class="card success">
+            <h3>Skill-Oriented Documentation (SR-PTD)</h3>
+            <p>
+                Written in a structure that maps to actionable AI capabilities.
+                Accumulates and compounds. After enough examples, it transforms into
+                a Skill that <strong>automates the work itself</strong>.
+                Every document is an investment that pays dividends.
+            </p>
+        </div>
+    </div>
+
+    <!-- Section 5: The Lifecycle -->
+    <div class="section">
+        <h2>The Skill Lifecycle</h2>
+
+        <div class="card">
+            <h3>1. Capture</h3>
+            <p>Every task generates an SR-PTD document. This is mandatory and enforced by the development workflow.</p>
+        </div>
+        <div class="card">
+            <h3>2. Accumulate</h3>
+            <p>Documents are stored, tagged, and organized by domain, language, and task pattern for easy clustering.</p>
+        </div>
+        <div class="card">
+            <h3>3. Cluster</h3>
+            <p>When 3-5 similar documents exist, they are grouped. Common workflows, repeated code, and shared knowledge are identified.</p>
+        </div>
+        <div class="card">
+            <h3>4. Extract</h3>
+            <p>A formal Skill is built from the clustered patterns -- with instructions, scripts, reference materials, and templates.</p>
+        </div>
+        <div class="card">
+            <h3>5. Deploy</h3>
+            <p>The Skill is installed and becomes available to the AI assistant. Future similar tasks are handled automatically.</p>
+        </div>
+        <div class="card">
+            <h3>6. Evolve</h3>
+            <p>As new tasks use the Skill, gaps and improvements are identified. The Skill is updated through a validated change process with strict quality controls.</p>
+        </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-box">
+        <h3>Key Takeaways</h3>
+        <ul>
+            <li>Every completed task produces structured documentation (SR-PTD)</li>
+            <li>The documentation format is designed to map directly to reusable Skill components</li>
+            <li>Documents accumulate and are clustered by similarity</li>
+            <li>After 3-5 similar documents, a formal Skill is extracted</li>
+            <li>Skills automate future similar tasks, compounding the team's efficiency</li>
+            <li>Skills evolve through validated updates as new edge cases are discovered</li>
+            <li>The entire process turns one-time problem solving into permanent organizational knowledge</li>
+        </ul>
+    </div>
+
+</div>
+
+<footer>
+    ClaUi Extension &mdash; SR-PTD to Skills Pipeline Documentation &mdash; Generated 2026-02-23
+</footer>
+
+</body>
+</html>

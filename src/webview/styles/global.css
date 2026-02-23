@@ -3755,6 +3755,74 @@ html, body, #root {
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* Info button (! icon in circle) */
+.skillgen-info-btn {
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #444);
+  color: var(--vscode-textLink-foreground, #3794ff);
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.skillgen-info-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+/* Collapsible info section */
+.skillgen-info-section {
+  background: var(--vscode-textBlockQuote-background, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--vscode-textBlockQuote-border, rgba(0, 122, 204, 0.5));
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.skillgen-info-section p {
+  margin: 0 0 8px 0;
+  color: var(--vscode-descriptionForeground, #aaa);
+}
+.skillgen-info-section p:last-of-type {
+  margin-bottom: 10px;
+}
+.skillgen-info-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--vscode-textLink-foreground, #3794ff);
+  margin-bottom: 6px;
+}
+.skillgen-info-link {
+  background: none;
+  border: 1px solid var(--vscode-textLink-foreground, #3794ff);
+  color: var(--vscode-textLink-foreground, #3794ff);
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.skillgen-info-link:hover {
+  background: var(--vscode-textLink-foreground, #3794ff);
+  color: var(--vscode-editor-background, #1e1e1e);
+}
+
+/* Row wrapper for dropdown item + info button */
+.status-bar-group-dropdown-item-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Toggle row */
 .skillgen-toggle-row {
   margin-bottom: 12px;
@@ -4607,6 +4675,7 @@ html, body, #root {
 .global-tooltip {
   position: fixed;
   z-index: 10000;
+  width: max-content;
   max-width: 320px;
   padding: 4px 8px;
   border-radius: 4px;

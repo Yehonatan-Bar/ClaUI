@@ -52,6 +52,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private analyticsSaved = false;
   private firstPrompt = '';
   private turnAuthFailureDetected = false;
+  private turnStructuredErrorDetected = false;
   private turnFailureText: string[] = [];
   private codexLoginLaunchInProgress = false;
 
@@ -84,6 +85,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       this.achievementService,
       this.projectAnalyticsStore
     );
+    this.messageHandler.setSecrets(context.secrets);
 
     if (logDir) {
       this.fileLogger = new FileLogger(logDir, `codex-session-${tabNumber}`);
@@ -509,6 +511,15 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private wireProcessEvents(tabLog: (msg: string) => void): void {
     this.processManager.on('event', (event: CodexExecJsonEvent) => {
       tabLog(`Codex JSON: ${event.type}`);
+      if (event.type === 'turn.started') {
+        this.turnStructuredErrorDetected = false;
+      }
+      if (event.type === 'error' || event.type === 'turn.failed') {
+        this.turnStructuredErrorDetected = true;
+      }
+      if (event.type === 'turn.completed') {
+        this.turnStructuredErrorDetected = false;
+      }
       this.demux.handleEvent(event);
     });
 
@@ -524,6 +535,10 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         return;
       }
       tabLog(`Codex STDERR: ${trimmed}`);
+      if (this.isKnownNonFatalCodexStderr(trimmed)) {
+        tabLog(`Ignoring known non-fatal Codex stderr noise`);
+        return;
+      }
       this.captureTurnFailureText(trimmed);
       // Codex often emits non-fatal warnings on stderr (e.g. shell snapshot support).
       if (/WARN\s+codex_core::shell_snapshot/i.test(trimmed)) {
@@ -561,10 +576,12 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
           this.resetTurnFailureCapture();
           return;
         }
-        this.postMessage({
-          type: 'error',
-          message: `Codex process exited with code ${info.code}. Check output logs for details.`,
-        });
+        if (!this.turnStructuredErrorDetected) {
+          this.postMessage({
+            type: 'error',
+            message: `Codex process exited with code ${info.code}. Check output logs for details.`,
+          });
+        }
       }
       this.resetTurnFailureCapture();
     });
@@ -590,6 +607,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
   private resetTurnFailureCapture(): void {
     this.turnAuthFailureDetected = false;
+    this.turnStructuredErrorDetected = false;
     this.turnFailureText = [];
   }
 
@@ -629,6 +647,14 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       /not logged in/i,
     ];
     return authPatterns.some((pattern) => pattern.test(normalized));
+  }
+
+  private isKnownNonFatalCodexStderr(text: string): boolean {
+    const knownNoisePatterns = [
+      /WARN\s+codex_core::shell_snapshot/i,
+      /ERROR\s+codex_core::rollout::list:\s*state db missing rollout path for thread/i,
+    ];
+    return knownNoisePatterns.some((pattern) => pattern.test(text));
   }
 
   private async launchCodexLoginFlow(): Promise<void> {

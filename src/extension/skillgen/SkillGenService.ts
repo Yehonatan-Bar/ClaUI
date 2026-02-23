@@ -4,9 +4,10 @@ import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import { SkillGenStore } from './SkillGenStore';
-import { PythonPipelineRunner } from './PythonPipelineRunner';
+import { PhaseOrchestrator } from './PhaseOrchestrator';
 import { DeduplicationEngine } from './DeduplicationEngine';
 import { SkillInstaller } from './SkillInstaller';
+import { getStoredApiKey } from '../process/envUtils';
 import type {
   SkillGenRunStatus,
   SkillGenRunHistoryEntry,
@@ -33,7 +34,7 @@ function shortId(): string {
  * - Scan for SR-PTD documents and track them in the ledger
  * - Check preflight conditions (Python, toolkit, API key)
  * - Enforce cross-process locking
- * - Run the Python pipeline
+ * - Run the phase-orchestrated pipeline (Python + Claude CLI)
  * - Deduplicate generated skills against existing ones
  * - Install results atomically with backup/rollback
  * - Report progress and results to the webview
@@ -45,15 +46,21 @@ export class SkillGenService {
   private progressLabel = '';
   /** Multi-tab broadcast: maps tabId -> webview sender */
   private readonly tabSenders = new Map<string, WebviewSender>();
+  private secrets: vscode.SecretStorage | null = null;
 
   readonly store: SkillGenStore;
-  private readonly runner: PythonPipelineRunner;
+  private readonly runner: PhaseOrchestrator;
   private readonly dedup: DeduplicationEngine;
   private readonly installer: SkillInstaller;
 
+  /** Provide SecretStorage so pipeline AI phases can use the user's API key */
+  setSecrets(secrets: vscode.SecretStorage): void {
+    this.secrets = secrets;
+  }
+
   constructor(memento: vscode.Memento) {
     this.store = new SkillGenStore(memento);
-    this.runner = new PythonPipelineRunner();
+    this.runner = new PhaseOrchestrator();
     this.dedup = new DeduplicationEngine();
     this.installer = new SkillInstaller();
 
@@ -275,6 +282,12 @@ export class SkillGenService {
       const pendingPaths = this.store.getPendingDocPaths();
       this.log(`[SkillGen:Pipeline][INFO] Pipeline executing | runId=${runId} pendingDocs=${pendingPaths.length} mode=${config.pipelineMode}`);
 
+      // Refresh API key for AI phases before each run
+      if (this.secrets) {
+        const apiKey = await getStoredApiKey(this.secrets);
+        this.runner.setApiKey(apiKey);
+      }
+
       const pipelineResult = await this.runner.run(
         config.docsDirectory,
         pendingPaths,
@@ -399,22 +412,15 @@ export class SkillGenService {
       return { ok: false, error: `Python not found at: ${config.pythonPath}` };
     }
 
-    // Check toolkit path exists
+    // Check toolkit path exists (needed for Python scripts in non-AI phases)
     if (!config.toolkitPath || !fs.existsSync(config.toolkitPath)) {
       return { ok: false, error: `Toolkit path not found: ${config.toolkitPath || '(not configured)'}. Set claudeMirror.skillGen.toolkitPath to your skill generation toolkit directory.` };
     }
 
-    // Check pipeline script exists at the resolved path
-    const scriptMap: Record<string, string> = {
-      run_pipeline: 'run_pipeline.py',
-      create_skills: 'create_skills.py',
-    };
-    const expectedScript = scriptMap[config.pipelineMode];
-    if (expectedScript) {
-      const scriptPath = path.join(config.toolkitPath, expectedScript);
-      if (!fs.existsSync(scriptPath)) {
-        return { ok: false, error: `Pipeline script not found: ${scriptPath}` };
-      }
+    // Check that the toolkit has a scripts/ directory with required Python scripts
+    const scriptsDir = path.join(config.toolkitPath, 'scripts');
+    if (!fs.existsSync(scriptsDir)) {
+      return { ok: false, error: `Toolkit scripts directory not found: ${scriptsDir}` };
     }
 
     // Check docs directory
@@ -430,17 +436,39 @@ export class SkillGenService {
 
   // ─── Locking ───────────────────────────────────────────────
 
+  private isProcessAlive(pid: number): boolean {
+    try {
+      process.kill(pid, 0); // signal 0 = existence check, does not kill
+      return true;
+    } catch {
+      return false; // ESRCH = no such process
+    }
+  }
+
   private acquireLock(lockFile: string, runId: string): boolean {
     try {
-      // Check if lock exists and is stale (older than 2 hours)
       if (fs.existsSync(lockFile)) {
-        const stat = fs.statSync(lockFile);
-        const ageMs = Date.now() - stat.mtimeMs;
-        if (ageMs < 2 * 60 * 60 * 1000) {
-          this.log(`[SkillGen:Lock][INFO] Lock contention: lock is fresh | runId=${runId} ageSec=${Math.round(ageMs / 1000)}`);
-          return false;
+        // First check: is the owning process still alive?
+        let ownerDead = false;
+        try {
+          const lockData = JSON.parse(fs.readFileSync(lockFile, 'utf-8'));
+          if (lockData.pid && !this.isProcessAlive(lockData.pid)) {
+            ownerDead = true;
+            this.log(`[SkillGen:Lock][WARNING] Removing orphaned lock (PID ${lockData.pid} is dead) | runId=${runId}`);
+          }
+        } catch { /* corrupt lock file, treat as stale */ ownerDead = true; }
+
+        if (!ownerDead) {
+          // Fallback: age-based stale detection (2 hours)
+          const stat = fs.statSync(lockFile);
+          const ageMs = Date.now() - stat.mtimeMs;
+          if (ageMs < 2 * 60 * 60 * 1000) {
+            this.log(`[SkillGen:Lock][INFO] Lock contention: lock is fresh and owner alive | runId=${runId} ageSec=${Math.round(ageMs / 1000)}`);
+            return false;
+          }
+          this.log(`[SkillGen:Lock][WARNING] Removing stale lock (older than 2h) | runId=${runId} ageMin=${Math.round(ageMs / 60000)}`);
         }
-        this.log(`[SkillGen:Lock][WARNING] Removing stale lock | runId=${runId} ageMin=${Math.round(ageMs / 60000)}`);
+
         fs.unlinkSync(lockFile);
       }
       // Create lock with our PID

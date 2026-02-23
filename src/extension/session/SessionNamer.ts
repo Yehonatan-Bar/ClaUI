@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
+import { buildClaudeCliEnv } from '../process/envUtils';
 
 /**
  * Spawns a lightweight one-shot Claude CLI process to generate
@@ -17,7 +18,7 @@ export class SessionNamer {
    * Generate a short session name from the user's first message.
    * Returns null if naming fails for any reason (timeout, bad output, etc.).
    */
-  async generateName(firstMessage: string): Promise<string | null> {
+  async generateName(firstMessage: string, apiKey?: string): Promise<string | null> {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const cliPath = config.get<string>('cliPath', 'claude');
 
@@ -39,10 +40,7 @@ export class SessionNamer {
       '--model', analysisModel,
     ];
 
-    // Clean environment to prevent nested-session detection
-    const env = { ...process.env };
-    delete env.CLAUDECODE;
-    delete env.CLAUDE_CODE_ENTRYPOINT;
+    const env = buildClaudeCliEnv(apiKey);
 
     this.log(`SessionNamer: spawning "${cliPath}" with args: ${JSON.stringify(args)}`);
     this.log(`SessionNamer: first message (${truncatedMessage.length} chars): "${truncatedMessage.slice(0, 80)}..."`);

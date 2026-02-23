@@ -27,6 +27,25 @@ export interface CodexTurnCompletedEvent {
   [key: string]: unknown;
 }
 
+export interface CodexTurnFailedEvent {
+  type: 'turn.failed';
+  error?: {
+    message?: string;
+    [key: string]: unknown;
+  } | string;
+  [key: string]: unknown;
+}
+
+export interface CodexErrorEvent {
+  type: 'error';
+  message?: string;
+  error?: {
+    message?: string;
+    [key: string]: unknown;
+  } | string;
+  [key: string]: unknown;
+}
+
 export interface CodexExecItemBase {
   id?: string;
   type: string;
@@ -78,7 +97,8 @@ export type CodexExecJsonEvent =
   | CodexThreadStartedEvent
   | CodexTurnStartedEvent
   | CodexTurnCompletedEvent
+  | CodexTurnFailedEvent
+  | CodexErrorEvent
   | CodexItemStartedEvent
   | CodexItemCompletedEvent
   | CodexUnknownJsonEvent;
-

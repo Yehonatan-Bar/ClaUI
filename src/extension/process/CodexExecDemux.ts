@@ -2,10 +2,12 @@ import { EventEmitter } from 'events';
 import type {
   CodexAgentMessageItem,
   CodexCommandExecutionItem,
+  CodexErrorEvent,
   CodexExecJsonEvent,
   CodexItemCompletedEvent,
   CodexItemStartedEvent,
   CodexTurnCompletedEvent,
+  CodexTurnFailedEvent,
 } from '../types/codex-exec-json';
 
 /**
@@ -23,6 +25,12 @@ export class CodexExecDemux extends EventEmitter {
       case 'turn.completed':
         this.handleTurnCompleted(event as CodexTurnCompletedEvent);
         return;
+      case 'turn.failed':
+        this.handleTurnFailed(event as CodexTurnFailedEvent);
+        return;
+      case 'error':
+        this.handleTopLevelError(event as CodexErrorEvent);
+        return;
       case 'item.started':
         this.handleItemStarted(event as CodexItemStartedEvent);
         return;
@@ -32,6 +40,28 @@ export class CodexExecDemux extends EventEmitter {
       default:
         this.emit('raw', event);
     }
+  }
+
+  private handleTurnFailed(event: CodexTurnFailedEvent): void {
+    const message =
+      typeof event.error === 'string'
+        ? event.error
+        : typeof event.error?.message === 'string'
+          ? event.error.message
+          : 'Codex turn failed';
+    this.emit('error', { message, raw: event });
+  }
+
+  private handleTopLevelError(event: CodexErrorEvent): void {
+    const message =
+      typeof event.message === 'string'
+        ? event.message
+        : typeof event.error === 'string'
+          ? event.error
+          : typeof event.error?.message === 'string'
+            ? event.error.message
+            : 'Codex error';
+    this.emit('error', { message, raw: event });
   }
 
   private handleTurnCompleted(event: CodexTurnCompletedEvent): void {

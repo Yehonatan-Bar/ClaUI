@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 
@@ -21,8 +21,20 @@ export const SkillGenPanel: React.FC = () => {
     skillGenProgressLabel,
     skillGenLastRun,
     skillGenHistory,
+    skillGenShowInfo,
     setSkillGenPanelOpen,
+    setSkillGenShowInfo,
   } = useAppStore();
+
+  const [infoOpen, setInfoOpen] = useState(false);
+
+  // Auto-expand info section when opened via the StatusBar info button
+  useEffect(() => {
+    if (skillGenShowInfo) {
+      setInfoOpen(true);
+      setSkillGenShowInfo(false);
+    }
+  }, [skillGenShowInfo, setSkillGenShowInfo]);
 
   const isRunning = skillGenRunStatus === 'running' || skillGenRunStatus === 'scanning'
     || skillGenRunStatus === 'preflight' || skillGenRunStatus === 'installing';
@@ -56,6 +68,11 @@ export const SkillGenPanel: React.FC = () => {
     setSkillGenPanelOpen(false);
   };
 
+  const handleOpenGuide = () => {
+    logUI('infoGuideOpened');
+    postToExtension({ type: 'openSkillGenGuide' } as any);
+  };
+
   const progressPercent = Math.min(100, Math.max(0, skillGenProgress));
   const progressWidth = `${progressPercent}%`;
 
@@ -81,10 +98,32 @@ export const SkillGenPanel: React.FC = () => {
         {/* Header */}
         <div className="skillgen-panel-header">
           <span className="skillgen-panel-title">Skill Generation</span>
-          <button className="skillgen-close-btn" onClick={handleClose} data-tooltip="Close">
-            x
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              className="skillgen-info-btn"
+              onClick={() => { setInfoOpen(!infoOpen); logUI('infoToggled', { open: !infoOpen }); }}
+              data-tooltip="How does this work?"
+            >
+              !
+            </button>
+            <button className="skillgen-close-btn" onClick={handleClose} data-tooltip="Close">
+              x
+            </button>
+          </div>
         </div>
+
+        {/* Collapsible info section */}
+        {infoOpen && (
+          <div className="skillgen-info-section">
+            <div className="skillgen-info-title">How Documentation Becomes Skills</div>
+            <p>Every completed task produces a structured <strong>SR-PTD</strong> document. These are not regular reports -- each section maps directly to a reusable Skill component.</p>
+            <p>After <strong>3-5 similar documents</strong> accumulate, they are automatically clustered and merged into a formal <strong>Skill</strong> -- a knowledge package that handles similar tasks automatically in the future.</p>
+            <p>Every task solved today becomes organizational knowledge that accelerates future work.</p>
+            <button className="skillgen-info-link" onClick={handleOpenGuide}>
+              Open full visual guide
+            </button>
+          </div>
+        )}
 
         {/* Enable/Disable toggle */}
         <div className="skillgen-toggle-row">

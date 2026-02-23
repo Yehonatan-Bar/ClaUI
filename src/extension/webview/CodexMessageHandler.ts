@@ -1,12 +1,17 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import type { CodexExecDemux } from '../process/CodexExecDemux';
 import type { PromptHistoryStore } from '../session/PromptHistoryStore';
 import type { ProjectAnalyticsStore } from '../session/ProjectAnalyticsStore';
 import type { AchievementService } from '../achievements/AchievementService';
 import type { WebviewBridge } from './MessageHandler';
 import type { ContentBlock } from '../types/stream-json';
+import { setStoredApiKey, maskApiKey } from '../process/envUtils';
 import type {
   CodexReasoningEffort,
+  CodexModelOption,
   ProviderCapabilities,
   ProviderId,
   TurnRecord,
@@ -42,6 +47,13 @@ function isExpectedNonFatalCommandExit(command: string, exitCode: number | null)
   return false;
 }
 
+function formatCodexModelLabel(id: string): string {
+  return id
+    .split('-')
+    .map((part) => (part.toLowerCase() === 'gpt' ? 'GPT' : part.charAt(0).toUpperCase() + part.slice(1)))
+    .join('-');
+}
+
 const CODEX_PROVIDER_CAPABILITIES: ProviderCapabilities = {
   supportsPlanApproval: false,
   supportsCompact: false,
@@ -70,6 +82,26 @@ export class CodexMessageHandler {
   private currentTurnCommands: string[] = [];
   private currentTurnHadAgentMessage = false;
   private messageCounter = 0;
+  private secrets: vscode.SecretStorage | null = null;
+
+  /** Provide SecretStorage for API key management */
+  setSecrets(secrets: vscode.SecretStorage): void {
+    this.secrets = secrets;
+  }
+
+  /** Send current API key status to the webview */
+  private async sendApiKeySetting(): Promise<void> {
+    if (!this.secrets) {
+      this.webview.postMessage({ type: 'apiKeySetting', hasKey: false, maskedKey: '' });
+      return;
+    }
+    const key = await this.secrets.get('claudeMirror.anthropicApiKey');
+    this.webview.postMessage({
+      type: 'apiKeySetting',
+      hasKey: !!key,
+      maskedKey: maskApiKey(key ?? undefined),
+    });
+  }
 
   constructor(
     private readonly tabId: string,
@@ -113,6 +145,18 @@ export class CodexMessageHandler {
             });
           }
           break;
+
+        case 'setApiKey': {
+          if (!this.secrets) {
+            this.log('setApiKey: no secrets available');
+            break;
+          }
+          void setStoredApiKey(this.secrets, msg.apiKey).then(() => {
+            this.log(`API key ${msg.apiKey.trim() ? 'saved' : 'cleared'}`);
+            void this.sendApiKeySetting();
+          });
+          break;
+        }
 
         case 'startSession':
           void this.session.startSession({ cwd: msg.workspacePath }).catch((err) => {
@@ -283,6 +327,14 @@ export class CodexMessageHandler {
       const model = this.getConfiguredCodexModelLabel();
       this.log(`Codex agent_message: id=${messageId} len=${data.text.length}`);
       this.webview.postMessage({ type: 'messageStart', messageId, model });
+      // Codex exec emits complete agent messages (not text deltas). Synthesize a single
+      // streamingText block so the existing webview finalize path persists the message.
+      this.webview.postMessage({
+        type: 'streamingText',
+        messageId,
+        blockIndex: 0,
+        text: data.text,
+      });
       this.webview.postMessage({
         type: 'assistantMessage',
         messageId,
@@ -405,7 +457,9 @@ export class CodexMessageHandler {
     this.sendProviderSetting();
     this.sendProviderCapabilities();
     this.sendCodexModelSetting();
+    this.sendCodexModelOptions();
     this.sendCodexReasoningEffortSetting();
+    void this.sendApiKeySetting();
   }
 
   private sendTextSettings(): void {
@@ -450,6 +504,13 @@ export class CodexMessageHandler {
     });
   }
 
+  private sendCodexModelOptions(): void {
+    this.webview.postMessage({
+      type: 'codexModelOptions',
+      options: this.readCodexModelOptions(),
+    });
+  }
+
   private sendCodexReasoningEffortSetting(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const effort = config.get<CodexReasoningEffort>('codex.reasoningEffort', '');
@@ -457,6 +518,66 @@ export class CodexMessageHandler {
       type: 'codexReasoningEffortSetting',
       effort,
     });
+  }
+
+  private readCodexModelOptions(): CodexModelOption[] {
+    try {
+      const modelsCachePath = path.join(os.homedir(), '.codex', 'models_cache.json');
+      if (!fs.existsSync(modelsCachePath)) {
+        this.log(`Codex models cache not found: ${modelsCachePath}`);
+        return [];
+      }
+
+      const parsed = JSON.parse(fs.readFileSync(modelsCachePath, 'utf8')) as {
+        models?: Array<Record<string, unknown>>;
+      };
+      const models = Array.isArray(parsed?.models) ? parsed.models : [];
+      const seen = new Set<string>();
+
+      const options = models
+        .filter((model) => {
+          const slug = typeof model.slug === 'string' ? model.slug : '';
+          const displayName = typeof model.display_name === 'string' ? model.display_name : '';
+          const haystack = `${slug} ${displayName}`.toLowerCase();
+          const isVisible = model.visibility === undefined || model.visibility === 'list';
+          return isVisible && (haystack.includes('gpt') || haystack.includes('codex'));
+        })
+        .sort((a, b) => {
+          const pa = typeof a.priority === 'number' ? a.priority : Number.MAX_SAFE_INTEGER;
+          const pb = typeof b.priority === 'number' ? b.priority : Number.MAX_SAFE_INTEGER;
+          if (pa !== pb) return pa - pb;
+          const sa = typeof a.slug === 'string' ? a.slug : '';
+          const sb = typeof b.slug === 'string' ? b.slug : '';
+          return sa.localeCompare(sb);
+        })
+        .map((model) => {
+          const slug = typeof model.slug === 'string' ? model.slug.trim() : '';
+          if (!slug || seen.has(slug)) return null;
+          seen.add(slug);
+          const supportedReasoningEfforts = Array.isArray(model.supported_reasoning_levels)
+            ? model.supported_reasoning_levels
+                .map((entry) => {
+                  if (!entry || typeof entry !== 'object') return null;
+                  const effort = (entry as { effort?: unknown }).effort;
+                  return typeof effort === 'string' ? (effort as CodexReasoningEffort) : null;
+                })
+                .filter((effort): effort is CodexReasoningEffort => !!effort)
+            : undefined;
+          return {
+            label: formatCodexModelLabel(slug),
+            value: slug,
+            supportedReasoningEfforts: supportedReasoningEfforts?.length ? supportedReasoningEfforts : undefined,
+          } as CodexModelOption;
+        })
+        .filter((opt): opt is CodexModelOption => !!opt);
+
+      this.log(`Loaded ${options.length} Codex model options from models_cache.json`);
+      return options;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`Failed to read Codex model options: ${message}`);
+      return [];
+    }
   }
 
   private handleGetProjectAnalytics(): void {

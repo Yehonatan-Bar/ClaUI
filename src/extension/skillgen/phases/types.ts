@@ -34,15 +34,12 @@ export const PHASE_PROGRESS_RANGES: Record<PhaseId, { start: number; end: number
   [PhaseId.D]: { start: 72, end: 95 },
 };
 
-/** Pipeline progress checkpoint format (matches Python's .pipeline_progress.json) */
-export interface PipelineProgress {
-  [phaseId: string]: {
-    status: 'SUCCESS' | 'FAILED';
-    timestamp: string;
-  };
-  last_phase?: string;
-  last_status?: string;
-}
+/**
+ * Pipeline progress checkpoint format (matches Python's .pipeline_progress.json).
+ * Phase entries are keyed by PhaseId, plus metadata fields last_phase/last_status.
+ * Uses Record<string, any> to match the loose JSON format.
+ */
+export type PipelineProgress = Record<string, any>;
 
 /** Pipeline workspace directory layout */
 export interface WorkspacePaths {

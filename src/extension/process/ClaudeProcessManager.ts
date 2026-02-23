@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ChildProcess, spawn, exec } from 'child_process';
 import { EventEmitter } from 'events';
 import type { CliOutputEvent, CliInputMessage } from '../types/stream-json';
+import { buildClaudeCliEnv, getStoredApiKey } from './envUtils';
 
 export interface ProcessStartOptions {
   resume?: string;
@@ -98,10 +99,10 @@ export class ClaudeProcessManager extends EventEmitter {
     this.log(`Spawning: ${cliPath} ${args.join(' ')}`);
     this.log(`CWD: ${cwd || '(none)'}`);
 
-    // Unset CLAUDECODE env var to prevent nested-session detection
-    const env = { ...process.env };
-    delete env.CLAUDECODE;
-    delete env.CLAUDE_CODE_ENTRYPOINT;
+    // Build sanitized env; inject user's API key from SecretStorage if configured
+    const apiKey = await getStoredApiKey(this.context.secrets);
+    const env = buildClaudeCliEnv(apiKey);
+    this.log(`Env: hasAnthropicKey=${!!apiKey}`);
 
     const child = spawn(cliPath, args, {
       cwd,

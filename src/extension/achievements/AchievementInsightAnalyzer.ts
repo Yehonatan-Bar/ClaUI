@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { spawn, type ChildProcess } from 'child_process';
 import type { SessionSnapshot } from './AchievementEngine';
+import { buildClaudeCliEnv, getStoredApiKey } from '../process/envUtils';
 
 export interface InsightResult {
   sessionQuality: 'exceptional' | 'productive' | 'steady' | 'exploratory' | 'struggling';
@@ -21,8 +22,20 @@ export class AchievementInsightAnalyzer {
   private log: (msg: string) => void = () => {};
   private lastAnalysisDate: string;
 
+  private apiKey: string | undefined;
+  private secrets: vscode.SecretStorage | null = null;
+
   constructor(private readonly globalState: vscode.Memento) {
     this.lastAnalysisDate = globalState.get<string>(INSIGHT_DATE_KEY, '');
+  }
+
+  setApiKey(key: string | undefined): void {
+    this.apiKey = key;
+  }
+
+  /** Provide SecretStorage so the analyzer can read the fresh API key before each spawn */
+  setSecrets(secrets: vscode.SecretStorage): void {
+    this.secrets = secrets;
   }
 
   setLogger(logger: (msg: string) => void): void {
@@ -43,6 +56,10 @@ export class AchievementInsightAnalyzer {
     }
 
     try {
+      // Refresh API key from SecretStorage before spawning
+      if (this.secrets) {
+        this.apiKey = await getStoredApiKey(this.secrets);
+      }
       const result = await this.spawnAnalysis(input);
       if (result) {
         this.lastAnalysisDate = today;
@@ -103,9 +120,7 @@ export class AchievementInsightAnalyzer {
       '{"sessionQuality":"...","insight":"...","codingPattern":"...","xpBonus":0}';
 
     const args = ['-p', '--model', MODEL];
-    const env = { ...process.env };
-    delete env.CLAUDECODE;
-    delete env.CLAUDE_CODE_ENTRYPOINT;
+    const env = buildClaudeCliEnv(this.apiKey);
 
     this.log(`[InsightAnalyzer] Spawning Sonnet analysis (${durationMin}min session, ${input.filesTouched.length} files)`);
 
