@@ -1,0 +1,663 @@
+**תוכנית יישום מפורטת: מסלול מקביל ל־Codex (בלי לפגוע במסלול Claude שעובד)**
+
+**החלטה ארכיטקטונית**
+נלך על `Parallel Track` מלא ל־Codex, עם שכפול מכוון של חלקים בצד ההרחבה (extension), ולא על הכללה/ריפקטור של המסלול הקיים.
+
+המשמעות:
+- מסלול Claude נשאר עובד כמו היום כמעט ללא שינוי.
+- מסלול Codex נכתב בנפרד, עם פרוטוקול/לוגיקה משלו.
+- ה־UI המשותף נשאר ברובו זהה, עם התאמות קטנות בלבד.
+- שכפול קוד הוא החלטה מודעת לטובת יציבות ומהירות יישום.
+
+**עקרונות מחייבים**
+1. לא משנים התנהגות קיימת של Claude מעבר לניתוב לפי provider.
+2. לא מנסים "לאחד" פרוטוקולים בשלב ראשון.
+3. מוסיפים `provider` כקונספט במעטפת בלבד (UI/state/store/commands).
+4. מסלול Codex יעמוד לבד, גם אם יש קוד כפול.
+5. פיצ'רים לא נתמכים ב־Codex יוסתרו/יושבתו במפורש, לא "ישברו בשקט".
+
+---
+
+**מטרה פונקציונלית (מה המשתמש יקבל)**
+1. כפתור חדש `Codex` בסרגל התחתון.
+2. בחירה של provider (`Claude` / `Codex`) כברירת מחדל לשיחות חדשות.
+3. פתיחת טאב חדש של Codex עם UI דומה מאוד ל־Claude.
+4. שליחת הודעות, קבלת תשובה, הרצת פקודות דרך Codex, ביטול, Resume בסיסי.
+5. היסטוריה נפרדת/מאוחדת עם סימון provider.
+6. מסלול Claude נשאר יציב ולא מושפע.
+
+---
+
+**לא־מטרות (MVP)**
+1. לא "ממירים" session פעילה של Claude ל־Codex באותו thread.
+2. לא עושים תאימות מלאה ל־Plan Approval Bar של Claude במסלול Codex.
+3. לא עושים ריפקטור גנרי לכל שכבת ה־process/protocol.
+4. לא מבטיחים parity מלא של streaming delta (ל־Codex אין כרגע אותו פורמט).
+
+---
+
+**הגדרת UX מדויקת לכפתור החדש**
+**הכפתור**
+- מיקום: ליד `ModelSelector` בסרגל התחתון (`StatusBar`).
+- טקסט: `Codex`.
+- מצב פעיל: מודגש אם ה־provider הנבחר הוא `codex`.
+- tooltip:
+  - אם provider נוכחי `claude`: `Switch default provider to Codex and open a new Codex tab`
+  - אם provider נוכחי `codex`: `Codex is the current provider`
+
+**התנהגות לחיצה**
+1. אם אין session פעילה בטאב:
+- הכפתור מגדיר provider = `codex`.
+- לא פותח אוטומטית session אלא אם המשתמש לוחץ Start (לשמור על התנהגות עקבית).
+- אופציה חלופית (אם רוצים UX מהיר): לפתוח טאב חדש ולהתחיל session לוגית. נבחר אחת בלבד לפני יישום. המלצה: לפתוח טאב חדש.
+
+2. אם יש טאב Claude פעיל:
+- הכפתור לא "מחליף" את הטאב הקיים.
+- הוא עושה:
+  - `provider` ברירת מחדל = `codex`
+  - פותח טאב חדש במסלול Codex
+- הטאב Claude נשאר פתוח וללא שינוי.
+
+3. אם יש טאב Codex פעיל:
+- הכפתור לא עושה כלום (או רק מאשר מצב).
+- לא פותח טאב נוסף כדי למנוע accidental tab spam.
+
+4. אם יש turn פעיל (busy):
+- הכפתור disabled בטאב הנוכחי.
+- לא מבצעים מעבר בזמן עיבוד.
+
+הערה חשובה:
+זה UX נכון מקצועית, כי מעבר provider הוא לא החלפת מודל. אין הבטחה להמשך אותו session cross-provider.
+
+---
+
+**תכנון ארכיטקטוני (Clone-First)**
+ניצור מסלול Codex נפרד בצד ההרחבה, עם שכפול מבוקר של מחלקות מרכזיות.
+
+**קבצים חדשים (מסלול Codex)**
+1. `src/extension/types/codex-exec-json.ts`
+- טיפוסים עבור אירועי `codex exec --json` JSONL.
+- פרסר permissive: לא להישבר על אירועים חדשים/לא מוכרים.
+
+2. `src/extension/process/CodexExecProcessManager.ts`
+- מנהל process ל־Codex.
+- שונה מהותית מ־Claude:
+  - אין session process מתמשך
+  - יש process לכל turn (`exec` / `exec resume`)
+- מנהל child process פעיל אחד בלבד (לצורך cancel).
+
+3. `src/extension/process/CodexExecDemux.ts`
+- ממיר JSONL של Codex לאירועים פנימיים למסלול Codex.
+- אירועים צפויים:
+  - `threadStarted`
+  - `turnStarted`
+  - `agentMessage`
+  - `commandExecutionStart`
+  - `commandExecutionComplete`
+  - `turnCompleted`
+  - `error`
+  - `raw` / `unknownItem` (לוג בלבד)
+
+4. `src/extension/webview/CodexMessageHandler.ts`
+- שכפול של `MessageHandler` עם התאמות למסלול Codex.
+- מתרגם אירועי Codex להודעות webview הקיימות ככל האפשר.
+- משבית פיצ'רים לא נתמכים.
+
+5. `src/extension/session/CodexSessionTab.ts`
+- שכפול של `SessionTab` עם lifecycle שונה:
+  - session לוגית (threadId) + process לכל turn
+  - ללא `ControlProtocol` של stdin מתמשך
+- אחראי על webview panel, busy state, history load, save analytics, title, logging.
+
+6. `src/extension/session/CodexConversationReader.ts`
+- קורא היסטוריה מ־`~/.codex/sessions/**/*.jsonl`
+- מחזיר `SerializedChatMessage[]` בפורמט של ה־UI הקיים.
+
+---
+
+**קבצים קיימים שייעברו שינוי מינימלי**
+1. `package.json`
+- הוספת settings חדשים ל־Codex + provider.
+- הוספת command optional לכפתור shortcut אם נרצה.
+
+2. `src/extension/types/webview-messages.ts`
+- הוספת הודעות `setProvider`, `providerSetting`, `providerCapabilities`
+- הרחבת הודעות session metadata עם `provider` (אופציונלי בהתחלה)
+
+3. `src/webview/state/store.ts`
+- שדה `provider` ו־`selectedProvider`
+- שדה `providerCapabilities`
+
+4. `src/webview/hooks/useClaudeStream.ts`
+- למרות השם, נשאיר את הקובץ.
+- נוסיף טיפול ב־`providerSetting` ו־`providerCapabilities`.
+
+5. `src/webview/components/StatusBar/StatusBar.tsx`
+- כפתור `Codex`
+- Provider selector (או quick switch בלבד)
+- רינדור מותנה של selectors לפי provider
+
+6. `src/extension/session/TabManager.ts`
+- ניתוב יצירת טאב לפי provider (`Claude SessionTab` הקיים או `CodexSessionTab` החדש)
+
+7. `src/extension/commands.ts`
+- `startSession`, `showHistory`, `resumeSession` צריכים לעבוד לפי provider / item provider
+
+8. `src/extension/session/SessionStore.ts`
+- הוספת `provider` ל־metadata עם migration backward-compatible
+
+9. `src/extension/types/webview-messages.ts` + `src/extension/session/ProjectAnalyticsStore.ts`
+- `SessionSummary` יקבל `provider`
+
+---
+
+**מודל נתונים חדש (מחייב)**
+**Session metadata (היסטוריה)**
+ב־`src/extension/session/SessionStore.ts`:
+- להוסיף `provider: 'claude' | 'codex'`
+- backward compatibility:
+  - אם חסר `provider` בנתונים קיימים -> להתייחס כ־`claude`
+
+**Project analytics**
+ב־`SessionSummary`:
+- להוסיף `provider: 'claude' | 'codex'`
+- backward compatibility:
+  - אם חסר -> `claude`
+
+**Webview state**
+להוסיף ב־`store`:
+- `provider: 'claude' | 'codex' | null` (provider של הטאב הפעיל)
+- `selectedProvider: 'claude' | 'codex'` (ברירת מחדל לטאבים חדשים)
+- `providerCapabilities: { ... }`
+
+---
+
+**הגדרת Capabilities (ברורה וחד־משמעית)**
+נוסיף אובייקט capabilities מה־extension ל־webview, כדי לא לפזר `if codex` בכל UI.
+
+מפתח מומלץ:
+- `supportsPlanApproval`
+- `supportsCompact`
+- `supportsFork`
+- `supportsImages`
+- `supportsPermissionModeSelector`
+- `supportsLiveTextStreaming`
+- `supportsConversationDiskReplay`
+- `supportsCostUsd`
+
+**Claude capabilities (כיום)**
+- כמעט הכל `true` (לפי מה שכבר עובד)
+
+**Codex capabilities (MVP)**
+- `supportsPlanApproval: false`
+- `supportsCompact: false`
+- `supportsFork: false` (MVP)
+- `supportsImages: false` (MVP ראשון)
+- `supportsPermissionModeSelector: false` (MVP ראשון)
+- `supportsLiveTextStreaming: false` (אין delta parity)
+- `supportsConversationDiskReplay: true` (אחרי `CodexConversationReader`)
+- `supportsCostUsd: false` (יש tokens, אין `cost_usd` בפורמט שנבדק)
+
+---
+
+**מסלול Codex: התנהגות טכנית (מלא)**
+**מודל סשן**
+במסלול Codex הסשן הוא לוגי, לא process מתמשך.
+- נשמור `threadId`
+- כל turn ירוץ בתהליך חדש
+- turn ראשון:
+  - `codex exec --json ...`
+- turn המשך:
+  - `codex exec resume --json <threadId> ...`
+
+**בניית פקודה (מחייבת)**
+מומלץ להעביר prompt דרך stdin כדי להימנע מבעיות escaping/length:
+- turn ראשון: `codex exec --json -C <cwd> [--model <model>] -`
+- turn המשך: `codex exec resume --json <threadId> [--model <model>] -`
+
+הערה:
+לא להגדיר בשלב ראשון flags של sandbox/approval unless verified config keys. להשתמש ב־defaults של Codex כדי לא לשבור תאימות מקומית.
+
+**Cancel**
+- `cancelRequest` במסלול Codex = kill process tree של ה־turn הפעיל
+- הסשן נשאר פתוח (`threadId` נשמר)
+- אין auto-resume process כי אין process מתמשך
+
+**Stop Session**
+- מסיים סשן לוגי
+- אם יש turn פעיל -> kill
+- שולח `sessionEnded`
+- משאיר היסטוריה ב־UI עד clear/new session (כמו היום)
+
+---
+
+**מיפוי אירועי Codex ל־UI הקיים (מפורט)**
+מטרת המיפוי היא שה־React UI יעבוד כמעט בלי שינוי.
+
+1. `thread.started`
+- מקור session/thread id
+- נשלח ל־webview:
+  - `sessionStarted { sessionId: thread_id, model: configuredModelOrUnknown, provider: 'codex' }`
+- נשמור ב־`SessionStore`
+
+2. `turn.started`
+- נשלח `processBusy: true`
+- נייצר `messageStart` סינתטי רק כאשר מתחיל להיווצר assistant output (לא מיד)
+
+3. `item.completed` מסוג `agent_message`
+- אם אין `messageStart` פתוח -> לשלוח `messageStart` סינתטי
+- לשלוח `assistantMessage` עם `ContentBlock[]` מסוג text בלבד בשלב ראשון
+- `messageStop` סינתטי
+- לא להסתמך על streaming deltas
+
+4. `item.started/completed` מסוג `command_execution`
+- נצבור telemetry פנימי עבור:
+  - command string
+  - exit code
+  - aggregated output
+- לצורך dashboard/vitals:
+  - נתרגם ל־tool pseudo `Bash`
+- אפשרות MVP:
+  - לא להציג tool block בצ'אט
+  - כן לשמור `bashCommands` ל־`turnComplete`
+- אפשרות Phase 2:
+  - לסנתז `toolUseStart/toolUseInput` ל־UI
+
+5. `turn.completed`
+- נשלח `costUpdate` עם:
+  - `costUsd: 0`
+  - `totalCostUsd: 0`
+  - tokens מתוך `usage`
+- נשלח `turnComplete`
+- נשלח `processBusy: false`
+
+6. `item.completed` מסוג `reasoning`
+- MVP: לא מציגים ב־chat
+- רק לוג פנימי
+
+7. unknown items/events
+- לוג בלבד, לא crash
+
+---
+
+**שכפול `MessageHandler` (Codex) – מה נשאר ומה מושבת**
+ב־`CodexMessageHandler.ts` נעתיק את `MessageHandler.ts` ונפשט.
+
+**נתמך ב־MVP**
+- `sendMessage`
+- `cancelRequest`
+- `startSession`
+- `stopSession`
+- `resumeSession`
+- `clearSession`
+- `editAndResend` (כסשן חדש באותו טאב)
+- `showHistory`
+- `openFile`, `openUrl`
+- `gitPush` (לא תלוי provider)
+- `getProjectAnalytics`
+- UI settings רגילים (font/theme וכו')
+
+**מושבת במפורש ב־Codex MVP**
+- `compact` (הודעת error ברורה)
+- `planApprovalResponse` (לא אמור להופיע)
+- `forkSession` / `forkFromMessage` (error/hide)
+- `setPermissionMode` (ignored/hide control)
+- `translateMessage` (מושבת או נשאר Claude-only לפי החלטה)
+- `enhancePrompt` (מושבת או נשאר Claude-only לפי החלטה)
+- `turnAnalysis` / `ActivitySummarizer` / `SessionNamer` AI (Claude-only)
+
+המלצה ברורה לשלב ראשון:
+- לכבות פיצ'רי AI משניים במסלול Codex, כדי לא ליצור "חצי Codex חצי Claude".
+
+---
+
+**שכפול `SessionTab` (Codex) – שינויים ספציפיים**
+ב־`CodexSessionTab.ts` נעתיק את `SessionTab.ts` ונחליף רק את שכבת ה־runtime.
+
+**שינויים מחייבים**
+1. להחליף `ClaudeProcessManager` + `StreamDemux` + `ControlProtocol` בגרסאות Codex.
+2. לשנות `startSession()`:
+- לא חייב להתחיל process מיד
+- יכול לפתוח session לוגית ולשלוח `sessionStarted` עם `pending`
+- thread id יגיע ב־turn הראשון
+
+3. לשנות `sendText()`:
+- מפעיל `CodexExecProcessManager.runTurn()`
+- אם יש `threadId` -> `exec resume`
+- אחרת -> `exec`
+
+4. לשנות `cancelRequest()`:
+- kill turn process בלבד
+
+5. לשנות `wireProcessEvents()`:
+- התאמה לאירועי Codex demux
+
+6. `loadAndSendConversationHistory()`:
+- להשתמש ב־`CodexConversationReader`
+
+7. `switchModel(model)`:
+- לא `resume` של process מתמשך
+- רק update setting + session הבא / turn הבא
+- אם רוצים "החלפה מיידית": turn הבא ב־resume עם model חדש
+- לא לעצור "session process" כי אין כזה
+
+**מה נשאר כמעט זהה**
+- webview panel setup
+- title handling
+- busy spinner בטאב
+- file logger
+- status bar handling
+- callbacks ל־TabManager
+- analytics save scaffolding
+
+---
+
+**CodexConversationReader – תכנון מפורט**
+**מקור נתונים**
+- `~/.codex/sessions/YYYY/MM/DD/rollout-...-<threadId>.jsonl`
+
+**איתור קובץ**
+1. חיפוש לפי thread id בתוך שם הקובץ.
+2. העדפה לקבצים לפי `mtime` (הכי חדש).
+3. סינון לפי `cwd` אם קיים ב־`session_meta` (optional אבל מומלץ).
+
+**Parsing (MVP)**
+- לקרוא שורות JSONL
+- לטפל ב:
+  - `session_meta`
+  - `response_item` כאשר `payload.type === 'message'`
+- לכל `message`:
+  - אם `role === 'user'` -> להפוך ל־`SerializedChatMessage` user
+  - אם `role === 'assistant'` -> להפוך ל־assistant
+  - להתעלם מ־`developer`/`system`
+- המרה של content:
+  - `input_text` / `output_text` -> `ContentBlock { type: 'text', text }`
+- אם אין parse מלא:
+  - fallback: להחזיר `[]` וללוג שגיאה (לא crash)
+
+---
+
+**שינויים ב־UI (מינימליים אבל מספיקים)**
+**1. Provider Selector / Quick Button**
+קובץ מומלץ חדש:
+- `src/webview/components/ProviderSelector/ProviderSelector.tsx`
+
+התנהגות:
+- Dropdown פשוט `Claude | Codex`
+- שולח `setProvider`
+
+בנוסף:
+- כפתור `Codex` ב־`StatusBar.tsx`
+- לוחץ -> `setProvider('codex')` + `openNewCodexTab` (או command)
+
+**2. Model selector לפי provider**
+כדי לא לשבור את `ModelSelector` הקיים:
+- משאירים `ModelSelector` ל־Claude בלבד
+- מוסיפים `CodexModelSelector` חדש (פשוט, אפשר select+default)
+- `StatusBar.tsx` מרנדר conditionally לפי provider
+
+**3. Permission selector**
+- `PermissionModeSelector` מוצג רק ב־Claude
+- ב־Codex MVP:
+  - hide
+  - או badge קטן `Codex Defaults`
+
+**4. פיצ'רים לא נתמכים**
+UI יסתיר לפי capabilities:
+- Plan Approval bar
+- Fork button
+- Compact action (או disabled)
+- Codex path לא יראה "Claude-only" labels היכן שאפשר
+
+---
+
+**שינויים בפקודות (commands) – חד משמעי**
+**`claudeMirror.startSession`**
+- לא ישתנה שם command
+- יבדוק `claudeMirror.provider`
+- אם `claude` -> `SessionTab` הקיים
+- אם `codex` -> `CodexSessionTab`
+
+**`claudeMirror.showHistory`**
+- יציג provider בכל שורה:
+  - `Claude | <model>`
+  - `Codex | <model>`
+- בחירה של item תפתח tab לפי `item.provider`, לא לפי provider גלובלי
+
+**`claudeMirror.resumeSession`**
+- אם משתמש מזין ידנית ID:
+  - route לפי provider ברירת מחדל
+- עדיף להוסיף command חדש later:
+  - `Resume Claude Session`
+  - `Resume Codex Session`
+- ל־MVP מספיק route לפי provider ברירת מחדל + `showHistory` כדרך מומלצת
+
+---
+
+**שכבת settings (package.json) – תכנון מדויק**
+להוסיף settings חדשים בלי לשבור קיימים:
+
+1. `claudeMirror.provider`
+- type: string
+- enum: `claude`, `codex`
+- default: `claude`
+
+2. `claudeMirror.codex.cliPath`
+- default: `codex`
+
+3. `claudeMirror.codex.model`
+- type: string
+- default: `""`
+- תיאור: model for Codex sessions (empty = CLI/config default)
+
+4. `claudeMirror.codex.showReasoning`
+- boolean
+- default: false
+- לשלב 2 (אופציונלי)
+
+5. `claudeMirror.codex.enableCommandTelemetry`
+- boolean
+- default: true
+- לשימוש ב־Vitals/analytics
+
+לא נוגעים ב:
+- `claudeMirror.cliPath`
+- `claudeMirror.model`
+- `claudeMirror.permissionMode`
+אלה נשארים למסלול Claude בלבד.
+
+---
+
+**מדיניות שכפול קוד (כדי למנוע כאוס)**
+השכפול יהיה מכוון ומוגבל.
+
+**מותר לשכפל**
+- `SessionTab` -> `CodexSessionTab`
+- `MessageHandler` -> `CodexMessageHandler`
+- `ProcessManager`/`Demux` חדשים
+- `ConversationReader` חדש
+
+**אסור לשכפל כרגע**
+- קומפוננטות React כלליות של chat rendering
+- Zustand store כולו
+- `commands.ts` כולו
+- `TabManager.ts` כולו
+
+**כלל עבודה**
+קודם משכפלים קובץ, משנים namespace/logging/class names, ורק אחר כך מפחיתים/מוסיפים לוגיקה. לא משנים את הקובץ המקורי כדי "לחלץ משותף".
+
+---
+
+**שלבי יישום (Ready-to-Implement)**
+**שלב 1: תשתית Provider + UI Switch (ללא Codex runtime עדיין)**
+מטרה: לבחור provider ולהציג כפתור/selector, בלי להפעיל Codex בפועל.
+
+שינויים:
+- `package.json`: settings ל־provider + codex cli/model
+- `src/extension/types/webview-messages.ts`: `setProvider`, `providerSetting`
+- `src/webview/state/store.ts`: `selectedProvider`, `provider`
+- `src/webview/hooks/useClaudeStream.ts`: טיפול ב־provider messages
+- `src/webview/components/ProviderSelector/ProviderSelector.tsx` (חדש)
+- `src/webview/components/StatusBar/StatusBar.tsx`: כפתור `Codex` + selector
+- `src/extension/webview/MessageHandler.ts`: רק Claude path שולח/מקבל `providerSetting` (כדי שה־UI יסתנכרן)
+
+תנאי קבלה:
+- אפשר לבחור Claude/Codex ב־UI
+- הבחירה נשמרת ב־VS Code settings
+- מסלול Claude ממשיך לעבוד בדיוק כרגיל
+
+**שלב 2: Codex runtime בסיסי (טקסט בלבד)**
+מטרה: טאב Codex עובד end-to-end עם שליחה/תשובה/ביטול.
+
+קבצים חדשים:
+- `src/extension/types/codex-exec-json.ts`
+- `src/extension/process/CodexExecProcessManager.ts`
+- `src/extension/process/CodexExecDemux.ts`
+- `src/extension/webview/CodexMessageHandler.ts`
+- `src/extension/session/CodexSessionTab.ts`
+
+קבצים משתנים:
+- `src/extension/session/TabManager.ts` (router לפי provider)
+- `src/extension/commands.ts` (`startSession` route)
+- `src/extension/extension.ts` אם צריך wiring נוסף
+
+תנאי קבלה:
+- `Start Session` עם provider=codex פותח טאב Codex
+- שליחת טקסט עובדת
+- מתקבלת תשובת assistant
+- `Cancel` עובד
+- `Claude` tabs ממשיכים לעבוד
+
+**שלב 3: Session store + History + Resume עבור Codex**
+מטרה: Codex sessions נשמרות/מופיעות בהיסטוריה ונפתחות מחדש.
+
+קבצים חדשים:
+- `src/extension/session/CodexConversationReader.ts`
+
+קבצים משתנים:
+- `src/extension/session/SessionStore.ts` (הוספת `provider`)
+- `src/extension/commands.ts` (`showHistory` + resume routing)
+- `src/extension/session/CodexSessionTab.ts` (`loadAndSendConversationHistory`)
+- `src/extension/types/webview-messages.ts` אם מוסיפים provider ל־history/session messages
+
+תנאי קבלה:
+- Codex session נשמרת בהיסטוריה עם provider
+- `showHistory` מציג Claude + Codex
+- בחירת Codex session פותחת טאב Codex עם היסטוריה מוצגת
+- data ישן (ללא provider) ממשיך לעבוד כ־Claude
+
+**שלב 4: Capabilities + UI gating (למנוע פיצ'רים שבורים)**
+מטרה: UI דומה אבל לא מציג פעולות שלא נתמכות ב־Codex.
+
+שינויים:
+- `providerCapabilities` message + store
+- hide/disable:
+  - Plan approval UI
+  - Fork
+  - Compact
+  - PermissionMode selector (ב־Codex)
+- conditional render של Claude/Codex model selector
+
+תנאי קבלה:
+- בטאב Codex אין לחצנים שבורים/מטעים
+- בטאב Claude כל ה־UI הקיים ממשיך להופיע
+
+**שלב 5: Analytics בסיסי + Telemetry של commands**
+מטרה: Dashboard/Vitals ממשיכים לעבוד סביר במסלול Codex.
+
+שינויים:
+- `SessionSummary.provider`
+- `turnComplete` ב־Codex עם tokens ו־bashCommands
+- mapping `command_execution` -> `bashCommands`
+- `costUsd=0` (מפורש, לא fake)
+
+תנאי קבלה:
+- sessions של Codex מופיעות בדאשבורד
+- אין crashes בדוחות/גרפים
+- session summaries כוללות provider
+
+---
+
+**סטטוס פיצ'רים במסלול Codex (MVP)**
+**נתמך**
+- chat text turns
+- cancel
+- basic resume by thread
+- history list
+- open file/url
+- git push button
+- tokens (אם מגיעים ב־`turn.completed.usage`)
+- basic analytics
+
+**מושבת במפורש**
+- compact
+- plan approval bar
+- fork conversation
+- Claude permission mode selector
+- Claude AI enhancer / translator / turn analyzer / activity summarizer / session namer (שלב ראשון)
+
+---
+
+**בדיקות ידניות (Test Matrix) – חובה לפני merge**
+1. Claude regression: start/send/cancel/resume/history/fork/compact עדיין עובדים.
+2. Provider switch: בחירה ב־Codex לא שוברת טאב Claude פתוח.
+3. Codex start: start session + send first message מקבל thread id ותשובה.
+4. Codex multi-turn: turn שני משתמש ב־`exec resume` וממשיך הקשר.
+5. Codex cancel: ביטול באמצע turn, אחר כך send חדש עובד.
+6. Codex history: session נשמרת ומופיעה ב־`showHistory`.
+7. Resume Codex: פתיחה מהיסטוריה טוענת שיחה קודמת.
+8. UI gating: אין Plan/Fork/Compact שבורים ב־Codex.
+9. Mixed history migration: sessions ישנים (Claude ללא provider field) עדיין מוצגים.
+10. Dashboard stability: no crashes עם sessions משני providers.
+
+---
+
+**ניהול סיכונים (חד משמעי)**
+1. סיכון גבוה: שינוי accidental במסלול Claude.
+פתרון:
+- לא לערוך `SessionTab.ts` / `MessageHandler.ts` מעבר לשינויים קטנים של provider settings sync.
+- כל לוגיקת Codex בקבצים חדשים.
+
+2. סיכון בינוני: Codex JSON schema משתנה.
+פתרון:
+- parser permissive + ignore unknown events + logging.
+
+3. סיכון בינוני: היסטוריית Codex local format משתנה.
+פתרון:
+- `CodexConversationReader` best-effort + fallback ל־no history (ללא crash).
+
+4. סיכון נמוך-בינוני: חוויית streaming פחות חלקה.
+פתרון:
+- לתקשר ב־UI capabilities (`supportsLiveTextStreaming=false`)
+- לא לנסות לזייף delta אמיתי בשלב ראשון.
+
+---
+
+**כללי יישום מחייבים למפתח (כדי שהתוכנית תישאר נקייה)**
+1. קודם ליצור קבצי Codex חדשים ולהפעיל אותם דרך feature flag/provider.
+2. רק אחרי שיש path עובד, להוסיף history/analytics.
+3. לא לבצע ריפקטור "כללי" במהלך המימוש.
+4. כל שינוי בקבצי Claude קיים חייב להיות קטן ומקומי.
+5. כל unsupported feature ב־Codex חייב לקבל disable/hide מפורש, לא `TODO` שקט.
+
+---
+
+**Definition of Done (MVP)**
+היישום נחשב גמור כשהכול מתקיים:
+1. כפתור `Codex` קיים ופועל.
+2. אפשר לפתוח טאב Codex ולנהל שיחה רב־תורית.
+3. מסלול Claude נשאר יציב.
+4. `showHistory` תומך בשני providers.
+5. אין ב־Codex UI פעולות שבורות/מטעות.
+6. אין crash ב־Dashboard/Vitals עם sessions של Codex.
+
+---
+
+**המלצה לביצוע בפועל (PRs)**
+1. PR 1: Provider settings + UI switch + routing skeleton.
+2. PR 2: Codex runtime בסיסי (send/receive/cancel).
+3. PR 3: History/Resume + SessionStore migration.
+4. PR 4: Capabilities gating + analytics baseline.
+5. PR 5: Polish (tool telemetry display / images / additional features).
+
+אם תרצה, השלב הבא שלי הוא לכתוב לך תוכנית יישום ברמת "טאסקים לפי קבצים" (checklist אופרטיבי עם סדר עריכה מדויק לכל קובץ).

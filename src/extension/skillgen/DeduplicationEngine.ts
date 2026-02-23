@@ -47,11 +47,6 @@ export class DeduplicationEngine {
 
   /**
    * Check all skills in the skills_out directory against existing installed skills.
-   *
-   * @param skillsOutDir - Directory containing newly generated skills (each in a subfolder)
-   * @param installedSkillsDir - Directory where skills are currently installed
-   * @param useAI - Whether to use AI for ambiguous cases (Tier 3)
-   * @returns Array of dedup results, one per generated skill
    */
   async checkAll(
     skillsOutDir: string,
@@ -64,14 +59,26 @@ export class DeduplicationEngine {
     const generatedSkills = this.listSkillDirs(skillsOutDir);
     const installedSkills = this.listSkillDirs(installedSkillsDir);
 
-    this.log(`[SkillGen:Dedup] Checking ${generatedSkills.length} generated skills against ${installedSkills.length} installed skills`);
+    this.log(`[SkillGen:Dedup][INFO] Dedup started | generated=${generatedSkills.length} installed=${installedSkills.length} aiEnabled=${useAI}`);
 
     for (const genSkill of generatedSkills) {
       const genPath = path.join(skillsOutDir, genSkill);
       const result = await this.checkSingle(genSkill, genPath, installedSkillsDir, installedSkills, useAI);
       results.push(result);
-      this.log(`[SkillGen:Dedup] ${genSkill}: ${result.verdict} (tier ${result.tier}) - ${result.reason}`);
+      this.log(`[SkillGen:Dedup][DEBUG] Verdict | skill=${genSkill} verdict=${result.verdict} tier=${result.tier} reason=${result.reason}`);
     }
+
+    const verdictCounts = {
+      new: results.filter(r => r.verdict === 'new').length,
+      upgrade: results.filter(r => r.verdict === 'upgrade').length,
+      skip: results.filter(r => r.verdict === 'skip').length,
+    };
+    const tierCounts = {
+      tier1: results.filter(r => r.tier === 1).length,
+      tier2: results.filter(r => r.tier === 2).length,
+      tier3: results.filter(r => r.tier === 3).length,
+    };
+    this.log(`[SkillGen:Dedup][INFO] Dedup complete | new=${verdictCounts.new} upgrade=${verdictCounts.upgrade} skip=${verdictCounts.skip} tier1=${tierCounts.tier1} tier2=${tierCounts.tier2} tier3=${tierCounts.tier3}`);
 
     return results;
   }
@@ -108,7 +115,6 @@ export class DeduplicationEngine {
 
   /**
    * Tier 1: Compare traceability.json fingerprints and source document overlap.
-   * This is deterministic and fast - prioritized over other checks.
    */
   private checkTraceability(
     skillName: string,
@@ -117,7 +123,7 @@ export class DeduplicationEngine {
     installedSkills: string[]
   ): DeduplicationResult | null {
     const genTrace = this.readTraceability(genPath);
-    if (!genTrace) return null; // No traceability info available
+    if (!genTrace) return null;
 
     for (const installed of installedSkills) {
       const installedPath = path.join(installedDir, installed);
@@ -144,7 +150,6 @@ export class DeduplicationEngine {
         const overlapRatio = overlap.length / Math.max(genSources.size, installedSources.size);
 
         if (overlapRatio > 0.7) {
-          // High source overlap with different fingerprint = upgrade candidate
           return {
             skillName,
             verdict: 'upgrade',
@@ -156,12 +161,11 @@ export class DeduplicationEngine {
       }
     }
 
-    return null; // No traceability match
+    return null;
   }
 
   /**
    * Tier 2: Compare skill names, descriptions, keywords.
-   * Uses string similarity without AI.
    */
   private checkMetadata(
     skillName: string,
@@ -187,7 +191,6 @@ export class DeduplicationEngine {
 
     if (!bestMatch) return null;
 
-    // Thresholds (initial - need tuning with real data)
     if (bestMatch.score > 0.85) {
       return {
         skillName,
@@ -208,7 +211,7 @@ export class DeduplicationEngine {
       };
     }
 
-    return null; // Below threshold
+    return null;
   }
 
   /**
@@ -221,9 +224,7 @@ export class DeduplicationEngine {
     _installedDir: string,
     _installedSkills: string[]
   ): Promise<DeduplicationResult | null> {
-    // TODO: Phase 3 - implement AI-based comparison using Claude Sonnet
-    // For now, return null (let it be treated as new)
-    this.log('[SkillGen:Dedup] AI deduplication not yet implemented, treating as new');
+    this.log('[SkillGen:Dedup][DEBUG] AI deduplication not yet implemented, falling through');
     return null;
   }
 

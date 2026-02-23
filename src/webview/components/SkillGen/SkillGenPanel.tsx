@@ -2,6 +2,11 @@ import React from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 
+/** Production-safe UI logger: posts log messages to the extension output channel */
+function logUI(event: string, data?: Record<string, unknown>): void {
+  postToExtension({ type: 'skillGenUiLog', level: 'INFO', event, data });
+}
+
 /**
  * Full panel for skill generation: shows progress bar, controls, last run info, and history.
  * Opens as an overlay when the user clicks the skill gen indicator in the status bar.
@@ -23,18 +28,31 @@ export const SkillGenPanel: React.FC = () => {
     || skillGenRunStatus === 'preflight' || skillGenRunStatus === 'installing';
 
   const handleGenerate = () => {
+    logUI('generateClicked', {
+      pendingDocs: skillGenPendingDocs,
+      threshold: skillGenThreshold,
+      enabled: skillGenEnabled,
+      runStatus: skillGenRunStatus,
+    });
     postToExtension({ type: 'skillGenTrigger' });
   };
 
   const handleCancel = () => {
+    logUI('cancelClicked', {
+      runStatus: skillGenRunStatus,
+      progress: skillGenProgress,
+    });
     postToExtension({ type: 'skillGenCancel' });
   };
 
   const handleToggle = () => {
-    postToExtension({ type: 'setSkillGenEnabled', enabled: !skillGenEnabled });
+    const newState = !skillGenEnabled;
+    logUI('toggleEnabled', { from: skillGenEnabled, to: newState, pendingDocs: skillGenPendingDocs });
+    postToExtension({ type: 'setSkillGenEnabled', enabled: newState });
   };
 
   const handleClose = () => {
+    logUI('panelClosed');
     setSkillGenPanelOpen(false);
   };
 

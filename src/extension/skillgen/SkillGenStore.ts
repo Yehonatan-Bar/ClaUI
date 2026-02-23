@@ -64,7 +64,11 @@ export class SkillGenStore {
 
   /** Replace the full ledger */
   private async saveLedger(ledger: SkillGenLedger): Promise<void> {
-    await this.memento.update(STORE_KEY, ledger);
+    try {
+      await this.memento.update(STORE_KEY, ledger);
+    } catch (err) {
+      this.log(`[SkillGen:Store][ERROR] Failed to save ledger | error=${err}`);
+    }
   }
 
   /** Get count of documents with 'pending' status */
@@ -100,7 +104,9 @@ export class SkillGenStore {
     const ledger = this.getLedger();
     const now = new Date().toISOString();
     const scannedPaths = new Set(scannedDocs.map(d => d.relativePath));
-    let newPendingCount = 0;
+    let newCount = 0;
+    let changedCount = 0;
+    let removedCount = 0;
 
     // Add/update scanned documents
     for (const doc of scannedDocs) {
@@ -114,28 +120,31 @@ export class SkillGenStore {
           status: 'pending',
           discoveredAt: now,
         };
-        newPendingCount++;
+        newCount++;
       } else if (existing.mtimeMs !== doc.mtimeMs || existing.size !== doc.size) {
         // Changed document - mark as pending again
         existing.mtimeMs = doc.mtimeMs;
         existing.size = doc.size;
         existing.status = 'pending';
-        newPendingCount++;
+        changedCount++;
       }
       // Unchanged documents keep their current status
     }
 
     // Remove documents that are no longer on disk
-    for (const path of Object.keys(ledger.documents)) {
-      if (!scannedPaths.has(path)) {
-        delete ledger.documents[path];
+    for (const p of Object.keys(ledger.documents)) {
+      if (!scannedPaths.has(p)) {
+        delete ledger.documents[p];
+        removedCount++;
       }
     }
 
     ledger.lastScanAt = now;
     await this.saveLedger(ledger);
-    this.log(`[SkillGen] Scan complete: ${scannedDocs.length} total, ${newPendingCount} newly pending, ${this.getPendingCount()} total pending`);
-    return newPendingCount;
+
+    const totalPending = Object.values(ledger.documents).filter(d => d.status === 'pending').length;
+    this.log(`[SkillGen:Store][DEBUG] Ledger updated | scanned=${scannedDocs.length} new=${newCount} changed=${changedCount} removed=${removedCount} totalPending=${totalPending} totalTracked=${Object.keys(ledger.documents).length}`);
+    return newCount + changedCount;
   }
 
   /**
@@ -144,13 +153,15 @@ export class SkillGenStore {
    */
   async markAllProcessed(): Promise<void> {
     const ledger = this.getLedger();
+    let count = 0;
     for (const doc of Object.values(ledger.documents)) {
       if (doc.status === 'pending') {
         doc.status = 'processed';
+        count++;
       }
     }
     await this.saveLedger(ledger);
-    this.log('[SkillGen] All pending documents marked as processed');
+    this.log(`[SkillGen:Store][DEBUG] Marked all processed | count=${count}`);
   }
 
   /** Add a run to the history */
@@ -165,6 +176,7 @@ export class SkillGenStore {
       ledger.lastRunAt = entry.date;
     }
     await this.saveLedger(ledger);
+    this.log(`[SkillGen:Store][DEBUG] Run history added | status=${entry.status} historyLength=${ledger.history.length}`);
   }
 
   /** Get run history */
@@ -181,6 +193,6 @@ export class SkillGenStore {
   /** Clear all data (for testing/reset) */
   async clear(): Promise<void> {
     await this.memento.update(STORE_KEY, undefined);
-    this.log('[SkillGen] Store cleared');
+    this.log('[SkillGen:Store][INFO] Store cleared');
   }
 }

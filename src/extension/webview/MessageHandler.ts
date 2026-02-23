@@ -115,15 +115,8 @@ export class MessageHandler {
   private pendingApprovalTool: string | null = null;
   /** Set after user responds to approval - suppresses stale re-notifications from late events */
   private approvalResponseProcessed = false;
-  /** After user approves ExitPlanMode, auto-approve subsequent ExitPlanMode calls in the same turn */
-  private autoApproveExitPlanMode = false;
-  /** Tracks whether EnterPlanMode was called in this session (prevents stale ExitPlanMode after compaction) */
+  /** Tracks whether EnterPlanMode was called in this session */
   private planModeActive = false;
-  /** Safety counter: consecutive auto-approvals of stale ExitPlanMode. Prevents infinite loops. */
-  private staleExitPlanModeAutoApproveCount = 0;
-  /** Counter for auto-approvals via the user-approved path (autoApproveExitPlanMode flag).
-   *  Hard limit prevents infinite loops even when the user approved ExitPlanMode. */
-  private exitPlanModeAutoApproveCount = 0;
 
   /** Activity summarizer: periodically summarizes tool activity via Haiku */
   private activitySummarizer: ActivitySummarizer | null = null;
@@ -162,6 +155,9 @@ export class MessageHandler {
   private adventureBeatIndex = 0;
   /** Last assistant message ID for TurnRecord association */
   private lastMessageId = '';
+
+  /** Codex consultation: timestamp when the request was sent (for latency tracking) */
+  private _codexConsultStartedAt: number | null = null;
 
   /** Extension-side TurnRecord accumulator for project analytics persistence */
   private turnRecords: TurnRecord[] = [];
@@ -283,9 +279,6 @@ export class MessageHandler {
           this.log(`Sending user message: "${msg.text.slice(0, 80)}..."`);
           // If there was a pending approval, the user's message implicitly responds to it
           this.clearApprovalTracking();
-          this.autoApproveExitPlanMode = false;
-          this.exitPlanModeAutoApproveCount = 0;
-          this.staleExitPlanModeAutoApproveCount = 0;
           this.achievementService.onUserPrompt(this.tabId, msg.text);
           this.control.sendText(msg.text);
           this.webview.postMessage({ type: 'processBusy', busy: true });
@@ -298,9 +291,6 @@ export class MessageHandler {
           this.log(`Sending message with ${msg.images.length} images`);
           // If there was a pending approval, the user's message implicitly responds to it
           this.clearApprovalTracking();
-          this.autoApproveExitPlanMode = false;
-          this.exitPlanModeAutoApproveCount = 0;
-          this.staleExitPlanModeAutoApproveCount = 0;
           if (msg.text.trim()) {
             this.achievementService.onUserPrompt(this.tabId, msg.text);
           }
@@ -540,29 +530,40 @@ export class MessageHandler {
 
         // --- Skill Generation ---
         case 'setSkillGenEnabled':
-          this.log(`Setting skillGen enabled: ${msg.enabled}`);
+          this.log(`[SkillGen:Msg][INFO] setSkillGenEnabled | enabled=${msg.enabled}`);
           vscode.workspace.getConfiguration('claudeMirror').update('skillGen.enabled', msg.enabled, true);
           break;
 
         case 'skillGenTrigger':
-          this.log('Skill generation triggered from webview');
+          this.log(`[SkillGen:Msg][INFO] skillGenTrigger received | serviceAvailable=${!!this.skillGenService}`);
           if (this.skillGenService) {
             void this.skillGenService.scanDocuments().then(() => {
+              this.log('[SkillGen:Msg][INFO] Scan complete, routing to triggerPipeline');
               void this.skillGenService!.triggerPipeline();
             });
+          } else {
+            this.log('[SkillGen:Msg][WARNING] skillGenTrigger rejected: SkillGenService not available');
           }
           break;
 
         case 'skillGenCancel':
-          this.log('Skill generation cancel requested from webview');
+          this.log(`[SkillGen:Msg][INFO] skillGenCancel received | serviceAvailable=${!!this.skillGenService}`);
           this.skillGenService?.cancelPipeline();
           break;
 
         case 'getSkillGenStatus':
           if (this.skillGenService) {
-            this.webview.postMessage(this.skillGenService.getStatus());
+            const status = this.skillGenService.getStatus();
+            this.log(`[SkillGen:Msg][DEBUG] getSkillGenStatus | pending=${status.pendingDocs} runStatus=${status.runStatus}`);
+            this.webview.postMessage(status);
           }
           break;
+
+        case 'skillGenUiLog': {
+          const dataStr = msg.data ? ' | ' + Object.entries(msg.data).map(([k, v]) => `${k}=${v}`).join(' ') : '';
+          this.log(`[SkillGen:UI][${msg.level}] ${msg.event}${dataStr}`);
+          break;
+        }
 
         case 'showHistory':
           this.log('Webview requested history view');
@@ -581,45 +582,44 @@ export class MessageHandler {
 
         case 'planApprovalResponse':
           this.log(`Plan approval response: action=${msg.action} toolName=${msg.toolName || '(none)'} pendingTool=${this.pendingApprovalTool || '(none)'}`);
-          // User manually responded - reset all auto-approve counters
-          this.staleExitPlanModeAutoApproveCount = 0;
-          this.exitPlanModeAutoApproveCount = 0;
           {
           // Use msg.toolName from webview as primary source - it's reliable because
           // the webview stores it when the approval bar is shown. Fall back to
           // this.pendingApprovalTool which may have been cleared by a `result` event
           // that races between showing the approval bar and the user clicking Approve.
           const effectiveToolName = msg.toolName || this.pendingApprovalTool || '';
-          // Any approval action on ExitPlanMode: auto-approve subsequent calls
+          const norm = effectiveToolName.trim().toLowerCase();
+          const isExitPlanMode = norm === 'exitplanmode' || norm.endsWith('.exitplanmode');
           const isApproveAction = msg.action === 'approve' || msg.action === 'approveClearBypass' || msg.action === 'approveManual';
-          if (isApproveAction && effectiveToolName) {
-            const norm = effectiveToolName.trim().toLowerCase();
-            if (norm === 'exitplanmode' || norm.endsWith('.exitplanmode')) {
-              this.autoApproveExitPlanMode = true;
-              // Plan mode cycle complete - clear the flag
-              this.planModeActive = false;
+
+          if (isExitPlanMode) {
+            // Plan mode cycle complete
+            this.planModeActive = false;
+          }
+
+          // ExitPlanMode approve: DO NOT send a user message to the CLI.
+          // The CLI already auto-approves ExitPlanMode (via bypassPermissions or
+          // allowedTools). Sending a user message creates a spurious conversation
+          // turn that causes the model to call ExitPlanMode again → infinite loop.
+          // Only send messages for reject/feedback (to tell the model to revise).
+          if (isExitPlanMode && isApproveAction) {
+            this.log('ExitPlanMode approved - closing bar without sending user message (CLI auto-approves)');
+            if (msg.action === 'approveClearBypass') {
+              this.log('Plan approval: also compacting context');
+              this.control.compact();
+            } else if (msg.action === 'approveManual') {
+              this.log('Plan approval: switching to supervised mode');
+              vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', 'supervised', true);
+              this.webview.postMessage({ type: 'permissionModeSetting', mode: 'supervised' });
             }
-          }
-          // Rejecting or giving feedback on ExitPlanMode also ends the plan cycle
-          if ((msg.action === 'reject' || msg.action === 'feedback') && effectiveToolName) {
-            const norm = effectiveToolName.trim().toLowerCase();
-            if (norm === 'exitplanmode' || norm.endsWith('.exitplanmode')) {
-              this.planModeActive = false;
-            }
-          }
-          }
-          if (msg.action === 'approve') {
-            // "Yes, and bypass permissions" - proceed with full-access mode
+            // Don't send text - just close the bar
+          } else if (msg.action === 'approve') {
             this.control.sendText('Yes, proceed with the plan.');
           } else if (msg.action === 'approveClearBypass') {
-            // "Yes, clear context and bypass permissions" - approve first, then compact.
-            // Sending approval BEFORE compact ensures the CLI processes the plan approval
-            // in the right state. Compaction runs asynchronously afterward.
-            this.log('Plan approval: approving plan, then clearing context (compact)');
+            this.log('Plan approval: approving, then clearing context (compact)');
             this.control.sendText('Yes, proceed with the plan. Please compact context to free up space.');
             this.control.compact();
           } else if (msg.action === 'approveManual') {
-            // "Yes, manually approve edits" - switch to supervised mode then proceed
             this.log('Plan approval: switching to supervised mode for manual edit approval');
             vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', 'supervised', true);
             this.webview.postMessage({ type: 'permissionModeSetting', mode: 'supervised' });
@@ -633,6 +633,7 @@ export class MessageHandler {
             const answer = msg.selectedOptions?.join(', ') || msg.feedback || '';
             this.log(`Question answer: "${answer}"`);
             this.control.sendText(answer);
+          }
           }
           this.clearApprovalTracking();
           // Suppress stale re-notifications from late assistantMessage events
@@ -657,9 +658,7 @@ export class MessageHandler {
           // Save analytics for the current session BEFORE clearing records
           this.webview.saveProjectAnalyticsNow?.();
           this.clearApprovalTracking();
-          this.autoApproveExitPlanMode = false;
-          this.exitPlanModeAutoApproveCount = 0;
-          this.staleExitPlanModeAutoApproveCount = 0;
+          this.planModeActive = false;
           this.firstMessageSent = false;
           this.activitySummarizer?.reset();
           this.turnRecords = [];
@@ -919,6 +918,52 @@ export class MessageHandler {
                 error: `Translation error: ${err.message}`,
               });
             });
+          break;
+        }
+
+        case 'codexConsult': {
+          const question = msg.question.trim();
+          this.log(`[CODEX_CONSULT] Received consultation request (${question.length} chars): "${question.slice(0, 100)}..."`);
+          if (!question) {
+            this.log('[CODEX_CONSULT] Empty question, ignoring');
+            break;
+          }
+          const processRunning = this.processManager.isRunning;
+          const sessionId = this.processManager.currentSessionId;
+          this.log(`[CODEX_CONSULT] Process state: running=${processRunning}, sessionId=${sessionId}`);
+          if (!processRunning) {
+            this.log('[CODEX_CONSULT] ERROR: Process not running, cannot send consultation');
+            this.webview.postMessage({ type: 'error', message: 'Cannot consult Codex: no active session' });
+            break;
+          }
+          const codexPrompt = [
+            '[Codex Consultation Request]',
+            'The user wants to consult with the Codex GPT expert about the following question.',
+            '',
+            'INSTRUCTIONS:',
+            '1. Formulate a comprehensive consultation prompt that includes:',
+            '   - Background context about the system/codebase you are working on',
+            '   - The specific problem or question described below',
+            '   - Any relevant code context from our recent conversation',
+            '2. Call the mcp__codex__codex tool with this enriched prompt',
+            '3. Present the Codex response clearly to the user',
+            '4. Then analyze the response and continue with implementation based on the advice',
+            '',
+            "USER'S QUESTION:",
+            question,
+          ].join('\n');
+          this.log(`[CODEX_CONSULT] Built prompt (${codexPrompt.length} chars), sending to CLI...`);
+          this._codexConsultStartedAt = Date.now();
+          this.clearApprovalTracking();
+          try {
+            this.control.sendText(codexPrompt);
+            this.log('[CODEX_CONSULT] Prompt sent to CLI successfully');
+          } catch (err) {
+            this.log(`[CODEX_CONSULT] ERROR sending to CLI: ${err instanceof Error ? err.message : String(err)}`);
+            this.webview.postMessage({ type: 'error', message: `Codex consultation failed: ${err instanceof Error ? err.message : String(err)}` });
+            break;
+          }
+          this.webview.postMessage({ type: 'processBusy', busy: true });
           break;
         }
 
@@ -1412,6 +1457,11 @@ export class MessageHandler {
       'toolUseStart',
       (data: { messageId: string; blockIndex: number; toolName: string; toolId: string }) => {
         this.log(`-> webview: toolUseStart ${data.toolName}`);
+        // Codex consultation: detect when the MCP tool is invoked
+        if (data.toolName.includes('codex') && this._codexConsultStartedAt) {
+          const elapsed = Date.now() - this._codexConsultStartedAt;
+          this.log(`[CODEX_CONSULT] Tool invoked: ${data.toolName} (${elapsed}ms since request)`);
+        }
         this.currentMessageToolNames.push(data.toolName);
         // Track plan mode: EnterPlanMode sets the flag so ExitPlanMode knows it's legitimate
         if (isEnterPlanModeTool(data.toolName)) {
@@ -1580,6 +1630,13 @@ export class MessageHandler {
     this.demux.on(
       'result',
       (event: ResultSuccess | ResultError) => {
+        // Codex consultation: log result timing if a consultation was in flight
+        if (this._codexConsultStartedAt) {
+          const elapsed = Date.now() - this._codexConsultStartedAt;
+          const hadCodexTool = this.currentMessageToolNames.some(n => n.includes('codex'));
+          this.log(`[CODEX_CONSULT] Result received: elapsed=${elapsed}ms, subtype=${event.subtype}, codexToolUsed=${hadCodexTool}, tools=[${this.currentMessageToolNames.join(',')}]`);
+          this._codexConsultStartedAt = null;
+        }
         // Snapshot BEFORE clearing (clearApprovalTracking resets the array)
         const toolNamesSnapshot = [...this.currentMessageToolNames];
         const adventureSnapshot = this.snapshotAdventureMetadata();
@@ -1588,21 +1645,15 @@ export class MessageHandler {
 
         // Preserve pendingApprovalTool across the result event if an approval
         // bar is currently visible in the webview. The `result` event fires
-        // when the CLI turn completes (after ExitPlanMode pauses for input),
-        // but the user hasn't responded yet. Without this, the approval
-        // response handler can't identify which tool was pending and fails
-        // to reset planModeActive / autoApproveExitPlanMode.
+        // when the CLI turn completes, but the user may not have responded to
+        // the approval bar yet. Without this, the approval response handler
+        // can't identify which tool was pending.
         const savedApprovalTool = this.pendingApprovalTool;
         this.clearApprovalTracking();
         if (savedApprovalTool) {
           this.pendingApprovalTool = savedApprovalTool;
           this.log(`Preserved pendingApprovalTool=${savedApprovalTool} across result event`);
         }
-        // NOTE: Do NOT reset autoApproveExitPlanMode here. The result event fires
-        // after each CLI turn completes. If the user approved ExitPlanMode, that
-        // approval should persist across turns so subsequent ExitPlanMode calls
-        // (e.g. model re-enters plan mode) are auto-approved. The flag is reset
-        // when the user sends a new message (sendMessage handler) or on editAndResend.
         if (event.subtype === 'success') {
           this.achievementService.onResult(this.tabId, true);
           const success = event as ResultSuccess;
@@ -1808,43 +1859,13 @@ export class MessageHandler {
       this.log(`Suppressing stale plan approval notification for ${toolName} - already responded`);
       return;
     }
-    // Auto-approve subsequent ExitPlanMode calls after user already approved one
-    // in this session. This prevents repeated approval prompts when Claude re-enters
-    // plan mode during implementation. Hard limit prevents infinite loops.
-    const norm = toolName.trim().toLowerCase();
-    const isExitPlanMode = norm === 'exitplanmode' || norm.endsWith('.exitplanmode');
-    if (isExitPlanMode && this.autoApproveExitPlanMode) {
-      this.exitPlanModeAutoApproveCount++;
-      if (this.exitPlanModeAutoApproveCount > 5) {
-        this.log(`WARNING: ${this.exitPlanModeAutoApproveCount} auto-approvals of ExitPlanMode via user-approved path - disabling auto-approve, showing bar`);
-        this.autoApproveExitPlanMode = false;
-        // Fall through to show the approval bar so the user can break the loop
-      } else {
-        this.log(`Auto-approving subsequent ExitPlanMode #${this.exitPlanModeAutoApproveCount} (user already approved)`);
-        this.approvalResponseProcessed = true; // suppress fallback events for this message
-        this.control.sendText('Yes, proceed with the plan.');
-        return;
-      }
-    }
-    // Auto-approve stale ExitPlanMode after context compaction: if EnterPlanMode
-    // was never called in this session, ExitPlanMode is a stale artifact from
-    // compacted context. Auto-approve to prevent the user from getting stuck.
-    // Safety valve: after 3 consecutive auto-approvals, show the bar to the user
-    // to prevent infinite loops where the model keeps calling ExitPlanMode.
-    // NOTE: Counter is NOT reset after showing the bar - once exceeded, always show bar.
-    if (isExitPlanMode && !this.planModeActive) {
-      this.staleExitPlanModeAutoApproveCount++;
-      if (this.staleExitPlanModeAutoApproveCount > 3) {
-        this.log(`WARNING: ${this.staleExitPlanModeAutoApproveCount} stale ExitPlanMode auto-approvals - showing bar to user`);
-        // Don't reset counter - keep showing bar for all future stale calls
-        // to prevent the infinite loop of: auto-approve 3x → show bar → approve → reset → repeat
-      } else {
-        this.log(`Auto-approving stale ExitPlanMode #${this.staleExitPlanModeAutoApproveCount} (no EnterPlanMode seen in session)`);
-        this.approvalResponseProcessed = true;
-        this.control.sendText('Yes, proceed with the plan.');
-        return;
-      }
-    }
+    // NOTE: We intentionally do NOT auto-approve ExitPlanMode by sending user
+    // messages. The CLI already auto-approves ExitPlanMode (via bypassPermissions
+    // or allowedTools). Sending "Yes, proceed with the plan." as a user message
+    // creates a spurious conversation turn that causes the model to call
+    // ExitPlanMode again, leading to an infinite loop. Instead, we always show
+    // the approval bar and let the user interact with it. The approve action
+    // closes the bar without sending any message to the CLI.
     this.log(`Plan approval required: tool=${toolName}`);
     this.pendingApprovalTool = toolName;
     this.webview.postMessage({

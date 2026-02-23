@@ -169,29 +169,29 @@ Bidirectional bridge between the webview and the CLI process. Accepts a `Webview
 StreamDemux events are translated to `ExtensionToWebviewMessage` types and sent via `webview.postMessage()`.
 
 **Plan Approval Detection:**
-MessageHandler tracks tool names during streaming (`currentMessageToolNames`). When `messageDelta` fires with `stopReason === 'tool_use'` and one of the tools is `ExitPlanMode` or `AskUserQuestion`, it sends a `planApprovalRequired` message to the webview with the `toolName`. The user's response is sent back as a plain text message to the CLI via stdin. For plan approvals: approve/reject/feedback text. For questions: the selected option label(s) or a custom text answer.
+MessageHandler tracks tool names during streaming (`currentMessageToolNames`). When `messageDelta` fires with `stopReason === 'tool_use'` and one of the tools is `ExitPlanMode` or `AskUserQuestion`, it sends a `planApprovalRequired` message to the webview with the `toolName`. The approval bar is shown to the user. For `AskUserQuestion`, the user's response is sent as a plain text message to the CLI via stdin. For `ExitPlanMode`, approve actions do NOT send any user message (see below).
+
+**ExitPlanMode: No User Message on Approve:**
+The CLI auto-approves `ExitPlanMode` (via `--permission-mode bypassPermissions` or `--allowedTools`). Sending a user message like `"Yes, proceed with the plan."` after approval creates a spurious conversation turn that the model interprets as a new request, causing it to call `ExitPlanMode` again in an infinite loop. Therefore:
+- **Approve actions** (`approve`, `approveClearBypass`, `approveManual`): Close the approval bar without sending any text to the CLI. Side effects (compaction, permission mode switch) are still applied.
+- **Reject/feedback actions**: Send the rejection/feedback text to the CLI as a user message, which the model processes normally.
 
 **Race condition handling (result vs. approval):**
-The `result` event fires when the CLI turn completes (after `ExitPlanMode` pauses for input), which can happen BEFORE the user clicks Approve. To prevent `clearApprovalTracking()` from clearing `pendingApprovalTool` prematurely:
+The `result` event fires when the CLI turn completes, which can happen BEFORE the user clicks Approve. To prevent `clearApprovalTracking()` from clearing `pendingApprovalTool` prematurely:
 1. **toolName in response**: PlanApprovalBar and InputArea include `toolName` in all `planApprovalResponse` messages. The handler uses `msg.toolName || this.pendingApprovalTool` as fallback, so it can identify the tool even if `result` already cleared the tracking.
 2. **Preserved across result**: The `result` handler saves and restores `pendingApprovalTool` if it's set, preventing the race from clearing the tool name.
 
-**Stale Plan Mode Detection (post-compaction):**
-After context compaction, the Claude model may call `ExitPlanMode` as a stale artifact (the compacted context mentions plan mode, but no real plan exists). MessageHandler tracks a `planModeActive` flag:
+**Plan Mode Tracking:**
+MessageHandler tracks a `planModeActive` flag:
 - Set to `true` when `EnterPlanMode` tool is seen in `toolUseStart`
-- Set to `false` when the user responds to ANY ExitPlanMode approval (approve/approveClearBypass/approveManual/reject/feedback)
-- When `ExitPlanMode` is detected but `planModeActive` is `false`, the extension auto-approves silently (`"Yes, proceed with the plan."`) instead of showing the approval bar. This prevents the user from getting stuck on a "Plan Ready for Review" prompt with no actual plan to review.
-- **Safety valve**: A counter (`staleExitPlanModeAutoApproveCount`) tracks consecutive stale auto-approvals. After 3, the bar is always shown (counter does NOT reset, preventing the loop of: auto-approve 3x, show bar, approve, reset, repeat).
-
-**User-Approved Auto-Approve Path:**
-When the user explicitly approves ExitPlanMode, `autoApproveExitPlanMode` is set to `true`. Subsequent ExitPlanMode calls in the same session are auto-approved via this flag (up to 5 times). This flag is NOT reset in the `result` handler - it persists across CLI turns until the user sends a new message or the session resets. A separate counter (`exitPlanModeAutoApproveCount`) limits auto-approvals to 5, after which the bar is shown again. All counters reset when the user sends a new message or manually interacts with the approval bar.
+- Set to `false` when the user responds to any ExitPlanMode approval or on session reset
 
 **Plan Approval Options (CLI-matching):**
 PlanApprovalBar shows 4 options matching the CLI's plan approval UX:
-1. **"Yes, clear context and bypass permissions"** (`approveClearBypass`): Approves the plan, sends approval text, then triggers context compaction.
-2. **"Yes, and bypass permissions"** (`approve`): Standard approval - proceeds in full-access mode.
-3. **"Yes, manually approve edits"** (`approveManual`): Approves the plan, switches to supervised permission mode.
-4. **"Type here to tell Claude what to change"** (`feedback`): Opens a text area for custom feedback.
+1. **"Yes, clear context and bypass permissions"** (`approveClearBypass`): Closes bar + triggers context compaction.
+2. **"Yes, and bypass permissions"** (`approve`): Standard approval - closes bar, model continues in full-access mode.
+3. **"Yes, manually approve edits"** (`approveManual`): Closes bar + switches to supervised permission mode.
+4. **"Type here to tell Claude what to change"** (`feedback`): Sends feedback text to the CLI.
 
 **Plan Approval Cleanup (multiple safety nets):**
 The `pendingApproval` state is cleared in several places to prevent the approval bar from lingering:

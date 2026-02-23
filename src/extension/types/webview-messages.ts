@@ -244,6 +244,13 @@ export interface GetSkillGenStatusRequest {
   type: 'getSkillGenStatus';
 }
 
+export interface SkillGenUiLogMessage {
+  type: 'skillGenUiLog';
+  level: 'INFO' | 'DEBUG';
+  event: string;
+  data?: Record<string, unknown>;
+}
+
 export interface SetGitHubSyncEnabledRequest {
   type: 'setGitHubSyncEnabled';
   enabled: boolean;
@@ -277,6 +284,11 @@ export interface GetCommunityDataRequest {
 export interface CopyShareCardRequest {
   type: 'copyShareCard';
   format: 'markdown' | 'shields-badge';
+}
+
+export interface CodexConsultRequest {
+  type: 'codexConsult';
+  question: string;
 }
 
 export type WebviewToExtensionMessage =
@@ -325,13 +337,15 @@ export type WebviewToExtensionMessage =
   | SkillGenTriggerRequest
   | SkillGenCancelRequest
   | GetSkillGenStatusRequest
+  | SkillGenUiLogMessage
   | SetGitHubSyncEnabledRequest
   | GitHubSyncRequest
   | AddFriendRequest
   | RemoveFriendRequest
   | RefreshFriendsRequest
   | GetCommunityDataRequest
-  | CopyShareCardRequest;
+  | CopyShareCardRequest
+  | CodexConsultRequest;
 
 export interface WebviewImageData {
   base64: string;
