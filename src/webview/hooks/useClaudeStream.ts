@@ -35,6 +35,7 @@ export function useClaudeStream(): void {
     setSelectedProvider,
     setProviderCapabilities,
     setSelectedModel,
+    setSelectedCodexReasoningEffort,
     setResuming,
     setPendingApproval,
     setProjectPromptHistory,
@@ -253,6 +254,10 @@ export function useClaudeStream(): void {
 
         case 'providerCapabilities':
           setProviderCapabilities(msg.capabilities);
+          break;
+
+        case 'codexReasoningEffortSetting':
+          setSelectedCodexReasoningEffort(msg.effort);
           break;
 
         case 'typingThemeSetting':
@@ -526,6 +531,7 @@ export function useClaudeStream(): void {
     setSelectedProvider,
     setProviderCapabilities,
     setSelectedModel,
+    setSelectedCodexReasoningEffort,
     setResuming,
     setPendingApproval,
     setProjectPromptHistory,
@@ -564,5 +570,12 @@ export function useClaudeStream(): void {
 export function postToExtension(
   message: import('../../extension/types/webview-messages').WebviewToExtensionMessage
 ): void {
-  vscodeApi?.postMessage(message);
+  if (!vscodeApi) {
+    console.warn('[WEBVIEW->EXT] VS Code API unavailable; message dropped', message);
+    return;
+  }
+  if (message.type === 'setProvider' || message.type === 'startSession' || message.type === 'openProviderTab') {
+    console.log(`%c[WEBVIEW->EXT] ${message.type}`, 'color: #7ee787; font-weight: bold', JSON.parse(JSON.stringify(message)));
+  }
+  vscodeApi.postMessage(message);
 }

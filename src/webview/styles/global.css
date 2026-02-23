@@ -238,6 +238,7 @@ html, body, #root {
   max-width: 100%;
   font-size: var(--chat-font-size, inherit);
   font-family: var(--chat-font-family, var(--theme-chat-font-family, inherit));
+  position: relative;
 }
 
 .message-user {
@@ -259,6 +260,15 @@ html, body, #root {
   letter-spacing: 0.5px;
   margin-bottom: 4px;
   color: var(--vscode-descriptionForeground);
+}
+
+.message-timestamp {
+  margin-left: 8px;
+  font-weight: 400;
+  font-size: 10px;
+  opacity: 0.6;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 /* Streaming text indicator */
@@ -1000,6 +1010,7 @@ html, body, #root {
 
 /* History button in status bar - always visible */
 .status-bar-history-btn,
+.status-bar-prompt-history-btn,
 .status-bar-feedback-btn {
   background: none;
   border: 1px solid var(--vscode-panel-border, #333);
@@ -1013,9 +1024,15 @@ html, body, #root {
 }
 
 .status-bar-history-btn:hover,
+.status-bar-prompt-history-btn:hover,
 .status-bar-feedback-btn:hover {
   background: var(--vscode-toolbar-hoverBackground);
   color: var(--vscode-editor-foreground);
+}
+
+.status-bar-prompt-history-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .status-bar-achievements-btn {
@@ -1963,6 +1980,7 @@ html, body, #root {
   border-color: var(--vscode-focusBorder);
 }
 
+.status-bar-provider-quick-btn,
 .status-bar-codex-btn {
   background: linear-gradient(180deg, rgba(88, 166, 255, 0.12), rgba(88, 166, 255, 0.04));
   color: var(--vscode-foreground);
@@ -1973,17 +1991,20 @@ html, body, #root {
   cursor: pointer;
 }
 
+.status-bar-provider-quick-btn:hover:not(:disabled),
 .status-bar-codex-btn:hover:not(:disabled) {
   border-color: rgba(88, 166, 255, 0.6);
   background: linear-gradient(180deg, rgba(88, 166, 255, 0.2), rgba(88, 166, 255, 0.08));
 }
 
+.status-bar-provider-quick-btn.active,
 .status-bar-codex-btn.active {
   color: var(--vscode-button-foreground, #fff);
   background: var(--vscode-button-background, #0e639c);
   border-color: var(--vscode-button-background, #0e639c);
 }
 
+.status-bar-provider-quick-btn:disabled,
 .status-bar-codex-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -4568,6 +4589,17 @@ html, body, #root {
   opacity: 0.7;
 }
 
+/* Intensity border hover zone for tooltip trigger */
+.intensity-border-zone {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: help;
+  z-index: 1;
+}
+
 /* ============================================================
    Global Tooltip (event-delegated via data-tooltip attribute)
    ============================================================ */
@@ -4575,7 +4607,7 @@ html, body, #root {
 .global-tooltip {
   position: fixed;
   z-index: 10000;
-  max-width: 250px;
+  max-width: 320px;
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 11px;

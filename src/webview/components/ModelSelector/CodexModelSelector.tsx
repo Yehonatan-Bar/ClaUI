@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
+import type { CodexReasoningEffort } from '../../../extension/types/webview-messages';
 
 const CODEX_MODEL_OPTIONS = [
   { label: 'Default', value: '' },
@@ -8,12 +9,27 @@ const CODEX_MODEL_OPTIONS = [
   { label: 'GPT-5', value: 'gpt-5' },
 ];
 
+const CODEX_REASONING_EFFORT_OPTIONS: Array<{ label: string; value: CodexReasoningEffort }> = [
+  { label: 'Default', value: '' },
+  { label: 'Low', value: 'low' },
+  { label: 'Medium', value: 'medium' },
+  { label: 'High', value: 'high' },
+  { label: 'Extra High', value: 'xhigh' },
+];
+
 /**
  * Codex model selector (separate from Claude selector to avoid mixing provider-specific labels/options).
  * Changes are persisted to `claudeMirror.codex.model`.
  */
 export const CodexModelSelector: React.FC = () => {
-  const { selectedModel, model, isConnected, setSelectedModel } = useAppStore();
+  const {
+    selectedModel,
+    selectedCodexReasoningEffort,
+    model,
+    isConnected,
+    setSelectedModel,
+    setSelectedCodexReasoningEffort,
+  } = useAppStore();
 
   const options = useMemo(() => {
     if (!selectedModel || CODEX_MODEL_OPTIONS.some((opt) => opt.value === selectedModel)) {
@@ -30,6 +46,12 @@ export const CodexModelSelector: React.FC = () => {
     setSelectedModel(newModel);
     postToExtension({ type: 'setModel', model: newModel });
   }, [setSelectedModel]);
+
+  const handleEffortChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const effort = e.target.value as CodexReasoningEffort;
+    setSelectedCodexReasoningEffort(effort);
+    postToExtension({ type: 'setCodexReasoningEffort', effort });
+  }, [setSelectedCodexReasoningEffort]);
 
   const activeModelLabel = model && model !== 'connecting...' && model !== 'connected' && model !== 'unknown'
     ? model
@@ -57,6 +79,19 @@ export const CodexModelSelector: React.FC = () => {
           {activeModelLabel}
         </span>
       )}
+      <span className="model-selector-label">Reasoning</span>
+      <select
+        className="model-selector-select"
+        value={selectedCodexReasoningEffort}
+        onChange={handleEffortChange}
+        data-tooltip="Codex reasoning effort (applies next turn)"
+      >
+        {CODEX_REASONING_EFFORT_OPTIONS.map((opt) => (
+          <option key={opt.value || 'default'} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 };

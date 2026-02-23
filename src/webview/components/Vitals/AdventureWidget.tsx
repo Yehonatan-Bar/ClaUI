@@ -195,7 +195,7 @@ export const AdventureWidget: React.FC = React.memo(() => {
       onDoubleClick={handleDoubleClick}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      data-tooltip={tooltip ?? 'Double-click to reset position'}
+      data-tooltip={tooltip ?? 'Adventure Widget\n\nPixel-art dungeon crawler\nEach turn = a room in the maze\n\nEncounters:\nScrolls = read operations\nAnvils = edit operations\nTraps = errors\nDragons = 3+ errors\nTreasure = recovery after errors\n\nDrag to move, double-click to reset position'}
     >
       <canvas
         ref={canvasRef}

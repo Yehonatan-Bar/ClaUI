@@ -191,6 +191,16 @@ Fields added to `TurnRecord` for the dashboard:
 - `bashCommands?: string[]` - Shell commands run this turn
 - `semantics?: TurnSemantics` - Async semantic analysis
 
+## Commands Tab Data Sources
+
+The Commands tab shows bash commands from two sources:
+
+1. **Live streaming** (`MessageHandler.ts`): During an active session, `blockStop` events trigger JSON parsing of Bash tool input, collecting commands into `currentBashCommands[]`. These are included in the `turnComplete` message sent to the webview.
+
+2. **Rebuilt turn history** (`turnVitals.ts`): When turn history is reconstructed from stored messages (e.g., after VS Code reload, session restore, vitals enable), `deriveTurnFromAssistantMessage()` extracts bash commands from `tool_use` content blocks where `name === 'Bash'` and `input.command` is a string.
+
+Both paths feed into `flattenCommands()` in `dashboardUtils.ts`, which iterates `turnHistory[].bashCommands` and categorizes each command (git, npm, test, build, deploy, search, file, other).
+
 ## Known Limitations
 
 - Bundle size increased (~991 KB total webview) due to Recharts + D3. Lazy-loading is a follow-up.

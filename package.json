@@ -111,6 +111,25 @@
           "default": "",
           "description": "Codex model to use for new Codex sessions. Leave empty to use the CLI/config default."
         },
+        "claudeMirror.codex.reasoningEffort": {
+          "type": "string",
+          "default": "",
+          "enum": [
+            "",
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "enumDescriptions": [
+            "Use Codex CLI/config default reasoning effort",
+            "Low reasoning effort (faster, lighter reasoning)",
+            "Medium reasoning effort (balanced)",
+            "High reasoning effort (deeper reasoning)",
+            "Extra high reasoning effort (maximum depth, slower)"
+          ],
+          "description": "Codex reasoning effort for new turns. Leave empty to use the CLI/config default."
+        },
         "claudeMirror.useCtrlEnterToSend": {
           "type": "boolean",
           "default": true,

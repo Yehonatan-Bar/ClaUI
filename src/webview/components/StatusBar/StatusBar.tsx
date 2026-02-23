@@ -52,6 +52,7 @@ export const StatusBar: React.FC<{
     providerCapabilities,
     setSelectedProvider,
     setCodexConsultPanelOpen,
+    setPromptHistoryPanelOpen,
   } = useAppStore();
 
   const { barRef, isCollapsed } = useStatusBarCollapse();
@@ -89,6 +90,10 @@ export const StatusBar: React.FC<{
 
   const handleHistory = () => {
     postToExtension({ type: 'showHistory' });
+  };
+
+  const handlePromptHistory = () => {
+    setPromptHistoryPanelOpen(true);
   };
 
   const handleOpenPlans = () => {
@@ -135,17 +140,56 @@ export const StatusBar: React.FC<{
     setVitalsInfoOpen(false);
   };
 
-  const handleSetCodexProvider = () => {
-    if (selectedProvider === 'codex' || isBusy) {
+  const handleOpenProviderTab = (targetProvider: 'claude' | 'codex') => {
+    const targetLabel = targetProvider === 'codex' ? 'Codex' : 'Claude';
+
+    if (provider === targetProvider || isBusy) {
+      const reason = provider === targetProvider ? `current-tab-is-${targetProvider}` : 'busy';
+      console.log(`[StatusBar] ${targetLabel} button ignored`, {
+        reason,
+        targetProvider,
+        selectedProvider,
+        provider,
+        isBusy,
+      });
+      postToExtension({
+        type: 'diag',
+        phase: `statusbar.${targetProvider}.click.ignored`,
+        detail: `reason=${reason} target=${targetProvider} selected=${selectedProvider} current=${provider ?? 'none'} busy=${isBusy}`,
+      } as any);
       return;
     }
-    setSelectedProvider('codex');
-    postToExtension({ type: 'setProvider', provider: 'codex' });
+    console.log(`[StatusBar] ${targetLabel} button clicked -> open new ${targetLabel} tab`, {
+      targetProvider,
+      selectedProviderBefore: selectedProvider,
+      currentTabProvider: provider,
+      isBusy,
+    });
+    postToExtension({
+      type: 'diag',
+      phase: `statusbar.${targetProvider}.click`,
+      detail: `target=${targetProvider} selectedBefore=${selectedProvider} current=${provider ?? 'none'} busy=${isBusy}`,
+    } as any);
+    if (selectedProvider !== targetProvider) {
+      setSelectedProvider(targetProvider);
+    }
+    postToExtension({ type: 'openProviderTab', provider: targetProvider });
   };
 
-  const codexButtonTitle = selectedProvider === 'codex'
-    ? `Codex is the selected default provider${provider ? ` (current tab: ${provider === 'codex' ? 'Codex' : 'Claude'})` : ''}`
-    : 'Switch default provider to Codex for new sessions/tabs';
+  const handleSetClaudeProvider = () => handleOpenProviderTab('claude');
+  const handleSetCodexProvider = () => handleOpenProviderTab('codex');
+
+  const claudeButtonTitle = provider === 'claude'
+    ? 'Claude is the current provider'
+    : selectedProvider === 'claude'
+      ? 'Open a new Claude tab'
+      : 'Switch default provider to Claude and open a new Claude tab';
+
+  const codexButtonTitle = provider === 'codex'
+    ? 'Codex is the current provider'
+    : selectedProvider === 'codex'
+      ? 'Open a new Codex tab'
+      : 'Switch default provider to Codex and open a new Codex tab';
 
   const isCodexUi = provider === 'codex' || !providerCapabilities.supportsPermissionModeSelector;
   const modelSelectorElement = isCodexUi ? <CodexModelSelector /> : <ModelSelector />;
@@ -209,10 +253,21 @@ export const StatusBar: React.FC<{
           <button className="status-bar-group-dropdown-item" onClick={handleHistory} data-tooltip="Conversation History (Ctrl+Shift+H)">
             History
           </button>
+          <button className="status-bar-group-dropdown-item" onClick={handlePromptHistory} disabled={!isConnected} data-tooltip="Prompt History">
+            Prompts
+          </button>
           <div className="status-bar-group-dropdown-separator" />
           <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
             <ProviderSelector />
           </div>
+          <button
+            className={`status-bar-group-dropdown-item ${selectedProvider === 'claude' ? 'active' : ''}`}
+            onClick={handleSetClaudeProvider}
+            disabled={isBusy}
+            data-tooltip={claudeButtonTitle}
+          >
+            Claude
+          </button>
           <button
             className={`status-bar-group-dropdown-item ${selectedProvider === 'codex' ? 'active' : ''}`}
             onClick={handleSetCodexProvider}
@@ -301,6 +356,9 @@ export const StatusBar: React.FC<{
       <button className="status-bar-history-btn" onClick={handleHistory} data-tooltip="Conversation History (Ctrl+Shift+H)">
         History
       </button>
+      <button className="status-bar-prompt-history-btn" onClick={handlePromptHistory} data-tooltip="Prompt History" disabled={!isConnected}>
+        Prompts
+      </button>
       <button className="status-bar-plans-btn" onClick={handleOpenPlans} data-tooltip="Open plan document in browser">
         Plans
       </button>
@@ -318,7 +376,15 @@ export const StatusBar: React.FC<{
       )}
       {showGitPush && gitGroup}
       <button
-        className={`status-bar-codex-btn ${selectedProvider === 'codex' ? 'active' : ''}`}
+        className={`status-bar-provider-quick-btn ${selectedProvider === 'claude' ? 'active' : ''}`}
+        onClick={handleSetClaudeProvider}
+        disabled={isBusy}
+        data-tooltip={claudeButtonTitle}
+      >
+        Claude
+      </button>
+      <button
+        className={`status-bar-provider-quick-btn ${selectedProvider === 'codex' ? 'active' : ''}`}
         onClick={handleSetCodexProvider}
         disabled={isBusy}
         data-tooltip={codexButtonTitle}

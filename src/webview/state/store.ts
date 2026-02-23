@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { ContentBlock } from '../../extension/types/stream-json';
-import type { ProviderCapabilities, ProviderId, TypingTheme } from '../../extension/types/webview-messages';
+import type { CodexReasoningEffort, ProviderCapabilities, ProviderId, TypingTheme } from '../../extension/types/webview-messages';
 import type {
   AchievementAwardPayload,
   AchievementGoalPayload,
@@ -70,6 +70,7 @@ export interface AppState {
   selectedProvider: ProviderId;
   providerCapabilities: ProviderCapabilities;
   selectedModel: string;  // model chosen by user for next session
+  selectedCodexReasoningEffort: CodexReasoningEffort;
   isConnected: boolean;
   isBusy: boolean;
   lastActivityAt: number;
@@ -256,6 +257,7 @@ export interface AppState {
   setProviderCapabilities: (capabilities: ProviderCapabilities) => void;
   setResuming: (resuming: boolean) => void;
   setSelectedModel: (model: string) => void;
+  setSelectedCodexReasoningEffort: (effort: CodexReasoningEffort) => void;
   setPendingApproval: (approval: { toolName: string; planText: string } | null) => void;
   truncateFromMessage: (messageId: string) => void;
   setActivitySummary: (summary: { shortLabel: string; fullSummary: string } | null) => void;
@@ -457,6 +459,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedProvider: 'claude',
   providerCapabilities: { ...DEFAULT_PROVIDER_CAPABILITIES },
   selectedModel: '',
+  selectedCodexReasoningEffort: '',
   isConnected: false,
   isBusy: false,
   lastActivityAt: 0,
@@ -905,6 +908,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setResuming: (resuming) => set({ isResuming: resuming }),
 
   setSelectedModel: (model) => set({ selectedModel: model }),
+
+  setSelectedCodexReasoningEffort: (effort) => set({ selectedCodexReasoningEffort: effort }),
 
   setPendingApproval: (approval) => set({ pendingApproval: approval }),
 
