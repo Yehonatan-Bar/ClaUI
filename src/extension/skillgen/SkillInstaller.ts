@@ -65,16 +65,17 @@ export class SkillInstaller {
     // Record skips
     result.skipped = toSkip.map(r => r.skillName);
 
-    this.log(`[SkillGen:Install] Plan: ${toInstall.length} new, ${toUpgrade.length} upgrades, ${toSkip.length} skips`);
+    this.log(`[SkillGen:Install][INFO] Install plan | new=${toInstall.length} upgrade=${toUpgrade.length} skip=${toSkip.length} backupDir=${backupDir}`);
 
     // Process upgrades first (backup + replace)
     for (const upgrade of toUpgrade) {
       try {
         await this.upgradeSkill(upgrade, skillsOutDir, targetDir, backupDir);
         result.upgraded.push(upgrade.skillName);
+        this.log(`[SkillGen:Install][DEBUG] Upgraded | skill=${upgrade.skillName}`);
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        this.log(`[SkillGen:Install] Failed to upgrade ${upgrade.skillName}: ${errorMsg}`);
+        this.log(`[SkillGen:Install][ERROR] Upgrade failed | skill=${upgrade.skillName} operation=upgrade error=${errorMsg}`);
         result.failed.push({ skillName: upgrade.skillName, error: errorMsg });
         // Attempt rollback of this single skill
         this.rollbackSingle(upgrade.skillName, targetDir, backupDir);
@@ -86,14 +87,15 @@ export class SkillInstaller {
       try {
         await this.installNew(install, skillsOutDir, targetDir);
         result.installed.push(install.skillName);
+        this.log(`[SkillGen:Install][DEBUG] Installed new | skill=${install.skillName}`);
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        this.log(`[SkillGen:Install] Failed to install ${install.skillName}: ${errorMsg}`);
+        this.log(`[SkillGen:Install][ERROR] Install failed | skill=${install.skillName} operation=install error=${errorMsg}`);
         result.failed.push({ skillName: install.skillName, error: errorMsg });
       }
     }
 
-    this.log(`[SkillGen:Install] Complete: ${result.installed.length} installed, ${result.upgraded.length} upgraded, ${result.skipped.length} skipped, ${result.failed.length} failed`);
+    this.log(`[SkillGen:Install][INFO] Install complete | installed=${result.installed.length} upgraded=${result.upgraded.length} skipped=${result.skipped.length} failed=${result.failed.length}`);
     return result;
   }
 
@@ -104,7 +106,7 @@ export class SkillInstaller {
   async rollback(result: InstallationResult, targetDir: string): Promise<void> {
     if (!result.backupDir) return;
 
-    this.log('[SkillGen:Install] Rolling back...');
+    this.log(`[SkillGen:Install][INFO] Rollback started | upgraded=${result.upgraded.length} installed=${result.installed.length}`);
 
     // Restore upgraded skills from backup
     for (const skillName of result.upgraded) {
@@ -117,14 +119,14 @@ export class SkillInstaller {
       try {
         if (fs.existsSync(targetPath)) {
           fs.rmSync(targetPath, { recursive: true, force: true });
-          this.log(`[SkillGen:Install] Removed new skill: ${skillName}`);
+          this.log(`[SkillGen:Install][DEBUG] Rollback: removed new skill | skill=${skillName}`);
         }
       } catch (err) {
-        this.log(`[SkillGen:Install] Failed to remove ${skillName}: ${err}`);
+        this.log(`[SkillGen:Install][ERROR] Rollback: failed to remove | skill=${skillName} error=${err}`);
       }
     }
 
-    this.log('[SkillGen:Install] Rollback complete');
+    this.log('[SkillGen:Install][INFO] Rollback complete');
   }
 
   // --- Private helpers ---
@@ -142,7 +144,6 @@ export class SkillInstaller {
     }
 
     this.copyDirRecursive(sourcePath, targetPath);
-    this.log(`[SkillGen:Install] Installed new skill: ${dedup.skillName}`);
   }
 
   private async upgradeSkill(
@@ -161,7 +162,7 @@ export class SkillInstaller {
     // Backup existing skill
     if (fs.existsSync(existingPath)) {
       this.copyDirRecursive(existingPath, backupPath);
-      this.log(`[SkillGen:Install] Backed up existing: ${existingName} -> ${backupPath}`);
+      this.log(`[SkillGen:Install][DEBUG] Backed up | skill=${existingName} backupPath=${backupPath}`);
 
       // Remove existing
       fs.rmSync(existingPath, { recursive: true, force: true });
@@ -170,7 +171,6 @@ export class SkillInstaller {
     // Install new version
     const targetPath = path.join(targetDir, dedup.skillName);
     this.copyDirRecursive(sourcePath, targetPath);
-    this.log(`[SkillGen:Install] Upgraded skill: ${existingName} -> ${dedup.skillName}`);
   }
 
   private rollbackSingle(skillName: string, targetDir: string, backupDir: string): void {
@@ -185,10 +185,10 @@ export class SkillInstaller {
         }
         // Restore from backup
         this.copyDirRecursive(backupPath, targetPath);
-        this.log(`[SkillGen:Install] Restored from backup: ${skillName}`);
+        this.log(`[SkillGen:Install][DEBUG] Restored from backup | skill=${skillName}`);
       }
     } catch (err) {
-      this.log(`[SkillGen:Install] Rollback failed for ${skillName}: ${err}`);
+      this.log(`[SkillGen:Install][ERROR] Rollback failed for single skill | skill=${skillName} error=${err}`);
     }
   }
 

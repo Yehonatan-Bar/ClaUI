@@ -193,6 +193,10 @@ export interface AppState {
   sessionActivityElapsedMs: number;
   sessionActivityRunningSinceMs: number | null;
 
+  // Codex Consultation
+  codexConsultPanelOpen: boolean;
+  setCodexConsultPanelOpen: (open: boolean) => void;
+
   // Skill Generation
   skillGenEnabled: boolean;
   skillGenThreshold: number;
@@ -497,6 +501,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   sessionActivityStarted: false,
   sessionActivityElapsedMs: 0,
   sessionActivityRunningSinceMs: null,
+
+  // Codex Consultation
+  codexConsultPanelOpen: false,
+  setCodexConsultPanelOpen: (open) => set({ codexConsultPanelOpen: open }),
 
   // Skill Generation
   skillGenEnabled: true,
@@ -1178,6 +1186,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       communityPanelOpen: false,
       // Note: githubSyncStatus and communityFriends persist across resets
       friendActionPending: false,
+      codexConsultPanelOpen: false,
       isEnhancing: false,
       enhancerPopoverOpen: false,
       enhanceComparisonData: null,

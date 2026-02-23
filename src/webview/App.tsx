@@ -3,9 +3,6 @@ import { useClaudeStream } from './hooks/useClaudeStream';
 import { useAppStore } from './state/store';
 import { MessageList } from './components/ChatView/MessageList';
 import { InputArea } from './components/InputArea/InputArea';
-import { TextSettingsBar } from './components/TextSettingsBar/TextSettingsBar';
-import { ModelSelector } from './components/ModelSelector/ModelSelector';
-import { PermissionModeSelector } from './components/PermissionModeSelector/PermissionModeSelector';
 import { PlanApprovalBar } from './components/ChatView/PlanApprovalBar';
 import { PromptHistoryPanel } from './components/ChatView/PromptHistoryPanel';
 import { AchievementPanel } from './components/Achievements/AchievementPanel';
@@ -16,21 +13,13 @@ import { ShareCard } from './components/Achievements/ShareCard';
 import { VitalsContainer } from './components/Vitals/VitalsContainer';
 import { AdventureWidget } from './components/Vitals/AdventureWidget';
 import { SessionTimeline } from './components/Vitals/SessionTimeline';
-import { VitalsInfoPanel } from './components/Vitals/VitalsInfoPanel';
+import { StatusBar } from './components/StatusBar/StatusBar';
 import { DashboardPanel } from './components/Dashboard';
 import { SkillGenPanel } from './components/SkillGen';
+import { CodexConsultPanel } from './components/InputArea/CodexConsultPanel';
 import { postToExtension } from './hooks/useClaudeStream';
-import { t as tAch } from './components/Achievements/achievementI18n';
 import { detectRtl } from './hooks/useRtlDetection';
 import { deriveTurnHistoryFromMessages } from './utils/turnVitals';
-
-function formatDuration(durationMs: number): string {
-  const totalSec = Math.max(0, Math.floor(durationMs / 1000));
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  return [h, m, s].map((n) => n.toString().padStart(2, '0')).join(':');
-}
 
 export const App: React.FC = () => {
   useClaudeStream();
@@ -57,6 +46,8 @@ export const App: React.FC = () => {
     dashboardOpen,
     skillGenPanelOpen,
     communityPanelOpen,
+    codexConsultPanelOpen,
+    setCodexConsultPanelOpen,
   } = useAppStore();
   const forkInit = useAppStore((s) => s.forkInit);
   const hasMessages = messages.length > 0 || streamingMessageId !== null;
@@ -179,6 +170,9 @@ export const App: React.FC = () => {
               )}
             </div>
           ) : null}
+          {codexConsultPanelOpen && (
+            <CodexConsultPanel onClose={() => setCodexConsultPanelOpen(false)} />
+          )}
           <InputArea />
           {achievementsEnabled && <SessionRecapCard />}
           <StatusBar cost={cost} />
@@ -247,195 +241,3 @@ const SessionEndedBar: React.FC = () => {
   );
 };
 
-/** Bottom status bar showing cost and token info */
-const StatusBar: React.FC<{
-  cost: { costUsd: number; totalCostUsd: number; inputTokens: number; outputTokens: number };
-}> = ({ cost }) => {
-  const [tickMs, setTickMs] = React.useState(() => Date.now());
-  const [vitalsInfoOpen, setVitalsInfoOpen] = React.useState(false);
-  const vitalsInfoRef = React.useRef<HTMLDivElement>(null);
-  const {
-    gitPushSettings,
-    gitPushRunning,
-    setGitPushRunning,
-    setGitPushConfigPanelOpen,
-    achievementsEnabled,
-    achievementProfile,
-    achievementLanguage,
-    setAchievementPanelOpen,
-    vitalsEnabled,
-    setVitalsEnabled,
-    toggleDashboard,
-    sessionActivityStarted,
-    sessionActivityElapsedMs,
-    sessionActivityRunningSinceMs,
-    skillGenEnabled,
-    skillGenPendingDocs,
-    skillGenThreshold,
-    skillGenRunStatus,
-    setSkillGenPanelOpen,
-  } = useAppStore();
-
-  useEffect(() => {
-    const id = setInterval(() => setTickMs(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  // Close vitals info panel on outside click
-  useEffect(() => {
-    if (!vitalsInfoOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (vitalsInfoRef.current && !vitalsInfoRef.current.contains(e.target as Node)) {
-        setVitalsInfoOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [vitalsInfoOpen]);
-
-  const activityMs = sessionActivityElapsedMs + (
-    sessionActivityRunningSinceMs ? Math.max(0, tickMs - sessionActivityRunningSinceMs) : 0
-  );
-
-  const handleHistory = () => {
-    postToExtension({ type: 'showHistory' });
-  };
-
-  const handleOpenPlans = () => {
-    postToExtension({ type: 'openPlanDocs' });
-  };
-
-  const handleFeedback = () => {
-    postToExtension({ type: 'openFeedback' });
-  };
-
-  const handleGitPush = () => {
-    if (!gitPushSettings?.enabled) {
-      setGitPushConfigPanelOpen(true);
-      return;
-    }
-    setGitPushRunning(true);
-    postToExtension({ type: 'gitPush' });
-  };
-
-  const handleToggleGitConfig = () => {
-    setGitPushConfigPanelOpen(!useAppStore.getState().gitPushConfigPanelOpen);
-  };
-
-  const handleAchievements = () => {
-    postToExtension({ type: 'getAchievementsSnapshot' });
-    setAchievementPanelOpen(!useAppStore.getState().achievementPanelOpen);
-  };
-
-  const handleToggleVitals = () => {
-    const next = !vitalsEnabled;
-    setVitalsEnabled(next);
-    postToExtension({ type: 'setVitalsEnabled', enabled: next });
-  };
-
-  return (
-    <div className="status-bar">
-      <div className="cost-display">
-        <span>Turn: ${(cost?.costUsd ?? 0).toFixed(4)}</span>
-        <span>Total: ${(cost?.totalCostUsd ?? 0).toFixed(4)}</span>
-      </div>
-      <div
-        className={`status-bar-session-clock ${sessionActivityRunningSinceMs ? 'running' : ''}`}
-        title="Claude active processing time (starts after first prompt)"
-      >
-        Active: {sessionActivityStarted ? formatDuration(activityMs) : '00:00:00'}
-      </div>
-      {achievementsEnabled && (
-        <button
-          className="status-bar-achievements-btn"
-          onClick={handleAchievements}
-          title={tAch(achievementLanguage).achievements}
-        >
-          {tAch(achievementLanguage).trophy} {achievementProfile.totalAchievements}
-        </button>
-      )}
-      <button className="status-bar-history-btn" onClick={handleHistory} title="Conversation History (Ctrl+Shift+H)">
-        History
-      </button>
-      <button className="status-bar-plans-btn" onClick={handleOpenPlans} title="Open plan document in browser">
-        Plans
-      </button>
-      <button className="status-bar-feedback-btn" onClick={handleFeedback} title="Send feedback or report a bug">
-        Feedback
-      </button>
-      <div className="status-bar-git-group">
-        <button
-          className={`status-bar-git-btn ${gitPushSettings?.enabled ? '' : 'not-configured'}`}
-          onClick={handleGitPush}
-          disabled={gitPushRunning}
-          title={gitPushSettings?.enabled ? 'Git: add, commit & push' : 'Git push (setup needed)'}
-        >
-          {gitPushRunning ? '...' : 'Git'}
-        </button>
-        <button
-          className="status-bar-git-config-btn"
-          onClick={handleToggleGitConfig}
-          title="Git push settings"
-        >
-          *
-        </button>
-      </div>
-      <ModelSelector />
-      <PermissionModeSelector />
-      <TextSettingsBar />
-      <button
-        className="status-bar-dashboard-btn"
-        title="Analytics Dashboard"
-        aria-label="Open analytics dashboard"
-        onClick={toggleDashboard}
-        style={{
-          background: 'none',
-          border: '1px solid rgba(255,255,255,0.15)',
-          color: '#e6edf3',
-          cursor: 'pointer',
-          padding: '2px 8px',
-          borderRadius: '4px',
-          fontSize: '12px',
-        }}
-      >
-        Dashboard
-      </button>
-      {skillGenEnabled && (
-        <button
-          className={`status-bar-skillgen-btn ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''} ${skillGenRunStatus !== 'idle' && skillGenRunStatus !== 'succeeded' && skillGenRunStatus !== 'failed' ? 'running' : ''}`}
-          title={`Skill Gen: ${skillGenPendingDocs}/${skillGenThreshold} docs${skillGenRunStatus !== 'idle' ? ` (${skillGenRunStatus})` : ''}`}
-          onClick={() => {
-            postToExtension({ type: 'getSkillGenStatus' });
-            setSkillGenPanelOpen(true);
-          }}
-        >
-          Skills {skillGenPendingDocs}/{skillGenThreshold}
-        </button>
-      )}
-      <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
-        <div className="status-bar-vitals-controls">
-          <button
-            className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
-            onClick={handleToggleVitals}
-            title={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
-          >
-            Vitals
-          </button>
-          <button
-            className="status-bar-vitals-settings-btn"
-            onClick={() => setVitalsInfoOpen((prev) => !prev)}
-            title="Vitals settings"
-            aria-label="Vitals settings"
-          >
-            {'\u2699'}
-          </button>
-        </div>
-        {vitalsInfoOpen && <VitalsInfoPanel onClose={() => setVitalsInfoOpen(false)} />}
-      </div>
-      <div className="cost-display">
-        <span>In: {(cost?.inputTokens ?? 0).toLocaleString()}</span>
-        <span>Out: {(cost?.outputTokens ?? 0).toLocaleString()}</span>
-      </div>
-    </div>
-  );
-};

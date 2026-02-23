@@ -165,11 +165,52 @@ Atomic installation with safety guarantees.
 
 ---
 
+## Logging
+
+Comprehensive categorized logging covers the full SkillGen flow from UI button click through pipeline completion.
+
+### Log Categories
+
+| Category | Layer | Purpose | Default Level |
+|----------|-------|---------|---------------|
+| `[SkillGen:UI]` | Webview -> Extension bridge | Button clicks, panel open/close, toggle | INFO |
+| `[SkillGen:Msg]` | MessageHandler | Message routing, acceptance/rejection | INFO |
+| `[SkillGen:Scan]` | SkillGenService | Document scan lifecycle, threshold decisions | INFO |
+| `[SkillGen:Preflight]` | SkillGenService | Python/toolkit/docs checks | INFO/ERROR |
+| `[SkillGen:Lock]` | SkillGenService | Cross-process lock acquire/release/stale | INFO/WARNING |
+| `[SkillGen:Pipeline]` | SkillGenService + PythonPipelineRunner | Subprocess spawn/exit, progress stages | INFO/ERROR |
+| `[SkillGen:Dedup]` | DeduplicationEngine | Dedup verdict summary, tier counts | INFO (summary), DEBUG (per-skill) |
+| `[SkillGen:Install]` | SkillInstaller | Install plan/result, rollback | INFO (summary), DEBUG (per-skill) |
+| `[SkillGen:Store]` | SkillGenStore | Ledger persistence, history | DEBUG |
+| `[SkillGen:WebviewTx]` | SkillGenService | Tab register/unregister, broadcast | DEBUG |
+
+### Log Format
+
+`[SkillGen:<Category>][<LEVEL>] <event> | key=value key=value`
+
+### Correlation IDs
+
+- **runId**: 8-char hex ID generated at the start of each pipeline run. Appears in all pipeline/preflight/lock/install logs for end-to-end tracing.
+- **scanId**: 8-char hex ID generated at the start of each document scan.
+
+### Webview UI Logging Bridge
+
+Since `console.log` is stripped in production builds, the webview sends a `skillGenUiLog` message to the extension, which writes it to the output channel:
+- Message type: `skillGenUiLog` with fields `level`, `event`, `data`
+- Extension-side handler formats as `[SkillGen:UI][LEVEL] event | key=value`
+- Logged UI events: `panelOpened`, `generateClicked`, `cancelClicked`, `toggleEnabled`, `panelClosed`
+
+### Viewing Logs
+
+Logs appear in the VS Code **Output** panel under **ClaUi** channel.
+
+---
+
 ## Webview UI
 
 ### Status Bar Indicator
 
-A button in the status bar showing `Skills N/T` where N = pending docs, T = threshold. CSS classes:
+A button in the status bar showing `SkillDocs N/T` where N = pending docs, T = threshold. CSS classes:
 - `.threshold-reached` - Pulse animation when N >= T
 - `.running` - Visual indicator during pipeline execution
 
@@ -200,6 +241,7 @@ Full overlay panel (same pattern as AchievementPanel and DashboardPanel):
 | `skillGenTrigger` | Manual pipeline trigger |
 | `skillGenCancel` | Cancel running pipeline |
 | `getSkillGenStatus` | Request current status snapshot |
+| `skillGenUiLog` | UI interaction log (bridged to extension output channel) |
 
 ### Extension -> Webview
 

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>תוכנית פיתוח - התייעצות עם Codex</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            line-height: 1.7;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 2rem;
+            color: #38bdf8;
+            margin-bottom: 8px;
+            border-bottom: 2px solid #1e3a5f;
+            padding-bottom: 12px;
+        }
+        .subtitle {
+            color: #94a3b8;
+            font-size: 1rem;
+            margin-bottom: 32px;
+        }
+        h2 {
+            font-size: 1.3rem;
+            color: #7dd3fc;
+            margin-top: 32px;
+            margin-bottom: 12px;
+        }
+        p {
+            margin-bottom: 16px;
+            color: #cbd5e1;
+        }
+        .highlight-box {
+            background: #1e293b;
+            border-right: 4px solid #38bdf8;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .step {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+        }
+        .step-num {
+            background: #38bdf8;
+            color: #0f172a;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+            font-size: 0.9rem;
+        }
+        .step-content {
+            flex: 1;
+        }
+        .step-title {
+            color: #f1f5f9;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .step-desc {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+        .flow-diagram {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 24px 0;
+            text-align: center;
+        }
+        .flow-step {
+            display: inline-block;
+            background: #334155;
+            color: #e2e8f0;
+            padding: 8px 16px;
+            border-radius: 8px;
+            margin: 4px;
+            font-size: 0.9rem;
+        }
+        .flow-arrow {
+            color: #38bdf8;
+            margin: 0 6px;
+            font-size: 1.2rem;
+        }
+        .benefit {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+        }
+        .benefit-check {
+            color: #4ade80;
+            font-size: 1.2rem;
+        }
+        .risk-note {
+            background: #1e293b;
+            border-right: 4px solid #f59e0b;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .risk-note strong {
+            color: #fbbf24;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+        th, td {
+            padding: 10px 14px;
+            text-align: right;
+            border-bottom: 1px solid #334155;
+        }
+        th {
+            color: #7dd3fc;
+            font-weight: 600;
+        }
+        td {
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>תוכנית פיתוח - התייעצות עם Codex</h1>
+        <p class="subtitle">פיצ'ר חדש ב-ClaUi: ייעוץ מומחה GPT ישירות מתוך הממשק</p>
+
+        <h2>מה זה?</h2>
+        <p>
+            כפתור חדש בממשק של ClaUi שמאפשר למשתמש לשאול שאלה ולקבל תשובה ממומחה GPT חיצוני (Codex).
+            המערכת מעשירה אוטומטית את השאלה עם הקשר רלוונטי על הפרויקט והבעיה, כך שהמומחה מקבל תמונה מלאה.
+            התשובה מוצגת בצ'אט, וקלוד ממשיך לעבוד על סמך העצה שהתקבלה.
+        </p>
+
+        <h2>איך זה עובד?</h2>
+        <div class="flow-diagram">
+            <span class="flow-step">המשתמש לוחץ "Consult"</span>
+            <span class="flow-arrow">&larr;</span>
+            <span class="flow-step">מקליד שאלה</span>
+            <span class="flow-arrow">&larr;</span>
+            <span class="flow-step">קלוד מוסיף הקשר</span>
+            <span class="flow-arrow">&larr;</span>
+            <span class="flow-step">Codex מייעץ</span>
+            <span class="flow-arrow">&larr;</span>
+            <span class="flow-step">התשובה בצ'אט + המשך פיתוח</span>
+        </div>
+
+        <h2>תהליך עבודה מפורט</h2>
+        <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+                <div class="step-title">המשתמש לוחץ על כפתור "Consult" בסרגל התחתון</div>
+                <div class="step-desc">נפתחת חלונית קלט עם שדה טקסט וכפתור שליחה</div>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+                <div class="step-title">המשתמש מקליד את שאלת ההתייעצות</div>
+                <div class="step-desc">למשל: "מה הגישה הנכונה לטיפול בשגיאות ב-API?" או "איך לתכנן את ארכיטקטורת ה-caching?"</div>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+                <div class="step-title">קלוד מעשיר את השאלה בהקשר</div>
+                <div class="step-desc">קלוד מוסיף אוטומטית רקע על המערכת, קוד רלוונטי, והבעיה שנדונה בשיחה - כך ש-Codex מקבל תמונה מלאה</div>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+                <div class="step-title">Codex (מומחה GPT) מקבל את השאלה ומשיב</div>
+                <div class="step-desc">התשובה מוצגת בצ'אט כחלק מהשיחה הרגילה</div>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">5</div>
+            <div class="step-content">
+                <div class="step-title">קלוד ממשיך בפיתוח על סמך העצה</div>
+                <div class="step-desc">קלוד מנתח את תשובת Codex ומיישם את ההמלצות</div>
+            </div>
+        </div>
+
+        <h2>יתרונות</h2>
+        <div class="highlight-box">
+            <div class="benefit"><span class="benefit-check">+</span> גישה למומחה GPT חיצוני ישירות מתוך זרימת העבודה</div>
+            <div class="benefit"><span class="benefit-check">+</span> העשרת הקשר אוטומטית - המשתמש לא צריך להסביר מחדש את המצב</div>
+            <div class="benefit"><span class="benefit-check">+</span> התשובה מוזנת ישירות לקלוד להמשך עבודה</div>
+            <div class="benefit"><span class="benefit-check">+</span> שימוש בתשתית קיימת - ללא שירות חיצוני חדש</div>
+            <div class="benefit"><span class="benefit-check">+</span> חוויית משתמש חלקה - כפתור אחד, שאלה אחת, תשובה בצ'אט</div>
+        </div>
+
+        <h2>היקף השינויים</h2>
+        <table>
+            <tr>
+                <th>אזור</th>
+                <th>שינוי</th>
+            </tr>
+            <tr>
+                <td>ממשק (Webview)</td>
+                <td>כפתור בסרגל תחתון + חלונית קלט חדשה</td>
+            </tr>
+            <tr>
+                <td>ניהול מצב (Store)</td>
+                <td>שדה בוליאני לפתיחת/סגירת החלונית</td>
+            </tr>
+            <tr>
+                <td>תקשורת (Messages)</td>
+                <td>סוג הודעה חדש אחד</td>
+            </tr>
+            <tr>
+                <td>שכבת Extension</td>
+                <td>טיפול בהודעה + בניית פרומפט מובנה</td>
+            </tr>
+            <tr>
+                <td>עיצוב (CSS)</td>
+                <td>סגנונות לחלונית ולכפתור</td>
+            </tr>
+        </table>
+
+        <div class="risk-note">
+            <strong>הערה:</strong> הפיצ'ר דורש ש-MCP Codex יהיה מוגדר ופעיל בסביבת Claude Code.
+            אם הכלי לא זמין, קלוד יודיע על כך בצ'אט.
+        </div>
+
+        <h2>מורכבות ולו"ז</h2>
+        <div class="highlight-box">
+            <p>
+                <strong>רמת מורכבות:</strong> בינונית-נמוכה. הפיצ'ר מתבסס על תשתיות קיימות (כפתורי סרגל, חלוניות קלט, תקשורת WebView, זרימת הודעות CLI).
+            </p>
+            <p>
+                <strong>קבצים חדשים:</strong> 1 (רכיב React לחלונית הקלט)
+            </p>
+            <p>
+                <strong>קבצים לעדכון:</strong> 6 (סוגי הודעות, מצב, סרגל, App, מטפל הודעות, CSS)
+            </p>
+        </div>
+    </div>
+</body>
+</html>

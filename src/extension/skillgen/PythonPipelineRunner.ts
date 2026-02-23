@@ -44,14 +44,6 @@ export class PythonPipelineRunner {
 
   /**
    * Run the pipeline, writing outputs to the given workspace directory.
-   *
-   * @param docsDirectory - Directory containing SR-PTD docs
-   * @param pendingDocPaths - Relative paths of pending documents
-   * @param workspaceDir - Isolated workspace for pipeline artifacts
-   * @param pythonPath - Path to python executable
-   * @param toolkitPath - Path to the Python toolkit directory
-   * @param pipelineMode - Which entry point to use
-   * @param timeoutMs - Maximum run time
    */
   async run(
     docsDirectory: string,
@@ -75,6 +67,7 @@ export class PythonPipelineRunner {
     }
 
     this.emitProgress('running', 5, 'Preparing pipeline workspace...');
+    this.log(`[SkillGen:Pipeline][INFO] Preparing workspace | docsDir=${docsDirectory} docCount=${pendingDocPaths.length} mode=${pipelineMode} timeoutMs=${timeoutMs}`);
 
     // Write the list of pending docs to a manifest file
     const manifestPath = path.join(workspaceDir, 'pending_docs.json');
@@ -95,18 +88,20 @@ export class PythonPipelineRunner {
         timeoutMs
       );
 
+      const durationMs = Date.now() - startTime;
       return {
         ...result,
         skillsOutputDir: skillsOutDir,
-        durationMs: Date.now() - startTime,
+        durationMs,
       };
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      this.log(`[SkillGen] Pipeline failed: ${errorMsg}`);
+      const durationMs = Date.now() - startTime;
+      this.log(`[SkillGen:Pipeline][ERROR] Pipeline exception | error=${errorMsg} durationMs=${durationMs}`);
       return {
         success: false,
         skillsOutputDir: skillsOutDir,
-        durationMs: Date.now() - startTime,
+        durationMs,
         error: errorMsg,
       };
     }
@@ -114,8 +109,11 @@ export class PythonPipelineRunner {
 
   /** Cancel a running pipeline */
   cancel(): void {
-    if (!this.childProcess) return;
-    this.log('[SkillGen] Cancelling pipeline...');
+    if (!this.childProcess) {
+      this.log('[SkillGen:Pipeline][DEBUG] Cancel called but no child process');
+      return;
+    }
+    this.log(`[SkillGen:Pipeline][INFO] Cancelling pipeline | pid=${this.childProcess.pid}`);
     try {
       // On Windows, use taskkill to kill the entire process tree
       if (process.platform === 'win32' && this.childProcess.pid) {
@@ -128,6 +126,7 @@ export class PythonPipelineRunner {
     }
     this.childProcess = null;
     this.emitProgress('cancelled', 0, 'Pipeline cancelled');
+    this.log('[SkillGen:Pipeline][INFO] Pipeline cancelled successfully');
   }
 
   private async executePipeline(
@@ -175,7 +174,8 @@ export class PythonPipelineRunner {
           break;
       }
 
-      this.log(`[SkillGen] Running: ${pythonPath} ${args.join(' ')}`);
+      this.log(`[SkillGen:Pipeline][INFO] Spawning subprocess | cmd=${pythonPath} mode=${pipelineMode} cwd=${cwd}`);
+      this.log(`[SkillGen:Pipeline][DEBUG] Full command | ${pythonPath} ${args.join(' ')}`);
       this.emitProgress('running', 10, 'Starting Python pipeline...');
 
       const child = cp.spawn(pythonPath, args, {
@@ -190,58 +190,65 @@ export class PythonPipelineRunner {
       });
 
       this.childProcess = child;
+      this.log(`[SkillGen:Pipeline][INFO] Subprocess started | pid=${child.pid}`);
 
       let stdout = '';
       let stderr = '';
+      let lastProgressLabel = '';
 
       child.stdout?.on('data', (data: Buffer) => {
         const text = data.toString();
         stdout += text;
-        this.parsePipelineOutput(text);
+        this.parsePipelineOutput(text, lastProgressLabel, (label) => { lastProgressLabel = label; });
       });
 
       child.stderr?.on('data', (data: Buffer) => {
         const text = data.toString();
         stderr += text;
-        // Log stderr lines for diagnostics
+        // Log stderr lines for diagnostics (keep at DEBUG to avoid noise)
         for (const line of text.split('\n').filter(Boolean)) {
-          this.log(`[SkillGen:stderr] ${line}`);
+          this.log(`[SkillGen:Pipeline][DEBUG] stderr: ${line}`);
         }
       });
 
       // Timeout handler
       const timer = setTimeout(() => {
-        this.log(`[SkillGen] Pipeline timed out after ${timeoutMs}ms`);
+        this.log(`[SkillGen:Pipeline][ERROR] Pipeline timed out | timeoutMs=${timeoutMs} pid=${child.pid}`);
         this.cancel();
         reject(new Error(`Pipeline timed out after ${Math.round(timeoutMs / 1000)}s`));
       }, timeoutMs);
 
-      child.on('close', (code) => {
+      child.on('close', (code, signal) => {
         clearTimeout(timer);
         this.childProcess = null;
 
         // Write stdout/stderr to log files for debugging
         const logDir = path.join(workspaceDir, 'logs');
         const ts = new Date().toISOString().replace(/[:.]/g, '-');
+        let stdoutLogPath = '';
+        let stderrLogPath = '';
         try {
-          fs.writeFileSync(path.join(logDir, `pipeline-stdout-${ts}.log`), stdout, 'utf-8');
-          fs.writeFileSync(path.join(logDir, `pipeline-stderr-${ts}.log`), stderr, 'utf-8');
+          stdoutLogPath = path.join(logDir, `pipeline-stdout-${ts}.log`);
+          stderrLogPath = path.join(logDir, `pipeline-stderr-${ts}.log`);
+          fs.writeFileSync(stdoutLogPath, stdout, 'utf-8');
+          fs.writeFileSync(stderrLogPath, stderr, 'utf-8');
         } catch { /* non-critical */ }
 
         if (code === 0) {
-          this.log('[SkillGen] Pipeline completed successfully');
+          this.log(`[SkillGen:Pipeline][INFO] Subprocess exited successfully | code=0 stdoutLog=${stdoutLogPath}`);
           this.emitProgress('running', 90, 'Pipeline complete, preparing results...');
           resolve({ success: true });
         } else {
-          const errMsg = `Pipeline exited with code ${code}`;
-          this.log(`[SkillGen] ${errMsg}`);
-          resolve({ success: false, error: `${errMsg}\n${stderr.slice(-500)}` });
+          const stderrTail = stderr.slice(-300).trim();
+          this.log(`[SkillGen:Pipeline][ERROR] Subprocess exited with error | code=${code} signal=${signal || 'none'} stderrLog=${stderrLogPath} stderrTail=${stderrTail}`);
+          resolve({ success: false, error: `Pipeline exited with code ${code}\n${stderr.slice(-500)}` });
         }
       });
 
       child.on('error', (err) => {
         clearTimeout(timer);
         this.childProcess = null;
+        this.log(`[SkillGen:Pipeline][ERROR] Subprocess spawn error | error=${err.message}`);
         reject(err);
       });
     });
@@ -254,12 +261,21 @@ export class PythonPipelineRunner {
    *   [PROGRESS] 60 Clustering documents...
    *   [PROGRESS] 85 Generating skills...
    */
-  private parsePipelineOutput(text: string): void {
+  private parsePipelineOutput(
+    text: string,
+    lastLabel: string,
+    setLastLabel: (label: string) => void
+  ): void {
     for (const line of text.split('\n')) {
       const match = line.match(/\[PROGRESS\]\s*(\d+)\s*(.*)/);
       if (match) {
         const progress = Math.min(90, Math.max(10, parseInt(match[1], 10)));
         const label = match[2].trim() || 'Processing...';
+        // Only log when stage label changes to reduce noise
+        if (label !== lastLabel) {
+          this.log(`[SkillGen:Pipeline][INFO] Pipeline stage | progress=${progress}% label=${label}`);
+          setLastLabel(label);
+        }
         this.emitProgress('running', progress, label);
       }
     }

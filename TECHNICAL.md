@@ -89,12 +89,13 @@ claude-code-mirror/
 |   |       +-- webview-messages.ts       #   postMessage contract
 |   +-- webview/                          # React webview code (browser context)
 |       +-- index.tsx                     #   React entry point
-|       +-- App.tsx                       #   Main app with welcome/chat/status
+|       +-- App.tsx                       #   Main app with welcome/chat/status (StatusBar extracted to components/StatusBar/)
 |       +-- state/store.ts               #   Zustand state management
 |       +-- hooks/
 |       |   +-- useClaudeStream.ts        #   postMessage event dispatcher
 |       |   +-- useRtlDetection.ts        #   detectRtl() helper for InputArea (messages use dir="auto")
 |       |   +-- useFileMention.ts         #   @ file mention trigger detection, debounced search, popup state
+|       |   +-- useStatusBarCollapse.ts  #   ResizeObserver hook for responsive status bar collapse
 |       +-- components/
 |       |   +-- ChatView/
 |       |   |   +-- MessageList.tsx       #   Scrollable message list with scroll-to-bottom button
@@ -110,6 +111,7 @@ claude-code-mirror/
 |       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt, image paste, @ file mentions
 |       |   |   +-- FileMentionPopup.tsx  #   Autocomplete popup for @ file mentions
 |       |   |   +-- GitPushPanel.tsx      #   Config panel for git push (status, ask Claude to configure)
+|       |   |   +-- CodexConsultPanel.tsx #   Input panel for Codex GPT expert consultation
 |       |   +-- ModelSelector/
 |       |   |   +-- ModelSelector.tsx          #   Model dropdown (Sonnet/Opus/Haiku)
 |       |   +-- PermissionModeSelector/
@@ -157,6 +159,9 @@ claude-code-mirror/
 |       |   |   +-- charts/
 |       |   |       +-- RechartsWrappers.tsx  # 7 Recharts chart components
 |       |   |       +-- SemanticWidgets.tsx   # MoodTimeline, FrustrationAlert, BugRepeatTracker
+|       |   +-- StatusBar/
+|       |   |   +-- StatusBar.tsx            #   Bottom status bar with responsive collapse
+|       |   |   +-- StatusBarGroupButton.tsx #   Reusable dropdown group button for collapsed mode
 |       |   +-- TextSettingsBar/
 |       |       +-- TextSettingsBar.tsx   #   Font size/family/theme controls
 |       +-- styles/
@@ -231,6 +236,9 @@ claude-code-mirror/
 **React Chat UI** - React 18 components for message display, streaming text, tool use blocks, code blocks, image display, and RTL-aware input. The input area supports sending prompts while Claude is busy (interrupt), matching Claude Code CLI behavior. Ctrl+V pastes images from clipboard as base64 attachments (shown as thumbnails above the input, removable before sending). Both Send and Cancel buttons are visible during processing; Escape cancels the current response.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
+**StatusBar (Responsive)** - Bottom status bar extracted into its own component (`StatusBar/StatusBar.tsx`). Uses a `ResizeObserver` hook (`useStatusBarCollapse`) to detect panel width. At full width, all 14 items display inline. Below ~620px, items collapse into two dropdown groups: **"More"** (Feedback, Plans, History, Model, Permissions, Costs, Dashboard) and **"Tools"** (Skills, Trophy, Vitals). Always-visible items: Active Clock, Git, Aa (TextSettings), Tokens. Dropdowns open upward with click-outside dismiss, mutual exclusivity, and Escape key support.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
 **TextSettingsBar** - In-webview UI for adjusting chat text font size, font family, and typing personality theme. Supports Hebrew-friendly font presets and three rendering themes: Terminal Hacker, Retro, and Zen. Settings are stored in Zustand and synced from VS Code configuration on startup and on change.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
@@ -261,8 +269,9 @@ claude-code-mirror/
 **File Mention (@)** - Inline autocomplete triggered by typing `@` in the chat textarea. Searches workspace files via `vscode.workspace.findFiles()` with 150ms debounce, showing results in a popup above the input. Navigate with ArrowUp/Down, select with Enter/Tab/click. Replaces `@query` with the relative file path. Uses custom DOM events for extension-to-webview communication (same pattern as prompt history). All state is local to the `useFileMention` hook (not in Zustand).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/FILE_MENTION.md`
 
-**Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the CLI pauses waiting for stdin input. The extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'`, shows a CLI-matching 4-option approval bar: (1) clear context + bypass permissions, (2) bypass permissions, (3) manually approve edits, (4) type feedback. Option 1 triggers context compaction before proceeding. Option 3 switches to supervised permission mode. Context usage percentage is shown when token data is available. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON. Stale `ExitPlanMode` calls after context compaction (where no `EnterPlanMode` was seen) are auto-approved silently via the `planModeActive` flag.
+**Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'` and shows a CLI-matching 4-option approval bar: (1) clear context + bypass permissions, (2) bypass permissions, (3) manually approve edits, (4) type feedback. For `ExitPlanMode`, approve actions close the bar without sending user messages (the CLI auto-approves via bypassPermissions/allowedTools; sending text would create spurious turns causing infinite loops). Reject/feedback actions send text to the CLI. For `AskUserQuestion`, responses are sent as user messages. Option 1 also triggers context compaction. Option 3 switches to supervised permission mode. Context usage percentage is shown when token data is available. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+> Bug history: `Kingdom_of_Claudes_Beloved_MDs/BUG_EXITPLANMODE_INFINITE_LOOP.md`
 
 **Open Plan Docs** - "Plans" button in the status bar that opens HTML plan documents from both `Kingdom_of_Claudes_Beloved_MDs/` and the project root in the default browser. Files from both locations are merged and sorted by modification time (newest first), with a location tag (Kingdom/Root) in the QuickPick description. Single file opens directly; multiple files show a QuickPick. When no plan documents exist in either location, offers to activate the Plans feature by injecting a "Plan mode" prompt into the project's `CLAUDE.md` (with Hebrew or English language choice). Also available via Command Palette (`claudeMirror.openPlanDocs`).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
@@ -296,6 +305,9 @@ claude-code-mirror/
 
 **Prompt Enhancer** - AI-powered prompt rewriting that improves user prompts before sending. Uses a one-shot `claude -p` CLI call with a meta-prompt applying advanced prompt engineering (scaffolding, structure, context cues). Manual mode: sparkles button or Ctrl+Shift+E opens a comparison panel showing original and enhanced prompts stacked vertically for side-by-side review. Auto mode: intercepts Send, enhances, then auto-sends (falls back to original on failure). Gear popover with auto-enhance toggle and model selector. Configurable via `claudeMirror.promptEnhancer.*` settings.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/PROMPT_ENHANCER.md`
+
+**Codex Consultation** - Consult an external GPT expert (Codex) directly from the chat UI. A "Consult" button in the StatusBar opens an input panel where the user types a question. The question is sent to the Claude CLI session as a structured prompt instructing Claude to enrich it with system context and call the `mcp__codex__codex` MCP tool. The Codex response streams into the chat, and Claude continues development based on the advice.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_CONSULTATION.md`
 
 **File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/DRAG_AND_DROP_CHALLENGE.md`

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 
-const COLLAPSE_THRESHOLD = 620;
-const EXPAND_THRESHOLD = 640;
+const COLLAPSE_THRESHOLD = 900;
+const EXPAND_THRESHOLD = 920;
 
 interface UseStatusBarCollapseReturn {
   barRef: React.RefObject<HTMLDivElement>;

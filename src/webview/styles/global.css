@@ -743,6 +743,116 @@ html, body, #root {
   cursor: not-allowed;
 }
 
+/* --- Codex Consultation Panel --- */
+
+.codex-consult-panel {
+  margin-bottom: 8px;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--vscode-editor-background);
+}
+
+.codex-consult-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--vscode-sideBarSectionHeader-background, #252526);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vscode-editor-foreground);
+}
+
+.codex-consult-title {
+  font-size: 12px;
+}
+
+.codex-consult-close {
+  background: none;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.codex-consult-close:hover {
+  color: var(--vscode-editor-foreground);
+}
+
+.codex-consult-desc {
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.codex-consult-input {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px 10px;
+  align-items: flex-end;
+}
+
+.codex-consult-textarea {
+  flex: 1;
+  min-height: 48px;
+  padding: 6px 10px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12px;
+  resize: vertical;
+  outline: none;
+}
+
+.codex-consult-textarea:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+.codex-consult-send-btn {
+  padding: 6px 14px;
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.codex-consult-send-btn:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+.codex-consult-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --- StatusBar Consult Button --- */
+
+.status-bar-consult-btn {
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 3px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.status-bar-consult-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+
 /* Git Push Toast */
 .git-push-toast {
   display: flex;
@@ -989,6 +1099,106 @@ html, body, #root {
 .status-bar-git-config-btn:hover {
   background: var(--vscode-toolbar-hoverBackground);
   color: var(--vscode-editor-foreground);
+}
+
+/* Status bar responsive collapse */
+.status-bar.status-bar-collapsed {
+  gap: 8px;
+}
+
+.status-bar-group-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.status-bar-group-btn {
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 3px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.status-bar-group-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+
+.status-bar-group-btn.active {
+  color: var(--vscode-textLink-foreground, #3794ff);
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.status-bar-group-dropdown {
+  position: absolute;
+  bottom: 28px;
+  left: 0;
+  min-width: 220px;
+  max-width: 300px;
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 6px;
+  padding: 6px;
+  z-index: 9999;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+  animation: vitalsPopIn 0.15s ease-out;
+}
+
+.status-bar-group-dropdown-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.status-bar-group-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: none;
+  background: none;
+  color: var(--vscode-editor-foreground);
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  text-align: left;
+  width: 100%;
+}
+
+.status-bar-group-dropdown-item:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.status-bar-group-dropdown-item--static {
+  cursor: default;
+}
+
+.status-bar-group-dropdown-item--static:hover {
+  background: none;
+}
+
+.status-bar-group-dropdown-separator {
+  height: 1px;
+  background: var(--vscode-panel-border, #333);
+  margin: 4px 0;
+}
+
+.status-bar-group-dropdown-item .model-selector,
+.status-bar-group-dropdown-item .permission-mode-selector {
+  width: 100%;
+}
+
+.cost-display-collapsed {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  gap: 12px;
 }
 
 /* RTL support */
