@@ -93,6 +93,10 @@ interface AchievementTranslations {
   copied: string;
   shareCardTitle: string;
   shareCardDesc: string;
+  myPublicProfile: string;
+  openPublishedProfile: string;
+  publishToCreateProfile: string;
+  publishedProfileReady: string;
 
   // --- Original 12 achievements ---
   achNightOwlTitle: string;
@@ -292,10 +296,10 @@ const en: AchievementTranslations = {
   enableGithubSync: 'GitHub Sync',
   community: 'Community',
   share: 'Share',
-  connectGitHub: 'Connect with Token',
-  connectGitHubDesc: 'Share your achievements by publishing them to a public GitHub Gist. Create a Personal Access Token (PAT) with only "gist" scope for minimal permissions.',
-  connectPatHelp: 'Create a token with gist scope:',
-  connectPatLink: 'Create PAT on GitHub',
+  connectGitHub: 'Connect with GitHub (No Setup)',
+  connectGitHubDesc: 'Share your achievements by publishing them to a public GitHub Gist. For most users, this is a one-click browser sign-in (Device Flow) with only "gist" access - no settings change and no token paste required.',
+  connectPatHelp: 'Advanced fallback only (if GitHub sign-in is unavailable):',
+  connectPatLink: 'Create gist PAT on GitHub',
   lastSynced: 'Last synced',
   publishNow: 'Publish',
   disconnect: 'Disconnect',
@@ -319,6 +323,10 @@ const en: AchievementTranslations = {
   copied: 'Copied!',
   shareCardTitle: 'Share Your Achievements',
   shareCardDesc: 'Copy a markdown card or badges for your GitHub README.',
+  myPublicProfile: 'My Public Profile',
+  openPublishedProfile: 'Open Published Profile',
+  publishToCreateProfile: 'Publish once to create your public GitHub profile gist.',
+  publishedProfileReady: 'Your public profile is available on GitHub.',
 
   // --- Original 12 ---
   achNightOwlTitle: 'Night Owl',
@@ -518,10 +526,10 @@ const he: AchievementTranslations = {
   enableGithubSync: '\u05E1\u05E0\u05DB\u05E8\u05D5\u05DF GitHub',
   community: '\u05E7\u05D4\u05D9\u05DC\u05D4',
   share: '\u05E9\u05D9\u05EA\u05D5\u05E3',
-  connectGitHub: '\u05D4\u05EA\u05D7\u05D1\u05E8 \u05E2\u05DD \u05D8\u05D5\u05E7\u05DF',
-  connectGitHubDesc: '\u05E9\u05EA\u05E3 \u05D0\u05EA \u05D4\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05E9\u05DC\u05DA \u05E2\u05DC \u05D9\u05D3\u05D9 \u05E4\u05E8\u05E1\u05D5\u05DD \u05DC-GitHub Gist \u05E6\u05D9\u05D1\u05D5\u05E8\u05D9. \u05E6\u05D5\u05E8 Personal Access Token (PAT) \u05E2\u05DD \u05D4\u05E8\u05E9\u05D0\u05EA "gist" \u05D1\u05DC\u05D1\u05D3 \u05DC\u05D4\u05E8\u05E9\u05D0\u05D5\u05EA \u05DE\u05D9\u05E0\u05D9\u05DE\u05DC\u05D9\u05D5\u05EA.',
-  connectPatHelp: '\u05E6\u05D5\u05E8 \u05D8\u05D5\u05E7\u05DF \u05E2\u05DD \u05D4\u05E8\u05E9\u05D0\u05EA gist:',
-  connectPatLink: '\u05E6\u05D5\u05E8 PAT \u05D1-GitHub',
+  connectGitHub: '\u05D4\u05EA\u05D7\u05D1\u05E8 \u05DC-GitHub (\u05DC\u05DC\u05D0 \u05D4\u05D2\u05D3\u05E8\u05D4)',
+  connectGitHubDesc: '\u05E9\u05EA\u05E3 \u05D0\u05EA \u05D4\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05E9\u05DC\u05DA \u05E2\u05DC \u05D9\u05D3\u05D9 \u05E4\u05E8\u05E1\u05D5\u05DD \u05DC-GitHub Gist \u05E6\u05D9\u05D1\u05D5\u05E8\u05D9. \u05DC\u05E8\u05D5\u05D1 \u05D4\u05DE\u05E9\u05EA\u05DE\u05E9\u05D9\u05DD \u05D6\u05D4 \u05D7\u05D9\u05D1\u05D5\u05E8 \u05D3\u05E4\u05D3\u05E4\u05DF \u05D1\u05DC\u05D7\u05D9\u05E6\u05D4 \u05D0\u05D7\u05EA (Device Flow) \u05E2\u05DD \u05D4\u05E8\u05E9\u05D0\u05EA \"gist\" \u05D1\u05DC\u05D1\u05D3 - \u05DC\u05DC\u05D0 \u05E9\u05D9\u05E0\u05D5\u05D9 \u05D4\u05D2\u05D3\u05E8\u05D5\u05EA \u05D5\u05DC\u05DC\u05D0 \u05D4\u05D3\u05D1\u05E7\u05EA \u05D8\u05D5\u05E7\u05DF.',
+  connectPatHelp: '\u05D2\u05D9\u05D1\u05D5\u05D9 \u05DC\u05DE\u05EA\u05E7\u05D3\u05DE\u05D9\u05DD \u05D1\u05DC\u05D1\u05D3 (\u05D0\u05DD \u05D4\u05D7\u05D9\u05D1\u05D5\u05E8 \u05E2\u05DD GitHub \u05DC\u05D0 \u05D6\u05DE\u05D9\u05DF):',
+  connectPatLink: '\u05E6\u05D5\u05E8 PAT \u05E2\u05DD gist \u05D1-GitHub',
   lastSynced: '\u05E1\u05E0\u05DB\u05E8\u05DF \u05D0\u05D7\u05E8\u05D5\u05DF',
   publishNow: '\u05E4\u05E8\u05E1\u05DD',
   disconnect: '\u05E0\u05EA\u05E7',
@@ -545,6 +553,10 @@ const he: AchievementTranslations = {
   copied: '\u05D4\u05D5\u05E2\u05EA\u05E7!',
   shareCardTitle: '\u05E9\u05EA\u05E3 \u05D0\u05EA \u05D4\u05D4\u05D9\u05E9\u05D2\u05D9\u05DD \u05E9\u05DC\u05DA',
   shareCardDesc: '\u05D4\u05E2\u05EA\u05E7 \u05DB\u05E8\u05D8\u05D9\u05E1 Markdown \u05D0\u05D5 \u05EA\u05D2\u05D9\u05DD \u05DC-README \u05E9\u05DC\u05DA \u05D1-GitHub.',
+  myPublicProfile: 'My Public Profile',
+  openPublishedProfile: 'Open Published Profile',
+  publishToCreateProfile: 'Publish once to create your public GitHub profile gist.',
+  publishedProfileReady: 'Your public profile is available on GitHub.',
 
   // --- Original 12 ---
   achNightOwlTitle: '\u05D9\u05E0\u05E9\u05D5\u05E3 \u05DC\u05D9\u05DC\u05D4',

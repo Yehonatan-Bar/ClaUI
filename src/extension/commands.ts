@@ -287,7 +287,7 @@ export function registerCommands(
       }
     }),
 
-    // Open HTML plan documents from Kingdom_of_Claudes_Beloved_MDs in the default browser
+    // Open HTML plan documents from Kingdom_of_Claudes_Beloved_MDs and project root in the default browser
     vscode.commands.registerCommand('claudeMirror.openPlanDocs', async () => {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -298,52 +298,50 @@ export function registerCommands(
       const workspaceRoot = workspaceFolders[0].uri.fsPath;
       const kingdomDir = path.join(workspaceRoot, 'Kingdom_of_Claudes_Beloved_MDs');
 
-      // Collect HTML plan files (if the folder exists)
-      let htmlFiles: string[] = [];
-      if (fs.existsSync(kingdomDir)) {
+      // Collect HTML plan files from both Kingdom dir and project root
+      const planFiles: Array<{ label: string; description: string; filePath: string; mtimeMs: number }> = [];
+
+      const collectHtmlFiles = (dir: string, locationTag: string) => {
+        if (!fs.existsSync(dir)) return;
         try {
-          const allFiles = fs.readdirSync(kingdomDir);
-          htmlFiles = allFiles
-            .filter(f => f.endsWith('.html'))
-            .sort((a, b) => {
-              const aStat = fs.statSync(path.join(kingdomDir, a));
-              const bStat = fs.statSync(path.join(kingdomDir, b));
-              return bStat.mtimeMs - aStat.mtimeMs;
+          const allFiles = fs.readdirSync(dir);
+          for (const f of allFiles) {
+            if (!f.endsWith('.html')) continue;
+            const filePath = path.join(dir, f);
+            const stat = fs.statSync(filePath);
+            planFiles.push({
+              label: f,
+              description: `${locationTag} - ${formatRelativeTime(stat.mtime.toISOString())}`,
+              filePath,
+              mtimeMs: stat.mtimeMs,
             });
-        } catch (err) {
-          vscode.window.showErrorMessage(
-            `Failed to read plan docs folder: ${err instanceof Error ? err.message : String(err)}`
-          );
-          return;
+          }
+        } catch {
+          // Skip directories that can't be read
         }
-      }
+      };
+
+      collectHtmlFiles(kingdomDir, 'Kingdom');
+      collectHtmlFiles(workspaceRoot, 'Root');
+
+      // Sort all collected files by modification time (newest first)
+      planFiles.sort((a, b) => b.mtimeMs - a.mtimeMs);
 
       // No plan documents found - offer to activate the Plans feature
-      if (htmlFiles.length === 0) {
+      if (planFiles.length === 0) {
         await promptPlanFeatureActivation(workspaceRoot, log);
         return;
       }
 
       // Single file: open directly
-      if (htmlFiles.length === 1) {
-        const filePath = path.join(kingdomDir, htmlFiles[0]);
-        log(`Opening single plan doc: ${filePath}`);
-        await vscode.env.openExternal(vscode.Uri.file(filePath));
+      if (planFiles.length === 1) {
+        log(`Opening single plan doc: ${planFiles[0].filePath}`);
+        await vscode.env.openExternal(vscode.Uri.file(planFiles[0].filePath));
         return;
       }
 
       // Multiple files: show QuickPick sorted by modification time
-      const items = htmlFiles.map(f => {
-        const filePath = path.join(kingdomDir, f);
-        const stat = fs.statSync(filePath);
-        return {
-          label: f,
-          description: formatRelativeTime(stat.mtime.toISOString()),
-          filePath,
-        };
-      });
-
-      const picked = await vscode.window.showQuickPick(items, {
+      const picked = await vscode.window.showQuickPick(planFiles, {
         placeHolder: 'Select a plan document to open in browser',
         matchOnDescription: true,
       });

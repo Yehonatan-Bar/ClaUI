@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { t as tAch } from './achievementI18n';
+import { LEVEL_THRESHOLDS } from './levelThresholds';
 import type { CommunityFriendProfilePayload } from '../../../extension/types/webview-messages';
 
 export const CommunityPanel: React.FC = () => {
@@ -40,6 +41,12 @@ export const CommunityPanel: React.FC = () => {
 
   const handlePublish = () => {
     postToExtension({ type: 'githubSync', action: 'publish' });
+  };
+
+  const handleOpenPublishedProfile = () => {
+    const url = githubSyncStatus?.gistUrl;
+    if (!url) return;
+    postToExtension({ type: 'openUrl', url });
   };
 
   const handleAddFriend = () => {
@@ -124,10 +131,26 @@ export const CommunityPanel: React.FC = () => {
             <button className="community-sync-publish-btn" onClick={handlePublish} title={tr.publishNow}>
               {tr.publishNow}
             </button>
+            <button
+              className="community-sync-publish-btn"
+              onClick={handleOpenPublishedProfile}
+              title={tr.openPublishedProfile}
+              disabled={!githubSyncStatus?.gistUrl}
+            >
+              {tr.openPublishedProfile}
+            </button>
             <button className="community-sync-disconnect-btn" onClick={handleDisconnect} title={tr.disconnect}>
               {tr.disconnect}
             </button>
           </div>
+
+          <MyPublicProfileCard
+            profile={achievementProfile}
+            gistUrl={githubSyncStatus?.gistUrl || ''}
+            tr={tr}
+            onPublish={handlePublish}
+            onOpenPublishedProfile={handleOpenPublishedProfile}
+          />
 
           {/* Tabs */}
           <div className="community-tabs">
@@ -230,6 +253,63 @@ export const CommunityPanel: React.FC = () => {
           )}
         </>
       )}
+    </div>
+  );
+};
+
+const MyPublicProfileCard: React.FC<{
+  profile: { totalXp: number; level: number; totalAchievements: number };
+  gistUrl: string;
+  tr: ReturnType<typeof tAch>;
+  onPublish: () => void;
+  onOpenPublishedProfile: () => void;
+}> = ({ profile, gistUrl, tr, onPublish, onOpenPublishedProfile }) => {
+  const currentLevelThreshold = LEVEL_THRESHOLDS[profile.level - 1] ?? 0;
+  const nextLevelThreshold = LEVEL_THRESHOLDS[profile.level] ?? currentLevelThreshold + 1000;
+  const xpInLevel = profile.totalXp - currentLevelThreshold;
+  const xpNeeded = Math.max(1, nextLevelThreshold - currentLevelThreshold);
+  const xpProgress = Math.max(0, Math.min(100, (xpInLevel / xpNeeded) * 100));
+
+  return (
+    <div className="community-my-profile-card">
+      <div className="community-my-profile-header">
+        <strong>{tr.myPublicProfile}</strong>
+        <span className={`community-my-profile-status ${gistUrl ? 'ready' : 'pending'}`}>
+          {gistUrl ? tr.publishedProfileReady : tr.publishToCreateProfile}
+        </span>
+      </div>
+
+      <div className="community-my-profile-metrics">
+        <div className="community-my-metric">
+          <span className="community-my-metric-label">{tr.level}</span>
+          <span className="community-my-metric-value">{profile.level}</span>
+        </div>
+        <div className="community-my-metric">
+          <span className="community-my-metric-label">{tr.xp}</span>
+          <span className="community-my-metric-value">{profile.totalXp.toLocaleString()}</span>
+        </div>
+        <div className="community-my-metric">
+          <span className="community-my-metric-label">{tr.achievementsLabel}</span>
+          <span className="community-my-metric-value">{profile.totalAchievements}</span>
+        </div>
+      </div>
+
+      <div className="community-my-profile-xp-bar" aria-hidden="true">
+        <div className="community-my-profile-xp-fill" style={{ width: `${xpProgress}%` }} />
+      </div>
+
+      <div className="community-my-profile-actions">
+        <button className="community-my-profile-btn primary" onClick={onPublish}>
+          {tr.publishNow}
+        </button>
+        <button
+          className="community-my-profile-btn"
+          onClick={onOpenPublishedProfile}
+          disabled={!gistUrl}
+        >
+          {tr.openPublishedProfile}
+        </button>
+      </div>
     </div>
   );
 };

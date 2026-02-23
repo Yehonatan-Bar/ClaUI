@@ -101,7 +101,7 @@ export const ShareCard: React.FC = () => {
 
         {!connected && (
           <p style={{ fontSize: 11, opacity: 0.5, marginTop: 10, textAlign: 'center' }}>
-            Connect GitHub via the Community panel to enable sharing.
+            Connect GitHub in the Community panel to enable sharing (no manual setup for most users).
           </p>
         )}
       </div>

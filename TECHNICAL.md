@@ -83,7 +83,7 @@ claude-code-mirror/
 |   |   |   +-- AchievementEngine.ts      #   Game logic (files, languages, error cycles, goals)
 |   |   |   +-- AchievementService.ts     #   Lifecycle bridge, streaks, tiers, AI insight wiring, GitHub auto-sync
 |   |   |   +-- AchievementInsightAnalyzer.ts #  Sonnet CLI spawn for session analysis (once/day)
-|   |   |   +-- GitHubSyncService.ts     #   GitHub auth, Gist CRUD, friend lookup, badge generation, 15min cache
+|   |   |   +-- GitHubSyncService.ts     #   GitHub PAT auth (SecretStorage), Gist CRUD, friend lookup, badge generation, auto-reconnect
 |   |   +-- types/
 |   |       +-- stream-json.ts            #   CLI protocol type definitions
 |   |       +-- webview-messages.ts       #   postMessage contract
@@ -264,7 +264,7 @@ claude-code-mirror/
 **Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the CLI pauses waiting for stdin input. The extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'`, shows a CLI-matching 4-option approval bar: (1) clear context + bypass permissions, (2) bypass permissions, (3) manually approve edits, (4) type feedback. Option 1 triggers context compaction before proceeding. Option 3 switches to supervised permission mode. Context usage percentage is shown when token data is available. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON. Stale `ExitPlanMode` calls after context compaction (where no `EnterPlanMode` was seen) are auto-approved silently via the `planModeActive` flag.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**Open Plan Docs** - "Plans" button in the status bar that opens HTML plan documents from `Kingdom_of_Claudes_Beloved_MDs/` in the default browser. Single file opens directly; multiple files show a QuickPick sorted by modification time. When no plan documents exist, offers to activate the Plans feature by injecting a "Plan mode" prompt into the project's `CLAUDE.md` (with Hebrew or English language choice). Also available via Command Palette (`claudeMirror.openPlanDocs`).
+**Open Plan Docs** - "Plans" button in the status bar that opens HTML plan documents from both `Kingdom_of_Claudes_Beloved_MDs/` and the project root in the default browser. Files from both locations are merged and sorted by modification time (newest first), with a location tag (Kingdom/Root) in the QuickPick description. Single file opens directly; multiple files show a QuickPick. When no plan documents exist in either location, offers to activate the Plans feature by injecting a "Plan mode" prompt into the project's `CLAUDE.md` (with Hebrew or English language choice). Also available via Command Palette (`claudeMirror.openPlanDocs`).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Editable Prompts** - Users can edit previously sent messages by hovering over a user message and clicking "Edit". The message content switches to an inline textarea. On send, all messages from the edit point onward are removed from the UI, the current CLI session is stopped, a new session starts, and the edited prompt is sent as the first message. Only text-only user messages are editable (not images). The edit button is hidden while the assistant is busy.
