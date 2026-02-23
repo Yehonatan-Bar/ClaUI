@@ -55,7 +55,7 @@ Extension (Node.js)                    Webview (React)
 | AchievementEngine.ts | `src/extension/achievements/` | Core game logic: tracks bug fixes, test passes, streaks, language detection, cancel counts, session goals, file paths, frontend/backend classification, error cycles, config file detection, markdown file counting |
 | AchievementService.ts | `src/extension/achievements/` | Bridge between Engine+Store and webview messaging. Handles daily streaks, cross-session tier achievements (bug-slayer, test-master, edit-veteran, session milestones, time-investor, streak tiers), AI insight integration, auto-sync to GitHub |
 | AchievementInsightAnalyzer.ts | `src/extension/achievements/` | Spawns Sonnet CLI once per day for deeper session analysis. Returns quality, insight, coding pattern, XP bonus |
-| GitHubSyncService.ts | `src/extension/achievements/` | GitHub auth (VS Code authentication API), Gist CRUD (create/update public gist), friend lookup by username convention, badge generation (shields.io + markdown table), 15min friend cache, globalState persistence |
+| GitHubSyncService.ts | `src/extension/achievements/` | GitHub auth via OAuth Device Flow (preferred) with PAT fallback, token storage in VS Code SecretStorage, Gist CRUD (create/update public gist), friend lookup by username convention, badge generation (shields.io + markdown table), 15min friend cache, auto-reconnect on activation, globalState persistence |
 
 ### Webview Frontend
 
@@ -296,6 +296,7 @@ All UI strings are translated:
 | `claudeMirror.achievements.sound` | `false` | Play sound on achievement toast |
 | `claudeMirror.achievements.aiInsight` | `true` | Enable AI-powered session insights (once per day) |
 | `claudeMirror.achievements.githubSync` | `false` | Auto-sync achievements to GitHub Gist after each session |
+| `claudeMirror.achievements.githubOAuthClientId` | publisher-provided client ID | GitHub OAuth App Client ID for browser-based sign-in (Device Flow). Published builds can ship a default so users do not need manual setup. Override for custom/self-hosted OAuth apps. If empty, connect falls back to PAT input |
 
 ## State Flow
 
@@ -314,11 +315,13 @@ Social sharing layer for achievements using GitHub Gists. No backend server need
 
 ### How It Works
 
-1. **Authentication**: Uses VS Code's built-in `vscode.authentication.getSession('github', ['gist'])` -- prompts user to sign in via GitHub
-2. **Publishing**: Creates/updates a public Gist with description `"ClaUi Developer Achievements"` and filename `claui-achievements.json`
-3. **Discovery**: Friends are found by convention -- `GET /users/{username}/gists` and filter by description
-4. **Auto-sync**: After each session end, if `githubSync` setting is enabled and user is connected
-5. **Badges**: Uses shields.io dynamic badges pointing to the raw Gist URL
+1. **Authentication (preferred)**: Uses GitHub OAuth Device Flow with only `gist` scope. In published builds, the extension can ship a default OAuth App Client ID so users can click Connect without any manual settings step. GitHub opens in the browser, the user approves access, and the extension polls for the access token. The token is stored securely in VS Code's encrypted `SecretStorage` and persists across restarts (auto-reconnect on activation).
+2. **PAT fallback**: If `claudeMirror.achievements.githubOAuthClientId` is not configured, connect falls back to PAT input (`gist` scope only) using VS Code password input. PAT is validated the same way (`GET /user` + `x-oauth-scopes`) and stored in `SecretStorage`.
+3. **Publishing**: Creates/updates a public Gist with description `"ClaUi Developer Achievements"` and filename `claui-achievements.json`
+4. **Discovery**: Friends are found by convention -- `GET /users/{username}/gists` and filter by description
+5. **Auto-sync**: After each session end, if `githubSync` setting is enabled and user is connected
+6. **Badges**: Uses shields.io dynamic badges pointing to the raw Gist URL
+7. **Auto-reconnect**: On extension activation, if a stored GitHub token exists in `SecretStorage`, the service validates it against `GET /user` and restores the connection silently. Revoked tokens are cleaned up; network errors preserve the stored token for next restart.
 
 ### ShareableProfile Schema
 
@@ -345,12 +348,16 @@ interface ShareableProfile {
 
 ### Key Design Decisions
 
+- **Minimal permissions** -- Uses GitHub OAuth Device Flow requesting only `gist` scope (PAT fallback also requires only `gist`)
+- **Better UX** -- Primary connect flow is browser-based GitHub sign-in (Device Flow), so most users do not need to create or paste a PAT
+- **Persistent auth** -- OAuth/PAT token stored in VS Code's encrypted SecretStorage; auto-reconnects on restart
 - **Opt-in only** -- `githubSync` defaults to `false`; user must explicitly connect
 - **Silent sync** -- Network failures never break the extension; local data is always source of truth
 - **15min cache** -- Friend profiles cached to respect GitHub rate limits (60/hr unauthenticated)
 - **Schema versioning** -- `version: 1` field enables future backward-compatible changes
 - **Discovery by convention** -- Gist description "ClaUi Developer Achievements" eliminates need for a registry
 - **CSP updated** -- `img-src` allows `https://avatars.githubusercontent.com` for friend avatars
+- **Scope validation** -- On connect, checks `x-oauth-scopes` header to verify the token has `gist` scope before accepting it
 
 ### Message Types (10 new)
 

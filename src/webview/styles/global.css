@@ -2808,9 +2808,9 @@ html, body, #root {
   border-radius: 3px;
   color: var(--vscode-descriptionForeground);
   cursor: pointer;
-  padding: 1px 6px;
-  font-size: 11px;
-  line-height: 1.4;
+  padding: 1px 5px;
+  font-size: 15px;
+  line-height: 1;
   transition: color 0.15s, border-color 0.15s;
 }
 
@@ -3803,6 +3803,12 @@ html, body, #root {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.community-sync-publish-btn:disabled,
+.community-sync-disconnect-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .community-sync-disconnect-btn {
   border-color: rgba(244, 67, 54, 0.3);
   color: #ef9a9a;
@@ -3810,6 +3816,121 @@ html, body, #root {
 
 .community-sync-disconnect-btn:hover {
   background: rgba(244, 67, 54, 0.1);
+}
+
+/* My public profile card */
+.community-my-profile-card {
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(55, 148, 255, 0.06), rgba(255, 255, 255, 0.02));
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.community-my-profile-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.community-my-profile-header strong {
+  font-size: 13px;
+}
+
+.community-my-profile-status {
+  font-size: 11px;
+  opacity: 0.75;
+  text-align: right;
+}
+
+.community-my-profile-status.ready {
+  color: #9fd4ff;
+  opacity: 1;
+}
+
+.community-my-profile-status.pending {
+  color: var(--vscode-descriptionForeground, #aaa);
+}
+
+.community-my-profile-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.community-my-metric {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 6px 8px;
+}
+
+.community-my-metric-label {
+  display: block;
+  font-size: 10px;
+  opacity: 0.65;
+  margin-bottom: 2px;
+}
+
+.community-my-metric-value {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.community-my-profile-xp-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.community-my-profile-xp-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4caf50, #42a5f5, #7e57c2);
+  transition: width 0.25s ease;
+}
+
+.community-my-profile-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.community-my-profile-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--vscode-editor-foreground, #e6edf3);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.community-my-profile-btn.primary {
+  border-color: rgba(55, 148, 255, 0.35);
+  color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.community-my-profile-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.community-my-profile-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .community-my-profile-metrics {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Tabs */

@@ -300,6 +300,11 @@
           "default": false,
           "description": "Automatically sync achievements to a public GitHub Gist after each session. Enables the Community feature for sharing and comparing achievements with other developers."
         },
+        "claudeMirror.achievements.githubOAuthClientId": {
+          "type": "string",
+          "default": "Ov23liUl2uzLluowvRCS",
+          "description": "GitHub OAuth App client ID for browser-based GitHub sign-in (Device Flow) used by Community sharing. Request only the gist scope. Can be overridden for custom/self-hosted OAuth apps. Leave empty to use PAT fallback."
+        },
         "claudeMirror.srPtdAutoInject": {
           "type": "boolean",
           "default": true,
