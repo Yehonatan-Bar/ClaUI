@@ -23,18 +23,17 @@ A full-screen overlay dashboard inside the chat webview with two modes: **Sessio
 
 ### Webview-side
 - `src/webview/components/Dashboard/DashboardPanel.tsx` - Root overlay (Session/Project toggle, tab nav, header, close)
-- `src/webview/components/Dashboard/MetricsCards.tsx` - 8-card summary (cost, turns, tools, errors, durations)
+- `src/webview/components/Dashboard/MetricsCards.tsx` - 6-card summary (turns, tools, errors, durations)
 - `src/webview/components/Dashboard/TurnTable.tsx` - Sortable paginated table (15 rows/page)
 - `src/webview/components/Dashboard/dashboardUtils.ts` - Colors, helpers, command categorization
-- `src/webview/components/Dashboard/charts/RechartsWrappers.tsx` - 7 Recharts components
+- `src/webview/components/Dashboard/charts/RechartsWrappers.tsx` - 6 Recharts components
 - `src/webview/components/Dashboard/charts/SemanticWidgets.tsx` - MoodTimeline, FrustrationAlert, BugRepeatTracker
 - `src/webview/components/Dashboard/tabs/` - Session tabs (6) + Project tabs (4)
 
 ## Session Mode (6 Tabs)
 
 ### Overview
-- 8 metric cards (cost, turns, avg cost, error rate, total tool uses, top tool, shell commands, avg duration)
-- Cost area chart (cumulative + per-turn)
+- 6 metric cards (turns, error rate, total tool uses, top tool, shell commands, avg duration)
 - Duration bar per turn (colored by category)
 - Tool frequency horizontal bar (top 15)
 - Turn category donut chart
@@ -70,8 +69,7 @@ A full-screen overlay dashboard inside the chat webview with two modes: **Sessio
 ## Project Mode (4 Tabs)
 
 ### Project Overview
-- 8 aggregated metric cards (total sessions, total cost, total turns, total tool uses, avg session cost, overall error rate, most used model, avg session duration)
-- Cost per session bar chart
+- 6 aggregated metric cards (total sessions, total turns, total tool uses, overall error rate, most used model, avg session duration)
 - Turns per session bar chart
 - Aggregated tool frequency horizontal bar (top 15, all sessions combined)
 - Aggregated category distribution donut (all sessions combined)
@@ -79,7 +77,7 @@ A full-screen overlay dashboard inside the chat webview with two modes: **Sessio
 
 ### Project Sessions
 - Text search filter on session name
-- Sortable table: Name, Date, Model, Turns, Cost, Errors, Duration, Top Tool
+- Sortable table: Name, Date, Model, Turns, Errors, Duration, Top Tool
 - Default sort: date descending (most recent first)
 - Expandable rows showing: token breakdown, tool frequency list, category distribution
 
@@ -98,7 +96,7 @@ A full-screen overlay dashboard inside the chat webview with two modes: **Sessio
 
 Pre-aggregated session analytics (~500 bytes per session) stored in `ProjectAnalyticsStore`.
 
-**Fields:** sessionId, sessionName, model, startedAt, endedAt, durationMs, totalCostUsd, totalTurns, totalErrors, totalToolUses, totalInputTokens, totalOutputTokens, totalCacheCreationTokens, totalCacheReadTokens, totalBashCommands, toolFrequency, categoryDistribution, taskTypeDistribution, avgCostPerTurn, avgDurationMs, errorRate.
+**Fields:** sessionId, sessionName, model, startedAt, endedAt, durationMs, totalTurns, totalErrors, totalToolUses, totalInputTokens, totalOutputTokens, totalCacheCreationTokens, totalCacheReadTokens, totalBashCommands, toolFrequency, categoryDistribution, taskTypeDistribution, avgDurationMs, errorRate.
 
 ### Data Flow
 

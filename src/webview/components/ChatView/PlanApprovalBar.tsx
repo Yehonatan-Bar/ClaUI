@@ -213,7 +213,7 @@ export const PlanApprovalBar: React.FC = () => {
               key={i}
               className={`question-option-btn ${selectedOptions.has(opt.label) ? 'selected' : ''}`}
               onClick={() => handleOptionClick(opt.label)}
-              title={opt.description || undefined}
+              data-tooltip={opt.description || undefined}
             >
               {questionData.multiSelect && (
                 <span className="question-checkbox">

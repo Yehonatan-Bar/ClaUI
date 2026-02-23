@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import type { SessionSummary } from '../../../../extension/types/webview-messages';
-import { DASH_COLORS, formatCost, formatDuration, formatTokens } from '../dashboardUtils';
+import { DASH_COLORS, formatDuration, formatTokens } from '../dashboardUtils';
 
 interface ProjectSessionsTabProps {
   sessions: SessionSummary[];
 }
 
-type SortKey = 'name' | 'date' | 'model' | 'turns' | 'cost' | 'errors' | 'duration' | 'topTool';
+type SortKey = 'name' | 'date' | 'model' | 'turns' | 'errors' | 'duration' | 'topTool';
 
 function getTopTool(toolFrequency: Record<string, number>): string {
   const entries = Object.entries(toolFrequency);
@@ -25,8 +25,6 @@ function getSortValue(session: SessionSummary, key: SortKey): string | number {
       return (session.model || '').toLowerCase();
     case 'turns':
       return session.totalTurns;
-    case 'cost':
-      return session.totalCostUsd;
     case 'errors':
       return session.totalErrors;
     case 'duration':
@@ -66,7 +64,6 @@ const columns: { key: SortKey; label: string }[] = [
   { key: 'date', label: 'Date' },
   { key: 'model', label: 'Model' },
   { key: 'turns', label: 'Turns' },
-  { key: 'cost', label: 'Cost' },
   { key: 'errors', label: 'Errors' },
   { key: 'duration', label: 'Duration' },
   { key: 'topTool', label: 'Top Tool' },
@@ -201,7 +198,6 @@ export const ProjectSessionsTab: React.FC<ProjectSessionsTabProps> = ({ sessions
                     <td style={tdStyle}>{new Date(session.startedAt).toLocaleDateString()}</td>
                     <td style={tdStyle}>{session.model}</td>
                     <td style={tdStyle}>{session.totalTurns}</td>
-                    <td style={tdStyle}>{formatCost(session.totalCostUsd)}</td>
                     <td style={{ ...tdStyle, color: session.totalErrors > 0 ? DASH_COLORS.red : DASH_COLORS.text }}>
                       {session.totalErrors}
                     </td>

@@ -86,7 +86,7 @@ export const PromptHistoryPanel: React.FC = () => {
       <div className="prompt-history-panel" onClick={(e) => e.stopPropagation()}>
         <div className="prompt-history-header">
           <span className="prompt-history-title">Prompt History</span>
-          <button className="prompt-history-close" onClick={close} title="Close (Esc)">
+          <button className="prompt-history-close" onClick={close} data-tooltip="Close (Esc)">
             x
           </button>
         </div>
@@ -123,7 +123,7 @@ export const PromptHistoryPanel: React.FC = () => {
                 key={`${activeTab}-${i}`}
                 className="prompt-history-item"
                 onClick={() => handleSelect(prompt)}
-                title={prompt}
+                data-tooltip={prompt}
               >
                 <span className="prompt-history-item-text">{prompt}</span>
               </button>

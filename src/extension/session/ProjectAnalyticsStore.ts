@@ -19,14 +19,22 @@ export class ProjectAnalyticsStore {
     if (!Array.isArray(raw)) {
       return [];
     }
-    // Filter out corrupt entries that lack required fields
-    const sessions = raw.filter(
-      (s): s is SessionSummary =>
-        !!s &&
-        typeof (s as SessionSummary).sessionId === 'string' &&
-        typeof (s as SessionSummary).endedAt === 'string'
-    );
-    return [...sessions].sort(
+    // Filter out corrupt entries and normalize legacy summaries (missing provider => Claude)
+    const sessions: SessionSummary[] = [];
+    for (const s of raw) {
+      if (!s || typeof s !== 'object') {
+        continue;
+      }
+      const candidate = s as Partial<SessionSummary>;
+      if (typeof candidate.sessionId !== 'string' || typeof candidate.endedAt !== 'string') {
+        continue;
+      }
+      sessions.push({
+        ...(candidate as SessionSummary),
+        provider: candidate.provider === 'codex' ? 'codex' : 'claude',
+      });
+    }
+    return sessions.sort(
       (a, b) => new Date(b.endedAt).getTime() - new Date(a.endedAt).getTime()
     );
   }

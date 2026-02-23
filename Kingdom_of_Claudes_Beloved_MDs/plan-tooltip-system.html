@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaUi - Tooltip System Plan</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    line-height: 1.7;
+    padding: 40px 20px;
+  }
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 28px;
+    color: #00d2ff;
+    border-bottom: 2px solid #00d2ff33;
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+  }
+  h2 {
+    font-size: 20px;
+    color: #7ec8e3;
+    margin-top: 32px;
+    margin-bottom: 12px;
+  }
+  p { margin-bottom: 14px; }
+  .card {
+    background: #16213e;
+    border: 1px solid #0f3460;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .highlight {
+    background: #0f3460;
+    border-right: 4px solid #00d2ff;
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 16px;
+  }
+  ul { padding-right: 24px; margin-bottom: 14px; }
+  li { margin-bottom: 6px; }
+  .badge {
+    display: inline-block;
+    background: #00d2ff22;
+    color: #00d2ff;
+    border: 1px solid #00d2ff44;
+    border-radius: 12px;
+    padding: 2px 10px;
+    font-size: 13px;
+    margin-left: 6px;
+  }
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    padding: 0;
+  }
+  .steps li {
+    counter-increment: step;
+    padding: 10px 16px 10px 0;
+    border-bottom: 1px solid #0f346044;
+    position: relative;
+  }
+  .steps li::before {
+    content: counter(step);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: #00d2ff;
+    color: #1a1a2e;
+    border-radius: 50%;
+    font-weight: bold;
+    font-size: 14px;
+    margin-left: 12px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+  }
+  th, td {
+    padding: 8px 12px;
+    text-align: right;
+    border-bottom: 1px solid #0f3460;
+  }
+  th {
+    background: #0f3460;
+    color: #7ec8e3;
+    font-weight: 600;
+  }
+  .summary-box {
+    background: linear-gradient(135deg, #0f3460, #16213e);
+    border: 1px solid #00d2ff44;
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 32px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>ClaUi - מערכת Tooltip גלובלית</h1>
+
+<div class="highlight">
+  <strong>מטרה:</strong> להחליף את כל ההסברים המפוזרים בממשק (טקסט רגיל של הדפדפן, או חסרים לגמרי) במערכת אחידה ויפה שמשתלבת עם עיצוב VS Code.
+</div>
+
+<h2>מצב קיים</h2>
+<div class="card">
+  <p>כיום הממשק מכיל כ-137 אלמנטים אינטראקטיביים (כפתורים, שדות, תפריטים). מתוכם:</p>
+  <table>
+    <tr><th>מצב</th><th>כמות</th><th>תיאור</th></tr>
+    <tr><td>עם הסבר בסיסי</td><td>~60</td><td>טולטיפ של הדפדפן - פשוט, לא מעוצב, מופיע באיחור</td></tr>
+    <tr><td>ללא הסבר כלל</td><td>~77</td><td>המשתמש לא יודע מה הכפתור עושה עד שלוחץ</td></tr>
+  </table>
+  <p>כל רכיב מטפל בהסברים בצורה שונה - אין אחידות.</p>
+</div>
+
+<h2>הפתרון המוצע</h2>
+<div class="card">
+  <p>מנגנון מרכזי אחד שמאזין לתנועות העכבר בכל הממשק. כשהעכבר נח על אלמנט שיש לו הסבר מוגדר - מוצג חלונית הסבר מעוצבת.</p>
+  <ul>
+    <li><strong>השהיית הופעה:</strong> 400 מילישניות - מונע הצפה כשמזיזים עכבר מהר</li>
+    <li><strong>מיקום חכם:</strong> מופיע מעל האלמנט, אם אין מקום - יורד מתחת. לא יוצא מגבולות המסך</li>
+    <li><strong>אנימציה חלקה:</strong> כניסה ויציאה עדינות (150 מילישניות)</li>
+    <li><strong>עיצוב אחיד:</strong> משתמש בצבעים של VS Code - משתלב עם כל ערכת נושא</li>
+    <li><strong>נגישות:</strong> תואם לקוראי מסך</li>
+  </ul>
+</div>
+
+<h2>שלבי ביצוע</h2>
+<ol class="steps">
+  <li>יצירת רכיב הטולטיפ המרכזי - קובץ חדש אחד</li>
+  <li>הוספת עיצוב (כ-25 שורות) לקובץ העיצוב הקיים</li>
+  <li>חיבור הרכיב לממשק הראשי</li>
+  <li>בדיקה ראשונית עם שורת הסטטוס (הרכיב עם הכי הרבה כפתורים)</li>
+  <li>העברת כל 24 קבצי הרכיבים למערכת החדשה</li>
+  <li>הוספת הסברים ל-40 אלמנטים שחסר להם טקסט</li>
+  <li>בנייה, התקנה ובדיקה מלאה</li>
+  <li>עדכון תיעוד</li>
+</ol>
+
+<h2>היקף השינוי</h2>
+<div class="card">
+  <table>
+    <tr><th>פעולה</th><th>כמות</th></tr>
+    <tr><td>קובץ חדש</td><td>1</td></tr>
+    <tr><td>קבצים שנערכים</td><td>26</td></tr>
+    <tr><td>הסברים שמועברים למערכת חדשה</td><td>~67</td></tr>
+    <tr><td>הסברים חדשים שנוספים</td><td>~40</td></tr>
+  </table>
+</div>
+
+<h2>מה לא משתנה</h2>
+<div class="card">
+  <ul>
+    <li>הטולטיפ המיוחד של ציר הזמן (Timeline) - נשאר כמו שהוא, לא מפריע</li>
+    <li>הסברים בתוך קישורים וקבצים בצ'אט - נשארים במנגנון הדפדפן</li>
+    <li>טולטיפים של גרפים בדשבורד - מערכת נפרדת לחלוטין</li>
+  </ul>
+</div>
+
+<div class="summary-box">
+  <h2 style="margin-top:0">סיכום</h2>
+  <p>שינוי זה יוסיף מערכת הסברים מקצועית ואחידה לכל הממשק. המשתמש יוכל לרחף על כל כפתור ולקבל הסבר ברור על מה הוא עושה - בעיצוב שמשתלב עם VS Code, עם אנימציה חלקה ומיקום חכם שלא יוצא מגבולות המסך.</p>
+  <p>ההשפעה על ביצועים: מינימלית - מדובר במאזין אחד ברמת המסמך ואלמנט יחיד שמוצג בכל רגע נתון.</p>
+</div>
+
+</div>
+</body>
+</html>

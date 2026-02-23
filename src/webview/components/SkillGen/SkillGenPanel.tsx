@@ -81,7 +81,7 @@ export const SkillGenPanel: React.FC = () => {
         {/* Header */}
         <div className="skillgen-panel-header">
           <span className="skillgen-panel-title">Skill Generation</span>
-          <button className="skillgen-close-btn" onClick={handleClose} title="Close">
+          <button className="skillgen-close-btn" onClick={handleClose} data-tooltip="Close">
             x
           </button>
         </div>
@@ -125,7 +125,7 @@ export const SkillGenPanel: React.FC = () => {
               className="skillgen-btn skillgen-btn-generate"
               onClick={handleGenerate}
               disabled={!skillGenEnabled || skillGenPendingDocs === 0}
-              title={!skillGenEnabled ? 'Enable skill generation first' : skillGenPendingDocs === 0 ? 'No pending documents' : 'Generate skills now'}
+              data-tooltip={!skillGenEnabled ? 'Enable skill generation first' : skillGenPendingDocs === 0 ? 'No pending documents' : 'Generate skills now'}
             >
               Generate Now
             </button>

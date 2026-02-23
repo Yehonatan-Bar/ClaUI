@@ -33,11 +33,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
     : [{ type: 'text', text: String(message.content) }];
 
   const textContent = extractTextContent(contentBlocks);
+  const providerCapabilities = useAppStore((s) => s.providerCapabilities);
 
   // Only text-only user messages are editable (not images)
   const hasOnlyText = isUser && contentBlocks.every((b) => b.type === 'text');
   const canEdit = hasOnlyText && !isBusy && !!onEditAndResend;
-  const canFork = isUser && hasOnlyText && !!onFork;
+  const canFork = isUser && hasOnlyText && !!onFork && providerCapabilities.supportsFork;
 
   // Translation state from store
   const translations = useAppStore((s) => s.translations);
@@ -162,7 +163,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
           <button
             className="copy-message-btn"
             onClick={handleCopy}
-            title="Copy to clipboard"
+            data-tooltip="Copy to clipboard"
           >
             {copied ? 'Copied!' : 'Copy'}
           </button>
@@ -171,7 +172,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
           <button
             className="edit-message-btn"
             onClick={handleEditClick}
-            title="Edit and resend this message"
+            data-tooltip="Edit and resend this message"
           >
             Edit
           </button>
@@ -180,16 +181,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
           <button
             className="fork-message-btn"
             onClick={() => onFork!(message.id, textContent)}
-            title="Fork conversation from this message"
+            data-tooltip="Fork conversation from this message"
           >
             Fork
           </button>
         )}
-        {!isUser && textContent && (
+        {!isUser && textContent && providerCapabilities.supportsTranslation && (
           <button
             className={`translate-message-btn${isShowingTranslation ? ' showing-translation' : ''}${isTranslating ? ' translating' : ''}`}
             onClick={handleTranslate}
-            title={isShowingTranslation ? 'Show original' : `Translate to ${translationLanguage}`}
+            data-tooltip={isShowingTranslation ? 'Show original' : `Translate to ${translationLanguage}`}
             disabled={isTranslating}
           >
             {isTranslating ? 'Translating...' : isShowingTranslation ? 'Original' : translationLanguage}
@@ -208,10 +209,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
             rows={3}
           />
           <div className="edit-message-buttons">
-            <button className="edit-message-send" onClick={handleEditSend} disabled={!editText.trim()}>
+            <button className="edit-message-send" onClick={handleEditSend} disabled={!editText.trim()} data-tooltip="Send edited message">
               Send
             </button>
-            <button className="edit-message-cancel" onClick={handleEditCancel}>
+            <button className="edit-message-cancel" onClick={handleEditCancel} data-tooltip="Cancel editing">
               Cancel
             </button>
           </div>

@@ -1,13 +1,12 @@
 import React from 'react';
 import type { TurnRecord } from '../../../../extension/types/webview-messages';
 import { MetricsCards } from '../MetricsCards';
-import { CostAreaChart, ToolFrequencyBar, CategoryDonut, DurationBar } from '../charts/RechartsWrappers';
+import { ToolFrequencyBar, CategoryDonut, DurationBar } from '../charts/RechartsWrappers';
 import { MoodTimeline, FrustrationAlert } from '../charts/SemanticWidgets';
 import { DASH_COLORS } from '../dashboardUtils';
 
 interface OverviewTabProps {
   turnHistory: TurnRecord[];
-  totalCostUsd: number;
 }
 
 const chartCardStyle = {
@@ -24,7 +23,7 @@ const chartTitleStyle = {
   marginBottom: '12px',
 };
 
-export const OverviewTab: React.FC<OverviewTabProps> = ({ turnHistory, totalCostUsd }) => {
+export const OverviewTab: React.FC<OverviewTabProps> = ({ turnHistory }) => {
   if (turnHistory.length === 0) {
     return (
       <div style={{ color: DASH_COLORS.textMuted, textAlign: 'center', padding: '48px', fontSize: '14px' }}>
@@ -35,14 +34,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ turnHistory, totalCost
 
   return (
     <div>
-      <MetricsCards turnHistory={turnHistory} totalCostUsd={totalCostUsd} />
+      <MetricsCards turnHistory={turnHistory} />
 
-      {/* Row 1: Cost + Mood */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-        <div style={chartCardStyle}>
-          <div style={chartTitleStyle}>Cost per Turn</div>
-          <CostAreaChart turnHistory={turnHistory} />
-        </div>
+      {/* Row 1: Duration */}
+      <div style={{ marginBottom: '16px' }}>
         <div style={chartCardStyle}>
           <div style={chartTitleStyle}>Duration per Turn</div>
           <DurationBar turnHistory={turnHistory} />

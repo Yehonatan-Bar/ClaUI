@@ -139,7 +139,7 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = React.memo(
           className={`weather-icon weather-${weather.mood}`}
           onMouseDown={onMouseDown}
           onClick={handleClick}
-          title={WEATHER_LABELS[weather.mood]}
+          data-tooltip={WEATHER_LABELS[weather.mood]}
           style={{ cursor: dragRef.current?.moved ? 'grabbing' : 'grab' }}
         >
           <span className="weather-symbol">{WEATHER_SYMBOLS[weather.mood]}</span>

@@ -22,7 +22,7 @@ export const MoodTimeline: React.FC<MoodTimelineProps> = ({ turnHistory }) => {
             return (
               <span
                 key={idx}
-                title={`Turn ${idx + 1} - no analysis`}
+                data-tooltip={`Turn ${idx + 1} - no analysis`}
                 style={{
                   display: 'inline-block',
                   width: '16px',
@@ -41,7 +41,7 @@ export const MoodTimeline: React.FC<MoodTimelineProps> = ({ turnHistory }) => {
           return (
             <span
               key={idx}
-              title={`Turn ${idx + 1} | ${sem.taskType} | ${sem.taskOutcome} | confidence: ${(sem.confidence * 100).toFixed(0)}%`}
+              data-tooltip={`Turn ${idx + 1} | ${sem.taskType} | ${sem.taskOutcome} | confidence: ${(sem.confidence * 100).toFixed(0)}%`}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',

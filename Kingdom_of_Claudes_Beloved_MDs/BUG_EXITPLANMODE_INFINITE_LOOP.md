@@ -2,187 +2,212 @@
 
 ## Summary
 
-When the model called `ExitPlanMode` and the user approved the plan, the system entered an infinite loop: model calls ExitPlanMode, extension sends approval text, model calls ExitPlanMode again, endlessly. The user could never exit plan mode and start implementation.
+When the model calls `ExitPlanMode` and the user approves the plan, the system should let the model continue implementing. Instead, multiple code paths can re-trigger the approval bar or send spurious user messages to the CLI, causing the model to call ExitPlanMode again.
 
-**Date Fixed**: 2026-02-23
-**Severity**: Critical (completely blocked plan mode workflow)
-**File Modified**: `src/extension/webview/MessageHandler.ts`
-
----
-
-## Symptom
-
-User session transcript showed this repeating pattern:
-
-```
-Assistant: [creates plan, calls ExitPlanMode]
-User: "Yes, proceed with the plan."
-Assistant: [calls ExitPlanMode again with identical allowedPrompts]
-User: "Yes, proceed with the plan."
-Assistant: [calls ExitPlanMode again]
-... repeats indefinitely ...
-```
-
-At one point, the model managed to read some files (Read tool works in plan mode) but then immediately called ExitPlanMode again. The model itself recognized the problem:
-
-> "I see the system is still in plan mode. The plan is already complete and you've approved it."
-
-But could not break out of the loop.
+**Date First Fixed**: 2026-02-23
+**Date Second Fix**: 2026-02-23
+**Severity**: Critical (blocks plan mode workflow)
+**Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`
 
 ---
 
-## Root Cause
+## Root Cause (Original)
 
 **The extension sent `"Yes, proceed with the plan."` as a user message to the CLI stdin.** This was the fundamental error.
 
-### Why this is wrong
+The CLI auto-approves `ExitPlanMode` internally (via `bypassPermissions` or `allowedTools`). Sending a user message creates a spurious conversation turn that causes the model to call ExitPlanMode again.
 
-The CLI is launched with either:
-- `--permission-mode bypassPermissions` (full-access mode)
-- `--allowedTools ...ExitPlanMode...` (supervised mode)
+The original fix removed auto-approve logic and made ExitPlanMode approve actions close the bar without sending text.
 
-In both cases, the CLI **auto-approves** `ExitPlanMode` internally. The model calls the tool, the CLI processes it, provides a tool result, and the model continues implementing.
+---
 
-When the extension sent `"Yes, proceed with the plan."` via `control.sendText()`, it wrote:
-```json
-{ "type": "user", "message": { "role": "user", "content": "Yes, proceed with the plan." } }
+## Root Causes (Recurrence)
+
+After the original fix, the bug recurred due to **five overlapping issues**:
+
+### 1. Guard reset on `messageStart` (PRIMARY)
+
+When the model started a new turn after ExitPlanMode, the `messageStart` handler unconditionally reset:
+- `pendingApprovalTool = null`
+- `approvalResponseProcessed = false`
+
+This wiped the protection against re-triggers. Late `assistantMessage` events (which arrive after `messageStart`) could then pass through the guard and re-show the approval bar.
+
+### 2. `assistantMessage` fallback re-trigger
+
+The `assistantMessage` event handler has a fallback detection path:
+```typescript
+if (!this.pendingApprovalTool && event.message.stop_reason === 'tool_use') {
+  // find approval tool in content blocks...
+  this.notifyPlanApprovalRequired(approvalToolBlock.name);
+}
 ```
 
-This is a **new user message**, not a tool approval. The CLI treated it as a new conversation turn. The model received this text and, interpreting it as a signal related to plan mode, called `ExitPlanMode` again.
+After `messageStart` cleared `pendingApprovalTool`, this fallback could fire from accumulated/replayed content that still contained ExitPlanMode blocks.
 
-### The auto-approve amplifier
+### 3. Stale approval bar in webview
 
-Two auto-approve paths in `notifyPlanApprovalRequired()` made it worse:
+`processBusy: false` (sent on result event) did NOT clear `pendingApproval` in the webview. The approval bar remained visible after the CLI had already auto-approved ExitPlanMode and the model started implementing.
 
-1. **Stale ExitPlanMode path**: If `planModeActive` was `false` (no `EnterPlanMode` seen, e.g. after context compaction), the extension auto-approved by immediately sending the user message. This created a rapid tight loop without any user interaction. Safety valve: show bar after 3 auto-approvals.
+### 4. User text routed as feedback
 
-2. **User-approved path**: After the user approved once, `autoApproveExitPlanMode` was set to `true`. Subsequent ExitPlanMode calls were auto-approved instantly. Safety valve: show bar after 5 auto-approvals.
+When the user typed text while the stale approval bar was visible, InputArea routed it as a `planApprovalResponse` with `action: 'feedback'`. The feedback handler sent the text via `control.sendText()` -- the exact same "user message to CLI" pattern that caused the original loop.
 
-Both safety valves had counter resets when the user clicked approve on the bar, so the loop would restart: auto-approve N times, show bar, user approves, counters reset, auto-approve N more times...
+### 5. No `planModeActive` guard for ExitPlanMode
 
-### Event flow diagram
+`notifyPlanApprovalRequired()` had no check for whether plan mode was still active. After ExitPlanMode was processed (`planModeActive = false`), any late event detection could still re-trigger the notification.
+
+### Event flow of the recurrence
 
 ```
-Model calls ExitPlanMode
+Model calls ExitPlanMode in message A
     |
     v
-CLI auto-approves (bypassPermissions/allowedTools)
+messageDelta fires -> approval bar shows in webview
     |
     v
-CLI provides tool_result -> model continues implementing
+CLI auto-approves ExitPlanMode -> model starts implementing
     |
     v
-Extension detects ExitPlanMode in messageDelta event
+result event fires -> processBusy: false (bar NOT cleared)
     |
     v
-notifyPlanApprovalRequired() fires
+messageStart for message B -> pendingApprovalTool=null, approvalResponseProcessed=false
     |
-    +-- Auto-approve path: sends "Yes, proceed" immediately
-    |   |
-    |   v
-    |   CLI receives as NEW user message -> starts new turn
-    |   |
-    |   v
-    |   Model sees "Yes, proceed" -> calls ExitPlanMode again
-    |   |
-    |   v
-    |   LOOP (back to top)
+    v
+Model implements (creates files, edits code)
     |
-    +-- Manual path: shows approval bar -> user clicks approve
-        |
-        v
-        Extension sends "Yes, proceed" -> same loop as above
+    +-- Path A: Late assistantMessage for message A arrives
+    |   -> !pendingApprovalTool (cleared) && stop_reason === 'tool_use'
+    |   -> ExitPlanMode found in content -> notifyPlanApprovalRequired fires
+    |   -> Approval bar re-shows
+    |
+    +-- Path B: User sees stale approval bar, types "I approve"
+        -> InputArea routes as feedback (pendingApproval was still set)
+        -> control.sendText("I approve") -> new user message to CLI
+        -> Model gets confused -> may call ExitPlanMode again
 ```
 
 ---
 
-## Fix Applied
+## Fix Applied (Second Round)
 
-### 1. Removed all auto-approve logic
+### 1. Added `exitPlanModeProcessed` flag
 
-Deleted state variables:
-- `autoApproveExitPlanMode: boolean` - flag to auto-approve subsequent calls
-- `exitPlanModeAutoApproveCount: number` - counter for user-approved auto-approvals (limit 5)
-- `staleExitPlanModeAutoApproveCount: number` - counter for stale auto-approvals (limit 3)
+New state variable that tracks whether an ExitPlanMode approval cycle has completed in this session:
+- Set to `true` when user responds to ExitPlanMode (any action)
+- Reset to `false` when EnterPlanMode is detected (new plan cycle)
+- Reset to `false` on editAndResend (session restart)
 
-Deleted their usage in:
-- `notifyPlanApprovalRequired()` - two auto-approve code paths (~30 lines removed)
-- `sendMessage` handler - counter resets
-- `sendMessageWithImages` handler - counter resets
-- `editAndResend` handler - counter resets
-- `planApprovalResponse` handler - counter resets and flag setting
-- `result` event handler - note about preserving the flag
+Guard in `notifyPlanApprovalRequired()`:
+```typescript
+const isExitPlanMode = norm === 'exitplanmode' || norm.endsWith('.exitplanmode');
+if (isExitPlanMode && this.exitPlanModeProcessed) {
+  this.log('Suppressing stale ExitPlanMode notification - already processed');
+  return;
+}
+```
 
-### 2. ExitPlanMode approve actions no longer send user messages
+This prevents ALL stale re-triggers from late `assistantMessage` events, replayed sessions, or fallback detection paths.
 
-In the `planApprovalResponse` handler, when the tool is `ExitPlanMode` and the action is an approve action (`approve`, `approveClearBypass`, `approveManual`):
-- **Close the approval bar** (clear tracking state)
-- **DO NOT send any text to the CLI** via `control.sendText()`
-- **Still apply side effects**: compaction for `approveClearBypass`, permission mode switch for `approveManual`
+### 2. Clear ExitPlanMode approval bar from webview on `messageStart`
 
-### 3. Reject/feedback still sends messages
+In `useClaudeStream.ts`, the `messageStart` handler now clears `pendingApproval` if it's for ExitPlanMode (but NOT for AskUserQuestion, which genuinely pauses the CLI):
 
-When the user rejects or gives feedback on an ExitPlanMode plan, the extension still sends the text as a user message. This is correct because the user explicitly wants to communicate with the model to revise the plan.
+```typescript
+case 'messageStart': {
+  const currentApproval = useAppStore.getState().pendingApproval;
+  if (currentApproval && currentApproval.toolName !== 'AskUserQuestion') {
+    setPendingApproval(null);
+  }
+  handleMessageStart(msg.messageId, msg.model);
+  break;
+}
+```
 
-### 4. AskUserQuestion unchanged
+This prevents the user from accidentally interacting with a stale approval bar after the model has started implementing.
 
-`AskUserQuestion` handling is unaffected. For questions, user messages ARE the correct response mechanism - the model is waiting for the user's answer.
+### 3. ExitPlanMode blocks ALL user messages, not just approves
+
+Previously, only approve actions (`approve`, `approveClearBypass`, `approveManual`) were guarded. Reject and feedback actions still sent text via `control.sendText()`.
+
+Now, ALL ExitPlanMode actions (approve, reject, feedback) close the bar without sending text. The CLI has already auto-approved and moved on -- sending any text creates a spurious user message.
+
+```typescript
+if (isExitPlanMode) {
+  this.log(`ExitPlanMode ${msg.action} - closing bar without sending user message`);
+  // Apply side effects only (compact, permission mode switch)
+  // Don't send text - just close the bar
+}
+```
+
+The user can still redirect the model by typing a new message (regular `sendMessage` path, not the feedback path).
 
 ---
 
-## Key Code (after fix)
+## Key Code (current)
 
-### notifyPlanApprovalRequired (simplified)
+### notifyPlanApprovalRequired
 
 ```typescript
 private notifyPlanApprovalRequired(toolName: string): void {
   if (this.pendingApprovalTool === toolName) return;
   if (this.approvalResponseProcessed) return;
 
-  // Always show the approval bar. Never auto-approve by sending messages.
+  // Suppress stale ExitPlanMode when already processed in this plan cycle
+  const norm = toolName.trim().toLowerCase();
+  const isExitPlanMode = norm === 'exitplanmode' || norm.endsWith('.exitplanmode');
+  if (isExitPlanMode && this.exitPlanModeProcessed) return;
+
   this.log(`Plan approval required: tool=${toolName}`);
   this.pendingApprovalTool = toolName;
   this.webview.postMessage({ type: 'planApprovalRequired', toolName });
 }
 ```
 
-### planApprovalResponse handler (ExitPlanMode branch)
+### planApprovalResponse handler
 
 ```typescript
-if (isExitPlanMode && isApproveAction) {
-  this.log('ExitPlanMode approved - closing bar without sending user message');
-  if (msg.action === 'approveClearBypass') {
-    this.control.compact();
-  } else if (msg.action === 'approveManual') {
-    vscode.workspace.getConfiguration('claudeMirror')
-      .update('permissionMode', 'supervised', true);
-    this.webview.postMessage({ type: 'permissionModeSetting', mode: 'supervised' });
-  }
-  // Don't send text - just close the bar
+if (isExitPlanMode) {
+  this.planModeActive = false;
+  this.exitPlanModeProcessed = true;
+}
+
+if (isExitPlanMode) {
+  // ALL actions: close bar without sending text. CLI already auto-approved.
+  if (msg.action === 'approveClearBypass') this.control.compact();
+  else if (msg.action === 'approveManual') { /* switch permission mode */ }
 }
 ```
 
 ---
 
-## Remaining Considerations
+## Defense in Depth
 
-### Approval bar is now informational for ExitPlanMode
+The bug is now blocked by three independent layers:
 
-Since the CLI auto-approves ExitPlanMode, the model may already be implementing by the time the user sees the approval bar. Clicking "approve" just dismisses the bar. This is acceptable because:
-- The user can still **reject** or **give feedback** to redirect the model
-- The bar provides visibility into the plan mode transition
-- It prevents the infinite loop that was the critical issue
-
-### AskUserQuestion is NOT affected
-
-The approval bar for `AskUserQuestion` still works as before: user messages are sent to the CLI, because the model is genuinely waiting for the user's answer to continue.
+| Layer | Location | What it prevents |
+|-------|----------|------------------|
+| `exitPlanModeProcessed` flag | MessageHandler.ts `notifyPlanApprovalRequired` | Stale re-triggers from late events/replays |
+| Clear approval bar on `messageStart` | useClaudeStream.ts | User interacting with stale bar |
+| Block ALL ExitPlanMode text to CLI | MessageHandler.ts `planApprovalResponse` | Spurious user messages even if bar somehow appears |
 
 ---
 
-## How to Verify the Fix
+## AskUserQuestion is NOT affected
+
+All three fixes are specifically guarded to NOT affect AskUserQuestion:
+- `exitPlanModeProcessed` only checks ExitPlanMode tool name
+- `messageStart` only clears non-AskUserQuestion approval bars
+- The text-blocking guard only applies when `isExitPlanMode` is true
+
+---
+
+## How to Verify
 
 1. Start a session in ClaUi
 2. Give a task that triggers plan mode (e.g., ask Claude to plan a complex feature)
 3. When the approval bar appears, click any approve button
-4. Verify: the model should continue implementing without looping back to ExitPlanMode
-5. Check logs (`Output -> ClaUi`): should see `"ExitPlanMode approved - closing bar without sending user message"` instead of the old `"Auto-approving subsequent ExitPlanMode"` messages
+4. Verify: the model continues implementing without the approval bar re-appearing
+5. Check logs (`Output -> ClaUi`): should see `"ExitPlanMode approved - closing bar without sending user message"` and any suppressed notifications logged as `"Suppressing stale ExitPlanMode notification"`
+6. Test AskUserQuestion separately: verify the approval bar works normally for questions (user can type answers)

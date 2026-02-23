@@ -47,7 +47,7 @@ export const TextSettingsBar: React.FC = () => {
       <button
         className="text-settings-toggle"
         onClick={() => setIsOpen(true)}
-        title="Text display settings"
+        data-tooltip="Text display settings"
       >
         Aa
       </button>
@@ -62,7 +62,7 @@ export const TextSettingsBar: React.FC = () => {
           className="text-settings-btn"
           onClick={() => changeFontSize(-1)}
           disabled={textSettings.fontSize <= 10}
-          title="Decrease font size"
+          data-tooltip="Decrease font size"
         >
           -
         </button>
@@ -71,7 +71,7 @@ export const TextSettingsBar: React.FC = () => {
           className="text-settings-btn"
           onClick={() => changeFontSize(1)}
           disabled={textSettings.fontSize >= 32}
-          title="Increase font size"
+          data-tooltip="Increase font size"
         >
           +
         </button>
@@ -107,7 +107,7 @@ export const TextSettingsBar: React.FC = () => {
       <button
         className="text-settings-btn text-settings-close"
         onClick={() => setIsOpen(false)}
-        title="Close settings"
+        data-tooltip="Close settings"
       >
         x
       </button>

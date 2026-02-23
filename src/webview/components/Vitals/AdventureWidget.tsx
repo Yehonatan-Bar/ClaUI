@@ -195,7 +195,7 @@ export const AdventureWidget: React.FC = React.memo(() => {
       onDoubleClick={handleDoubleClick}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      title={tooltip ?? 'Double-click to reset position'}
+      data-tooltip={tooltip ?? 'Double-click to reset position'}
     >
       <canvas
         ref={canvasRef}

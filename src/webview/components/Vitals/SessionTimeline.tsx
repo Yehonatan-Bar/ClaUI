@@ -31,8 +31,8 @@ export const SessionTimeline: React.FC<SessionTimelineProps> = React.memo(
     const [showLegend, setShowLegend] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    const maxCost = useMemo(
-      () => Math.max(...turnHistory.map((t) => t.costUsd), 0.001),
+    const maxDuration = useMemo(
+      () => Math.max(...turnHistory.map((t) => t.durationMs), 1),
       [turnHistory]
     );
 
@@ -43,10 +43,10 @@ export const SessionTimeline: React.FC<SessionTimelineProps> = React.memo(
         const heightPercent = totalDuration > 0
           ? (Math.max(turn.durationMs, 200) / totalDuration) * 100
           : 100 / turnHistory.length;
-        const opacity = 0.35 + 0.65 * (turn.costUsd / maxCost);
+        const opacity = 0.35 + 0.65 * (turn.durationMs / maxDuration);
         return { turn, heightPercent, opacity };
       });
-    }, [turnHistory, maxCost]);
+    }, [turnHistory, maxDuration]);
 
     const handleClick = useCallback(
       (messageId: string) => {
@@ -70,7 +70,7 @@ export const SessionTimeline: React.FC<SessionTimelineProps> = React.memo(
             <div className="timeline-legend">
               <div className="timeline-legend-title">Session Timeline</div>
               <div className="timeline-legend-desc">
-                Visual map of your conversation. Each block is a turn — taller blocks took longer, brighter blocks cost more.
+                Visual map of your conversation. Each block is a turn — taller blocks took longer, brighter blocks had longer API calls.
               </div>
               <div className="timeline-legend-items">
                 {(Object.keys(CATEGORY_COLORS) as TurnCategory[]).map((cat) => (
@@ -116,10 +116,9 @@ export const SessionTimeline: React.FC<SessionTimelineProps> = React.memo(
                   {turn.toolNames.length > 0 && (
                     <div>{turn.toolNames.join(', ')}</div>
                   )}
-                  <div>
-                    {turn.durationMs > 0 ? `${(turn.durationMs / 1000).toFixed(1)}s` : ''}
-                    {turn.costUsd > 0 ? ` | $${turn.costUsd.toFixed(4)}` : ''}
-                  </div>
+                  {turn.durationMs > 0 && (
+                    <div>{(turn.durationMs / 1000).toFixed(1)}s</div>
+                  )}
                 </div>
               )}
             </div>

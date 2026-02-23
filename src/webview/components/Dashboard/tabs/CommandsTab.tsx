@@ -158,7 +158,7 @@ const CommandRow: React.FC<{ cmd: CommandEntry }> = ({ cmd }) => {
       </span>
       <span
         style={{ fontFamily: 'monospace', color: DASH_COLORS.text, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-        title={cmd.command}
+        data-tooltip={cmd.command}
       >
         {truncated}
       </span>

@@ -115,7 +115,8 @@ interface DocumentFingerprint {
 Central orchestrator. Coordinates the full pipeline: scan -> preflight -> lock -> pipeline -> dedup -> install.
 
 **Key behaviors:**
-- Preflight checks: verifies Python exists, toolkit path valid, docs directory exists
+- Preflight checks: verifies Python exists, toolkit path valid, pipeline script exists at resolved path, docs directory exists
+- Default toolkit path: auto-resolves to `<docsDirectory>/used/skills_from_docs_toolkit` when `toolkitPath` setting is empty
 - Cross-process locking via lock files (stale detection after 2 hours)
 - Auto-run mode: triggers pipeline automatically when threshold reached
 - Notification mode: just broadcasts status, user triggers manually
@@ -266,7 +267,7 @@ All settings under `claudeMirror.skillGen.*` in `package.json`:
 | `docsPattern` | `"SR-PTD_*.md"` | Glob pattern for document files |
 | `skillsDirectory` | `"~/.claude/skills"` | Target directory for installed skills |
 | `pythonPath` | `"python"` | Python executable path |
-| `toolkitPath` | `""` | Skill generation toolkit path |
+| `toolkitPath` | `""` (auto-resolves to `<docsDir>/used/skills_from_docs_toolkit`) | Skill generation toolkit path |
 | `workspaceDir` | `""` | Isolated pipeline workspace |
 | `pipelineMode` | `"run_pipeline"` | Pipeline execution mode |
 | `autoRun` | `true` | Auto-trigger on threshold |

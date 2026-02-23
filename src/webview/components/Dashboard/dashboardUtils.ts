@@ -102,10 +102,6 @@ export const TOKEN_COLORS = {
 };
 
 // --- Formatting ---
-export function formatCost(usd: number): string {
-  return `$${usd.toFixed(4)}`;
-}
-
 export function formatTokens(n: number): string {
   return n.toLocaleString();
 }

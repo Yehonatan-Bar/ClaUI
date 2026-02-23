@@ -5,6 +5,22 @@
 import type { ContentBlock } from './stream-json';
 
 export type TypingTheme = 'terminal-hacker' | 'retro' | 'zen';
+export type ProviderId = 'claude' | 'codex';
+
+export interface ProviderCapabilities {
+  supportsPlanApproval: boolean;
+  supportsCompact: boolean;
+  supportsFork: boolean;
+  supportsImages: boolean;
+  supportsGitPush: boolean;
+  supportsTranslation: boolean;
+  supportsPromptEnhancer: boolean;
+  supportsCodexConsult: boolean;
+  supportsPermissionModeSelector: boolean;
+  supportsLiveTextStreaming: boolean;
+  supportsConversationDiskReplay: boolean;
+  supportsCostUsd: boolean;
+}
 
 // --- Webview -> Extension ---
 
@@ -63,6 +79,11 @@ export interface ClearSessionRequest {
 export interface SetModelRequest {
   type: 'setModel';
   model: string;
+}
+
+export interface SetProviderRequest {
+  type: 'setProvider';
+  provider: ProviderId;
 }
 
 export interface SetTypingThemeRequest {
@@ -304,6 +325,7 @@ export type WebviewToExtensionMessage =
   | PickFilesRequest
   | ClearSessionRequest
   | SetModelRequest
+  | SetProviderRequest
   | SetTypingThemeRequest
   | ShowHistoryRequest
   | OpenPlanDocsRequest
@@ -359,6 +381,7 @@ export interface SessionStartedMessage {
   sessionId: string;
   model: string;
   isResume?: boolean;
+  provider?: ProviderId;
 }
 
 export interface SessionEndedMessage {
@@ -454,6 +477,16 @@ export interface TypingThemeSettingMessage {
 export interface ModelSettingMessage {
   type: 'modelSetting';
   model: string;
+}
+
+export interface ProviderSettingMessage {
+  type: 'providerSetting';
+  provider: ProviderId;
+}
+
+export interface ProviderCapabilitiesMessage {
+  type: 'providerCapabilities';
+  capabilities: ProviderCapabilities;
 }
 
 export interface PlanApprovalRequiredMessage {
@@ -725,6 +758,7 @@ export interface ConversationHistoryMessage {
 /** Pre-aggregated summary of a completed session, persisted in workspaceState */
 export interface SessionSummary {
   sessionId: string;
+  provider: ProviderId;
   sessionName: string;
   model: string;
   startedAt: string;   // ISO date
@@ -898,6 +932,8 @@ export type ExtensionToWebviewMessage =
   | TextSettingsMessage
   | TypingThemeSettingMessage
   | ModelSettingMessage
+  | ProviderSettingMessage
+  | ProviderCapabilitiesMessage
   | PlanApprovalRequiredMessage
   | PromptHistoryResponseMessage
   | ActivitySummaryMessage

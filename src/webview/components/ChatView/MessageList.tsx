@@ -128,7 +128,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
         <button
           className="scroll-to-bottom-btn"
           onClick={scrollToBottom}
-          title="Scroll to bottom"
+          data-tooltip="Scroll to bottom"
           aria-label="Scroll to bottom"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">

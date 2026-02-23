@@ -50,6 +50,7 @@ export const ToolUseBlock: React.FC<ToolUseBlockProps> = ({
         className="tool-use-header"
         onClick={() => setIsCollapsed(!isCollapsed)}
         style={{ cursor: 'pointer' }}
+        data-tooltip="Click to expand/collapse"
       >
         <span className={`tool-collapse-indicator${isCollapsed ? '' : ' expanded'}`} />
         <span className="tool-use-name">{displayName}</span>

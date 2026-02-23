@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { ContentBlock } from '../../extension/types/stream-json';
-import type { TypingTheme } from '../../extension/types/webview-messages';
+import type { ProviderCapabilities, ProviderId, TypingTheme } from '../../extension/types/webview-messages';
 import type {
   AchievementAwardPayload,
   AchievementGoalPayload,
@@ -65,7 +65,10 @@ export interface AchievementToast extends AchievementAwardPayload {
 export interface AppState {
   // Session
   sessionId: string | null;
+  provider: ProviderId | null;
   model: string | null;
+  selectedProvider: ProviderId;
+  providerCapabilities: ProviderCapabilities;
   selectedModel: string;  // model chosen by user for next session
   isConnected: boolean;
   isBusy: boolean;
@@ -248,6 +251,9 @@ export interface AppState {
   addToPromptHistory: (prompt: string) => void;
   setTextSettings: (settings: Partial<TextSettings>) => void;
   setTypingTheme: (theme: TypingTheme) => void;
+  setProvider: (provider: ProviderId | null) => void;
+  setSelectedProvider: (provider: ProviderId) => void;
+  setProviderCapabilities: (capabilities: ProviderCapabilities) => void;
   setResuming: (resuming: boolean) => void;
   setSelectedModel: (model: string) => void;
   setPendingApproval: (approval: { toolName: string; planText: string } | null) => void;
@@ -314,6 +320,21 @@ const initialCost: CostInfo = {
   totalCostUsd: 0,
   inputTokens: 0,
   outputTokens: 0,
+};
+
+const DEFAULT_PROVIDER_CAPABILITIES: ProviderCapabilities = {
+  supportsPlanApproval: true,
+  supportsCompact: true,
+  supportsFork: true,
+  supportsImages: true,
+  supportsGitPush: true,
+  supportsTranslation: true,
+  supportsPromptEnhancer: true,
+  supportsCodexConsult: true,
+  supportsPermissionModeSelector: true,
+  supportsLiveTextStreaming: true,
+  supportsConversationDiskReplay: true,
+  supportsCostUsd: true,
 };
 
 // --- Session Vitals ---
@@ -431,7 +452,10 @@ function buildTurnByMessageId(turns: TurnRecord[]): Record<string, TurnRecord> {
 export const useAppStore = create<AppState>((set, get) => ({
   // Initial state
   sessionId: null,
+  provider: 'claude',
   model: null,
+  selectedProvider: 'claude',
+  providerCapabilities: { ...DEFAULT_PROVIDER_CAPABILITIES },
   selectedModel: '',
   isConnected: false,
   isBusy: false,
@@ -872,6 +896,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setTypingTheme: (theme) => set({ typingTheme: theme }),
 
+  setProvider: (provider) => set({ provider }),
+
+  setSelectedProvider: (provider) => set({ selectedProvider: provider }),
+
+  setProviderCapabilities: (providerCapabilities) => set({ providerCapabilities }),
+
   setResuming: (resuming) => set({ isResuming: resuming }),
 
   setSelectedModel: (model) => set({ selectedModel: model }),
@@ -1139,6 +1169,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   reset: () =>
     set((state) => ({
       sessionId: null,
+      provider: state.provider,
       model: null,
       isConnected: false,
       isBusy: false,
@@ -1152,6 +1183,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       textSettings: { ...defaultTextSettings },
       typingTheme: 'zen' as const,
       pendingFilePaths: null,
+      selectedProvider: state.selectedProvider,
+      providerCapabilities: state.providerCapabilities,
       isResuming: false,
       pendingApproval: null,
       promptHistoryPanelOpen: false,

@@ -48,6 +48,7 @@ export const StatusBarGroupButton: React.FC<StatusBarGroupButtonProps> = ({
       <button
         className={`status-bar-group-btn ${isOpen ? 'active' : ''}`}
         onClick={onToggle}
+        data-tooltip={label}
       >
         {label} {isOpen ? '\u25BC' : '\u25B2'}
       </button>

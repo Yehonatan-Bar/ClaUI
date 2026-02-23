@@ -20,6 +20,7 @@ import { CodexConsultPanel } from './components/InputArea/CodexConsultPanel';
 import { postToExtension } from './hooks/useClaudeStream';
 import { detectRtl } from './hooks/useRtlDetection';
 import { deriveTurnHistoryFromMessages } from './utils/turnVitals';
+import { GlobalTooltip } from './components/Tooltip/GlobalTooltip';
 
 export const App: React.FC = () => {
   useClaudeStream();
@@ -36,6 +37,7 @@ export const App: React.FC = () => {
     textSettings,
     typingTheme,
     pendingApproval,
+    providerCapabilities,
     promptHistoryPanelOpen,
     activitySummary,
     achievementsEnabled,
@@ -111,7 +113,7 @@ export const App: React.FC = () => {
           <button
             className="error-dismiss"
             onClick={() => setError(null)}
-            title="Dismiss"
+            data-tooltip="Dismiss"
           >
             x
           </button>
@@ -139,7 +141,7 @@ export const App: React.FC = () => {
 
       {isConnected ? (
         <>
-          {pendingApproval ? (
+          {pendingApproval && providerCapabilities.supportsPlanApproval ? (
             <PlanApprovalBar />
           ) : (isBusy || !!activitySummary) ? (
             <div
@@ -170,7 +172,7 @@ export const App: React.FC = () => {
               )}
             </div>
           ) : null}
-          {codexConsultPanelOpen && (
+          {providerCapabilities.supportsCodexConsult && codexConsultPanelOpen && (
             <CodexConsultPanel onClose={() => setCodexConsultPanelOpen(false)} />
           )}
           <InputArea />
@@ -187,6 +189,7 @@ export const App: React.FC = () => {
         <WelcomeScreen />
       )}
       {achievementsEnabled && <AchievementToastStack />}
+      <GlobalTooltip delay={400} />
     </div>
   );
 };
@@ -208,10 +211,10 @@ const WelcomeScreen: React.FC = () => {
         Start a new session to begin chatting with Claude Code.
         Your conversation will be visible in both the chat UI and terminal.
       </div>
-      <button className="start-button" onClick={handleStart}>
+      <button className="start-button" onClick={handleStart} data-tooltip="Start a new Claude Code session">
         Start Session
       </button>
-      <button className="history-button" onClick={handleHistory}>
+      <button className="history-button" onClick={handleHistory} data-tooltip="Browse previous conversations">
         Conversation History
       </button>
     </div>
@@ -231,13 +234,12 @@ const SessionEndedBar: React.FC = () => {
   return (
     <div className="session-ended-bar">
       <span>Session ended</span>
-      <button className="restart-button" onClick={handleRestart}>
+      <button className="restart-button" onClick={handleRestart} data-tooltip="Start a new session">
         New Session
       </button>
-      <button className="history-link-button" onClick={handleHistory}>
+      <button className="history-link-button" onClick={handleHistory} data-tooltip="Browse previous conversations">
         History
       </button>
     </div>
   );
 };
-

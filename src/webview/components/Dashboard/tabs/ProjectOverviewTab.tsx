@@ -5,7 +5,7 @@ import {
   PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { DASH_COLORS, CATEGORY_COLORS, formatCost, formatDuration } from '../dashboardUtils';
+import { DASH_COLORS, CATEGORY_COLORS, formatDuration } from '../dashboardUtils';
 
 interface ProjectOverviewTabProps {
   sessions: SessionSummary[];
@@ -93,11 +93,9 @@ export const ProjectOverviewTab: React.FC<ProjectOverviewTabProps> = ({ sessions
 
   // --- Computed metrics ---
   const totalSessions = sessions.length;
-  const totalCost = sessions.reduce((s, x) => s + (x.totalCostUsd ?? 0), 0);
   const totalTurns = sessions.reduce((s, x) => s + (x.totalTurns ?? 0), 0);
   const totalToolUses = sessions.reduce((s, x) => s + (x.totalToolUses ?? 0), 0);
   const totalErrors = sessions.reduce((s, x) => s + (x.totalErrors ?? 0), 0);
-  const avgSessionCost = totalSessions > 0 ? totalCost / totalSessions : 0;
   const overallErrorRate = totalTurns > 0 ? (totalErrors / totalTurns) * 100 : 0;
   const mostUsedModel = findMostUsedModel(sessions);
   const avgDurationMs = totalSessions > 0
@@ -106,10 +104,8 @@ export const ProjectOverviewTab: React.FC<ProjectOverviewTabProps> = ({ sessions
 
   const cards: CardData[] = [
     { label: 'Total Sessions', value: String(totalSessions), color: DASH_COLORS.blue },
-    { label: 'Total Cost', value: formatCost(totalCost), color: DASH_COLORS.green },
     { label: 'Total Turns', value: String(totalTurns), color: DASH_COLORS.purple },
     { label: 'Total Tool Uses', value: String(totalToolUses), color: DASH_COLORS.teal },
-    { label: 'Avg Session Cost', value: formatCost(avgSessionCost), color: DASH_COLORS.amber },
     {
       label: 'Overall Error Rate',
       value: `${overallErrorRate.toFixed(1)}%`,
@@ -120,11 +116,6 @@ export const ProjectOverviewTab: React.FC<ProjectOverviewTabProps> = ({ sessions
   ];
 
   // --- Chart data ---
-  const costPerSession = sessions.map((s) => ({
-    name: getSessionLabel(s),
-    cost: s.totalCostUsd ?? 0,
-  }));
-
   const turnsPerSession = sessions.map((s) => ({
     name: getSessionLabel(s),
     turns: s.totalTurns ?? 0,
@@ -148,7 +139,7 @@ export const ProjectOverviewTab: React.FC<ProjectOverviewTabProps> = ({ sessions
       {/* Metric cards */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
+        gridTemplateColumns: 'repeat(3, 1fr)',
         gap: '12px',
         marginBottom: '20px',
       }}>
@@ -169,36 +160,8 @@ export const ProjectOverviewTab: React.FC<ProjectOverviewTabProps> = ({ sessions
         ))}
       </div>
 
-      {/* Row 1: Cost per Session + Turns per Session */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-        <div style={chartCardStyle}>
-          <div style={chartTitleStyle}>Cost per Session</div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={costPerSession}>
-              <CartesianGrid strokeDasharray="3 3" stroke={DASH_COLORS.border} />
-              <XAxis
-                dataKey="name"
-                tick={{ fill: DASH_COLORS.textMuted, fontSize: 11 }}
-                axisLine={{ stroke: DASH_COLORS.border }}
-                tickLine={false}
-                interval="preserveStartEnd"
-              />
-              <YAxis
-                tick={{ fill: DASH_COLORS.textMuted, fontSize: 11 }}
-                axisLine={{ stroke: DASH_COLORS.border }}
-                tickLine={false}
-                tickFormatter={(v: number) => `$${v.toFixed(2)}`}
-              />
-              <Tooltip
-                contentStyle={tooltipStyle}
-                formatter={(value: number | undefined) => [formatCost(value ?? 0), 'Cost']}
-                labelStyle={{ color: DASH_COLORS.textMuted }}
-              />
-              <Bar dataKey="cost" fill={DASH_COLORS.green} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
+      {/* Row 1: Turns per Session */}
+      <div style={{ marginBottom: '16px' }}>
         <div style={chartCardStyle}>
           <div style={chartTitleStyle}>Turns per Session</div>
           <ResponsiveContainer width="100%" height={220}>

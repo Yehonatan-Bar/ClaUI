@@ -88,6 +88,29 @@
           "default": "claude",
           "description": "Path to the Claude CLI executable"
         },
+        "claudeMirror.provider": {
+          "type": "string",
+          "default": "claude",
+          "enum": [
+            "claude",
+            "codex"
+          ],
+          "enumDescriptions": [
+            "Claude (current runtime)",
+            "Codex (UI/settings only for now)"
+          ],
+          "description": "Default provider for new sessions."
+        },
+        "claudeMirror.codex.cliPath": {
+          "type": "string",
+          "default": "codex",
+          "description": "Path to the Codex CLI executable"
+        },
+        "claudeMirror.codex.model": {
+          "type": "string",
+          "default": "",
+          "description": "Codex model to use for new Codex sessions. Leave empty to use the CLI/config default."
+        },
         "claudeMirror.useCtrlEnterToSend": {
           "type": "boolean",
           "default": true,
