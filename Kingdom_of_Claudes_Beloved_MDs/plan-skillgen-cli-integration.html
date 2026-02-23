@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClaUi - Integration Plan: Claude Code CLI for Skill Generation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #f5f7fa;
+            color: #2d3748;
+            line-height: 1.7;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 32px 40px;
+            border-radius: 12px;
+            margin-bottom: 32px;
+        }
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        .header .subtitle {
+            font-size: 15px;
+            opacity: 0.9;
+        }
+        .header .date {
+            font-size: 13px;
+            opacity: 0.7;
+            margin-top: 8px;
+        }
+        .section {
+            background: white;
+            border-radius: 10px;
+            padding: 28px 32px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .section h2 {
+            font-size: 18px;
+            color: #667eea;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .section p {
+            margin-bottom: 12px;
+        }
+        .highlight-box {
+            background: #f0f4ff;
+            border-right: 4px solid #667eea;
+            padding: 16px 20px;
+            border-radius: 6px;
+            margin: 16px 0;
+        }
+        .warning-box {
+            background: #fff8f0;
+            border-right: 4px solid #ed8936;
+            padding: 16px 20px;
+            border-radius: 6px;
+            margin: 16px 0;
+        }
+        .success-box {
+            background: #f0fff4;
+            border-right: 4px solid #48bb78;
+            padding: 16px 20px;
+            border-radius: 6px;
+            margin: 16px 0;
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+        .comparison-table th {
+            background: #f7fafc;
+            padding: 10px 14px;
+            text-align: right;
+            font-weight: 600;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .comparison-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+        .phase-list {
+            list-style: none;
+            padding: 0;
+        }
+        .phase-list li {
+            padding: 10px 16px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .phase-list li.python {
+            background: #f0f4ff;
+        }
+        .phase-list li.ai {
+            background: #f0fff4;
+        }
+        .phase-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            min-width: 60px;
+            text-align: center;
+        }
+        .badge-python { background: #667eea; color: white; }
+        .badge-ai { background: #48bb78; color: white; }
+        .steps-list {
+            list-style: none;
+            padding: 0;
+            counter-reset: step;
+        }
+        .steps-list li {
+            counter-increment: step;
+            padding: 10px 0;
+            padding-right: 40px;
+            position: relative;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .steps-list li:last-child { border-bottom: none; }
+        .steps-list li::before {
+            content: counter(step);
+            position: absolute;
+            right: 0;
+            top: 10px;
+            width: 28px;
+            height: 28px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .footer {
+            text-align: center;
+            color: #a0aec0;
+            font-size: 13px;
+            margin-top: 32px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>ClaUi - שילוב Claude Code CLI ביצירת Skills</h1>
+            <div class="subtitle">ביטול התלות במפתח API נפרד - שימוש בחשבון Claude Code הקיים</div>
+            <div class="date">23 בפברואר 2026</div>
+        </div>
+
+        <div class="section">
+            <h2>הבעיה</h2>
+            <p>
+                תהליך יצירת ה-Skills מורכב מ-8 שלבים. ארבעה מהם דורשים קריאות AI
+                (העשרת תגיות, קיבוץ, מיזוג, וסינתזה).
+                כיום שלבים אלו משתמשים בספריית Python שדורשת מפתח API נפרד של Anthropic
+                (<code>ANTHROPIC_API_KEY</code>).
+            </p>
+            <div class="warning-box">
+                <strong>הבעיה:</strong> המשתמש צריך להגדיר מפתח API נפרד, מה שמסרבל את התהליך
+                ויוצר תלות בחשבון נוסף. התהליך נכשל 3 פעמים בגלל בעיות קונפיגורציה שונות.
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>הפתרון</h2>
+            <p>
+                ClaUi כבר משתמש בקריאות CLI של Claude Code (לשיפור פרומפטים, מתן שמות, תרגום ועוד).
+                קריאות אלו עוברות דרך החשבון הקיים של המשתמש - ללא צורך במפתח API נפרד.
+            </p>
+            <div class="success-box">
+                <strong>הפתרון:</strong> נעביר את כל קריאות ה-AI של תהליך יצירת ה-Skills לעבור
+                דרך אותו מנגנון CLI קיים. שלבים שלא דורשים AI ימשיכו לרוץ ב-Python כרגיל.
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>השוואה: לפני ואחרי</h2>
+            <table class="comparison-table">
+                <tr>
+                    <th></th>
+                    <th>היום</th>
+                    <th>אחרי השינוי</th>
+                </tr>
+                <tr>
+                    <td><strong>אימות</strong></td>
+                    <td>מפתח API נפרד (ANTHROPIC_API_KEY)</td>
+                    <td>חשבון Claude Code קיים</td>
+                </tr>
+                <tr>
+                    <td><strong>הגדרה נדרשת</strong></td>
+                    <td>קובץ .env עם מפתח</td>
+                    <td>שום דבר - עובד מהקופסה</td>
+                </tr>
+                <tr>
+                    <td><strong>שלבי AI</strong></td>
+                    <td>Python עם ספריית anthropic</td>
+                    <td>TypeScript עם Claude CLI</td>
+                </tr>
+                <tr>
+                    <td><strong>שלב D (סינתזה)</strong></td>
+                    <td>סדרתי - אחד אחרי השני</td>
+                    <td>מקבילי - עד 3 בו-זמנית</td>
+                </tr>
+                <tr>
+                    <td><strong>שלבים ללא AI</strong></td>
+                    <td>Python</td>
+                    <td>Python (ללא שינוי)</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>מבנה השלבים</h2>
+            <p>8 שלבי התהליך, מחולקים לפי סוג הריצה:</p>
+            <ul class="phase-list">
+                <li class="python">
+                    <span class="phase-badge badge-python">Python</span>
+                    <span><strong>B</strong> - חילוץ מידע מ-SR-PTD (עיבוד קבצים בלבד)</span>
+                </li>
+                <li class="python">
+                    <span class="phase-badge badge-python">Python</span>
+                    <span><strong>C.0-C.1</strong> - יצירת כרטיסי מסמכים וקיבוץ ראשוני</span>
+                </li>
+                <li class="ai">
+                    <span class="phase-badge badge-ai">CLI</span>
+                    <span><strong>C.2</strong> - העשרת תגיות באמצעות AI (Sonnet)</span>
+                </li>
+                <li class="ai">
+                    <span class="phase-badge badge-ai">CLI</span>
+                    <span><strong>C.3</strong> - קיבוץ מתקדם באמצעות AI (Sonnet)</span>
+                </li>
+                <li class="ai">
+                    <span class="phase-badge badge-ai">CLI</span>
+                    <span><strong>C.4</strong> - מיזוג בין-קבוצות באמצעות AI (Sonnet)</span>
+                </li>
+                <li class="python">
+                    <span class="phase-badge badge-python">Python</span>
+                    <span><strong>C.5</strong> - בחירת נציגים (עיבוד קבצים בלבד)</span>
+                </li>
+                <li class="python">
+                    <span class="phase-badge badge-python">Python</span>
+                    <span><strong>Sanity</strong> - בדיקת תקינות</span>
+                </li>
+                <li class="ai">
+                    <span class="phase-badge badge-ai">CLI</span>
+                    <span><strong>D</strong> - סינתזת Skills באמצעות AI (Opus) - מקבילי!</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>תוכנית ביצוע</h2>
+            <ol class="steps-list">
+                <li>יצירת מנגנון שיתופי לקריאות CLI (בסיס לכל שלבי ה-AI)</li>
+                <li>יצירת מריץ Python לשלבים ללא AI (B, C.0-C.1, C.5, Sanity)</li>
+                <li>מימוש שלב C.2 - העשרת תגיות (הפשוט ביותר, טוב לבדיקה ראשונה)</li>
+                <li>מימוש שלבים C.3 ו-C.4 - קיבוץ ומיזוג</li>
+                <li>מימוש שלב D - סינתזת Skills עם ריצה מקבילית</li>
+                <li>חיבור כל השלבים למתזמר מרכזי חדש</li>
+                <li>בדיקות מקצה לקצה - הרצת התהליך המלא</li>
+                <li>עדכון תיעוד ו-SR-PTD</li>
+            </ol>
+        </div>
+
+        <div class="section">
+            <h2>יתרונות</h2>
+            <div class="highlight-box">
+                <p><strong>ביטול מפתח API</strong> - לא צריך יותר ANTHROPIC_API_KEY. התהליך עובד עם חשבון Claude Code הקיים.</p>
+            </div>
+            <div class="highlight-box">
+                <p><strong>האצת שלב D</strong> - סינתזת Skills רצה במקביל (עד 3 בו-זמנית) במקום אחד-אחד. זה השלב הכבד ביותר.</p>
+            </div>
+            <div class="highlight-box">
+                <p><strong>שליטה טובה יותר</strong> - כל שלב רץ בנפרד עם דיווח התקדמות מדויק, במקום תהליך Python אחד גדול.</p>
+            </div>
+            <div class="highlight-box">
+                <p><strong>תיקון באג</strong> - שלב C.4 היה מסומן כ"לא דורש API" למרות שדורש. בארכיטקטורה החדשה זה מטופל נכון.</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>סיכונים וצמצומם</h2>
+            <table class="comparison-table">
+                <tr>
+                    <th>סיכון</th>
+                    <th>צמצום</th>
+                </tr>
+                <tr>
+                    <td>קריאות CLI איטיות יותר מ-API ישיר</td>
+                    <td>מקביליות בשלב D מפצה; שלבים אחרים הם קריאות קצרות</td>
+                </tr>
+                <tr>
+                    <td>הפרומפטים מועתקים מ-Python ל-TypeScript</td>
+                    <td>העתקה מדויקת של הפרומפטים ללא שינוי תוכן</td>
+                </tr>
+                <tr>
+                    <td>שלבי Python צריכים לרוץ כתהליכי-בן בודדים</td>
+                    <td>אותו מנגנון הרצה שכבר קיים ועובד</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="footer">
+            ClaUi - Claude Code Mirror Extension | 2026
+        </div>
+    </div>
+</body>
+</html>

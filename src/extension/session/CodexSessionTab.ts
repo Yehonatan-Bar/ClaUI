@@ -51,6 +51,9 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private sessionStartedAt = '';
   private analyticsSaved = false;
   private firstPrompt = '';
+  private turnAuthFailureDetected = false;
+  private turnFailureText: string[] = [];
+  private codexLoginLaunchInProgress = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -232,6 +235,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     }
 
     this.currentModel = this.getCurrentModel();
+    this.resetTurnFailureCapture();
     await this.processManager.runTurn({
       prompt: text,
       threadId: this.threadId || undefined,
@@ -510,6 +514,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
     this.processManager.on('raw', (text: string) => {
       tabLog(`Codex raw: ${text}`);
+      this.captureTurnFailureText(text);
+      this.maybeMarkTurnAuthFailure(text, tabLog);
     });
 
     this.processManager.on('stderr', (text: string) => {
@@ -518,10 +524,16 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         return;
       }
       tabLog(`Codex STDERR: ${trimmed}`);
+      this.captureTurnFailureText(trimmed);
       // Codex often emits non-fatal warnings on stderr (e.g. shell snapshot support).
       if (/WARN\s+codex_core::shell_snapshot/i.test(trimmed)) {
         return;
       }
+      if (this.isLikelyCodexAuthFailure(trimmed)) {
+        this.maybeMarkTurnAuthFailure(trimmed, tabLog);
+        return;
+      }
+      this.maybeMarkTurnAuthFailure(trimmed, tabLog);
       this.postMessage({ type: 'error', message: trimmed });
     });
 
@@ -530,24 +542,120 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       if (this.processManager.cancelledByUser) {
         tabLog('Codex turn cancelled by user');
         this.postMessage({ type: 'processBusy', busy: false });
+        this.resetTurnFailureCapture();
         return;
       }
       if (info.code !== 0 && info.code !== null) {
         this.achievementService.onRuntimeError(this.id);
         this.postMessage({ type: 'processBusy', busy: false });
+        if (!this.turnAuthFailureDetected && this.isLikelyCodexAuthFailure(this.turnFailureText.join('\n'))) {
+          this.turnAuthFailureDetected = true;
+        }
+        if (this.turnAuthFailureDetected) {
+          tabLog('Codex auth failure detected; triggering login redirect flow');
+          void this.launchCodexLoginFlow();
+          this.postMessage({
+            type: 'error',
+            message: 'Codex is not signed in. Opened a terminal to run "codex login". Complete login and retry.',
+          });
+          this.resetTurnFailureCapture();
+          return;
+        }
         this.postMessage({
           type: 'error',
           message: `Codex process exited with code ${info.code}. Check output logs for details.`,
         });
       }
+      this.resetTurnFailureCapture();
     });
 
     this.processManager.on('error', (err: Error) => {
       tabLog(`Codex process error: ${err.message}`);
+      this.captureTurnFailureText(err.message);
+      this.maybeMarkTurnAuthFailure(err.message, tabLog);
       this.achievementService.onRuntimeError(this.id);
       this.postMessage({ type: 'processBusy', busy: false });
-      this.postMessage({ type: 'error', message: `Codex process error: ${err.message}` });
+      if (this.turnAuthFailureDetected) {
+        void this.launchCodexLoginFlow();
+        this.postMessage({
+          type: 'error',
+          message: 'Codex is not signed in. Opened a terminal to run "codex login". Complete login and retry.',
+        });
+      } else {
+        this.postMessage({ type: 'error', message: `Codex process error: ${err.message}` });
+      }
+      this.resetTurnFailureCapture();
     });
+  }
+
+  private resetTurnFailureCapture(): void {
+    this.turnAuthFailureDetected = false;
+    this.turnFailureText = [];
+  }
+
+  private captureTurnFailureText(text: string): void {
+    const trimmed = text?.trim();
+    if (!trimmed) {
+      return;
+    }
+    if (this.turnFailureText.length >= 20) {
+      this.turnFailureText.shift();
+    }
+    this.turnFailureText.push(trimmed);
+  }
+
+  private maybeMarkTurnAuthFailure(text: string, log: (msg: string) => void): void {
+    if (this.turnAuthFailureDetected) {
+      return;
+    }
+    if (!this.isLikelyCodexAuthFailure(text)) {
+      return;
+    }
+    this.turnAuthFailureDetected = true;
+    log(`Detected Codex authentication/login failure: ${text.trim()}`);
+  }
+
+  private isLikelyCodexAuthFailure(text: string): boolean {
+    const normalized = text.toLowerCase();
+    const authPatterns = [
+      /no auth credentials found/i,
+      /\b401\b.*unauthorized/i,
+      /unauthorized.*no auth/i,
+      /please .*codex login/i,
+      /run .*codex login/i,
+      /error logging in/i,
+      /token exchange failed/i,
+      /oauth\/token/i,
+      /not logged in/i,
+    ];
+    return authPatterns.some((pattern) => pattern.test(normalized));
+  }
+
+  private async launchCodexLoginFlow(): Promise<void> {
+    if (this.codexLoginLaunchInProgress) {
+      return;
+    }
+    this.codexLoginLaunchInProgress = true;
+    try {
+      const cliPath = vscode.workspace.getConfiguration('claudeMirror').get<string>('codex.cliPath', 'codex') || 'codex';
+      const terminal = vscode.window.createTerminal({ name: 'Codex Login' });
+      terminal.show();
+      terminal.sendText(`${this.quoteTerminalArg(cliPath)} login`, true);
+      void vscode.window.showWarningMessage(
+        'Codex is not signed in. A terminal was opened to run "codex login". Complete the login flow, then resend your message.'
+      );
+    } finally {
+      setTimeout(() => {
+        this.codexLoginLaunchInProgress = false;
+      }, 1500);
+    }
+  }
+
+  private quoteTerminalArg(value: string): string {
+    if (!value || !/[\s"]/u.test(value)) {
+      return value;
+    }
+    return `"${value.replace(/"/g, '\\"')}"`;
   }
 
   private wireDemuxStatusBar(): void {
