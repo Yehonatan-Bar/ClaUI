@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaUi - סקירת יכולות</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
+
+  :root {
+    --bg-deep: #0a0e1a;
+    --bg-card: #111827;
+    --bg-card-hover: #1a2332;
+    --accent-blue: #3b82f6;
+    --accent-purple: #8b5cf6;
+    --accent-cyan: #06b6d4;
+    --accent-green: #10b981;
+    --accent-orange: #f59e0b;
+    --accent-pink: #ec4899;
+    --accent-red: #ef4444;
+    --accent-coral: #f97316;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --border-subtle: rgba(255,255,255,0.06);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Heebo', sans-serif;
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ===== HERO ===== */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59,130,246,0.15), transparent),
+      radial-gradient(ellipse 60% 40% at 20% 80%, rgba(139,92,246,0.1), transparent),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(6,182,212,0.08), transparent);
+    pointer-events: none;
+  }
+
+  .hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black, transparent);
+    animation: gridPulse 8s ease-in-out infinite;
+  }
+
+  @keyframes gridPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+  }
+
+  .hero-logo {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    margin-bottom: 2rem;
+  }
+
+  .hero-logo-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid rgba(59,130,246,0.3);
+    animation: ringRotate 12s linear infinite;
+  }
+
+  .hero-logo-ring:nth-child(2) {
+    inset: 8px;
+    border-color: rgba(139,92,246,0.25);
+    animation-duration: 18s;
+    animation-direction: reverse;
+  }
+
+  .hero-logo-ring:nth-child(3) {
+    inset: 16px;
+    border-color: rgba(6,182,212,0.2);
+    animation-duration: 24s;
+  }
+
+  @keyframes ringRotate {
+    0% { transform: rotate(0deg); border-radius: 50%; }
+    25% { border-radius: 45% 55% 50% 50%; }
+    50% { transform: rotate(180deg); border-radius: 50%; }
+    75% { border-radius: 50% 50% 45% 55%; }
+    100% { transform: rotate(360deg); border-radius: 50%; }
+  }
+
+  .hero-logo-inner {
+    position: absolute;
+    inset: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    font-weight: 800;
+    letter-spacing: -1px;
+    color: white;
+    box-shadow: 0 0 40px rgba(59,130,246,0.3);
+  }
+
+  .hero h1 {
+    position: relative;
+    font-size: clamp(3rem, 8vw, 6rem);
+    font-weight: 900;
+    letter-spacing: -2px;
+    background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+  }
+
+  .hero-subtitle {
+    position: relative;
+    font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+    font-weight: 300;
+    color: var(--text-secondary);
+    max-width: 650px;
+    margin-bottom: 3rem;
+  }
+
+  .hero-badges {
+    position: relative;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .hero-badge {
+    padding: 0.5rem 1.2rem;
+    border-radius: 100px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    backdrop-filter: blur(10px);
+  }
+
+  .hero-badge span { color: var(--accent-cyan); font-weight: 700; }
+
+  .scroll-hint {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    animation: bounce 2s ease-in-out infinite;
+  }
+
+  .scroll-hint svg { width: 20px; height: 20px; }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(8px); }
+  }
+
+  /* ===== NAV ===== */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,14,26,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0 2rem;
+  }
+
+  .nav-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    height: 56px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .nav-inner::-webkit-scrollbar { display: none; }
+
+  .nav-brand {
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: var(--accent-blue);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .nav a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: color 0.2s;
+    flex-shrink: 0;
+  }
+
+  .nav a:hover { color: var(--text-primary); }
+
+  /* ===== SECTIONS ===== */
+  .section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 6rem 2rem;
+  }
+
+  .section-header {
+    text-align: center;
+    margin-bottom: 4rem;
+  }
+
+  .section-tag {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 0.35rem 1rem;
+    border-radius: 100px;
+    margin-bottom: 1rem;
+  }
+
+  .section-title {
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 800;
+    margin-bottom: 0.75rem;
+  }
+
+  .section-desc {
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  /* ===== FEATURE CARDS ===== */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .feature-card {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    padding: 2rem;
+    transition: all 0.3s ease;
+    overflow: hidden;
+  }
+
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 3px;
+    border-radius: 16px 16px 0 0;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .feature-card:hover {
+    background: var(--bg-card-hover);
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.1);
+  }
+
+  .feature-card:hover::before { opacity: 1; }
+
+  .feature-visual {
+    width: 100%;
+    height: 140px;
+    border-radius: 10px;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    direction: ltr;
+    text-align: left;
+  }
+
+  .feature-card h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .feature-card p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+  /* ===== VISUAL MOCKS ===== */
+  .theme-chat { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
+  .theme-tabs { background: linear-gradient(135deg, #0c1222 0%, #162032 100%); }
+  .theme-ai { background: linear-gradient(135deg, #0f0a1a 0%, #1a1030 100%); }
+  .theme-vitals { background: linear-gradient(135deg, #0a1a15 0%, #0f2520 100%); }
+  .theme-analytics { background: linear-gradient(135deg, #0a0a1a 0%, #15152a 100%); }
+  .theme-achieve { background: linear-gradient(135deg, #1a0f0a 0%, #2a1a10 100%); }
+  .theme-devtools { background: linear-gradient(135deg, #0f1520 0%, #1a2030 100%); }
+  .theme-custom { background: linear-gradient(135deg, #0a0f1a 0%, #141a2a 100%); }
+  .theme-provider { background: linear-gradient(135deg, #0a0f1a 0%, #101825 100%); }
+  .theme-adventure { background: linear-gradient(135deg, #0a0a15 0%, #1a1025 100%); }
+
+  .chat-mock { display: flex; flex-direction: column; gap: 8px; width: 90%; direction: ltr; }
+
+  .chat-bubble {
+    padding: 8px 14px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    max-width: 78%;
+    line-height: 1.4;
+    font-family: 'Heebo', sans-serif;
+  }
+
+  .chat-user {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    align-self: flex-end;
+    border-bottom-left-radius: 4px;
+  }
+
+  .chat-assistant {
+    background: rgba(255,255,255,0.08);
+    color: #e2e8f0;
+    align-self: flex-start;
+    border-bottom-right-radius: 4px;
+  }
+
+  .chat-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 12px;
+    background: var(--accent-cyan);
+    animation: blink 1s step-end infinite;
+    vertical-align: middle;
+    margin-right: 2px;
+  }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  .tabs-bar { display: flex; gap: 2px; direction: ltr; }
+
+  .tab-item {
+    padding: 5px 14px;
+    border-radius: 8px 8px 0 0;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid transparent;
+    border-bottom: none;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .tab-item.active {
+    background: rgba(255,255,255,0.08);
+    color: white;
+    border-color: rgba(255,255,255,0.1);
+  }
+
+  .tab-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+  .tabs-content {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 0 0 8px 8px;
+    padding: 12px;
+    min-height: 60px;
+    direction: ltr;
+  }
+
+  .tabs-content .mini-line { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.06); margin-bottom: 5px; }
+  .tabs-content .mini-line:nth-child(1) { width: 85%; }
+  .tabs-content .mini-line:nth-child(2) { width: 60%; }
+  .tabs-content .mini-line:nth-child(3) { width: 72%; }
+
+  .ai-sparkles { position: relative; width: 80px; height: 80px; }
+
+  .ai-sparkle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: var(--accent-purple);
+    border-radius: 50%;
+    animation: sparkleFloat 3s ease-in-out infinite;
+  }
+
+  .ai-sparkle:nth-child(1) { top: 10%; right: 20%; animation-delay: 0s; background: var(--accent-cyan); }
+  .ai-sparkle:nth-child(2) { top: 50%; right: 0; animation-delay: 0.5s; }
+  .ai-sparkle:nth-child(3) { top: 80%; right: 30%; animation-delay: 1s; background: var(--accent-pink); }
+  .ai-sparkle:nth-child(4) { top: 30%; right: 60%; animation-delay: 1.5s; background: var(--accent-orange); }
+  .ai-sparkle:nth-child(5) { top: 70%; right: 70%; animation-delay: 2s; }
+  .ai-sparkle:nth-child(6) { top: 10%; right: 80%; animation-delay: 2.5s; background: var(--accent-green); }
+
+  .ai-center-icon {
+    position: absolute;
+    inset: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(236,72,153,0.2));
+    border: 1px solid rgba(139,92,246,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  @keyframes sparkleFloat {
+    0%, 100% { transform: translateY(0) scale(1); opacity: 0.6; }
+    50% { transform: translateY(-10px) scale(1.5); opacity: 1; }
+  }
+
+  .weather-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    position: relative;
+    flex-shrink: 0;
+    box-shadow: 0 0 20px rgba(251,191,36,0.3);
+    animation: weatherPulse 3s ease-in-out infinite;
+  }
+
+  .weather-icon::after {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, #fde68a, #f59e0b);
+  }
+
+  @keyframes weatherPulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(251,191,36,0.2); }
+    50% { box-shadow: 0 0 30px rgba(251,191,36,0.4); }
+  }
+
+  .timeline-seg { width: 10px; border-radius: 2px; }
+
+  .analytics-mock {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 80px;
+    width: 80%;
+    direction: ltr;
+  }
+
+  .bar-col {
+    flex: 1;
+    border-radius: 4px 4px 0 0;
+    min-width: 12px;
+  }
+
+  .badge-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    border: 2px solid;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .badge-circle.common { border-color: #94a3b8; background: rgba(148,163,184,0.1); }
+  .badge-circle.rare { border-color: #3b82f6; background: rgba(59,130,246,0.1); }
+  .badge-circle.epic { border-color: #8b5cf6; background: rgba(139,92,246,0.15); }
+  .badge-circle.legendary { border-color: #f59e0b; background: rgba(245,158,11,0.15); box-shadow: 0 0 15px rgba(245,158,11,0.3); }
+
+  .badge-xp {
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.5rem;
+    font-weight: 700;
+    background: var(--bg-card);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--accent-orange);
+  }
+
+  .devtools-mock { display: flex; flex-direction: column; gap: 6px; width: 85%; direction: ltr; }
+
+  .devtools-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.02);
+  }
+
+  .devtools-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+  }
+
+  .custom-mock { display: flex; gap: 8px; width: 90%; direction: ltr; }
+
+  .theme-preview {
+    flex: 1;
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border: 1px solid rgba(255,255,255,0.06);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .theme-preview-label { font-size: 0.55rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+  .theme-preview-line { height: 4px; border-radius: 2px; }
+
+  .tp-hacker { background: #0a0a0a; color: #22c55e; }
+  .tp-hacker .theme-preview-line { background: rgba(34,197,94,0.3); }
+  .tp-hacker .theme-preview-line:nth-child(2) { background: rgba(34,197,94,0.5); width: 70%; }
+
+  .tp-retro { background: #0a0a2e; color: #f59e0b; }
+  .tp-retro .theme-preview-line { background: rgba(245,158,11,0.3); }
+  .tp-retro .theme-preview-line:nth-child(2) { background: rgba(245,158,11,0.5); width: 60%; }
+  .tp-retro::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.1) 4px);
+    pointer-events: none;
+  }
+
+  .tp-zen { background: #111827; color: #94a3b8; }
+  .tp-zen .theme-preview-line { background: rgba(148,163,184,0.15); }
+  .tp-zen .theme-preview-line:nth-child(2) { background: rgba(148,163,184,0.25); width: 80%; }
+
+  .dungeon-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    gap: 1px;
+    width: 100px;
+    height: 100px;
+  }
+
+  .d-wall { background: #1a1a2e; }
+  .d-floor { background: #2a2a40; }
+  .d-player { background: #22c55e; box-shadow: 0 0 4px #22c55e; }
+  .d-treasure { background: #f59e0b; box-shadow: 0 0 4px #f59e0b; }
+  .d-monster { background: #ef4444; box-shadow: 0 0 4px #ef4444; }
+  .d-scroll { background: #3b82f6; box-shadow: 0 0 4px #3b82f6; }
+
+  .provider-badge {
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    border: 2px solid;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .provider-badge.claude-badge { border-color: var(--accent-blue); background: rgba(59,130,246,0.1); color: var(--accent-blue); }
+  .provider-badge.codex-badge { border-color: var(--accent-green); background: rgba(16,185,129,0.1); color: var(--accent-green); }
+
+  .provider-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: providerPulse 2s ease-in-out infinite;
+  }
+
+  .claude-badge .provider-dot { background: var(--accent-blue); }
+  .codex-badge .provider-dot { background: var(--accent-green); }
+
+  @keyframes providerPulse {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.3); }
+  }
+
+  @keyframes progressPulse {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
+  }
+
+  /* ===== SECTION COLORS ===== */
+  .s-chat .section-tag { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+  .s-chat .section-title { color: var(--accent-blue); }
+  .s-chat .feature-card::before { background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple)); }
+
+  .s-tabs .section-tag { background: rgba(249,115,22,0.15); color: var(--accent-coral); }
+  .s-tabs .section-title { color: var(--accent-coral); }
+  .s-tabs .feature-card::before { background: linear-gradient(90deg, var(--accent-coral), var(--accent-orange)); }
+
+  .s-ai .section-tag { background: rgba(139,92,246,0.15); color: var(--accent-purple); }
+  .s-ai .section-title { color: var(--accent-purple); }
+  .s-ai .feature-card::before { background: linear-gradient(90deg, var(--accent-purple), var(--accent-pink)); }
+
+  .s-vitals .section-tag { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+  .s-vitals .section-title { color: var(--accent-green); }
+  .s-vitals .feature-card::before { background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); }
+
+  .s-analytics .section-tag { background: rgba(6,182,212,0.15); color: var(--accent-cyan); }
+  .s-analytics .section-title { color: var(--accent-cyan); }
+  .s-analytics .feature-card::before { background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue)); }
+
+  .s-achieve .section-tag { background: rgba(245,158,11,0.15); color: var(--accent-orange); }
+  .s-achieve .section-title { color: var(--accent-orange); }
+  .s-achieve .feature-card::before { background: linear-gradient(90deg, var(--accent-orange), var(--accent-red)); }
+
+  .s-devtools .section-tag { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+  .s-devtools .section-title { color: var(--accent-green); }
+  .s-devtools .feature-card::before { background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); }
+
+  .s-custom .section-tag { background: rgba(236,72,153,0.15); color: var(--accent-pink); }
+  .s-custom .section-title { color: var(--accent-pink); }
+  .s-custom .feature-card::before { background: linear-gradient(90deg, var(--accent-pink), var(--accent-purple)); }
+
+  /* ===== STATS BAR ===== */
+  .stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 3rem;
+    flex-wrap: wrap;
+    padding: 3rem 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    border-top: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .stat-item { text-align: center; }
+
+  .stat-number {
+    font-size: 2.5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .stat-label { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+  /* ===== FOOTER ===== */
+  .footer {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  .footer a { color: var(--accent-blue); text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 768px) {
+    .features-grid { grid-template-columns: 1fr; }
+    .stats-bar { gap: 2rem; }
+    .section { padding: 4rem 1.5rem; }
+    .custom-mock { flex-direction: column; }
+  }
+
+  /* ===== SCROLL REVEAL ===== */
+  .reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-logo">
+    <div class="hero-logo-ring"></div>
+    <div class="hero-logo-ring"></div>
+    <div class="hero-logo-ring"></div>
+    <div class="hero-logo-inner">C</div>
+  </div>
+  <h1>ClaUi</h1>
+  <p class="hero-subtitle">ממשק צ'אט עשיר וויזואלי ל-Claude Code בתוך VS Code. ריבוי לשוניות, תובנות AI, אנליטיקה, גיימיפיקציה ועוד.</p>
+  <div class="hero-badges">
+    <div class="hero-badge"><span>36+</span>&nbsp;יכולות</div>
+    <div class="hero-badge"><span>65</span>&nbsp;הישגים</div>
+    <div class="hero-badge"><span>3</span>&nbsp;ערכות עיצוב</div>
+    <div class="hero-badge"><span>2</span>&nbsp;ספקי AI</div>
+  </div>
+  <div class="scroll-hint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
+  </div>
+</section>
+
+<!-- ===== NAV ===== -->
+<nav class="nav">
+  <div class="nav-inner">
+    <span class="nav-brand">ClaUi</span>
+    <a href="#chat">צ'אט</a>
+    <a href="#tabs">לשוניות</a>
+    <a href="#ai">יכולות AI</a>
+    <a href="#vitals">מדדי בריאות</a>
+    <a href="#analytics">אנליטיקה</a>
+    <a href="#achievements">הישגים</a>
+    <a href="#devtools">כלי פיתוח</a>
+    <a href="#customization">התאמה אישית</a>
+  </div>
+</nav>
+
+<!-- ===== STATS ===== -->
+<div class="stats-bar reveal">
+  <div class="stat-item">
+    <div class="stat-number">36+</div>
+    <div class="stat-label">יכולות</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-number">13</div>
+    <div class="stat-label">פקודות</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-number">40+</div>
+    <div class="stat-label">הגדרות</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-number">65</div>
+    <div class="stat-label">הישגים</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-number">10</div>
+    <div class="stat-label">שפות תרגום</div>
+  </div>
+</div>
+
+<!-- ===== 1. CORE CHAT ===== -->
+<section id="chat" class="section s-chat">
+  <div class="section-header reveal">
+    <span class="section-tag">ליבה</span>
+    <h2 class="section-title">חוויית הצ'אט</h2>
+    <p class="section-desc">ממשק צ'אט מלוטש ועשיר ביכולות שמביא את Claude Code לחיים בתוך VS Code.</p>
+  </div>
+
+  <div class="features-grid">
+    <!-- Rich Messages -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-chat">
+        <div class="chat-mock">
+          <div class="chat-bubble chat-user">Fix the auth bug in login.ts</div>
+          <div class="chat-bubble chat-assistant">I'll look into the auth flow. Let me read the file... <span class="chat-cursor"></span></div>
+        </div>
+      </div>
+      <h3>הודעות צ'אט עשירות</h3>
+      <p>רנדור Markdown מלא, בלוקי קוד עם הדגשת תחביר והעתקה/כיווץ, חותמת זמן, תג מודל, וסמן מהבהב בזמן סטרימינג חי.</p>
+    </div>
+
+    <!-- Tool Visualization -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-chat">
+        <div class="chat-mock" style="gap: 4px;">
+          <div style="background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.15); border-radius: 8px; padding: 6px 10px; font-size: 0.65rem; color: #60a5fa; display: flex; align-items: center; gap: 6px;">
+            <span style="width: 6px; height: 6px; background: #3b82f6; border-radius: 50%;"></span>
+            Read &middot; src/auth/login.ts
+          </div>
+          <div style="background: rgba(139,92,246,0.08); border: 1px solid rgba(139,92,246,0.15); border-radius: 8px; padding: 6px 10px; font-size: 0.65rem; color: #a78bfa; display: flex; align-items: center; gap: 6px;">
+            <span style="width: 6px; height: 6px; background: #8b5cf6; border-radius: 50%;"></span>
+            Edit &middot; src/auth/login.ts:42
+          </div>
+          <div style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.15); border-radius: 8px; padding: 6px 10px; font-size: 0.65rem; color: #34d399; display: flex; align-items: center; gap: 6px;">
+            <span style="width: 6px; height: 6px; background: #10b981; border-radius: 50%;"></span>
+            Bash &middot; npm test
+          </div>
+        </div>
+      </div>
+      <h3>הצגת שימוש בכלים</h3>
+      <p>כל קריאת כלי (Read, Edit, Bash, Grep...) מוצגת כבלוק מתקפל עם תוויות ברורות. הרחב לצפייה בקלט/פלט מלא, כולל שלבי אישור תוכנית.</p>
+    </div>
+
+    <!-- Clickable Paths -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-chat">
+        <div style="width: 85%; direction: ltr;">
+          <div style="font-family: Consolas, monospace; font-size: 0.7rem; color: var(--text-secondary); line-height: 1.8;">
+            <div>Found issue in <span style="color: #60a5fa; text-decoration: underline; cursor: pointer;">src/auth/login.ts:42</span></div>
+            <div>Related: <span style="color: #60a5fa; text-decoration: underline; cursor: pointer;">C:\projects\app\config.json</span></div>
+            <div>Docs: <span style="color: #34d399; text-decoration: underline; cursor: pointer;">https://docs.example.com</span></div>
+          </div>
+        </div>
+      </div>
+      <h3>נתיבי קבצים וקישורים לחיצים</h3>
+      <p>נתיבי קבצים מזוהים אוטומטית בהודעות -- Ctrl+Click פותח אותם בעורך VS Code (עם תמיכה בשורה:עמודה). קישורי URL נפתחים בדפדפן.</p>
+    </div>
+
+    <!-- Input Area -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-chat">
+        <div style="width: 88%; direction: ltr;">
+          <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; gap: 4px;">
+              <div style="width: 28px; height: 28px; border-radius: 6px; background: rgba(59,130,246,0.1); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #60a5fa;">+</div>
+              <div style="width: 28px; height: 28px; border-radius: 6px; background: rgba(139,92,246,0.1); display: flex; align-items: center; justify-content: center; font-size: 0.55rem; color: #a78bfa;">@</div>
+              <div style="width: 28px; height: 28px; border-radius: 6px; background: rgba(6,182,212,0.1); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #22d3ee;">Aa</div>
+            </div>
+            <div style="font-size: 0.65rem; color: var(--text-muted); padding: 4px 0;">Type your message... | Ctrl+Enter to send</div>
+            <div style="display: flex; gap: 4px; justify-content: flex-end;">
+              <div style="font-size: 0.55rem; padding: 3px 10px; background: rgba(139,92,246,0.2); color: #a78bfa; border-radius: 4px;">Enhance</div>
+              <div style="font-size: 0.55rem; padding: 3px 10px; background: var(--accent-blue); color: white; border-radius: 4px;">Send</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <h3>אזור קלט חכם</h3>
+      <p>שדה טקסט מתרחב אוטומטית עם בוחר קבצים (+), אזכור קבצים עם @, הדבקת תמונות (Ctrl+V), היסטוריית פרומפטים (חצים), ביטול/שחזור, ותמיכה מלאה ב-RTL.</p>
+    </div>
+
+    <!-- Plan Approval -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-chat">
+        <div style="width: 88%; direction: ltr;">
+          <div style="background: rgba(139,92,246,0.05); border: 1px solid rgba(139,92,246,0.15); border-radius: 10px; padding: 10px;">
+            <div style="font-size: 0.65rem; color: #a78bfa; font-weight: 600; margin-bottom: 6px;">Plan Approval Required</div>
+            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+              <div style="font-size: 0.55rem; padding: 4px 8px; border-radius: 6px; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.2);">Approve</div>
+              <div style="font-size: 0.55rem; padding: 4px 8px; border-radius: 6px; background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.2);">Skip Approvals</div>
+              <div style="font-size: 0.55rem; padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.08);">Manual</div>
+              <div style="font-size: 0.55rem; padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid rgba(255,255,255,0.08);">Feedback</div>
+            </div>
+            <div style="font-size: 0.55rem; color: var(--text-muted); margin-top: 6px;">Context: 47% used</div>
+          </div>
+        </div>
+      </div>
+      <h3>אישור תוכניות ושאלות</h3>
+      <p>כש-Claude צריך אישור, מופיע סרגל 4 אפשרויות (תואם ל-CLI). לשאלות -- תמיכה בבחירה בודדת/מרובה ותשובות חופשיות. מוצג אחוז ניצול הקשר.</p>
+    </div>
+
+    <!-- Edit & Fork -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-chat">
+        <div class="chat-mock" style="gap: 6px; position: relative;">
+          <div class="chat-bubble chat-user" style="position: relative;">
+            Fix the login bug
+            <div style="position: absolute; top: -6px; left: -6px; display: flex; gap: 3px;">
+              <div style="font-size: 0.45rem; padding: 2px 5px; border-radius: 3px; background: rgba(59,130,246,0.3); color: #93c5fd;">Edit</div>
+              <div style="font-size: 0.45rem; padding: 2px 5px; border-radius: 3px; background: rgba(139,92,246,0.3); color: #c4b5fd;">Fork</div>
+            </div>
+          </div>
+          <div class="chat-bubble chat-assistant" style="opacity: 0.4;">Previous response...</div>
+          <div style="width: 100%; border-top: 1px dashed rgba(255,255,255,0.1); position: relative;">
+            <span style="position: absolute; top: -6px; left: 50%; transform: translateX(-50%); font-size: 0.45rem; color: var(--text-muted); background: #0f172a; padding: 0 4px;">rewind</span>
+          </div>
+        </div>
+      </div>
+      <h3>עריכה ופיצול הודעות</h3>
+      <p>העבר עכבר על הודעת משתמש לעריכה (שכתוב ושליחה מחדש) או פיצול (הסתעפות ללשונית חדשה). עריכה מחזירה את השיחה; פיצול משמר את המקור.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 2. MULTI-TAB ===== -->
+<section id="tabs" class="section s-tabs">
+  <div class="section-header reveal">
+    <span class="section-tag">סשנים</span>
+    <h2 class="section-title">ריבוי לשוניות</h2>
+    <p class="section-desc">הרצת שיחות מקבילות, כל אחת עם תהליך Claude משלה, צבע ייחודי ואישיות.</p>
+  </div>
+
+  <div class="features-grid">
+    <!-- Tabs -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-tabs">
+        <div style="display: flex; flex-direction: column; width: 90%; gap: 0;">
+          <div class="tabs-bar">
+            <div class="tab-item active"><div class="tab-dot" style="background:#3b82f6"></div>Auth Fix</div>
+            <div class="tab-item"><div class="tab-dot" style="background:#f97316"></div>API Tests</div>
+            <div class="tab-item"><div class="tab-dot" style="background:#10b981"></div>Refactor</div>
+            <div class="tab-item"><div class="tab-dot" style="background:#8b5cf6"></div>Docs</div>
+          </div>
+          <div class="tabs-content">
+            <div class="mini-line"></div>
+            <div class="mini-line"></div>
+            <div class="mini-line"></div>
+          </div>
+        </div>
+      </div>
+      <h3>לשוניות מקבילות בצבעים</h3>
+      <p>כל לשונית מקבלת צבע ייחודי מפלטת 8 צבעים. הלשוניות עצמאיות לחלוטין -- לכל אחת תהליך CLI משלה, מצב משלה. פתח כמה שצריך.</p>
+    </div>
+
+    <!-- Auto-Naming -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-tabs">
+        <div style="display: flex; flex-direction: column; gap: 8px; direction: ltr; width: 80%;">
+          <div style="font-size: 0.7rem; color: var(--text-muted); font-family: Consolas, monospace; text-align: center;">"Fix the login validation..."</div>
+          <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z"/></svg>
+            <span style="font-size: 0.6rem; color: var(--text-muted);">AI Naming</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z"/></svg>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+            <div style="padding: 4px 12px; border-radius: 6px; background: rgba(249,115,22,0.15); border: 1px solid rgba(249,115,22,0.3); font-size: 0.75rem; font-weight: 600; color: #fb923c;">Login Fix</div>
+          </div>
+        </div>
+      </div>
+      <h3>שמות אוטומטיים עם AI</h3>
+      <p>ההודעה הראשונה מפעילה קריאת Haiku ברקע שמייצרת שם קצר ותיאורי ללשונית. תומך בעברית ואנגלית. שנה ידנית עם כפתור העיפרון.</p>
+    </div>
+
+    <!-- Session History -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-tabs">
+        <div style="width: 85%; direction: ltr;">
+          <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 6px 0;">
+            <div style="padding: 5px 10px; font-size: 0.6rem; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid rgba(255,255,255,0.05);">Recent Sessions</div>
+            <div style="padding: 5px 10px; font-size: 0.62rem; color: var(--text-primary); display: flex; justify-content: space-between; background: rgba(59,130,246,0.05);">
+              <span>Auth Refactor</span><span style="color: var(--text-muted);">2h ago</span>
+            </div>
+            <div style="padding: 5px 10px; font-size: 0.62rem; color: var(--text-secondary); display: flex; justify-content: space-between;">
+              <span>API Tests</span><span style="color: var(--text-muted);">5h ago</span>
+            </div>
+            <div style="padding: 5px 10px; font-size: 0.62rem; color: var(--text-secondary); display: flex; justify-content: space-between;">
+              <span>DB Migration</span><span style="color: var(--text-muted);">1d ago</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <h3>היסטוריית סשנים וחידוש</h3>
+      <p>עיין בסשנים קודמים דרך Ctrl+Shift+H. חדש כל סשן מיד עם השמעה מלאה של השיחה. כולל גם היסטוריית פרומפטים ב-3 רמות (סשן / פרויקט / גלובלי).</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 3. AI FEATURES ===== -->
+<section id="ai" class="section s-ai">
+  <div class="section-header reveal">
+    <span class="section-tag">מונע AI</span>
+    <h2 class="section-title">שירותי AI ברקע</h2>
+    <p class="section-desc">תהליכי AI ברקע שמעשירים את החוויה בלי להפריע לעבודה.</p>
+  </div>
+
+  <div class="features-grid">
+    <!-- Prompt Enhancer -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-ai">
+        <div style="width: 85%; direction: ltr;">
+          <div style="display: flex; gap: 8px; align-items: stretch;">
+            <div style="flex: 1; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px;">
+              <div style="font-size: 0.5rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">ORIGINAL</div>
+              <div style="font-size: 0.6rem; color: var(--text-secondary);">fix the bug</div>
+            </div>
+            <div style="display: flex; align-items: center; font-size: 0.8rem; color: var(--accent-purple);">&#10230;</div>
+            <div style="flex: 1; background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.2); border-radius: 8px; padding: 8px;">
+              <div style="font-size: 0.5rem; font-weight: 600; color: #a78bfa; margin-bottom: 4px;">ENHANCED</div>
+              <div style="font-size: 0.6rem; color: var(--text-primary);">Fix the auth validation bug in login.ts causing 401 errors</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <h3>שיפור פרומפטים</h3>
+      <p>AI משכתב את הפרומפט לבהירות ודיוק. השוו מקור מול משופר זה-לצד-זה. מצב אוטומטי מיירט כל שליחה. מודל ניתן להגדרה.</p>
+    </div>
+
+    <!-- Translation -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-ai">
+        <div style="width: 80%; direction: ltr;">
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="font-size: 0.65rem; color: var(--text-secondary);">I fixed the authentication handler to validate tokens properly...</div>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <div style="font-size: 0.5rem; padding: 2px 6px; border-radius: 4px; background: rgba(236,72,153,0.15); color: #f472b6;">Translate</div>
+            </div>
+            <div style="font-size: 0.65rem; color: var(--text-primary); direction: rtl; text-align: right; background: rgba(236,72,153,0.04); padding: 6px 8px; border-radius: 6px; border-right: 2px solid rgba(236,72,153,0.3);">&#x202B;תיקנתי את מטפל האימות כך שיאמת טוקנים כראוי...</div>
+          </div>
+        </div>
+      </div>
+      <h3>תרגום הודעות</h3>
+      <p>תרגום בלחיצה ל-10 שפות (עברית, ערבית, רוסית, ספרדית, צרפתית, גרמנית, פורטוגזית, סינית, יפנית, קוריאנית). נשמר במטמון, מיידי אחרי פעם ראשונה.</p>
+    </div>
+
+    <!-- Semantic Analysis -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-ai">
+        <div class="ai-sparkles">
+          <div class="ai-sparkle"></div>
+          <div class="ai-sparkle"></div>
+          <div class="ai-sparkle"></div>
+          <div class="ai-sparkle"></div>
+          <div class="ai-sparkle"></div>
+          <div class="ai-sparkle"></div>
+          <div class="ai-center-icon" style="font-size: 0.8rem; font-weight: 600; color: #c4b5fd;">AI</div>
+        </div>
+      </div>
+      <h3>ניתוח סמנטי של תורות</h3>
+      <p>מנוע רקע שמסווג כל תור: מצב רוח המשתמש, סוג משימה, תוצאה וחזרה על באגים. מפעיל את וידג'ט מזג האוויר, התראות תסכול וציר זמן רגשי באנליטיקה.</p>
+    </div>
+
+    <!-- Activity Summary -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-ai">
+        <div style="width: 80%; direction: ltr; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+          <div style="display: flex; gap: 4px; align-items: center;">
+            <div style="width: 6px; height: 6px; background: var(--accent-purple); border-radius: 50%; animation: blink 1s step-end infinite;"></div>
+            <div style="width: 6px; height: 6px; background: var(--accent-purple); border-radius: 50%; animation: blink 1s step-end infinite; animation-delay: 0.33s;"></div>
+            <div style="width: 6px; height: 6px; background: var(--accent-purple); border-radius: 50%; animation: blink 1s step-end infinite; animation-delay: 0.66s;"></div>
+          </div>
+          <div style="font-size: 0.7rem; font-weight: 600; color: #c4b5fd;">Fixing authentication flow</div>
+          <div style="font-size: 0.6rem; color: var(--text-muted); text-align: center;">Reading login.ts, editing validation, running tests...</div>
+        </div>
+      </div>
+      <h3>סיכום פעילות</h3>
+      <p>אחרי כל N שימושים בכלים, קריאת AI ברקע מייצרת תווית קצרה וסיכום. מוצג באינדיקטור החשיבה כדי שתמיד תדעו מה Claude עושה.</p>
+    </div>
+
+    <!-- Dual Provider -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-provider">
+        <div style="display: flex; gap: 16px; align-items: center;">
+          <div class="provider-badge claude-badge">
+            <div class="provider-dot"></div>
+            Claude
+          </div>
+          <div style="font-size: 1rem; color: var(--text-muted);">+</div>
+          <div class="provider-badge codex-badge">
+            <div class="provider-dot"></div>
+            Codex
+          </div>
+        </div>
+      </div>
+      <h3>ספק כפול: Claude + Codex</h3>
+      <p>ארכיטקטורת ספק כפול מלאה. מעבר בין Claude ל-OpenAI Codex עם נתיבי ריצה נפרדים, היסטוריית סשנים עצמאית, ושליטה מבוססת יכולות בממשק.</p>
+    </div>
+
+    <!-- Skill Generation -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-ai">
+        <div style="width: 80%; direction: ltr;">
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 0.6rem; color: var(--text-muted);">
+              <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden;">
+                <div style="width: 65%; height: 100%; background: linear-gradient(90deg, #8b5cf6, #ec4899); border-radius: 3px; animation: progressPulse 2s ease-in-out infinite;"></div>
+              </div>
+              65%
+            </div>
+            <div style="font-size: 0.55rem; color: #c4b5fd;">Phase 5/8: Cross-Bucket Merge</div>
+            <div style="display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap;">
+              <div style="font-size: 0.45rem; padding: 2px 6px; border-radius: 3px; background: rgba(16,185,129,0.15); color: #34d399;">Extracted</div>
+              <div style="font-size: 0.45rem; padding: 2px 6px; border-radius: 3px; background: rgba(16,185,129,0.15); color: #34d399;">Clustered</div>
+              <div style="font-size: 0.45rem; padding: 2px 6px; border-radius: 3px; background: rgba(16,185,129,0.15); color: #34d399;">Enriched</div>
+              <div style="font-size: 0.45rem; padding: 2px 6px; border-radius: 3px; background: rgba(139,92,246,0.15); color: #a78bfa;">Merging...</div>
+              <div style="font-size: 0.45rem; padding: 2px 6px; border-radius: 3px; background: rgba(255,255,255,0.05); color: var(--text-muted);">Synthesis</div>
+              <div style="font-size: 0.45rem; padding: 2px 6px; border-radius: 3px; background: rgba(255,255,255,0.05); color: var(--text-muted);">Install</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <h3>יצירת Skills אוטומטית</h3>
+      <p>ממיר את תיעוד המשימות (SR-PTD) ל-Skills של Claude דרך צינור AI בן 8 שלבים. חילוץ, אשכול, דדופליקציה, סינתזה והתקנה אטומית.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 4. SESSION VITALS ===== -->
+<section id="vitals" class="section s-vitals">
+  <div class="section-header reveal">
+    <span class="section-tag">מדדים</span>
+    <h2 class="section-title">מדדי בריאות הסשן</h2>
+    <p class="section-desc">אינדיקטורים ויזואליים בזמן אמת שנותנים לכם לחוש את הדופק של הסשן במבט.</p>
+  </div>
+
+  <div class="features-grid">
+    <!-- Weather Widget -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-vitals">
+        <div style="display: flex; gap: 16px; align-items: center;">
+          <div class="weather-icon"></div>
+          <div style="direction: ltr;">
+            <div style="font-size: 0.75rem; font-weight: 600; color: #fbbf24;">Clear Sky</div>
+            <div style="font-size: 0.6rem; color: var(--text-muted); margin-top: 2px;">Low errors, good momentum</div>
+          </div>
+        </div>
+      </div>
+      <h3>וידג'ט מזג אוויר</h3>
+      <p>אייקון מזג אוויר צף וניתן לגרירה שמשקף את בריאות הסשן. 8 מצבי רוח מ"שמיים בהירים" עד "סופת רעמים", מחושבים מלחץ שגיאות, מהירות עלות, מומנטום וזרימת פרודוקטיביות.</p>
+    </div>
+
+    <!-- Session Timeline -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-vitals">
+        <div style="display: flex; align-items: center; gap: 16px; width: 90%; direction: ltr;">
+          <div style="display: flex; flex-direction: column; gap: 2px; flex-shrink: 0;">
+            <div class="timeline-seg" style="height: 12px; background: #10b981;"></div>
+            <div class="timeline-seg" style="height: 8px; background: #3b82f6;"></div>
+            <div class="timeline-seg" style="height: 18px; background: #8b5cf6;"></div>
+            <div class="timeline-seg" style="height: 10px; background: #10b981;"></div>
+            <div class="timeline-seg" style="height: 6px; background: #ef4444;"></div>
+            <div class="timeline-seg" style="height: 14px; background: #f97316;"></div>
+            <div class="timeline-seg" style="height: 10px; background: #10b981;"></div>
+            <div class="timeline-seg" style="height: 8px; background: #06b6d4;"></div>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-size: 0.55rem; color: var(--text-muted); margin-bottom: 6px;">Legend:</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+              <div style="display: flex; align-items: center; gap: 3px; font-size: 0.5rem; color: var(--text-muted);"><div style="width: 6px; height: 6px; border-radius: 1px; background: #10b981;"></div>Success</div>
+              <div style="display: flex; align-items: center; gap: 3px; font-size: 0.5rem; color: var(--text-muted);"><div style="width: 6px; height: 6px; border-radius: 1px; background: #ef4444;"></div>Error</div>
+              <div style="display: flex; align-items: center; gap: 3px; font-size: 0.5rem; color: var(--text-muted);"><div style="width: 6px; height: 6px; border-radius: 1px; background: #3b82f6;"></div>Discussion</div>
+              <div style="display: flex; align-items: center; gap: 3px; font-size: 0.5rem; color: var(--text-muted);"><div style="width: 6px; height: 6px; border-radius: 1px; background: #8b5cf6;"></div>Code</div>
+              <div style="display: flex; align-items: center; gap: 3px; font-size: 0.5rem; color: var(--text-muted);"><div style="width: 6px; height: 6px; border-radius: 1px; background: #f97316;"></div>Research</div>
+              <div style="display: flex; align-items: center; gap: 3px; font-size: 0.5rem; color: var(--text-muted);"><div style="width: 6px; height: 6px; border-radius: 1px; background: #06b6d4;"></div>Commands</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <h3>ציר זמן הסשן</h3>
+      <p>מיני-מפה אנכית בצד הימני. כל מקטע = תור שהושלם, מקודד צבע לפי קטגוריה. לחיצה גוללת לאותו תור; ריחוף מציג פרטים. גובה = משך זמן.</p>
+    </div>
+
+    <!-- Intensity Borders -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-vitals">
+        <div style="width: 85%; direction: ltr; display: flex; flex-direction: column; gap: 6px;">
+          <div style="border-right: 3px solid #10b981; padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: 6px; font-size: 0.6rem; color: var(--text-secondary);">Low activity turn</div>
+          <div style="border-right: 5px solid #8b5cf6; padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: 6px; font-size: 0.6rem; color: var(--text-secondary);">Medium (3 tools)</div>
+          <div style="border-right: 8px solid #f97316; padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: 6px; font-size: 0.6rem; color: var(--text-secondary);">High activity (7+ tools)</div>
+        </div>
+      </div>
+      <h3>גבולות עוצמת תור</h3>
+      <p>גבול שמאלי על כל הודעת עוזר. צבע = קטגוריית התור, עובי = עוצמת שימוש בכלים (דק / בינוני / עבה). סריקה ויזואלית מיידית של דפוסי פעילות.</p>
+    </div>
+
+    <!-- Adventure Widget -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-adventure">
+        <div class="dungeon-grid">
+          <div class="d-wall"></div><div class="d-wall"></div><div class="d-wall"></div><div class="d-wall"></div><div class="d-wall"></div><div class="d-wall"></div><div class="d-wall"></div><div class="d-wall"></div>
+          <div class="d-wall"></div><div class="d-floor"></div><div class="d-floor"></div><div class="d-scroll"></div><div class="d-wall"></div><div class="d-floor"></div><div class="d-floor"></div><div class="d-wall"></div>
+          <div class="d-wall"></div><div class="d-floor"></div><div class="d-wall"></div><div class="d-floor"></div><div class="d-wall"></div><div class="d-floor"></div><div class="d-wall"></div><div class="d-wall"></div>
+          <div class="d-wall"></div><div class="d-floor"></div><div class="d-wall"></div><div class="d-floor"></div><div class="d-floor"></div><div class="d-floor"></div><div class="d-floor"></div><div class="d-wall"></div>
+          <div class="d-wall"></div><div class="d-floor"></div><div class="d-floor"></div><div class="d-floor"></div><div class="d-wall"></div><div class="d-wall"></div><div class="d-floor"></div><div class="d-wall"></div>
+          <div class="d-wall"></div><div class="d-wall"></div><div class="d-wall"></div><div class="d-floor"></div><div class="d-wall"></div><div class="d-monster"></div><div class="d-floor"></div><div class="d-wall"></div>
+          <div class="d-wall"></div><div class="d-player"></div><div class="d-floor"></div><div class="d-floor"></div><div class="d-floor"></div><div class="d-floor"></div><div class="d-treasure"></div><div class="d-wall"></div>
+          <div class="d-wall"></div><div class="d-wall"></div><div class="d-wall"></div><div class="d-wall"></div><div class="d-wall"></div><div class="d-wall"></div><div class="d-wall"></div><div class="d-wall"></div>
+        </div>
+      </div>
+      <h3>וידג'ט הרפתקאות (מבוך פיקסלים)</h3>
+      <p>משחק roguelike בפיקסל-ארט בגודל 120x120 שממפה פעילות סשן אמיתית לחקירת מבוכים. קריאת קבצים = מגילות, עריכות = סדנים, שגיאות = מלכודות, התאוששות = אוצרות.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 5. ANALYTICS ===== -->
+<section id="analytics" class="section s-analytics">
+  <div class="section-header reveal">
+    <span class="section-tag">אנליטיקה</span>
+    <h2 class="section-title">לוח בקרה אנליטי</h2>
+    <p class="section-desc">אנליטיקה במסך מלא עם גרפים, טבלאות ותובנות סמנטיות לאורך סשנים ופרויקטים.</p>
+  </div>
+
+  <div class="features-grid">
+    <!-- Charts -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-analytics">
+        <div class="analytics-mock">
+          <div class="bar-col" style="height: 30%; background: linear-gradient(to top, #0e7490, #06b6d4);"></div>
+          <div class="bar-col" style="height: 55%; background: linear-gradient(to top, #0e7490, #06b6d4);"></div>
+          <div class="bar-col" style="height: 80%; background: linear-gradient(to top, #0e7490, #06b6d4);"></div>
+          <div class="bar-col" style="height: 45%; background: linear-gradient(to top, #0e7490, #06b6d4);"></div>
+          <div class="bar-col" style="height: 70%; background: linear-gradient(to top, #0e7490, #06b6d4);"></div>
+          <div class="bar-col" style="height: 35%; background: linear-gradient(to top, #0e7490, #06b6d4);"></div>
+          <div class="bar-col" style="height: 60%; background: linear-gradient(to top, #0e7490, #06b6d4);"></div>
+          <div class="bar-col" style="height: 90%; background: linear-gradient(to top, #0e7490, #06b6d4);"></div>
+          <div class="bar-col" style="height: 50%; background: linear-gradient(to top, #0e7490, #06b6d4);"></div>
+          <div class="bar-col" style="height: 40%; background: linear-gradient(to top, #0e7490, #06b6d4);"></div>
+        </div>
+      </div>
+      <h3>לוח בקרה עם 10 לשוניות</h3>
+      <p>מצב סשן (6 לשוניות): סקירה, טוקנים, כלים, ציר זמן, פקודות, הקשר. מצב פרויקט (4 לשוניות): סקירה, סשנים, טוקנים, כלים. מופעל על ידי Recharts.</p>
+    </div>
+
+    <!-- Metrics -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-analytics">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 85%; direction: ltr;">
+          <div style="background: rgba(6,182,212,0.06); border: 1px solid rgba(6,182,212,0.15); border-radius: 6px; padding: 8px; text-align: center;">
+            <div style="font-size: 1rem; font-weight: 700; color: #22d3ee;">47</div>
+            <div style="font-size: 0.5rem; color: var(--text-muted);">Turns</div>
+          </div>
+          <div style="background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.15); border-radius: 6px; padding: 8px; text-align: center;">
+            <div style="font-size: 1rem; font-weight: 700; color: #60a5fa;">$1.23</div>
+            <div style="font-size: 0.5rem; color: var(--text-muted);">Cost</div>
+          </div>
+          <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.15); border-radius: 6px; padding: 8px; text-align: center;">
+            <div style="font-size: 1rem; font-weight: 700; color: #34d399;">156K</div>
+            <div style="font-size: 0.5rem; color: var(--text-muted);">Tokens</div>
+          </div>
+          <div style="background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.15); border-radius: 6px; padding: 8px; text-align: center;">
+            <div style="font-size: 1rem; font-weight: 700; color: #a78bfa;">89</div>
+            <div style="font-size: 0.5rem; color: var(--text-muted);">Tools</div>
+          </div>
+        </div>
+      </div>
+      <h3>מדדים, גרפים ותובנות</h3>
+      <p>מעקב עלויות, ספירת טוקנים, עמודות תדירות כלים, תרשימי עוגה לקטגוריות, משך לפי תור, ציר זמן רגשי, זיהוי תסכול, מעקב באגים חוזרים, ובדיקת שיחות מלאה.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 6. ACHIEVEMENTS ===== -->
+<section id="achievements" class="section s-achieve">
+  <div class="section-header reveal">
+    <span class="section-tag">גיימיפיקציה</span>
+    <h2 class="section-title">הישגים וקהילה</h2>
+    <p class="section-desc">65 הישגים, 25 רמות XP, רצפי ימים, יעדי סשן ושיתוף חברתי דרך GitHub.</p>
+  </div>
+
+  <div class="features-grid">
+    <!-- Achievements -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-achieve">
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <div class="badge-circle common"><span style="font-size: 0.7rem;">C</span><span class="badge-xp">10xp</span></div>
+          <div class="badge-circle rare"><span style="font-size: 0.7rem;">R</span><span class="badge-xp">25xp</span></div>
+          <div class="badge-circle epic"><span style="font-size: 0.7rem;">E</span><span class="badge-xp">50xp</span></div>
+          <div class="badge-circle legendary"><span style="font-size: 0.7rem;">L</span><span class="badge-xp">200xp</span></div>
+        </div>
+      </div>
+      <h3>65 הישגים, 4 רמות נדירות</h3>
+      <p>7 קטגוריות: דיבאגינג, טסטים, ריפקטור, שיתוף פעולה, סשן, ארכיטקטורה, פרודוקטיביות. 4 רמות נדירות מרגיל ועד אגדי. התראות טוסט עם אפקטי צליל אופציונליים.</p>
+    </div>
+
+    <!-- Leveling -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-achieve">
+        <div style="width: 80%; direction: ltr; text-align: center;">
+          <div style="font-size: 0.6rem; color: var(--text-muted); margin-bottom: 4px;">Level 12</div>
+          <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; margin-bottom: 6px;">
+            <div style="width: 72%; height: 100%; background: linear-gradient(90deg, #f59e0b, #ef4444); border-radius: 4px;"></div>
+          </div>
+          <div style="font-size: 0.55rem; color: var(--text-muted);">1,450 / 2,000 XP</div>
+          <div style="margin-top: 10px; display: flex; gap: 3px; justify-content: center; flex-wrap: wrap;">
+            <div style="font-size: 0.45rem; padding: 2px 5px; border-radius: 3px; background: rgba(245,158,11,0.1); color: #fbbf24;">Daily Streak: 5</div>
+            <div style="font-size: 0.45rem; padding: 2px 5px; border-radius: 3px; background: rgba(16,185,129,0.1); color: #34d399;">Goals: 3/4</div>
+            <div style="font-size: 0.45rem; padding: 2px 5px; border-radius: 3px; background: rgba(59,130,246,0.1); color: #60a5fa;">Sessions: 47</div>
+          </div>
+        </div>
+      </div>
+      <h3>מערכת XP ורמות</h3>
+      <p>מערכת התקדמות בת 25 רמות עם XP מהישגים ויעדי סשן. רצפי ימים, יעדים לכל סשן (7 תבניות), ותובנות AI יומיות לבונוס XP.</p>
+    </div>
+
+    <!-- Community -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-achieve">
+        <div style="width: 85%; direction: ltr;">
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <div style="text-align: center;">
+              <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b, #ef4444); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: white;">Y</div>
+              <div style="font-size: 0.45rem; color: var(--text-muted); margin-top: 2px;">Lv.12</div>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">vs</div>
+            <div style="text-align: center;">
+              <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: white;">D</div>
+              <div style="font-size: 0.45rem; color: var(--text-muted); margin-top: 2px;">Lv.8</div>
+            </div>
+          </div>
+          <div style="margin-top: 8px; font-size: 0.5rem; color: var(--text-muted);">Compare achievements, XP, streaks</div>
+        </div>
+      </div>
+      <h3>קהילת GitHub ושיתוף</h3>
+      <p>פרסם את הפרופיל שלך ל-GitHub Gist דרך OAuth. הוסף חברים לפי שם משתמש, השווה זה-לצד-זה. צור תגים של shields.io וכרטיסי פרופיל. תמיכה מלאה בעברית/אנגלית.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 7. DEV TOOLS ===== -->
+<section id="devtools" class="section s-devtools">
+  <div class="section-header reveal">
+    <span class="section-tag">פיתוח</span>
+    <h2 class="section-title">כלי פיתוח</h2>
+    <p class="section-desc">אינטגרציית Git, לוגים, ניהול הרשאות וטיפול במפתחות API מובנים בזרימת העבודה.</p>
+  </div>
+
+  <div class="features-grid">
+    <!-- Git Push -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-devtools">
+        <div class="devtools-mock">
+          <div class="devtools-line">
+            <div class="devtools-icon" style="background: rgba(16,185,129,0.2); color: #34d399;">+</div>
+            <span style="color: #34d399;">git add .</span>
+          </div>
+          <div class="devtools-line">
+            <div class="devtools-icon" style="background: rgba(59,130,246,0.2); color: #60a5fa;">C</div>
+            <span style="color: #60a5fa;">git commit -m "Auth Fix"</span>
+          </div>
+          <div class="devtools-line">
+            <div class="devtools-icon" style="background: rgba(139,92,246,0.2); color: #a78bfa;">P</div>
+            <span style="color: #a78bfa;">git push origin main</span>
+          </div>
+        </div>
+      </div>
+      <h3>Git Push בלחיצה אחת</h3>
+      <p>Git add + commit + push בלחיצה אחת. שם הלשונית כהודעת commit (תבנית ניתנת להגדרה). כפתור גלגל שיניים להגדרות. התראות טוסט לתוצאות.</p>
+    </div>
+
+    <!-- Permissions & API Key -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-devtools">
+        <div style="width: 80%; direction: ltr; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; gap: 6px;">
+            <div style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid rgba(16,185,129,0.2); background: rgba(16,185,129,0.05); text-align: center;">
+              <div style="font-size: 0.6rem; font-weight: 600; color: #34d399;">Full Access</div>
+              <div style="font-size: 0.45rem; color: var(--text-muted); margin-top: 2px;">All tools</div>
+            </div>
+            <div style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid rgba(245,158,11,0.2); background: rgba(245,158,11,0.05); text-align: center;">
+              <div style="font-size: 0.6rem; font-weight: 600; color: #fbbf24;">Supervised</div>
+              <div style="font-size: 0.45rem; color: var(--text-muted); margin-top: 2px;">Read-only</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 6px; background: rgba(255,255,255,0.03);">
+            <div style="font-size: 0.5rem; color: var(--text-muted);">API Key:</div>
+            <div style="font-size: 0.5rem; color: #34d399;">OS Keychain</div>
+          </div>
+        </div>
+      </div>
+      <h3>הרשאות ומפתח API</h3>
+      <p>מצב גישה מלאה או מפוקח. מפתח API מאובטח ב-Keychain של מערכת ההפעלה דרך VS Code SecretStorage. ניקוי סביבה מסיר מפתחות שעברו בירושה מכל נקודות ההפעלה.</p>
+    </div>
+
+    <!-- Logging -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-devtools">
+        <div class="devtools-mock">
+          <div class="devtools-line">
+            <div class="devtools-icon" style="background: rgba(6,182,212,0.2); color: #22d3ee;">i</div>
+            <span style="color: #22d3ee;">14:32:01</span>&nbsp;<span>Session started</span>
+          </div>
+          <div class="devtools-line">
+            <div class="devtools-icon" style="background: rgba(245,158,11,0.2); color: #fbbf24;">w</div>
+            <span style="color: #fbbf24;">14:32:15</span>&nbsp;<span>Context at 78%</span>
+          </div>
+          <div class="devtools-line">
+            <div class="devtools-icon" style="background: rgba(239,68,68,0.2); color: #f87171;">e</div>
+            <span style="color: #f87171;">14:33:02</span>&nbsp;<span>Process exit code 1</span>
+          </div>
+        </div>
+      </div>
+      <h3>לוגים ודיאגנוסטיקה</h3>
+      <p>קבצי לוג לכל סשן עם רוטציה אוטומטית ב-2MB. לוגר גלובלי + לוגרים לכל לשונית. ערוץ פלט "ClaUi" לדיאגנוסטיקת VS Code. Error Boundary תופס קריסות React בחן.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 8. CUSTOMIZATION ===== -->
+<section id="customization" class="section s-custom">
+  <div class="section-header reveal">
+    <span class="section-tag">התאמה</span>
+    <h2 class="section-title">התאמה אישית ועיצוב</h2>
+    <p class="section-desc">שלוש ערכות עיצוב ויזואליות, בקרות גופן, סרגל סטטוס רספונסיבי ו-40+ הגדרות.</p>
+  </div>
+
+  <div class="features-grid">
+    <!-- Themes -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-custom">
+        <div class="custom-mock">
+          <div class="theme-preview tp-hacker">
+            <div class="theme-preview-label">Hacker</div>
+            <div class="theme-preview-line" style="width: 90%;"></div>
+            <div class="theme-preview-line" style="width: 60%;"></div>
+            <div class="theme-preview-line" style="width: 75%;"></div>
+          </div>
+          <div class="theme-preview tp-retro">
+            <div class="theme-preview-label">Retro</div>
+            <div class="theme-preview-line" style="width: 85%;"></div>
+            <div class="theme-preview-line" style="width: 55%;"></div>
+            <div class="theme-preview-line" style="width: 70%;"></div>
+          </div>
+          <div class="theme-preview tp-zen">
+            <div class="theme-preview-label">Zen</div>
+            <div class="theme-preview-line" style="width: 80%;"></div>
+            <div class="theme-preview-line" style="width: 65%;"></div>
+            <div class="theme-preview-line" style="width: 72%;"></div>
+          </div>
+        </div>
+      </div>
+      <h3>שלוש ערכות עיצוב</h3>
+      <p><strong>Terminal Hacker:</strong> ירוק-על-שחור, חשיפת מכונת כתיבה, זוהר טקסט. <strong>Retro:</strong> קווי סריקת CRT בענבר, אפקט וינייט. <strong>Zen:</strong> מינימליזם רגוע, אנימציות נשימה.</p>
+    </div>
+
+    <!-- Text Settings -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-custom">
+        <div style="width: 80%; direction: ltr; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); font-size: 0.6rem; color: var(--text-muted);">-</div>
+            <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">14px</div>
+            <div style="padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); font-size: 0.6rem; color: var(--text-muted);">+</div>
+          </div>
+          <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+            <div style="font-size: 0.5rem; padding: 3px 6px; border-radius: 4px; background: rgba(236,72,153,0.15); color: #f472b6;">Segoe UI</div>
+            <div style="font-size: 0.5rem; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-muted);">Arial</div>
+            <div style="font-size: 0.5rem; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-muted);">David</div>
+            <div style="font-size: 0.5rem; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-muted);">Consolas</div>
+            <div style="font-size: 0.5rem; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-muted);">Calibri</div>
+          </div>
+        </div>
+      </div>
+      <h3>הגדרות גופן וטקסט</h3>
+      <p>גודל גופן 10-32px, 7 משפחות גופנים מוכנות (כולל ידידותיות לעברית: David, Tahoma). הכל נגיש דרך כפתור "Aa" בסרגל הסטטוס. שינויים מיידיים.</p>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="feature-card reveal">
+      <div class="feature-visual theme-custom">
+        <div style="width: 92%; direction: ltr;">
+          <div style="display: flex; gap: 3px; align-items: center; padding: 4px 6px; background: rgba(255,255,255,0.03); border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); flex-wrap: wrap;">
+            <div style="font-size: 0.45rem; padding: 2px 5px; border-radius: 3px; background: rgba(59,130,246,0.1); color: #60a5fa;">02:45</div>
+            <div style="font-size: 0.45rem; padding: 2px 5px; border-radius: 3px; background: rgba(16,185,129,0.1); color: #34d399;">Git</div>
+            <div style="font-size: 0.45rem; padding: 2px 5px; border-radius: 3px; background: rgba(255,255,255,0.05); color: var(--text-muted);">Aa</div>
+            <div style="font-size: 0.45rem; padding: 2px 5px; border-radius: 3px; background: rgba(139,92,246,0.1); color: #a78bfa;">History</div>
+            <div style="font-size: 0.45rem; padding: 2px 5px; border-radius: 3px; background: rgba(255,255,255,0.05); color: var(--text-muted);">Prompts</div>
+            <div style="font-size: 0.45rem; padding: 2px 5px; border-radius: 3px; background: rgba(6,182,212,0.1); color: #22d3ee;">Analytics</div>
+            <div style="font-size: 0.45rem; padding: 2px 5px; border-radius: 3px; background: rgba(245,158,11,0.1); color: #fbbf24;">Achievements</div>
+            <div style="font-size: 0.45rem; padding: 2px 5px; border-radius: 3px; background: rgba(255,255,255,0.05); color: var(--text-muted);">Sonnet 4.6</div>
+            <div style="font-size: 0.45rem; padding: 2px 5px; border-radius: 3px; background: rgba(255,255,255,0.05); color: var(--text-muted);">47K / 12K</div>
+          </div>
+          <div style="font-size: 0.45rem; color: var(--text-muted); margin-top: 4px; text-align: center;">Auto-collapses below 900px</div>
+        </div>
+      </div>
+      <h3>סרגל סטטוס רספונסיבי</h3>
+      <p>15+ פריטים: שעון, Git, מודל, טוקנים, אנליטיקה, הישגים, הגדרות ועוד. מתחת ל-900px, מתכווץ אוטומטית לתפריטים נפתחים מקובצים. תמיד נראים: שעון, Git, הגדרות טקסט, טוקנים.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <p style="margin-bottom: 0.5rem;">
+    <strong>ClaUi</strong> &middot; ממשק צ'אט עשיר ל-Claude Code ב-VS Code
+  </p>
+  <p>
+    <a href="https://github.com/Yehonatan-Bar/ClaUI" target="_blank">GitHub</a>
+    &nbsp;&middot;&nbsp;
+    Version 0.1.24
+    &nbsp;&middot;&nbsp;
+    React, Zustand, Recharts & Webpack
+  </p>
+</footer>
+
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) entry.target.classList.add('visible');
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
