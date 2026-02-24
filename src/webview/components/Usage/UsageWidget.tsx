@@ -5,32 +5,38 @@ import type { UsageStat } from '../../../extension/types/webview-messages';
 
 const STORAGE_KEY = 'claui-usage-pos';
 const WIDGET_WIDTH = 200;
+const DEFAULT_MARGIN = 16;
+const DEFAULT_TOP = 60;
 
-function clampPosition(top: number, right: number): { top: number; right: number } {
-  const maxTop = Math.max(0, window.innerHeight - 100);
-  const maxRight = Math.max(0, window.innerWidth - WIDGET_WIDTH);
+interface WidgetPosition {
+  left: number;
+  top: number;
+}
+
+function clampPosition(pos: WidgetPosition): WidgetPosition {
+  const maxLeft = Math.max(0, window.innerWidth - WIDGET_WIDTH);
+  const maxTop = Math.max(0, window.innerHeight - 80);
   return {
-    top: Math.max(0, Math.min(top, maxTop)),
-    right: Math.max(0, Math.min(right, maxRight)),
+    left: Math.max(0, Math.min(pos.left, maxLeft)),
+    top: Math.max(0, Math.min(pos.top, maxTop)),
   };
 }
 
-function loadPosition(): { top: number; right: number } | null {
+function loadPosition(): WidgetPosition | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const pos = JSON.parse(raw);
-      if (typeof pos.top === 'number' && typeof pos.right === 'number') {
-        return clampPosition(pos.top, pos.right);
-      }
+    if (!raw) return null;
+    const pos = JSON.parse(raw);
+    if (typeof pos.left === 'number' && typeof pos.top === 'number') {
+      return clampPosition(pos);
     }
   } catch { /* ignore */ }
   return null;
 }
 
-function savePosition(top: number, right: number): void {
+function savePosition(pos: WidgetPosition): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ top, right }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pos));
   } catch { /* ignore */ }
 }
 
@@ -101,17 +107,13 @@ export const UsageWidget: React.FC = () => {
   const usageFetchedAt = useAppStore((s) => s.usageFetchedAt);
   const usageError = useAppStore((s) => s.usageError);
 
-  const saved = loadPosition();
-  const [pos, setPos] = useState({ top: saved?.top ?? 60, right: saved?.right ?? 16 });
+  // Position defaults to top-right corner; loaded from localStorage if available
+  const [position, setPosition] = useState<WidgetPosition | null>(loadPosition);
   const [loading, setLoading] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   const widgetRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{
-    startX: number; startY: number;
-    startTop: number; startRight: number;
-    moved: boolean;
-  } | null>(null);
+  const dragOffset = useRef({ x: 0, y: 0 });
 
   // Track when data arrives so we can clear the loading state
   const prevFetchedAt = useRef(usageFetchedAt);
@@ -125,70 +127,69 @@ export const UsageWidget: React.FC = () => {
   // Re-clamp position on window resize
   useEffect(() => {
     const onResize = () => {
-      setPos((cur) => clampPosition(cur.top, cur.right));
+      setPosition((prev) => prev ? clampPosition(prev) : null);
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const handleRefresh = useCallback(() => {
+  // Attach document mousemove/mouseup only while dragging (same pattern as AdventureWidget)
+  useEffect(() => {
+    if (!dragging) return;
+
+    const handleMove = (e: MouseEvent) => {
+      const newLeft = e.clientX - dragOffset.current.x;
+      const newTop = e.clientY - dragOffset.current.y;
+      setPosition(clampPosition({ left: newLeft, top: newTop }));
+    };
+
+    const handleUp = (e: MouseEvent) => {
+      const newLeft = e.clientX - dragOffset.current.x;
+      const newTop = e.clientY - dragOffset.current.y;
+      const clamped = clampPosition({ left: newLeft, top: newTop });
+      setPosition(clamped);
+      savePosition(clamped);
+      setDragging(false);
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+    };
+  }, [dragging]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const el = widgetRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    setDragging(true);
+    e.preventDefault();
+  }, []);
+
+  const handleRefresh = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
     setLoading(true);
     postToExtension({ type: 'requestUsage' });
   }, []);
 
-  // Drag handlers
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    dragRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      startTop: pos.top,
-      startRight: pos.right,
-      moved: false,
-    };
-    e.preventDefault();
-  }, [pos]);
-
-  useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => {
-      const d = dragRef.current;
-      if (!d) return;
-      const dx = e.clientX - d.startX;
-      const dy = e.clientY - d.startY;
-      if (!d.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
-      if (!d.moved) {
-        d.moved = true;
-        setIsDragging(true);
-      }
-      const clamped = clampPosition(d.startTop + dy, d.startRight - dx);
-      setPos(clamped);
-    };
-    const onMouseUp = () => {
-      const d = dragRef.current;
-      if (!d) return;
-      if (d.moved) {
-        setPos((cur) => { savePosition(cur.top, cur.right); return cur; });
-      }
-      dragRef.current = null;
-      setIsDragging(false);
-    };
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-  }, []);
-
   const hasData = usageStats.length > 0;
+
+  // Compute left/top: if no saved position, default to top-right corner
+  const computedLeft = position?.left ?? Math.max(0, window.innerWidth - WIDGET_WIDTH - DEFAULT_MARGIN);
+  const computedTop = position?.top ?? DEFAULT_TOP;
 
   return (
     <div
       ref={widgetRef}
+      onMouseDown={handleMouseDown}
       style={{
         position: 'fixed',
-        top: pos.top,
-        right: pos.right,
+        left: computedLeft,
+        top: computedTop,
         zIndex: 900,
         background: 'var(--vscode-sideBar-background, #1e1e1e)',
         border: '1px solid var(--vscode-panel-border, rgba(255,255,255,0.15))',
@@ -196,21 +197,17 @@ export const UsageWidget: React.FC = () => {
         padding: '10px 12px',
         width: WIDGET_WIDTH,
         boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-        cursor: 'default',
+        cursor: dragging ? 'grabbing' : 'grab',
         userSelect: 'none',
       }}
     >
-      {/* Draggable header row */}
-      <div
-        onMouseDown={onMouseDown}
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 10,
-          cursor: isDragging ? 'grabbing' : 'grab',
-        }}
-      >
+      {/* Header row */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{
             fontSize: 10,

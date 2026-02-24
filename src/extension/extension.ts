@@ -104,6 +104,28 @@ export function activate(context: vscode.ExtensionContext): void {
   // Register commands routed through the tab manager
   registerCommands(context, tabManager, sessionStore, log, logDir);
 
+  // First-run welcome notification
+  const hasShownWelcome = context.globalState.get<boolean>('claui.welcomeShown', false);
+  if (!hasShownWelcome) {
+    void context.globalState.update('claui.welcomeShown', true);
+    void vscode.window.showInformationMessage(
+      'ClaUI is ready! Press Ctrl+Shift+C to open a Claude session.',
+      'Open ClaUI'
+    ).then(selection => {
+      if (selection === 'Open ClaUI') {
+        void vscode.commands.executeCommand('claudeMirror.startSession');
+      }
+    });
+  }
+
+  // Permanent launcher status bar item (always visible)
+  const launcherItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+  launcherItem.text = '$(comment-discussion) ClaUI';
+  launcherItem.tooltip = 'Open Claude session (Ctrl+Shift+C)';
+  launcherItem.command = 'claudeMirror.startSession';
+  launcherItem.show();
+  context.subscriptions.push(launcherItem);
+
   log('Extension activated');
 }
 
