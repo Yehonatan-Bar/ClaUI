@@ -544,6 +544,10 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       }
       this.captureTurnFailureText(trimmed);
       this.maybeMarkTurnCliMissing(trimmed, tabLog);
+      if (this.turnCliMissingDetected) {
+        // Let the exit/error handler emit a single friendly install guidance message.
+        return;
+      }
       // Codex often emits non-fatal warnings on stderr (e.g. shell snapshot support).
       if (/WARN\s+codex_core::shell_snapshot/i.test(trimmed)) {
         return;
@@ -594,7 +598,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
           this.resetTurnFailureCapture();
           return;
         }
-        if (!this.turnStructuredErrorDetected) {
+        if (!this.turnStructuredErrorDetected && this.turnFailureText.length === 0) {
           this.postMessage({
             type: 'error',
             message: `Codex process exited with code ${info.code}. Check output logs for details.`,
