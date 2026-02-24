@@ -19,6 +19,7 @@ import type { PromptHistoryStore } from './PromptHistoryStore';
 import { MessageHandler, type WebviewBridge } from '../webview/MessageHandler';
 import { buildWebviewHtml } from '../webview/WebviewProvider';
 import type { SkillGenService } from '../skillgen/SkillGenService';
+import type { TokenUsageRatioTracker } from './TokenUsageRatioTracker';
 import type { CliOutputEvent, AssistantMessage } from '../types/stream-json';
 import type {
   ExtensionToWebviewMessage,
@@ -90,7 +91,8 @@ export class SessionTab implements WebviewBridge {
     private readonly promptHistoryStore: PromptHistoryStore,
     private readonly achievementService: AchievementService,
     logDir: string | null,
-    private readonly skillGenService?: SkillGenService
+    private readonly skillGenService?: SkillGenService,
+    private readonly tokenRatioTracker?: TokenUsageRatioTracker
   ) {
     this.tabNumber = tabNumber;
     this.id = `tab-${tabNumber}`;
@@ -112,6 +114,9 @@ export class SessionTab implements WebviewBridge {
     this.messageHandler.setSessionNameGetter(() => this.baseTitle);
     this.messageHandler.setProjectAnalyticsStore(this.projectAnalyticsStore);
     this.messageHandler.setSecrets(context.secrets);
+    if (this.tokenRatioTracker) {
+      this.messageHandler.setTokenRatioTracker(this.tokenRatioTracker);
+    }
 
     // Create per-tab file logger if file logging is enabled
     if (logDir) {

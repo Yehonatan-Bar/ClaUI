@@ -14,6 +14,7 @@ import type { ProjectAnalyticsStore } from '../session/ProjectAnalyticsStore';
 import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import { getStoredApiKey, setStoredApiKey, maskApiKey } from '../process/envUtils';
+import type { TokenUsageRatioTracker } from '../session/TokenUsageRatioTracker';
 import type {
   AdventureBeatMessage,
   ExtensionToWebviewMessage,
@@ -165,6 +166,8 @@ export class MessageHandler {
   private promptEnhancer: PromptEnhancer | null = null;
   /** Skill generation service (global, shared across tabs) */
   private skillGenService: SkillGenService | null = null;
+  /** Global token-usage ratio tracker (shared across all tabs) */
+  private tokenRatioTracker: TokenUsageRatioTracker | null = null;
 
   /** Bash command strings seen in the current assistant message */
   private currentBashCommands: string[] = [];
@@ -269,6 +272,11 @@ export class MessageHandler {
   /** Attach a ProjectAnalyticsStore for persisting session summaries */
   setProjectAnalyticsStore(store: ProjectAnalyticsStore): void {
     this.projectAnalyticsStore = store;
+  }
+
+  /** Attach the global TokenUsageRatioTracker */
+  setTokenRatioTracker(tracker: TokenUsageRatioTracker): void {
+    this.tokenRatioTracker = tracker;
   }
 
   /** Provide SecretStorage for API key management */
@@ -1120,6 +1128,19 @@ export class MessageHandler {
           break;
         }
 
+        case 'getTokenRatioData': {
+          this.log('Sending token ratio data to webview');
+          this.sendTokenRatioData();
+          break;
+        }
+
+        case 'clearTokenRatioData': {
+          this.log('Clearing all token ratio data');
+          this.tokenRatioTracker?.clearAll();
+          this.sendTokenRatioData();
+          break;
+        }
+
         case 'ready':
           this.log('Webview ready');
           // Send text display settings
@@ -1409,6 +1430,39 @@ export class MessageHandler {
       stats: result.stats,
       fetchedAt: result.fetchedAt,
       error: result.error,
+    });
+  }
+
+  /** Fetch usage data and create token-ratio samples */
+  private async sampleTokenUsageRatio(): Promise<void> {
+    if (!this.tokenRatioTracker) return;
+    try {
+      const { UsageFetcher } = await import('../process/UsageFetcher');
+      const cliPath = vscode.workspace.getConfiguration('claudeMirror').get<string>('cliPath', 'claude');
+      const apiKey = await this.getApiKey();
+      const fetcher = new UsageFetcher(cliPath, apiKey);
+      const result = await fetcher.fetch();
+      if (result.stats.length > 0) {
+        this.tokenRatioTracker.createSamples(result.stats);
+        this.sendTokenRatioData();
+        this.log(`Token ratio: sampled ${result.stats.length} buckets`);
+      }
+    } catch (err) {
+      this.log(`Token ratio sample failed: ${err}`);
+    }
+  }
+
+  /** Send current token ratio data to the webview */
+  private sendTokenRatioData(): void {
+    if (!this.tokenRatioTracker) return;
+    const history = this.tokenRatioTracker.getHistory();
+    const summaries = this.tokenRatioTracker.computeSummaries();
+    this.webview.postMessage({
+      type: 'tokenRatioData',
+      samples: history.samples,
+      summaries,
+      globalTurnCount: history.globalTurnCount,
+      cumulativeTokens: history.cumulativeTokens,
     });
   }
 
@@ -1904,6 +1958,18 @@ export class MessageHandler {
           this.log(`Emitting turnComplete: turn=${successTurn.turnIndex} category=${successTurn.category} tools=[${successTurn.toolNames.join(',')}]`);
           this.webview.postMessage({ type: 'turnComplete', turn: successTurn });
           this.turnRecords.push(successTurn as TurnRecord);
+          // Token-Usage Ratio Tracker: record turn and sample if due
+          if (this.tokenRatioTracker) {
+            const shouldSample = this.tokenRatioTracker.recordTurn({
+              inputTokens: successTurn.inputTokens ?? 0,
+              outputTokens: successTurn.outputTokens ?? 0,
+              cacheCreationTokens: successTurn.cacheCreationTokens ?? 0,
+              cacheReadTokens: successTurn.cacheReadTokens ?? 0,
+            });
+            if (shouldSample) {
+              void this.sampleTokenUsageRatio();
+            }
+          }
           // TurnAnalyzer: fire-and-forget semantic analysis
           if (this.turnAnalyzer) {
             void this.turnAnalyzer.analyze({
@@ -1947,6 +2013,15 @@ export class MessageHandler {
           this.log(`Emitting turnComplete (error): turn=${errorTurn.turnIndex}`);
           this.webview.postMessage({ type: 'turnComplete', turn: errorTurn });
           this.turnRecords.push(errorTurn as TurnRecord);
+          // Token-Usage Ratio Tracker: record turn (0 tokens for error turns)
+          if (this.tokenRatioTracker) {
+            const shouldSample = this.tokenRatioTracker.recordTurn({
+              inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0,
+            });
+            if (shouldSample) {
+              void this.sampleTokenUsageRatio();
+            }
+          }
           // TurnAnalyzer: fire-and-forget semantic analysis for error turns
           if (this.turnAnalyzer) {
             void this.turnAnalyzer.analyze({

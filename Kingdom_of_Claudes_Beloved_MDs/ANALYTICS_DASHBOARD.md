@@ -16,10 +16,11 @@ A full-screen overlay dashboard inside the chat webview with two modes: **Sessio
 
 ### Extension-side
 - `src/extension/session/TurnAnalyzer.ts` - Spawns one-shot Claude CLI for semantic analysis
+- `src/extension/session/TokenUsageRatioTracker.ts` - Global tracker correlating tokens with usage % (see Token-Usage Ratio Tracker section)
 - `src/extension/session/ProjectAnalyticsStore.ts` - Persists `SessionSummary[]` in `workspaceState` (200 session cap)
-- `src/extension/webview/MessageHandler.ts` - Populates token/command fields, triggers TurnAnalyzer, sends session metadata, accumulates TurnRecords, handles `getProjectAnalytics` requests
+- `src/extension/webview/MessageHandler.ts` - Populates token/command fields, triggers TurnAnalyzer, sends session metadata, accumulates TurnRecords, handles `getProjectAnalytics` and `getTokenRatioData` requests
 - `src/extension/session/SessionTab.ts` - Saves `SessionSummary` to `ProjectAnalyticsStore` on session end
-- `src/extension/types/webview-messages.ts` - `TurnSemantics`, `TurnRecord`, `SessionSummary`, `SessionMetadataMessage`, project analytics messages
+- `src/extension/types/webview-messages.ts` - `TurnSemantics`, `TurnRecord`, `SessionSummary`, `SessionMetadataMessage`, `TokenUsageRatioSample`, `TokenRatioBucketSummary`, project analytics messages, token ratio messages
 
 ### Webview-side
 - `src/webview/components/Dashboard/DashboardPanel.tsx` - Root overlay (Session/Project toggle, tab nav, header, close)
@@ -28,9 +29,9 @@ A full-screen overlay dashboard inside the chat webview with two modes: **Sessio
 - `src/webview/components/Dashboard/dashboardUtils.ts` - Colors, helpers, command categorization
 - `src/webview/components/Dashboard/charts/RechartsWrappers.tsx` - 6 Recharts components
 - `src/webview/components/Dashboard/charts/SemanticWidgets.tsx` - MoodTimeline, FrustrationAlert, BugRepeatTracker
-- `src/webview/components/Dashboard/tabs/` - Session tabs (6) + Project tabs (4)
+- `src/webview/components/Dashboard/tabs/` - Session tabs (8) + Project tabs (4)
 
-## Session Mode (6 Tabs)
+## Session Mode (8 Tabs)
 
 ### Overview
 - 6 metric cards (turns, error rate, total tool uses, top tool, shell commands, avg duration)
@@ -65,6 +66,20 @@ A full-screen overlay dashboard inside the chat webview with two modes: **Sessio
 - Role-based filter (All / User / Assistant)
 - Free-text search across message content, tool names, and tool inputs
 - Expand All / Collapse All controls
+
+### Usage
+- Fetches live Anthropic API usage data via `UsageFetcher` (OAuth token from `~/.claude/.credentials.json`)
+- Displays billing buckets with usage percentage, daily spend, monthly limit, and reset dates
+- Auto-refresh toggle with configurable interval
+
+### Token Ratio
+- Correlates token consumption with usage percentage changes over time
+- Summary cards: one per billing bucket showing latest tokensPerPercent, trend arrow, sample count
+- Global stats bar: total turns tracked, cumulative token breakdown (input/output/cache creation/cache read)
+- Trend line chart (Recharts LineChart): tokensPerPercent over time, one colored line per bucket
+- Samples table: last 50 samples (Date, Bucket, Usage%, Delta Tokens, Delta Usage%, Tokens/1%)
+- Clear Data button to reset all stored samples
+- Shows "Waiting for data..." when fewer than 5 turns have been tracked
 
 ## Project Mode (4 Tabs)
 
@@ -200,6 +215,52 @@ The Commands tab shows bash commands from two sources:
 2. **Rebuilt turn history** (`turnVitals.ts`): When turn history is reconstructed from stored messages (e.g., after VS Code reload, session restore, vitals enable), `deriveTurnFromAssistantMessage()` extracts bash commands from `tool_use` content blocks where `name === 'Bash'` and `input.command` is a string.
 
 Both paths feed into `flattenCommands()` in `dashboardUtils.ts`, which iterates `turnHistory[].bashCommands` and categorizes each command (git, npm, test, build, deploy, search, file, other).
+
+## Token-Usage Ratio Tracker
+
+Correlates two independent data streams -- token counts (from CLI result events) and usage percentage (from Anthropic OAuth API) -- to answer: "how many tokens equal 1% of usage?"
+
+### Core Module: `TokenUsageRatioTracker`
+
+**File:** `src/extension/session/TokenUsageRatioTracker.ts`
+
+**Global singleton** -- instantiated once in `extension.ts` with `context.globalState`, injected through TabManager -> SessionTab -> MessageHandler via optional constructor parameters and a setter method.
+
+**Key API:**
+- `recordTurn(tokens)` - Increments global turn counter and cumulative token totals. Returns `true` every 5 turns (sample is due).
+- `createSamples(usageStats)` - Called when sample is due. Fetches current usage %, computes delta tokens and delta usage % since last sample, calculates `tokensPerPercent = deltaTokens / deltaUsagePercent`. Handles edge cases: usage reset (negative delta -> null ratio), no change (zero delta -> null), first sample (baseline only, no ratio).
+- `getHistory()` - Returns all stored samples (up to 500, FIFO eviction).
+- `computeSummaries()` - Groups samples by billing bucket, computes per-bucket: avgTokensPerPercent, latestTokensPerPercent, trend (increasing/decreasing/stable/insufficient-data).
+- `clearAll()` - Resets all stored data.
+
+**Persistence:** Samples stored in VS Code `globalState` under key `claudeMirror.tokenUsageRatio`. Uses `enqueueWrite()` to serialize all writes, preventing race conditions when multiple tabs record turns simultaneously.
+
+### Data Flow
+
+```
+CLI result event completes (success or error):
+  MessageHandler extracts token counts
+    -> tracker.recordTurn({ input, output, cacheCreation, cacheRead })
+    -> Returns true every 5 turns
+
+When sample is due:
+  MessageHandler.sampleTokenUsageRatio() (fire-and-forget)
+    -> Creates UsageFetcher (dynamic import)
+    -> Fetches usage stats from api.anthropic.com/api/oauth/usage
+    -> tracker.createSamples(usageStats)
+    -> sendTokenRatioData() pushes tokenRatioData message to webview
+
+Dashboard TokenRatioTab mounts:
+  -> postToExtension({ type: 'getTokenRatioData' })
+  -> MessageHandler reads tracker.getHistory() + computeSummaries()
+  -> Sends tokenRatioData message to webview
+  -> Zustand store updates, tab renders reactively
+```
+
+### Message Types
+- `GetTokenRatioDataRequest` - Webview requests current data
+- `ClearTokenRatioDataRequest` - Webview requests data wipe
+- `TokenRatioDataMessage` - Extension sends samples, summaries, globalTurnCount, cumulativeTokens
 
 ## Known Limitations
 

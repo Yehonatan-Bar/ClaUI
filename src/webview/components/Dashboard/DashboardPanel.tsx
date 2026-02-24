@@ -12,9 +12,10 @@ import { ProjectSessionsTab } from './tabs/ProjectSessionsTab';
 import { ProjectTokensTab } from './tabs/ProjectTokensTab';
 import { ProjectToolsTab } from './tabs/ProjectToolsTab';
 import { UsageTab } from './tabs/UsageTab';
+import { TokenRatioTab } from './tabs/TokenRatioTab';
 import { DASH_COLORS } from './dashboardUtils';
 
-type SessionTab = 'overview' | 'tokens' | 'tools' | 'timeline' | 'commands' | 'context' | 'usage';
+type SessionTab = 'overview' | 'tokens' | 'tools' | 'timeline' | 'commands' | 'context' | 'usage' | 'ratio';
 type ProjectTab = 'p-overview' | 'p-sessions' | 'p-tokens' | 'p-tools';
 type DashboardTab = SessionTab | ProjectTab;
 
@@ -26,6 +27,7 @@ const SESSION_TABS: { key: SessionTab; label: string }[] = [
   { key: 'commands', label: 'Commands' },
   { key: 'context', label: 'Context' },
   { key: 'usage', label: 'Usage' },
+  { key: 'ratio', label: 'Token Ratio' },
 ];
 
 const PROJECT_TABS: { key: ProjectTab; label: string }[] = [
@@ -226,6 +228,7 @@ export const DashboardPanel: React.FC = () => {
         {mode === 'session' && activeTab === 'commands' && <CommandsTab turnHistory={turnHistory} />}
         {mode === 'session' && activeTab === 'context' && <ContextTab />}
         {mode === 'session' && activeTab === 'usage' && <UsageTab />}
+        {mode === 'session' && activeTab === 'ratio' && <TokenRatioTab />}
         {/* Project tabs */}
         {mode === 'project' && activeTab === 'p-overview' && <ProjectOverviewTab sessions={projectSessions} />}
         {mode === 'project' && activeTab === 'p-sessions' && <ProjectSessionsTab sessions={projectSessions} />}

@@ -259,18 +259,24 @@ export const InputArea: React.FC = () => {
     historyIndexRef.current = -1;
     draftRef.current = '';
 
-    // If plan/question approval is pending, route text as feedback/answer
-    if (pendingApproval && trimmed && pendingImages.length === 0) {
+    // If AskUserQuestion approval is pending, route text as answer
+    if (pendingApproval && pendingApproval.toolName === 'AskUserQuestion' && trimmed && pendingImages.length === 0) {
       markSessionPromptSent();
-      const isQuestion = pendingApproval.toolName === 'AskUserQuestion';
       postToExtension({
         type: 'planApprovalResponse',
-        action: isQuestion ? 'questionAnswer' : 'feedback',
+        action: 'questionAnswer',
         feedback: trimmed,
-        selectedOptions: isQuestion ? [trimmed] : undefined,
+        selectedOptions: [trimmed],
         toolName: pendingApproval.toolName,
       });
       setPendingApproval(null);
+    } else if (pendingApproval && trimmed && pendingImages.length === 0) {
+      // ExitPlanMode: the CLI already auto-approved and the model is implementing.
+      // Don't route as feedback (it would be silently dropped). Instead, clear the
+      // approval bar and send as a regular message to redirect the model.
+      setPendingApproval(null);
+      markSessionPromptSent();
+      postToExtension({ type: 'sendMessage', text: trimmed });
     } else if (pendingImages.length > 0) {
       markSessionPromptSent();
       postToExtension({ type: 'sendMessageWithImages', text: trimmed, images: pendingImages });
