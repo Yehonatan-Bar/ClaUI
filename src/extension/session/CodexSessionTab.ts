@@ -454,6 +454,10 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.setTabName(`Codex ${this.tabNumber} [${shortId}]`);
   }
 
+  openCodexLoginTerminal(): void {
+    void this.launchCodexLoginFlow();
+  }
+
   isSessionActive(): boolean {
     return this.sessionActive;
   }

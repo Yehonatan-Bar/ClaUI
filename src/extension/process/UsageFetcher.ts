@@ -8,8 +8,13 @@ export interface UsageFetchResult {
 }
 
 /**
- * Runs a short-lived `claude -p "/usage"` subprocess, parses the plain-text
- * output into structured UsageStat records, and returns the result.
+ * Runs a short-lived `claude` subprocess in interactive mode, pipes "/usage"
+ * to stdin (then closes it), and parses the plain-text output into structured
+ * UsageStat records.
+ *
+ * Why interactive (no -p): `claude -p "/usage"` would send "/usage" as an AI
+ * prompt over the network (slow, requires API). The slash command `/usage` is
+ * handled locally by the CLI only in interactive/stdin mode.
  *
  * Each section in the output looks like:
  *   Current session
@@ -35,18 +40,25 @@ export class UsageFetcher {
       let errorOutput = '';
       let settled = false;
 
-      const child = spawn(this.cliPath, ['-p', '/usage'], {
+      // Run in interactive mode (no -p flag) so /usage is processed as a
+      // slash command rather than forwarded to the AI as a network prompt.
+      const child = spawn(this.cliPath, [], {
         env,
         shell: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
+
+      // Write the slash command then close stdin so the CLI exits cleanly.
+      child.stdin.write('/usage\n');
+      child.stdin.end();
 
       const timeout = setTimeout(() => {
         if (!settled) {
           settled = true;
           child.kill();
-          resolve({ stats: [], fetchedAt: Date.now(), error: 'Usage fetch timed out after 15s' });
+          resolve({ stats: [], fetchedAt: Date.now(), error: 'Usage fetch timed out after 10s' });
         }
-      }, 15000);
+      }, 10000);
 
       child.stdout.on('data', (chunk: Buffer) => {
         output += chunk.toString();

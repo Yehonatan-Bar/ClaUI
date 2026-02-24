@@ -232,6 +232,10 @@ export interface OpenSettingsRequest {
   query: string;
 }
 
+export interface OpenCodexLoginRequest {
+  type: 'openCodexLogin';
+}
+
 export interface SetTurnAnalysisEnabledRequest {
   type: 'setTurnAnalysisEnabled';
   enabled: boolean;
@@ -385,6 +389,7 @@ export type WebviewToExtensionMessage =
   | SetTranslationLanguageRequest
   | AdventureDebugLogMessage
   | OpenSettingsRequest
+  | OpenCodexLoginRequest
   | SetTurnAnalysisEnabledRequest
   | SetAnalysisModelRequest
   | GetProjectAnalyticsRequest

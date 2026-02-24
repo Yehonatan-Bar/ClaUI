@@ -26,6 +26,7 @@ export interface CodexSessionController {
   clearSession(options?: { cwd?: string }): Promise<void>;
   sendText(text: string): Promise<void>;
   cancelRequest(): void;
+  openCodexLoginTerminal(): void;
   isSessionActive(): boolean;
   getSessionId(): string | null;
   getCurrentModel(): string;
@@ -267,6 +268,10 @@ export class CodexMessageHandler {
 
         case 'openSettings':
           void vscode.commands.executeCommand('workbench.action.openSettings', msg.query);
+          break;
+
+        case 'openCodexLogin':
+          this.session.openCodexLoginTerminal();
           break;
 
         case 'getProjectAnalytics':
