@@ -2,7 +2,7 @@
 
 ## Overview
 
-A full-screen overlay dashboard inside the chat webview with two modes: **Session** (current session analytics) and **Project** (aggregated analytics across all past sessions in the workspace). Opens from the StatusBar "Dashboard" button. A pill toggle in the header switches between modes.
+A full-screen overlay dashboard inside the chat webview with three modes: **Session** (current session analytics), **Project** (aggregated analytics across all past sessions in the workspace), and **User** (global user-level analytics shared across all workspaces). Opens from the StatusBar "Dashboard" button. A pill toggle in the header switches between modes (blue=Session, purple=Project, amber=User).
 
 ## Architecture
 
@@ -29,9 +29,9 @@ A full-screen overlay dashboard inside the chat webview with two modes: **Sessio
 - `src/webview/components/Dashboard/dashboardUtils.ts` - Colors, helpers, command categorization
 - `src/webview/components/Dashboard/charts/RechartsWrappers.tsx` - 6 Recharts components
 - `src/webview/components/Dashboard/charts/SemanticWidgets.tsx` - MoodTimeline, FrustrationAlert, BugRepeatTracker
-- `src/webview/components/Dashboard/tabs/` - Session tabs (8) + Project tabs (4)
+- `src/webview/components/Dashboard/tabs/` - Session tabs (7) + Project tabs (4) + User tabs (1)
 
-## Session Mode (8 Tabs)
+## Session Mode (7 Tabs)
 
 ### Overview
 - 6 metric cards (turns, error rate, total tool uses, top tool, shell commands, avg duration)
@@ -71,6 +71,10 @@ A full-screen overlay dashboard inside the chat webview with two modes: **Sessio
 - Fetches live Anthropic API usage data via `UsageFetcher` (OAuth token from `~/.claude/.credentials.json`)
 - Displays billing buckets with usage percentage, daily spend, monthly limit, and reset dates
 - Auto-refresh toggle with configurable interval
+
+## User Mode (1 Tab)
+
+User mode displays global user-level analytics shared across all workspaces (stored in VS Code `globalState`). The tab bar is hidden when only 1 tab exists.
 
 ### Token Ratio
 - Correlates cost-weighted token consumption with usage percentage changes over time

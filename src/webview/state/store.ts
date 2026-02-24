@@ -201,7 +201,7 @@ export interface AppState {
 
   // Project-level analytics (cross-session, from workspaceState)
   projectSessions: SessionSummary[];
-  projectDashboardMode: 'session' | 'project';
+  projectDashboardMode: 'session' | 'project' | 'user';
 
   // Session activity timer (Claude active processing time only)
   sessionActivityStarted: boolean;
@@ -332,7 +332,7 @@ export interface AppState {
   setTurnAnalysisSettings: (settings: { enabled: boolean; analysisModel: string }) => void;
   setSessionMetadata: (meta: { tools: string[]; model: string; cwd: string; mcpServers: string[] }) => void;
   setProjectSessions: (sessions: SessionSummary[]) => void;
-  setProjectDashboardMode: (mode: 'session' | 'project') => void;
+  setProjectDashboardMode: (mode: 'session' | 'project' | 'user') => void;
   setSkillGenSettings: (settings: { enabled: boolean; threshold: number }) => void;
   setSkillGenStatus: (status: { pendingDocs: number; threshold: number; runStatus: SkillGenRunStatus; progress: number; progressLabel: string; lastRun: SkillGenRunHistoryEntry | null; history: SkillGenRunHistoryEntry[] }) => void;
   setSkillGenProgress: (update: { runStatus: SkillGenRunStatus; progress: number; progressLabel: string }) => void;
