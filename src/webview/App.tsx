@@ -117,7 +117,7 @@ export const App: React.FC = () => {
             <div className="setup-notice-eyebrow">Codex Setup Required</div>
             <div className="setup-notice-title">Codex CLI is not installed (or not in PATH)</div>
             <div className="setup-notice-text">
-              ClaUi Codex mode uses the Codex CLI. Install the Codex CLI, then sign in with <code>codex login</code>.
+              ClaUi Codex mode uses the Codex CLI. Step 1: install the Codex CLI. Step 2 (optional): set a custom path. Step 3: run <code>codex login</code>.
             </div>
             <div className="setup-notice-actions">
               <button
@@ -131,6 +131,12 @@ export const App: React.FC = () => {
                 onClick={() => postToExtension({ type: 'openSettings', query: 'claudeMirror.codex.cliPath' })}
               >
                 Open Codex Path Setting
+              </button>
+              <button
+                className="setup-notice-btn"
+                onClick={() => postToExtension({ type: 'openCodexLogin' })}
+              >
+                Open Login Terminal (codex login)
               </button>
               <button
                 className="setup-notice-btn ghost"
