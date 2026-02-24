@@ -234,7 +234,8 @@ export interface AppState {
   tokenRatioSummaries: TokenRatioBucketSummary[];
   tokenRatioGlobalTurnCount: number;
   tokenRatioCumulativeTokens: { input: number; output: number; cacheCreation: number; cacheRead: number } | null;
-  setTokenRatioData: (samples: TokenUsageRatioSample[], summaries: TokenRatioBucketSummary[], globalTurnCount: number, cumulativeTokens: { input: number; output: number; cacheCreation: number; cacheRead: number }) => void;
+  tokenRatioCumulativeWeightedTokens: number | null;
+  setTokenRatioData: (samples: TokenUsageRatioSample[], summaries: TokenRatioBucketSummary[], globalTurnCount: number, cumulativeTokens: { input: number; output: number; cacheCreation: number; cacheRead: number }, cumulativeWeightedTokens: number) => void;
 
   // Actions
   setSession: (sessionId: string, model: string) => void;
@@ -588,8 +589,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   tokenRatioSummaries: [],
   tokenRatioGlobalTurnCount: 0,
   tokenRatioCumulativeTokens: null,
-  setTokenRatioData: (samples, summaries, globalTurnCount, cumulativeTokens) =>
-    set({ tokenRatioSamples: samples, tokenRatioSummaries: summaries, tokenRatioGlobalTurnCount: globalTurnCount, tokenRatioCumulativeTokens: cumulativeTokens }),
+  tokenRatioCumulativeWeightedTokens: null,
+  setTokenRatioData: (samples, summaries, globalTurnCount, cumulativeTokens, cumulativeWeightedTokens) =>
+    set({ tokenRatioSamples: samples, tokenRatioSummaries: summaries, tokenRatioGlobalTurnCount: globalTurnCount, tokenRatioCumulativeTokens: cumulativeTokens, tokenRatioCumulativeWeightedTokens: cumulativeWeightedTokens }),
 
   // Actions
   setSession: (sessionId, model) =>

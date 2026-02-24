@@ -5,10 +5,23 @@ import type {
   UsageStat,
 } from '../types/webview-messages';
 
+/**
+ * Cost weights relative to base input price.
+ * Identical across Opus and Sonnet (same multiplier structure).
+ * Input=$1x, Output=$5x, CacheWrite(5-min)=$1.25x, CacheRead=$0.1x
+ */
+const COST_WEIGHTS = {
+  input: 1.0,
+  output: 5.0,
+  cacheCreation: 1.25, // 5-min TTL (Claude Code default)
+  cacheRead: 0.1,
+};
+
 /** Persisted data shape for globalState */
 interface TokenUsageRatioHistory {
   samples: TokenUsageRatioSample[];
   cumulativeTokens: { input: number; output: number; cacheCreation: number; cacheRead: number };
+  cumulativeWeightedTokens: number;
   globalTurnCount: number;
   lastSampledAtTurnCount: number;
 }
@@ -25,8 +38,17 @@ const STORAGE_KEY = 'claudeMirror.tokenUsageRatio';
 const SAMPLE_INTERVAL = 5; // every N turns
 const MAX_SAMPLES = 500;
 
+/** Compute the cost-weighted token value for a set of token counts */
+function weightedSum(input: number, output: number, cacheCreation: number, cacheRead: number): number {
+  return input * COST_WEIGHTS.input
+    + output * COST_WEIGHTS.output
+    + cacheCreation * COST_WEIGHTS.cacheCreation
+    + cacheRead * COST_WEIGHTS.cacheRead;
+}
+
 /**
  * Correlates token consumption with usage percentage changes over time.
+ * Tokens are cost-weighted so the ratio accurately reflects real API spend.
  * Global (shared across all tabs/sessions), persisted in VS Code globalState.
  */
 export class TokenUsageRatioTracker {
@@ -46,6 +68,12 @@ export class TokenUsageRatioTracker {
     this.history.cumulativeTokens.output += tokens.outputTokens;
     this.history.cumulativeTokens.cacheCreation += tokens.cacheCreationTokens;
     this.history.cumulativeTokens.cacheRead += tokens.cacheReadTokens;
+
+    this.history.cumulativeWeightedTokens += weightedSum(
+      tokens.inputTokens, tokens.outputTokens,
+      tokens.cacheCreationTokens, tokens.cacheReadTokens
+    );
+
     this.history.globalTurnCount++;
 
     const turnsSinceLastSample = this.history.globalTurnCount - this.history.lastSampledAtTurnCount;
@@ -58,25 +86,40 @@ export class TokenUsageRatioTracker {
    */
   createSamples(usageStats: UsageStat[]): void {
     const now = Date.now();
-    const cumTotal = this.totalCumulativeTokens();
+    const cumRaw = this.totalCumulativeTokens();
+    const cumWeighted = this.history.cumulativeWeightedTokens;
 
     for (const stat of usageStats) {
       const bucket = this.labelToBucketKey(stat.label);
       const lastForBucket = this.lastSampleForBucket(bucket);
 
       let deltaTokens = 0;
+      let weightedDeltaTokens = 0;
       let deltaUsagePercent = 0;
       let tokensPerPercent: number | null = null;
 
       if (lastForBucket) {
-        deltaTokens = cumTotal - lastForBucket.cumulativeTotalTokens;
+        deltaTokens = cumRaw - lastForBucket.cumulativeTotalTokens;
         deltaUsagePercent = stat.percentage - lastForBucket.usagePercent;
 
-        // Usage reset (window rolled over) or no change
-        if (deltaUsagePercent > 0 && deltaTokens > 0) {
-          tokensPerPercent = Math.round(deltaTokens / deltaUsagePercent);
+        // Only compute weighted delta if previous sample had weighted data
+        // (backward compat: old samples before cost-weighting have no weighted field)
+        const prevWeighted = lastForBucket.cumulativeWeightedTokens;
+        if (prevWeighted !== undefined && prevWeighted > 0) {
+          weightedDeltaTokens = cumWeighted - prevWeighted;
+
+          // Usage reset (window rolled over) or no change
+          if (deltaUsagePercent > 0 && weightedDeltaTokens > 0) {
+            tokensPerPercent = Math.round(weightedDeltaTokens / deltaUsagePercent);
+          }
+        } else {
+          // Old sample without weighted data: use raw delta as fallback
+          if (deltaUsagePercent > 0 && deltaTokens > 0) {
+            tokensPerPercent = Math.round(deltaTokens / deltaUsagePercent);
+          }
+          weightedDeltaTokens = deltaTokens; // approximate for display
         }
-        // Negative delta = reset, null is appropriate
+        // Negative deltaUsagePercent = reset, null is appropriate
       }
 
       const sample: TokenUsageRatioSample = {
@@ -85,8 +128,10 @@ export class TokenUsageRatioTracker {
         bucket,
         bucketLabel: stat.label,
         usagePercent: stat.percentage,
-        cumulativeTotalTokens: cumTotal,
+        cumulativeTotalTokens: cumRaw,
+        cumulativeWeightedTokens: cumWeighted,
         deltaTokens,
+        weightedDeltaTokens,
         deltaUsagePercent,
         tokensPerPercent,
       };
@@ -203,6 +248,10 @@ export class TokenUsageRatioTracker {
   private load(): TokenUsageRatioHistory {
     const stored = this.globalState.get<TokenUsageRatioHistory>(STORAGE_KEY);
     if (stored && Array.isArray(stored.samples)) {
+      // Backward compat: old history may not have cumulativeWeightedTokens
+      if (typeof stored.cumulativeWeightedTokens !== 'number') {
+        stored.cumulativeWeightedTokens = 0;
+      }
       return stored;
     }
     return this.emptyHistory();
@@ -212,6 +261,7 @@ export class TokenUsageRatioTracker {
     return {
       samples: [],
       cumulativeTokens: { input: 0, output: 0, cacheCreation: 0, cacheRead: 0 },
+      cumulativeWeightedTokens: 0,
       globalTurnCount: 0,
       lastSampledAtTurnCount: 0,
     };

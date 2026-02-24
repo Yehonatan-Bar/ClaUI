@@ -1023,7 +1023,9 @@ export interface TokenUsageRatioSample {
   bucketLabel: string;
   usagePercent: number;
   cumulativeTotalTokens: number;
+  cumulativeWeightedTokens: number;
   deltaTokens: number;
+  weightedDeltaTokens: number;
   deltaUsagePercent: number;
   tokensPerPercent: number | null;
 }
@@ -1043,6 +1045,7 @@ export interface TokenRatioDataMessage {
   summaries: TokenRatioBucketSummary[];
   globalTurnCount: number;
   cumulativeTokens: { input: number; output: number; cacheCreation: number; cacheRead: number };
+  cumulativeWeightedTokens: number;
 }
 
 export interface GetTokenRatioDataRequest {
