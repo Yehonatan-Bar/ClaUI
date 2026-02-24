@@ -729,7 +729,10 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
           const terminal = vscode.window.createTerminal({ name: 'Codex Setup' });
           terminal.show();
           terminal.sendText('echo Codex CLI was not found on PATH (or at the configured path).', true);
+          terminal.sendText('echo Note: Signing in to the official Codex VS Code extension does not expose the "codex" command to ClaUi.', true);
           terminal.sendText('echo Install Codex CLI first: https://github.com/openai/codex', true);
+          terminal.sendText('echo Check if the command is visible: where.exe codex', true);
+          terminal.sendText('echo Or set claudeMirror.codex.cliPath to the full path of codex.exe', true);
           terminal.sendText('echo Then run: codex login', true);
           void this.showCodexCliMissingGuidance();
           return;
@@ -780,7 +783,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     const installGuideUrl = 'https://github.com/openai/codex';
 
     const choice = await vscode.window.showErrorMessage(
-      'Codex CLI was not found. ClaUi Codex mode runs the Codex CLI ("codex"), not the official VS Code extension. Install Codex CLI (or set claudeMirror.codex.cliPath), then run "codex login".',
+      'Codex CLI was not found. Even if the official Codex VS Code extension is installed and signed in, ClaUi still needs the "codex" CLI command on PATH (or configured via claudeMirror.codex.cliPath). Then run "codex login".',
       'Open Install Guide',
       'Open Settings'
     );

@@ -117,7 +117,7 @@ export const App: React.FC = () => {
             <div className="setup-notice-eyebrow">Codex Setup Required</div>
             <div className="setup-notice-title">Codex CLI is not installed (or not in PATH)</div>
             <div className="setup-notice-text">
-              ClaUi Codex mode uses the Codex CLI. Step 1: install the Codex CLI. Step 2 (optional): set a custom path. Step 3: run <code>codex login</code>.
+              ClaUi Codex mode uses the <code>codex</code> CLI command. Installing/signing in to the official Codex VS Code extension alone is not enough for ClaUi. Step 1: install Codex CLI. Step 2 (optional): set a custom path. Step 3: run <code>codex login</code>.
             </div>
             <div className="setup-notice-actions">
               <button
