@@ -2,6 +2,7 @@ import React from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { resetAdventureWidgetPosition } from './AdventureWidget';
+import { resetUsageWidgetPosition } from '../Usage/UsageWidget';
 
 const LANGUAGE_OPTIONS = [
   'Hebrew', 'Arabic', 'Russian', 'Spanish', 'French',
@@ -28,6 +29,8 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
   const turnAnalysisEnabled = useAppStore((s) => s.turnAnalysisEnabled);
   const analysisModel = useAppStore((s) => s.analysisModel);
   const skillGenEnabled = useAppStore((s) => s.skillGenEnabled);
+  const usageWidgetEnabled = useAppStore((s) => s.usageWidgetEnabled);
+  const setUsageWidgetEnabled = useAppStore((s) => s.setUsageWidgetEnabled);
   const hasApiKey = useAppStore((s) => s.hasApiKey);
   const maskedApiKey = useAppStore((s) => s.maskedApiKey);
 
@@ -64,6 +67,15 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
 
   const handleSkillGenToggle = () => {
     postToExtension({ type: 'setSkillGenEnabled', enabled: !skillGenEnabled });
+  };
+
+  const handleUsageWidgetToggle = () => {
+    const next = !usageWidgetEnabled;
+    setUsageWidgetEnabled(next);
+    postToExtension({ type: 'setUsageWidgetEnabled', enabled: next });
+    if (next) {
+      postToExtension({ type: 'requestUsage' });
+    }
   };
 
   const handleSaveApiKey = () => {
@@ -264,6 +276,28 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
         >
           <span className="vitals-toggle-knob" />
         </button>
+      </div>
+
+      <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
+        <span>Usage Widget</span>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {usageWidgetEnabled && (
+            <button
+              className="vitals-info-close"
+              onClick={() => { resetUsageWidgetPosition(); }}
+              data-tooltip="Reset widget position to default"
+              style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}
+            >
+              Reset
+            </button>
+          )}
+          <button
+            className={`vitals-info-toggle-btn ${usageWidgetEnabled ? 'on' : 'off'}`}
+            onClick={handleUsageWidgetToggle}
+          >
+            <span className="vitals-toggle-knob" />
+          </button>
+        </div>
       </div>
 
       <div className="vitals-info-toggle-row">

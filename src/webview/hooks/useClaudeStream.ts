@@ -72,6 +72,8 @@ export function useClaudeStream(): void {
     setCommunityFriends,
     setFriendActionPending,
     setApiKeySetting,
+    setUsageWidgetEnabled,
+    setUsageData,
   } = useAppStore();
 
   useEffect(() => {
@@ -507,6 +509,14 @@ export function useClaudeStream(): void {
         case 'apiKeySetting':
           setApiKeySetting(msg.hasKey, msg.maskedKey);
           break;
+
+        case 'usageWidgetSetting':
+          setUsageWidgetEnabled(msg.enabled);
+          break;
+
+        case 'usageData':
+          setUsageData(msg.stats, msg.fetchedAt, msg.error);
+          break;
       }
     }
 
@@ -575,6 +585,8 @@ export function useClaudeStream(): void {
     setSkillGenStatus,
     setSkillGenProgress,
     setApiKeySetting,
+    setUsageWidgetEnabled,
+    setUsageData,
   ]);
 }
 

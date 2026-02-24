@@ -1089,6 +1089,18 @@ export class MessageHandler {
           break;
         }
 
+        case 'requestUsage': {
+          this.log('Fetching Claude usage data');
+          void this.fetchAndSendUsage();
+          break;
+        }
+
+        case 'setUsageWidgetEnabled': {
+          this.log(`Setting usage widget enabled: ${msg.enabled}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('usageWidget', msg.enabled, true);
+          break;
+        }
+
         case 'ready':
           this.log('Webview ready');
           // Send text display settings
@@ -1109,6 +1121,8 @@ export class MessageHandler {
           this.sendVitalsSetting();
           // Send adventure widget setting
           this.sendAdventureWidgetSetting();
+          // Send usage widget setting
+          this.sendUsageWidgetSetting();
           // Send translation language setting
           this.sendTranslationLanguageSetting();
           // Send turn analysis settings
@@ -1355,6 +1369,30 @@ export class MessageHandler {
     });
   }
 
+  /** Read usage widget setting from VS Code config and send to webview */
+  private sendUsageWidgetSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const enabled = config.get<boolean>('usageWidget', false);
+    this.log(`Sending usage widget setting: enabled=${enabled}`);
+    this.webview.postMessage({ type: 'usageWidgetSetting', enabled });
+  }
+
+  /** Fetch Claude usage data from CLI and send to the webview */
+  private async fetchAndSendUsage(): Promise<void> {
+    const { UsageFetcher } = await import('../process/UsageFetcher');
+    const cliPath = vscode.workspace.getConfiguration('claudeMirror').get<string>('cliPath', 'claude');
+    const apiKey = await this.getApiKey();
+    const fetcher = new UsageFetcher(cliPath, apiKey);
+    const result = await fetcher.fetch();
+    this.log(`Usage fetch result: ${result.stats.length} stats, error=${result.error ?? 'none'}`);
+    this.webview.postMessage({
+      type: 'usageData',
+      stats: result.stats,
+      fetchedAt: result.fetchedAt,
+      error: result.error,
+    });
+  }
+
   /** Read turn analysis settings from VS Code config and send to webview */
   private sendTurnAnalysisSettings(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -1541,6 +1579,9 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.adventureWidget')) {
         this.sendAdventureWidgetSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.usageWidget')) {
+        this.sendUsageWidgetSetting();
       }
       if (e.affectsConfiguration('claudeMirror.translationLanguage')) {
         this.sendTranslationLanguageSetting();

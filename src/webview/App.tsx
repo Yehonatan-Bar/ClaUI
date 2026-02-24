@@ -12,6 +12,7 @@ import { CommunityPanel } from './components/Achievements/CommunityPanel';
 import { ShareCard } from './components/Achievements/ShareCard';
 import { VitalsContainer } from './components/Vitals/VitalsContainer';
 import { AdventureWidget } from './components/Vitals/AdventureWidget';
+import { UsageWidget } from './components/Usage/UsageWidget';
 import { SessionTimeline } from './components/Vitals/SessionTimeline';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { DashboardPanel } from './components/Dashboard';
@@ -44,6 +45,7 @@ export const App: React.FC = () => {
     achievementPanelOpen,
     vitalsEnabled,
     adventureEnabled,
+    usageWidgetEnabled,
     turnHistory,
     dashboardOpen,
     skillGenPanelOpen,
@@ -60,6 +62,8 @@ export const App: React.FC = () => {
     () => (turnHistory.length > 0 ? turnHistory : deriveTurnHistoryFromMessages(messages)),
     [turnHistory, messages]
   );
+  const isCodexCliMissingError =
+    typeof lastError === 'string' && /codex cli not found/i.test(lastError);
 
   const handleTimelineTurnClick = React.useCallback((messageId: string) => {
     const el = document.querySelector(`[data-message-id="${messageId}"]`);
@@ -106,8 +110,38 @@ export const App: React.FC = () => {
       {dashboardOpen && <DashboardPanel />}
       {skillGenPanelOpen && <SkillGenPanel />}
 
-      {/* Error banner */}
-      {lastError && (
+      {/* Error banner / setup guidance */}
+      {lastError && (isCodexCliMissingError ? (
+        <div className="setup-notice-banner" role="alert" aria-live="polite">
+          <div className="setup-notice-content">
+            <div className="setup-notice-eyebrow">Codex Setup Required</div>
+            <div className="setup-notice-title">Codex CLI is not installed (or not in PATH)</div>
+            <div className="setup-notice-text">
+              ClaUi Codex mode uses the Codex CLI. Install the Codex CLI, then sign in with <code>codex login</code>.
+            </div>
+            <div className="setup-notice-actions">
+              <button
+                className="setup-notice-btn primary"
+                onClick={() => postToExtension({ type: 'openUrl', url: 'https://github.com/openai/codex' })}
+              >
+                Open Install Guide
+              </button>
+              <button
+                className="setup-notice-btn"
+                onClick={() => postToExtension({ type: 'openSettings', query: 'claudeMirror.codex.cliPath' })}
+              >
+                Open Codex Path Setting
+              </button>
+              <button
+                className="setup-notice-btn ghost"
+                onClick={() => setError(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
         <div className="error-banner">
           <span>{lastError}</span>
           <button
@@ -118,12 +152,14 @@ export const App: React.FC = () => {
             x
           </button>
         </div>
-      )}
+      ))}
 
       {/* Vitals: weather widget + cost heat bar */}
       <VitalsContainer />
       {/* Adventure widget: independent of vitals, toggled via gear settings */}
       {adventureEnabled && <AdventureWidget />}
+      {/* Usage widget: floating display of API usage stats, toggled via gear settings */}
+      {usageWidgetEnabled && <UsageWidget />}
 
       {/* Always show messages if they exist, regardless of connection state */}
       {hasMessages ? (
