@@ -200,8 +200,8 @@
 /* File path and URL links inside markdown content */
 .markdown-content .file-path-link {
   color: var(--vscode-textLink-foreground, #3794ff);
-  text-decoration: none;
-  border-bottom: 1px dotted var(--vscode-textLink-foreground, #3794ff);
+  text-decoration: underline;
+  text-underline-offset: 2px;
   cursor: pointer;
 }
 

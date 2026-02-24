@@ -101,7 +101,7 @@ function linkifyTextNodes(container: HTMLElement): void {
       span.tabIndex = 0;
       if (m.type === 'file') {
         span.dataset.path = m.text;
-        span.title = `Ctrl+Click to open ${m.text}`;
+        span.title = `Click to open ${m.text}`;
       } else {
         span.dataset.url = m.text;
         span.title = m.text;
@@ -160,8 +160,8 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ text }) => {
         return;
       }
 
-      // File path links (Ctrl+Click)
-      if (target.classList.contains('file-path-link') && (e.ctrlKey || e.metaKey)) {
+      // File path links (single click)
+      if (target.classList.contains('file-path-link')) {
         e.preventDefault();
         e.stopPropagation();
         postToExtension({ type: 'openFile', filePath: target.dataset.path || target.textContent || '' });

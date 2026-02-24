@@ -120,17 +120,15 @@ export function renderTextWithFileLinks(text: string): React.ReactNode[] {
           key={`fp-${link.index}`}
           className="file-path-link"
           onClick={(e) => {
-            if (e.ctrlKey || e.metaKey) {
-              e.preventDefault();
-              e.stopPropagation();
-              openFileInEditor(link.text);
-            }
+            e.preventDefault();
+            e.stopPropagation();
+            openFileInEditor(link.text);
           }}
-          title={`Ctrl+Click to open ${link.text}`}
+          title={`Click to open ${link.text}`}
           role="link"
           tabIndex={0}
           onKeyDown={(e) => {
-            if ((e.ctrlKey || e.metaKey) && (e.key === 'Enter' || e.key === ' ')) {
+            if (e.key === 'Enter' || e.key === ' ') {
               openFileInEditor(link.text);
             }
           }}

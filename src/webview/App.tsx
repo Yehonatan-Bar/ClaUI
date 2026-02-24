@@ -136,7 +136,7 @@ export const App: React.FC = () => {
                 className="setup-notice-btn"
                 onClick={() => postToExtension({ type: 'openCodexLogin' })}
               >
-                Open Login Terminal (codex login)
+                Open Setup/Login Terminal
               </button>
               <button
                 className="setup-notice-btn ghost"

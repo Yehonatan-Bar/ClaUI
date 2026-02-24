@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { exec } from 'child_process';
 import { CodexExecProcessManager } from '../process/CodexExecProcessManager';
 import { CodexExecDemux } from '../process/CodexExecDemux';
 import { CodexMessageHandler, type CodexSessionController } from '../webview/CodexMessageHandler';
@@ -360,6 +361,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       startedAt: existing?.startedAt || this.sessionStartedAt || new Date().toISOString(),
       lastActiveAt: new Date().toISOString(),
       firstPrompt: this.firstPrompt || existing?.firstPrompt,
+      workspacePath: existing?.workspacePath || this.sessionCwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
     });
   }
 
@@ -455,7 +457,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   }
 
   openCodexLoginTerminal(): void {
-    void this.launchCodexLoginFlow();
+    void this.launchCodexLoginFlow({ precheckCli: true });
   }
 
   isSessionActive(): boolean {
@@ -714,13 +716,25 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     return knownNoisePatterns.some((pattern) => pattern.test(text));
   }
 
-  private async launchCodexLoginFlow(): Promise<void> {
+  private async launchCodexLoginFlow(options?: { precheckCli?: boolean }): Promise<void> {
     if (this.codexLoginLaunchInProgress) {
       return;
     }
     this.codexLoginLaunchInProgress = true;
     try {
       const cliPath = vscode.workspace.getConfiguration('claudeMirror').get<string>('codex.cliPath', 'codex') || 'codex';
+      if (options?.precheckCli) {
+        const cliAvailable = await this.probeCodexCliAvailability(cliPath);
+        if (!cliAvailable) {
+          const terminal = vscode.window.createTerminal({ name: 'Codex Setup' });
+          terminal.show();
+          terminal.sendText('echo Codex CLI was not found on PATH (or at the configured path).', true);
+          terminal.sendText('echo Install Codex CLI first: https://github.com/openai/codex', true);
+          terminal.sendText('echo Then run: codex login', true);
+          void this.showCodexCliMissingGuidance();
+          return;
+        }
+      }
       const terminal = vscode.window.createTerminal({ name: 'Codex Login' });
       terminal.show();
       terminal.sendText(`${this.quoteTerminalArg(cliPath)} login`, true);
@@ -732,6 +746,29 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         this.codexLoginLaunchInProgress = false;
       }, 1500);
     }
+  }
+
+  private probeCodexCliAvailability(cliPath: string): Promise<boolean> {
+    const candidate = (cliPath || 'codex').trim() || 'codex';
+    return new Promise((resolve) => {
+      exec(
+        `${this.quoteTerminalArg(candidate)} --version`,
+        { timeout: 5000, windowsHide: true },
+        (err, stdout, stderr) => {
+          if (!err) {
+            resolve(true);
+            return;
+          }
+          const combined = [stdout, stderr, err.message].filter(Boolean).join('\n');
+          if (this.isLikelyCodexCliMissing(combined)) {
+            resolve(false);
+            return;
+          }
+          // If the probe failed for another reason, assume the CLI exists and let login try.
+          resolve(true);
+        }
+      );
+    });
   }
 
   private async showCodexCliMissingGuidance(): Promise<void> {

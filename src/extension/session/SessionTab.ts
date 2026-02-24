@@ -442,6 +442,7 @@ export class SessionTab implements WebviewBridge {
       startedAt: existing?.startedAt || this.sessionStartedAt || new Date().toISOString(),
       lastActiveAt: new Date().toISOString(),
       firstPrompt: this.firstPrompt || existing?.firstPrompt,
+      workspacePath: existing?.workspacePath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
     });
   }
 
