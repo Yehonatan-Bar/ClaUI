@@ -164,7 +164,7 @@ export const App: React.FC = () => {
       <VitalsContainer />
       {/* Adventure widget: independent of vitals, toggled via gear settings */}
       {adventureEnabled && <AdventureWidget />}
-      {/* Usage widget: floating display of API usage stats, toggled via gear settings */}
+      {/* Usage widget: floating display of subscription usage data, toggled via gear settings */}
       {usageWidgetEnabled && <UsageWidget />}
 
       {/* Always show messages if they exist, regardless of connection state */}

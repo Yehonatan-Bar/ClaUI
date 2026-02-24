@@ -265,8 +265,9 @@ export function registerCommands(
       const currentWorkspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       const sessions = currentWorkspace
         ? allSessions.filter(s => {
+            // Include legacy sessions (no workspacePath) alongside current workspace sessions
             if (!s.workspacePath) {
-              return false; // Exclude legacy sessions without a workspace path
+              return true;
             }
             // Case-insensitive comparison for Windows paths
             return s.workspacePath.toLowerCase() === currentWorkspace.toLowerCase();

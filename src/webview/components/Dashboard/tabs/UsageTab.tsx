@@ -108,7 +108,7 @@ export const UsageTab: React.FC = () => {
       }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: DASH_COLORS.text }}>
-            API Usage
+            Usage Data
           </div>
           {usageFetchedAt && (
             <div style={{ fontSize: 12, color: DASH_COLORS.textMuted, marginTop: 2 }}>
@@ -164,7 +164,7 @@ export const UsageTab: React.FC = () => {
           <div style={{ fontSize: 28, marginBottom: 10 }}>
             {'\u{1F4CA}'}
           </div>
-          <div>Click <strong>Refresh</strong> to load your current API usage statistics.</div>
+          <div>Click <strong>Refresh</strong> to load your current usage data.</div>
           <div style={{ fontSize: 11, marginTop: 6, opacity: 0.7 }}>
             Shows session and weekly usage limits from Claude Code.
           </div>
