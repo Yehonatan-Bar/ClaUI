@@ -38,17 +38,17 @@ The meta-prompt instructs Claude to:
 3. Add scaffolding (acceptance criteria, step-by-step approach, edge cases)
 4. Use structured formatting (numbered steps, bullet points)
 5. Add context cues ("Think step by step", "Consider edge cases")
-6. Keep it concise (1.5-3x original length)
+6. Keep it concise (1.5-2x original length; for long prompts >1000 chars, focus on restructuring not expanding)
 7. Match the language of the original prompt (Hebrew stays Hebrew)
 8. Output only the enhanced text, no meta-commentary
 
-Input is truncated to 4000 characters. Backend timeout is 30 seconds. Client-side safety timeout is 35 seconds (resets `isEnhancing` if backend result never arrives).
+Input is truncated to 3000 characters (with `[...truncated]` marker). Backend timeout is 60 seconds. Client-side safety timeout is 65 seconds (resets `isEnhancing` if backend result never arrives).
 
 ## UX Flows
 
 ### Manual Enhancement (with Comparison Panel)
 1. User types prompt, clicks the sparkles button (or Ctrl+Shift+E)
-2. Textarea dims with "Enhancing..." overlay, button spins
+2. Textarea dims with "Enhancing..." overlay (shows elapsed seconds for long prompts), button spins
 3. Comparison panel appears above the input area showing both original and enhanced text
 4. User reviews both versions, clicks "Use Enhanced" or "Use Original"
 5. Selected text is placed in the textarea, comparison panel closes
@@ -129,7 +129,16 @@ If enhancement fails (`prompt-enhance-failed` event) and auto-send was pending, 
 ## Reliability Safeguards
 
 ### Client-Side Safety Timeout
-A 35-second timeout in InputArea resets `isEnhancing` to false if the backend never sends `enhancePromptResult`. This prevents the UI from getting permanently stuck in "Enhancing..." state. Both the manual enhance and auto-enhance paths set this timeout, and both the `prompt-enhanced` and `prompt-enhance-failed` event handlers clear it.
+A 65-second timeout in InputArea resets `isEnhancing` to false if the backend never sends `enhancePromptResult`. This prevents the UI from getting permanently stuck in "Enhancing..." state. Both the manual enhance and auto-enhance paths set this timeout, and both the `prompt-enhanced` and `prompt-enhance-failed` event handlers clear it.
+
+### Elapsed Time Progress
+An interval counter shows elapsed seconds in the overlay. For long prompts (>1000 chars), it immediately shows "Enhancing long prompt... Ns". For shorter prompts, elapsed seconds appear after 5 seconds of waiting. The timer is cleaned up on success, failure, and safety timeout.
+
+### Stdin Backpressure Handling
+The stdin write to the child process checks the return value of `write()`. If the buffer is full (`false` return), it waits for the `drain` event before calling `end()`. This prevents data loss on Windows with large prompts containing multi-byte characters (e.g., Hebrew).
+
+### Enhanced Error Logging
+stderr output is accumulated in a buffer and included in all error, timeout, and empty-result log messages to aid debugging.
 
 ### Windows Process Kill
 On Windows with `shell: true`, `child.kill('SIGTERM')` only kills the `cmd.exe` wrapper, leaving the actual `claude` CLI process orphaned. PromptEnhancer uses `taskkill /F /T /PID` (same pattern as ClaudeProcessManager) to kill the entire process tree on timeout.
