@@ -52,9 +52,11 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private analyticsSaved = false;
   private firstPrompt = '';
   private turnAuthFailureDetected = false;
+  private turnCliMissingDetected = false;
   private turnStructuredErrorDetected = false;
   private turnFailureText: string[] = [];
   private codexLoginLaunchInProgress = false;
+  private codexInstallGuidanceShownAt = 0;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -526,6 +528,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.processManager.on('raw', (text: string) => {
       tabLog(`Codex raw: ${text}`);
       this.captureTurnFailureText(text);
+      this.maybeMarkTurnCliMissing(text, tabLog);
       this.maybeMarkTurnAuthFailure(text, tabLog);
     });
 
@@ -540,6 +543,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         return;
       }
       this.captureTurnFailureText(trimmed);
+      this.maybeMarkTurnCliMissing(trimmed, tabLog);
       // Codex often emits non-fatal warnings on stderr (e.g. shell snapshot support).
       if (/WARN\s+codex_core::shell_snapshot/i.test(trimmed)) {
         return;
@@ -563,6 +567,20 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       if (info.code !== 0 && info.code !== null) {
         this.achievementService.onRuntimeError(this.id);
         this.postMessage({ type: 'processBusy', busy: false });
+        if (!this.turnCliMissingDetected && this.isLikelyCodexCliMissing(this.turnFailureText.join('\n'))) {
+          this.turnCliMissingDetected = true;
+        }
+        if (this.turnCliMissingDetected) {
+          tabLog('Codex CLI missing/not found detected; showing install guidance');
+          void this.showCodexCliMissingGuidance();
+          this.postMessage({
+            type: 'error',
+            message:
+              'Codex CLI not found. ClaUi Codex mode wraps the Codex CLI (not the VS Code extension). Install Codex and/or set "claudeMirror.codex.cliPath", then run "codex login" and retry.',
+          });
+          this.resetTurnFailureCapture();
+          return;
+        }
         if (!this.turnAuthFailureDetected && this.isLikelyCodexAuthFailure(this.turnFailureText.join('\n'))) {
           this.turnAuthFailureDetected = true;
         }
@@ -589,10 +607,18 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.processManager.on('error', (err: Error) => {
       tabLog(`Codex process error: ${err.message}`);
       this.captureTurnFailureText(err.message);
+      this.maybeMarkTurnCliMissing(err.message, tabLog);
       this.maybeMarkTurnAuthFailure(err.message, tabLog);
       this.achievementService.onRuntimeError(this.id);
       this.postMessage({ type: 'processBusy', busy: false });
-      if (this.turnAuthFailureDetected) {
+      if (this.turnCliMissingDetected) {
+        void this.showCodexCliMissingGuidance();
+        this.postMessage({
+          type: 'error',
+          message:
+            'Codex CLI not found. ClaUi Codex mode wraps the Codex CLI (not the VS Code extension). Install Codex and/or set "claudeMirror.codex.cliPath", then run "codex login" and retry.',
+        });
+      } else if (this.turnAuthFailureDetected) {
         void this.launchCodexLoginFlow();
         this.postMessage({
           type: 'error',
@@ -607,6 +633,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
   private resetTurnFailureCapture(): void {
     this.turnAuthFailureDetected = false;
+    this.turnCliMissingDetected = false;
     this.turnStructuredErrorDetected = false;
     this.turnFailureText = [];
   }
@@ -633,6 +660,17 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     log(`Detected Codex authentication/login failure: ${text.trim()}`);
   }
 
+  private maybeMarkTurnCliMissing(text: string, log: (msg: string) => void): void {
+    if (this.turnCliMissingDetected) {
+      return;
+    }
+    if (!this.isLikelyCodexCliMissing(text)) {
+      return;
+    }
+    this.turnCliMissingDetected = true;
+    log(`Detected Codex CLI missing/not found failure: ${text.trim()}`);
+  }
+
   private isLikelyCodexAuthFailure(text: string): boolean {
     const normalized = text.toLowerCase();
     const authPatterns = [
@@ -647,6 +685,17 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       /not logged in/i,
     ];
     return authPatterns.some((pattern) => pattern.test(normalized));
+  }
+
+  private isLikelyCodexCliMissing(text: string): boolean {
+    const normalized = text.toLowerCase();
+    const missingPatterns = [
+      /'codex'\s+is not recognized as an internal or external command/i,
+      /\bcodex:\s+command not found\b/i,
+      /\bspawn\b.*\bcodex\b.*\benoent\b/i,
+      /\benoent\b.*\bcodex\b/i,
+    ];
+    return missingPatterns.some((pattern) => pattern.test(normalized));
   }
 
   private isKnownNonFatalCodexStderr(text: string): boolean {
@@ -674,6 +723,29 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       setTimeout(() => {
         this.codexLoginLaunchInProgress = false;
       }, 1500);
+    }
+  }
+
+  private async showCodexCliMissingGuidance(): Promise<void> {
+    const now = Date.now();
+    if (now - this.codexInstallGuidanceShownAt < 1500) {
+      return;
+    }
+    this.codexInstallGuidanceShownAt = now;
+    const installGuideUrl = 'https://github.com/openai/codex';
+
+    const choice = await vscode.window.showErrorMessage(
+      'Codex CLI was not found. ClaUi Codex mode runs the Codex CLI ("codex"), not the official VS Code extension. Install Codex CLI (or set claudeMirror.codex.cliPath), then run "codex login".',
+      'Open Install Guide',
+      'Open Settings'
+    );
+
+    if (choice === 'Open Install Guide') {
+      await vscode.env.openExternal(vscode.Uri.parse(installGuideUrl));
+      return;
+    }
+    if (choice === 'Open Settings') {
+      await vscode.commands.executeCommand('workbench.action.openSettings', 'claudeMirror.codex.cliPath');
     }
   }
 
