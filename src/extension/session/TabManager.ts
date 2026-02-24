@@ -7,6 +7,7 @@ import type { PromptHistoryStore } from './PromptHistoryStore';
 import type { ExtensionToWebviewMessage, ProviderId } from '../types/webview-messages';
 import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
+import type { TokenUsageRatioTracker } from './TokenUsageRatioTracker';
 
 /** Distinct colors for tab header bars, cycling through the palette */
 const TAB_COLORS = [
@@ -38,7 +39,8 @@ export class TabManager {
     private readonly promptHistoryStore: PromptHistoryStore,
     private readonly achievementService: AchievementService,
     private readonly logDir: string | null,
-    private readonly skillGenService?: SkillGenService
+    private readonly skillGenService?: SkillGenService,
+    private readonly tokenRatioTracker?: TokenUsageRatioTracker
   ) {
     // Single shared status bar item across all tabs
     this.statusBarItem = vscode.window.createStatusBarItem(
@@ -85,7 +87,8 @@ export class TabManager {
       this.promptHistoryStore,
       this.achievementService,
       this.logDir,
-      this.skillGenService
+      this.skillGenService,
+      this.tokenRatioTracker
     );
 
     this.tabs.set(tab.id, tab);

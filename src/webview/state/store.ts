@@ -10,6 +10,8 @@ import type {
   SessionSummary,
   SkillGenRunStatus,
   SkillGenRunHistoryEntry,
+  TokenUsageRatioSample,
+  TokenRatioBucketSummary,
   TurnRecord,
   TurnSemantics,
   CommunityFriendProfilePayload,
@@ -226,6 +228,13 @@ export interface AppState {
   skillGenHistory: SkillGenRunHistoryEntry[];
   skillGenPanelOpen: boolean;
   skillGenShowInfo: boolean;
+
+  // Token-Usage Ratio
+  tokenRatioSamples: TokenUsageRatioSample[];
+  tokenRatioSummaries: TokenRatioBucketSummary[];
+  tokenRatioGlobalTurnCount: number;
+  tokenRatioCumulativeTokens: { input: number; output: number; cacheCreation: number; cacheRead: number } | null;
+  setTokenRatioData: (samples: TokenUsageRatioSample[], summaries: TokenRatioBucketSummary[], globalTurnCount: number, cumulativeTokens: { input: number; output: number; cacheCreation: number; cacheRead: number }) => void;
 
   // Actions
   setSession: (sessionId: string, model: string) => void;
@@ -573,6 +582,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   skillGenHistory: [],
   skillGenPanelOpen: false,
   skillGenShowInfo: false,
+
+  // Token-Usage Ratio
+  tokenRatioSamples: [],
+  tokenRatioSummaries: [],
+  tokenRatioGlobalTurnCount: 0,
+  tokenRatioCumulativeTokens: null,
+  setTokenRatioData: (samples, summaries, globalTurnCount, cumulativeTokens) =>
+    set({ tokenRatioSamples: samples, tokenRatioSummaries: summaries, tokenRatioGlobalTurnCount: globalTurnCount, tokenRatioCumulativeTokens: cumulativeTokens }),
 
   // Actions
   setSession: (sessionId, model) =>

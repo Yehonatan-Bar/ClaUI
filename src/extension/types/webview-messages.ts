@@ -439,7 +439,9 @@ export type WebviewToExtensionMessage =
   | CodexConsultRequest
   | SetApiKeyRequest
   | RequestUsageMessage
-  | SetUsageWidgetEnabledRequest;
+  | SetUsageWidgetEnabledRequest
+  | GetTokenRatioDataRequest
+  | ClearTokenRatioDataRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -1012,6 +1014,45 @@ export interface UsageWidgetSettingMessage {
   enabled: boolean;
 }
 
+// --- Token-Usage Ratio Tracker ---
+
+export interface TokenUsageRatioSample {
+  id: string;
+  timestamp: number;
+  bucket: string;
+  bucketLabel: string;
+  usagePercent: number;
+  cumulativeTotalTokens: number;
+  deltaTokens: number;
+  deltaUsagePercent: number;
+  tokensPerPercent: number | null;
+}
+
+export interface TokenRatioBucketSummary {
+  bucket: string;
+  bucketLabel: string;
+  sampleCount: number;
+  avgTokensPerPercent: number | null;
+  latestTokensPerPercent: number | null;
+  trend: 'increasing' | 'decreasing' | 'stable' | 'insufficient-data';
+}
+
+export interface TokenRatioDataMessage {
+  type: 'tokenRatioData';
+  samples: TokenUsageRatioSample[];
+  summaries: TokenRatioBucketSummary[];
+  globalTurnCount: number;
+  cumulativeTokens: { input: number; output: number; cacheCreation: number; cacheRead: number };
+}
+
+export interface GetTokenRatioDataRequest {
+  type: 'getTokenRatioData';
+}
+
+export interface ClearTokenRatioDataRequest {
+  type: 'clearTokenRatioData';
+}
+
 /** Serializable chat message for passing between webview instances (e.g. fork) */
 export interface SerializedChatMessage {
   id: string;
@@ -1079,4 +1120,5 @@ export type ExtensionToWebviewMessage =
   | ShareCardCopiedMessage
   | ApiKeySettingMessage
   | UsageDataMessage
-  | UsageWidgetSettingMessage;
+  | UsageWidgetSettingMessage
+  | TokenRatioDataMessage;

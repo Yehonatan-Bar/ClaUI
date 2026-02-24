@@ -74,6 +74,7 @@ export function useClaudeStream(): void {
     setApiKeySetting,
     setUsageWidgetEnabled,
     setUsageData,
+    setTokenRatioData,
   } = useAppStore();
 
   useEffect(() => {
@@ -131,20 +132,19 @@ export function useClaudeStream(): void {
 
         case 'messageStart': {
           logState('before messageStart');
-          // Clear stale ExitPlanMode approval bars. When the CLI auto-approves
-          // ExitPlanMode and the model starts a new turn (implementation), the
-          // approval bar was informational only. Leaving it visible allows the
-          // user to accidentally type text that gets routed as plan feedback,
-          // which sends a new user message to the CLI and can re-trigger the
-          // ExitPlanMode infinite loop.
+          // Do NOT clear ExitPlanMode approval bars here. The CLI auto-approves
+          // ExitPlanMode and the model starts implementing, but the user still
+          // wants to see the 4 approval options (compact context, bypass
+          // permissions, supervised mode, or type feedback). The infinite loop
+          // is prevented by two other defenses:
+          //   1. `exitPlanModeProcessed` flag in MessageHandler suppresses stale re-triggers
+          //   2. ExitPlanMode planApprovalResponse handler blocks ALL text to CLI
+          // The bar is cleared when the user clicks an option, sends a message
+          // (processBusy), or when a new planApprovalRequired replaces it.
           //
-          // AskUserQuestion bars are NOT cleared here because the CLI truly
-          // pauses and waits for user input - no new messageStart should arrive
-          // until the user responds.
-          const currentApproval = useAppStore.getState().pendingApproval;
-          if (currentApproval && currentApproval.toolName !== 'AskUserQuestion') {
-            setPendingApproval(null);
-          }
+          // AskUserQuestion bars are also preserved - the CLI truly pauses and
+          // waits for user input, so no new messageStart should arrive until
+          // the user responds.
           handleMessageStart(msg.messageId, msg.model);
           logState('after messageStart');
           break;
@@ -517,6 +517,10 @@ export function useClaudeStream(): void {
         case 'usageData':
           setUsageData(msg.stats, msg.fetchedAt, msg.error);
           break;
+
+        case 'tokenRatioData':
+          setTokenRatioData(msg.samples, msg.summaries, msg.globalTurnCount, msg.cumulativeTokens);
+          break;
       }
     }
 
@@ -587,6 +591,7 @@ export function useClaudeStream(): void {
     setApiKeySetting,
     setUsageWidgetEnabled,
     setUsageData,
+    setTokenRatioData,
   ]);
 }
 

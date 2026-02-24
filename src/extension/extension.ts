@@ -10,6 +10,7 @@ import { AchievementInsightAnalyzer } from './achievements/AchievementInsightAna
 import { GitHubSyncService } from './achievements/GitHubSyncService';
 import { SkillGenService } from './skillgen/SkillGenService';
 import { installSkillFiles, injectClaudeMdInstructions } from './skillgen/SrPtdBootstrap';
+import { TokenUsageRatioTracker } from './session/TokenUsageRatioTracker';
 import { registerCommands } from './commands';
 
 let tabManager: TabManager;
@@ -89,6 +90,9 @@ export function activate(context: vscode.ExtensionContext): void {
     void injectClaudeMdInstructions(docsDir, log);
   }
 
+  // Create global token-usage ratio tracker (shared across all tabs)
+  const tokenRatioTracker = new TokenUsageRatioTracker(context.globalState);
+
   // Create the tab manager that owns all session tabs
   tabManager = new TabManager(
     context,
@@ -98,7 +102,8 @@ export function activate(context: vscode.ExtensionContext): void {
     promptHistoryStore,
     achievementService,
     enableFileLogging ? logDir : null,
-    skillGenService
+    skillGenService,
+    tokenRatioTracker
   );
 
   // Register commands routed through the tab manager
