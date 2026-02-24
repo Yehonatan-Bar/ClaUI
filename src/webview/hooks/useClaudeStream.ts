@@ -519,7 +519,7 @@ export function useClaudeStream(): void {
           break;
 
         case 'tokenRatioData':
-          setTokenRatioData(msg.samples, msg.summaries, msg.globalTurnCount, msg.cumulativeTokens);
+          setTokenRatioData(msg.samples, msg.summaries, msg.globalTurnCount, msg.cumulativeTokens, msg.cumulativeWeightedTokens);
           break;
       }
     }

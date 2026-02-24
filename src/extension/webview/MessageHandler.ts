@@ -1463,6 +1463,7 @@ export class MessageHandler {
       summaries,
       globalTurnCount: history.globalTurnCount,
       cumulativeTokens: history.cumulativeTokens,
+      cumulativeWeightedTokens: history.cumulativeWeightedTokens,
     });
   }
 

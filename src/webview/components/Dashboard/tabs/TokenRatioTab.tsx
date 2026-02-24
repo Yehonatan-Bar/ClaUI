@@ -62,7 +62,7 @@ const SummaryCard: React.FC<{ summary: TokenRatioBucketSummary }> = ({ summary }
         <span style={{ fontSize: 28, fontWeight: 700, color: DASH_COLORS.text }}>
           {summary.latestTokensPerPercent !== null ? formatTokens(summary.latestTokensPerPercent) : 'N/A'}
         </span>
-        <span style={{ fontSize: 12, color: DASH_COLORS.textMuted }}>tokens/1%</span>
+        <span style={{ fontSize: 12, color: DASH_COLORS.textMuted }}>weighted tok/1%</span>
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
         <span style={{ fontSize: 11, color: DASH_COLORS.textMuted }}>
@@ -98,6 +98,7 @@ export const TokenRatioTab: React.FC = () => {
   const summaries = useAppStore((s) => s.tokenRatioSummaries);
   const globalTurnCount = useAppStore((s) => s.tokenRatioGlobalTurnCount);
   const cumulativeTokens = useAppStore((s) => s.tokenRatioCumulativeTokens);
+  const cumulativeWeightedTokens = useAppStore((s) => s.tokenRatioCumulativeWeightedTokens);
 
   // Request data on mount
   useEffect(() => {
@@ -131,6 +132,28 @@ export const TokenRatioTab: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Cost Weight Info */}
+      <div style={{
+        background: 'rgba(88, 166, 255, 0.08)',
+        border: `1px solid rgba(88, 166, 255, 0.25)`,
+        borderRadius: 8,
+        padding: '10px 16px',
+        fontSize: 11,
+        color: DASH_COLORS.textMuted,
+        lineHeight: 1.6,
+      }}>
+        <span style={{ fontWeight: 600, color: DASH_COLORS.blue }}>Cost-weighted calculation</span>
+        {' -- Tokens are weighted by relative API cost: '}
+        <span style={{ color: DASH_COLORS.text }}>Output=5x</span>
+        {', '}
+        <span style={{ color: DASH_COLORS.text }}>Cache Write=1.25x</span>
+        {', '}
+        <span style={{ color: DASH_COLORS.text }}>Input=1x</span>
+        {', '}
+        <span style={{ color: DASH_COLORS.text }}>Cache Read=0.1x</span>
+        {'. This correlates more accurately with actual usage %.'}
+      </div>
+
       {/* Summary Cards */}
       {summaries.length > 0 && (
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -153,25 +176,31 @@ export const TokenRatioTab: React.FC = () => {
           <div style={{ fontSize: 20, fontWeight: 700, color: DASH_COLORS.text }}>{globalTurnCount}</div>
         </div>
         <div>
-          <span style={{ fontSize: 11, color: DASH_COLORS.textMuted }}>Cumulative Tokens (all-time)</span>
+          <span style={{ fontSize: 11, color: DASH_COLORS.textMuted }}>Raw Tokens (all-time)</span>
           <div style={{ fontSize: 20, fontWeight: 700, color: DASH_COLORS.text }}>{formatTokens(totalTokens)}</div>
+        </div>
+        <div>
+          <span style={{ fontSize: 11, color: DASH_COLORS.textMuted }}>Weighted Tokens (all-time)</span>
+          <div style={{ fontSize: 20, fontWeight: 700, color: DASH_COLORS.blue }}>
+            {cumulativeWeightedTokens !== null ? formatTokens(Math.round(cumulativeWeightedTokens)) : 'N/A'}
+          </div>
         </div>
         {cumulativeTokens && (
           <>
             <div>
-              <span style={{ fontSize: 11, color: DASH_COLORS.textMuted }}>Input</span>
+              <span style={{ fontSize: 11, color: DASH_COLORS.textMuted }}>Input (1x)</span>
               <div style={{ fontSize: 14, color: DASH_COLORS.blue }}>{formatTokens(cumulativeTokens.input)}</div>
             </div>
             <div>
-              <span style={{ fontSize: 11, color: DASH_COLORS.textMuted }}>Output</span>
+              <span style={{ fontSize: 11, color: DASH_COLORS.textMuted }}>Output (5x)</span>
               <div style={{ fontSize: 14, color: DASH_COLORS.green }}>{formatTokens(cumulativeTokens.output)}</div>
             </div>
             <div>
-              <span style={{ fontSize: 11, color: DASH_COLORS.textMuted }}>Cache Write</span>
+              <span style={{ fontSize: 11, color: DASH_COLORS.textMuted }}>Cache Write (1.25x)</span>
               <div style={{ fontSize: 14, color: DASH_COLORS.amber }}>{formatTokens(cumulativeTokens.cacheCreation)}</div>
             </div>
             <div>
-              <span style={{ fontSize: 11, color: DASH_COLORS.textMuted }}>Cache Read</span>
+              <span style={{ fontSize: 11, color: DASH_COLORS.textMuted }}>Cache Read (0.1x)</span>
               <div style={{ fontSize: 14, color: DASH_COLORS.teal }}>{formatTokens(cumulativeTokens.cacheRead)}</div>
             </div>
           </>
@@ -187,7 +216,7 @@ export const TokenRatioTab: React.FC = () => {
           padding: '16px 12px',
         }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: DASH_COLORS.text, marginBottom: 12, paddingLeft: 8 }}>
-            Tokens per 1% Usage Over Time
+            Weighted Tokens per 1% Usage Over Time
           </div>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={chartData}>
@@ -235,7 +264,7 @@ export const TokenRatioTab: React.FC = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${DASH_COLORS.border}` }}>
-                {['Date', 'Bucket', 'Usage%', 'Delta Tokens', 'Delta Usage%', 'Tokens/1%'].map((h) => (
+                {['Date', 'Bucket', 'Usage%', 'Raw Delta', 'Weighted Delta', 'Delta Usage%', 'Weighted Tok/1%'].map((h) => (
                   <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: DASH_COLORS.textMuted, fontWeight: 500 }}>
                     {h}
                   </th>
@@ -252,7 +281,10 @@ export const TokenRatioTab: React.FC = () => {
                     </span>
                   </td>
                   <td style={{ padding: '6px 10px', color: DASH_COLORS.text }}>{s.usagePercent}%</td>
-                  <td style={{ padding: '6px 10px', color: DASH_COLORS.text }}>{formatTokens(s.deltaTokens)}</td>
+                  <td style={{ padding: '6px 10px', color: DASH_COLORS.textMuted }}>{formatTokens(s.deltaTokens)}</td>
+                  <td style={{ padding: '6px 10px', color: DASH_COLORS.text }}>
+                    {formatTokens(Math.round(s.weightedDeltaTokens ?? s.deltaTokens))}
+                  </td>
                   <td style={{ padding: '6px 10px', color: s.deltaUsagePercent < 0 ? DASH_COLORS.amber : DASH_COLORS.text }}>
                     {s.deltaUsagePercent >= 0 ? '+' : ''}{s.deltaUsagePercent.toFixed(1)}%
                   </td>

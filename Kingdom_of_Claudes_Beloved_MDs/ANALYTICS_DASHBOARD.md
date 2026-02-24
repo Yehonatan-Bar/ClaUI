@@ -73,11 +73,12 @@ A full-screen overlay dashboard inside the chat webview with two modes: **Sessio
 - Auto-refresh toggle with configurable interval
 
 ### Token Ratio
-- Correlates token consumption with usage percentage changes over time
-- Summary cards: one per billing bucket showing latest tokensPerPercent, trend arrow, sample count
-- Global stats bar: total turns tracked, cumulative token breakdown (input/output/cache creation/cache read)
-- Trend line chart (Recharts LineChart): tokensPerPercent over time, one colored line per bucket
-- Samples table: last 50 samples (Date, Bucket, Usage%, Delta Tokens, Delta Usage%, Tokens/1%)
+- Correlates cost-weighted token consumption with usage percentage changes over time
+- Cost weight info banner explaining the weighting formula (Output=5x, CacheWrite=1.25x, Input=1x, CacheRead=0.1x)
+- Summary cards: one per billing bucket showing latest weighted tokensPerPercent, trend arrow, sample count
+- Global stats bar: total turns tracked, raw tokens, weighted tokens, per-type breakdown with cost multiplier labels
+- Trend line chart (Recharts LineChart): weighted tokensPerPercent over time, one colored line per bucket
+- Samples table: last 50 samples (Date, Bucket, Usage%, Raw Delta, Weighted Delta, Delta Usage%, Weighted Tok/1%)
 - Clear Data button to reset all stored samples
 - Shows "Waiting for data..." when fewer than 5 turns have been tracked
 
@@ -218,7 +219,20 @@ Both paths feed into `flattenCommands()` in `dashboardUtils.ts`, which iterates 
 
 ## Token-Usage Ratio Tracker
 
-Correlates two independent data streams -- token counts (from CLI result events) and usage percentage (from Anthropic OAuth API) -- to answer: "how many tokens equal 1% of usage?"
+Correlates two independent data streams -- token counts (from CLI result events) and usage percentage (from Anthropic OAuth API) -- to answer: "how many cost-weighted tokens equal 1% of usage?"
+
+### Cost Weighting
+
+Different token types have vastly different API costs. Raw token sums are inaccurate for correlation with usage %. The tracker applies cost weights (identical across Opus and Sonnet):
+
+| Token Type | Weight | Rationale |
+|---|---|---|
+| Input | 1.0x | Base reference |
+| Output | 5.0x | $25/$5 (output costs 5x input) |
+| Cache Creation | 1.25x | $6.25/$5 (5-min TTL, Claude Code default) |
+| Cache Read | 0.1x | $0.50/$5 (90% cheaper than input) |
+
+Formula: `weightedTokens = input*1.0 + output*5.0 + cacheCreation*1.25 + cacheRead*0.1`
 
 ### Core Module: `TokenUsageRatioTracker`
 
@@ -227,13 +241,13 @@ Correlates two independent data streams -- token counts (from CLI result events)
 **Global singleton** -- instantiated once in `extension.ts` with `context.globalState`, injected through TabManager -> SessionTab -> MessageHandler via optional constructor parameters and a setter method.
 
 **Key API:**
-- `recordTurn(tokens)` - Increments global turn counter and cumulative token totals. Returns `true` every 5 turns (sample is due).
-- `createSamples(usageStats)` - Called when sample is due. Fetches current usage %, computes delta tokens and delta usage % since last sample, calculates `tokensPerPercent = deltaTokens / deltaUsagePercent`. Handles edge cases: usage reset (negative delta -> null ratio), no change (zero delta -> null), first sample (baseline only, no ratio).
+- `recordTurn(tokens)` - Increments global turn counter, raw cumulative tokens, and cost-weighted cumulative total. Returns `true` every 5 turns (sample is due).
+- `createSamples(usageStats)` - Called when sample is due. Fetches current usage %, computes weighted delta tokens and delta usage % since last sample, calculates `tokensPerPercent = weightedDeltaTokens / deltaUsagePercent`. Handles edge cases: usage reset (negative delta -> null ratio), no change (zero delta -> null), first sample (baseline only, no ratio). Falls back to raw delta for old samples without weighted data.
 - `getHistory()` - Returns all stored samples (up to 500, FIFO eviction).
 - `computeSummaries()` - Groups samples by billing bucket, computes per-bucket: avgTokensPerPercent, latestTokensPerPercent, trend (increasing/decreasing/stable/insufficient-data).
 - `clearAll()` - Resets all stored data.
 
-**Persistence:** Samples stored in VS Code `globalState` under key `claudeMirror.tokenUsageRatio`. Uses `enqueueWrite()` to serialize all writes, preventing race conditions when multiple tabs record turns simultaneously.
+**Persistence:** Samples stored in VS Code `globalState` under key `claudeMirror.tokenUsageRatio`. Uses `enqueueWrite()` to serialize all writes, preventing race conditions when multiple tabs record turns simultaneously. Backward compatible: old history without `cumulativeWeightedTokens` gets it initialized to 0 on load.
 
 ### Data Flow
 
@@ -241,6 +255,7 @@ Correlates two independent data streams -- token counts (from CLI result events)
 CLI result event completes (success or error):
   MessageHandler extracts token counts
     -> tracker.recordTurn({ input, output, cacheCreation, cacheRead })
+    -> Accumulates raw + weighted cumulative tokens
     -> Returns true every 5 turns
 
 When sample is due:
@@ -253,14 +268,14 @@ When sample is due:
 Dashboard TokenRatioTab mounts:
   -> postToExtension({ type: 'getTokenRatioData' })
   -> MessageHandler reads tracker.getHistory() + computeSummaries()
-  -> Sends tokenRatioData message to webview
+  -> Sends tokenRatioData message to webview (includes cumulativeWeightedTokens)
   -> Zustand store updates, tab renders reactively
 ```
 
 ### Message Types
 - `GetTokenRatioDataRequest` - Webview requests current data
 - `ClearTokenRatioDataRequest` - Webview requests data wipe
-- `TokenRatioDataMessage` - Extension sends samples, summaries, globalTurnCount, cumulativeTokens
+- `TokenRatioDataMessage` - Extension sends samples, summaries, globalTurnCount, cumulativeTokens, cumulativeWeightedTokens
 
 ## Known Limitations
 
