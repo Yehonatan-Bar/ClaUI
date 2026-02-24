@@ -122,6 +122,12 @@ export const App: React.FC = () => {
             <div className="setup-notice-actions">
               <button
                 className="setup-notice-btn primary"
+                onClick={() => postToExtension({ type: 'autoSetupCodexCli' })}
+              >
+                Auto-setup Codex CLI
+              </button>
+              <button
+                className="setup-notice-btn"
                 onClick={() => postToExtension({ type: 'autoDetectCodexCliPath' })}
               >
                 Auto-detect Codex CLI
