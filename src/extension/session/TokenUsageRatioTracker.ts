@@ -75,6 +75,7 @@ export class TokenUsageRatioTracker {
     );
 
     this.history.globalTurnCount++;
+    this.enqueueWrite();
 
     const turnsSinceLastSample = this.history.globalTurnCount - this.history.lastSampledAtTurnCount;
     return turnsSinceLastSample >= SAMPLE_INTERVAL;

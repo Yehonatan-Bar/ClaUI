@@ -15,9 +15,10 @@ import { UsageTab } from './tabs/UsageTab';
 import { TokenRatioTab } from './tabs/TokenRatioTab';
 import { DASH_COLORS } from './dashboardUtils';
 
-type SessionTab = 'overview' | 'tokens' | 'tools' | 'timeline' | 'commands' | 'context' | 'usage' | 'ratio';
+type SessionTab = 'overview' | 'tokens' | 'tools' | 'timeline' | 'commands' | 'context' | 'usage';
 type ProjectTab = 'p-overview' | 'p-sessions' | 'p-tokens' | 'p-tools';
-type DashboardTab = SessionTab | ProjectTab;
+type UserTab = 'u-ratio';
+type DashboardTab = SessionTab | ProjectTab | UserTab;
 
 const SESSION_TABS: { key: SessionTab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
@@ -27,7 +28,6 @@ const SESSION_TABS: { key: SessionTab; label: string }[] = [
   { key: 'commands', label: 'Commands' },
   { key: 'context', label: 'Context' },
   { key: 'usage', label: 'Usage' },
-  { key: 'ratio', label: 'Token Ratio' },
 ];
 
 const PROJECT_TABS: { key: ProjectTab; label: string }[] = [
@@ -35,6 +35,10 @@ const PROJECT_TABS: { key: ProjectTab; label: string }[] = [
   { key: 'p-sessions', label: 'Sessions' },
   { key: 'p-tokens', label: 'Tokens' },
   { key: 'p-tools', label: 'Tools' },
+];
+
+const USER_TABS: { key: UserTab; label: string }[] = [
+  { key: 'u-ratio', label: 'Token Ratio' },
 ];
 
 const modeToggleBase: React.CSSProperties = {
@@ -47,24 +51,29 @@ const modeToggleBase: React.CSSProperties = {
   transition: 'background 0.15s, color 0.15s',
 };
 
+const MODE_COLORS: Record<string, string> = {
+  session: DASH_COLORS.blue,
+  project: DASH_COLORS.purple,
+  user: DASH_COLORS.amber,
+};
+
+function getDefaultTab(mode: 'session' | 'project' | 'user'): DashboardTab {
+  if (mode === 'project') return 'p-overview';
+  if (mode === 'user') return 'u-ratio';
+  return 'overview';
+}
+
 export const DashboardPanel: React.FC = () => {
   const { turnHistory, setDashboardOpen, projectSessions, projectDashboardMode, setProjectDashboardMode } = useAppStore();
-  const [activeTab, setActiveTab] = useState<DashboardTab>(
-    projectDashboardMode === 'project' ? 'p-overview' : 'overview'
-  );
+  const [activeTab, setActiveTab] = useState<DashboardTab>(getDefaultTab(projectDashboardMode));
   const mode = projectDashboardMode;
 
   // Normalize local tab state to the persisted mode on mount / reopen.
-  // Without this, reopening the dashboard in Project mode can still render the
-  // Session "overview" tab content (which may look like "no data").
   useEffect(() => {
     setActiveTab((prev) => {
-      if (mode === 'project' && !prev.startsWith('p-')) {
-        return 'p-overview';
-      }
-      if (mode === 'session' && prev.startsWith('p-')) {
-        return 'overview';
-      }
+      if (mode === 'project' && !prev.startsWith('p-')) return 'p-overview';
+      if (mode === 'user' && !prev.startsWith('u-')) return 'u-ratio';
+      if (mode === 'session' && (prev.startsWith('p-') || prev.startsWith('u-'))) return 'overview';
       return prev;
     });
   }, [mode]);
@@ -91,13 +100,13 @@ export const DashboardPanel: React.FC = () => {
     postToExtension({ type: 'openSettings', query: 'claudeMirror' } as any);
   };
 
-  const handleModeSwitch = (newMode: 'session' | 'project') => {
+  const handleModeSwitch = (newMode: 'session' | 'project' | 'user') => {
     setProjectDashboardMode(newMode);
-    // Reset to the first tab of the new mode
-    setActiveTab(newMode === 'session' ? 'overview' : 'p-overview');
+    setActiveTab(getDefaultTab(newMode));
   };
 
-  const tabs = mode === 'session' ? SESSION_TABS : PROJECT_TABS;
+  const tabs = mode === 'project' ? PROJECT_TABS : mode === 'user' ? USER_TABS : SESSION_TABS;
+  const modeColor = MODE_COLORS[mode] || DASH_COLORS.blue;
 
   return (
     <div style={{
@@ -121,7 +130,7 @@ export const DashboardPanel: React.FC = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <span style={{ fontSize: '16px', fontWeight: 700 }}>ClaUi Analytics</span>
-          {/* Session / Project mode toggle */}
+          {/* Session / Project / User mode toggle */}
           <div style={{
             display: 'flex',
             background: DASH_COLORS.cardBg,
@@ -148,6 +157,16 @@ export const DashboardPanel: React.FC = () => {
               }}
             >
               Project
+            </button>
+            <button
+              onClick={() => handleModeSwitch('user')}
+              style={{
+                ...modeToggleBase,
+                background: mode === 'user' ? DASH_COLORS.amber : 'transparent',
+                color: mode === 'user' ? '#fff' : DASH_COLORS.textMuted,
+              }}
+            >
+              User
             </button>
           </div>
         </div>
@@ -184,35 +203,37 @@ export const DashboardPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div style={{
-        display: 'flex',
-        gap: '2px',
-        borderBottom: `1px solid ${DASH_COLORS.border}`,
-        padding: '0 20px',
-        flexShrink: 0,
-      }}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            style={{
-              padding: '10px 18px',
-              cursor: 'pointer',
-              color: activeTab === tab.key ? (mode === 'project' ? DASH_COLORS.purple : DASH_COLORS.blue) : DASH_COLORS.textMuted,
-              background: 'none',
-              border: 'none',
-              borderBottomWidth: '2px',
-              borderBottomStyle: 'solid',
-              borderBottomColor: activeTab === tab.key ? (mode === 'project' ? DASH_COLORS.purple : DASH_COLORS.blue) : 'transparent',
-              fontSize: '13px',
-              fontWeight: activeTab === tab.key ? 600 : 400,
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Tab bar (hidden when user mode has only 1 tab) */}
+      {tabs.length > 1 && (
+        <div style={{
+          display: 'flex',
+          gap: '2px',
+          borderBottom: `1px solid ${DASH_COLORS.border}`,
+          padding: '0 20px',
+          flexShrink: 0,
+        }}>
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                padding: '10px 18px',
+                cursor: 'pointer',
+                color: activeTab === tab.key ? modeColor : DASH_COLORS.textMuted,
+                background: 'none',
+                border: 'none',
+                borderBottomWidth: '2px',
+                borderBottomStyle: 'solid',
+                borderBottomColor: activeTab === tab.key ? modeColor : 'transparent',
+                fontSize: '13px',
+                fontWeight: activeTab === tab.key ? 600 : 400,
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Content area */}
       <div style={{
@@ -228,12 +249,13 @@ export const DashboardPanel: React.FC = () => {
         {mode === 'session' && activeTab === 'commands' && <CommandsTab turnHistory={turnHistory} />}
         {mode === 'session' && activeTab === 'context' && <ContextTab />}
         {mode === 'session' && activeTab === 'usage' && <UsageTab />}
-        {mode === 'session' && activeTab === 'ratio' && <TokenRatioTab />}
         {/* Project tabs */}
         {mode === 'project' && activeTab === 'p-overview' && <ProjectOverviewTab sessions={projectSessions} />}
         {mode === 'project' && activeTab === 'p-sessions' && <ProjectSessionsTab sessions={projectSessions} />}
         {mode === 'project' && activeTab === 'p-tokens' && <ProjectTokensTab sessions={projectSessions} />}
         {mode === 'project' && activeTab === 'p-tools' && <ProjectToolsTab sessions={projectSessions} />}
+        {/* User tabs */}
+        {mode === 'user' && activeTab === 'u-ratio' && <TokenRatioTab />}
       </div>
     </div>
   );
