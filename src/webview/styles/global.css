@@ -1299,6 +1299,40 @@ html, body, #root {
   color: var(--vscode-editor-foreground);
 }
 
+.setup-notice-code {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  background: color-mix(in srgb, var(--vscode-textCodeBlock-background, #1e1e1e) 85%, transparent);
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.setup-notice-code code {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 13px;
+  color: var(--vscode-editor-foreground);
+  flex: 1;
+  user-select: all;
+}
+
+.setup-notice-copy-btn {
+  border: 1px solid var(--vscode-panel-border, #444);
+  background: color-mix(in srgb, var(--vscode-input-background) 88%, var(--vscode-editor-background));
+  color: var(--vscode-editor-foreground);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.setup-notice-copy-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.08));
+}
+
 .setup-notice-actions {
   display: flex;
   flex-wrap: wrap;

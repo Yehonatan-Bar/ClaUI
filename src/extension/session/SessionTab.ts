@@ -74,6 +74,8 @@ export class SessionTab implements WebviewBridge {
   private readonly fileLogger: FileLogger | null = null;
   /** Fork initialization data (set before startSession when forking) */
   private forkInitData: { promptText: string; messages: SerializedChatMessage[] } | null = null;
+  /** Tracks whether stderr indicates Claude CLI is not installed */
+  private claudeCliMissingDetected = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -663,6 +665,19 @@ export class SessionTab implements WebviewBridge {
         this.saveProjectAnalytics();
         this.achievementService.onSessionCrash(this.id);
         this.achievementService.onSessionEnd(this.id);
+
+        // Claude CLI not installed - send informative error instead of generic crash
+        if (this.claudeCliMissingDetected) {
+          tabLog('Claude CLI not found - showing install guidance');
+          this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+          this.postMessage({
+            type: 'error',
+            message: 'Claude CLI not found. Install Claude Code CLI by running: npm install -g @anthropic-ai/claude-code',
+          });
+          this.claudeCliMissingDetected = false;
+          return;
+        }
+
         this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
         this.postMessage({
           type: 'error',
@@ -704,6 +719,13 @@ export class SessionTab implements WebviewBridge {
 
     this.processManager.on('stderr', (text: string) => {
       tabLog(`STDERR: ${text}`);
+      // Detect Claude CLI not installed/not in PATH
+      if (this.isLikelyClaudeCliMissing(text)) {
+        this.claudeCliMissingDetected = true;
+        tabLog('Detected Claude CLI missing from stderr');
+        // Don't forward raw stderr - the exit handler will send a better message
+        return;
+      }
       this.achievementService.onRuntimeError(this.id);
       this.postMessage({ type: 'error', message: text.trim() });
     });
@@ -713,12 +735,37 @@ export class SessionTab implements WebviewBridge {
       this.achievementService.onRuntimeError(this.id);
       this.achievementService.onSessionCrash(this.id);
       this.achievementService.onSessionEnd(this.id);
+      // Check for ENOENT (command not found without shell)
+      if (this.isLikelyClaudeCliMissing(err.message)) {
+        this.claudeCliMissingDetected = true;
+      }
+      if (this.claudeCliMissingDetected) {
+        tabLog('Claude CLI not found - showing install guidance');
+        this.postMessage({
+          type: 'error',
+          message: 'Claude CLI not found. Install Claude Code CLI by running: npm install -g @anthropic-ai/claude-code',
+        });
+        this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+        return;
+      }
       vscode.window.showErrorMessage(
         `Claude CLI error (Tab ${this.tabNumber}): ${err.message}. Is "claude" in your PATH?`
       );
       this.postMessage({ type: 'error', message: `Process error: ${err.message}` });
       this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
     });
+  }
+
+  /** Check if stderr/error text indicates Claude CLI is not installed or not in PATH */
+  private isLikelyClaudeCliMissing(text: string): boolean {
+    const missingPatterns = [
+      /'claude'\s+is not recognized as an internal or external command/i,
+      /\bclaude:\s+command not found\b/i,
+      /\bspawn\b.*\bclaude\b.*\benoent\b/i,
+      /\benoent\b.*\bclaude\b/i,
+      /command not found.*claude/i,
+    ];
+    return missingPatterns.some((pattern) => pattern.test(text));
   }
 
   /** Build and persist a SessionSummary from accumulated TurnRecords */

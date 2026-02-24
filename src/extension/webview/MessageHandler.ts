@@ -829,6 +829,25 @@ export class MessageHandler {
           this.handleOpenUrl(msg.url);
           break;
 
+        case 'openTerminal':
+          this.log(`Opening terminal with command: "${msg.command || ''}"`);
+          {
+            const terminal = vscode.window.createTerminal({ name: 'Claude Code Setup' });
+            terminal.show();
+            if (msg.command) {
+              terminal.sendText(msg.command, false);
+            }
+          }
+          break;
+
+        case 'copyToClipboard':
+          this.log(`Copying to clipboard: "${(msg.text || '').slice(0, 50)}"`);
+          vscode.env.clipboard.writeText(msg.text || '').then(
+            () => this.log('Copied to clipboard'),
+            (err) => this.log(`Clipboard write failed: ${err}`)
+          );
+          break;
+
         case 'gitPush':
           this.handleGitPush();
           break;
