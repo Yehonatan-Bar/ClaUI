@@ -236,6 +236,10 @@ export interface OpenCodexLoginRequest {
   type: 'openCodexLogin';
 }
 
+export interface PickCodexCliPathRequest {
+  type: 'pickCodexCliPath';
+}
+
 export interface SetTurnAnalysisEnabledRequest {
   type: 'setTurnAnalysisEnabled';
   enabled: boolean;
@@ -390,6 +394,7 @@ export type WebviewToExtensionMessage =
   | AdventureDebugLogMessage
   | OpenSettingsRequest
   | OpenCodexLoginRequest
+  | PickCodexCliPathRequest
   | SetTurnAnalysisEnabledRequest
   | SetAnalysisModelRequest
   | GetProjectAnalyticsRequest
