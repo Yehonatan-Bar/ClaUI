@@ -267,11 +267,20 @@ export class CodexMessageHandler {
           break;
 
         case 'openSettings':
+          if (msg.query === 'claudeMirror.codex.cliPath') {
+            void vscode.window.showInformationMessage(
+              'In "Codex CLI Path", keep "codex" only if the command works in a new terminal. Otherwise paste the full path to codex.exe, or use "Browse for codex.exe" from the setup card.'
+            );
+          }
           void vscode.commands.executeCommand('workbench.action.openSettings', msg.query);
           break;
 
         case 'openCodexLogin':
           this.session.openCodexLoginTerminal();
+          break;
+
+        case 'pickCodexCliPath':
+          void this.handlePickCodexCliPath();
           break;
 
         case 'getProjectAnalytics':
@@ -638,6 +647,33 @@ export class CodexMessageHandler {
       return;
     }
     void vscode.env.openExternal(vscode.Uri.parse(url));
+  }
+
+  private async handlePickCodexCliPath(): Promise<void> {
+    const filters =
+      process.platform === 'win32'
+        ? { Executables: ['exe', 'cmd', 'bat'], All: ['*'] }
+        : undefined;
+
+    const picked = await vscode.window.showOpenDialog({
+      canSelectFiles: true,
+      canSelectFolders: false,
+      canSelectMany: false,
+      openLabel: 'Select Codex CLI',
+      title: 'Select codex CLI executable',
+      filters,
+    });
+
+    const uri = picked?.[0];
+    if (!uri) {
+      return;
+    }
+
+    const selectedPath = uri.fsPath;
+    await vscode.workspace.getConfiguration('claudeMirror').update('codex.cliPath', selectedPath, true);
+    void vscode.window.showInformationMessage(
+      `Saved Codex CLI path: ${selectedPath}. Retry your message, and if needed run "codex login".`
+    );
   }
 
   private nextMessageId(): string {
