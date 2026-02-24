@@ -258,11 +258,28 @@ export function registerCommands(
 
     // Show conversation history in a QuickPick
     vscode.commands.registerCommand('claudeMirror.showHistory', async () => {
-      const sessions = sessionStore.getSessions();
-      log(`[showHistory] Found ${sessions.length} sessions in store`);
+      const allSessions = sessionStore.getSessions();
+      log(`[showHistory] Found ${allSessions.length} sessions in store`);
+
+      // Filter to sessions from the current workspace, if one is open
+      const currentWorkspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const sessions = currentWorkspace
+        ? allSessions.filter(s => {
+            if (!s.workspacePath) {
+              return false; // Exclude legacy sessions without a workspace path
+            }
+            // Case-insensitive comparison for Windows paths
+            return s.workspacePath.toLowerCase() === currentWorkspace.toLowerCase();
+          })
+        : allSessions;
+
+      log(`[showHistory] Showing ${sessions.length} sessions for workspace: ${currentWorkspace || '(none)'}`);
 
       if (sessions.length === 0) {
-        vscode.window.showInformationMessage('No conversation history yet.');
+        const msg = currentWorkspace
+          ? 'No conversation history for this project yet.'
+          : 'No conversation history yet.';
+        vscode.window.showInformationMessage(msg);
         return;
       }
 

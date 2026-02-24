@@ -10,6 +10,7 @@ export interface SessionMetadata {
   startedAt: string;   // ISO date string
   lastActiveAt: string; // ISO date string
   firstPrompt?: string; // First line of the user's first message
+  workspacePath?: string; // Workspace folder path when the session was created
 }
 
 type StoredSessionMetadata = Omit<SessionMetadata, 'provider'> & {

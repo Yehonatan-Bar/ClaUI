@@ -1409,19 +1409,16 @@ html, body, #root {
 }
 
 /* Clickable file path links in chat messages and code blocks.
-   Ctrl+Click to open (matching VS Code link behavior). */
+   Single-click to open the file in VS Code. */
 .file-path-link {
   color: var(--vscode-textLink-foreground, #3794ff);
-  text-decoration: none;
-  border-bottom: 1px dotted var(--vscode-textLink-foreground, #3794ff);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 .file-path-link:hover {
   color: var(--vscode-textLink-activeForeground, #3794ff);
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  border-bottom: none;
 }
 
 /* Clickable URL links in chat messages. Single-click to open in browser. */
