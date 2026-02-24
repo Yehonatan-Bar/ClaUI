@@ -116,15 +116,18 @@ export const TokenRatioTab: React.FC = () => {
     postToExtension({ type: 'clearTokenRatioData' } as any);
   };
 
-  if (samples.length === 0 && globalTurnCount < 5) {
+  // Check if all samples are baselines (no valid ratio yet)
+  const hasValidRatio = samples.some(s => s.tokensPerPercent !== null);
+
+  if (samples.length === 0 && globalTurnCount < 2) {
     return (
       <div style={{ textAlign: 'center', padding: '60px 20px', color: DASH_COLORS.textMuted }}>
         <div style={{ fontSize: 24, marginBottom: 12 }}>Waiting for data...</div>
         <div style={{ fontSize: 14 }}>
-          Token ratio tracking starts after {5 - globalTurnCount} more turn{5 - globalTurnCount !== 1 ? 's' : ''}.
+          Token ratio tracking starts after {2 - globalTurnCount} more turn{2 - globalTurnCount !== 1 ? 's' : ''}.
         </div>
         <div style={{ fontSize: 12, marginTop: 8, opacity: 0.6 }}>
-          Samples are taken every 5 turns by fetching usage % from the API.
+          First baseline sample is taken after 2 turns, then every 5 turns to build trend data.
         </div>
       </div>
     );
@@ -153,6 +156,22 @@ export const TokenRatioTab: React.FC = () => {
         <span style={{ color: DASH_COLORS.text }}>Cache Read=0.1x</span>
         {'. This correlates more accurately with actual usage %.'}
       </div>
+
+      {/* Baseline notice: shown when samples exist but no ratio computed yet */}
+      {samples.length > 0 && !hasValidRatio && (
+        <div style={{
+          background: 'rgba(210, 153, 34, 0.10)',
+          border: '1px solid rgba(210, 153, 34, 0.30)',
+          borderRadius: 8,
+          padding: '10px 16px',
+          fontSize: 12,
+          color: DASH_COLORS.amber,
+          lineHeight: 1.6,
+        }}>
+          Baseline recorded -- token/usage ratios will appear after the next sample (approximately 5 more turns).
+          The current samples store cumulative tokens and usage % as reference points for computing deltas.
+        </div>
+      )}
 
       {/* Summary Cards */}
       {summaries.length > 0 && (
@@ -289,7 +308,9 @@ export const TokenRatioTab: React.FC = () => {
                     {s.deltaUsagePercent >= 0 ? '+' : ''}{s.deltaUsagePercent.toFixed(1)}%
                   </td>
                   <td style={{ padding: '6px 10px', fontWeight: 600, color: s.tokensPerPercent !== null ? DASH_COLORS.text : DASH_COLORS.textMuted }}>
-                    {s.tokensPerPercent !== null ? formatTokens(s.tokensPerPercent) : 'N/A'}
+                    {s.tokensPerPercent !== null
+                      ? formatTokens(s.tokensPerPercent)
+                      : (s.deltaTokens > 0 ? 'Baseline' : 'N/A')}
                   </td>
                 </tr>
               ))}

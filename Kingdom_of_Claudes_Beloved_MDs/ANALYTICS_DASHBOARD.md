@@ -84,7 +84,10 @@ User mode displays global user-level analytics shared across all workspaces (sto
 - Trend line chart (Recharts LineChart): weighted tokensPerPercent over time, one colored line per bucket
 - Samples table: last 50 samples (Date, Bucket, Usage%, Raw Delta, Weighted Delta, Delta Usage%, Weighted Tok/1%)
 - Clear Data button to reset all stored samples
-- Shows "Waiting for data..." when fewer than 5 turns have been tracked
+- Quick-start: first baseline sample created after just 2 turns (subsequent samples every 5 turns)
+- First samples show actual token accumulation (delta from zero) with "Baseline" label instead of N/A
+- Amber info banner when all samples are baselines, explaining that ratios appear after the next sample
+- Shows "Waiting for data..." only when fewer than 2 turns have been tracked
 
 ## Project Mode (4 Tabs)
 

@@ -3995,6 +3995,45 @@ html, body, #root {
   color: var(--vscode-descriptionForeground, #8b949e);
 }
 
+.skillgen-threshold-display {
+  cursor: pointer;
+  border-bottom: 1px dashed var(--vscode-descriptionForeground, #8b949e);
+  transition: color 0.15s;
+}
+
+.skillgen-threshold-display:hover {
+  color: var(--vscode-foreground, #e1e4e8);
+}
+
+.skillgen-threshold-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.skillgen-threshold-input {
+  width: 48px;
+  padding: 1px 4px;
+  font-size: 12px;
+  text-align: center;
+  background: var(--vscode-input-background, #1e1e1e);
+  color: var(--vscode-input-foreground, #e1e4e8);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 3px;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.skillgen-threshold-input:focus {
+  border-color: var(--vscode-focusBorder, #007acc);
+}
+
+.skillgen-threshold-input::-webkit-inner-spin-button,
+.skillgen-threshold-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 /* Action buttons */
 .skillgen-actions {
   margin-bottom: 16px;

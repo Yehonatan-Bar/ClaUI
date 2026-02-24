@@ -638,6 +638,13 @@ export class MessageHandler {
           vscode.workspace.getConfiguration('claudeMirror').update('skillGen.enabled', msg.enabled, true);
           break;
 
+        case 'setSkillGenThreshold': {
+          const newThreshold = Math.max(5, Math.min(100, Math.round(msg.threshold)));
+          this.log(`[SkillGen:Msg][INFO] setSkillGenThreshold | threshold=${newThreshold}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('skillGen.threshold', newThreshold, true);
+          break;
+        }
+
         case 'skillGenTrigger':
           this.log(`[SkillGen:Msg][INFO] skillGenTrigger received | serviceAvailable=${!!this.skillGenService}`);
           if (this.skillGenService) {
