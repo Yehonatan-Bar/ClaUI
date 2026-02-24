@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Token Ratio Tracker - Plan</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 30px;
+    line-height: 1.7;
+  }
+  h1 {
+    color: #58a6ff;
+    border-bottom: 2px solid #30363d;
+    padding-bottom: 12px;
+    font-size: 28px;
+  }
+  h2 {
+    color: #79c0ff;
+    margin-top: 32px;
+    font-size: 20px;
+  }
+  h3 {
+    color: #d2a8ff;
+    font-size: 16px;
+  }
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+  }
+  .highlight {
+    background: #1f2937;
+    border-right: 4px solid #58a6ff;
+    padding: 12px 18px;
+    margin: 12px 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin: 12px 0;
+  }
+  .step-num {
+    background: #58a6ff;
+    color: #0d1117;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .tag {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+  .tag-new { background: #238636; color: #fff; }
+  .tag-modify { background: #9e6a03; color: #fff; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+  }
+  th, td {
+    padding: 10px 14px;
+    text-align: right;
+    border-bottom: 1px solid #30363d;
+  }
+  th {
+    background: #161b22;
+    color: #79c0ff;
+    font-weight: 600;
+  }
+  .muted { color: #8b949e; }
+  ul { padding-right: 20px; }
+  li { margin: 6px 0; }
+</style>
+</head>
+<body>
+
+<h1>תוכנית פיתוח: מודול יחס טוקנים-שימוש</h1>
+
+<h2>מה הבעיה?</h2>
+<div class="card">
+  <p>כיום התוסף מציג שני נתונים בנפרד:</p>
+  <ul>
+    <li><strong>אחוז שימוש</strong> - כמה מהמכסה נותר למשתמש (לפי שעות/שבוע)</li>
+    <li><strong>כמות טוקנים</strong> - כמה טוקנים נצרכו בשיחה הנוכחית</li>
+  </ul>
+  <p>אין קשר בין השניים. המשתמש לא יודע <strong>כמה טוקנים שווים אחוז אחד</strong> מהמכסה.</p>
+</div>
+
+<h2>מה הפתרון?</h2>
+<div class="highlight">
+  <strong>מודול חדש שמבצע דגימה כל 5 תורות (turns):</strong> בודק את אחוז השימוש הנוכחי, משווה לדגימה הקודמת, ומחשב כמה טוקנים נצרכו עבור כל שינוי של 1% בשימוש. הנתונים נשמרים לאורך זמן ומוצגים בדשבורד עם גרפים והשוואות.
+</div>
+
+<h2>איך זה עובד?</h2>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div>
+    <strong>ספירה גלובלית</strong> - כל פעם שקלוד מסיים תור (תשובה), המונה עולה ב-1 והטוקנים נצברים. זה עובד ברמת המשתמש - לא משנה באיזה פרויקט או טאב.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div>
+    <strong>דגימה כל 5 תורות</strong> - כשהמונה מגיע לכפולה של 5, המערכת שולפת את אחוז השימוש הנוכחי מהAPI של אנתרופיק.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div>
+    <strong>חישוב יחס</strong> - משווה את הדגימה לדגימה הקודמת: כמה טוקנים נצרכו וכמה אחוז שימוש השתנה. מחלק ומקבל "טוקנים לאחוז".
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div>
+    <strong>שמירה ותצוגה</strong> - כל דגימה נשמרת (עד 500 דגימות). הדשבורד מציג כרטיסי סיכום, גרף מגמה, וטבלת נתונים גולמיים.
+  </div>
+</div>
+
+<h2>מה יראה המשתמש?</h2>
+<div class="card">
+  <h3>טאב חדש בדשבורד: "Token Ratio"</h3>
+  <table>
+    <tr>
+      <th>אזור</th>
+      <th>תוכן</th>
+    </tr>
+    <tr>
+      <td>כרטיסי סיכום</td>
+      <td>עבור כל סוג מכסה (5 שעות, שבועי, וכו') - כמה טוקנים = 1%, מגמה (עולה/יורד/יציב), מספר דגימות</td>
+    </tr>
+    <tr>
+      <td>סטטיסטיקות כלליות</td>
+      <td>סה"כ תורות שנעקבו, סה"כ טוקנים שנצרכו מאז ההתקנה</td>
+    </tr>
+    <tr>
+      <td>גרף מגמה</td>
+      <td>גרף קו שמציג את היחס לאורך זמן - האם "עלות" של אחוז אחד משתנה?</td>
+    </tr>
+    <tr>
+      <td>טבלת דגימות</td>
+      <td>50 הדגימות האחרונות עם כל הפרטים: תאריך, אחוז שימוש, טוקנים, שינוי, יחס</td>
+    </tr>
+  </table>
+</div>
+
+<h2>נקודה חשובה: ברמת המשתמש</h2>
+<div class="highlight">
+  כל הנתונים נשמרים <strong>ברמה גלובלית</strong> (לא לפי פרויקט), כי אחוז השימוש הוא של חשבון המשתמש כולו. גם אם פותחים פרויקטים שונים - הספירה ממשיכה.
+</div>
+
+<h2>היקף השינויים</h2>
+<div class="card">
+  <table>
+    <tr>
+      <th>פעולה</th>
+      <th>קבצים</th>
+      <th>סוג</th>
+    </tr>
+    <tr>
+      <td>מודול חישוב חדש</td>
+      <td>1 קובץ</td>
+      <td><span class="tag tag-new">חדש</span></td>
+    </tr>
+    <tr>
+      <td>רכיב דשבורד חדש</td>
+      <td>1 קובץ</td>
+      <td><span class="tag tag-new">חדש</span></td>
+    </tr>
+    <tr>
+      <td>חיווט והטמעה</td>
+      <td>7 קבצים</td>
+      <td><span class="tag tag-modify">עדכון</span></td>
+    </tr>
+  </table>
+  <p class="muted">סה"כ: 2 קבצים חדשים, 7 קבצים מעודכנים</p>
+</div>
+
+<h2>שלבי ביצוע</h2>
+<div class="card">
+  <div class="step"><div class="step-num">1</div><div>הגדרת מבני נתונים וממשקים</div></div>
+  <div class="step"><div class="step-num">2</div><div>בניית מודול החישוב והשמירה</div></div>
+  <div class="step"><div class="step-num">3</div><div>חיווט המודול למנגנון הקיים (כל תור -> ספירה -> דגימה)</div></div>
+  <div class="step"><div class="step-num">4</div><div>עדכון ניהול המצב בצד הלקוח</div></div>
+  <div class="step"><div class="step-num">5</div><div>בניית רכיב הדשבורד עם גרפים וטבלאות</div></div>
+  <div class="step"><div class="step-num">6</div><div>בנייה, התקנה, בדיקה</div></div>
+  <div class="step"><div class="step-num">7</div><div>עדכון תיעוד טכני</div></div>
+</div>
+
+<h2>מקרי קצה</h2>
+<div class="card">
+  <table>
+    <tr><th>מקרה</th><th>טיפול</th></tr>
+    <tr><td>אחוז השימוש לא משתנה</td><td>הדגימה נשמרת אבל היחס מסומן כ-N/A</td></tr>
+    <tr><td>איפוס מכסה (כל 5 שעות/שבוע)</td><td>מזוהה אוטומטית, הופך לנקודת בסיס חדשה</td></tr>
+    <tr><td>שימוש בקלוד מחוץ לתוסף</td><td>היחס יכלול גם שימוש חיצוני (מגבלה טבעית)</td></tr>
+    <tr><td>כמה טאבים פתוחים</td><td>מודול אחד משותף - הספירה מצטברת</td></tr>
+    <tr><td>הפעלה מחדש של VS Code</td><td>הנתונים שמורים ומשוחזרים אוטומטית</td></tr>
+  </table>
+</div>
+
+</body>
+</html>

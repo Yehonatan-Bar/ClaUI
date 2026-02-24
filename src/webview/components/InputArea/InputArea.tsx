@@ -113,6 +113,11 @@ export const InputArea: React.FC = () => {
   const originalTextBeforeEnhanceRef = useRef('');
   // Ref: client-side safety timeout to reset isEnhancing if result never arrives
   const enhanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Elapsed seconds counter for enhance progress indication
+  const [enhanceElapsed, setEnhanceElapsed] = useState(0);
+  const enhanceElapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Track prompt length for dynamic progress message
+  const enhancePromptLenRef = useRef(0);
 
   // Seed prompt history from existing user messages on mount (covers messages
   // sent before this feature was deployed or before a reload)
@@ -137,20 +142,41 @@ export const InputArea: React.FC = () => {
   // Auto-detect RTL for the input text
   const direction = text ? (detectRtl(text) ? 'rtl' : 'ltr') : 'auto';
 
+  /** Start elapsed time counter for enhance progress */
+  const startEnhanceTimer = useCallback(() => {
+    setEnhanceElapsed(0);
+    if (enhanceElapsedRef.current) clearInterval(enhanceElapsedRef.current);
+    enhanceElapsedRef.current = setInterval(() => {
+      setEnhanceElapsed((prev) => prev + 1);
+    }, 1000);
+  }, []);
+
+  /** Stop elapsed time counter */
+  const stopEnhanceTimer = useCallback(() => {
+    if (enhanceElapsedRef.current) {
+      clearInterval(enhanceElapsedRef.current);
+      enhanceElapsedRef.current = null;
+    }
+    setEnhanceElapsed(0);
+  }, []);
+
   /** Trigger prompt enhancement via the extension host */
   const handleEnhancePrompt = useCallback(() => {
     const trimmed = text.trim();
     if (!providerCapabilities.supportsPromptEnhancer || !trimmed || isEnhancing || !isConnected) return;
     originalTextBeforeEnhanceRef.current = trimmed;
+    enhancePromptLenRef.current = trimmed.length;
     setIsEnhancing(true);
-    // Safety timeout: reset isEnhancing if result never arrives (35s > backend 30s timeout)
+    startEnhanceTimer();
+    // Safety timeout: reset isEnhancing if result never arrives (65s > backend 60s timeout)
     if (enhanceTimeoutRef.current) clearTimeout(enhanceTimeoutRef.current);
     enhanceTimeoutRef.current = setTimeout(() => {
       setIsEnhancing(false);
+      stopEnhanceTimer();
       enhanceTimeoutRef.current = null;
-    }, 35_000);
+    }, 65_000);
     postToExtension({ type: 'enhancePrompt', text: trimmed } as any);
-  }, [text, isEnhancing, isConnected, setIsEnhancing, providerCapabilities.supportsPromptEnhancer]);
+  }, [text, isEnhancing, isConnected, setIsEnhancing, providerCapabilities.supportsPromptEnhancer, startEnhanceTimer, stopEnhanceTimer]);
 
   /** Toggle the enhancer settings popover */
   const handleToggleEnhancerPopover = useCallback(() => {
@@ -213,13 +239,16 @@ export const InputArea: React.FC = () => {
       setIsEnhancing(true);
       autoSendAfterEnhanceRef.current = true;
       originalTextBeforeEnhanceRef.current = trimmed;
-      // Safety timeout: reset isEnhancing if result never arrives
+      enhancePromptLenRef.current = trimmed.length;
+      startEnhanceTimer();
+      // Safety timeout: reset isEnhancing if result never arrives (65s > backend 60s timeout)
       if (enhanceTimeoutRef.current) clearTimeout(enhanceTimeoutRef.current);
       enhanceTimeoutRef.current = setTimeout(() => {
         setIsEnhancing(false);
+        stopEnhanceTimer();
         autoSendAfterEnhanceRef.current = false;
         enhanceTimeoutRef.current = null;
-      }, 35_000);
+      }, 65_000);
       postToExtension({ type: 'enhancePrompt', text: trimmed } as any);
       return;
     }
@@ -617,7 +646,8 @@ export const InputArea: React.FC = () => {
     const handler = (e: Event) => {
       const enhanced = (e as CustomEvent<string>).detail;
 
-      // Clear safety timeout since result arrived
+      // Clear safety timeout and elapsed timer since result arrived
+      stopEnhanceTimer();
       if (enhanceTimeoutRef.current) {
         clearTimeout(enhanceTimeoutRef.current);
         enhanceTimeoutRef.current = null;
@@ -651,7 +681,8 @@ export const InputArea: React.FC = () => {
   // Listen for prompt enhancement failures
   useEffect(() => {
     const handler = () => {
-      // Clear safety timeout since result arrived (even if failure)
+      // Clear safety timeout and elapsed timer since result arrived (even if failure)
+      stopEnhanceTimer();
       if (enhanceTimeoutRef.current) {
         clearTimeout(enhanceTimeoutRef.current);
         enhanceTimeoutRef.current = null;
@@ -850,7 +881,13 @@ export const InputArea: React.FC = () => {
           />
           {isEnhancing && (
             <div className="enhance-overlay">
-              <span className="enhance-overlay-text">Enhancing...</span>
+              <span className="enhance-overlay-text">
+                {enhancePromptLenRef.current > 1000
+                  ? `Enhancing long prompt... ${enhanceElapsed}s`
+                  : enhanceElapsed > 5
+                    ? `Enhancing... ${enhanceElapsed}s`
+                    : 'Enhancing...'}
+              </span>
             </div>
           )}
         </div>

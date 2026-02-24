@@ -116,32 +116,29 @@ export const App: React.FC = () => {
       {lastError && (isClaudeCliMissingError ? (
         <div className="setup-notice-banner" role="alert" aria-live="polite">
           <div className="setup-notice-content">
-            <div className="setup-notice-eyebrow">Claude Code Setup Required</div>
-            <div className="setup-notice-title">Claude Code CLI is not installed (or not in PATH)</div>
+            <div className="setup-notice-eyebrow">Claude Code CLI Not Found</div>
+            <div className="setup-notice-title">The <code>claude</code> command was not found on this machine</div>
             <div className="setup-notice-text">
-              ClaUi requires the <code>claude</code> CLI command. Run the following command in your terminal to install it:
-            </div>
-            <div className="setup-notice-code">
-              <code>npm install -g @anthropic-ai/claude-code</code>
-              <button
-                className="setup-notice-copy-btn"
-                onClick={() => {
-                  postToExtension({ type: 'copyToClipboard', text: 'npm install -g @anthropic-ai/claude-code' });
-                }}
-                data-tooltip="Copy command"
-              >
-                Copy
-              </button>
-            </div>
-            <div className="setup-notice-text" style={{ marginTop: '8px' }}>
-              After installation, restart VS Code or reload the window, then click <strong>Start Session</strong>.
+              You can use <strong>Codex</strong> instead, or install Claude Code CLI to use Claude mode.
             </div>
             <div className="setup-notice-actions">
               <button
                 className="setup-notice-btn primary"
-                onClick={() => postToExtension({ type: 'openTerminal', command: 'npm install -g @anthropic-ai/claude-code' })}
+                onClick={() => {
+                  setError(null);
+                  postToExtension({ type: 'openProviderTab', provider: 'codex' });
+                }}
               >
-                Open Terminal with Install Command
+                Switch to Codex
+              </button>
+              <button
+                className="setup-notice-btn"
+                onClick={() => {
+                  postToExtension({ type: 'copyToClipboard', text: 'npm install -g @anthropic-ai/claude-code' });
+                }}
+                data-tooltip="Copies: npm install -g @anthropic-ai/claude-code"
+              >
+                Copy Install Command
               </button>
               <button
                 className="setup-notice-btn"
