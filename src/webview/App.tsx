@@ -64,6 +64,8 @@ export const App: React.FC = () => {
   );
   const isCodexCliMissingError =
     typeof lastError === 'string' && /codex cli not found/i.test(lastError);
+  const isClaudeCliMissingError =
+    typeof lastError === 'string' && /claude cli not found/i.test(lastError);
 
   const handleTimelineTurnClick = React.useCallback((messageId: string) => {
     const el = document.querySelector(`[data-message-id="${messageId}"]`);
@@ -111,7 +113,58 @@ export const App: React.FC = () => {
       {skillGenPanelOpen && <SkillGenPanel />}
 
       {/* Error banner / setup guidance */}
-      {lastError && (isCodexCliMissingError ? (
+      {lastError && (isClaudeCliMissingError ? (
+        <div className="setup-notice-banner" role="alert" aria-live="polite">
+          <div className="setup-notice-content">
+            <div className="setup-notice-eyebrow">Claude Code Setup Required</div>
+            <div className="setup-notice-title">Claude Code CLI is not installed (or not in PATH)</div>
+            <div className="setup-notice-text">
+              ClaUi requires the <code>claude</code> CLI command. Run the following command in your terminal to install it:
+            </div>
+            <div className="setup-notice-code">
+              <code>npm install -g @anthropic-ai/claude-code</code>
+              <button
+                className="setup-notice-copy-btn"
+                onClick={() => {
+                  postToExtension({ type: 'copyToClipboard', text: 'npm install -g @anthropic-ai/claude-code' });
+                }}
+                data-tooltip="Copy command"
+              >
+                Copy
+              </button>
+            </div>
+            <div className="setup-notice-text" style={{ marginTop: '8px' }}>
+              After installation, restart VS Code or reload the window, then click <strong>Start Session</strong>.
+            </div>
+            <div className="setup-notice-actions">
+              <button
+                className="setup-notice-btn primary"
+                onClick={() => postToExtension({ type: 'openTerminal', command: 'npm install -g @anthropic-ai/claude-code' })}
+              >
+                Open Terminal with Install Command
+              </button>
+              <button
+                className="setup-notice-btn"
+                onClick={() => postToExtension({ type: 'openUrl', url: 'https://docs.anthropic.com/en/docs/claude-code/overview' })}
+              >
+                Claude Code Docs
+              </button>
+              <button
+                className="setup-notice-btn"
+                onClick={() => postToExtension({ type: 'openSettings', query: 'claudeMirror.cliPath' })}
+              >
+                Set CLI Path
+              </button>
+              <button
+                className="setup-notice-btn ghost"
+                onClick={() => setError(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : isCodexCliMissingError ? (
         <div className="setup-notice-banner" role="alert" aria-live="polite">
           <div className="setup-notice-content">
             <div className="setup-notice-eyebrow">Codex Setup Required</div>

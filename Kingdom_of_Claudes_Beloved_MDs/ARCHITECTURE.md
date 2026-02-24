@@ -69,6 +69,7 @@ claude -p --verbose
 - Non-JSON lines emitted as `'raw'` events (progress indicators, etc.)
 - Supports `--resume <session-id>` and `--fork-session` flags for session management
 - Exit/error handlers are guarded against stale process references: during rapid stop()+start() (e.g. edit-and-resend), the old process's async exit handler will NOT null-out the newly spawned process reference
+- CLI missing detection: stderr and error events are checked against patterns (e.g. "'claude' is not recognized", "command not found", ENOENT). When detected, a specific "Claude CLI not found" error is sent to the webview instead of the generic crash message, and the webview shows an informative setup banner with install instructions
 
 **Events emitted:**
 | Event | Payload | When |

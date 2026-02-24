@@ -232,6 +232,16 @@ export interface OpenSettingsRequest {
   query: string;
 }
 
+export interface OpenTerminalRequest {
+  type: 'openTerminal';
+  command?: string;
+}
+
+export interface CopyToClipboardRequest {
+  type: 'copyToClipboard';
+  text: string;
+}
+
 export interface OpenCodexLoginRequest {
   type: 'openCodexLogin';
 }
@@ -401,6 +411,8 @@ export type WebviewToExtensionMessage =
   | SetTranslationLanguageRequest
   | AdventureDebugLogMessage
   | OpenSettingsRequest
+  | OpenTerminalRequest
+  | CopyToClipboardRequest
   | OpenCodexLoginRequest
   | PickCodexCliPathRequest
   | AutoDetectCodexCliPathRequest
