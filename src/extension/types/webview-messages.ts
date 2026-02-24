@@ -240,6 +240,10 @@ export interface PickCodexCliPathRequest {
   type: 'pickCodexCliPath';
 }
 
+export interface AutoDetectCodexCliPathRequest {
+  type: 'autoDetectCodexCliPath';
+}
+
 export interface SetTurnAnalysisEnabledRequest {
   type: 'setTurnAnalysisEnabled';
   enabled: boolean;
@@ -395,6 +399,7 @@ export type WebviewToExtensionMessage =
   | OpenSettingsRequest
   | OpenCodexLoginRequest
   | PickCodexCliPathRequest
+  | AutoDetectCodexCliPathRequest
   | SetTurnAnalysisEnabledRequest
   | SetAnalysisModelRequest
   | GetProjectAnalyticsRequest

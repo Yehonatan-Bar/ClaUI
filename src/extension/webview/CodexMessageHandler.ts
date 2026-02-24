@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { exec } from 'child_process';
 import type { CodexExecDemux } from '../process/CodexExecDemux';
 import type { PromptHistoryStore } from '../session/PromptHistoryStore';
 import type { ProjectAnalyticsStore } from '../session/ProjectAnalyticsStore';
@@ -268,9 +269,8 @@ export class CodexMessageHandler {
 
         case 'openSettings':
           if (msg.query === 'claudeMirror.codex.cliPath') {
-            void vscode.window.showInformationMessage(
-              'In "Codex CLI Path", keep "codex" only if the command works in a new terminal. Otherwise paste the full path to codex.exe, or use "Browse for codex.exe" from the setup card.'
-            );
+            void this.handleCodexCliPathHelpAndOpenSettings(msg.query);
+            break;
           }
           void vscode.commands.executeCommand('workbench.action.openSettings', msg.query);
           break;
@@ -281,6 +281,10 @@ export class CodexMessageHandler {
 
         case 'pickCodexCliPath':
           void this.handlePickCodexCliPath();
+          break;
+
+        case 'autoDetectCodexCliPath':
+          void this.handleAutoDetectCodexCliPath();
           break;
 
         case 'getProjectAnalytics':
@@ -652,8 +656,9 @@ export class CodexMessageHandler {
   private async handlePickCodexCliPath(): Promise<void> {
     const filters =
       process.platform === 'win32'
-        ? { Executables: ['exe', 'cmd', 'bat'], All: ['*'] }
+        ? { Executables: ['exe', 'cmd', 'bat', 'ps1'], All: ['*'] }
         : undefined;
+    const defaultUri = this.getLikelyCodexCliDirectoryUri();
 
     const picked = await vscode.window.showOpenDialog({
       canSelectFiles: true,
@@ -662,6 +667,7 @@ export class CodexMessageHandler {
       openLabel: 'Select Codex CLI',
       title: 'Select codex CLI executable',
       filters,
+      defaultUri,
     });
 
     const uri = picked?.[0];
@@ -674,6 +680,93 @@ export class CodexMessageHandler {
     void vscode.window.showInformationMessage(
       `Saved Codex CLI path: ${selectedPath}. Retry your message, and if needed run "codex login".`
     );
+  }
+
+  private async handleCodexCliPathHelpAndOpenSettings(query: string): Promise<void> {
+    const choice = await vscode.window.showInformationMessage(
+      'What to put in "Codex CLI Path": use "codex" only if it works in a new terminal. Otherwise use the full path to codex.exe/codex.cmd.',
+      'Auto-detect Now',
+      'Browse for File',
+      'Open Setting'
+    );
+
+    if (choice === 'Auto-detect Now') {
+      await this.handleAutoDetectCodexCliPath();
+      return;
+    }
+    if (choice === 'Browse for File') {
+      await this.handlePickCodexCliPath();
+      return;
+    }
+    if (choice === 'Open Setting') {
+      await vscode.commands.executeCommand('workbench.action.openSettings', query);
+      return;
+    }
+    await vscode.commands.executeCommand('workbench.action.openSettings', query);
+  }
+
+  private async handleAutoDetectCodexCliPath(): Promise<void> {
+    const candidates = await this.findCodexCliCandidates();
+    if (candidates.length === 0) {
+      void vscode.window.showWarningMessage(
+        'Could not find "codex" on PATH. Install Codex CLI, then retry, or use "Browse for codex executable".'
+      );
+      return;
+    }
+
+    let selectedPath = candidates[0];
+    if (candidates.length > 1) {
+      const picked = await vscode.window.showQuickPick(
+        candidates.map((c) => ({ label: path.basename(c), description: c })),
+        {
+          placeHolder: 'Select the Codex CLI executable to use in ClaUi',
+          title: 'Multiple Codex CLI candidates found',
+        }
+      );
+      if (!picked?.description) {
+        return;
+      }
+      selectedPath = picked.description;
+    }
+
+    await vscode.workspace.getConfiguration('claudeMirror').update('codex.cliPath', selectedPath, true);
+    void vscode.window.showInformationMessage(
+      `Codex CLI path set to: ${selectedPath}. Retry your message, and if needed run "codex login".`
+    );
+  }
+
+  private findCodexCliCandidates(): Promise<string[]> {
+    const command = process.platform === 'win32' ? 'where.exe codex' : 'command -v codex || which codex';
+    return new Promise((resolve) => {
+      exec(command, { windowsHide: true, timeout: 5000 }, (err, stdout) => {
+        if (err && !stdout?.trim()) {
+          resolve([]);
+          return;
+        }
+        const lines = stdout
+          .split(/\r?\n/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .filter((s, idx, arr) => arr.indexOf(s) === idx);
+        resolve(lines);
+      });
+    });
+  }
+
+  private getLikelyCodexCliDirectoryUri(): vscode.Uri | undefined {
+    const candidates: string[] = [];
+    if (process.platform === 'win32') {
+      const appDataNpm = process.env.APPDATA ? path.join(process.env.APPDATA, 'npm') : '';
+      const localPrograms = process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Programs') : '';
+      const programFiles = process.env.ProgramFiles || '';
+      const userProfile = process.env.USERPROFILE || os.homedir();
+      candidates.push(appDataNpm, localPrograms, programFiles, userProfile);
+    } else {
+      candidates.push('/usr/local/bin', '/opt/homebrew/bin', os.homedir());
+    }
+
+    const existing = candidates.find((dir) => !!dir && fs.existsSync(dir));
+    return existing ? vscode.Uri.file(existing) : undefined;
   }
 
   private nextMessageId(): string {

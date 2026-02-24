@@ -117,11 +117,17 @@ export const App: React.FC = () => {
             <div className="setup-notice-eyebrow">Codex Setup Required</div>
             <div className="setup-notice-title">Codex CLI is not installed (or not in PATH)</div>
             <div className="setup-notice-text">
-              ClaUi Codex mode uses the <code>codex</code> CLI command. Installing/signing in to the official Codex VS Code extension alone is not enough for ClaUi. In the path setting, enter either <code>codex</code> (if it works in terminal) or the full path to <code>codex.exe</code>.
+              ClaUi Codex mode uses the <code>codex</code> CLI command. Installing/signing in to the official Codex VS Code extension alone is not enough for ClaUi. If you already installed Codex CLI, start with <strong>Auto-detect Codex CLI</strong>.
             </div>
             <div className="setup-notice-actions">
               <button
                 className="setup-notice-btn primary"
+                onClick={() => postToExtension({ type: 'autoDetectCodexCliPath' })}
+              >
+                Auto-detect Codex CLI
+              </button>
+              <button
+                className="setup-notice-btn"
                 onClick={() => postToExtension({ type: 'openUrl', url: 'https://github.com/openai/codex' })}
               >
                 Open Install Guide
@@ -130,7 +136,7 @@ export const App: React.FC = () => {
                 className="setup-notice-btn"
                 onClick={() => postToExtension({ type: 'pickCodexCliPath' })}
               >
-                Browse for codex.exe
+                Browse for codex executable
               </button>
               <button
                 className="setup-notice-btn"

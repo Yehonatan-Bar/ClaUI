@@ -728,12 +728,13 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         if (!cliAvailable) {
           const terminal = vscode.window.createTerminal({ name: 'Codex Setup' });
           terminal.show();
-          terminal.sendText('echo Codex CLI was not found on PATH (or at the configured path).', true);
-          terminal.sendText('echo Note: Signing in to the official Codex VS Code extension does not expose the "codex" command to ClaUi.', true);
-          terminal.sendText('echo Install Codex CLI first: https://github.com/openai/codex', true);
-          terminal.sendText('echo Check if the command is visible: where.exe codex', true);
-          terminal.sendText('echo Or set claudeMirror.codex.cliPath to the full path of codex.exe', true);
-          terminal.sendText('echo Then run: codex login', true);
+          this.sendTerminalInfoLine(terminal, 'Codex CLI was not found on PATH (or at the configured path).');
+          this.sendTerminalInfoLine(terminal, 'Note: Signing in to the official Codex VS Code extension does not expose the "codex" command to ClaUi.');
+          this.sendTerminalInfoLine(terminal, 'Install Codex CLI first: https://github.com/openai/codex');
+          this.sendTerminalInfoLine(terminal, 'Checking whether the command is visible on PATH...');
+          terminal.sendText(process.platform === 'win32' ? 'where.exe codex' : 'which codex', true);
+          this.sendTerminalInfoLine(terminal, 'If not found, set claudeMirror.codex.cliPath to the full path of codex.exe/codex.cmd.');
+          this.sendTerminalInfoLine(terminal, 'Then run: codex login');
           void this.showCodexCliMissingGuidance();
           return;
         }
@@ -802,6 +803,15 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       return value;
     }
     return `"${value.replace(/"/g, '\\"')}"`;
+  }
+
+  private sendTerminalInfoLine(terminal: vscode.Terminal, text: string): void {
+    const escaped = text.replace(/'/g, "''");
+    if (process.platform === 'win32') {
+      terminal.sendText(`Write-Host '${escaped}'`, true);
+      return;
+    }
+    terminal.sendText(`printf '%s\\n' '${escaped}'`, true);
   }
 
   private wireDemuxStatusBar(): void {
