@@ -87,6 +87,7 @@ User mode displays global user-level analytics shared across all workspaces (sto
 - Quick-start: first baseline sample created after just 2 turns (subsequent samples every 5 turns)
 - First samples show actual token accumulation (delta from zero) with "Baseline" label instead of N/A
 - Amber info banner when all samples are baselines, explaining that ratios appear after the next sample
+- "Resample Now" button: triggers immediate usage fetch and ratio computation without waiting for the automatic sampling interval
 - Shows "Waiting for data..." only when fewer than 2 turns have been tracked
 
 ## Project Mode (4 Tabs)

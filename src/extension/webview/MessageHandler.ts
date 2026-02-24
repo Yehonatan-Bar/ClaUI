@@ -1148,6 +1148,12 @@ export class MessageHandler {
           break;
         }
 
+        case 'forceResampleTokenRatio': {
+          this.log('Force resampling token ratio data');
+          void this.sampleTokenUsageRatio();
+          break;
+        }
+
         case 'ready':
           this.log('Webview ready');
           // Send text display settings

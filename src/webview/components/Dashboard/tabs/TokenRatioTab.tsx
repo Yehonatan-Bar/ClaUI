@@ -116,6 +116,10 @@ export const TokenRatioTab: React.FC = () => {
     postToExtension({ type: 'clearTokenRatioData' } as any);
   };
 
+  const handleResample = () => {
+    postToExtension({ type: 'forceResampleTokenRatio' } as any);
+  };
+
   // Check if all samples are baselines (no valid ratio yet)
   const hasValidRatio = samples.some(s => s.tokensPerPercent !== null);
 
@@ -167,9 +171,32 @@ export const TokenRatioTab: React.FC = () => {
           fontSize: 12,
           color: DASH_COLORS.amber,
           lineHeight: 1.6,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
         }}>
-          Baseline recorded -- token/usage ratios will appear after the next sample (approximately 5 more turns).
-          The current samples store cumulative tokens and usage % as reference points for computing deltas.
+          <span>
+            Baseline recorded. Click <strong>Resample Now</strong> to compute ratios from current usage data,
+            or wait for automatic sampling (~5 turns).
+          </span>
+          <button
+            onClick={handleResample}
+            style={{
+              background: DASH_COLORS.amber,
+              color: '#000',
+              border: 'none',
+              borderRadius: 6,
+              padding: '6px 16px',
+              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            Resample Now
+          </button>
         </div>
       )}
 
@@ -319,8 +346,22 @@ export const TokenRatioTab: React.FC = () => {
         </div>
       )}
 
-      {/* Clear Data */}
-      <div style={{ textAlign: 'center', paddingTop: 8 }}>
+      {/* Actions */}
+      <div style={{ textAlign: 'center', paddingTop: 8, display: 'flex', justifyContent: 'center', gap: 12 }}>
+        <button
+          onClick={handleResample}
+          style={{
+            background: 'transparent',
+            border: `1px solid ${DASH_COLORS.blue}`,
+            color: DASH_COLORS.blue,
+            borderRadius: 6,
+            padding: '8px 20px',
+            cursor: 'pointer',
+            fontSize: 12,
+          }}
+        >
+          Resample Now
+        </button>
         <button
           onClick={handleClear}
           style={{
@@ -333,7 +374,7 @@ export const TokenRatioTab: React.FC = () => {
             fontSize: 12,
           }}
         >
-          Clear All Token Ratio Data
+          Clear All Data
         </button>
       </div>
     </div>

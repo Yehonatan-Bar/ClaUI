@@ -447,7 +447,8 @@ export type WebviewToExtensionMessage =
   | RequestUsageMessage
   | SetUsageWidgetEnabledRequest
   | GetTokenRatioDataRequest
-  | ClearTokenRatioDataRequest;
+  | ClearTokenRatioDataRequest
+  | ForceResampleTokenRatioRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -1060,6 +1061,10 @@ export interface GetTokenRatioDataRequest {
 
 export interface ClearTokenRatioDataRequest {
   type: 'clearTokenRatioData';
+}
+
+export interface ForceResampleTokenRatioRequest {
+  type: 'forceResampleTokenRatio';
 }
 
 /** Serializable chat message for passing between webview instances (e.g. fork) */
