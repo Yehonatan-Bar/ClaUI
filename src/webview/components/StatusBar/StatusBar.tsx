@@ -295,7 +295,7 @@ export const StatusBar: React.FC<{
   const usagePopover = usagePopoverOpen ? (
     <div className="status-bar-usage-popover">
       <div className="status-bar-usage-popover-header">
-        <span>API Usage</span>
+        <span>Usage Data</span>
         <button
           className="vitals-info-close"
           onClick={handleUsageRefresh}
@@ -435,7 +435,7 @@ export const StatusBar: React.FC<{
             <button
               className={`status-bar-vitals-btn ${usagePopoverOpen ? 'active' : ''}`}
               onClick={handleUsageClick}
-              data-tooltip="API Usage"
+              data-tooltip="Usage Data"
             >
               {maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}
             </button>
@@ -572,7 +572,7 @@ export const StatusBar: React.FC<{
         <button
           className={`status-bar-vitals-btn ${usagePopoverOpen ? 'active' : ''}`}
           onClick={handleUsageClick}
-          data-tooltip="API Usage"
+          data-tooltip="Usage Data"
         >
           {maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}
         </button>

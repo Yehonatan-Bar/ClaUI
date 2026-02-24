@@ -4,11 +4,26 @@ import { postToExtension } from '../../hooks/useClaudeStream';
 import type { UsageStat } from '../../../extension/types/webview-messages';
 
 const STORAGE_KEY = 'claui-usage-pos';
+const WIDGET_WIDTH = 200;
+
+function clampPosition(top: number, right: number): { top: number; right: number } {
+  const maxTop = Math.max(0, window.innerHeight - 100);
+  const maxRight = Math.max(0, window.innerWidth - WIDGET_WIDTH);
+  return {
+    top: Math.max(0, Math.min(top, maxTop)),
+    right: Math.max(0, Math.min(right, maxRight)),
+  };
+}
 
 function loadPosition(): { top: number; right: number } | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const pos = JSON.parse(raw);
+      if (typeof pos.top === 'number' && typeof pos.right === 'number') {
+        return clampPosition(pos.top, pos.right);
+      }
+    }
   } catch { /* ignore */ }
   return null;
 }
@@ -89,6 +104,7 @@ export const UsageWidget: React.FC = () => {
   const saved = loadPosition();
   const [pos, setPos] = useState({ top: saved?.top ?? 60, right: saved?.right ?? 16 });
   const [loading, setLoading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const widgetRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
@@ -105,6 +121,15 @@ export const UsageWidget: React.FC = () => {
       setLoading(false);
     }
   }, [usageFetchedAt]);
+
+  // Re-clamp position on window resize
+  useEffect(() => {
+    const onResize = () => {
+      setPos((cur) => clampPosition(cur.top, cur.right));
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const handleRefresh = useCallback(() => {
     setLoading(true);
@@ -131,8 +156,12 @@ export const UsageWidget: React.FC = () => {
       const dx = e.clientX - d.startX;
       const dy = e.clientY - d.startY;
       if (!d.moved && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
-      d.moved = true;
-      setPos({ top: d.startTop + dy, right: d.startRight - dx });
+      if (!d.moved) {
+        d.moved = true;
+        setIsDragging(true);
+      }
+      const clamped = clampPosition(d.startTop + dy, d.startRight - dx);
+      setPos(clamped);
     };
     const onMouseUp = () => {
       const d = dragRef.current;
@@ -141,6 +170,7 @@ export const UsageWidget: React.FC = () => {
         setPos((cur) => { savePosition(cur.top, cur.right); return cur; });
       }
       dragRef.current = null;
+      setIsDragging(false);
     };
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
@@ -164,13 +194,13 @@ export const UsageWidget: React.FC = () => {
         border: '1px solid var(--vscode-panel-border, rgba(255,255,255,0.15))',
         borderRadius: 8,
         padding: '10px 12px',
-        width: 200,
+        width: WIDGET_WIDTH,
         boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
         cursor: 'default',
         userSelect: 'none',
       }}
     >
-      {/* Header row */}
+      {/* Draggable header row */}
       <div
         onMouseDown={onMouseDown}
         style={{
@@ -178,12 +208,23 @@ export const UsageWidget: React.FC = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: 10,
-          cursor: 'grab',
+          cursor: isDragging ? 'grabbing' : 'grab',
         }}
       >
-        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--vscode-foreground)' }}>
-          API Usage
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{
+            fontSize: 10,
+            color: 'var(--vscode-descriptionForeground)',
+            opacity: 0.4,
+            letterSpacing: 1,
+            lineHeight: 1,
+          }}>
+            {'\u2847'}
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--vscode-foreground)' }}>
+            Usage Data
+          </span>
+        </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           {usageFetchedAt && (
             <span style={{ fontSize: 9, color: 'var(--vscode-descriptionForeground)', opacity: 0.6 }}>
