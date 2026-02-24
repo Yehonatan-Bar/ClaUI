@@ -27,6 +27,8 @@ export const SkillGenPanel: React.FC = () => {
   } = useAppStore();
 
   const [infoOpen, setInfoOpen] = useState(false);
+  const [editingThreshold, setEditingThreshold] = useState(false);
+  const [thresholdDraft, setThresholdDraft] = useState(String(skillGenThreshold));
 
   // Auto-expand info section when opened via the StatusBar info button
   useEffect(() => {
@@ -61,6 +63,17 @@ export const SkillGenPanel: React.FC = () => {
     const newState = !skillGenEnabled;
     logUI('toggleEnabled', { from: skillGenEnabled, to: newState, pendingDocs: skillGenPendingDocs });
     postToExtension({ type: 'setSkillGenEnabled', enabled: newState });
+  };
+
+  const handleThresholdSave = () => {
+    const parsed = parseInt(thresholdDraft, 10);
+    if (!isNaN(parsed) && parsed >= 5 && parsed <= 100) {
+      logUI('thresholdChanged', { from: skillGenThreshold, to: parsed });
+      postToExtension({ type: 'setSkillGenThreshold', threshold: parsed });
+    } else {
+      setThresholdDraft(String(skillGenThreshold));
+    }
+    setEditingThreshold(false);
   };
 
   const handleClose = () => {
@@ -148,7 +161,36 @@ export const SkillGenPanel: React.FC = () => {
           <div className="skillgen-progress-label">
             {isRunning
               ? `${skillGenProgressLabel || 'Processing...'} (${progressPercent}%)`
-              : `${skillGenPendingDocs} / ${skillGenThreshold} documents`
+              : editingThreshold
+                ? (
+                  <span className="skillgen-threshold-edit">
+                    {skillGenPendingDocs} /
+                    <input
+                      type="number"
+                      className="skillgen-threshold-input"
+                      value={thresholdDraft}
+                      min={5}
+                      max={100}
+                      autoFocus
+                      onChange={(e) => setThresholdDraft(e.target.value)}
+                      onBlur={handleThresholdSave}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleThresholdSave();
+                        if (e.key === 'Escape') { setThresholdDraft(String(skillGenThreshold)); setEditingThreshold(false); }
+                      }}
+                    />
+                    documents
+                  </span>
+                )
+                : (
+                  <span
+                    className="skillgen-threshold-display"
+                    onClick={() => { setThresholdDraft(String(skillGenThreshold)); setEditingThreshold(true); }}
+                    data-tooltip="Click to change threshold"
+                  >
+                    {skillGenPendingDocs} / {skillGenThreshold} documents
+                  </span>
+                )
             }
           </div>
         </div>

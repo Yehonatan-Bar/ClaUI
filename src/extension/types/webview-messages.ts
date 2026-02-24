@@ -295,6 +295,11 @@ export interface SetSkillGenEnabledRequest {
   enabled: boolean;
 }
 
+export interface SetSkillGenThresholdRequest {
+  type: 'setSkillGenThreshold';
+  threshold: number;
+}
+
 export interface SkillGenTriggerRequest {
   type: 'skillGenTrigger';
 }
@@ -424,6 +429,7 @@ export type WebviewToExtensionMessage =
   | SetAutoEnhanceRequest
   | SetEnhancerModelRequest
   | SetSkillGenEnabledRequest
+  | SetSkillGenThresholdRequest
   | SkillGenTriggerRequest
   | SkillGenCancelRequest
   | GetSkillGenStatusRequest

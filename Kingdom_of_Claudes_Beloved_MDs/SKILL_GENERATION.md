@@ -330,6 +330,7 @@ Full overlay panel:
 - Enable/disable toggle
 - Current status display with run status badge
 - Progress bar with shimmer animation during pipeline runs
+- **Editable threshold** -- clicking the "X / Y documents" label enters inline edit mode with a number input (range 5-100). Saves on Enter/blur, cancels on Escape. Sends `setSkillGenThreshold` message to update the VS Code setting.
 - "Generate Now" button (disabled when running or below threshold)
 - "Cancel" button (visible only during runs)
 - Last run info (time, status, skills generated)
@@ -344,6 +345,7 @@ Full overlay panel:
 | Type | Purpose |
 |------|---------|
 | `setSkillGenEnabled` | Toggle feature on/off |
+| `setSkillGenThreshold` | Update threshold from inline editor (5-100) |
 | `skillGenTrigger` | Manual pipeline trigger |
 | `skillGenCancel` | Cancel running pipeline |
 | `getSkillGenStatus` | Request current status snapshot |

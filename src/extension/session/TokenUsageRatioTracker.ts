@@ -77,6 +77,19 @@ export class TokenUsageRatioTracker {
     this.history.globalTurnCount++;
     this.enqueueWrite();
 
+    // Quick-start: trigger first baseline sample after just 2 turns
+    if (this.history.samples.length === 0 && this.history.globalTurnCount >= 2) {
+      return true;
+    }
+
+    // If all existing samples are baselines (no valid ratio yet), use shorter
+    // interval (2 turns) to get real data ASAP instead of waiting the full 5.
+    if (this.history.samples.length > 0 &&
+        this.history.samples.every(s => s.tokensPerPercent === null)) {
+      const turnsSince = this.history.globalTurnCount - this.history.lastSampledAtTurnCount;
+      return turnsSince >= 2;
+    }
+
     const turnsSinceLastSample = this.history.globalTurnCount - this.history.lastSampledAtTurnCount;
     return turnsSinceLastSample >= SAMPLE_INTERVAL;
   }
@@ -121,6 +134,13 @@ export class TokenUsageRatioTracker {
           weightedDeltaTokens = deltaTokens; // approximate for display
         }
         // Negative deltaUsagePercent = reset, null is appropriate
+      } else {
+        // First sample for this bucket: delta is entire cumulative (from zero).
+        // We can't compute tokensPerPercent (no baseline usage% to diff),
+        // but showing actual token accumulation is more useful than zeros.
+        deltaTokens = cumRaw;
+        weightedDeltaTokens = cumWeighted;
+        // deltaUsagePercent stays 0 (unknown baseline), tokensPerPercent stays null
       }
 
       const sample: TokenUsageRatioSample = {
