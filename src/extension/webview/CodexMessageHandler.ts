@@ -265,6 +265,10 @@ export class CodexMessageHandler {
           this.handleOpenUrl(msg.url);
           break;
 
+        case 'openSettings':
+          void vscode.commands.executeCommand('workbench.action.openSettings', msg.query);
+          break;
+
         case 'getProjectAnalytics':
           this.handleGetProjectAnalytics();
           break;

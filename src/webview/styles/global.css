@@ -1249,6 +1249,92 @@ html, body, #root {
   font-size: 14px;
 }
 
+.setup-notice-banner {
+  margin: 10px 12px 0;
+  border: 1px solid color-mix(in srgb, var(--vscode-button-background) 55%, var(--vscode-panel-border, #333));
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--vscode-button-background) 28%, transparent), transparent 55%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--vscode-editor-background) 82%, var(--vscode-sideBar-background, #111)),
+      color-mix(in srgb, var(--vscode-editor-background) 92%, #000)
+    );
+  color: var(--vscode-editor-foreground);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.setup-notice-content {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setup-notice-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--vscode-descriptionForeground);
+}
+
+.setup-notice-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.setup-notice-text {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--vscode-descriptionForeground);
+}
+
+.setup-notice-text code {
+  background: color-mix(in srgb, var(--vscode-textCodeBlock-background, #222) 75%, transparent);
+  border: 1px solid color-mix(in srgb, var(--vscode-panel-border, #333) 50%, transparent);
+  border-radius: 5px;
+  padding: 1px 5px;
+  color: var(--vscode-editor-foreground);
+}
+
+.setup-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.setup-notice-btn {
+  border: 1px solid var(--vscode-panel-border, #444);
+  background: color-mix(in srgb, var(--vscode-input-background) 88%, var(--vscode-editor-background));
+  color: var(--vscode-editor-foreground);
+  border-radius: 7px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.setup-notice-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.08));
+}
+
+.setup-notice-btn.primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border-color: color-mix(in srgb, var(--vscode-button-background) 75%, black);
+}
+
+.setup-notice-btn.primary:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.setup-notice-btn.ghost {
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+}
+
 /* Welcome screen */
 .welcome-screen {
   display: flex;
@@ -4704,4 +4790,99 @@ html, body, #root {
 
 .global-tooltip.placement-bottom.visible {
   transform: translateY(0);
+}
+
+/* ============================================
+   Usage Button & Popover (Status Bar)
+   ============================================ */
+
+.status-bar-usage-wrapper {
+  position: relative;
+}
+
+.status-bar-usage-popover {
+  position: absolute;
+  bottom: 28px;
+  right: 0;
+  width: 240px;
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 6px;
+  padding: 10px 12px;
+  z-index: 9999;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+  animation: vitalsPopIn 0.15s ease-out;
+}
+
+.status-bar-usage-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--vscode-panel-border, #333);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vscode-editor-foreground);
+}
+
+.status-bar-usage-popover-empty {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  text-align: center;
+  padding: 6px 0;
+}
+
+.status-bar-usage-popover-error {
+  font-size: 10px;
+  color: #f85149;
+  line-height: 1.4;
+}
+
+.status-bar-usage-stat {
+  margin-bottom: 10px;
+}
+
+.status-bar-usage-stat:last-child {
+  margin-bottom: 0;
+}
+
+.status-bar-usage-stat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.status-bar-usage-stat-label {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  line-height: 1.2;
+}
+
+.status-bar-usage-stat-pct {
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.status-bar-usage-bar-bg {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  height: 6px;
+  overflow: hidden;
+}
+
+.status-bar-usage-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.status-bar-usage-stat-resets {
+  font-size: 9px;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.65;
+  margin-top: 2px;
 }

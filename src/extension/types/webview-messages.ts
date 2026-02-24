@@ -337,6 +337,15 @@ export interface SetApiKeyRequest {
   apiKey: string;  // empty string = clear the key
 }
 
+export interface RequestUsageMessage {
+  type: 'requestUsage';
+}
+
+export interface SetUsageWidgetEnabledRequest {
+  type: 'setUsageWidgetEnabled';
+  enabled: boolean;
+}
+
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
@@ -396,7 +405,9 @@ export type WebviewToExtensionMessage =
   | GetCommunityDataRequest
   | CopyShareCardRequest
   | CodexConsultRequest
-  | SetApiKeyRequest;
+  | SetApiKeyRequest
+  | RequestUsageMessage
+  | SetUsageWidgetEnabledRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -950,6 +961,25 @@ export interface ApiKeySettingMessage {
   maskedKey: string;  // e.g. "****abcd" or "" if no key
 }
 
+/** One usage stat entry from the claude /usage command output */
+export interface UsageStat {
+  label: string;       // e.g. "Current session", "Current week (all models)"
+  percentage: number;  // 0–100
+  resetsAt: string;    // e.g. "1pm (Asia/Jerusalem)"
+}
+
+export interface UsageDataMessage {
+  type: 'usageData';
+  stats: UsageStat[];
+  fetchedAt: number;
+  error?: string;
+}
+
+export interface UsageWidgetSettingMessage {
+  type: 'usageWidgetSetting';
+  enabled: boolean;
+}
+
 /** Serializable chat message for passing between webview instances (e.g. fork) */
 export interface SerializedChatMessage {
   id: string;
@@ -1015,4 +1045,6 @@ export type ExtensionToWebviewMessage =
   | CommunityDataMessage
   | FriendActionResultMessage
   | ShareCardCopiedMessage
-  | ApiKeySettingMessage;
+  | ApiKeySettingMessage
+  | UsageDataMessage
+  | UsageWidgetSettingMessage;

@@ -20,12 +20,21 @@ function formatDuration(durationMs: number): string {
   return [h, m, s].map((n) => n.toString().padStart(2, '0')).join(':');
 }
 
+function usageBarColor(pct: number): string {
+  if (pct > 75) return '#f85149';
+  if (pct > 50) return '#d29922';
+  return '#3fb950';
+}
+
 export const StatusBar: React.FC<{
   cost: { costUsd: number; totalCostUsd: number; inputTokens: number; outputTokens: number };
 }> = ({ cost }) => {
   const [tickMs, setTickMs] = React.useState(() => Date.now());
   const [vitalsInfoOpen, setVitalsInfoOpen] = React.useState(false);
   const vitalsInfoRef = React.useRef<HTMLDivElement>(null);
+  const [usagePopoverOpen, setUsagePopoverOpen] = React.useState(false);
+  const [usageLoading, setUsageLoading] = React.useState(false);
+  const usageRef = React.useRef<HTMLDivElement>(null);
   const {
     gitPushSettings,
     gitPushRunning,
@@ -55,6 +64,9 @@ export const StatusBar: React.FC<{
     setSelectedProvider,
     setCodexConsultPanelOpen,
     setPromptHistoryPanelOpen,
+    usageStats,
+    usageFetchedAt,
+    usageError,
   } = useAppStore();
 
   const { barRef, isCollapsed } = useStatusBarCollapse();
@@ -77,6 +89,18 @@ export const StatusBar: React.FC<{
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [vitalsInfoOpen]);
+
+  // Close usage popover on outside click
+  useEffect(() => {
+    if (!usagePopoverOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (usageRef.current && !usageRef.current.contains(e.target as Node)) {
+        setUsagePopoverOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [usagePopoverOpen]);
 
   // Close dropdowns when expanding back
   useEffect(() => {
@@ -129,6 +153,28 @@ export const StatusBar: React.FC<{
     setVitalsEnabled(next);
     postToExtension({ type: 'setVitalsEnabled', enabled: next });
   };
+
+  const handleUsageClick = () => {
+    setUsagePopoverOpen((prev) => !prev);
+    if (!usageStats.length) {
+      setUsageLoading(true);
+      postToExtension({ type: 'requestUsage' });
+    }
+  };
+
+  const handleUsageRefresh = () => {
+    setUsageLoading(true);
+    postToExtension({ type: 'requestUsage' });
+  };
+
+  // Clear loading indicator when new data arrives
+  const prevUsageFetchedAt = React.useRef(usageFetchedAt);
+  useEffect(() => {
+    if (usageFetchedAt !== prevUsageFetchedAt.current) {
+      prevUsageFetchedAt.current = usageFetchedAt;
+      setUsageLoading(false);
+    }
+  }, [usageFetchedAt]);
 
   const handleNavToggle = () => {
     setNavOpen((p) => !p);
@@ -240,6 +286,56 @@ export const StatusBar: React.FC<{
     </div>
   );
 
+  // The highest single usage percentage (for button label hint)
+  const maxUsagePct = usageStats.length > 0
+    ? Math.max(...usageStats.map((s) => s.percentage))
+    : null;
+
+  // Inline popover for the Usage button
+  const usagePopover = usagePopoverOpen ? (
+    <div className="status-bar-usage-popover">
+      <div className="status-bar-usage-popover-header">
+        <span>API Usage</span>
+        <button
+          className="vitals-info-close"
+          onClick={handleUsageRefresh}
+          disabled={usageLoading}
+          data-tooltip="Refresh"
+          style={{ fontSize: 13, padding: '0 4px' }}
+        >
+          {'\u21BB'}
+        </button>
+      </div>
+      {usageLoading && !usageStats.length ? (
+        <div className="status-bar-usage-popover-empty">Loading...</div>
+      ) : usageError && !usageStats.length ? (
+        <div className="status-bar-usage-popover-error">{usageError}</div>
+      ) : usageStats.length > 0 ? (
+        usageStats.map((stat, i) => (
+          <div key={i} className="status-bar-usage-stat">
+            <div className="status-bar-usage-stat-header">
+              <span className="status-bar-usage-stat-label">{stat.label}</span>
+              <span className="status-bar-usage-stat-pct" style={{ color: usageBarColor(stat.percentage) }}>
+                {stat.percentage}%
+              </span>
+            </div>
+            <div className="status-bar-usage-bar-bg">
+              <div
+                className="status-bar-usage-bar-fill"
+                style={{ width: `${Math.min(stat.percentage, 100)}%`, background: usageBarColor(stat.percentage) }}
+              />
+            </div>
+            {stat.resetsAt && (
+              <div className="status-bar-usage-stat-resets">Resets {stat.resetsAt}</div>
+            )}
+          </div>
+        ))
+      ) : (
+        <div className="status-bar-usage-popover-empty">No data — click {'\u21BB'} to load</div>
+      )}
+    </div>
+  ) : null;
+
   // --- COLLAPSED mode ---
   if (isCollapsed) {
     return (
@@ -335,6 +431,16 @@ export const StatusBar: React.FC<{
               {tAch(achievementLanguage).trophy} {achievementProfile.totalAchievements}
             </button>
           )}
+          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={usageRef}>
+            <button
+              className={`status-bar-vitals-btn ${usagePopoverOpen ? 'active' : ''}`}
+              onClick={handleUsageClick}
+              data-tooltip="API Usage"
+            >
+              {maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}
+            </button>
+            {usagePopover}
+          </div>
           <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={vitalsInfoRef}>
             <button
               className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
@@ -462,6 +568,16 @@ export const StatusBar: React.FC<{
           </button>
         </>
       )}
+      <div className="status-bar-usage-wrapper" ref={usageRef}>
+        <button
+          className={`status-bar-vitals-btn ${usagePopoverOpen ? 'active' : ''}`}
+          onClick={handleUsageClick}
+          data-tooltip="API Usage"
+        >
+          {maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}
+        </button>
+        {usagePopover}
+      </div>
       <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
         <div className="status-bar-vitals-controls">
           <button

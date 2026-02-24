@@ -13,6 +13,7 @@ import type {
   TurnRecord,
   TurnSemantics,
   CommunityFriendProfilePayload,
+  UsageStat,
 } from '../../extension/types/webview-messages';
 import type { AdventureBeat } from '../components/Vitals/adventure/types';
 import { deriveTurnHistoryFromMessages } from '../utils/turnVitals';
@@ -138,6 +139,12 @@ export interface AppState {
   turnHistory: TurnRecord[];
   turnByMessageId: Record<string, TurnRecord>;
   weather: WeatherState;
+
+  // Usage widget
+  usageWidgetEnabled: boolean;
+  usageStats: UsageStat[];
+  usageFetchedAt: number | null;
+  usageError: string | undefined;
 
   // Achievements
   achievementsEnabled: boolean;
@@ -284,6 +291,8 @@ export interface AppState {
   setTranslating: (messageId: string, translating: boolean) => void;
   toggleTranslationView: (messageId: string) => void;
   setVitalsEnabled: (enabled: boolean) => void;
+  setUsageWidgetEnabled: (enabled: boolean) => void;
+  setUsageData: (stats: UsageStat[], fetchedAt: number, error?: string) => void;
   rebuildTurnHistoryFromMessages: (messages?: ChatMessage[]) => void;
   addTurnRecord: (turn: TurnRecord) => void;
   setAchievementLanguage: (lang: AchievementLang) => void;
@@ -504,6 +513,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   turnHistory: [],
   turnByMessageId: {},
   weather: { ...initialWeather },
+  usageWidgetEnabled: false,
+  usageStats: [],
+  usageFetchedAt: null,
+  usageError: undefined,
   achievementsEnabled: true,
   achievementsSound: false,
   achievementLanguage: (() => {
@@ -1024,6 +1037,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         weather: calculateWeather(rebuilt),
       };
     }),
+
+  setUsageWidgetEnabled: (enabled) => set({ usageWidgetEnabled: enabled }),
+
+  setUsageData: (stats, fetchedAt, error) =>
+    set({ usageStats: stats, usageFetchedAt: fetchedAt, usageError: error }),
 
   rebuildTurnHistoryFromMessages: (messages) =>
     set((state) => {
