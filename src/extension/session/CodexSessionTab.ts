@@ -7,6 +7,7 @@ import { CodexExecDemux } from '../process/CodexExecDemux';
 import { CodexMessageHandler, type CodexSessionController } from '../webview/CodexMessageHandler';
 import { buildWebviewHtml } from '../webview/WebviewProvider';
 import { CodexConversationReader } from './CodexConversationReader';
+import { CodexSessionNamer } from './CodexSessionNamer';
 import { FileLogger } from './FileLogger';
 import type { WebviewBridge } from '../webview/MessageHandler';
 import type { SessionTabCallbacks } from './SessionTab';
@@ -45,6 +46,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private thinkingFrame = 0;
   private static readonly THINKING_FRAMES = ['|', '/', '-', '\\'];
   private readonly fileLogger: FileLogger | null = null;
+  private readonly sessionNamer: CodexSessionNamer;
   private sessionActive = false;
   private threadId: string | null = null;
   private currentModel = '';
@@ -58,6 +60,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private turnFailureText: string[] = [];
   private codexLoginLaunchInProgress = false;
   private codexInstallGuidanceShownAt = 0;
+  private sessionNamingRequested = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -104,6 +107,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     };
     this.processManager.setLogger(tabLog);
     this.messageHandler.setLogger(tabLog);
+    this.sessionNamer = new CodexSessionNamer();
+    this.sessionNamer.setLogger(tabLog);
 
     this.baseTitle = `Codex ${tabNumber}`;
     this.panel = vscode.window.createWebviewPanel(
@@ -180,6 +185,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.currentModel = this.getCurrentModel();
     this.sessionStartedAt = this.sessionStartedAt || new Date().toISOString();
     this.analyticsSaved = false;
+    this.sessionNamingRequested = false;
     this.achievementService.onSessionStart(this.id);
 
     if (options?.resume) {
@@ -238,6 +244,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         this.firstPrompt = firstLine;
       }
     }
+
+    this.triggerSessionNaming(text);
 
     this.currentModel = this.getCurrentModel();
     this.resetTurnFailureCapture();
@@ -363,6 +371,45 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       firstPrompt: this.firstPrompt || existing?.firstPrompt,
       workspacePath: existing?.workspacePath || this.sessionCwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
     });
+  }
+
+  /** Fire-and-forget: spawn a Codex CLI request to auto-name this session */
+  private triggerSessionNaming(userText: string): void {
+    const trimmed = userText.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const autoName = config.get<boolean>('autoNameSessions', true);
+    if (!autoName) {
+      this.log(`[Codex Tab ${this.tabNumber}] [SessionNaming] SKIPPED: autoNameSessions is disabled`);
+      return;
+    }
+
+    if (this.sessionNamingRequested) {
+      this.log(`[Codex Tab ${this.tabNumber}] [SessionNaming] SKIPPED: naming already requested`);
+      return;
+    }
+
+    this.sessionNamingRequested = true;
+    this.log(`[Codex Tab ${this.tabNumber}] [SessionNaming] Launching CodexSessionNamer...`);
+
+    void this.sessionNamer
+      .generateName(trimmed, this.currentModel || undefined)
+      .then((name) => {
+        this.log(`[Codex Tab ${this.tabNumber}] [SessionNaming] generateName returned: "${name}"`);
+        if (!name || this.disposed) {
+          return;
+        }
+        this.setTabName(name);
+        this.persistSessionMetadata(name);
+        this.fileLogger?.updateSessionName(name);
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        this.log(`[Codex Tab ${this.tabNumber}] [SessionNaming] ERROR: ${message}`);
+      });
   }
 
   /** Build and persist a SessionSummary from accumulated Codex turn records */

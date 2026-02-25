@@ -72,6 +72,7 @@ export function useClaudeStream(): void {
     setCommunityFriends,
     setFriendActionPending,
     setApiKeySetting,
+    setClaudeAuthStatus,
     setUsageWidgetEnabled,
     setUsageData,
     setTokenRatioData,
@@ -510,6 +511,10 @@ export function useClaudeStream(): void {
           setApiKeySetting(msg.hasKey, msg.maskedKey);
           break;
 
+        case 'claudeAuthStatus':
+          setClaudeAuthStatus(msg.loggedIn, msg.email, msg.subscriptionType);
+          break;
+
         case 'usageWidgetSetting':
           setUsageWidgetEnabled(msg.enabled);
           break;
@@ -589,6 +594,7 @@ export function useClaudeStream(): void {
     setSkillGenStatus,
     setSkillGenProgress,
     setApiKeySetting,
+    setClaudeAuthStatus,
     setUsageWidgetEnabled,
     setUsageData,
     setTokenRatioData,

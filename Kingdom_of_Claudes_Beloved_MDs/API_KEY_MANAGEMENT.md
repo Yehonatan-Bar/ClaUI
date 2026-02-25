@@ -14,7 +14,7 @@ This module:
 |------|---------|
 | `src/extension/process/envUtils.ts` | Shared utility: env sanitization, key storage, key masking |
 | `src/extension/types/webview-messages.ts` | `SetApiKeyRequest` and `ApiKeySettingMessage` message types |
-| `src/webview/components/Vitals/VitalsInfoPanel.tsx` | API Key UI row (Set/Clear/masked display) |
+| `src/webview/components/Vitals/VitalsInfoPanel.tsx` | API Key UI row (Set/Clear/masked display), alongside separate Claude Account login/logout controls |
 | `src/webview/state/store.ts` | `hasApiKey`, `maskedApiKey` state fields |
 | `src/webview/hooks/useClaudeStream.ts` | Handles `apiKeySetting` message from extension |
 
@@ -104,6 +104,7 @@ Located in `VitalsInfoPanel.tsx` (gear icon panel next to Vitals):
 - **Key set**: Shows masked value (e.g., `****abcd`) + "Clear" button.
 - Enter submits, Escape cancels.
 - Key is stored in OS keychain via VS Code SecretStorage (`claudeMirror.anthropicApiKey`).
+- Claude subscription login/logout is a separate row ("Claude Account") and uses Claude CLI auth commands, not SecretStorage.
 
 ## Security
 

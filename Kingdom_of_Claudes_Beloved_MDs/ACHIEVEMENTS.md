@@ -4,7 +4,7 @@ Gamification system that awards badges and XP for coding milestones while using 
 
 ## Overview
 
-The Achievements feature tracks user activity across sessions (bug fixes, test passes, files touched, daily streaks, coding patterns) and awards achievements when milestones are reached. It includes an XP-based leveling system (25 levels), per-session goals, toast notifications, a session recap card, and AI-powered session insights.
+The Achievements feature tracks user activity across sessions (bug fixes, test passes, files touched, daily streaks, coding patterns) and awards achievements when milestones are reached. It includes an XP-based leveling system (25 levels), per-session goals, toast notifications, a session recap card, AI-powered session insights, and a live recap snapshot request path used by the webview idle reminder (summary without ending the session).
 
 ## Architecture
 
@@ -52,8 +52,8 @@ Extension (Node.js)                    Webview (React)
 |------|------|---------|
 | AchievementCatalog.ts | `src/extension/achievements/` | 65 achievement definitions with id, title, description, rarity, category, xp. Categories: debugging, testing, refactor, collaboration, session, architecture, productivity |
 | AchievementStore.ts | `src/extension/achievements/` | Persistence via VS Code `globalState`. Tracks 8 counters: bugFixes, testPasses, sessionsCompleted, totalEdits, consecutiveDays, lastSessionDate, totalSessionMinutes. 25 level thresholds. |
-| AchievementEngine.ts | `src/extension/achievements/` | Core game logic: tracks bug fixes, test passes, streaks, language detection, cancel counts, session goals, file paths, frontend/backend classification, error cycles, config file detection, markdown file counting |
-| AchievementService.ts | `src/extension/achievements/` | Bridge between Engine+Store and webview messaging. Handles daily streaks, cross-session tier achievements (bug-slayer, test-master, edit-veteran, session milestones, time-investor, streak tiers), AI insight integration, auto-sync to GitHub |
+| AchievementEngine.ts | `src/extension/achievements/` | Core game logic: tracks bug fixes, test passes, streaks, language detection, cancel counts, session goals, file paths, frontend/backend classification, error cycles, config file detection, markdown file counting; exposes session snapshot/discard helpers for live recap + edit-and-resend restarts |
+| AchievementService.ts | `src/extension/achievements/` | Bridge between Engine+Store and webview messaging. Handles daily streaks, cross-session tier achievements (bug-slayer, test-master, edit-veteran, session milestones, time-investor, streak tiers), AI insight integration, live session recap snapshots (no end), silent session abandon on edit-and-resend, auto-sync to GitHub |
 | AchievementInsightAnalyzer.ts | `src/extension/achievements/` | Spawns Sonnet CLI once per day for deeper session analysis. Returns quality, insight, coding pattern, XP bonus |
 | GitHubSyncService.ts | `src/extension/achievements/` | GitHub auth via OAuth Device Flow (preferred) with PAT fallback, token storage in VS Code SecretStorage, Gist CRUD (create/update public gist), friend lookup by username convention, badge generation (shields.io + markdown table), 15min friend cache, auto-reconnect on activation, globalState persistence |
 
@@ -65,7 +65,7 @@ Extension (Node.js)                    Webview (React)
 | CommunityPanel.tsx | `src/webview/components/Achievements/` | Full overlay panel: GitHub Connect card, sync status bar, Friends tab (list + add/remove), Compare tab (side-by-side stats & achievement grid) |
 | ShareCard.tsx | `src/webview/components/Achievements/` | Modal for sharing: visual profile preview (level, XP bar, achievements), Copy Markdown Card button, Copy Shields Badge button |
 | AchievementToastStack.tsx | `src/webview/components/Achievements/` | Stack of rarity-colored toasts with auto-dismiss and optional sound |
-| SessionRecapCard.tsx | `src/webview/components/Achievements/` | End-of-session summary showing time, bugs, tests, files, languages, badges, XP, AI insight, session quality badge, coding pattern |
+| SessionRecapCard.tsx | `src/webview/components/Achievements/` | Session summary card (normally at session end, but can also be populated by manual live recap snapshot) showing time, bugs, tests, files, languages, badges, XP, AI insight, session quality badge, coding pattern |
 | achievementI18n.ts | `src/webview/components/Achievements/` | All UI strings in English and Hebrew, with helper functions for dynamic lookups. Includes ~30 community-related strings |
 | levelThresholds.ts | `src/webview/components/Achievements/` | XP level thresholds (duplicated from AchievementStore for webview use) |
 
@@ -74,9 +74,9 @@ Extension (Node.js)                    Webview (React)
 | File | Role |
 |------|------|
 | store.ts | Zustand state: `achievementsEnabled`, `achievementsSound`, `achievementLanguage`, `achievementProfile`, `achievementGoals`, `achievementToasts`, `achievementPanelOpen`, `sessionRecap`, `communityPanelOpen`, `githubSyncStatus`, `communityFriends`, `friendActionPending` |
-| App.tsx | Renders Panel, CommunityPanel, ShareCard, ToastStack, RecapCard; Trophy button in StatusBar |
-| useClaudeStream.ts | Dispatches achievement + community message types from extension (`githubSyncStatus`, `communityData`, `friendActionResult`, `shareCardCopied`) |
-| MessageHandler.ts | Calls achievement hooks at every lifecycle point; handles 6 community message types (`githubSync`, `addFriend`, `removeFriend`, `refreshFriends`, `getCommunityData`, `copyShareCard`); watches `achievements.githubSync` config |
+| App.tsx | Renders Panel, CommunityPanel, ShareCard, ToastStack, RecapCard, and idle session-summary nudge (1h inactivity, Later/Dismiss controls); Trophy button in StatusBar |
+| useClaudeStream.ts | Dispatches achievement + community message types from extension (`githubSyncStatus`, `communityData`, `friendActionResult`, `shareCardCopied`) and applies `sessionRecap` payloads for both end-of-session and live snapshots |
+| MessageHandler.ts | Calls achievement hooks at every lifecycle point; handles `requestSessionRecapSnapshot` (manual summary without end); uses silent achievement-session abandon during `editAndResend`; handles 6 community message types (`githubSync`, `addFriend`, `removeFriend`, `refreshFriends`, `getCommunityData`, `copyShareCard`); watches `achievements.githubSync` config |
 | extension.ts | Creates AchievementInsightAnalyzer + GitHubSyncService, wires both to AchievementService |
 | WebviewProvider.ts | CSP `img-src` includes `https://avatars.githubusercontent.com` for friend avatars |
 | global.css | All achievement + community CSS classes including friend cards, compare view, share card modal |
