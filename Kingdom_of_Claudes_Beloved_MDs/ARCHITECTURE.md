@@ -327,9 +327,9 @@ interface SessionMetadata {
 - Created in `extension.ts activate()`, passed to `TabManager` and `registerCommands()`
 - `TabManager` passes it to each `SessionTab`
 - `SessionTab` saves metadata on `demux.init` (preserves existing name/firstPrompt for resumed sessions), on session name generation, and on first prompt capture
-- `commands.ts showHistory` reads sessions and shows a VS Code QuickPick displaying the session name (label), model + relative time (description), and first prompt (detail)
+- `commands.ts showHistory` first shows a source picker QuickPick with two options: "Extension Sessions" (ClaUi-only) and "All Sessions" (delegates to `discoverSessions` for disk-wide scan). When "Extension Sessions" is chosen, shows a second QuickPick displaying session name (label), model + relative time (description), and first prompt (detail)
 
-**Keybinding:** `Ctrl+Shift+H` opens the history QuickPick.
+**Keybinding:** `Ctrl+Shift+H` opens the history source picker. `Ctrl+Alt+D` opens disk discovery directly.
 
 ### ConversationReader (`session/ConversationReader.ts`)
 

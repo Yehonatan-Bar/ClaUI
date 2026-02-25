@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>תוכנית: כפתור היסטוריה עם שתי אפשרויות</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 700px; margin: 40px auto; padding: 20px; background: #f8f9fa; color: #333; line-height: 1.7; }
+  h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+  h2 { color: #2980b9; margin-top: 30px; }
+  .card { background: white; border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  .option { display: flex; align-items: center; gap: 15px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; margin: 8px 0; }
+  .option-icon { font-size: 24px; min-width: 40px; text-align: center; }
+  .option-title { font-weight: bold; color: #2c3e50; }
+  .option-desc { font-size: 0.9em; color: #666; }
+  .highlight { background: #e8f4fd; border-right: 4px solid #3498db; padding: 12px 16px; border-radius: 4px; margin: 10px 0; }
+  .scope { color: #27ae60; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>תוכנית: כפתור היסטוריה עם שתי אפשרויות</h1>
+
+<div class="card">
+  <h2>מה המצב היום?</h2>
+  <p>כשלוחצים על כפתור <strong>"History"</strong>, מוצגת רשימת שיחות שנפתחו <strong>רק דרך התוסף</strong>.</p>
+  <p>שיחות שנוהלו ישירות מהטרמינל (שורת פקודה) לא מופיעות ברשימה הזו.</p>
+</div>
+
+<div class="card">
+  <h2>מה ישתנה?</h2>
+  <p>בלחיצה על כפתור ההיסטוריה, תופיע <strong>תפריט בחירה</strong> עם שתי אפשרויות:</p>
+
+  <div class="option">
+    <div class="option-icon">1</div>
+    <div>
+      <div class="option-title">שיחות התוסף</div>
+      <div class="option-desc">שיחות שנפתחו מתוך התוסף בלבד - ההתנהגות הנוכחית</div>
+    </div>
+  </div>
+
+  <div class="option">
+    <div class="option-icon">2</div>
+    <div>
+      <div class="option-title">כל השיחות</div>
+      <div class="option-desc">סריקה של כל שיחות Claude מהדיסק, כולל שיחות מהטרמינל</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>היקף השינוי</h2>
+  <div class="highlight">
+    <p>שינוי <span class="scope">קטן ומדויק</span> - עדכון קובץ אחד בלבד.</p>
+    <p>כל שאר המערכת נשארת ללא שינוי. קיצור המקשים Ctrl+Alt+D ימשיך לעבוד כגישה ישירה לסריקת כל השיחות.</p>
+  </div>
+</div>
+
+<div class="card">
+  <h2>חוויית המשתמש</h2>
+  <p>1. המשתמש לוחץ על <strong>History</strong></p>
+  <p>2. נפתח תפריט עם שתי האפשרויות</p>
+  <p>3. המשתמש בוחר את הסוג הרצוי</p>
+  <p>4. מוצגת רשימת השיחות המתאימה</p>
+  <p>5. המשתמש בוחר שיחה ומחדש אותה</p>
+</div>
+
+</body>
+</html>

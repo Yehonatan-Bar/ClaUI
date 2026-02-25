@@ -258,6 +258,30 @@ export function registerCommands(
 
     // Show conversation history in a QuickPick
     vscode.commands.registerCommand('claudeMirror.showHistory', async () => {
+      // Step 1: Ask which history source
+      const sourceItems: vscode.QuickPickItem[] = [
+        {
+          label: '$(window) Extension Sessions',
+          description: 'Conversations opened inside ClaUi',
+        },
+        {
+          label: '$(search) All Sessions',
+          description: 'Discover all Claude sessions from disk (including CLI)',
+        },
+      ];
+
+      const source = await vscode.window.showQuickPick(sourceItems, {
+        placeHolder: 'Browse conversation history from...',
+      });
+
+      if (!source) { return; }
+
+      if (source.label.includes('All Sessions')) {
+        await vscode.commands.executeCommand('claudeMirror.discoverSessions');
+        return;
+      }
+
+      // Step 2: Show ClaUi extension sessions
       const allSessions = sessionStore.getSessions();
       log(`[showHistory] Found ${allSessions.length} sessions in store`);
 
@@ -279,8 +303,8 @@ export function registerCommands(
 
       if (sessions.length === 0) {
         const msg = currentWorkspace
-          ? 'No conversation history for this project yet.'
-          : 'No conversation history yet.';
+          ? 'No ClaUi conversation history for this project yet. Use "All Sessions" to discover CLI sessions.'
+          : 'No ClaUi conversation history yet. Use "All Sessions" to discover CLI sessions.';
         vscode.window.showInformationMessage(msg);
         return;
       }
