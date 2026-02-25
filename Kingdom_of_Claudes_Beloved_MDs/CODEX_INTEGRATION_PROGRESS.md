@@ -325,3 +325,28 @@ Verification note:
   - `CodexMessageHandler` now handles `getPromptHistory` and returns `promptHistoryResponse`
 - Added prompt history persistence for Codex `editAndResend` path so edited prompts also enter shared project/global history
 - Result: prompt history is now shared/visible across Claude + Codex modes via the same `PromptHistoryStore`
+
+## 2026-02-25 - Codex "stuck" UI fix (webview message ordering race)
+
+- Investigated stuck-looking Codex tabs where the CLI had already completed (`agent_message` + `turn.completed`, exit code `0`) but the webview showed no reply / transient thinking only.
+- Root cause was a UI ordering race in Codex mode:
+  - `CodexExecDemux` can emit `item.completed(agent_message)` and `turn.completed` back-to-back
+  - `CodexMessageHandler` was posting multiple webview messages immediately (`messageStart`, `streamingText`, `assistantMessage`, `messageStop`, `costUpdate`, `turnComplete`, `processBusy=false`) without serialization
+  - under unlucky ordering, the webview could finalize/clear before the synthetic Codex message sequence was fully applied
+- Fix:
+  - added a small FIFO `postToWebview(...)` queue inside `CodexMessageHandler`
+  - routed Codex live turn lifecycle messages (user send/busy, demux `turnStarted`, `agentMessage`, `turnCompleted`, demux errors, command-error UI) through the queue
+  - preserves event order at the extension->webview boundary and prevents lost/missing Codex replies caused by end-of-turn reordering
+
+### Follow-up (same day): reproduction still observed after FIFO fix
+
+- Reproduced again on tab `המשך פריסה לשרת` (user reported last message at ~11:27 local time; extension/per-tab logs show ~09:27 because log line timestamps are UTC-style while file names are local time).
+- Logs confirmed the turn was fully successful end-to-end on the CLI + extension side:
+  - `Codex agent_message` emitted
+  - `Codex JSON: turn.completed`
+  - `setBusy(false) prev=true`
+  - process exit `code=0`
+  - Codex JSONL file contains the full `agent_message` final text and `task_complete`
+- Added a second hardening layer in the webview (`useClaudeStream`):
+  - when provider is Codex and an `assistantMessage` arrives while a streaming message is active, immediately `addAssistantMessage(...)` (upsert by message ID) in addition to updating the snapshot
+  - this preserves the reply even if `messageStop` / `costUpdate` / `processBusy(false)` finalize/clear ordering is still unlucky at the webview boundary

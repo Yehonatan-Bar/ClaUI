@@ -238,6 +238,9 @@ claude-code-mirror/
 **MessageHandler** - Bidirectional bridge translating webview postMessages into CLI commands and StreamDemux events into webview messages. Accepts a `WebviewBridge` interface (implemented by SessionTab). Triggers auto-naming on first user message. Detects plan approval pauses (ExitPlanMode/AskUserQuestion) and forwards approval responses.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
+**CodexMessageHandler** - Codex-specific webview/runtime bridge for `codex exec --json` sessions. Maps `CodexExecDemux` events into existing webview message types (including synthesized `messageStart`/`streamingText`/`messageStop` around complete Codex `agent_message` items), handles Codex settings/history/image sends, and serializes live turn `postMessage` emissions through a FIFO queue to reduce end-of-turn ordering races. The webview (`useClaudeStream`) also applies a Codex-only fallback by immediately upserting complete `assistantMessage` payloads, so replies remain visible even if finalize/clear events arrive out of order.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_INTEGRATION_PROGRESS.md`
+
 **SessionNamer** - Spawns a one-shot `claude -p` process using Haiku to generate a 1-3 word tab name from the user's first message. Matches the language of the message (Hebrew/English). 10-second timeout, sanitized output, all errors silently logged.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_NAMER.md`
 
@@ -355,7 +358,7 @@ claude-code-mirror/
 | `claudeMirror.autoRestart` | `true` | Auto-restart process on crash |
 | `claudeMirror.chatFontSize` | `14` | Font size (px) for chat messages (10-32) |
 | `claudeMirror.chatFontFamily` | `""` | Font family for chat messages (empty = VS Code default) |
-| `claudeMirror.typingTheme` | `"zen"` | Response rendering personality theme: "terminal-hacker", "retro", "zen", or "neo-zen" |
+| `claudeMirror.typingTheme` | `"neo-zen"` | Response rendering personality theme: "terminal-hacker", "retro", "zen", or "neo-zen" |
 | `claudeMirror.autoNameSessions` | `true` | Auto-generate tab names from first message (Claude: Haiku, Codex: one-shot codex exec) |
 | `claudeMirror.activitySummary` | `true` | Periodically summarize tool activity in busy indicator via Haiku |
 | `claudeMirror.activitySummaryThreshold` | `3` | Tool uses before triggering an activity summary (1-10) |

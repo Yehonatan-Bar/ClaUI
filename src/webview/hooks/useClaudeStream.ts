@@ -162,10 +162,17 @@ export function useClaudeStream(): void {
             'blocks:', Array.isArray(msg.content) ? msg.content.map((b: ContentBlock) => b.type) : msg.content
           );
           const currentState = useAppStore.getState();
+          const isCodexMode = currentState.provider === 'codex';
           if (!currentState.streamingMessageId) {
             // No active streaming message - this is a replayed/complete message
             // (e.g. during session resume). Add directly to the messages array.
             addAssistantMessage(msg.messageId, msg.content, msg.model);
+          } else if (isCodexMode) {
+            // Codex emits complete agent messages (not incremental snapshots).
+            // Upsert immediately so the reply survives any end-of-turn ordering race
+            // between messageStop/costUpdate/processBusy messages.
+            addAssistantMessage(msg.messageId, msg.content, msg.model);
+            updateAssistantSnapshot(msg.messageId, msg.content, msg.model);
           } else {
             // Mid-stream snapshot during live streaming - store for metadata only.
             updateAssistantSnapshot(msg.messageId, msg.content, msg.model);
