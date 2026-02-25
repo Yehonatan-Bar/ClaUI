@@ -13,6 +13,7 @@ import { setStoredApiKey, maskApiKey } from '../process/envUtils';
 import type {
   CodexReasoningEffort,
   CodexModelOption,
+  ExtensionToWebviewMessage,
   ProviderCapabilities,
   ProviderId,
   TurnRecord,
@@ -93,6 +94,7 @@ export class CodexMessageHandler {
   private messageCounter = 0;
   private secrets: vscode.SecretStorage | null = null;
   private autoSetupCodexCliInProgress = false;
+  private webviewPostQueue: Promise<void> = Promise.resolve();
 
   /** Provide SecretStorage for API key management */
   setSecrets(secrets: vscode.SecretStorage): void {
@@ -125,6 +127,22 @@ export class CodexMessageHandler {
 
   setLogger(logger: (msg: string) => void): void {
     this.log = logger;
+  }
+
+  /**
+   * Serialize Codex live UI messages to avoid end-of-turn ordering races in the
+   * webview (agent_message + turn.completed can arrive back-to-back).
+   */
+  private postToWebview(msg: ExtensionToWebviewMessage): void {
+    this.webviewPostQueue = this.webviewPostQueue
+      .catch(() => undefined)
+      .then(() => {
+        try {
+          this.webview.postMessage(msg);
+        } catch (err) {
+          this.log(`Failed to post Codex webview message (${msg.type}): ${this.errMsg(err)}`);
+        }
+      });
   }
 
   initialize(): void {
@@ -194,15 +212,15 @@ export class CodexMessageHandler {
           this.log(`Codex sendMessage requested: len=${msg.text.length} preview="${msg.text.slice(0, 80).replace(/\s+/g, ' ')}"`);
           this.achievementService.onUserPrompt(this.tabId, msg.text);
           void this.promptHistoryStore.addPrompt(msg.text);
-          this.webview.postMessage({
+          this.postToWebview({
             type: 'userMessage',
             content: [{ type: 'text', text: msg.text } as ContentBlock],
           });
-          this.webview.postMessage({ type: 'processBusy', busy: true });
+          this.postToWebview({ type: 'processBusy', busy: true });
           void this.session.sendText(msg.text).catch((err) => {
             this.log(`Codex sendText failed: ${this.errMsg(err)}`);
-            this.webview.postMessage({ type: 'processBusy', busy: false });
-            this.webview.postMessage({ type: 'error', message: `Failed to send Codex message: ${this.errMsg(err)}` });
+            this.postToWebview({ type: 'processBusy', busy: false });
+            this.postToWebview({ type: 'error', message: `Failed to send Codex message: ${this.errMsg(err)}` });
           });
           break;
 
@@ -226,19 +244,19 @@ export class CodexMessageHandler {
               },
             });
           }
-          this.webview.postMessage({ type: 'userMessage', content });
-          this.webview.postMessage({ type: 'processBusy', busy: true });
+          this.postToWebview({ type: 'userMessage', content });
+          this.postToWebview({ type: 'processBusy', busy: true });
           void this.session.sendWithImages(msg.text, msg.images).catch((err) => {
             this.log(`Codex sendWithImages failed: ${this.errMsg(err)}`);
-            this.webview.postMessage({ type: 'processBusy', busy: false });
-            this.webview.postMessage({ type: 'error', message: `Failed to send Codex message with images: ${this.errMsg(err)}` });
+            this.postToWebview({ type: 'processBusy', busy: false });
+            this.postToWebview({ type: 'error', message: `Failed to send Codex message with images: ${this.errMsg(err)}` });
           });
           break;
         }
 
         case 'cancelRequest':
           this.achievementService.onCancel(this.tabId);
-          this.webview.postMessage({ type: 'processBusy', busy: false });
+          this.postToWebview({ type: 'processBusy', busy: false });
           this.session.cancelRequest();
           break;
 
@@ -429,7 +447,7 @@ export class CodexMessageHandler {
   private bindDemuxEvents(): void {
     this.demux.on('threadStarted', (data: { threadId: string }) => {
       this.log(`Codex thread.started: ${data.threadId}`);
-      this.webview.postMessage({
+      this.postToWebview({
         type: 'sessionStarted',
         sessionId: data.threadId,
         model: this.getConfiguredCodexModelLabel(),
@@ -442,7 +460,7 @@ export class CodexMessageHandler {
       this.currentTurnCommands = [];
       this.currentTurnHadAgentMessage = false;
       this.log('Codex turn.started');
-      this.webview.postMessage({ type: 'processBusy', busy: true });
+      this.postToWebview({ type: 'processBusy', busy: true });
     });
 
     this.demux.on('agentMessage', (data: { id: string; text: string }) => {
@@ -451,22 +469,22 @@ export class CodexMessageHandler {
       this.lastMessageId = messageId;
       const model = this.getConfiguredCodexModelLabel();
       this.log(`Codex agent_message: id=${messageId} len=${data.text.length}`);
-      this.webview.postMessage({ type: 'messageStart', messageId, model });
+      this.postToWebview({ type: 'messageStart', messageId, model });
       // Codex exec emits complete agent messages (not text deltas). Synthesize a single
       // streamingText block so the existing webview finalize path persists the message.
-      this.webview.postMessage({
+      this.postToWebview({
         type: 'streamingText',
         messageId,
         blockIndex: 0,
         text: data.text,
       });
-      this.webview.postMessage({
+      this.postToWebview({
         type: 'assistantMessage',
         messageId,
         content: [{ type: 'text', text: data.text } as ContentBlock],
         model,
       });
-      this.webview.postMessage({ type: 'messageStop' });
+      this.postToWebview({ type: 'messageStop' });
       if (data.text.trim()) {
         this.achievementService.onAssistantText(this.tabId, data.text);
       }
@@ -485,7 +503,7 @@ export class CodexMessageHandler {
       if (isExpectedNonFatalCommandExit(command || data.command, data.exitCode)) {
         this.log(`Codex command non-fatal exit ignored: exit=${data.exitCode} cmd=${command || data.command}`);
       } else if (data.exitCode !== null && data.exitCode !== 0) {
-        this.webview.postMessage({
+        this.postToWebview({
           type: 'error',
           message: `Command failed (exit ${data.exitCode}): ${command || data.command}`,
         });
@@ -500,7 +518,7 @@ export class CodexMessageHandler {
       const toolNames = hasCommands ? ['Bash'] : [];
       if (!this.currentTurnHadAgentMessage) {
         this.log(`Codex turn.completed without agent_message (tokens out=${data.usage.outputTokens})`);
-        this.webview.postMessage({
+        this.postToWebview({
           type: 'error',
           message: 'Codex completed the turn but no assistant message was received. Check Codex logs/JSON events.',
         });
@@ -524,15 +542,15 @@ export class CodexMessageHandler {
       };
 
       this.turnRecords.push(turn);
-      this.webview.postMessage({
+      this.postToWebview({
         type: 'costUpdate',
         costUsd: 0,
         totalCostUsd: 0,
         inputTokens: data.usage.inputTokens,
         outputTokens: data.usage.outputTokens,
       });
-      this.webview.postMessage({ type: 'turnComplete', turn });
-      this.webview.postMessage({ type: 'processBusy', busy: false });
+      this.postToWebview({ type: 'turnComplete', turn });
+      this.postToWebview({ type: 'processBusy', busy: false });
       this.currentTurnCommands = [];
       this.currentTurnStartedAt = 0;
       this.currentTurnHadAgentMessage = false;
@@ -540,8 +558,8 @@ export class CodexMessageHandler {
 
     this.demux.on('error', (data: { message: string }) => {
       this.log(`Codex demux error: ${data.message}`);
-      this.webview.postMessage({ type: 'error', message: data.message });
-      this.webview.postMessage({ type: 'processBusy', busy: false });
+      this.postToWebview({ type: 'error', message: data.message });
+      this.postToWebview({ type: 'processBusy', busy: false });
     });
 
     this.demux.on('reasoning', (data: { text: string }) => {

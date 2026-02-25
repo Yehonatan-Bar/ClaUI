@@ -154,7 +154,7 @@
         },
         "claudeMirror.typingTheme": {
           "type": "string",
-          "default": "zen",
+          "default": "neo-zen",
           "enum": [
             "terminal-hacker",
             "retro",
