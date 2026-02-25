@@ -263,14 +263,15 @@ export function registerCommands(
 
       // Filter to sessions from the current workspace, if one is open
       const currentWorkspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const normalizePath = (p: string) => p.replace(/[\\/]+/g, '/').replace(/\/+$/, '').toLowerCase();
       const sessions = currentWorkspace
         ? allSessions.filter(s => {
-            // Include legacy sessions (no workspacePath) alongside current workspace sessions
+            // Exclude sessions without workspacePath — they belong to unknown projects
             if (!s.workspacePath) {
-              return true;
+              return false;
             }
-            // Case-insensitive comparison for Windows paths
-            return s.workspacePath.toLowerCase() === currentWorkspace.toLowerCase();
+            // Normalize separators and case for Windows path comparison
+            return normalizePath(s.workspacePath) === normalizePath(currentWorkspace);
           })
         : allSessions;
 
