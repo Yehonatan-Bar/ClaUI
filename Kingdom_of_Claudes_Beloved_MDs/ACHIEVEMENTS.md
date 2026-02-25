@@ -27,7 +27,7 @@ Extension (Node.js)                    Webview (React)
 | AchievementService   |               +----------------------+
 |   Lifecycle bridge   |               | AchievementToastStack|
 |   Streak tracking    |               |   Rarity-colored     |
-+----------------------+               |   Auto-dismiss 5s    |
++----------------------+               |   Auto-dismiss 10s   |
 | InsightAnalyzer      |               +----------------------+
 |   Sonnet CLI spawn   |               | SessionRecapCard     |
 |   Once per day       |               |   Duration, stats    |

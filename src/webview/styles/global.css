@@ -1914,27 +1914,32 @@ html, body, #root {
   z-index: 30;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  width: 340px;
+  gap: 8px;
+  width: 420px;
 }
 
 .achievement-toast {
   display: grid;
   grid-template-columns: 1fr auto auto;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
-  border-radius: 8px;
-  border: 1px solid var(--vscode-panel-border, #333);
-  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--vscode-panel-border, #333);
+  padding: 14px 16px;
   background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
   animation: summaryFadeIn 0.2s ease-out;
+  font-size: 14px;
 }
 
 .achievement-toast-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
+}
+
+.achievement-toast-main strong {
+  font-size: 15px;
 }
 
 .achievement-toast-main span {
@@ -1943,6 +1948,7 @@ html, body, #root {
 
 .achievement-toast-meta {
   font-weight: 700;
+  font-size: 16px;
 }
 
 .achievement-toast-dismiss {
