@@ -50,7 +50,7 @@ export const AchievementToastStack: React.FC = () => {
           dismissAchievementToast(toast.toastId);
           scheduled.current.delete(toast.toastId);
           sounded.current.delete(toast.toastId);
-        }, 5000);
+        }, 10000);
       }
       if (achievementsSound && !sounded.current.has(toast.toastId)) {
         playToastSound(toast.rarity);
