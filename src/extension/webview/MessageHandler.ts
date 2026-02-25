@@ -608,6 +608,19 @@ export class MessageHandler {
           break;
         }
 
+        case 'uiDebugLog': {
+          let payloadText = '';
+          if (msg.payload) {
+            try {
+              payloadText = ` ${JSON.stringify(msg.payload)}`;
+            } catch {
+              payloadText = ' [payload-unserializable]';
+            }
+          }
+          this.log(`[UiDebug][${msg.source}] ${msg.event}${payloadText}`);
+          break;
+        }
+
         case 'openSettings':
           this.log(`Opening VS Code Settings with query: ${(msg as any).query}`);
           vscode.commands.executeCommand('workbench.action.openSettings', (msg as any).query || 'claudeMirror');

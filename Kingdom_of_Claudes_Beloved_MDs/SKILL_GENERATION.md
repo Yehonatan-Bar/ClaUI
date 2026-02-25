@@ -313,11 +313,11 @@ Logs appear in the VS Code **Output** panel under **ClaUi** channel.
 
 ### Status Bar Indicator
 
-A button in the status bar showing `SkillDocs N/T` where N = pending docs, T = threshold. CSS classes:
+A button in the status bar showing `SkillDocs N/T` where N = pending docs, T = threshold. It is shown in Claude UI mode (hidden in Codex UI mode). CSS classes:
 - `.threshold-reached` - Pulse animation when N >= T
 - `.running` - Visual indicator during pipeline execution
 
-An `!` info button (`.skillgen-info-btn`) appears next to SkillDocs in both expanded and collapsed status bar modes. Clicking it opens the SkillGenPanel with the info section auto-expanded (via `skillGenShowInfo` store flag).
+An `!` info button (`.skillgen-info-btn`) appears next to SkillDocs in both expanded and collapsed status bar modes (Claude UI mode only). Clicking it opens the SkillGenPanel with the info section auto-expanded (via `skillGenShowInfo` store flag).
 
 ### Settings Gear Toggle
 

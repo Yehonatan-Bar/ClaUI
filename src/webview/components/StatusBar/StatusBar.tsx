@@ -408,7 +408,7 @@ export const StatusBar: React.FC<{
         </StatusBarGroupButton>
 
         <StatusBarGroupButton label="Tools" isOpen={toolsOpen} onToggle={handleToolsToggle} alignRight>
-          {skillGenEnabled && (
+          {skillGenEnabled && !isCodexUi && (
             <div className="status-bar-group-dropdown-item-row">
               <button
                 className={`status-bar-group-dropdown-item ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''}`}
@@ -439,16 +439,18 @@ export const StatusBar: React.FC<{
               {tAch(achievementLanguage).trophy} {achievementProfile.totalAchievements}
             </button>
           )}
-          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={usageRef}>
-            <button
-              className={`status-bar-vitals-btn ${usagePopoverOpen ? 'active' : ''}`}
-              onClick={handleUsageClick}
-              data-tooltip="Usage Data"
-            >
-              {maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}
-            </button>
-            {usagePopover}
-          </div>
+          {!isCodexUi && (
+            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={usageRef}>
+              <button
+                className={`status-bar-vitals-btn ${usagePopoverOpen ? 'active' : ''}`}
+                onClick={handleUsageClick}
+                data-tooltip="Usage Data"
+              >
+                {maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}
+              </button>
+              {usagePopover}
+            </div>
+          )}
           <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={vitalsInfoRef}>
             <button
               className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
@@ -549,7 +551,7 @@ export const StatusBar: React.FC<{
       >
         Dashboard
       </button>
-      {skillGenEnabled && (
+      {skillGenEnabled && !isCodexUi && (
         <>
           <button
             className={`status-bar-skillgen-btn ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''} ${skillGenRunStatus !== 'idle' && skillGenRunStatus !== 'succeeded' && skillGenRunStatus !== 'failed' ? 'running' : ''}`}
@@ -576,16 +578,18 @@ export const StatusBar: React.FC<{
           </button>
         </>
       )}
-      <div className="status-bar-usage-wrapper" ref={usageRef}>
-        <button
-          className={`status-bar-vitals-btn ${usagePopoverOpen ? 'active' : ''}`}
-          onClick={handleUsageClick}
-          data-tooltip="Usage Data"
-        >
-          {maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}
-        </button>
-        {usagePopover}
-      </div>
+      {!isCodexUi && (
+        <div className="status-bar-usage-wrapper" ref={usageRef}>
+          <button
+            className={`status-bar-vitals-btn ${usagePopoverOpen ? 'active' : ''}`}
+            onClick={handleUsageClick}
+            data-tooltip="Usage Data"
+          >
+            {maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}
+          </button>
+          {usagePopover}
+        </div>
+      )}
       <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
         <div className="status-bar-vitals-controls">
           <button

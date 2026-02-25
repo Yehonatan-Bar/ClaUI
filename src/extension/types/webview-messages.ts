@@ -4,7 +4,7 @@
 
 import type { ContentBlock } from './stream-json';
 
-export type TypingTheme = 'terminal-hacker' | 'retro' | 'zen';
+export type TypingTheme = 'terminal-hacker' | 'retro' | 'zen' | 'neo-zen';
 export type ProviderId = 'claude' | 'codex';
 export type CodexReasoningEffort = '' | 'low' | 'medium' | 'high' | 'xhigh';
 export interface CodexModelOption {
@@ -227,6 +227,14 @@ export interface AdventureDebugLogMessage {
   ts: number;
 }
 
+export interface UiDebugLogMessage {
+  type: 'uiDebugLog';
+  source: string;
+  event: string;
+  payload?: Record<string, unknown>;
+  ts: number;
+}
+
 export interface GetAchievementsSnapshotRequest {
   type: 'getAchievementsSnapshot';
 }
@@ -432,6 +440,7 @@ export type WebviewToExtensionMessage =
   | SetAdventureWidgetEnabledRequest
   | SetTranslationLanguageRequest
   | AdventureDebugLogMessage
+  | UiDebugLogMessage
   | OpenSettingsRequest
   | OpenTerminalRequest
   | CopyToClipboardRequest

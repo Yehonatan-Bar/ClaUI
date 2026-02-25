@@ -75,6 +75,8 @@ export const InputArea: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoMgr = useMemo(() => new UndoManager(), []);
   const {
+    provider,
+    selectedProvider,
     isBusy,
     isConnected,
     providerCapabilities,
@@ -141,6 +143,17 @@ export const InputArea: React.FC = () => {
 
   // Auto-detect RTL for the input text
   const direction = text ? (detectRtl(text) ? 'rtl' : 'ltr') : 'auto';
+  const effectiveProvider = provider ?? selectedProvider;
+
+  const logUiDebug = useCallback((event: string, payload?: Record<string, unknown>) => {
+    postToExtension({
+      type: 'uiDebugLog',
+      source: 'InputArea',
+      event,
+      payload,
+      ts: Date.now(),
+    });
+  }, []);
 
   /** Start elapsed time counter for enhance progress */
   const startEnhanceTimer = useCallback(() => {
@@ -324,6 +337,21 @@ export const InputArea: React.FC = () => {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      const keyLower = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      if ((e.ctrlKey || e.metaKey) && (keyLower === 'c' || keyLower === 'v' || keyLower === 'x')) {
+        logUiDebug('clipboardShortcutKeydown', {
+          key: e.key,
+          ctrlKey: e.ctrlKey,
+          metaKey: e.metaKey,
+          shiftKey: e.shiftKey,
+          defaultPrevented: e.defaultPrevented,
+          provider: effectiveProvider,
+          supportsImages: providerCapabilities.supportsImages,
+          selectionStart: textareaRef.current?.selectionStart ?? null,
+          selectionEnd: textareaRef.current?.selectionEnd ?? null,
+        });
+      }
+
       // File mention popup intercepts navigation keys when open
       if (fileMention.isOpen) {
         if (e.key === 'ArrowDown') {
@@ -477,7 +505,7 @@ export const InputArea: React.FC = () => {
         }
       }
     },
-    [sendMessage, isBusy, cancelRequest, text, resizeTextarea, undoMgr, fileMention, applyMentionInsert, handleEnhancePrompt, enhanceComparisonData, handleUseOriginal, providerCapabilities.supportsPromptEnhancer]
+    [sendMessage, isBusy, cancelRequest, text, resizeTextarea, undoMgr, fileMention, applyMentionInsert, handleEnhancePrompt, enhanceComparisonData, handleUseOriginal, providerCapabilities.supportsPromptEnhancer, providerCapabilities.supportsImages, logUiDebug, effectiveProvider]
   );
 
   /** Auto-resize textarea to fit content, reset history browsing on manual edits */
@@ -502,8 +530,19 @@ export const InputArea: React.FC = () => {
     e.preventDefault();
     const el = textareaRef.current;
     if (!el) return;
+    logUiDebug('contextMenuPasteAttempt', {
+      provider: effectiveProvider,
+      supportsImages: providerCapabilities.supportsImages,
+      selectionStart: el.selectionStart,
+      selectionEnd: el.selectionEnd,
+    });
 
     navigator.clipboard.readText().then((clipboardText) => {
+      logUiDebug('contextMenuClipboardReadText', {
+        provider: effectiveProvider,
+        textLen: clipboardText?.length ?? 0,
+        hasText: !!clipboardText,
+      });
       if (!clipboardText) return;
       const start = el.selectionStart;
       const end = el.selectionEnd;
@@ -523,49 +562,105 @@ export const InputArea: React.FC = () => {
         resizeTextarea();
       });
     }).catch(() => {
+      logUiDebug('contextMenuClipboardReadTextFailed', { provider: effectiveProvider });
       // Clipboard API not available or permission denied - silently ignore
     });
-  }, [text, resizeTextarea, undoMgr]);
+  }, [text, resizeTextarea, undoMgr, logUiDebug, effectiveProvider, providerCapabilities.supportsImages]);
 
   /** Handle paste events - extract images from clipboard */
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    if (!providerCapabilities.supportsImages) {
+    const items = e.clipboardData?.items;
+    if (!items) {
+      logUiDebug('pasteEventNoClipboardItems', {
+        provider: effectiveProvider,
+        supportsImages: providerCapabilities.supportsImages,
+      });
       return;
     }
-    const items = e.clipboardData?.items;
-    if (!items) return;
 
     const imageItems: DataTransferItem[] = [];
+    const itemSummaries: Array<{ kind: string; type: string }> = [];
     for (let i = 0; i < items.length; i++) {
-      if (items[i].type.startsWith('image/')) {
-        imageItems.push(items[i]);
+      const item = items[i];
+      itemSummaries.push({ kind: item.kind, type: item.type });
+      if (item.type.startsWith('image/')) {
+        imageItems.push(item);
       }
     }
 
+    logUiDebug('pasteEvent', {
+      provider: effectiveProvider,
+      supportsImages: providerCapabilities.supportsImages,
+      itemCount: items.length,
+      imageItemCount: imageItems.length,
+      items: itemSummaries,
+    });
+
     if (imageItems.length === 0) return;
+
+    if (!providerCapabilities.supportsImages) {
+      logUiDebug('pasteImageBlockedUnsupportedProvider', {
+        provider: effectiveProvider,
+        imageItemCount: imageItems.length,
+        items: itemSummaries,
+      });
+      return;
+    }
 
     // Prevent default only when we have images (let text paste through normally)
     e.preventDefault();
+    logUiDebug('pasteImageIntercepted', {
+      provider: effectiveProvider,
+      imageItemCount: imageItems.length,
+    });
 
     for (const item of imageItems) {
       const file = item.getAsFile();
-      if (!file) continue;
+      if (!file) {
+        logUiDebug('pasteImageItemNoFile', { provider: effectiveProvider, mime: item.type });
+        continue;
+      }
+
+      logUiDebug('pasteImageFileReadStart', {
+        provider: effectiveProvider,
+        mime: file.type || item.type,
+        size: file.size,
+      });
 
       const reader = new FileReader();
       reader.onload = () => {
         const dataUrl = reader.result as string;
         // dataUrl format: "data:image/png;base64,iVBOR..."
         const match = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
-        if (!match) return;
+        if (!match) {
+          logUiDebug('pasteImageDataUrlParseFailed', {
+            provider: effectiveProvider,
+            resultType: typeof reader.result,
+            preview: typeof dataUrl === 'string' ? dataUrl.slice(0, 40) : '',
+          });
+          return;
+        }
 
         const mediaType = match[1] as WebviewImageData['mediaType'];
         const base64 = match[2];
 
+        logUiDebug('pasteImageQueued', {
+          provider: effectiveProvider,
+          mediaType,
+          base64Len: base64.length,
+        });
         setPendingImages((prev) => [...prev, { base64, mediaType }]);
+      };
+      reader.onerror = () => {
+        logUiDebug('pasteImageFileReadError', {
+          provider: effectiveProvider,
+          mime: file.type || item.type,
+          size: file.size,
+        });
       };
       reader.readAsDataURL(file);
     }
-  }, [providerCapabilities.supportsImages]);
+  }, [providerCapabilities.supportsImages, logUiDebug, effectiveProvider]);
 
   /** Remove a pending image by index */
   const removePendingImage = useCallback((index: number) => {

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import type { CodexExecDemux } from '../process/CodexExecDemux';
 import type { PromptHistoryStore } from '../session/PromptHistoryStore';
 import type { ProjectAnalyticsStore } from '../session/ProjectAnalyticsStore';
@@ -26,6 +26,7 @@ export interface CodexSessionController {
   stopSession(): void;
   clearSession(options?: { cwd?: string }): Promise<void>;
   sendText(text: string): Promise<void>;
+  sendWithImages(text: string, images: Array<{ base64: string; mediaType: string }>): Promise<void>;
   cancelRequest(): void;
   openCodexLoginTerminal(): void;
   isSessionActive(): boolean;
@@ -66,8 +67,8 @@ const CODEX_PROVIDER_CAPABILITIES: ProviderCapabilities = {
   supportsPlanApproval: false,
   supportsCompact: false,
   supportsFork: false,
-  supportsImages: false,
-  supportsGitPush: false,
+  supportsImages: true,
+  supportsGitPush: true,
   supportsTranslation: false,
   supportsPromptEnhancer: false,
   supportsCodexConsult: false,
@@ -205,6 +206,36 @@ export class CodexMessageHandler {
           });
           break;
 
+        case 'sendMessageWithImages': {
+          this.log(`Codex sendMessageWithImages requested: images=${msg.images.length} textLen=${msg.text.length}`);
+          if (msg.text.trim()) {
+            this.achievementService.onUserPrompt(this.tabId, msg.text);
+            void this.promptHistoryStore.addPrompt(msg.text);
+          }
+          const content: ContentBlock[] = [];
+          if (msg.text) {
+            content.push({ type: 'text', text: msg.text });
+          }
+          for (const img of msg.images) {
+            content.push({
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: img.mediaType,
+                data: img.base64,
+              },
+            });
+          }
+          this.webview.postMessage({ type: 'userMessage', content });
+          this.webview.postMessage({ type: 'processBusy', busy: true });
+          void this.session.sendWithImages(msg.text, msg.images).catch((err) => {
+            this.log(`Codex sendWithImages failed: ${this.errMsg(err)}`);
+            this.webview.postMessage({ type: 'processBusy', busy: false });
+            this.webview.postMessage({ type: 'error', message: `Failed to send Codex message with images: ${this.errMsg(err)}` });
+          });
+          break;
+        }
+
         case 'cancelRequest':
           this.achievementService.onCancel(this.tabId);
           this.webview.postMessage({ type: 'processBusy', busy: false });
@@ -262,6 +293,19 @@ export class CodexMessageHandler {
           void vscode.workspace.getConfiguration('claudeMirror').update('typingTheme', msg.theme, true);
           break;
 
+        case 'uiDebugLog': {
+          let payloadText = '';
+          if (msg.payload) {
+            try {
+              payloadText = ` ${JSON.stringify(msg.payload)}`;
+            } catch {
+              payloadText = ' [payload-unserializable]';
+            }
+          }
+          this.log(`[UiDebug][${msg.source}] ${msg.event}${payloadText}`);
+          break;
+        }
+
         case 'setPermissionMode':
           void vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', msg.mode, true)
             .then(() => {
@@ -317,15 +361,46 @@ export class CodexMessageHandler {
           this.handleGetProjectAnalytics();
           break;
 
+        case 'getPromptHistory':
+          this.log(`Fetching prompt history (Codex): scope=${msg.scope}`);
+          {
+            const prompts = msg.scope === 'project'
+              ? this.promptHistoryStore.getProjectHistory()
+              : this.promptHistoryStore.getGlobalHistory();
+            this.webview.postMessage({
+              type: 'promptHistoryResponse',
+              scope: msg.scope,
+              prompts,
+            });
+          }
+          break;
+
+        case 'gitPush':
+          this.handleGitPush();
+          break;
+
+        case 'gitPushConfig':
+          this.log(`Git push config request (Codex): "${msg.instruction.slice(0, 80)}..."`);
+          {
+            const configPrompt = `Please help me configure git push for this VS Code extension project. The settings are VS Code settings under "claudeMirror.gitPush.*": enabled (boolean), scriptPath (string, relative to workspace), commitMessageTemplate (string, supports {sessionName} placeholder). ${msg.instruction}`;
+            this.webview.postMessage({ type: 'processBusy', busy: true });
+            void this.session.sendText(configPrompt).catch((err) => {
+              this.webview.postMessage({ type: 'processBusy', busy: false });
+              this.webview.postMessage({ type: 'error', message: `Failed to send Codex message: ${this.errMsg(err)}` });
+            });
+          }
+          break;
+
+        case 'getGitPushSettings':
+          this.sendGitPushSettings();
+          break;
+
         case 'compact':
         case 'forkSession':
         case 'forkFromMessage':
         case 'planApprovalResponse':
-        case 'sendMessageWithImages':
         case 'translateMessage':
         case 'enhancePrompt':
-        case 'gitPush':
-        case 'gitPushConfig':
           this.webview.postMessage({
             type: 'error',
             message: `${msg.type} is not supported in Codex MVP yet.`,
@@ -333,6 +408,9 @@ export class CodexMessageHandler {
           break;
 
         case 'editAndResend':
+          if (msg.text.trim()) {
+            void this.promptHistoryStore.addPrompt(msg.text);
+          }
           void this.session
             .clearSession()
             .then(() => this.session.sendText(msg.text))
@@ -492,6 +570,9 @@ export class CodexMessageHandler {
       if (e.affectsConfiguration('claudeMirror.permissionMode')) {
         this.sendPermissionModeSetting();
       }
+      if (e.affectsConfiguration('claudeMirror.gitPush')) {
+        this.sendGitPushSettings();
+      }
       if (e.affectsConfiguration('claudeMirror.codex.model')) {
         this.sendCodexModelSetting();
       }
@@ -507,6 +588,7 @@ export class CodexMessageHandler {
     this.sendProviderSetting();
     this.sendProviderCapabilities();
     this.sendPermissionModeSetting();
+    this.sendGitPushSettings();
     this.sendCodexModelSetting();
     this.sendCodexModelOptions();
     this.sendCodexReasoningEffortSetting();
@@ -553,6 +635,16 @@ export class CodexMessageHandler {
     this.webview.postMessage({
       type: 'permissionModeSetting',
       mode,
+    });
+  }
+
+  private sendGitPushSettings(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    this.webview.postMessage({
+      type: 'gitPushSettings',
+      enabled: config.get<boolean>('gitPush.enabled', true),
+      scriptPath: config.get<string>('gitPush.scriptPath', 'scripts/git-push.ps1'),
+      commitMessageTemplate: config.get<string>('gitPush.commitMessageTemplate', '{sessionName}'),
     });
   }
 
@@ -1085,6 +1177,60 @@ export class CodexMessageHandler {
 
     const existing = candidates.find((dir) => !!dir && fs.existsSync(dir));
     return existing ? vscode.Uri.file(existing) : undefined;
+  }
+
+  private handleGitPush(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const enabled = config.get<boolean>('gitPush.enabled', true);
+
+    if (!enabled) {
+      this.webview.postMessage({
+        type: 'gitPushResult',
+        success: false,
+        output: 'Git push is not configured. Please set it up first.',
+      });
+      return;
+    }
+
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceRoot) {
+      this.webview.postMessage({
+        type: 'gitPushResult',
+        success: false,
+        output: 'No workspace folder open.',
+      });
+      return;
+    }
+
+    const scriptPath = config.get<string>('gitPush.scriptPath', 'scripts/git-push.ps1');
+    const template = config.get<string>('gitPush.commitMessageTemplate', '{sessionName}');
+    const commitMessage = template.replace('{sessionName}', 'Codex session');
+    const fullScriptPath = path.resolve(workspaceRoot, scriptPath);
+
+    this.log(`Git push (Codex): running "${fullScriptPath}" with message "${commitMessage}"`);
+    execFile(
+      'powershell',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', fullScriptPath, '-Message', commitMessage],
+      { cwd: workspaceRoot, timeout: 30000 },
+      (error, stdout, stderr) => {
+        if (error) {
+          this.log(`Git push failed (Codex): ${error.message}`);
+          this.webview.postMessage({
+            type: 'gitPushResult',
+            success: false,
+            output: stderr || error.message,
+          });
+          return;
+        }
+
+        this.log('Git push succeeded (Codex)');
+        this.webview.postMessage({
+          type: 'gitPushResult',
+          success: true,
+          output: stdout,
+        });
+      }
+    );
   }
 
   private nextMessageId(): string {
