@@ -15,6 +15,7 @@ import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import { getStoredApiKey, setStoredApiKey, maskApiKey } from '../process/envUtils';
 import type { TokenUsageRatioTracker } from '../session/TokenUsageRatioTracker';
+import { AuthManager } from '../auth/AuthManager';
 import type {
   AdventureBeatMessage,
   ExtensionToWebviewMessage,
@@ -191,6 +192,7 @@ export class MessageHandler {
   /** Project analytics store (injected, may be null if not wired) */
   private projectAnalyticsStore: ProjectAnalyticsStore | null = null;
   private secrets: vscode.SecretStorage | null = null;
+  private authManager: AuthManager | null = null;
 
   constructor(
     private readonly tabId: string,
@@ -284,6 +286,11 @@ export class MessageHandler {
     this.secrets = secrets;
   }
 
+  /** Provide Claude auth manager for login/logout/status actions */
+  setAuthManager(manager: AuthManager): void {
+    this.authManager = manager;
+  }
+
   /** Read the API key from SecretStorage (returns undefined if no key set) */
   private async getApiKey(): Promise<string | undefined> {
     if (!this.secrets) return undefined;
@@ -302,6 +309,34 @@ export class MessageHandler {
       hasKey: !!key,
       maskedKey: maskApiKey(key ?? undefined),
     });
+  }
+
+  private getClaudeCliPath(): string {
+    const configured = vscode.workspace.getConfiguration('claudeMirror').get<string>('cliPath', 'claude');
+    return (configured || 'claude').trim() || 'claude';
+  }
+
+  private quoteTerminalArg(value: string): string {
+    if (!value || !/[\s"]/u.test(value)) {
+      return value;
+    }
+    return `"${value.replace(/"/g, '\\"')}"`;
+  }
+
+  private async sendClaudeAuthStatus(): Promise<void> {
+    const fallback = { loggedIn: false, email: '', subscriptionType: '' };
+    if (!this.authManager) {
+      this.webview.postMessage({ type: 'claudeAuthStatus', ...fallback });
+      return;
+    }
+
+    try {
+      const status = await this.authManager.getAuthStatus(this.getClaudeCliPath());
+      this.webview.postMessage({ type: 'claudeAuthStatus', ...status });
+    } catch (err) {
+      this.log(`Failed to get Claude auth status: ${err}`);
+      this.webview.postMessage({ type: 'claudeAuthStatus', ...fallback });
+    }
   }
 
   /** Update API key for all scheduler-based spawners (TurnAnalyzer, ActivitySummarizer) */
@@ -860,6 +895,36 @@ export class MessageHandler {
           }
           break;
 
+        case 'claudeAuthLogin': {
+          const cliPath = this.getClaudeCliPath();
+          this.log(`Opening Claude login terminal (cliPath="${cliPath}")`);
+          const terminal = vscode.window.createTerminal({ name: 'Claude Login' });
+          terminal.show();
+          terminal.sendText(`${this.quoteTerminalArg(cliPath)} auth login`, true);
+          break;
+        }
+
+        case 'claudeAuthLogout': {
+          const cliPath = this.getClaudeCliPath();
+          this.log(`Running Claude logout (cliPath="${cliPath}")`);
+          void (async () => {
+            const ok = this.authManager ? await this.authManager.logout(cliPath) : false;
+            if (!ok) {
+              this.webview.postMessage({
+                type: 'error',
+                message: 'Claude logout failed. Check that the Claude CLI is installed and the path is correct.',
+              });
+            }
+            await this.sendClaudeAuthStatus();
+          })();
+          break;
+        }
+
+        case 'claudeAuthStatus':
+          this.log('Refreshing Claude auth status');
+          void this.sendClaudeAuthStatus();
+          break;
+
         case 'copyToClipboard':
           this.log(`Copying to clipboard: "${(msg.text || '').slice(0, 50)}"`);
           vscode.env.clipboard.writeText(msg.text || '').then(
@@ -1195,6 +1260,8 @@ export class MessageHandler {
           this.webview.postMessage(this.achievementService.buildSnapshotMessage(this.tabId));
           // Send API key status
           void this.sendApiKeySetting();
+          // Send Claude auth status
+          void this.sendClaudeAuthStatus();
           // Refresh API key for scheduler-based spawners
           void this.refreshSchedulerApiKeys();
           // Send GitHub sync status

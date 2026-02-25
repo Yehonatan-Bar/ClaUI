@@ -38,10 +38,12 @@ A "Git" button in the InputArea executes `scripts/git-push.ps1` which:
 - When configured (`enabled=true`): clicking executes the push script
 - When not configured: clicking opens the config panel
 - Shows "..." while the push is running
+- In provider modes that do not support Git Push yet (e.g. Codex MVP), the Git button stays visible but is disabled with a tooltip explanation
 
 ### Gear Toggle
 - Small `*` button joined to the right of the Git button in the status bar
 - Always available - opens/closes the config panel regardless of config state
+- In provider modes that do not support Git Push yet (e.g. Codex MVP), the gear toggle stays visible but is disabled
 
 ### Config Panel
 - Shows above the input area when open

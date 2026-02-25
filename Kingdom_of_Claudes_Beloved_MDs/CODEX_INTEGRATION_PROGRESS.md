@@ -148,6 +148,16 @@ Important implementation notes for the next developer (Stage 4: Capabilities + U
 - `CodexConversationReader` is intentionally best-effort (local format may change). If Stage 4 touches replay-related UX, do not assume strict Codex JSONL schema stability.
 - Keep Claude path unchanged where possible; Stage 4 should mainly add capability plumbing (`providerCapabilities`) and conditional rendering/gating in webview.
 
+## 2026-02-25 - Codex auto session naming parity
+
+- Added `src/extension/session/CodexSessionNamer.ts` to mirror Claude's first-message auto naming behavior for Codex tabs.
+- `CodexSessionTab.sendText()` now triggers a one-shot naming request on the first user prompt (honors `claudeMirror.autoNameSessions`).
+- Naming runs through `codex exec --json` with read-only sandbox and `model_reasoning_effort=medium`, then updates:
+  - tab title
+  - persisted session metadata (when `threadId` exists / later on thread start via `baseTitle`)
+  - per-tab file log name (`FileLogger.updateSessionName`)
+- Failures/timeouts are non-fatal and only logged, matching Claude-style best-effort behavior.
+
 Verification note:
 
 - `npm run build` passed after Stage 3 changes (extension + webview). The same local shell/profile CLI noise may appear after build output in this environment, but webpack compilation succeeded.

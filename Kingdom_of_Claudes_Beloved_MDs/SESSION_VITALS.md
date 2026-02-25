@@ -68,7 +68,11 @@ Dropdown panel opened by clicking the "Vitals" button in the StatusBar. Shows ex
 
 - **File**: `src/webview/components/Vitals/VitalsInfoPanel.tsx`
 - **Content**: Explains weather icon, cost heat bar, timeline, intensity borders, and adventure widget
-- **Toggles**: Adventure Widget (separate toggle) and Show Vitals (master toggle)
+- **Utilities**:
+  - **Claude Account row**: Login (opens VS Code terminal and runs `claude auth login`), Logout (background `claude auth logout`), Refresh (manual status poll after browser/terminal auth flow), status text (email + subscription type when available)
+  - **API Key row**: Set/Clear explicit Anthropic API key (separate from Claude subscription login)
+- **State**: Claude auth status is mirrored into Zustand (`claudeAuthLoggedIn`, `claudeAuthEmail`, `claudeAuthSubscriptionType`) via `claudeAuthStatus` postMessage
+- **Extension flow**: `MessageHandler` sends auth status on webview `ready` and on explicit refresh/logout
 - **Closes on**: clicking the close button or clicking outside the panel
 
 ### Adventure Widget
@@ -150,6 +154,7 @@ export interface TurnRecord {
 | `src/webview/components/Vitals/CostHeatBar.tsx` | Cost gradient bar |
 | `src/webview/components/Vitals/VitalsContainer.tsx` | Conditional wrapper |
 | `src/webview/components/Vitals/VitalsInfoPanel.tsx` | Info panel with explanations + toggle |
+| `src/extension/auth/AuthManager.ts` | Claude auth status/logout helpers (`auth status --json`, `auth logout`) |
 | `src/webview/components/ChatView/MessageBubble.tsx` | Turn intensity borders |
 | `src/webview/components/ChatView/MessageList.tsx` | Scroll fraction tracking |
 | `src/webview/styles/global.css` | All vitals CSS |

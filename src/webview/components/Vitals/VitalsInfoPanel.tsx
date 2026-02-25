@@ -33,6 +33,9 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
   const setUsageWidgetEnabled = useAppStore((s) => s.setUsageWidgetEnabled);
   const hasApiKey = useAppStore((s) => s.hasApiKey);
   const maskedApiKey = useAppStore((s) => s.maskedApiKey);
+  const claudeAuthLoggedIn = useAppStore((s) => s.claudeAuthLoggedIn);
+  const claudeAuthEmail = useAppStore((s) => s.claudeAuthEmail);
+  const claudeAuthSubscriptionType = useAppStore((s) => s.claudeAuthSubscriptionType);
 
   const [showApiKeyInput, setShowApiKeyInput] = React.useState(false);
   const [apiKeyDraft, setApiKeyDraft] = React.useState('');
@@ -90,6 +93,18 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
     postToExtension({ type: 'setApiKey', apiKey: '' });
   };
 
+  const handleClaudeAuthRefresh = () => {
+    postToExtension({ type: 'claudeAuthStatus' });
+  };
+
+  const handleClaudeAuthLogin = () => {
+    postToExtension({ type: 'claudeAuthLogin' });
+  };
+
+  const handleClaudeAuthLogout = () => {
+    postToExtension({ type: 'claudeAuthLogout' });
+  };
+
   return (
     <div className="vitals-info-panel">
       <div className="vitals-info-header">
@@ -142,6 +157,67 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
             <span>Pixel-art dungeon crawler. Each turn = a room: scrolls (read), anvils (edit), traps (errors), dragons (3+ errors), treasure (recovery).</span>
           </div>
         </div>
+      </div>
+
+      <div className="vitals-info-toggle-row" style={{ marginBottom: 6, flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Claude Account</span>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button
+              className="vitals-info-close"
+              onClick={handleClaudeAuthRefresh}
+              style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}
+              data-tooltip="Refresh Claude CLI login status after completing auth"
+            >
+              {'\u21BB'}
+            </button>
+            {claudeAuthLoggedIn ? (
+              <button
+                className="vitals-info-close"
+                onClick={handleClaudeAuthLogout}
+                style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}
+                data-tooltip="Run 'claude auth logout'"
+              >
+                Logout
+              </button>
+            ) : (
+              <button
+                className="vitals-info-close"
+                onClick={handleClaudeAuthLogin}
+                style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}
+                data-tooltip="Open a terminal and run 'claude auth login'"
+              >
+                Login
+              </button>
+            )}
+          </div>
+        </div>
+        {claudeAuthLoggedIn ? (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ opacity: 0.75, fontSize: 11 }}>Signed in</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 0 }}>
+              <span
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  opacity: 0.85,
+                  maxWidth: 220,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+                title={claudeAuthEmail}
+              >
+                {claudeAuthEmail || 'Unknown account'}
+              </span>
+              {!!claudeAuthSubscriptionType && (
+                <span style={{ fontSize: 10, opacity: 0.6 }}>{claudeAuthSubscriptionType}</span>
+              )}
+            </div>
+          </div>
+        ) : (
+          <span style={{ opacity: 0.75, fontSize: 11 }}>Not logged in</span>
+        )}
       </div>
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6, flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>

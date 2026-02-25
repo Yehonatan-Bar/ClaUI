@@ -245,7 +245,8 @@ export const StatusBar: React.FC<{
   const permissionSelectorElement = providerCapabilities.supportsPermissionModeSelector
     ? <PermissionModeSelector />
     : null;
-  const showGitPush = providerCapabilities.supportsGitPush;
+  const gitPushSupported = providerCapabilities.supportsGitPush;
+  const showGitPush = true;
   const showCodexConsult = providerCapabilities.supportsCodexConsult;
 
   // --- Shared elements ---
@@ -264,15 +265,22 @@ export const StatusBar: React.FC<{
       <button
         className={`status-bar-git-btn ${gitPushSettings?.enabled ? '' : 'not-configured'}`}
         onClick={handleGitPush}
-        disabled={gitPushRunning}
-        data-tooltip={gitPushSettings?.enabled ? 'Git: add, commit & push' : 'Git push (setup needed)'}
+        disabled={gitPushRunning || !gitPushSupported}
+        data-tooltip={
+          !gitPushSupported
+            ? 'Git push is not available in this mode yet'
+            : gitPushSettings?.enabled
+              ? 'Git: add, commit & push'
+              : 'Git push (setup needed)'
+        }
       >
         {gitPushRunning ? '...' : 'Git'}
       </button>
       <button
         className="status-bar-git-config-btn"
         onClick={handleToggleGitConfig}
-        data-tooltip="Git push settings"
+        disabled={!gitPushSupported}
+        data-tooltip={gitPushSupported ? 'Git push settings' : 'Git push settings are not available in this mode yet'}
       >
         *
       </button>

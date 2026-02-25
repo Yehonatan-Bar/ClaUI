@@ -20,6 +20,7 @@ import { MessageHandler, type WebviewBridge } from '../webview/MessageHandler';
 import { buildWebviewHtml } from '../webview/WebviewProvider';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import type { TokenUsageRatioTracker } from './TokenUsageRatioTracker';
+import { AuthManager } from '../auth/AuthManager';
 import type { CliOutputEvent, AssistantMessage } from '../types/stream-json';
 import type {
   ExtensionToWebviewMessage,
@@ -114,6 +115,7 @@ export class SessionTab implements WebviewBridge {
     this.messageHandler.setSessionNameGetter(() => this.baseTitle);
     this.messageHandler.setProjectAnalyticsStore(this.projectAnalyticsStore);
     this.messageHandler.setSecrets(context.secrets);
+    this.messageHandler.setAuthManager(new AuthManager());
     if (this.tokenRatioTracker) {
       this.messageHandler.setTokenRatioTracker(this.tokenRatioTracker);
     }

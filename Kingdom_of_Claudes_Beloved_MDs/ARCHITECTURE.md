@@ -464,7 +464,7 @@ Users can edit a previously sent message and resend it, discarding everything af
 5. `addUserMessage(newText)` adds the edited message immediately so it's visible in the UI
 6. Webview sends `editAndResend` message to extension
 7. MessageHandler immediately sets `processBusy: true` to block user input
-8. MessageHandler stops the current CLI process (with `setSuppressNextExit` to avoid showing "session ended")
+8. MessageHandler stops the current CLI process (with `setSuppressNextExit` to avoid showing "session ended") and silently abandons the current achievement session state (no session recap is emitted for edit-and-resend)
 9. A fresh CLI process is spawned via `processManager.start()`
 10. Once the process starts, the edited text is sent immediately as the first stdin message
 11. The CLI emits `system/init` (which updates session metadata), then responds normally
@@ -478,7 +478,7 @@ The edited message is added to the store locally (step 5) rather than waiting fo
 - `store.ts` - `truncateFromMessage` action, `addUserMessage` with deduplication
 - `MessageBubble.tsx` - Edit button, inline textarea, send/cancel
 - `MessageList.tsx` - `handleEditAndResend` callback wiring
-- `MessageHandler.ts` - `editAndResend` case: stop process, restart, send edited text immediately
+- `MessageHandler.ts` - `editAndResend` case: stop process, silent achievement-session abandon, restart, send edited text immediately
 - `global.css` - `.edit-message-*` styles (button fades in on hover)
 
 **Edge cases:**

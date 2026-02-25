@@ -59,6 +59,7 @@ claude-code-mirror/
 |   |   |   +-- SessionTab.ts             #   Per-tab bundle (process+demux+panel+handler)
 |   |   |   +-- TabManager.ts             #   Manages all tabs, tracks active tab
 |   |   |   +-- SessionNamer.ts           #   Auto-generates tab names via Haiku
+|   |   |   +-- CodexSessionNamer.ts      #   Auto-generates Codex tab names via one-shot codex exec
 |   |   |   +-- ActivitySummarizer.ts     #   Periodic tool activity summary via Haiku
 |   |   |   +-- AdventureInterpreter.ts  #   Converts TurnRecords to AdventureBeats (dungeon crawler)
 |   |   |   +-- MessageTranslator.ts      #   Translates assistant messages to Hebrew via Sonnet CLI call
@@ -72,7 +73,8 @@ claude-code-mirror/
 |   |   |   +-- TokenUsageRatioTracker.ts #   Correlates token consumption with usage % (global, persisted)
 |   |   |   +-- SessionFork.ts            #   Phase 3 stub (rewind)
 |   |   +-- terminal/                     #   Phase 2 stubs
-|   |   +-- auth/                         #   Phase 5 stub
+|   |   +-- auth/
+|   |   |   +-- AuthManager.ts           #   Claude CLI auth status/login/logout helpers
 |   |   +-- skillgen/
 |   |   |   +-- SkillGenStore.ts          #   Document ledger persistence (globalState)
 |   |   |   +-- SkillGenService.ts        #   Main orchestrator (scan, preflight, lock, pipeline, dedup, install)
@@ -194,6 +196,7 @@ claude-code-mirror/
     +-- ARCHITECTURE.md                   #   Data flow and component interaction
     +-- ACTIVITY_SUMMARIZER.md            #   Periodic activity summary via Haiku
     +-- ADVENTURE_WIDGET.md              #   Pixel-art dungeon crawler session visualizer
+    +-- CLAUDE_AUTH_LOGIN_LOGOUT.md      #   Claude CLI account login/logout/status integration
     +-- DRAG_AND_DROP_CHALLENGE.md        #   Why drag-and-drop is blocked, workarounds
     +-- FILE_LOGGER.md                    #   File-based logging with rotation and rename
     +-- FILE_MENTION.md                   #   @ file mention autocomplete feature
@@ -217,6 +220,9 @@ claude-code-mirror/
 **TabManager** - Manages all SessionTab instances. Tracks the active (focused) tab, provides create/close/closeAll methods, shares a single status bar item, assigns distinct colors from an 8-color palette, and groups tabs in the same editor column.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
+**AuthManager** - Claude account auth helper for the extension host. Reads `.claude/.credentials.json` presence (legacy stub behavior) and now runs `claude auth status --json` / `claude auth logout` via `execFile` with a 10s timeout. Returns normalized `{ loggedIn, email, subscriptionType }` to `MessageHandler`, which forwards status to the webview and triggers logout refresh.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/CLAUDE_AUTH_LOGIN_LOGOUT.md`
+
 **ClaudeProcessManager** - Spawns the Claude CLI child process with stream-json flags, handles stdin/stdout piping, process lifecycle, and crash detection. Uses `taskkill /F /T` on Windows to kill the entire process tree (required because `shell: true` creates a cmd.exe wrapper that SIGTERM alone cannot penetrate). Reads the user's API key from SecretStorage before each spawn and passes it via `buildClaudeCliEnv()`. Instantiated per-tab by SessionTab.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
@@ -234,6 +240,9 @@ claude-code-mirror/
 
 **SessionNamer** - Spawns a one-shot `claude -p` process using Haiku to generate a 1-3 word tab name from the user's first message. Matches the language of the message (Hebrew/English). 10-second timeout, sanitized output, all errors silently logged.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_NAMER.md`
+
+**CodexSessionNamer** - Spawns a one-shot `codex exec --json` process (read-only sandbox) to generate a 1-3 word tab name from the first user message in Codex tabs. Uses `model_reasoning_effort=medium`, parses `agent_message` JSON events, sanitizes output, and silently falls back if the CLI call fails.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_INTEGRATION_PROGRESS.md`
 
 **ActivitySummarizer** - Periodically summarizes Claude's tool activity via Haiku. After every N tool uses (configurable, default 3), sends enriched tool names to Haiku for a short label + full summary. Displays a detailed summary panel in the busy indicator (short label + full sentence). Updates status bar tooltip. Does NOT overwrite tab title (session name stays fixed). Debounces rapid tool uses, prevents concurrent calls.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ACTIVITY_SUMMARIZER.md`
@@ -253,7 +262,7 @@ claude-code-mirror/
 **React Chat UI** - React 18 components for message display, streaming text, tool use blocks, code blocks, image display, and RTL-aware input. The input area supports sending prompts while Claude is busy (interrupt), matching Claude Code CLI behavior. Ctrl+V pastes images from clipboard as base64 attachments (shown as thumbnails above the input, removable before sending). Both Send and Cancel buttons are visible during processing; Escape cancels the current response.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**StatusBar (Responsive)** - Bottom status bar extracted into its own component (`StatusBar/StatusBar.tsx`). Uses a `ResizeObserver` hook (`useStatusBarCollapse`) to detect panel width. At full width, all 15 items display inline. Below ~620px, items collapse into two dropdown groups: **"More"** (Feedback, Plans, History, Prompts, Model, Permissions, Costs, Dashboard) and **"Tools"** (Skills, Trophy, Vitals). Always-visible items: Active Clock, Git, Aa (TextSettings), Tokens. Dropdowns open upward with click-outside dismiss, mutual exclusivity, and Escape key support.
+**StatusBar (Responsive)** - Bottom status bar extracted into its own component (`StatusBar/StatusBar.tsx`). Uses a `ResizeObserver` hook (`useStatusBarCollapse`) to detect panel width. At full width, all 15 items display inline. Below ~620px, items collapse into two dropdown groups: **"More"** (Feedback, Plans, History, Prompts, Model, Permissions, Costs, Dashboard) and **"Tools"** (Skills, Trophy, Vitals). Always-visible items: Active Clock, Git, Aa (TextSettings), Tokens. In provider modes that do not support Git Push yet (currently Codex MVP), the Git controls remain visible but are disabled with tooltips. Dropdowns open upward with click-outside dismiss, mutual exclusivity, and Escape key support.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Global Tooltip System** - Unified, VS Code-themed tooltip rendered via a single `GlobalTooltip` React component mounted at the App root. Uses document-level event delegation to detect `mouseover` on any element with a `data-tooltip` attribute, then renders a positioned tooltip via `createPortal`. 400ms hover delay, auto-flips above/below trigger, shifts horizontally to stay within viewport, hides on scroll. Accessible (`role="tooltip"`, dynamic `aria-describedby`). Touch-device guard. All ~25 component files use `data-tooltip="..."` instead of native `title` attributes.
@@ -302,13 +311,13 @@ claude-code-mirror/
 **Fork Conversation** - Users can fork the conversation from any user message by hovering and clicking "Fork". This opens a new tab that uses `--resume <sessionId> --fork-session` to create a branched CLI session with full conversation context. After the CLI replays all messages, the webview truncates messages at the fork point (keeping only history before the forked message) and places the forked message's text into the input area. The user can then edit and re-send, getting a different response branch. Uses a 500ms debounced timer to detect replay completion. Key files: `MessageBubble.tsx` (Fork button), `MessageList.tsx` (handler), `MessageHandler.ts` (`forkFromMessage`), `commands.ts` (`claudeMirror.forkFromMessage`), `SessionTab.ts` (`setForkInit`), `App.tsx` (fork completion logic), `InputArea.tsx` (`fork-set-input` listener).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**Session Vitals** - Visual session health dashboard with 5 components: Session Timeline (vertical color-coded minimap alongside messages, click-to-jump), Weather Widget (animated mood icon reflecting error/success patterns), Cost Heat Bar (gradient strip showing cost accumulation), Turn Intensity Borders (colored left border on assistant messages based on tool activity), and a Vitals toggle button in the StatusBar. Data pipeline: `MessageHandler` builds `TurnRecord` on each CLI result event, sends to webview via `turnComplete` postMessage, stored in Zustand (`turnHistory[]`, `turnByMessageId{}`). Weather mood recalculated on each turn via sliding window algorithm. All components hidden when vitals disabled.
+**Session Vitals** - Visual session health dashboard with 5 components: Session Timeline (vertical color-coded minimap alongside messages, click-to-jump), Weather Widget (animated mood icon reflecting error/success patterns), Cost Heat Bar (gradient strip showing cost accumulation), Turn Intensity Borders (colored left border on assistant messages based on tool activity), and a Vitals toggle button in the StatusBar. The Vitals gear dropdown (`VitalsInfoPanel`) also hosts quick settings utilities including API key management and Claude CLI account Login/Logout/Refresh controls (status shown as email + subscription type when available). Data pipeline: `MessageHandler` builds `TurnRecord` on each CLI result event, sends to webview via `turnComplete` postMessage, stored in Zustand (`turnHistory[]`, `turnByMessageId{}`). Weather mood recalculated on each turn via sliding window algorithm. All components hidden when vitals disabled.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_VITALS.md`
 
 **Adventure Widget** - Pixel-art dungeon crawler that visualizes session activity as a thin-wall maze grid. Each CLI turn extends the maze and maps to an encounter: scrolls (Read), anvils (Edit), traps (errors), dragons (3+ errors), treasure (recovery). Canvas 2D engine with 4x4 mini sprites on a 40x40 cell maze, PICO-8 palette, BFS pathfinding, state machine (IDLE/WALKING/ENCOUNTER/RESOLUTION). Extension-side `AdventureInterpreter` converts `TurnRecord` to `AdventureBeat` via deterministic rules. Toggleable separately from main vitals.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ADVENTURE_WIDGET.md`
 
-**Achievements / Trophy** - Gamification system that awards badges for coding milestones. Features: 30 achievements across 7 categories (debugging, testing, refactor, collaboration, session, architecture, productivity), 4 rarities, XP-based leveling (15 tiers), per-session goals (7 templates), daily streaks, file/language tracking, frontend/backend classification, error cycle detection, toast notifications with optional sound, session recap card with AI insights, and full i18n (EN+HE). AI Session Insight: spawns Sonnet CLI once per day at session end for deeper analysis (quality, pattern, XP bonus). **Community / GitHub Sync**: Publish achievements to a public GitHub Gist, discover and compare with other developers via friend lookup, generate shields.io dynamic badges and markdown profile cards for GitHub README. Backend: `AchievementEngine`, `AchievementCatalog`, `AchievementStore`, `AchievementService`, `AchievementInsightAnalyzer`, `GitHubSyncService`. Frontend: `AchievementPanel`, `CommunityPanel`, `ShareCard`, `AchievementToastStack`, `SessionRecapCard`, `achievementI18n.ts`.
+**Achievements / Trophy** - Gamification system that awards badges for coding milestones. Features: 30 achievements across 7 categories (debugging, testing, refactor, collaboration, session, architecture, productivity), 4 rarities, XP-based leveling (15 tiers), per-session goals (7 templates), daily streaks, file/language tracking, frontend/backend classification, error cycle detection, toast notifications with optional sound, session recap card with AI insights, and full i18n (EN+HE). AI Session Insight: spawns Sonnet CLI once per day at session end for deeper analysis (quality, pattern, XP bonus). Includes a live recap snapshot request (`requestSessionRecapSnapshot`) used by an idle reminder nudge (1 hour idle, with Later=3h deferral / Dismiss) without ending the session. Edit-and-resend now abandons the current achievement session state and restarts cleanly without emitting a false session recap. **Community / GitHub Sync**: Publish achievements to a public GitHub Gist, discover and compare with other developers via friend lookup, generate shields.io dynamic badges and markdown profile cards for GitHub README. Backend: `AchievementEngine`, `AchievementCatalog`, `AchievementStore`, `AchievementService`, `AchievementInsightAnalyzer`, `GitHubSyncService`. Frontend: `AchievementPanel`, `CommunityPanel`, `ShareCard`, `AchievementToastStack`, `SessionRecapCard`, `achievementI18n.ts`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ACHIEVEMENTS.md`
 
 **Analytics Dashboard** - Full-screen overlay with three modes: **Session** (7 tabs: Overview, Tokens, Tools, Timeline, Commands, Context, Usage), **Project** (4 tabs: Overview, Sessions, Tokens, Tools), and **User** (Token Ratio). A pill toggle in the header switches modes (blue=Session, purple=Project, amber=User). Session mode shows current-session analytics from Zustand `turnHistory`. Project mode aggregates `SessionSummary` records across all past sessions in the workspace, persisted in `ProjectAnalyticsStore` (VS Code `workspaceState`, survives restarts). User mode shows global user-level analytics from VS Code `globalState` (shared across all workspaces). Session summaries are auto-saved from ALL exit paths (normal exit, crash, tab close, VS Code close, session clear, edit-and-resend) via `flushTurnRecords()` + `analyticsSaved` guard to prevent data loss and double-save. Project data is loaded on demand.
@@ -347,7 +356,7 @@ claude-code-mirror/
 | `claudeMirror.chatFontSize` | `14` | Font size (px) for chat messages (10-32) |
 | `claudeMirror.chatFontFamily` | `""` | Font family for chat messages (empty = VS Code default) |
 | `claudeMirror.typingTheme` | `"zen"` | Response rendering personality theme: "terminal-hacker", "retro", or "zen" |
-| `claudeMirror.autoNameSessions` | `true` | Auto-generate tab names from first message using Haiku |
+| `claudeMirror.autoNameSessions` | `true` | Auto-generate tab names from first message (Claude: Haiku, Codex: one-shot codex exec) |
 | `claudeMirror.activitySummary` | `true` | Periodically summarize tool activity in busy indicator via Haiku |
 | `claudeMirror.activitySummaryThreshold` | `3` | Tool uses before triggering an activity summary (1-10) |
 | `claudeMirror.model` | `""` | Claude model to use for new sessions (empty = CLI default) |
