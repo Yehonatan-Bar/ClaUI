@@ -67,7 +67,7 @@ interface CodexCliCandidate {
 const CODEX_PROVIDER_CAPABILITIES: ProviderCapabilities = {
   supportsPlanApproval: false,
   supportsCompact: false,
-  supportsFork: false,
+  supportsFork: true,
   supportsImages: true,
   supportsGitPush: true,
   supportsTranslation: false,
@@ -413,9 +413,21 @@ export class CodexMessageHandler {
           this.sendGitPushSettings();
           break;
 
+        case 'forkFromMessage':
+          this.log(
+            `Codex fork from message: sessionId=${msg.sessionId}, index=${msg.forkMessageIndex}, historyLen=${msg.messages?.length ?? 0}`
+          );
+          void vscode.commands.executeCommand(
+            'claudeMirror.forkFromMessage',
+            msg.sessionId,
+            msg.forkMessageIndex,
+            msg.promptText,
+            msg.messages || []
+          );
+          break;
+
         case 'compact':
         case 'forkSession':
-        case 'forkFromMessage':
         case 'planApprovalResponse':
         case 'translateMessage':
         case 'enhancePrompt':
