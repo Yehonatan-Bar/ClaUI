@@ -784,7 +784,7 @@ export class MessageHandler {
           this.firstMessageSent = false;
           this.activitySummarizer?.reset();
           this.turnRecords = [];
-          this.achievementService.onSessionEnd(this.tabId);
+          this.achievementService.abandonSession(this.tabId);
           this.webview.postMessage({ type: 'processBusy', busy: true });
           {
             const editedText = msg.text;
@@ -818,6 +818,11 @@ export class MessageHandler {
                 });
               });
           }
+          break;
+
+        case 'requestSessionRecapSnapshot':
+          this.log('Manual session recap snapshot requested');
+          this.achievementService.sendSessionRecapSnapshot(this.tabId);
           break;
 
         case 'getPromptHistory':

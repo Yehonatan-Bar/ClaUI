@@ -1494,6 +1494,61 @@ html, body, #root {
   background: var(--vscode-button-hoverBackground);
 }
 
+.session-summary-nudge {
+  margin: 8px 16px 0 16px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--vscode-focusBorder, #007fd4) 22%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--vscode-focusBorder, #007fd4) 5%, var(--vscode-editor-background));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  animation: summaryFadeIn 0.2s ease-out;
+}
+
+.session-summary-nudge-text {
+  color: var(--vscode-descriptionForeground);
+}
+
+.session-summary-nudge-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.session-summary-nudge-btn {
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-button-secondaryForeground, var(--vscode-editor-foreground));
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.session-summary-nudge-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.session-summary-nudge-btn.primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border-color: transparent;
+}
+
+.session-summary-nudge-btn.primary:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.session-summary-nudge-btn.ghost {
+  background: transparent;
+  opacity: 0.85;
+}
+
 /* Busy indicator */
 .busy-indicator {
   padding: 8px 16px;

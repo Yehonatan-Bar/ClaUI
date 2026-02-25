@@ -212,6 +212,10 @@ export interface AppState {
   hasApiKey: boolean;
   maskedApiKey: string;
   setApiKeySetting: (hasKey: boolean, maskedKey: string) => void;
+  claudeAuthLoggedIn: boolean;
+  claudeAuthEmail: string;
+  claudeAuthSubscriptionType: string;
+  setClaudeAuthStatus: (loggedIn: boolean, email: string, subscriptionType: string) => void;
 
   // Codex Consultation
   codexConsultPanelOpen: boolean;
@@ -567,6 +571,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   hasApiKey: false,
   maskedApiKey: '',
   setApiKeySetting: (hasKey, maskedKey) => set({ hasApiKey: hasKey, maskedApiKey: maskedKey }),
+  claudeAuthLoggedIn: false,
+  claudeAuthEmail: '',
+  claudeAuthSubscriptionType: '',
+  setClaudeAuthStatus: (loggedIn, email, subscriptionType) =>
+    set({
+      claudeAuthLoggedIn: loggedIn,
+      claudeAuthEmail: email,
+      claudeAuthSubscriptionType: subscriptionType,
+    }),
 
   // Codex Consultation
   codexConsultPanelOpen: false,
@@ -1298,5 +1311,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       // the extension will re-push the setting on the next 'ready' event)
       hasApiKey: false,
       maskedApiKey: '',
+      claudeAuthLoggedIn: false,
+      claudeAuthEmail: '',
+      claudeAuthSubscriptionType: '',
     })),
 }));

@@ -188,6 +188,23 @@ Important implementation notes for the next developer (Stage 5: Analytics + Hard
 - `supportsCompact` is included in capabilities plumbing, but there is no visible compact button in the current webview UI to gate yet.
 - History/resume/provider routing from Stage 3 should be kept intact while running the Stage 5 regression matrix (especially legacy sessions without `provider` -> Claude fallback).
 
+## 2026-02-25 - Codex permission mode wiring (write access fix)
+
+Root cause fixed:
+
+- Codex tabs were not forwarding `claudeMirror.permissionMode` to the `codex exec` CLI, so Codex fell back to the user's local CLI/config defaults (which can be read-only).
+
+What changed:
+
+- `CodexExecProcessManager` now reads `claudeMirror.permissionMode` and maps it to Codex CLI flags:
+  - `full-access` -> `--dangerously-bypass-approvals-and-sandbox`
+  - `supervised` -> `--sandbox read-only`
+- `CodexMessageHandler` now enables the Permission Mode selector in Codex tabs and handles `setPermissionMode` / `permissionModeSetting` sync.
+
+Operational note:
+
+- This change requires packaging + installing the extension (`npm run deploy:local`) and a VS Code window reload. `npm run build` alone only updates local `dist/` and does not update the installed extension copy under `~/.vscode/extensions/`.
+
 Verification note:
 
 - `npm run build` passed after Stage 4 changes (extension + webview). Standard webpack size warnings remain.

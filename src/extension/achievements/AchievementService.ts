@@ -122,6 +122,16 @@ export class AchievementService {
     this.lastCrashAt.delete(tabId);
   }
 
+  /** Drop current session state without counting it as completed or sending a recap (used by edit-and-resend restarts). */
+  abandonSession(tabId: string): void {
+    if (!this.engine.hasSession(tabId)) return;
+    this.engine.discardSession(tabId);
+    this.sessionAwards.delete(tabId);
+    this.sessionXp.delete(tabId);
+    this.send(tabId, { type: 'achievementProgress', goals: [] });
+    this.broadcastSnapshots();
+  }
+
   onSessionEnd(tabId: string): void {
     if (!this.isEnabled()) return;
     if (!this.engine.hasSession(tabId)) return;
@@ -268,6 +278,27 @@ export class AchievementService {
         this.syncService.syncIfNeeded(shareableProfile).catch(() => {});
       }
     });
+  }
+
+  /** Send a live session recap snapshot without ending the session. */
+  sendSessionRecapSnapshot(tabId: string): void {
+    if (!this.isEnabled()) return;
+    const snapshot = this.engine.getSessionSnapshot(tabId);
+    if (!snapshot) return;
+
+    const recap: SessionRecapPayload = {
+      durationMs: snapshot.sessionDurationMs,
+      bugsFixed: snapshot.bugsFixed,
+      passingTests: snapshot.testsPassed,
+      highestStreak: snapshot.highestStreak,
+      newAchievements: [...(this.sessionAwards.get(tabId) || [])],
+      xpEarned: this.sessionXp.get(tabId) || 0,
+      level: this.profile.level,
+      filesTouched: snapshot.filesTouched.length,
+      languagesUsed: [...snapshot.languages],
+    };
+
+    this.send(tabId, { type: 'sessionRecap', recap });
   }
 
   onSessionCrash(tabId: string): void {

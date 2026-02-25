@@ -23,6 +23,9 @@ import { detectRtl } from './hooks/useRtlDetection';
 import { deriveTurnHistoryFromMessages } from './utils/turnVitals';
 import { GlobalTooltip } from './components/Tooltip/GlobalTooltip';
 
+const SESSION_SUMMARY_IDLE_MS = 60 * 60 * 1000;
+const SESSION_SUMMARY_DEFER_MS = 3 * 60 * 60 * 1000;
+
 export const App: React.FC = () => {
   useClaudeStream();
 
@@ -286,6 +289,7 @@ export const App: React.FC = () => {
             <CodexConsultPanel onClose={() => setCodexConsultPanelOpen(false)} />
           )}
           <InputArea />
+          {achievementsEnabled && <SessionSummaryNudge hasMessages={hasMessages} />}
           {achievementsEnabled && <SessionRecapCard />}
           <StatusBar cost={cost} />
         </>
@@ -300,6 +304,84 @@ export const App: React.FC = () => {
       )}
       {achievementsEnabled && <AchievementToastStack />}
       <GlobalTooltip delay={400} />
+    </div>
+  );
+};
+
+const SessionSummaryNudge: React.FC<{ hasMessages: boolean }> = ({ hasMessages }) => {
+  const { isConnected, isBusy, lastActivityAt, pendingApproval, sessionRecap } = useAppStore();
+  const [nowMs, setNowMs] = React.useState(() => Date.now());
+  const [deferUntilMs, setDeferUntilMs] = React.useState(0);
+  const [hiddenForActivityAt, setHiddenForActivityAt] = React.useState<number | null>(null);
+  const lastSeenActivityRef = React.useRef(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (lastActivityAt > 0 && lastActivityAt !== lastSeenActivityRef.current) {
+      lastSeenActivityRef.current = lastActivityAt;
+      setHiddenForActivityAt(null);
+    }
+  }, [lastActivityAt]);
+
+  useEffect(() => {
+    if (!isConnected) {
+      setDeferUntilMs(0);
+      setHiddenForActivityAt(null);
+      lastSeenActivityRef.current = 0;
+    }
+  }, [isConnected]);
+
+  if (!isConnected || !hasMessages || isBusy || !!pendingApproval || !!sessionRecap || lastActivityAt <= 0) {
+    return null;
+  }
+
+  const idleMs = Math.max(0, nowMs - lastActivityAt);
+  const shouldShow =
+    idleMs >= SESSION_SUMMARY_IDLE_MS &&
+    nowMs >= deferUntilMs &&
+    hiddenForActivityAt !== lastActivityAt;
+
+  if (!shouldShow) {
+    return null;
+  }
+
+  const idleMinutes = Math.floor(idleMs / 60_000);
+
+  return (
+    <div className="session-summary-nudge" role="status" aria-live="polite">
+      <span className="session-summary-nudge-text">
+        Session idle for {idleMinutes}m. Want a session summary?
+      </span>
+      <div className="session-summary-nudge-actions">
+        <button
+          className="session-summary-nudge-btn primary"
+          onClick={() => {
+            postToExtension({ type: 'requestSessionRecapSnapshot' });
+            setHiddenForActivityAt(lastActivityAt);
+          }}
+        >
+          Session Summary
+        </button>
+        <button
+          className="session-summary-nudge-btn"
+          onClick={() => {
+            setDeferUntilMs(Date.now() + SESSION_SUMMARY_DEFER_MS);
+            setHiddenForActivityAt(lastActivityAt);
+          }}
+        >
+          Later
+        </button>
+        <button
+          className="session-summary-nudge-btn ghost"
+          onClick={() => setHiddenForActivityAt(lastActivityAt)}
+        >
+          Dismiss
+        </button>
+      </div>
     </div>
   );
 };
