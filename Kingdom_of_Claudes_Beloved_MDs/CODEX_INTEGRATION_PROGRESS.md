@@ -1,5 +1,25 @@
 # Codex Integration Progress
 
+## 2026-02-25 - Codex image paste/send support
+
+- Enabled image capability in `CodexMessageHandler` (`supportsImages: true`) so Codex tabs accept pasted image attachments in `InputArea`.
+- Implemented `sendMessageWithImages` handling in `CodexMessageHandler` (posts a local user message with image blocks + sends the turn through the Codex runtime).
+- Added Codex session/runtime support for image attachments:
+  - `CodexSessionTab.sendWithImages(...)`
+  - `CodexExecProcessManager` temp image file creation from webview base64 payloads
+  - `codex exec` / `codex exec resume` args now include repeatable `--image <tempFile>` flags
+  - temp image files are cleaned up after turn exit/error
+- Result: pasted screenshots/images now send in Codex tabs (same InputArea UX as Claude mode).
+
+## 2026-02-25 - Codex Git Push UI/Runtime support
+
+- Enabled Git Push capability in `CodexMessageHandler` (`supportsGitPush: true`) so the status-bar Git button remains usable in Codex tabs.
+- Added Codex handling for:
+  - `gitPush` (runs the configured PowerShell script exactly like Claude flow)
+  - `getGitPushSettings` (syncs `claudeMirror.gitPush.*` to the webview)
+  - `gitPushConfig` (sends a configuration instruction prompt through the active Codex session)
+- Result: Git controls no longer disappear or stay disabled in Codex tabs; they behave like the Claude path (subject to the user's gitPush configuration).
+
 ## 2026-02-23 - Stage 1 completed (Provider Foundation + UI Switch)
 
 Completed only the first stage from `Codex_integration.txt`:
@@ -152,10 +172,13 @@ Important implementation notes for the next developer (Stage 4: Capabilities + U
 
 - Added `src/extension/session/CodexSessionNamer.ts` to mirror Claude's first-message auto naming behavior for Codex tabs.
 - `CodexSessionTab.sendText()` now triggers a one-shot naming request on the first user prompt (honors `claudeMirror.autoNameSessions`).
-- Naming runs through `codex exec --json` with read-only sandbox and `model_reasoning_effort=medium`, then updates:
+- Naming runs through `codex exec --json` with read-only sandbox and `model_reasoning_effort=medium`, using the same workspace/session `cwd` as normal Codex turns, then updates:
   - tab title
   - persisted session metadata (when `threadId` exists / later on thread start via `baseTitle`)
   - per-tab file log name (`FileLogger.updateSessionName`)
+- Parser accepts the common `agent_message.item.text` shape and a fallback `agent_message.item.content[]` text shape.
+- Fixed Codex tab-title race: if auto-naming returns before `thread.started`, `CodexSessionTab` now defers metadata save and reapplies the generated name when the thread ID arrives instead of overwriting it with `Codex [id]`.
+- Manual tab rename in Codex tabs now also persists the session name into `SessionStore` (not only the visible tab title / log filename).
 - Failures/timeouts are non-fatal and only logged, matching Claude-style best-effort behavior.
 
 Verification note:
@@ -179,9 +202,9 @@ Completed only the fourth stage from `Codex_integration.txt`:
 - Also hid other currently broken Codex UI controls already rejected at runtime by `CodexMessageHandler` (to keep Codex tab intentional):
   - translation button
   - prompt enhancer UI / auto-enhance path
-  - image paste/send path
   - git push controls
   - Codex consult button/panel
+- Clipboard image-paste diagnostics were later added in `InputArea` (`uiDebugLog` -> `Output -> ClaUi`) and were used to confirm the earlier Codex image block (`supportsImages: false`) before the follow-up runtime support was implemented.
 
 What is intentionally NOT implemented yet (left for later stages):
 
@@ -295,3 +318,10 @@ Codex reasoning effort support (new user-facing capability):
 Verification note:
 
 - `npm run build` passed after these follow-up changes (extension + webview).
+
+## 2026-02-25 - Prompt History parity fix (Codex)
+
+- Fixed Codex prompt history panel project/global tabs not loading in Codex tabs:
+  - `CodexMessageHandler` now handles `getPromptHistory` and returns `promptHistoryResponse`
+- Added prompt history persistence for Codex `editAndResend` path so edited prompts also enter shared project/global history
+- Result: prompt history is now shared/visible across Claude + Codex modes via the same `PromptHistoryStore`

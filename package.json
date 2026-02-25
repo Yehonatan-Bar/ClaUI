@@ -158,12 +158,14 @@
           "enum": [
             "terminal-hacker",
             "retro",
-            "zen"
+            "zen",
+            "neo-zen"
           ],
           "enumDescriptions": [
             "Terminal Hacker - Green on black with typewriter-style streaming",
             "Retro - Pixel-inspired typography with CRT scanline atmosphere",
-            "Zen - Minimal styling with calm, soft animations"
+            "Zen - Minimal styling with calm, soft animations",
+            "Neo Zen - Zen-inspired calm with subtle futuristic blue-cyan accents"
           ],
           "description": "Visual personality theme for response rendering in the chat webview."
         },

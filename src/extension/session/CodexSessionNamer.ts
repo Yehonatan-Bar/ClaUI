@@ -17,10 +17,11 @@ export class CodexSessionNamer {
    * Generate a short session name from the user's first message.
    * Uses Codex CLI with medium reasoning effort.
    */
-  async generateName(firstMessage: string, model?: string): Promise<string | null> {
+  async generateName(firstMessage: string, options?: { model?: string; cwd?: string }): Promise<string | null> {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const cliPath = config.get<string>('codex.cliPath', 'codex') || 'codex';
-    const selectedModel = (model || config.get<string>('codex.model', '') || '').trim();
+    const selectedModel = (options?.model || config.get<string>('codex.model', '') || '').trim();
+    const selectedCwd = options?.cwd?.trim();
     const truncatedMessage = firstMessage.slice(0, 200);
 
     const prompt =
@@ -29,6 +30,9 @@ export class CodexSessionNamer {
       `User message: "${truncatedMessage}"`;
 
     const args = ['exec', '--json', '--sandbox', 'read-only'];
+    if (selectedCwd) {
+      args.push('-C', selectedCwd);
+    }
     if (selectedModel) {
       args.push('--model', selectedModel);
     }
@@ -61,6 +65,7 @@ export class CodexSessionNamer {
       let child;
       try {
         child = spawn(cliPath, args, {
+          cwd: selectedCwd || undefined,
           env,
           stdio: ['pipe', 'pipe', 'pipe'],
           shell: true,
@@ -107,7 +112,11 @@ export class CodexSessionNamer {
         try {
           const event = JSON.parse(trimmed) as {
             type?: string;
-            item?: { type?: string; text?: unknown };
+            item?: {
+              type?: string;
+              text?: unknown;
+              content?: unknown;
+            };
           };
           if (
             event.type === 'item.completed' &&
@@ -117,6 +126,26 @@ export class CodexSessionNamer {
           ) {
             capturedAgentText = event.item.text;
             this.log(`CodexSessionNamer: captured agent_message (${capturedAgentText.length} chars)`);
+            return;
+          }
+
+          if (
+            event.type === 'item.completed' &&
+            event.item?.type === 'agent_message' &&
+            Array.isArray(event.item.content)
+          ) {
+            const joined = event.item.content
+              .map((part) => {
+                if (!part || typeof part !== 'object') return '';
+                const text = (part as { text?: unknown }).text;
+                return typeof text === 'string' ? text : '';
+              })
+              .join('')
+              .trim();
+            if (joined) {
+              capturedAgentText = joined;
+              this.log(`CodexSessionNamer: captured agent_message content[] (${capturedAgentText.length} chars)`);
+            }
           }
         } catch {
           // Some Codex builds may emit non-JSON lines/noise. Ignore.

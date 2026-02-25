@@ -20,6 +20,7 @@ import type {
   ExtensionToWebviewMessage,
   SerializedChatMessage,
   SessionSummary,
+  WebviewImageData,
   WebviewToExtensionMessage,
 } from '../types/webview-messages';
 import type { CodexExecJsonEvent } from '../types/codex-exec-json';
@@ -61,6 +62,27 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private codexLoginLaunchInProgress = false;
   private codexInstallGuidanceShownAt = 0;
   private sessionNamingRequested = false;
+  /** Auto-generated name produced before Codex emits thread.started (avoid title overwrite race). */
+  private deferredAutoSessionName: string | null = null;
+  private turnDiagSeq = 0;
+  private turnDiagHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private activeTurnDiag: {
+    id: number;
+    startedAt: number;
+    lastActivityAt: number;
+    promptLen: number;
+    threadIdAtStart: string | null;
+    modelAtStart: string;
+    cwdAtStart?: string;
+    jsonEvents: number;
+    rawEvents: number;
+    stderrEvents: number;
+    lastJsonType: string;
+    lastRawPreview: string;
+    lastStderrPreview: string;
+    sawTurnStarted: boolean;
+    sawTurnCompleted: boolean;
+  } | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -186,6 +208,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.sessionStartedAt = this.sessionStartedAt || new Date().toISOString();
     this.analyticsSaved = false;
     this.sessionNamingRequested = false;
+    this.deferredAutoSessionName = null;
     this.achievementService.onSessionStart(this.id);
 
     if (options?.resume) {
@@ -212,6 +235,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.firstPrompt = '';
     this.sessionStartedAt = '';
     this.sessionActive = false;
+    this.deferredAutoSessionName = null;
     this.postMessage({ type: 'sessionEnded', reason: 'stopped' });
     await this.startSession({ cwd: options?.cwd });
   }
@@ -226,11 +250,20 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.threadId = null;
     this.firstPrompt = '';
     this.sessionStartedAt = '';
+    this.deferredAutoSessionName = null;
     this.postMessage({ type: 'processBusy', busy: false });
     this.postMessage({ type: 'sessionEnded', reason: 'stopped' });
   }
 
   async sendText(text: string): Promise<void> {
+    await this.sendTurn(text);
+  }
+
+  async sendWithImages(text: string, images: Array<{ base64: string; mediaType: string }>): Promise<void> {
+    await this.sendTurn(text, images as WebviewImageData[]);
+  }
+
+  private async sendTurn(text: string, images?: WebviewImageData[]): Promise<void> {
     if (!this.sessionActive) {
       await this.startSession();
     }
@@ -245,19 +278,43 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       }
     }
 
-    this.triggerSessionNaming(text);
-
     this.currentModel = this.getCurrentModel();
+    this.triggerSessionNaming(text);
     this.resetTurnFailureCapture();
-    await this.processManager.runTurn({
-      prompt: text,
-      threadId: this.threadId || undefined,
-      cwd: this.sessionCwd,
-      model: this.currentModel || undefined,
-    });
+    this.beginTurnDiagnostics(text);
+    const tempImages = images?.length ? this.processManager.createTempImageFiles(images) : null;
+    let cleanupOnce: (() => void) | null = null;
+    if (tempImages) {
+      const cleanup = tempImages.cleanup;
+      cleanupOnce = () => {
+        this.processManager.off('exit', cleanupOnce!);
+        this.processManager.off('error', cleanupOnce!);
+        cleanup();
+      };
+      this.processManager.once('exit', cleanupOnce);
+      this.processManager.once('error', cleanupOnce);
+    }
+    try {
+      await this.processManager.runTurn({
+        prompt: text,
+        threadId: this.threadId || undefined,
+        cwd: this.sessionCwd,
+        model: this.currentModel || undefined,
+        imagePaths: tempImages?.paths,
+      });
+    } catch (err) {
+      if (cleanupOnce) {
+        this.processManager.off('exit', cleanupOnce);
+        this.processManager.off('error', cleanupOnce);
+      }
+      tempImages?.cleanup();
+      throw err;
+    }
+    this.noteTurnDiagnosticsActivity('lifecycle', 'runTurn dispatched');
   }
 
   cancelRequest(): void {
+    this.noteTurnDiagnosticsActivity('lifecycle', 'cancelRequest');
     this.postMessage({ type: 'processBusy', busy: false });
     this.processManager.cancelTurn();
   }
@@ -300,6 +357,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       return;
     }
     this.disposed = true;
+    this.endTurnDiagnostics('tab dispose()');
     this.stopThinkingAnimation();
     this.saveProjectAnalytics();
     this.processManager.stop();
@@ -396,15 +454,26 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.log(`[Codex Tab ${this.tabNumber}] [SessionNaming] Launching CodexSessionNamer...`);
 
     void this.sessionNamer
-      .generateName(trimmed, this.currentModel || undefined)
+      .generateName(trimmed, {
+        model: this.currentModel || undefined,
+        cwd: this.sessionCwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+      })
       .then((name) => {
         this.log(`[Codex Tab ${this.tabNumber}] [SessionNaming] generateName returned: "${name}"`);
         if (!name || this.disposed) {
           return;
         }
         this.setTabName(name);
-        this.persistSessionMetadata(name);
         this.fileLogger?.updateSessionName(name);
+        if (!this.threadId) {
+          this.deferredAutoSessionName = name;
+          this.log(
+            `[Codex Tab ${this.tabNumber}] [SessionNaming] Deferring session metadata save until thread id is available`
+          );
+          return;
+        }
+        this.deferredAutoSessionName = null;
+        this.persistSessionMetadata(name);
       })
       .catch((err) => {
         const message = err instanceof Error ? err.message : String(err);
@@ -550,6 +619,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.panel.onDidDispose(() => {
       this.disposed = true;
       try {
+        this.endTurnDiagnostics('panel onDidDispose');
         this.stopThinkingAnimation();
         this.saveProjectAnalytics();
         this.processManager.stop();
@@ -566,6 +636,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private wireProcessEvents(tabLog: (msg: string) => void): void {
     this.processManager.on('event', (event: CodexExecJsonEvent) => {
       tabLog(`Codex JSON: ${event.type}`);
+      this.noteTurnDiagnosticsActivity('json', event.type);
       if (event.type === 'turn.started') {
         this.turnStructuredErrorDetected = false;
       }
@@ -580,6 +651,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
     this.processManager.on('raw', (text: string) => {
       tabLog(`Codex raw: ${text}`);
+      this.noteTurnDiagnosticsActivity('raw', text);
       this.captureTurnFailureText(text);
       this.maybeMarkTurnCliMissing(text, tabLog);
       this.maybeMarkTurnAuthFailure(text, tabLog);
@@ -591,6 +663,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         return;
       }
       tabLog(`Codex STDERR: ${trimmed}`);
+      this.noteTurnDiagnosticsActivity('stderr', trimmed);
       if (this.isKnownNonFatalCodexStderr(trimmed)) {
         tabLog(`Ignoring known non-fatal Codex stderr noise`);
         return;
@@ -615,6 +688,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
     this.processManager.on('exit', (info: { code: number | null; signal: string | null }) => {
       tabLog(`Codex turn process exited: code=${info.code}, signal=${info.signal}`);
+      this.noteTurnDiagnosticsActivity('lifecycle', `process exit code=${info.code ?? 'null'} signal=${info.signal ?? 'null'}`);
+      this.endTurnDiagnostics(`process exit code=${info.code ?? 'null'} signal=${info.signal ?? 'null'}`);
       if (this.processManager.cancelledByUser) {
         tabLog('Codex turn cancelled by user');
         this.postMessage({ type: 'processBusy', busy: false });
@@ -663,6 +738,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
     this.processManager.on('error', (err: Error) => {
       tabLog(`Codex process error: ${err.message}`);
+      this.noteTurnDiagnosticsActivity('lifecycle', `process error: ${err.message}`);
+      this.endTurnDiagnostics(`process error: ${err.message}`);
       this.captureTurnFailureText(err.message);
       this.maybeMarkTurnCliMissing(err.message, tabLog);
       this.maybeMarkTurnAuthFailure(err.message, tabLog);
@@ -693,6 +770,118 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.turnCliMissingDetected = false;
     this.turnStructuredErrorDetected = false;
     this.turnFailureText = [];
+  }
+
+  private beginTurnDiagnostics(text: string): void {
+    const id = ++this.turnDiagSeq;
+    const now = Date.now();
+    this.endTurnDiagnostics(`superseded by new turn #${id}`);
+    this.activeTurnDiag = {
+      id,
+      startedAt: now,
+      lastActivityAt: now,
+      promptLen: text.length,
+      threadIdAtStart: this.threadId,
+      modelAtStart: this.currentModel || this.getCurrentModel() || 'codex',
+      cwdAtStart: this.sessionCwd,
+      jsonEvents: 0,
+      rawEvents: 0,
+      stderrEvents: 0,
+      lastJsonType: '',
+      lastRawPreview: '',
+      lastStderrPreview: '',
+      sawTurnStarted: false,
+      sawTurnCompleted: false,
+    };
+    this.log(
+      `[Codex Tab ${this.tabNumber}] [TurnDiag #${id}] BEGIN promptLen=${text.length} thread=${this.threadId || 'pending'} ` +
+        `model="${this.activeTurnDiag.modelAtStart}" cwd="${this.sessionCwd || '(none)'}" busy=${this.isBusy}`
+    );
+    this.turnDiagHeartbeatTimer = setInterval(() => {
+      this.logTurnDiagnosticsHeartbeat();
+    }, 15000);
+  }
+
+  private noteTurnDiagnosticsActivity(
+    source: 'json' | 'raw' | 'stderr' | 'lifecycle',
+    detail: string
+  ): void {
+    const diag = this.activeTurnDiag;
+    if (!diag) {
+      return;
+    }
+    diag.lastActivityAt = Date.now();
+    if (source === 'json') {
+      diag.jsonEvents += 1;
+      diag.lastJsonType = detail;
+      if (detail === 'turn.started') {
+        diag.sawTurnStarted = true;
+      } else if (detail === 'turn.completed') {
+        diag.sawTurnCompleted = true;
+      }
+    } else if (source === 'raw') {
+      diag.rawEvents += 1;
+      diag.lastRawPreview = this.summarizeTurnDiagText(detail);
+    } else if (source === 'stderr') {
+      diag.stderrEvents += 1;
+      diag.lastStderrPreview = this.summarizeTurnDiagText(detail);
+    }
+
+    if (source === 'lifecycle') {
+      this.log(`[Codex Tab ${this.tabNumber}] [TurnDiag #${diag.id}] ${detail}`);
+      return;
+    }
+
+    const count = source === 'json' ? diag.jsonEvents : source === 'raw' ? diag.rawEvents : diag.stderrEvents;
+    if (count <= 3 || count % 20 === 0) {
+      const extra =
+        source === 'json'
+          ? detail
+          : source === 'raw'
+            ? `preview="${diag.lastRawPreview}"`
+            : `preview="${diag.lastStderrPreview}"`;
+      this.log(`[Codex Tab ${this.tabNumber}] [TurnDiag #${diag.id}] ${source}#${count} ${extra}`);
+    }
+  }
+
+  private logTurnDiagnosticsHeartbeat(): void {
+    const diag = this.activeTurnDiag;
+    if (!diag) {
+      return;
+    }
+    const now = Date.now();
+    const elapsedMs = Math.max(0, now - diag.startedAt);
+    const idleMs = Math.max(0, now - diag.lastActivityAt);
+    this.log(
+      `[Codex Tab ${this.tabNumber}] [TurnDiag #${diag.id}] HEARTBEAT elapsed=${elapsedMs}ms idle=${idleMs}ms ` +
+        `running=${this.processManager.isTurnRunning} busy=${this.isBusy} cancelled=${this.processManager.cancelledByUser} ` +
+        `json=${diag.jsonEvents} raw=${diag.rawEvents} stderr=${diag.stderrEvents} ` +
+        `turnStarted=${diag.sawTurnStarted} turnCompleted=${diag.sawTurnCompleted} lastJson=${diag.lastJsonType || '(none)'} ` +
+        `structuredError=${this.turnStructuredErrorDetected} cliMissing=${this.turnCliMissingDetected} authFailure=${this.turnAuthFailureDetected}`
+    );
+  }
+
+  private endTurnDiagnostics(reason: string): void {
+    if (this.turnDiagHeartbeatTimer) {
+      clearInterval(this.turnDiagHeartbeatTimer);
+      this.turnDiagHeartbeatTimer = null;
+    }
+    const diag = this.activeTurnDiag;
+    if (!diag) {
+      return;
+    }
+    const now = Date.now();
+    this.log(
+      `[Codex Tab ${this.tabNumber}] [TurnDiag #${diag.id}] END reason="${reason}" elapsed=${Math.max(0, now - diag.startedAt)}ms ` +
+        `idle=${Math.max(0, now - diag.lastActivityAt)}ms json=${diag.jsonEvents} raw=${diag.rawEvents} stderr=${diag.stderrEvents} ` +
+        `turnStarted=${diag.sawTurnStarted} turnCompleted=${diag.sawTurnCompleted} lastJson=${diag.lastJsonType || '(none)'} ` +
+        `lastRaw="${diag.lastRawPreview || ''}" lastStderr="${diag.lastStderrPreview || ''}"`
+    );
+    this.activeTurnDiag = null;
+  }
+
+  private summarizeTurnDiagText(text: string): string {
+    return (text || '').replace(/\s+/g, ' ').trim().slice(0, 160);
   }
 
   private captureTurnFailureText(text: string): void {
@@ -894,7 +1083,16 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       this.analyticsSaved = false;
       tabLog(`Codex thread id set: ${data.threadId}`);
       const restored = this.restoreSessionName(data.threadId);
-      if (!restored) {
+      if (restored) {
+        this.deferredAutoSessionName = null;
+      } else if (this.deferredAutoSessionName) {
+        tabLog(`Applying deferred auto session name: "${this.deferredAutoSessionName}"`);
+        this.setTabName(this.deferredAutoSessionName);
+        this.fileLogger?.updateSessionName(this.deferredAutoSessionName);
+        this.persistSessionMetadata(this.deferredAutoSessionName);
+        this.deferredAutoSessionName = null;
+        return;
+      } else {
         this.updateTitle(data.threadId);
       }
       this.persistSessionMetadata();
@@ -919,6 +1117,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     if (this.isBusy === busy) {
       return;
     }
+    this.log(`[Codex Tab ${this.tabNumber}] setBusy(${busy}) prev=${this.isBusy}`);
+    this.noteTurnDiagnosticsActivity('lifecycle', `setBusy(${busy})`);
     this.isBusy = busy;
     if (busy) {
       this.startThinkingAnimation();
@@ -986,6 +1186,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     if (newName && newName !== currentName && !this.disposed) {
       this.setTabName(newName);
       this.fileLogger?.updateSessionName(newName);
+      this.deferredAutoSessionName = null;
+      this.persistSessionMetadata(newName);
     }
   }
 
