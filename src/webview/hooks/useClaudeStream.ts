@@ -41,6 +41,7 @@ export function useClaudeStream(): void {
     setPendingApproval,
     setProjectPromptHistory,
     setGlobalPromptHistory,
+    setToolActivity,
     setActivitySummary,
     setPermissionMode,
     setGitPushSettings,
@@ -106,6 +107,7 @@ export function useClaudeStream(): void {
         msg.type === 'assistantMessage' ||
         msg.type === 'toolUseStart' ||
         msg.type === 'toolUseInput' ||
+        msg.type === 'toolActivity' ||
         msg.type === 'messageStop' ||
         msg.type === 'processBusy' ||
         msg.type === 'costUpdate' ||
@@ -290,6 +292,10 @@ export function useClaudeStream(): void {
           } else {
             setGlobalPromptHistory(msg.prompts);
           }
+          break;
+
+        case 'toolActivity':
+          setToolActivity(msg.detail || null);
           break;
 
         case 'activitySummary':
@@ -573,6 +579,7 @@ export function useClaudeStream(): void {
     setPendingApproval,
     setProjectPromptHistory,
     setGlobalPromptHistory,
+    setToolActivity,
     setActivitySummary,
     setPermissionMode,
     setGitPushSettings,

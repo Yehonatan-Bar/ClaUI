@@ -78,6 +78,10 @@
       {
         "command": "claudeMirror.sendFeedback",
         "title": "ClaUi: Send Feedback"
+      },
+      {
+        "command": "claudeMirror.discoverSessions",
+        "title": "ClaUi: Discover All Sessions"
       }
     ],
     "configuration": {
@@ -491,6 +495,11 @@
         "command": "claudeMirror.toggleAchievements",
         "key": "ctrl+alt+a",
         "mac": "cmd+alt+a"
+      },
+      {
+        "command": "claudeMirror.discoverSessions",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d"
       }
     ],
     "menus": {

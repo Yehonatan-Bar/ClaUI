@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>ClaUi - Usage Tips</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0d1117; color: #c9d1d9; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.7; }
+  h1 { color: #cca700; border-bottom: 2px solid #cca700; padding-bottom: 10px; }
+  h2 { color: #58a6ff; margin-top: 30px; }
+  h3 { color: #8b949e; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 16px 20px; margin: 12px 0; }
+  .highlight { border-right: 3px solid #cca700; padding-right: 12px; }
+  .tip-preview { background: linear-gradient(135deg, rgba(204, 167, 0, 0.08), rgba(204, 167, 0, 0.03)); border-right: 3px solid #cca700; border-radius: 8px; padding: 12px 16px; margin: 16px 0; }
+  .tip-header { display: flex; align-items: center; gap: 8px; opacity: 0.7; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 6px; }
+  .tip-icon { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #cca700; color: #0d1117; font-size: 11px; font-weight: 700; }
+  .tip-title { font-weight: 700; font-size: 14px; color: #c9d1d9; }
+  .tip-desc { color: #8b949e; font-size: 13px; margin-top: 4px; }
+  .tip-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+  .tip-btn { padding: 3px 12px; border: 1px solid #30363d; border-radius: 4px; background: #21262d; color: #c9d1d9; font-size: 12px; cursor: pointer; }
+  .tip-counter { color: #8b949e; font-size: 11px; opacity: 0.6; }
+  kbd { display: inline-block; padding: 1px 6px; border: 1px solid #30363d; border-radius: 3px; background: #21262d; font-family: monospace; font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th, td { border: 1px solid #30363d; padding: 8px 12px; text-align: right; }
+  th { background: #161b22; color: #58a6ff; }
+  .step { display: flex; align-items: flex-start; gap: 12px; margin: 10px 0; }
+  .step-num { background: #cca700; color: #0d1117; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
+  .files { font-family: monospace; font-size: 13px; color: #79c0ff; }
+</style>
+</head>
+<body>
+
+<h1>Usage Tips - טיפים לשימוש בממשק</h1>
+
+<div class="card highlight">
+  <strong>מה זה?</strong><br>
+  פיצ'ר חדש שמציג למשתמש טיפים על יכולות נסתרות בממשק ClaUi. הטיפים מופיעים 5 פעמים ביום, בעיצוב ייחודי שמבדיל אותם בצורה ברורה מהודעות הצ'אט.
+</div>
+
+<h2>למה זה נחוץ?</h2>
+<p>
+  ל-ClaUi יש 32 קטגוריות של פיצ'רים עם למעלה מ-160 יכולות שונות, אבל רוב המשתמשים מגלים רק חלק קטן מהם. ה-README מתעד רק כ-30% מהפיצ'רים. הטיפים עוזרים למשתמשים לגלות פיצ'רים שהם לא מכירים.
+</p>
+
+<h2>איך זה נראה?</h2>
+
+<div class="tip-preview">
+  <div class="tip-header">
+    <span class="tip-icon">i</span>
+    <span>?DID YOU KNOW</span>
+  </div>
+  <div class="tip-title">File Mention (@)</div>
+  <div class="tip-desc">Type @ in the input box to search your workspace files. Select a file to insert its path into your message.</div>
+  <div class="tip-actions">
+    <span class="tip-btn">Got it</span>
+    <span class="tip-counter">2/5 today</span>
+  </div>
+</div>
+
+<p>
+  <strong>עיצוב ייחודי:</strong> הטיפים מוצגים עם פס צהוב-זהב בצד, רקע גרדיאנט עדין, ואייקון "i" עגול.
+  זה נראה שונה לחלוטין מהודעות הצ'אט, כדי שהמשתמש יבין מיד שזה טיפ מערכת ולא חלק מהשיחה עם Claude.
+</p>
+
+<h2>איך זה עובד?</h2>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div>הטיפ הראשון של היום מופיע כ-2 דקות אחרי שמתחיל סשן חדש</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div>טיפים נוספים מופיעים כל 45 דקות של שימוש פעיל</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div>המשתמש לוחץ "Got it" כדי לסגור את הטיפ</div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div>מוניט "X/5 today" מראה כמה טיפים נותרו להיום</div>
+</div>
+<div class="step">
+  <div class="step-num">5</div>
+  <div>בחצות הספירה מתאפסת, והסבב ממשיך מהטיפ הבא ברשימה</div>
+</div>
+
+<h2>מתי הטיפים לא מופיעים?</h2>
+
+<table>
+  <tr><th>מצב</th><th>סיבה</th></tr>
+  <tr><td>Claude עסוק</td><td>לא מפריעים בזמן עבודה</td></tr>
+  <tr><td>אישור תוכנית (Plan Approval)</td><td>לא מוסיפים עומס כשצריך החלטה</td></tr>
+  <tr><td>סיכום סשן מוצג</td><td>לא מתחרים עם UI אחר</td></tr>
+  <tr><td>הגענו ל-5 טיפים היום</td><td>מכסה יומית</td></tr>
+  <tr><td>הפיצ'ר כבוי בהגדרות</td><td>המשתמש בחר לא לראות טיפים</td></tr>
+</table>
+
+<h2>דוגמאות לטיפים</h2>
+
+<table>
+  <tr><th>פיצ'ר</th><th>תוכן הטיפ</th></tr>
+  <tr><td>File Mention</td><td>הקלד @ בשורת הקלט כדי לחפש קבצים עם השלמה אוטומטית</td></tr>
+  <tr><td>Prompt History</td><td>לחץ חץ למעלה/למטה בשורת הקלט כדי לדפדף בהיסטוריית הפרומפטים</td></tr>
+  <tr><td>Fork</td><td>לחץ "Fork" על כל הודעה כדי לפצל את השיחה לטאב חדש</td></tr>
+  <tr><td>Edit & Resend</td><td>רחף על הודעה שנשלחה ולחץ "Edit" כדי לערוך ולשלוח מחדש</td></tr>
+  <tr><td>Compact Context</td><td>Ctrl+Alt+K דוחס את ההקשר כדי לפנות מקום לטוקנים</td></tr>
+  <tr><td>Adventure Widget</td><td>הפעל את ה-Adventure Widget לראות משחק הרפתקאות פיקסלי שמשקף את הסשן</td></tr>
+  <tr><td>Dashboard</td><td>לחץ "Dashboard" כדי לראות אנליטיקות מלאות ב-3 מצבים: סשן, פרויקט, משתמש</td></tr>
+  <tr><td>Translation</td><td>תרגם הודעות של Claude ל-10 שפות שונות בלחיצת כפתור</td></tr>
+  <tr><td>Prompt Enhancer</td><td>לחץ על כפתור הניצוצות כדי לשפר את הפרומפט באמצעות AI לפני השליחה</td></tr>
+  <tr><td>Themes</td><td>נסה את ערכת "Terminal Hacker" למראה מטריקס, או "Retro" למראה CRT -- דרך כפתור Aa</td></tr>
+</table>
+
+<h2>הגדרות</h2>
+
+<div class="card">
+  <strong>claudeMirror.usageTips</strong><br>
+  סוג: boolean | ברירת מחדל: true<br>
+  מפעיל/מכבה את הטיפים. ניתן לכבות דרך הגדרות VS Code.
+</div>
+
+<h2>סיכום טכני</h2>
+
+<div class="card">
+  <strong>קבצים חדשים:</strong> 2<br>
+  <strong>קבצים שמשתנים:</strong> 7<br>
+  <strong>מיקום בממשק:</strong> מתחת לשורת הקלט, מעל הסטטוס בר<br>
+  <strong>אחסון:</strong> localStorage בצד ה-webview (ללא עלות API)<br>
+  <strong>עלות:</strong> אפס -- הטיפים הם טקסט סטטי, אין קריאות API<br>
+  <strong>כמות טיפים:</strong> ~50, מכסים את כל 32 הקטגוריות<br>
+  <strong>סבב מלא:</strong> ~10 ימים (50 טיפים / 5 ליום)
+</div>
+
+</body>
+</html>
