@@ -9,6 +9,7 @@ export interface CodexRunTurnOptions {
   threadId?: string;
   cwd?: string;
   model?: string;
+  permissionMode?: 'full-access' | 'supervised';
 }
 
 export interface CodexProcessExitInfo {
@@ -45,6 +46,9 @@ export class CodexExecProcessManager extends EventEmitter {
     const cliPath = config.get<string>('codex.cliPath', 'codex');
     const selectedModel = options.model ?? config.get<string>('codex.model', '');
     const selectedReasoningEffort = config.get<string>('codex.reasoningEffort', '').trim();
+    const permissionMode =
+      options.permissionMode ??
+      (config.get<string>('permissionMode', 'full-access') as 'full-access' | 'supervised');
     const cwd =
       options.cwd ||
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
@@ -55,6 +59,7 @@ export class CodexExecProcessManager extends EventEmitter {
       cwd,
       model: selectedModel,
       reasoningEffort: selectedReasoningEffort || undefined,
+      permissionMode,
     });
 
     this._cancelledByUser = false;
@@ -141,9 +146,16 @@ export class CodexExecProcessManager extends EventEmitter {
     return this._cancelledByUser;
   }
 
-  private buildArgs(opts: { threadId?: string; cwd?: string; model?: string; reasoningEffort?: string }): string[] {
+  private buildArgs(opts: {
+    threadId?: string;
+    cwd?: string;
+    model?: string;
+    reasoningEffort?: string;
+    permissionMode?: 'full-access' | 'supervised';
+  }): string[] {
+    const permissionArgs = this.buildPermissionArgs(opts.permissionMode ?? 'full-access');
     if (opts.threadId) {
-      const args = ['exec', 'resume', '--json'];
+      const args = ['exec', ...permissionArgs, 'resume', '--json'];
       if (opts.model) {
         args.push('--model', opts.model);
       }
@@ -154,7 +166,7 @@ export class CodexExecProcessManager extends EventEmitter {
       return args;
     }
 
-    const args = ['exec', '--json'];
+    const args = ['exec', '--json', ...permissionArgs];
     if (opts.cwd) {
       args.push('-C', opts.cwd);
     }
@@ -166,6 +178,17 @@ export class CodexExecProcessManager extends EventEmitter {
     }
     args.push('-');
     return args;
+  }
+
+  private buildPermissionArgs(permissionMode: 'full-access' | 'supervised'): string[] {
+    if (permissionMode === 'supervised') {
+      // Match the extension's "Supervised" semantics: Codex may read and analyze, but shell/file
+      // actions run inside a read-only sandbox.
+      return ['--sandbox', 'read-only'];
+    }
+
+    // Match the extension's "Full Access" semantics: no approval prompts and no sandboxing.
+    return ['--dangerously-bypass-approvals-and-sandbox'];
   }
 
   private handleStdoutChunk(chunk: Buffer): void {

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>ClaUi - Login / Logout</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    max-width: 700px;
+    margin: 40px auto;
+    padding: 20px 30px;
+    line-height: 1.7;
+  }
+  h1 {
+    color: #89b4fa;
+    border-bottom: 2px solid #313244;
+    padding-bottom: 10px;
+    font-size: 1.6em;
+  }
+  h2 {
+    color: #a6e3a1;
+    font-size: 1.2em;
+    margin-top: 24px;
+  }
+  .card {
+    background: #313244;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 12px 0;
+  }
+  .highlight {
+    color: #f9e2af;
+    font-weight: bold;
+  }
+  ul { padding-right: 20px; }
+  li { margin-bottom: 6px; }
+  .step-num {
+    display: inline-block;
+    background: #89b4fa;
+    color: #1e1e2e;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 24px;
+    font-weight: bold;
+    margin-left: 8px;
+    font-size: 0.85em;
+  }
+  .tag {
+    display: inline-block;
+    background: #45475a;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 0.85em;
+    margin: 2px;
+  }
+  .complexity {
+    background: #fab387;
+    color: #1e1e2e;
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-weight: bold;
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+
+<h1>תוכנית: הוספת Login / Logout לתוסף ClaUi</h1>
+
+<div class="card">
+  <strong>מטרה:</strong> לאפשר למשתמש להתחבר ולהתנתק מחשבון Claude ישירות מתוך התוסף,
+  דרך תפריט ההגדרות (גלגל השיניים ליד Vitals).
+  <br><br>
+  <strong>מורכבות:</strong> <span class="complexity">בינונית</span>
+</div>
+
+<h2>מה המשתמש יראה</h2>
+<div class="card">
+  <ul>
+    <li>בתפריט ההגדרות תתווסף <span class="highlight">שורת "Claude Account"</span> חדשה</li>
+    <li>כשמחובר: יוצג המייל, סוג המנוי, וכפתור <span class="highlight">Logout</span></li>
+    <li>כשלא מחובר: יוצג "Not logged in" וכפתור <span class="highlight">Login</span></li>
+    <li>כפתור רענון קטן - ללחוץ אחרי שמשלימים את ההתחברות בדפדפן</li>
+  </ul>
+</div>
+
+<h2>איך Login עובד</h2>
+<div class="card">
+  <p><span class="step-num">1</span> המשתמש לוחץ על כפתור Login בתפריט</p>
+  <p><span class="step-num">2</span> נפתח טרמינל ב-VS Code עם פקודת ההתחברות</p>
+  <p><span class="step-num">3</span> נפתח דפדפן עם עמוד הרשאה של Claude</p>
+  <p><span class="step-num">4</span> המשתמש מאשר בדפדפן (או מעתיק קוד ומדביק בטרמינל)</p>
+  <p><span class="step-num">5</span> המשתמש לוחץ על כפתור הרענון בתפריט - והסטטוס מתעדכן</p>
+</div>
+
+<h2>איך Logout עובד</h2>
+<div class="card">
+  <p>לחיצה על כפתור Logout מבצעת ניתוק שקט ברקע (ללא טרמינל) ומעדכנת את הסטטוס מיידית.</p>
+</div>
+
+<h2>שלבי הפיתוח</h2>
+<div class="card">
+  <p><span class="step-num">1</span> הרחבת מודול האימות הקיים עם לוגיקת התחברות/התנתקות</p>
+  <p><span class="step-num">2</span> הגדרת ההודעות בין ממשק המשתמש לתוסף</p>
+  <p><span class="step-num">3</span> הוספת מצב אימות לניהול המצב בממשק</p>
+  <p><span class="step-num">4</span> חיבור המטפלים בצד התוסף</p>
+  <p><span class="step-num">5</span> בניית הממשק בתפריט ההגדרות</p>
+  <p><span class="step-num">6</span> בדיקה, פריסה ותיעוד</p>
+</div>
+
+<h2>הערות</h2>
+<div class="card">
+  <ul>
+    <li>אין תלויות חדשות - הכל מבוסס על כלים קיימים</li>
+    <li>מבוסס על דפוס עבודה מוכח שכבר קיים בתוסף (ההתחברות של Codex)</li>
+    <li>7 קבצים נדרשים לשינוי, רובם תוספות קטנות</li>
+  </ul>
+</div>
+
+</body>
+</html>

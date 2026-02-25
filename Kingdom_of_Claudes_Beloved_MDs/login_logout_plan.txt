@@ -1,0 +1,105 @@
+# Plan: Add Login/Logout to VitalsInfoPanel
+
+## Context
+
+The user wants Login and Logout buttons in the settings gear dropdown (VitalsInfoPanel), mirroring `claude auth login` and `claude auth logout` CLI commands. The Codex login flow pattern already exists as a proven approach (opens a VS Code terminal for interactive auth). The `AuthManager` stub exists but needs real implementation.
+
+## Implementation Steps
+
+### 1. Extend `AuthManager.ts`
+**File:** `src/extension/auth/AuthManager.ts`
+
+- Add `AuthStatus` interface: `{ loggedIn: boolean; email: string; subscriptionType: string }`
+- Add `getAuthStatus(cliPath: string): Promise<AuthStatus>` - runs `claude auth status --json` via `child_process.execFile`, parses JSON, returns status. Falls back to `{ loggedIn: false, email: '', subscriptionType: '' }` on error. 10s timeout.
+- Add `logout(cliPath: string): Promise<boolean>` - runs `claude auth logout` via `execFile`, returns true/false. 10s timeout.
+- Export `AuthStatus` interface.
+
+### 2. Add message types in `webview-messages.ts`
+**File:** `src/extension/types/webview-messages.ts`
+
+Webview -> Extension (add near line 448 in the union):
+- `ClaudeAuthLoginRequest` - `{ type: 'claudeAuthLogin' }`
+- `ClaudeAuthLogoutRequest` - `{ type: 'claudeAuthLogout' }`
+- `ClaudeAuthStatusRequest` - `{ type: 'claudeAuthStatus' }`
+
+Extension -> Webview (add near line 1138 in the union):
+- `ClaudeAuthStatusMessage` - `{ type: 'claudeAuthStatus'; loggedIn: boolean; email: string; subscriptionType: string }`
+
+### 3. Add auth state to Zustand store
+**File:** `src/webview/state/store.ts`
+
+Add after the API Key state block (~line 214):
+- `claudeAuthLoggedIn: boolean` (default: `false`)
+- `claudeAuthEmail: string` (default: `''`)
+- `claudeAuthSubscriptionType: string` (default: `''`)
+- `setClaudeAuthStatus: (loggedIn, email, subscriptionType) => void`
+
+Also add to `clearSession` reset block (~line 1300).
+
+### 4. Handle auth message in `useClaudeStream.ts`
+**File:** `src/webview/hooks/useClaudeStream.ts`
+
+- Destructure `setClaudeAuthStatus` from store (~line 77)
+- Add case after `apiKeySetting` handler (~line 511):
+  ```
+  case 'claudeAuthStatus':
+    setClaudeAuthStatus(msg.loggedIn, msg.email, msg.subscriptionType);
+    break;
+  ```
+
+### 5. Add handlers in `MessageHandler.ts`
+**File:** `src/extension/webview/MessageHandler.ts`
+
+- Add `private authManager: AuthManager | null = null;` field
+- Add `setAuthManager(manager: AuthManager): void` setter
+- Add `private getClaudeCliPath(): string` helper (reads `claudeMirror.cliPath` setting, default `'claude'`)
+- Add `private async sendClaudeAuthStatus(): Promise<void>` - calls `authManager.getAuthStatus()`, posts result to webview
+- Add three case handlers:
+  - `'claudeAuthLogin'` - opens VS Code terminal `'Claude Login'`, sends `claude auth login`
+  - `'claudeAuthLogout'` - calls `authManager.logout()`, then `sendClaudeAuthStatus()`
+  - `'claudeAuthStatus'` - calls `sendClaudeAuthStatus()`
+- In `'ready'` handler (after line 1192): add `void this.sendClaudeAuthStatus();`
+
+### 6. Wire AuthManager into `SessionTab.ts`
+**File:** `src/extension/session/SessionTab.ts`
+
+- Import `AuthManager`
+- After `this.messageHandler.setSecrets(context.secrets)` (~line 116): add `this.messageHandler.setAuthManager(new AuthManager());`
+
+### 7. Add UI in `VitalsInfoPanel.tsx`
+**File:** `src/webview/components/Vitals/VitalsInfoPanel.tsx`
+
+Add a "Claude Account" row **before** the API Key row (before line 147):
+
+- Read from store: `claudeAuthLoggedIn`, `claudeAuthEmail`, `claudeAuthSubscriptionType`
+- When logged in: show email + subscription type + **Logout** button
+- When not logged in: show "Not logged in" + **Login** button
+- Always show a small **Refresh** button (arrow icon) - user clicks after completing browser-based login flow
+- Uses same styling patterns as the API Key row (`vitals-info-close` button class, monospace font, VS Code CSS vars)
+
+### 8. Build, deploy, verify
+- `npm run deploy:local` + reload VS Code
+- Test: open gear -> see auth status -> click Login -> complete in terminal -> click Refresh -> see logged in state -> click Logout -> see logged out state
+
+### 9. Update documentation (TECHNICAL.md + detail docs)
+
+### 10. Create SR-PTD documentation
+
+## Key Design Decisions
+
+- **Login via terminal** (not embedded in webview): The `claude auth login` flow is interactive (opens browser, asks for paste). The proven Codex pattern opens a VS Code terminal. No reliable "command completed" detection exists, so a manual Refresh button is provided.
+- **Logout via execFile** (not terminal): `claude auth logout` is non-interactive, so it runs silently in the background.
+- **Status via execFile**: `claude auth status --json` returns structured JSON, parsed directly.
+- **No new dependencies**: Uses only `child_process.execFile` (already available in Node.js).
+
+## Critical Files
+
+| File | Change |
+|------|--------|
+| `src/extension/auth/AuthManager.ts` | Add `getAuthStatus()`, `logout()` methods |
+| `src/extension/types/webview-messages.ts` | 4 new interfaces + 2 union additions |
+| `src/extension/webview/MessageHandler.ts` | 3 new case handlers + helper + ready hook |
+| `src/extension/session/SessionTab.ts` | Wire AuthManager |
+| `src/webview/state/store.ts` | 3 state fields + setter |
+| `src/webview/hooks/useClaudeStream.ts` | 1 new case handler |
+| `src/webview/components/Vitals/VitalsInfoPanel.tsx` | Claude Account UI row |

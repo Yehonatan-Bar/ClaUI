@@ -71,7 +71,7 @@ const CODEX_PROVIDER_CAPABILITIES: ProviderCapabilities = {
   supportsTranslation: false,
   supportsPromptEnhancer: false,
   supportsCodexConsult: false,
-  supportsPermissionModeSelector: false,
+  supportsPermissionModeSelector: true,
   supportsLiveTextStreaming: false,
   supportsConversationDiskReplay: true,
   supportsCostUsd: false,
@@ -262,6 +262,21 @@ export class CodexMessageHandler {
           void vscode.workspace.getConfiguration('claudeMirror').update('typingTheme', msg.theme, true);
           break;
 
+        case 'setPermissionMode':
+          void vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', msg.mode, true)
+            .then(() => {
+              const saved = vscode.workspace
+                .getConfiguration('claudeMirror')
+                .get<'full-access' | 'supervised'>('permissionMode', 'full-access');
+              this.log(`Permission mode saved (Codex handler): "${saved}" (requested "${msg.mode}")`);
+              this.webview.postMessage({ type: 'permissionModeSetting', mode: saved });
+            }, (err: unknown) => {
+              const message = err instanceof Error ? err.message : String(err);
+              this.log(`Failed to save permission mode "${msg.mode}" (Codex handler): ${message}`);
+              this.webview.postMessage({ type: 'error', message: `Failed to save permission mode: ${message}` });
+            });
+          break;
+
         case 'showHistory':
           void vscode.commands.executeCommand('claudeMirror.showHistory');
           break;
@@ -306,7 +321,6 @@ export class CodexMessageHandler {
         case 'forkSession':
         case 'forkFromMessage':
         case 'planApprovalResponse':
-        case 'setPermissionMode':
         case 'sendMessageWithImages':
         case 'translateMessage':
         case 'enhancePrompt':
@@ -475,6 +489,9 @@ export class CodexMessageHandler {
         this.log('Configuration changed: claudeMirror.provider (Codex handler)');
         this.sendProviderSetting();
       }
+      if (e.affectsConfiguration('claudeMirror.permissionMode')) {
+        this.sendPermissionModeSetting();
+      }
       if (e.affectsConfiguration('claudeMirror.codex.model')) {
         this.sendCodexModelSetting();
       }
@@ -489,6 +506,7 @@ export class CodexMessageHandler {
     this.sendTypingThemeSetting();
     this.sendProviderSetting();
     this.sendProviderCapabilities();
+    this.sendPermissionModeSetting();
     this.sendCodexModelSetting();
     this.sendCodexModelOptions();
     this.sendCodexReasoningEffortSetting();
@@ -526,6 +544,15 @@ export class CodexMessageHandler {
     this.webview.postMessage({
       type: 'providerCapabilities',
       capabilities: CODEX_PROVIDER_CAPABILITIES,
+    });
+  }
+
+  private sendPermissionModeSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const mode = config.get<'full-access' | 'supervised'>('permissionMode', 'full-access');
+    this.webview.postMessage({
+      type: 'permissionModeSetting',
+      mode,
     });
   }
 

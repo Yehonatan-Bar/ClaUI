@@ -82,6 +82,7 @@ export interface SessionSnapshot {
   filesTouched: string[];
   bugsFixed: number;
   testsPassed: number;
+  highestStreak: number;
   errorCount: number;
   sessionDurationMs: number;
   editCount: number;
@@ -624,12 +625,18 @@ export class AchievementEngine {
       filesTouched: Array.from(session.filesTouched),
       bugsFixed: session.bugFixes,
       testsPassed: session.passingTests,
+      highestStreak: session.bugFixTimes.length,
       errorCount: session.runtimeErrors,
       sessionDurationMs: Date.now() - session.startedAtMs,
       editCount: session.meaningfulEdits,
       languages: Array.from(session.languages),
       cancelCount: session.cancelCount,
     };
+  }
+
+  /** Drop session state without emitting recap or applying end-of-session awards/counters. */
+  discardSession(tabId: string): void {
+    this.sessions.delete(tabId);
   }
 
   endSession(

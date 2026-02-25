@@ -151,6 +151,10 @@ export interface EditAndResendRequest {
   text: string;
 }
 
+export interface RequestSessionRecapSnapshot {
+  type: 'requestSessionRecapSnapshot';
+}
+
 export interface ForkFromMessageRequest {
   type: 'forkFromMessage';
   sessionId: string;
@@ -244,6 +248,18 @@ export interface CopyToClipboardRequest {
 
 export interface OpenCodexLoginRequest {
   type: 'openCodexLogin';
+}
+
+export interface ClaudeAuthLoginRequest {
+  type: 'claudeAuthLogin';
+}
+
+export interface ClaudeAuthLogoutRequest {
+  type: 'claudeAuthLogout';
+}
+
+export interface ClaudeAuthStatusRequest {
+  type: 'claudeAuthStatus';
 }
 
 export interface PickCodexCliPathRequest {
@@ -402,6 +418,7 @@ export type WebviewToExtensionMessage =
   | OpenFeedbackRequest
   | GetPromptHistoryRequest
   | EditAndResendRequest
+  | RequestSessionRecapSnapshot
   | ForkFromMessageRequest
   | SetPermissionModeRequest
   | GitPushRequest
@@ -419,6 +436,9 @@ export type WebviewToExtensionMessage =
   | OpenTerminalRequest
   | CopyToClipboardRequest
   | OpenCodexLoginRequest
+  | ClaudeAuthLoginRequest
+  | ClaudeAuthLogoutRequest
+  | ClaudeAuthStatusRequest
   | PickCodexCliPathRequest
   | AutoDetectCodexCliPathRequest
   | AutoSetupCodexCliRequest
@@ -1002,6 +1022,13 @@ export interface ApiKeySettingMessage {
   maskedKey: string;  // e.g. "****abcd" or "" if no key
 }
 
+export interface ClaudeAuthStatusMessage {
+  type: 'claudeAuthStatus';
+  loggedIn: boolean;
+  email: string;
+  subscriptionType: string;
+}
+
 /** One usage stat entry from the claude /usage command output */
 export interface UsageStat {
   label: string;       // e.g. "Current session", "Current week (all models)"
@@ -1133,6 +1160,7 @@ export type ExtensionToWebviewMessage =
   | FriendActionResultMessage
   | ShareCardCopiedMessage
   | ApiKeySettingMessage
+  | ClaudeAuthStatusMessage
   | UsageDataMessage
   | UsageWidgetSettingMessage
   | TokenRatioDataMessage;
