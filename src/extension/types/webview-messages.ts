@@ -626,6 +626,12 @@ export interface ActivitySummaryMessage {
   fullSummary: string;
 }
 
+export interface ToolActivityMessage {
+  type: 'toolActivity';
+  toolName: string;        // Raw tool name: "Read", "Bash", etc.
+  detail: string;          // Human-readable: "Reading src/app.ts", "Running: npm test"
+}
+
 export interface PermissionModeSettingMessage {
   type: 'permissionModeSetting';
   mode: 'full-access' | 'supervised';
@@ -1137,6 +1143,7 @@ export type ExtensionToWebviewMessage =
   | PlanApprovalRequiredMessage
   | PromptHistoryResponseMessage
   | ActivitySummaryMessage
+  | ToolActivityMessage
   | PermissionModeSettingMessage
   | GitPushResultMessage
   | GitPushSettingsMessage

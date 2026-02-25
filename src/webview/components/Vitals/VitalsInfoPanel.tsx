@@ -161,7 +161,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6, flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Claude Account</span>
+          <span data-tooltip="Manage your Claude CLI authentication. Login to use your Anthropic account quota instead of an API key.">Claude Account</span>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <button
               className="vitals-info-close"
@@ -222,7 +222,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6, flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>API Key</span>
+          <span data-tooltip="Set an Anthropic API key for direct API access. Stored securely in the OS keychain. Used when no Claude CLI auth is available.">API Key</span>
           {hasApiKey ? (
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <span style={{ fontFamily: 'monospace', fontSize: 11, opacity: 0.7 }}>{maskedApiKey}</span>
@@ -287,7 +287,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
       </div>
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
-        <span>Translate to</span>
+        <span data-tooltip="Automatically translate Claude's responses to the selected language. A translate button will appear on each assistant message.">Translate to</span>
         <select
           className="vitals-info-language-select"
           value={translationLanguage}
@@ -300,7 +300,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
       </div>
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
-        <span>Adventure Widget</span>
+        <span data-tooltip="A pixel-art dungeon crawler that visualizes your coding session. Each Claude turn becomes a room: scrolls for reads, anvils for edits, traps for errors, dragons for 3+ errors.">Adventure Widget</span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {adventureEnabled && (
             <button
@@ -322,7 +322,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
       </div>
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
-        <span>Semantic Analysis</span>
+        <span data-tooltip="Analyze each Claude turn using AI to extract insights like intent, quality, and key decisions. Results appear in the turn details.">Semantic Analysis</span>
         <button
           className={`vitals-info-toggle-btn ${turnAnalysisEnabled ? 'on' : 'off'}`}
           onClick={handleTurnAnalysisToggle}
@@ -332,7 +332,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
       </div>
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
-        <span>Analysis Model</span>
+        <span data-tooltip="Choose which Claude model performs the semantic analysis. Haiku is fastest and cheapest, Opus is most capable but slower.">Analysis Model</span>
         <select
           className="vitals-info-language-select"
           value={analysisModel}
@@ -345,7 +345,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
       </div>
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
-        <span>Skill Generation</span>
+        <span data-tooltip="Automatically generate reusable skill files from completed conversations. Skills capture patterns and solutions for future use.">Skill Generation</span>
         <button
           className={`vitals-info-toggle-btn ${skillGenEnabled ? 'on' : 'off'}`}
           onClick={handleSkillGenToggle}
@@ -355,7 +355,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
       </div>
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
-        <span>Usage Widget</span>
+        <span data-tooltip="Show a floating widget displaying real-time API usage costs and token counts for the current session.">Usage Widget</span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {usageWidgetEnabled && (
             <button
@@ -377,7 +377,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
       </div>
 
       <div className="vitals-info-toggle-row">
-        <span>Show Vitals</span>
+        <span data-tooltip="Toggle the session vitals display: weather icon, timeline minimap, and intensity borders on assistant messages.">Show Vitals</span>
         <button
           className={`vitals-info-toggle-btn ${vitalsEnabled ? 'on' : 'off'}`}
           onClick={handleToggle}

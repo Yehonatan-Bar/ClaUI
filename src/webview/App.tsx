@@ -43,6 +43,7 @@ export const App: React.FC = () => {
     pendingApproval,
     providerCapabilities,
     promptHistoryPanelOpen,
+    currentToolActivity,
     activitySummary,
     achievementsEnabled,
     achievementPanelOpen,
@@ -271,7 +272,9 @@ export const App: React.FC = () => {
                 <span className="busy-indicator-text" dir={activityDir}>
                   {isBusy ? (
                     isResuming ? 'Resuming conversation...' : (
-                      activitySummary ? activitySummary.shortLabel + '...' : 'Thinking...'
+                      currentToolActivity ? currentToolActivity + '...' : (
+                        activitySummary ? activitySummary.shortLabel + '...' : 'Thinking...'
+                      )
                     )
                   ) : (
                     activitySummary ? activitySummary.shortLabel : ''

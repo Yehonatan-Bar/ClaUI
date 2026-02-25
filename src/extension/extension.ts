@@ -12,6 +12,7 @@ import { SkillGenService } from './skillgen/SkillGenService';
 import { installSkillFiles, injectClaudeMdInstructions } from './skillgen/SrPtdBootstrap';
 import { TokenUsageRatioTracker } from './session/TokenUsageRatioTracker';
 import { registerCommands } from './commands';
+import { registerDiscoverCommand } from './session/SessionDiscovery';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -108,6 +109,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register commands routed through the tab manager
   registerCommands(context, tabManager, sessionStore, log, logDir);
+  registerDiscoverCommand(context, tabManager, log);
 
   // First-run welcome notification
   const hasShownWelcome = context.globalState.get<boolean>('claui.welcomeShown', false);

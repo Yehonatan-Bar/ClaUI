@@ -1846,6 +1846,13 @@ export class MessageHandler {
           toolName: data.toolName,
           toolId: data.toolId,
         });
+        // Real-time tool activity indicator (instant, no API calls)
+        const baseTool = data.toolName.includes('__') ? data.toolName.split('__').pop() || data.toolName : data.toolName;
+        this.webview.postMessage({
+          type: 'toolActivity',
+          toolName: data.toolName,
+          detail: `Using ${baseTool}`,
+        });
         if (this.adventureInterpreter) {
           this.emitAdventureBeat(this.buildLiveToolBeat(data.toolName), 'toolUseStart');
         }
@@ -1882,6 +1889,12 @@ export class MessageHandler {
           }
           this.achievementService.onToolUse(this.tabId, toolName, rawInput);
           this.collectAdventureContext(toolName, rawInput);
+          // Real-time tool activity: send enriched detail now that we have full input
+          this.webview.postMessage({
+            type: 'toolActivity',
+            toolName,
+            detail: this.formatToolActivity(toolName, rawInput),
+          });
           // Extract Bash command strings for dashboard
           if (toolName === 'Bash') {
             try {
@@ -2141,6 +2154,8 @@ export class MessageHandler {
         this.currentAdventureArtifacts.clear();
         this.currentAdventureIndicators.clear();
         this.currentAdventureCommandTags.clear();
+        // Clear tool activity indicator before marking idle
+        this.webview.postMessage({ type: 'toolActivity', toolName: '', detail: '' });
         this.webview.postMessage({ type: 'processBusy', busy: false });
       }
     );
@@ -2480,6 +2495,68 @@ export class MessageHandler {
       return JSON.stringify(input);
     } catch {
       return '';
+    }
+  }
+
+  /**
+   * Create a human-readable tool activity description for the busy indicator.
+   * Returns a short label like "Reading src/app.ts" or "Running: npm test".
+   */
+  private formatToolActivity(toolName: string, rawJson: string): string {
+    const baseName = toolName.includes('__') ? toolName.split('__').pop() || toolName : toolName;
+
+    let key = '';
+    try {
+      const parsed = JSON.parse(rawJson) as Record<string, unknown>;
+      key =
+        (typeof parsed.file_path === 'string' && parsed.file_path) ||
+        (typeof parsed.path === 'string' && parsed.path) ||
+        (typeof parsed.command === 'string' && parsed.command) ||
+        (typeof parsed.pattern === 'string' && parsed.pattern) ||
+        (typeof parsed.query === 'string' && parsed.query) ||
+        (typeof parsed.url === 'string' && parsed.url) ||
+        (typeof parsed.prompt === 'string' && parsed.prompt) ||
+        '';
+    } catch {
+      // Partial JSON - try regex fallback
+      const m = rawJson.match(/"(?:file_path|path|command|pattern|query|url)"\s*:\s*"([^"]{1,200})"/);
+      if (m?.[1]) key = m[1];
+    }
+
+    // Truncate long values
+    if (key.length > 60) key = key.slice(0, 57) + '...';
+
+    // Extract just the filename from paths for Read/Write/Edit
+    const filename = (val: string) => {
+      const parts = val.replace(/\\/g, '/').split('/');
+      return parts[parts.length - 1] || val;
+    };
+
+    switch (baseName) {
+      case 'Read':
+        return key ? `Reading ${filename(key)}` : 'Reading file';
+      case 'Write':
+        return key ? `Writing ${filename(key)}` : 'Writing file';
+      case 'Edit':
+        return key ? `Editing ${filename(key)}` : 'Editing file';
+      case 'Bash':
+        return key ? `Running: ${key.length > 50 ? key.slice(0, 47) + '...' : key}` : 'Running command';
+      case 'Grep':
+        return key ? `Searching: ${key}` : 'Searching code';
+      case 'Glob':
+        return key ? `Finding files: ${key}` : 'Finding files';
+      case 'Task':
+        return 'Running agent';
+      case 'WebFetch':
+        return key ? `Fetching: ${key.length > 40 ? key.slice(0, 37) + '...' : key}` : 'Fetching URL';
+      case 'WebSearch':
+        return key ? `Searching web: ${key}` : 'Searching web';
+      case 'TodoWrite':
+        return 'Updating tasks';
+      case 'NotebookEdit':
+        return 'Editing notebook';
+      default:
+        return `Using ${baseName}`;
     }
   }
 

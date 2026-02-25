@@ -68,9 +68,17 @@ Dropdown panel opened by clicking the "Vitals" button in the StatusBar. Shows ex
 
 - **File**: `src/webview/components/Vitals/VitalsInfoPanel.tsx`
 - **Content**: Explains weather icon, cost heat bar, timeline, intensity borders, and adventure widget
-- **Utilities**:
-  - **Claude Account row**: Login (opens VS Code terminal and runs `claude auth login`), Logout (background `claude auth logout`), Refresh (manual status poll after browser/terminal auth flow), status text (email + subscription type when available)
-  - **API Key row**: Set/Clear explicit Anthropic API key (separate from Claude subscription login)
+- **Tooltips**: Every setting label has a `data-tooltip` attribute providing a description of the feature. Uses the global tooltip system (event-delegated via `data-tooltip` attribute, styled as `.global-tooltip` in `global.css`).
+- **Settings rows** (each with descriptive tooltip on hover):
+  - **Claude Account**: Login/Logout/Refresh buttons for Claude CLI authentication
+  - **API Key**: Set/Clear explicit Anthropic API key (stored in OS keychain)
+  - **Translate to**: Language selector for automatic response translation
+  - **Adventure Widget**: Toggle + Reset position button
+  - **Semantic Analysis**: Toggle AI-powered turn analysis
+  - **Analysis Model**: Choose Haiku/Sonnet/Opus for analysis
+  - **Skill Generation**: Toggle automatic skill file generation
+  - **Usage Widget**: Toggle floating cost/token widget + Reset position
+  - **Show Vitals**: Toggle the entire vitals display (weather, timeline, borders)
 - **State**: Claude auth status is mirrored into Zustand (`claudeAuthLoggedIn`, `claudeAuthEmail`, `claudeAuthSubscriptionType`) via `claudeAuthStatus` postMessage
 - **Extension flow**: `MessageHandler` sends auth status on webview `ready` and on explicit refresh/logout
 - **Closes on**: clicking the close button or clicking outside the panel

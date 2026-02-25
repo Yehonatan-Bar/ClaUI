@@ -115,6 +115,9 @@ export interface AppState {
   projectPromptHistory: string[];
   globalPromptHistory: string[];
 
+  // Real-time tool activity (lightweight, no API calls)
+  currentToolActivity: string | null;
+
   // Activity summary (from Haiku)
   activitySummary: { shortLabel: string; fullSummary: string } | null;
 
@@ -290,6 +293,7 @@ export interface AppState {
   setCodexModelOptions: (options: CodexModelOption[]) => void;
   setPendingApproval: (approval: { toolName: string; planText: string } | null) => void;
   truncateFromMessage: (messageId: string) => void;
+  setToolActivity: (detail: string | null) => void;
   setActivitySummary: (summary: { shortLabel: string; fullSummary: string } | null) => void;
   setPromptHistoryPanelOpen: (open: boolean) => void;
   setPermissionMode: (mode: 'full-access' | 'supervised') => void;
@@ -512,6 +516,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   promptHistoryPanelOpen: false,
   projectPromptHistory: [],
   globalPromptHistory: [],
+  currentToolActivity: null,
   activitySummary: null,
   permissionMode: 'full-access' as const,
   gitPushSettings: null,
@@ -649,6 +654,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         streamingBlocks: [],
         lastAssistantSnapshot: null,
         pendingApproval: null,
+        currentToolActivity: null,
         activitySummary: null,
         sessionActivityElapsedMs: finalElapsed,
         sessionActivityRunningSinceMs: null,
@@ -899,6 +905,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       streamingBlocks: [],
       lastAssistantSnapshot: null,
       isResuming: false,
+      currentToolActivity: null,
     });
   },
 
@@ -926,12 +933,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!busy && state.sessionActivityRunningSinceMs !== null) {
         return {
           isBusy: false,
+          currentToolActivity: null,
           sessionActivityElapsedMs: state.sessionActivityElapsedMs + (now - state.sessionActivityRunningSinceMs),
           sessionActivityRunningSinceMs: null,
         };
       }
 
-      return { isBusy: busy };
+      return { isBusy: busy, ...(!busy ? { currentToolActivity: null } : {}) };
     }),
 
   markActivity: () => set({ lastActivityAt: Date.now() }),
@@ -998,6 +1006,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         weather: calculateWeather(retainedTurns),
       };
     }),
+
+  setToolActivity: (detail) => set({ currentToolActivity: detail }),
 
   setActivitySummary: (summary) => set({ activitySummary: summary }),
 
@@ -1267,6 +1277,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       promptHistoryPanelOpen: false,
       projectPromptHistory: [],
       globalPromptHistory: [],
+      currentToolActivity: null,
       activitySummary: null,
       permissionMode: 'full-access' as const,
       gitPushSettings: null,
