@@ -803,12 +803,19 @@ export class MessageHandler {
             this.log(`Question answer: "${answer}"`);
             this.control.sendText(answer);
           }
-          }
           this.clearApprovalTracking();
           // Suppress stale re-notifications from late assistantMessage events
           // that may arrive after the user has already responded.
           this.approvalResponseProcessed = true;
-          this.webview.postMessage({ type: 'processBusy', busy: true });
+          // For ExitPlanMode: DON'T send processBusy:true. The CLI already
+          // auto-approved and may have already finished executing (sent result
+          // with processBusy:false). Sending processBusy:true here would create
+          // a stuck "Thinking..." indicator with no matching processBusy:false.
+          // For all other approvals: text was sent to the CLI, so we are busy.
+          if (!isExitPlanMode) {
+            this.webview.postMessage({ type: 'processBusy', busy: true });
+          }
+          }
           break;
 
         case 'forkFromMessage':

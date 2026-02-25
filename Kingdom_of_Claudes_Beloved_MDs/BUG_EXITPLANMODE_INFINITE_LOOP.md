@@ -7,6 +7,7 @@ The plan approval bar (4 CLI-matching options) and AskUserQuestion interactive c
 **Date First Fixed**: 2026-02-23
 **Date Second Fix**: 2026-02-23
 **Date Third Fix**: 2026-02-24 (approval bar visibility)
+**Date Fourth Fix**: 2026-02-25 (stuck Thinking after plan approval)
 **Severity**: Critical (blocks plan mode workflow)
 **Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`, `src/webview/components/InputArea/InputArea.tsx`
 
@@ -65,6 +66,14 @@ Both ExitPlanMode and AskUserQuestion bars were affected (AskUserQuestion was re
 1. **Removed `messageStart` clearing** in `useClaudeStream.ts` - approval bars now persist until user interaction
 2. **Fixed InputArea text routing** - text typed during ExitPlanMode bar is sent as a regular message (not silently-dropped feedback)
 
+### Fourth Bug (2026-02-25): Stuck "Thinking..." After Plan Approval
+
+**Cause**: After clicking approve on the ExitPlanMode approval bar, `processBusy: true` was unconditionally sent to the webview (line 811). But for ExitPlanMode, no text is sent to the CLI (the CLI already auto-approved and moved on). By the time the user clicks approve, the CLI may have already finished implementing and sent `result` with `processBusy: false`. The new `processBusy: true` has no matching `processBusy: false`, leaving the webview permanently stuck showing "Thinking...".
+
+**Symptoms**: After approving a plan, the UI shows only "Thinking..." indefinitely. Implementation messages (tool calls, text) may exist in the chat above the indicator but the user doesn't notice them because of the stuck indicator.
+
+**Fix**: Skip sending `processBusy: true` for ExitPlanMode approval responses. Since no text is sent to the CLI, the session isn't becoming busy. The approval bar is already cleared by the webview component itself (`setPendingApproval(null)` in PlanApprovalBar.tsx).
+
 ---
 
 ## Current Defense Layers
@@ -74,6 +83,7 @@ Both ExitPlanMode and AskUserQuestion bars were affected (AskUserQuestion was re
 | `exitPlanModeProcessed` flag | MessageHandler.ts `notifyPlanApprovalRequired` | Stale re-triggers from late events/replays |
 | Block ALL ExitPlanMode text to CLI | MessageHandler.ts `planApprovalResponse` | Spurious user messages even if bar somehow appears |
 | InputArea sends regular message (not feedback) | InputArea.tsx `sendMessage` | Text typed during ExitPlanMode goes as new user message, not dropped |
+| Skip `processBusy:true` for ExitPlanMode | MessageHandler.ts `planApprovalResponse` | Stuck "Thinking..." indicator after plan approval |
 
 The `messageStart` clearing was **removed** as a defense layer because it made the approval bar invisible.
 
@@ -134,6 +144,13 @@ if (isExitPlanMode) {
   if (msg.action === 'approveClearBypass') this.control.compact();
   else if (msg.action === 'approveManual') { /* switch permission mode */ }
 }
+// ... (non-ExitPlanMode branches send text to CLI) ...
+this.clearApprovalTracking();
+this.approvalResponseProcessed = true;
+// Only send processBusy:true for non-ExitPlanMode (where text was sent to CLI)
+if (!isExitPlanMode) {
+  this.webview.postMessage({ type: 'processBusy', busy: true });
+}
 ```
 
 ---
@@ -141,7 +158,7 @@ if (isExitPlanMode) {
 ## Bar Lifecycle
 
 The approval bar is cleared when:
-1. **User clicks a button** -> `planApprovalResponse` -> `processBusy: true` -> bar cleared
+1. **User clicks a button** -> PlanApprovalBar calls `setPendingApproval(null)` directly. For non-ExitPlanMode, also triggers `processBusy: true` from extension. For ExitPlanMode, no `processBusy:true` is sent (since CLI already moved on).
 2. **User sends a regular message** -> `sendMessage` -> `processBusy: true` -> bar cleared
 3. **New `planApprovalRequired` replaces it** (e.g., AskUserQuestion replaced by ExitPlanMode)
 4. **Session resets**
@@ -169,6 +186,7 @@ If the model calls AskUserQuestion and then ExitPlanMode in quick succession (co
 2. Give a task that triggers plan mode (e.g., ask Claude to plan a complex feature)
 3. When the approval bar appears with 4 options, verify it stays visible
 4. Click any approve button -> verify model continues without bar re-appearing
-5. Test typing text while bar is visible -> verify it sends as regular message (not dropped)
-6. Check logs (`Output -> ClaUi`): should see `"ExitPlanMode approved - closing bar without sending user message"`
-7. Test AskUserQuestion: give a task that triggers a question, verify option buttons appear
+5. **Verify NO stuck "Thinking..."** -> after clicking approve, the indicator should NOT show "Thinking..." indefinitely. If the CLI already finished, no indicator should show. If still executing, tool activity messages should appear.
+6. Test typing text while bar is visible -> verify it sends as regular message (not dropped)
+7. Check logs (`Output -> ClaUi`): should see `"ExitPlanMode approved - closing bar without sending user message"`
+8. Test AskUserQuestion: give a task that triggers a question, verify option buttons appear. After answering, "Thinking..." should show (text IS sent to CLI for AskUserQuestion).
