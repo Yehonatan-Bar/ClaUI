@@ -40,6 +40,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private messageCallback: ((msg: WebviewToExtensionMessage) => void) | null = null;
   private isWebviewReady = false;
   private pendingMessages: ExtensionToWebviewMessage[] = [];
+  private webviewPostDeliveryQueue: Promise<void> = Promise.resolve();
   private disposed = false;
   private baseTitle = '';
   private isBusy = false;
@@ -64,6 +65,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private sessionNamingRequested = false;
   /** Auto-generated name produced before Codex emits thread.started (avoid title overwrite race). */
   private deferredAutoSessionName: string | null = null;
+  /** Fork initialization data (history snapshot + prompt text) for new forked tabs */
+  private forkInitData: { promptText: string; messages: SerializedChatMessage[] } | null = null;
   private turnDiagSeq = 0;
   private turnDiagHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private activeTurnDiag: {
@@ -168,11 +171,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       this.pendingMessages.push(msg);
       return;
     }
-    try {
-      void this.panel.webview.postMessage(msg);
-    } catch {
-      this.disposed = true;
-    }
+    this.enqueueWebviewPost(msg);
   }
 
   onMessage(callback: (msg: WebviewToExtensionMessage) => void): void {
@@ -193,25 +192,22 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   }
 
   async startSession(options?: { resume?: string; fork?: boolean; cwd?: string }): Promise<void> {
-    if (options?.fork) {
-      this.postMessage({ type: 'error', message: 'Fork is not supported in Codex MVP yet.' });
-      return;
-    }
+    const isFork = !!options?.fork;
 
     this.sessionCwd =
       options?.cwd ||
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
       this.sessionCwd;
     this.sessionActive = true;
-    this.threadId = options?.resume || null;
+    this.threadId = isFork ? null : (options?.resume || null);
     this.currentModel = this.getCurrentModel();
-    this.sessionStartedAt = this.sessionStartedAt || new Date().toISOString();
+    this.sessionStartedAt = isFork ? new Date().toISOString() : (this.sessionStartedAt || new Date().toISOString());
     this.analyticsSaved = false;
     this.sessionNamingRequested = false;
     this.deferredAutoSessionName = null;
     this.achievementService.onSessionStart(this.id);
 
-    if (options?.resume) {
+    if (options?.resume && !isFork) {
       this.restoreSessionName(options.resume);
       this.loadAndSendConversationHistory(options.resume);
       this.persistSessionMetadata();
@@ -221,9 +217,18 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       type: 'sessionStarted',
       sessionId: this.threadId || 'pending',
       model: this.currentModel || 'codex',
-      isResume: !!options?.resume,
+      isResume: !!options?.resume && !isFork,
       provider: 'codex',
     });
+
+    if (this.forkInitData) {
+      this.postMessage({
+        type: 'forkInit',
+        promptText: this.forkInitData.promptText,
+        messages: this.forkInitData.messages,
+      });
+      this.forkInitData = null;
+    }
   }
 
   async clearSession(options?: { cwd?: string }): Promise<void> {
@@ -368,8 +373,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.panel.dispose();
   }
 
-  setForkInit(_init: { promptText: string; messages: SerializedChatMessage[] }): void {
-    this.postMessage({ type: 'error', message: 'Fork is not supported in Codex MVP yet.' });
+  setForkInit(init: { promptText: string; messages: SerializedChatMessage[] }): void {
+    this.forkInitData = init;
   }
 
   private restoreSessionName(sessionId: string): boolean {
@@ -1197,12 +1202,30 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     }
     const queued = this.pendingMessages;
     this.pendingMessages = [];
-    try {
-      for (const message of queued) {
-        void this.panel.webview.postMessage(message);
-      }
-    } catch {
-      this.disposed = true;
+    for (const message of queued) {
+      this.enqueueWebviewPost(message);
     }
+  }
+
+  /**
+   * VS Code webview.postMessage() is async (Thenable<boolean>). Queue deliveries to
+   * preserve message order at the actual webview boundary (not just caller order).
+   */
+  private enqueueWebviewPost(msg: ExtensionToWebviewMessage): void {
+    this.webviewPostDeliveryQueue = this.webviewPostDeliveryQueue
+      .catch(() => undefined)
+      .then(async () => {
+        if (this.disposed || !this.isWebviewReady) {
+          return;
+        }
+        try {
+          const delivered = await this.panel.webview.postMessage(msg);
+          if (delivered === false) {
+            this.log(`[Codex Tab ${this.tabNumber}] webview.postMessage(${msg.type}) returned false`);
+          }
+        } catch {
+          this.disposed = true;
+        }
+      });
   }
 }

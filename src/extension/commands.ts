@@ -491,8 +491,11 @@ export function registerCommands(
     vscode.commands.registerCommand(
       'claudeMirror.forkFromMessage',
       async (sessionId: string, forkMessageIndex: number, promptText: string, messages: SerializedChatMessage[]) => {
-        log(`Forking session ${sessionId} from message index ${forkMessageIndex}, historyLen=${messages?.length ?? 0}`);
-        const tab = tabManager.createTab();
+        const sourceProvider = sessionStore.getSession(sessionId)?.provider ?? 'claude';
+        log(
+          `Forking ${sourceProvider} session ${sessionId} from message index ${forkMessageIndex}, historyLen=${messages?.length ?? 0}`
+        );
+        const tab = tabManager.createTabForProvider(sourceProvider);
         try {
           tab.setForkInit({ promptText, messages: messages || [] });
           await tab.startSession({ resume: sessionId, fork: true });

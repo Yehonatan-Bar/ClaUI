@@ -300,7 +300,8 @@
 **מושבת במפורש ב־Codex MVP**
 - `compact` (הודעת error ברורה)
 - `planApprovalResponse` (לא אמור להופיע)
-- `forkSession` / `forkFromMessage` (error/hide)
+- `forkSession` (error/hide)
+- `forkFromMessage` (supported: opens a new Codex tab, copies history up to the forked message, prefills that message in the input)
 - `setPermissionMode` (ignored/hide control)
 - `translateMessage` (מושבת או נשאר Claude-only לפי החלטה)
 - `enhancePrompt` (מושבת או נשאר Claude-only לפי החלטה)
@@ -592,7 +593,7 @@ UI יסתיר לפי capabilities:
 **מושבת במפורש**
 - compact
 - plan approval bar
-- fork conversation
+- fork conversation from message (simple UI fork: new Codex tab + copied history + input prefill)
 - Claude permission mode selector
 - Claude AI enhancer / translator / turn analyzer / activity summarizer / session namer (שלב ראשון)
 
@@ -606,7 +607,7 @@ UI יסתיר לפי capabilities:
 5. Codex cancel: ביטול באמצע turn, אחר כך send חדש עובד.
 6. Codex history: session נשמרת ומופיעה ב־`showHistory`.
 7. Resume Codex: פתיחה מהיסטוריה טוענת שיחה קודמת.
-8. UI gating: אין Plan/Fork/Compact שבורים ב־Codex.
+8. UI gating: אין Plan/Compact שבורים ב־Codex; `forkFromMessage` works, `forkSession` remains disabled.
 9. Mixed history migration: sessions ישנים (Claude ללא provider field) עדיין מוצגים.
 10. Dashboard stability: no crashes עם sessions משני providers.
 

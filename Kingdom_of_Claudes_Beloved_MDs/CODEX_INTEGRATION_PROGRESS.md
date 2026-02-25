@@ -350,3 +350,19 @@ Verification note:
 - Added a second hardening layer in the webview (`useClaudeStream`):
   - when provider is Codex and an `assistantMessage` arrives while a streaming message is active, immediately `addAssistantMessage(...)` (upsert by message ID) in addition to updating the snapshot
   - this preserves the reply even if `messageStop` / `costUpdate` / `processBusy(false)` finalize/clear ordering is still unlucky at the webview boundary
+
+### Follow-up (same day): reproduction still observed again (`בעיית גישה מקומית`, ~12:04 local)
+
+- New repro still showed the same pattern in logs for Codex Tab 2:
+  - `Codex agent_message`
+  - `Codex JSON: turn.completed`
+  - `setBusy(false) prev=true`
+  - process exit `code=0`
+- User observation strongly narrowed scope further:
+  - after `Developer: Reload Window`, the missing live replies appear in the conversation history
+  - this indicates messages are being persisted/available, but live webview delivery/render synchronization is failing
+- Added a third hardening layer at the actual VS Code webview boundary (`CodexSessionTab`):
+  - `CodexSessionTab.postMessage()` no longer fire-and-forgets `void panel.webview.postMessage(msg)`
+  - it now queues deliveries and awaits the VS Code `Thenable<boolean>` from `panel.webview.postMessage(...)`
+  - `flushPendingMessages()` also routes through the same queue
+  - this preserves message order at the real async delivery layer (not only at `CodexMessageHandler` call order)
