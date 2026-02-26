@@ -13,6 +13,7 @@ import { installSkillFiles, injectClaudeMdInstructions } from './skillgen/SrPtdB
 import { TokenUsageRatioTracker } from './session/TokenUsageRatioTracker';
 import { registerCommands } from './commands';
 import { registerDiscoverCommand } from './session/SessionDiscovery';
+import { ClaUiSidebarViewProvider } from './sidebar/ClaUiSidebarViewProvider';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -110,19 +111,19 @@ export function activate(context: vscode.ExtensionContext): void {
   // Register commands routed through the tab manager
   registerCommands(context, tabManager, sessionStore, log, logDir);
   registerDiscoverCommand(context, tabManager, log);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      ClaUiSidebarViewProvider.viewType,
+      new ClaUiSidebarViewProvider(context, log)
+    )
+  );
 
-  // First-run welcome notification
-  const hasShownWelcome = context.globalState.get<boolean>('claui.welcomeShown', false);
-  if (!hasShownWelcome) {
-    void context.globalState.update('claui.welcomeShown', true);
-    void vscode.window.showInformationMessage(
-      'ClaUI is ready! Press Ctrl+Shift+C to open a Claude session.',
-      'Open ClaUI'
-    ).then(selection => {
-      if (selection === 'Open ClaUI') {
-        void vscode.commands.executeCommand('claudeMirror.startSession');
-      }
-    });
+  // First install: auto-open a Claude session so the user sees ClaUI immediately
+  const hasLaunched = context.globalState.get<boolean>('claui.hasLaunched', false);
+  if (!hasLaunched) {
+    void context.globalState.update('claui.hasLaunched', true);
+    log('First install detected - auto-opening ClaUI session');
+    void vscode.commands.executeCommand('claudeMirror.startSession');
   }
 
   // Permanent launcher status bar item (always visible)

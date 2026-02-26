@@ -8,6 +8,7 @@ import { CodexMessageHandler, type CodexSessionController } from '../webview/Cod
 import { buildWebviewHtml } from '../webview/WebviewProvider';
 import { CodexConversationReader } from './CodexConversationReader';
 import { CodexSessionNamer } from './CodexSessionNamer';
+import { MessageTranslator } from './MessageTranslator';
 import { FileLogger } from './FileLogger';
 import type { WebviewBridge } from '../webview/MessageHandler';
 import type { SessionTabCallbacks } from './SessionTab';
@@ -132,6 +133,9 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     };
     this.processManager.setLogger(tabLog);
     this.messageHandler.setLogger(tabLog);
+    const messageTranslator = new MessageTranslator();
+    messageTranslator.setLogger(tabLog);
+    this.messageHandler.setMessageTranslator(messageTranslator);
     this.sessionNamer = new CodexSessionNamer();
     this.sessionNamer.setLogger(tabLog);
 

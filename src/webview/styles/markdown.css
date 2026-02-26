@@ -210,3 +210,18 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* Clickable file paths and URLs inside inline code (backtick-wrapped) */
+.markdown-content code.file-path-link,
+.markdown-content code.url-link {
+  color: var(--vscode-textLink-foreground, #3794ff);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.markdown-content code.file-path-link:hover,
+.markdown-content code.url-link:hover {
+  color: var(--vscode-textLink-activeForeground, #3794ff);
+  text-decoration: underline;
+}

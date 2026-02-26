@@ -38,6 +38,45 @@ const PURIFY_CONFIG = {
 };
 
 /**
+ * Find inline <code> elements (not inside <pre>) whose entire text is a file path
+ * or URL, and make them clickable by adding link classes and data attributes.
+ * This handles the common case where Claude wraps file paths in backticks.
+ */
+function linkifyCodeElements(container: HTMLElement): void {
+  const codeElements = container.querySelectorAll('code:not(pre code)');
+
+  for (const codeEl of codeElements) {
+    const text = (codeEl.textContent || '').trim();
+    if (!text) continue;
+
+    // Test if the entire text is a file path
+    const fileRegex = new RegExp(FILE_PATH_REGEX.source);
+    const fileMatch = fileRegex.exec(text);
+    if (fileMatch && fileMatch.index === 0 && fileMatch[0] === text) {
+      const el = codeEl as HTMLElement;
+      el.classList.add('file-path-link');
+      el.dataset.path = text;
+      el.title = `Click to open ${text}`;
+      el.setAttribute('role', 'link');
+      el.tabIndex = 0;
+      continue;
+    }
+
+    // Test if the entire text is a URL
+    const urlRegex = new RegExp(URL_REGEX.source);
+    const urlMatch = urlRegex.exec(text);
+    if (urlMatch && urlMatch.index === 0 && urlMatch[0] === text) {
+      const el = codeEl as HTMLElement;
+      el.classList.add('url-link');
+      el.dataset.url = text;
+      el.title = text;
+      el.setAttribute('role', 'link');
+      el.tabIndex = 0;
+    }
+  }
+}
+
+/**
  * Walk text nodes in a container and wrap file paths / URLs with clickable spans.
  * Skips nodes inside <code>, <pre>, and <a> elements.
  */
@@ -133,6 +172,9 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ text }) => {
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    // Linkify file paths and URLs in inline <code> elements (backtick-wrapped paths)
+    linkifyCodeElements(container);
 
     // Linkify bare file paths and URLs in text nodes
     linkifyTextNodes(container);
