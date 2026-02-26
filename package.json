@@ -1,7 +1,7 @@
 {
   "name": "claude-code-mirror",
   "displayName": "ClaUi",
-  "description": "Rich chat UI for Claude Code - multiple tabs, model selection, file sending, image paste, and more",
+  "description": "The full IDE experience for Claude Code - multi-tab sessions, analytics, achievements, dual providers, prompt enhancement, and deep customization",
   "version": "0.1.55",
   "publisher": "JhonBar",
   "icon": "images/icon.png",
@@ -23,6 +23,17 @@
     "AI",
     "Chat"
   ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai-chat",
+    "copilot",
+    "ai-assistant"
+  ],
+  "galleryBanner": {
+    "color": "#1a1a2e",
+    "theme": "dark"
+  },
   "activationEvents": [
     "onStartupFinished"
   ],
