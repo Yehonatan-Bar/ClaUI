@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClaUi - תוכנית שכתוב README</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 {
+            font-size: 2.4em;
+            text-align: center;
+            margin-bottom: 8px;
+            background: linear-gradient(90deg, #00d2ff, #928dab);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle {
+            text-align: center;
+            color: #928dab;
+            font-size: 1.1em;
+            margin-bottom: 40px;
+        }
+        .section {
+            background: rgba(255,255,255,0.06);
+            border-radius: 16px;
+            padding: 28px 32px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .section h2 {
+            font-size: 1.4em;
+            color: #00d2ff;
+            margin-bottom: 16px;
+            border-bottom: 1px solid rgba(0,210,255,0.2);
+            padding-bottom: 8px;
+        }
+        .section p {
+            line-height: 1.8;
+            color: #c0c0c0;
+            margin-bottom: 12px;
+        }
+        .highlight {
+            color: #00d2ff;
+            font-weight: 600;
+        }
+        .group-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .group-card {
+            background: rgba(255,255,255,0.04);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+        .group-card h3 {
+            color: #928dab;
+            font-size: 1.05em;
+            margin-bottom: 8px;
+        }
+        .group-card p {
+            font-size: 0.92em;
+            color: #a0a0a0;
+            line-height: 1.6;
+        }
+        ul { padding-right: 20px; margin-top: 8px; }
+        li { margin-bottom: 6px; line-height: 1.6; color: #b0b0b0; }
+        .badge {
+            display: inline-block;
+            background: rgba(0,210,255,0.12);
+            color: #00d2ff;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin-left: 8px;
+            margin-bottom: 8px;
+        }
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+        }
+        .stat {
+            background: rgba(255,255,255,0.06);
+            padding: 12px 24px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .stat .num { font-size: 1.5em; color: #00d2ff; font-weight: 700; }
+        .stat .label { font-size: 0.82em; color: #928dab; margin-top: 2px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ClaUi - שכתוב עמוד ה-README</h1>
+        <p class="subtitle">תוכנית לעדכון דף המרקטפלייס של התוסף</p>
+
+        <div class="status-bar">
+            <div class="stat"><div class="num">1</div><div class="label">קובץ ראשי</div></div>
+            <div class="stat"><div class="num">6</div><div class="label">קבוצות פיצ'רים</div></div>
+            <div class="stat"><div class="num">~250</div><div class="label">שורות חדשות</div></div>
+        </div>
+
+        <div class="section">
+            <h2>מה הבעיה?</h2>
+            <p>
+                דף ה-README הנוכחי (שזה גם דף המרקטפלייס) <span class="highlight">מיושן לחלוטין</span>.
+                הוא מציג כ-20 פיצ'רים ו-12 הגדרות, בזמן שהתוסף כולל למעלה מ-<span class="highlight">160 יכולות ב-32 קטגוריות</span> עם למעלה מ-40 הגדרות.
+            </p>
+            <p>
+                פיצ'רים משמעותיים כמו לוח אנליטיקס, מערכת הישגים (65 הישגים), תמיכה כפולה ב-Claude ו-Codex,
+                שיפור פרומפטים, תרגום הודעות, ויטלס, ווידג'ט ההרפתקה, קהילה ב-GitHub ועוד -
+                <span class="highlight">לא מוזכרים כלל</span>.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>מה נעשה?</h2>
+            <p>שכתוב מלא של README.md עם מבנה חדש, מושך ועדכני. בנוסף, עדכון שדות המטאדאטה ב-package.json.</p>
+        </div>
+
+        <div class="section">
+            <h2>המבנה החדש</h2>
+            <p>הפיצ'רים יאורגנו ב-<span class="highlight">6 קבוצות נושאיות</span> ברורות וקלות לסריקה:</p>
+
+            <div class="group-grid">
+                <div class="group-card">
+                    <h3>Chat & Sessions</h3>
+                    <p>ריבוי טאבים, צבעים, שמות אוטומטיים, היסטוריה, חידוש שיחה, Fork ועריכת הודעות</p>
+                </div>
+                <div class="group-card">
+                    <h3>Smart Input</h3>
+                    <p>הדבקת תמונות, @אזכור קבצים, היסטוריית פרומפטים, שיפור פרומפטים AI, ביטול/הפסקה</p>
+                </div>
+                <div class="group-card">
+                    <h3>AI Intelligence</h3>
+                    <p>ספק כפול (Claude + Codex), בחירת מודל, ניתוח סמנטי, תרגום ל-10 שפות, ייעוץ Codex</p>
+                </div>
+                <div class="group-card">
+                    <h3>Analytics & Insights</h3>
+                    <p>דשבורד מלא (סשן/פרויקט/משתמש), מעקב טוקנים, עלויות, ומדדי שימוש</p>
+                </div>
+                <div class="group-card">
+                    <h3>Gamification & Social</h3>
+                    <p>65 הישגים, XP ורמות, רצף יומי, סיכום סשן, קהילת GitHub, השוואה עם חברים</p>
+                </div>
+                <div class="group-card">
+                    <h3>Visual & Customization</h3>
+                    <p>4 ערכות נושא, ויטלס (מזג אוויר, טיימליין, אינטנסיביות), ווידג'ט הרפתקה, RTL</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>עדכונים נוספים</h2>
+            <ul>
+                <li><span class="highlight">טבלת מקשי קיצור</span> - עדכון ל-13 קיצורים (מ-14 הרשומים ב-package.json)</li>
+                <li><span class="highlight">טבלת פקודות</span> - עדכון ל-14 פקודות (מ-10 ב-README הנוכחי)</li>
+                <li><span class="highlight">טבלת הגדרות</span> - הרחבה ל-~20 הגדרות חשובות (מ-12) + הפניה לרשימה המלאה</li>
+                <li><span class="highlight">package.json</span> - עדכון תיאור, הוספת מילות מפתח ובאנר למרקטפלייס</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>אימות</h2>
+            <ul>
+                <li>בנייה והתקנה מקומית עם npm run deploy:local</li>
+                <li>בדיקה שה-README מרונדר נכון בתצוגה מקדימה</li>
+                <li>אימות שאין אימוג'ים</li>
+                <li>תיעוד SR-PTD</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
