@@ -1,0 +1,1 @@
+export { BugReportPanel } from './BugReportPanel';

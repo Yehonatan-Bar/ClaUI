@@ -10,6 +10,9 @@ export interface ProcessStartOptions {
   cwd?: string;
   model?: string;
   permissionMode?: 'full-access' | 'supervised';
+  /** When true, omit --replay-user-messages so a resumed session does not
+   *  re-emit old messages to the webview (used by edit-and-resend). */
+  skipReplay?: boolean;
 }
 
 export interface ProcessExitInfo {
@@ -61,8 +64,13 @@ export class ClaudeProcessManager extends EventEmitter {
       '--output-format', 'stream-json',
       '--input-format', 'stream-json',
       '--include-partial-messages',
-      '--replay-user-messages',
     ];
+
+    // Skip replay when resuming for edit-and-resend to avoid re-emitting
+    // old messages into the webview (which already has the truncated history).
+    if (!options?.skipReplay) {
+      args.push('--replay-user-messages');
+    }
 
     // Full Access: bypass all permission checks so tools run without approval
     // Supervised: restrict to read-only tools via --allowedTools

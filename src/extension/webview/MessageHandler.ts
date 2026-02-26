@@ -16,6 +16,7 @@ import type { SkillGenService } from '../skillgen/SkillGenService';
 import { getStoredApiKey, setStoredApiKey, maskApiKey } from '../process/envUtils';
 import type { TokenUsageRatioTracker } from '../session/TokenUsageRatioTracker';
 import { AuthManager } from '../auth/AuthManager';
+import { BugReportService } from '../feedback/BugReportService';
 import type {
   AdventureBeatMessage,
   ExtensionToWebviewMessage,
@@ -60,6 +61,8 @@ export interface WebviewBridge {
  */
 /** Tool names that require user approval when the CLI pauses after calling them */
 const APPROVAL_TOOLS = ['ExitPlanMode', 'AskUserQuestion'];
+/** If ExitPlanMode approve does not auto-resume quickly, send a proceed nudge */
+const EXIT_PLANMODE_APPROVE_RESUME_FALLBACK_DELAY_MS = 5000;
 
 function isApprovalToolName(name: string): boolean {
   const normalized = name.trim().toLowerCase();
@@ -143,6 +146,17 @@ export class MessageHandler {
    *  Reset to false when EnterPlanMode is detected (new plan cycle starts).
    *  Used to suppress stale re-triggers from late assistantMessage events or replayed sessions. */
   private exitPlanModeProcessed = false;
+  /** Monotonic ID for approval-bar cycles (ExitPlanMode / AskUserQuestion) */
+  private nextApprovalCycleId = 1;
+  /** Cycle ID for the currently visible/preserved approval bar */
+  private pendingApprovalCycleId: number | null = null;
+  /** True if a post-approval assistant turn started (auto-resume observed) */
+  private pendingApprovalCycleResumeObserved = false;
+  /** True if the Claude turn completed after the approval bar appeared */
+  private pendingApprovalCycleResultObserved = false;
+  /** Delayed fallback: nudge Claude to proceed if ExitPlanMode approve did not auto-resume */
+  private exitPlanApproveResumeFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+  private exitPlanApproveResumeFallbackCycleId: number | null = null;
 
   /** Activity summarizer: periodically summarizes tool activity via Haiku */
   private activitySummarizer: ActivitySummarizer | null = null;
@@ -193,6 +207,9 @@ export class MessageHandler {
   private projectAnalyticsStore: ProjectAnalyticsStore | null = null;
   private secrets: vscode.SecretStorage | null = null;
   private authManager: AuthManager | null = null;
+  private bugReportService: BugReportService | null = null;
+  private logDir = '';
+  private extensionVersion = '0.0.0';
 
   constructor(
     private readonly tabId: string,
@@ -279,6 +296,16 @@ export class MessageHandler {
   /** Attach the global TokenUsageRatioTracker */
   setTokenRatioTracker(tracker: TokenUsageRatioTracker): void {
     this.tokenRatioTracker = tracker;
+  }
+
+  /** Set the log directory path for bug reports */
+  setLogDir(dir: string): void {
+    this.logDir = dir;
+  }
+
+  /** Set the extension version for bug reports */
+  setExtensionVersion(version: string): void {
+    this.extensionVersion = version;
   }
 
   /** Provide SecretStorage for API key management */
@@ -380,6 +407,11 @@ export class MessageHandler {
           // If there was a pending approval, the user's message implicitly responds to it
           this.clearApprovalTracking();
           this.achievementService.onUserPrompt(this.tabId, msg.text);
+          // Optimistic: show user message in UI immediately (before CLI echoes it back)
+          this.webview.postMessage({
+            type: 'userMessage',
+            content: [{ type: 'text', text: msg.text } as ContentBlock],
+          });
           this.control.sendText(msg.text);
           this.webview.postMessage({ type: 'processBusy', busy: true });
           this.triggerSessionNaming(msg.text);
@@ -387,13 +419,29 @@ export class MessageHandler {
           void this.promptHistoryStore.addPrompt(msg.text);
           break;
 
-        case 'sendMessageWithImages':
+        case 'sendMessageWithImages': {
           this.log(`Sending message with ${msg.images.length} images`);
           // If there was a pending approval, the user's message implicitly responds to it
           this.clearApprovalTracking();
           if (msg.text.trim()) {
             this.achievementService.onUserPrompt(this.tabId, msg.text);
           }
+          // Optimistic: show user message in UI immediately (before CLI echoes it back)
+          const imgContent: ContentBlock[] = [];
+          if (msg.text) {
+            imgContent.push({ type: 'text', text: msg.text });
+          }
+          for (const img of msg.images) {
+            imgContent.push({
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: img.mediaType,
+                data: img.base64,
+              },
+            } as ContentBlock);
+          }
+          this.webview.postMessage({ type: 'userMessage', content: imgContent });
           this.control.sendWithImages(msg.text, msg.images);
           this.webview.postMessage({ type: 'processBusy', busy: true });
           this.triggerSessionNaming(msg.text);
@@ -401,6 +449,7 @@ export class MessageHandler {
             void this.promptHistoryStore.addPrompt(msg.text);
           }
           break;
+        }
 
         case 'cancelRequest':
           this.log('Cancel requested - killing process');
@@ -746,6 +795,51 @@ export class MessageHandler {
           vscode.commands.executeCommand('claudeMirror.sendFeedback');
           break;
 
+        // ----- Bug Report -----
+        case 'bugReportInit': {
+          this.log('[BugReport] Init requested');
+          void (async () => {
+            const apiKey = await this.getApiKey();
+            this.bugReportService = new BugReportService(
+              this.webview,
+              this.log,
+              this.extensionVersion,
+              this.logDir,
+              apiKey,
+            );
+            this.bugReportService.startAutoCollection();
+          })();
+          break;
+        }
+        case 'bugReportChat':
+          if (this.bugReportService) {
+            this.bugReportService.handleChatMessage(msg.message);
+          }
+          break;
+        case 'bugReportApproveScript':
+          if (this.bugReportService) {
+            this.bugReportService.executeScript(msg.command, msg.index);
+          }
+          break;
+        case 'bugReportSubmit':
+          if (this.bugReportService) {
+            this.bugReportService.submit(msg.mode, msg.description);
+          }
+          break;
+        case 'bugReportGetPreview':
+          if (this.bugReportService) {
+            const files = this.bugReportService.getPreview();
+            this.webview.postMessage({ type: 'bugReportPreview', files });
+          }
+          break;
+        case 'bugReportClose':
+          this.log('[BugReport] Close requested');
+          if (this.bugReportService) {
+            this.bugReportService.dispose();
+            this.bugReportService = null;
+          }
+          break;
+
         case 'planApprovalResponse':
           this.log(`Plan approval response: action=${msg.action} toolName=${msg.toolName || '(none)'} pendingTool=${this.pendingApprovalTool || '(none)'}`);
           {
@@ -757,6 +851,8 @@ export class MessageHandler {
           const norm = effectiveToolName.trim().toLowerCase();
           const isExitPlanMode = norm === 'exitplanmode' || norm.endsWith('.exitplanmode');
           const isApproveAction = msg.action === 'approve' || msg.action === 'approveClearBypass' || msg.action === 'approveManual';
+          const approvalCycleId = this.pendingApprovalCycleId;
+          let scheduleExitPlanApproveFallback = false;
 
           if (isExitPlanMode) {
             // Plan mode cycle complete
@@ -771,6 +867,8 @@ export class MessageHandler {
           // This applies to approve, reject, AND feedback actions. By the time the
           // user interacts with the bar, the CLI has already moved on. The user can
           // still redirect the model by typing a new message (regular sendMessage path).
+          // Exception: on approve, a delayed fallback nudge is scheduled if no
+          // post-approval activity is observed within a short timeout.
           if (isExitPlanMode) {
             this.log(`ExitPlanMode ${msg.action} - closing bar without sending user message (CLI auto-approves)`);
             if (msg.action === 'approveClearBypass') {
@@ -782,6 +880,11 @@ export class MessageHandler {
               this.webview.postMessage({ type: 'permissionModeSetting', mode: 'supervised' });
             }
             // Don't send text - just close the bar
+            if (isApproveAction) {
+              scheduleExitPlanApproveFallback = true;
+            } else {
+              this.cancelExitPlanApproveResumeFallback();
+            }
           } else if (msg.action === 'approve') {
             this.control.sendText('Yes, proceed with the plan.');
           } else if (msg.action === 'approveClearBypass') {
@@ -803,14 +906,21 @@ export class MessageHandler {
             this.log(`Question answer: "${answer}"`);
             this.control.sendText(answer);
           }
-          this.clearApprovalTracking();
+          this.clearApprovalTracking({
+            preserveApprovalCycle: isExitPlanMode && scheduleExitPlanApproveFallback,
+          });
           // Suppress stale re-notifications from late assistantMessage events
           // that may arrive after the user has already responded.
           this.approvalResponseProcessed = true;
+          if (isExitPlanMode && scheduleExitPlanApproveFallback) {
+            this.scheduleExitPlanApproveResumeFallback(approvalCycleId);
+          }
           // For ExitPlanMode: DON'T send processBusy:true. The CLI already
           // auto-approved and may have already finished executing (sent result
           // with processBusy:false). Sending processBusy:true here would create
           // a stuck "Thinking..." indicator with no matching processBusy:false.
+          // The delayed fallback above sends processBusy:true only if it
+          // actually sends a proceed nudge to the CLI.
           // For all other approvals: text was sent to the CLI, so we are busy.
           if (!isExitPlanMode) {
             this.webview.postMessage({ type: 'processBusy', busy: true });
@@ -830,27 +940,33 @@ export class MessageHandler {
           break;
 
         case 'editAndResend':
-          this.log(`Edit-and-resend: stopping session and restarting with edited prompt`);
+          this.log(`Edit-and-resend: resuming session with edited prompt`);
           // Save analytics for the current session BEFORE clearing records
           this.webview.saveProjectAnalyticsNow?.();
           this.clearApprovalTracking();
           this.planModeActive = false;
           this.exitPlanModeProcessed = false;
-          this.firstMessageSent = false;
           this.activitySummarizer?.reset();
           this.turnRecords = [];
           this.achievementService.abandonSession(this.tabId);
           this.webview.postMessage({ type: 'processBusy', busy: true });
           {
             const editedText = msg.text;
+            // Capture the session ID BEFORE stopping so we can resume it.
+            // This lets Claude keep the full conversation context instead of
+            // starting from scratch (which made Claude lose all prior context).
+            const sessionToResume = this.processManager.currentSessionId;
+            this.log(`Edit-and-resend: will resume session ${sessionToResume || '(none)'}`);
             // Tell the exit handler not to send sessionEnded - we're restarting intentionally
             this.webview.setSuppressNextExit?.(true);
             this.processManager.stop();
             this.processManager
-              .start()
+              .start(sessionToResume
+                ? { resume: sessionToResume, skipReplay: true }
+                : undefined)
               .then(() => {
                 this.achievementService.onSessionStart(this.tabId);
-                this.log('New session started for edit-and-resend');
+                this.log('Session resumed for edit-and-resend');
                 this.webview.postMessage({
                   type: 'sessionStarted',
                   sessionId: this.processManager.currentSessionId || 'pending',
@@ -862,14 +978,14 @@ export class MessageHandler {
                 // so waiting for init before sending would deadlock.
                 this.log(`Edit-and-resend: sending edited prompt`);
                 this.control.sendText(editedText);
-                this.triggerSessionNaming(editedText);
+                // Don't rename the session tab - this is an edit, not a new conversation
                 void this.promptHistoryStore.addPrompt(editedText);
               })
               .catch((err) => {
                 this.webview.postMessage({ type: 'processBusy', busy: false });
                 this.webview.postMessage({
                   type: 'error',
-                  message: `Failed to restart session for edit: ${err.message}`,
+                  message: `Failed to resume session for edit: ${err.message}`,
                 });
               });
           }
@@ -1818,6 +1934,7 @@ export class MessageHandler {
     this.demux.on(
       'textDelta',
       (data: { messageId: string; blockIndex: number; text: string }) => {
+        this.markApprovalCycleResumeObserved('textDelta');
         this.log(`-> webview: streamingText msgId=${data.messageId} block=${data.blockIndex} "${data.text.slice(0, 40)}"`);
         this.webview.postMessage({
           type: 'streamingText',
@@ -1831,6 +1948,7 @@ export class MessageHandler {
     this.demux.on(
       'toolUseStart',
       (data: { messageId: string; blockIndex: number; toolName: string; toolId: string }) => {
+        this.markApprovalCycleResumeObserved(`toolUseStart:${data.toolName}`);
         this.log(`-> webview: toolUseStart ${data.toolName}`);
         // Codex consultation: detect when the MCP tool is invoked
         if (data.toolName.includes('codex') && this._codexConsultStartedAt) {
@@ -2031,6 +2149,9 @@ export class MessageHandler {
         const adventureSnapshot = this.snapshotAdventureMetadata();
         const bashCommandsSnapshot = [...this.currentBashCommands];
         const messageIdSnapshot = this.lastMessageId;
+        if (toolNamesSnapshot.length > 0 || this.pendingApprovalCycleResumeObserved) {
+          this.markApprovalCycleResultObserved(`result:${event.subtype}`);
+        }
 
         // Preserve pendingApprovalTool across the result event if an approval
         // bar is currently visible in the webview. The `result` event fires
@@ -2038,7 +2159,9 @@ export class MessageHandler {
         // the approval bar yet. Without this, the approval response handler
         // can't identify which tool was pending.
         const savedApprovalTool = this.pendingApprovalTool;
-        this.clearApprovalTracking();
+        this.clearApprovalTracking({
+          preserveApprovalCycle: !!savedApprovalTool || this.pendingApprovalCycleId != null,
+        });
         if (savedApprovalTool) {
           this.pendingApprovalTool = savedApprovalTool;
           this.log(`Preserved pendingApprovalTool=${savedApprovalTool} across result event`);
@@ -2255,9 +2378,106 @@ export class MessageHandler {
   }
 
   /** Reset tool name tracking and pending approval state */
-  private clearApprovalTracking(): void {
+  private clearApprovalTracking(options?: { preserveApprovalCycle?: boolean }): void {
     this.currentMessageToolNames = [];
     this.pendingApprovalTool = null;
+    if (!options?.preserveApprovalCycle) {
+      this.clearApprovalCycleState();
+    }
+  }
+
+  /** Reset approval-cycle metadata and any delayed ExitPlanMode fallback nudge */
+  private clearApprovalCycleState(): void {
+    this.pendingApprovalCycleId = null;
+    this.pendingApprovalCycleResumeObserved = false;
+    this.pendingApprovalCycleResultObserved = false;
+    this.cancelExitPlanApproveResumeFallback();
+  }
+
+  /** Cancel a scheduled ExitPlanMode approve fallback nudge (if any) */
+  private cancelExitPlanApproveResumeFallback(): void {
+    if (this.exitPlanApproveResumeFallbackTimer) {
+      clearTimeout(this.exitPlanApproveResumeFallbackTimer);
+      this.exitPlanApproveResumeFallbackTimer = null;
+    }
+    this.exitPlanApproveResumeFallbackCycleId = null;
+  }
+
+  /** Record post-approval meaningful progress (tool/text activity) */
+  private markApprovalCycleResumeObserved(source: string): void {
+    if (this.pendingApprovalCycleId == null || this.pendingApprovalCycleResumeObserved) {
+      return;
+    }
+    // Ignore events that belong to the original approval-generating turn.
+    // After the approval bar is shown, `pendingApprovalTool` remains set until a
+    // new assistant turn starts or the user clicks a button.
+    if (this.pendingApprovalTool) {
+      return;
+    }
+    this.pendingApprovalCycleResumeObserved = true;
+    this.log(`Approval cycle ${this.pendingApprovalCycleId}: resume observed via ${source}`);
+    if (this.exitPlanApproveResumeFallbackCycleId === this.pendingApprovalCycleId) {
+      this.cancelExitPlanApproveResumeFallback();
+      this.log(`ExitPlanMode approve fallback cancelled - auto-resume observed (cycle ${this.pendingApprovalCycleId})`);
+    }
+  }
+
+  /** Record that the Claude turn completed after the approval bar was shown */
+  private markApprovalCycleResultObserved(source: string): void {
+    if (this.pendingApprovalCycleId == null || this.pendingApprovalCycleResultObserved) {
+      return;
+    }
+    this.pendingApprovalCycleResultObserved = true;
+    this.log(`Approval cycle ${this.pendingApprovalCycleId}: result observed via ${source}`);
+    if (this.exitPlanApproveResumeFallbackCycleId === this.pendingApprovalCycleId) {
+      this.cancelExitPlanApproveResumeFallback();
+      this.log(`ExitPlanMode approve fallback cancelled - result observed (cycle ${this.pendingApprovalCycleId})`);
+    }
+  }
+
+  /** If ExitPlanMode approve does not auto-resume, send a delayed proceed nudge */
+  private scheduleExitPlanApproveResumeFallback(cycleId: number | null): void {
+    if (cycleId == null) {
+      this.log('ExitPlanMode approve fallback skipped - no approval cycle id');
+      return;
+    }
+    if (this.pendingApprovalCycleId !== cycleId) {
+      this.log(`ExitPlanMode approve fallback skipped - stale cycle ${cycleId}, current=${this.pendingApprovalCycleId ?? 'none'}`);
+      return;
+    }
+    if (this.pendingApprovalCycleResumeObserved || this.pendingApprovalCycleResultObserved) {
+      this.log(`ExitPlanMode approve fallback skipped - execution already resumed/completed (cycle ${cycleId})`);
+      this.clearApprovalCycleState();
+      return;
+    }
+
+    this.cancelExitPlanApproveResumeFallback();
+    this.exitPlanApproveResumeFallbackCycleId = cycleId;
+    this.log(`ExitPlanMode approve fallback scheduled in ${EXIT_PLANMODE_APPROVE_RESUME_FALLBACK_DELAY_MS}ms (cycle ${cycleId})`);
+    this.exitPlanApproveResumeFallbackTimer = setTimeout(() => {
+      this.exitPlanApproveResumeFallbackTimer = null;
+      this.exitPlanApproveResumeFallbackCycleId = null;
+
+      if (this.pendingApprovalCycleId !== cycleId) {
+        this.log(`ExitPlanMode approve fallback aborted - cycle changed (expected ${cycleId}, current=${this.pendingApprovalCycleId ?? 'none'})`);
+        return;
+      }
+      if (this.pendingApprovalCycleResumeObserved || this.pendingApprovalCycleResultObserved) {
+        this.log(`ExitPlanMode approve fallback aborted - execution resumed/completed during wait (cycle ${cycleId})`);
+        this.clearApprovalCycleState();
+        return;
+      }
+
+      this.log(`ExitPlanMode approve fallback firing - sending proceed nudge to CLI (cycle ${cycleId})`);
+      try {
+        this.control.sendText('Yes, proceed with the plan.');
+        this.webview.postMessage({ type: 'processBusy', busy: true });
+      } catch (err) {
+        this.log(`ExitPlanMode approve fallback send failed: ${err}`);
+      } finally {
+        this.clearApprovalCycleState();
+      }
+    }, EXIT_PLANMODE_APPROVE_RESUME_FALLBACK_DELAY_MS);
   }
 
   /** Notify webview that user approval is required for a plan/question tool */
@@ -2287,8 +2507,13 @@ export class MessageHandler {
     // creates a spurious conversation turn that causes the model to call
     // ExitPlanMode again, leading to an infinite loop. Instead, we always show
     // the approval bar and let the user interact with it. The approve action
-    // closes the bar without sending any message to the CLI.
-    this.log(`Plan approval required: tool=${toolName}`);
+    // closes the bar immediately; a delayed fallback nudge only fires if no
+    // post-approval activity is observed within a short timeout.
+    this.cancelExitPlanApproveResumeFallback();
+    this.pendingApprovalCycleId = this.nextApprovalCycleId++;
+    this.pendingApprovalCycleResumeObserved = false;
+    this.pendingApprovalCycleResultObserved = false;
+    this.log(`Plan approval required: tool=${toolName} cycle=${this.pendingApprovalCycleId}`);
     this.pendingApprovalTool = toolName;
     this.webview.postMessage({
       type: 'planApprovalRequired',

@@ -116,6 +116,12 @@ export class SessionTab implements WebviewBridge {
     this.messageHandler.setProjectAnalyticsStore(this.projectAnalyticsStore);
     this.messageHandler.setSecrets(context.secrets);
     this.messageHandler.setAuthManager(new AuthManager());
+    this.messageHandler.setExtensionVersion(
+      String((context.extension.packageJSON as { version?: unknown })?.version ?? '0.0.0'),
+    );
+    if (logDir) {
+      this.messageHandler.setLogDir(logDir);
+    }
     if (this.tokenRatioTracker) {
       this.messageHandler.setTokenRatioTracker(this.tokenRatioTracker);
     }

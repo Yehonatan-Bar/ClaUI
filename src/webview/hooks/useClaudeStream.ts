@@ -539,6 +539,45 @@ export function useClaudeStream(): void {
         case 'tokenRatioData':
           setTokenRatioData(msg.samples, msg.summaries, msg.globalTurnCount, msg.cumulativeTokens, msg.cumulativeWeightedTokens);
           break;
+
+        // ----- Bug Report -----
+        case 'bugReportOpen':
+          useAppStore.getState().setBugReportPanelOpen(true);
+          break;
+        case 'bugReportStatus':
+          useAppStore.setState({
+            bugReportPhase: msg.phase,
+            ...(msg.summary ? { bugReportDiagSummary: msg.summary } : {}),
+            ...(msg.error ? { bugReportError: msg.error } : {}),
+          });
+          break;
+        case 'bugReportChatResponse':
+          useAppStore.setState((s) => ({
+            bugReportChatMessages: [
+              ...s.bugReportChatMessages,
+              { role: 'assistant' as const, content: msg.text, scripts: msg.scripts },
+            ],
+            bugReportChatLoading: false,
+          }));
+          break;
+        case 'bugReportScriptResult':
+          useAppStore.setState((s) => ({
+            bugReportChatMessages: [
+              ...s.bugReportChatMessages,
+              { role: 'script' as const, content: `[Exit ${msg.exitCode}]\n${msg.output}` },
+            ],
+            bugReportChatLoading: true, // AI will auto-analyze the script output
+          }));
+          break;
+        case 'bugReportPreview':
+          useAppStore.setState({ bugReportPreviewFiles: msg.files });
+          break;
+        case 'bugReportSubmitResult':
+          useAppStore.setState({
+            bugReportPhase: msg.ok ? 'sent' : 'error',
+            ...(msg.error ? { bugReportError: msg.error } : {}),
+          });
+          break;
       }
     }
 

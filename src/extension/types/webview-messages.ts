@@ -401,6 +401,37 @@ export interface SetUsageWidgetEnabledRequest {
   enabled: boolean;
 }
 
+// --- Bug Report (Webview -> Extension) ---
+
+export interface BugReportInitRequest {
+  type: 'bugReportInit';
+}
+
+export interface BugReportChatRequest {
+  type: 'bugReportChat';
+  message: string;
+}
+
+export interface BugReportApproveScriptRequest {
+  type: 'bugReportApproveScript';
+  command: string;
+  index: number;
+}
+
+export interface BugReportSubmitRequest {
+  type: 'bugReportSubmit';
+  mode: 'quick' | 'ai';
+  description?: string;
+}
+
+export interface BugReportGetPreviewRequest {
+  type: 'bugReportGetPreview';
+}
+
+export interface BugReportCloseRequest {
+  type: 'bugReportClose';
+}
+
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
@@ -477,7 +508,13 @@ export type WebviewToExtensionMessage =
   | SetUsageWidgetEnabledRequest
   | GetTokenRatioDataRequest
   | ClearTokenRatioDataRequest
-  | ForceResampleTokenRatioRequest;
+  | ForceResampleTokenRatioRequest
+  | BugReportInitRequest
+  | BugReportChatRequest
+  | BugReportApproveScriptRequest
+  | BugReportSubmitRequest
+  | BugReportGetPreviewRequest
+  | BugReportCloseRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -1109,6 +1146,52 @@ export interface ForceResampleTokenRatioRequest {
   type: 'forceResampleTokenRatio';
 }
 
+// --- Bug Report (Extension -> Webview) ---
+
+export interface BugReportOpenMessage {
+  type: 'bugReportOpen';
+}
+
+export interface BugReportStatusMessage {
+  type: 'bugReportStatus';
+  phase: 'collecting' | 'ready' | 'sending' | 'sent' | 'error';
+  summary?: {
+    os: string;
+    vsCodeVersion: string;
+    extensionVersion: string;
+    nodeVersion: string;
+    claudeCliVersion: string | null;
+    codexCliVersion: string | null;
+    logFileCount: number;
+    logTotalSize: number;
+  };
+  error?: string;
+}
+
+export interface BugReportChatResponseMessage {
+  type: 'bugReportChatResponse';
+  text: string;
+  scripts: Array<{ command: string; language: string }>;
+}
+
+export interface BugReportScriptResultMessage {
+  type: 'bugReportScriptResult';
+  index: number;
+  output: string;
+  exitCode: number;
+}
+
+export interface BugReportPreviewMessage {
+  type: 'bugReportPreview';
+  files: Array<{ name: string; sizeBytes: number; preview?: string }>;
+}
+
+export interface BugReportSubmitResultMessage {
+  type: 'bugReportSubmitResult';
+  ok: boolean;
+  error?: string;
+}
+
 /** Serializable chat message for passing between webview instances (e.g. fork) */
 export interface SerializedChatMessage {
   id: string;
@@ -1179,4 +1262,10 @@ export type ExtensionToWebviewMessage =
   | ClaudeAuthStatusMessage
   | UsageDataMessage
   | UsageWidgetSettingMessage
-  | TokenRatioDataMessage;
+  | TokenRatioDataMessage
+  | BugReportOpenMessage
+  | BugReportStatusMessage
+  | BugReportChatResponseMessage
+  | BugReportScriptResultMessage
+  | BugReportPreviewMessage
+  | BugReportSubmitResultMessage;

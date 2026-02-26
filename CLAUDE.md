@@ -69,7 +69,11 @@ Never trust CLI event field types at runtime. The TypeScript interfaces describe
 
 - **Webview console**: `Developer: Open Webview Developer Tools` - shows React errors, state logs
 - **Extension output**: `Output -> ClaUi` - shows process lifecycle, startup timestamps
+- **Where `Output -> ClaUi` is stored**: VS Code persists the Output channel under `%APPDATA%\Code\logs\<VS Code session>\windowN\exthost\output_logging_<timestamp>\1-ClaUi.log` (not under `globalStorage`)
+- **Pick the right file**: there may be multiple `windowN` folders and multiple `output_logging_*` folders; choose the newest one that matches the repro time and active window
 - **Error Boundary**: React crashes display error + stack trace in the webview panel (instead of blank screen). If you see a blank screen, it's the VS Code rendering bug above, not a React crash
+
+- `globalStorage\...\logs\ClaUiLogs` are extension-managed logs, but they are not the same as the VS Code `Output -> ClaUi` history. For recent repros, check both.
 
 לתחקר תקלות עיין בלוגים האחרונים שבתקיה:
 C:\Users\yoni.bar\AppData\Roaming\Code\User\globalStorage\claude-code-mirror.claude-code-mirror\logs\ClaUiLogs

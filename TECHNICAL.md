@@ -78,6 +78,11 @@ claude-code-mirror/
 |   |   |   +-- SessionDiscovery.ts       #   Discover all Claude sessions from ~/.claude/projects/ filesystem
 |   |   |   +-- SessionFork.ts            #   Phase 3 stub (rewind)
 |   |   +-- terminal/                     #   Phase 2 stubs
+|   |   +-- feedback/
+|   |   |   +-- FormspreeService.ts      #   Formspree.io feedback submission (text + file attachments)
+|   |   |   +-- BugReportService.ts      #   Bug report lifecycle: auto-collect, AI chat, ZIP packaging, submission
+|   |   |   +-- DiagnosticsCollector.ts  #   Collects system/environment info + recent logs
+|   |   |   +-- BugReportTypes.ts        #   Shared WebviewBridge interface (avoids circular imports)
 |   |   +-- auth/
 |   |   |   +-- AuthManager.ts           #   Claude CLI auth status/login/logout helpers
 |   |   +-- skillgen/
@@ -156,6 +161,9 @@ claude-code-mirror/
 |       |   |   +-- levelThresholds.ts       #   XP level thresholds (shared with webview)
 |       |   +-- SkillGen/
 |       |   |   +-- SkillGenPanel.tsx     #   Full overlay panel (toggle, progress, history, actions)
+|       |   |   +-- index.ts             #   Barrel export
+|       |   +-- BugReport/
+|       |   |   +-- BugReportPanel.tsx    #   Full-screen overlay (Quick/AI mode tabs, chat, script approve/reject)
 |       |   |   +-- index.ts             #   Barrel export
 |       |   +-- Dashboard/
 |       |   |   +-- DashboardPanel.tsx    #   Root overlay (tab nav, close, Esc, Session/Project toggle)
@@ -312,14 +320,14 @@ claude-code-mirror/
 **File Mention (@)** - Inline autocomplete triggered by typing `@` in the chat textarea. Searches workspace files via `vscode.workspace.findFiles()` with 150ms debounce, showing results in a popup above the input. Navigate with ArrowUp/Down, select with Enter/Tab/click. Replaces `@query` with the relative file path. Uses custom DOM events for extension-to-webview communication (same pattern as prompt history). All state is local to the `useFileMention` hook (not in Zustand).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/FILE_MENTION.md`
 
-**Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'` and shows a CLI-matching 4-option approval bar: (1) clear context + bypass permissions, (2) bypass permissions, (3) manually approve edits, (4) type feedback. For `ExitPlanMode`, approve actions close the bar without sending user messages (the CLI auto-approves via bypassPermissions/allowedTools; sending text would create spurious turns causing infinite loops). Reject/feedback actions send text to the CLI. For `AskUserQuestion`, responses are sent as user messages. Option 1 also triggers context compaction. Option 3 switches to supervised permission mode. Context usage percentage is shown when token data is available. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON.
+**Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'` and shows a CLI-matching 4-option approval bar: (1) clear context + bypass permissions, (2) bypass permissions, (3) manually approve edits, (4) type feedback. For `ExitPlanMode`, approve actions close the bar without immediately sending user messages (the CLI usually auto-approves via bypassPermissions/allowedTools; immediate text would create spurious turns causing infinite loops). A delayed fallback nudge sends `"Yes, proceed with the plan."` only if no post-approval **meaningful progress** (tool activity or streamed text) is observed within a short timeout; `messageStart` / `result` alone are not treated as sufficient evidence of execution because Claude can emit an empty post-ExitPlanMode turn. Reject/feedback actions send text to the CLI. For `AskUserQuestion`, responses are sent as user messages. Option 1 also triggers context compaction. Option 3 switches to supervised permission mode. Context usage percentage is shown when token data is available. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 > Bug history: `Kingdom_of_Claudes_Beloved_MDs/BUG_EXITPLANMODE_INFINITE_LOOP.md`
 
 **Open Plan Docs** - "Plans" button in the status bar that opens HTML plan documents from both `Kingdom_of_Claudes_Beloved_MDs/` and the project root in the default browser. Files from both locations are merged and sorted by modification time (newest first), with a location tag (Kingdom/Root) in the QuickPick description. Single file opens directly; multiple files show a QuickPick. When no plan documents exist in either location, offers to activate the Plans feature by injecting a "Plan mode" prompt into the project's `CLAUDE.md` (with Hebrew or English language choice). Also available via Command Palette (`claudeMirror.openPlanDocs`).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**Editable Prompts** - Users can edit previously sent messages by hovering over a user message and clicking "Edit". The message content switches to an inline textarea. On send, all messages from the edit point onward are removed from the UI, the current CLI session is stopped, a new session starts, and the edited prompt is sent as the first message. Only text-only user messages are editable (not images). The edit button is hidden while the assistant is busy.
+**Editable Prompts** - Users can edit previously sent messages by hovering over a user message and clicking "Edit". The message content switches to an inline textarea. On send, all messages from the edit point onward are removed from the UI, the current CLI session is stopped, then **resumed** with `--resume <sessionId>` (without `--replay-user-messages` to avoid re-emitting old messages). The edited prompt is sent into the resumed session so Claude retains full prior conversation context. Only text-only user messages are editable (not images). The edit button is hidden while the assistant is busy.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Fork Conversation** - Users can fork the conversation from any user message by hovering and clicking "Fork". The webview sends a truncated message history (everything before the selected user message) plus the selected message text. `claudeMirror.forkFromMessage` creates a new tab using the same provider as the source session. Claude tabs still fork via CLI resume/fork semantics; Codex tabs now use a simple UI-level fork (new Codex session, copied history snapshot in the webview, and the forked message prefilled in the input box, without resuming the original thread). Key files: `MessageBubble.tsx` (Fork button), `MessageList.tsx` (handler), `MessageHandler.ts` / `CodexMessageHandler.ts` (`forkFromMessage` routing), `commands.ts` (`claudeMirror.forkFromMessage`), `SessionTab.ts` / `CodexSessionTab.ts` (`setForkInit` + fork startup), `App.tsx` (fork completion logic), `InputArea.tsx` (`fork-set-input` listener).
@@ -357,6 +365,12 @@ claude-code-mirror/
 
 **File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/DRAG_AND_DROP_CHALLENGE.md`
+
+**FormspreeService** - Standalone service for sending user feedback (text + optional file attachments) to the developer via Formspree.io. Write-only endpoint, no secrets in the codebase. Supports native multipart file uploads (paid plan) with automatic fallback to base64-embedded files in the message body (free plan). 15-second timeout, logger injection, follows GitHubSyncService patterns.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/FORMSPREE_FEEDBACK.md`
+
+**Full Bug Report** - Comprehensive in-extension bug reporting. 4th option in the Feedback QuickPick. Opens an overlay panel with two modes: Quick Report (required text description + auto-collected diagnostics) and AI-Assisted Report (chat with Claude Sonnet for guided diagnosis, with script suggestion approve/reject). Auto-collects system info, VS Code environment, CLI versions, and recent logs. Packages everything into a ZIP via `adm-zip` and submits via `FormspreeService`. Privacy-first: nothing sent until explicit user approval. Backend: `BugReportService`, `DiagnosticsCollector`. Frontend: `BugReportPanel`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/BUG_REPORT_FEATURE.md`
 
 ---
 

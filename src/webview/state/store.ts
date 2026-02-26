@@ -236,6 +236,23 @@ export interface AppState {
   skillGenPanelOpen: boolean;
   skillGenShowInfo: boolean;
 
+  // Bug Report
+  bugReportPanelOpen: boolean;
+  bugReportMode: 'quick' | 'ai';
+  bugReportPhase: 'idle' | 'collecting' | 'ready' | 'sending' | 'sent' | 'error';
+  bugReportDiagSummary: {
+    os: string; vsCodeVersion: string; extensionVersion: string;
+    nodeVersion: string; claudeCliVersion: string | null; codexCliVersion: string | null;
+    logFileCount: number; logTotalSize: number;
+  } | null;
+  bugReportChatMessages: Array<{ role: 'user' | 'assistant' | 'script'; content: string; scripts?: Array<{ command: string; language: string }> }>;
+  bugReportChatLoading: boolean;
+  bugReportPreviewFiles: Array<{ name: string; sizeBytes: number; preview?: string }>;
+  bugReportError: string | null;
+  setBugReportPanelOpen: (open: boolean) => void;
+  setBugReportMode: (mode: 'quick' | 'ai') => void;
+  bugReportReset: () => void;
+
   // Token-Usage Ratio
   tokenRatioSamples: TokenUsageRatioSample[];
   tokenRatioSummaries: TokenRatioBucketSummary[];
@@ -601,6 +618,28 @@ export const useAppStore = create<AppState>((set, get) => ({
   skillGenHistory: [],
   skillGenPanelOpen: false,
   skillGenShowInfo: false,
+
+  // Bug Report
+  bugReportPanelOpen: false,
+  bugReportMode: 'quick' as 'quick' | 'ai',
+  bugReportPhase: 'idle' as 'idle' | 'collecting' | 'ready' | 'sending' | 'sent' | 'error',
+  bugReportDiagSummary: null,
+  bugReportChatMessages: [],
+  bugReportChatLoading: false,
+  bugReportPreviewFiles: [],
+  bugReportError: null,
+  setBugReportPanelOpen: (open) => set({ bugReportPanelOpen: open }),
+  setBugReportMode: (mode) => set({ bugReportMode: mode }),
+  bugReportReset: () => set({
+    bugReportPanelOpen: false,
+    bugReportMode: 'quick' as 'quick' | 'ai',
+    bugReportPhase: 'idle' as 'idle' | 'collecting' | 'ready' | 'sending' | 'sent' | 'error',
+    bugReportDiagSummary: null,
+    bugReportChatMessages: [],
+    bugReportChatLoading: false,
+    bugReportPreviewFiles: [],
+    bugReportError: null,
+  }),
 
   // Token-Usage Ratio
   tokenRatioSamples: [],
@@ -1308,6 +1347,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Note: githubSyncStatus and communityFriends persist across resets
       friendActionPending: false,
       codexConsultPanelOpen: false,
+      bugReportPanelOpen: false,
+      bugReportPhase: 'idle' as 'idle' | 'collecting' | 'ready' | 'sending' | 'sent' | 'error',
+      bugReportChatMessages: [],
+      bugReportChatLoading: false,
+      bugReportPreviewFiles: [],
+      bugReportError: null,
       isEnhancing: false,
       enhancerPopoverOpen: false,
       enhanceComparisonData: null,
