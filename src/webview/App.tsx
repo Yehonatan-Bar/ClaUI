@@ -17,6 +17,7 @@ import { SessionTimeline } from './components/Vitals/SessionTimeline';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { DashboardPanel } from './components/Dashboard';
 import { SkillGenPanel } from './components/SkillGen';
+import { BugReportPanel } from './components/BugReport';
 import { CodexConsultPanel } from './components/InputArea/CodexConsultPanel';
 import { postToExtension } from './hooks/useClaudeStream';
 import { detectRtl } from './hooks/useRtlDetection';
@@ -56,6 +57,7 @@ export const App: React.FC = () => {
     communityPanelOpen,
     codexConsultPanelOpen,
     setCodexConsultPanelOpen,
+    bugReportPanelOpen,
   } = useAppStore();
   const forkInit = useAppStore((s) => s.forkInit);
   const hasMessages = messages.length > 0 || streamingMessageId !== null;
@@ -115,6 +117,7 @@ export const App: React.FC = () => {
       {achievementsEnabled && <ShareCard />}
       {dashboardOpen && <DashboardPanel />}
       {skillGenPanelOpen && <SkillGenPanel />}
+      {bugReportPanelOpen && <BugReportPanel />}
 
       {/* Error banner / setup guidance */}
       {lastError && (isClaudeCliMissingError ? (

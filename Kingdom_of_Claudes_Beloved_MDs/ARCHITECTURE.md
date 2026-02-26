@@ -153,8 +153,8 @@ Bidirectional bridge between the webview and the CLI process. Accepts a `Webview
 **Webview -> Extension direction:**
 | Webview Message | Action |
 |-----------------|--------|
-| `sendMessage` | Calls `control.sendText()` |
-| `sendMessageWithImages` | Calls `control.sendWithImages()` |
+| `sendMessage` | Sends optimistic `userMessage` to webview, then calls `control.sendText()` |
+| `sendMessageWithImages` | Sends optimistic `userMessage` (with image blocks) to webview, then calls `control.sendWithImages()` |
 | `cancelRequest` | Calls `control.cancel()` |
 | `compact` | Calls `control.compact()` |
 | `startSession` | Calls `processManager.start()` |
@@ -454,7 +454,7 @@ The `claudeMirror.openPlanDocs` command opens HTML plan documents in the default
 
 ### Editable Prompts (edit-and-resend)
 
-Users can edit a previously sent message and resend it, discarding everything after the edit point.
+Users can edit a previously sent message and resend it, discarding everything after the edit point. The CLI session is **resumed** (not restarted) so Claude retains full prior conversation context.
 
 **Flow:**
 1. User hovers over a user message -> "Edit" button appears in the role header
@@ -464,21 +464,25 @@ Users can edit a previously sent message and resend it, discarding everything af
 5. `addUserMessage(newText)` adds the edited message immediately so it's visible in the UI
 6. Webview sends `editAndResend` message to extension
 7. MessageHandler immediately sets `processBusy: true` to block user input
-8. MessageHandler stops the current CLI process (with `setSuppressNextExit` to avoid showing "session ended") and silently abandons the current achievement session state (no session recap is emitted for edit-and-resend)
-9. A fresh CLI process is spawned via `processManager.start()`
-10. Once the process starts, the edited text is sent immediately as the first stdin message
-11. The CLI emits `system/init` (which updates session metadata), then responds normally
+8. MessageHandler captures the current `sessionId` from `processManager.currentSessionId`
+9. MessageHandler stops the current CLI process (with `setSuppressNextExit` to avoid showing "session ended") and silently abandons the current achievement session state (no session recap is emitted for edit-and-resend)
+10. A new CLI process is spawned via `processManager.start({ resume: sessionId, skipReplay: true })` - this resumes the session so Claude has the full conversation context, but skips `--replay-user-messages` to avoid re-emitting old messages into the webview
+11. Once the process starts, the edited text is sent immediately as the next stdin message
+12. The CLI emits `system/init` (which updates session metadata), then responds normally with full context
 
 The edited message is sent **immediately** after process start, without waiting for `system/init`. The CLI in pipe mode only emits `system/init` after receiving its first stdin message, so waiting for init before sending would cause a deadlock.
 
 The edited message is added to the store locally (step 5) rather than waiting for the CLI echo, because the session restart can cause the echo to be delayed or lost. The `addUserMessage` function deduplicates within a 5-second window to prevent a duplicate if the CLI does echo the same text back.
+
+The `skipReplay` flag (`ProcessStartOptions.skipReplay`) omits `--replay-user-messages` from the CLI args so that the resumed session does not flood the webview with old messages that are already displayed (truncated history before the edit point).
 
 **Key files:**
 - `webview-messages.ts` - `EditAndResendRequest` type
 - `store.ts` - `truncateFromMessage` action, `addUserMessage` with deduplication
 - `MessageBubble.tsx` - Edit button, inline textarea, send/cancel
 - `MessageList.tsx` - `handleEditAndResend` callback wiring
-- `MessageHandler.ts` - `editAndResend` case: stop process, silent achievement-session abandon, restart, send edited text immediately
+- `MessageHandler.ts` - `editAndResend` case: capture sessionId, stop process, resume with session, send edited text
+- `ClaudeProcessManager.ts` - `ProcessStartOptions.skipReplay` flag, conditional `--replay-user-messages`
 - `global.css` - `.edit-message-*` styles (button fades in on hover)
 
 **Edge cases:**
@@ -486,7 +490,8 @@ The edited message is added to the store locally (step 5) rather than waiting fo
 - Only text-only user messages are editable (messages with images skip the edit button)
 - Editing the first message clears the entire conversation
 - Duplicate user messages with the same text within 5s are deduplicated
-- If session already ended, a new one starts automatically
+- If session already ended (no sessionId), falls back to starting a fresh session
+- Session tab is not renamed on edit-and-resend (unlike new sessions)
 
 **Tradeoff:** Claude does not "remember" messages before the edited prompt. The new session receives only the edited text. This is the simplest approach since the CLI does not support rewinding mid-conversation.
 

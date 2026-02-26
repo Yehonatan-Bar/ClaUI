@@ -438,6 +438,11 @@ export function registerCommands(
             description: `Compose an email to ${CLAUI_FEEDBACK_EMAIL}`,
             value: 'email' as const,
           },
+          {
+            label: '$(report) Full Bug Report',
+            description: 'Collect diagnostics, chat with AI, send full report',
+            value: 'fullBugReport' as const,
+          },
         ],
         {
           placeHolder: 'How would you like to send feedback for ClaUi?',
@@ -476,6 +481,18 @@ export function registerCommands(
       if (picked.value === 'feature') {
         await vscode.env.openExternal(vscode.Uri.parse(CLAUI_FEATURE_REQUEST_URL));
         log(`Opened GitHub feature request page: ${CLAUI_FEATURE_REQUEST_URL}`);
+        return;
+      }
+
+      if (picked.value === 'fullBugReport') {
+        const activeTab = tabManager.getActiveTab();
+        if (activeTab) {
+          activeTab.postMessage({ type: 'bugReportOpen' });
+          log('Opened Full Bug Report panel in active tab');
+        } else {
+          vscode.window.showWarningMessage('No active ClaUi session. Open a session first to use Full Bug Report.');
+          log('Full Bug Report: no active tab');
+        }
         return;
       }
 

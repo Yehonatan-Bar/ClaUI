@@ -8,6 +8,7 @@ The plan approval bar (4 CLI-matching options) and AskUserQuestion interactive c
 **Date Second Fix**: 2026-02-23
 **Date Third Fix**: 2026-02-24 (approval bar visibility)
 **Date Fourth Fix**: 2026-02-25 (stuck Thinking after plan approval)
+**Date Fifth Fix**: 2026-02-26 (approve click can be no-op if CLI did not auto-resume)
 **Severity**: Critical (blocks plan mode workflow)
 **Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`, `src/webview/components/InputArea/InputArea.tsx`
 
@@ -74,6 +75,14 @@ Both ExitPlanMode and AskUserQuestion bars were affected (AskUserQuestion was re
 
 **Fix**: Skip sending `processBusy: true` for ExitPlanMode approval responses. Since no text is sent to the CLI, the session isn't becoming busy. The approval bar is already cleared by the webview component itself (`setPendingApproval(null)` in PlanApprovalBar.tsx).
 
+### Fifth Bug (2026-02-26): Approve Click Does Nothing (No Auto-Resume)
+
+**Cause**: In some sessions, clicking approve on the `ExitPlanMode` bar did not result in any further Claude activity. The extension correctly avoided sending `"Yes, proceed with the plan."` (to prevent the historical infinite loop), but in these cases the CLI also did not auto-resume, so the click became a no-op.
+
+**Fix**: Keep the no-immediate-send behavior, but add a delayed fallback. After an `ExitPlanMode` approve click, the extension waits briefly for post-approval **meaningful activity** (e.g., `toolUseStart` or streamed text). If no progress is observed, it sends a single `"Yes, proceed with the plan."` nudge and sets `processBusy: true` at that moment only.
+
+**Follow-up (2026-02-26, same fix cycle)**: `messageStart` / `result` alone were too weak as a resume signal; Claude can emit a short empty turn and `result/success` immediately after `ExitPlanMode` without starting implementation. The fallback logic was tightened to cancel only on real progress (`toolUseStart` / `textDelta`), preventing false "already resumed" decisions.
+
 ---
 
 ## Current Defense Layers
@@ -84,6 +93,7 @@ Both ExitPlanMode and AskUserQuestion bars were affected (AskUserQuestion was re
 | Block ALL ExitPlanMode text to CLI | MessageHandler.ts `planApprovalResponse` | Spurious user messages even if bar somehow appears |
 | InputArea sends regular message (not feedback) | InputArea.tsx `sendMessage` | Text typed during ExitPlanMode goes as new user message, not dropped |
 | Skip `processBusy:true` for ExitPlanMode | MessageHandler.ts `planApprovalResponse` | Stuck "Thinking..." indicator after plan approval |
+| Delayed approve fallback (only if no resume observed) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | ExitPlanMode approve click becoming a no-op |
 
 The `messageStart` clearing was **removed** as a defense layer because it made the approval bar invisible.
 
@@ -140,14 +150,16 @@ else if (pendingApproval) {
 if (isExitPlanMode) {
   this.planModeActive = false;
   this.exitPlanModeProcessed = true;
-  // ALL actions: close bar without sending text. CLI already auto-approved.
+  // ALL actions: close bar without immediate text. CLI usually auto-approves.
+  // Approve actions schedule a delayed fallback nudge only if no resume/result appears.
   if (msg.action === 'approveClearBypass') this.control.compact();
   else if (msg.action === 'approveManual') { /* switch permission mode */ }
 }
 // ... (non-ExitPlanMode branches send text to CLI) ...
 this.clearApprovalTracking();
 this.approvalResponseProcessed = true;
-// Only send processBusy:true for non-ExitPlanMode (where text was sent to CLI)
+// Only send processBusy:true immediately for non-ExitPlanMode.
+// ExitPlanMode fallback sends processBusy:true only when it actually sends a nudge.
 if (!isExitPlanMode) {
   this.webview.postMessage({ type: 'processBusy', busy: true });
 }
@@ -158,7 +170,7 @@ if (!isExitPlanMode) {
 ## Bar Lifecycle
 
 The approval bar is cleared when:
-1. **User clicks a button** -> PlanApprovalBar calls `setPendingApproval(null)` directly. For non-ExitPlanMode, also triggers `processBusy: true` from extension. For ExitPlanMode, no `processBusy:true` is sent (since CLI already moved on).
+1. **User clicks a button** -> PlanApprovalBar calls `setPendingApproval(null)` directly. For non-ExitPlanMode, extension immediately sends text + `processBusy:true`. For ExitPlanMode, extension closes the bar and waits briefly for auto-resume; if none is observed, it sends a single proceed nudge + `processBusy:true`.
 2. **User sends a regular message** -> `sendMessage` -> `processBusy: true` -> bar cleared
 3. **New `planApprovalRequired` replaces it** (e.g., AskUserQuestion replaced by ExitPlanMode)
 4. **Session resets**
@@ -186,7 +198,7 @@ If the model calls AskUserQuestion and then ExitPlanMode in quick succession (co
 2. Give a task that triggers plan mode (e.g., ask Claude to plan a complex feature)
 3. When the approval bar appears with 4 options, verify it stays visible
 4. Click any approve button -> verify model continues without bar re-appearing
-5. **Verify NO stuck "Thinking..."** -> after clicking approve, the indicator should NOT show "Thinking..." indefinitely. If the CLI already finished, no indicator should show. If still executing, tool activity messages should appear.
+5. **Verify NO stuck "Thinking..."** -> after clicking approve, the indicator should NOT show "Thinking..." indefinitely. If the CLI already finished, no indicator should show. If still executing, tool activity messages should appear. If the CLI fails to auto-resume, the delayed fallback should start execution within a few seconds.
 6. Test typing text while bar is visible -> verify it sends as regular message (not dropped)
-7. Check logs (`Output -> ClaUi`): should see `"ExitPlanMode approved - closing bar without sending user message"`
+7. Check logs (`Output -> ClaUi`): should see the ExitPlanMode close-bar log, plus either an auto-resume/result observation log or `"ExitPlanMode approve fallback firing - sending proceed nudge to CLI"`
 8. Test AskUserQuestion: give a task that triggers a question, verify option buttons appear. After answering, "Thinking..." should show (text IS sent to CLI for AskUserQuestion).

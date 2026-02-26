@@ -69,13 +69,17 @@ Never trust CLI event field types at runtime. The TypeScript interfaces describe
 
 - **Webview console**: `Developer: Open Webview Developer Tools` - shows React errors, state logs
 - **Extension output**: `Output -> ClaUi` - shows process lifecycle, startup timestamps
+- **Where `Output -> ClaUi` is stored**: VS Code persists the Output channel under `%APPDATA%\Code\logs\<VS Code session>\windowN\exthost\output_logging_<timestamp>\1-ClaUi.log` (not under `globalStorage`)
+- **Pick the right file**: there may be multiple `windowN` folders and multiple `output_logging_*` folders; choose the newest one that matches the repro time and active window
 - **Error Boundary**: React crashes display error + stack trace in the webview panel (instead of blank screen). If you see a blank screen, it's the VS Code rendering bug above, not a React crash
 
 ### Codex stuck session diagnostics (where to read logs)
 
 - First check **`Output -> ClaUi`** for real-time Codex lifecycle logs (`Codex JSON`, `Codex STDERR`, `TurnDiag` heartbeat/end summaries)
+- If you need the persisted history of that same output channel, inspect `%APPDATA%\Code\logs\<VS Code session>\windowN\exthost\output_logging_<timestamp>\1-ClaUi.log`
 - Then check the latest files in:
   `C:\Users\yoni.bar\AppData\Roaming\Code\User\globalStorage\claude-code-mirror.claude-code-mirror\logs\ClaUiLogs`
+- `ClaUiLogs` are extension-managed rolling logs; `Output -> ClaUi` history may contain additional/earlier lines from the current VS Code window during live debugging
 - Codex per-tab logs are usually files that start as **`codex-session-<tab>`** and may later be renamed to the session title; search inside for `[Codex Tab`, `TurnDiag`, `Codex JSON:`, `Codex STDERR:`
 - Global extension startup/activation logs are in files named like **`extension_*.log`**
 - If the UI looks stuck but process logs continue, also inspect **`Developer: Open Webview Developer Tools`** (webview-side rendering/state issues)
