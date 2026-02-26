@@ -10,6 +10,7 @@ import type { AchievementService } from '../achievements/AchievementService';
 import type { WebviewBridge } from './MessageHandler';
 import type { ContentBlock } from '../types/stream-json';
 import { setStoredApiKey, maskApiKey } from '../process/envUtils';
+import { MessageTranslator } from '../session/MessageTranslator';
 import type {
   CodexReasoningEffort,
   CodexModelOption,
@@ -70,7 +71,7 @@ const CODEX_PROVIDER_CAPABILITIES: ProviderCapabilities = {
   supportsFork: true,
   supportsImages: true,
   supportsGitPush: true,
-  supportsTranslation: false,
+  supportsTranslation: true,
   supportsPromptEnhancer: false,
   supportsCodexConsult: false,
   supportsPermissionModeSelector: true,
@@ -95,10 +96,16 @@ export class CodexMessageHandler {
   private secrets: vscode.SecretStorage | null = null;
   private autoSetupCodexCliInProgress = false;
   private webviewPostQueue: Promise<void> = Promise.resolve();
+  private messageTranslator: MessageTranslator | null = null;
 
   /** Provide SecretStorage for API key management */
   setSecrets(secrets: vscode.SecretStorage): void {
     this.secrets = secrets;
+  }
+
+  /** Wire the message translator for translation feature */
+  setMessageTranslator(translator: MessageTranslator): void {
+    this.messageTranslator = translator;
   }
 
   /** Send current API key status to the webview */
@@ -113,6 +120,10 @@ export class CodexMessageHandler {
       hasKey: !!key,
       maskedKey: maskApiKey(key ?? undefined),
     });
+  }
+
+  private async getApiKey(): Promise<string | undefined> {
+    return this.secrets?.get('claudeMirror.anthropicApiKey') ?? undefined;
   }
 
   constructor(
@@ -429,13 +440,50 @@ export class CodexMessageHandler {
         case 'compact':
         case 'forkSession':
         case 'planApprovalResponse':
-        case 'translateMessage':
         case 'enhancePrompt':
           this.webview.postMessage({
             type: 'error',
             message: `${msg.type} is not supported in Codex MVP yet.`,
           });
           break;
+
+        case 'translateMessage': {
+          const config = vscode.workspace.getConfiguration('claudeMirror');
+          const targetLang = msg.language?.trim() || config.get<string>('translationLanguage', 'Hebrew');
+          this.log(`Translate request: messageId=${msg.messageId}, textLength=${msg.textContent.length}, language=${targetLang}`);
+          if (!this.messageTranslator) {
+            this.webview.postMessage({
+              type: 'translationResult',
+              messageId: msg.messageId,
+              translatedText: null,
+              success: false,
+              error: 'Translator not available',
+            });
+            break;
+          }
+          this.getApiKey().then((apiKey) => this.messageTranslator!
+            .translate(msg.textContent, targetLang, apiKey))
+            .then((translatedText) => {
+              this.webview.postMessage({
+                type: 'translationResult',
+                messageId: msg.messageId,
+                translatedText,
+                success: !!translatedText,
+                error: translatedText ? undefined : 'Translation failed',
+              });
+            })
+            .catch((err) => {
+              this.log(`Translation error: ${err}`);
+              this.webview.postMessage({
+                type: 'translationResult',
+                messageId: msg.messageId,
+                translatedText: null,
+                success: false,
+                error: `Translation error: ${err.message}`,
+              });
+            });
+          break;
+        }
 
         case 'editAndResend':
           if (msg.text.trim()) {

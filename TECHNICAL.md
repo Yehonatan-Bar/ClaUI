@@ -35,17 +35,21 @@ User-facing documentation (features, shortcuts, settings): see [README.md](READM
 
 ```
 claude-code-mirror/
-+-- package.json                          # Extension manifest, commands, settings
++-- package.json                          # Extension manifest, commands, settings, Activity Bar views
 +-- tsconfig.json                         # TypeScript config (ES2022, JSX)
 +-- webpack.config.js                     # Dual-target: extension (Node) + webview (browser)
 +-- .vscodeignore
 +-- dist/                                 # Build output
 |   +-- extension.js                      #   Extension host bundle (15 KB)
 |   +-- webview.js                        #   React webview bundle (170 KB)
++-- images/
+|   +-- claui-activity.svg               # Activity Bar icon for the ClaUi sidebar container
 +-- src/
 |   +-- extension/                        # Extension host code (Node.js context)
 |   |   +-- extension.ts                  #   Activation, creates TabManager
 |   |   +-- commands.ts                   #   VS Code command handlers (routes via TabManager)
+|   |   +-- sidebar/
+|   |   |   +-- ClaUiSidebarViewProvider.ts #   Activity Bar sidebar launcher (WebviewViewProvider)
 |   |   +-- process/
 |   |   |   +-- ClaudeProcessManager.ts   #   Spawns and manages CLI process
 |   |   |   +-- CodexExecProcessManager.ts #  Spawns and manages Codex exec processes
@@ -220,6 +224,9 @@ claude-code-mirror/
 
 **TabManager** - Manages all SessionTab instances. Tracks the active (focused) tab, provides create/close/closeAll methods, shares a single status bar item, assigns distinct colors from an 8-color palette, and groups tabs in the same editor column.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**ClaUiSidebarViewProvider** - Provides the Activity Bar sidebar launcher view (`claui.sidebarLauncher`) and forwards button clicks from the sidebar webview to existing extension commands (start session, history, discovery, logs). This gives ClaUi a dedicated left-side VS Code icon without moving the main chat UI into the sidebar.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ACTIVITY_BAR_LAUNCHER.md`
 
 **AuthManager** - Claude account auth helper for the extension host. Reads `.claude/.credentials.json` presence (legacy stub behavior) and now runs `claude auth status --json` / `claude auth logout` via `execFile` with a 10s timeout. Returns normalized `{ loggedIn, email, subscriptionType }` to `MessageHandler`, which forwards status to the webview and triggers logout refresh.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CLAUDE_AUTH_LOGIN_LOGOUT.md`

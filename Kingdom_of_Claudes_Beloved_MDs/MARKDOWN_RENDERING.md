@@ -34,7 +34,8 @@ parseTextWithCodeBlocks(text)   [MessageBubble.tsx]
                           |
                           dangerouslySetInnerHTML --> rendered DOM
                           |
-                          useEffect: linkifyTextNodes() --> bare file paths/URLs become clickable
+                          useEffect: linkifyCodeElements() --> backtick-wrapped paths/URLs in <code> become clickable
+                          useEffect: linkifyTextNodes() --> bare file paths/URLs in text nodes become clickable
                           useEffect: event delegation --> click handler for all link types
 ```
 
@@ -56,13 +57,19 @@ parseTextWithCodeBlocks(text)   [MessageBubble.tsx]
 - Custom renderer overrides for `link` (adds `data-href` and `class="md-link"`) and `codespan` (adds `class="md-inline-code"`)
 - DOMPurify whitelist: `p, br, strong, em, del, a, code, pre, h1-h6, ul, ol, li, blockquote, table, thead, tbody, tr, th, td, hr, span, div, sup, sub, input`
 
-### Link Handling (3 types)
+### Link Handling (4 types)
 
 1. **Markdown links** (`[text](url)`) - Rendered by `marked` as `<a class="md-link" data-href="...">`. Click handler checks if URL or file path, routes to `openUrl` or `openFile`.
 
-2. **Bare file paths** - Detected post-render by `linkifyTextNodes()` using `FILE_PATH_REGEX`. Wrapped in `<span class="file-path-link">`. Ctrl+Click opens in VS Code editor.
+2. **Backtick-wrapped file paths/URLs** - Inline `<code>` elements whose entire text matches `FILE_PATH_REGEX` or `URL_REGEX` get the `file-path-link` or `url-link` class added directly to the `<code>` element by `linkifyCodeElements()`. This is the most common case since Claude wraps file paths in backticks.
 
-3. **Bare URLs** - Detected post-render by `linkifyTextNodes()` using `URL_REGEX`. Wrapped in `<span class="url-link">`. Single click opens in browser.
+3. **Bare file paths** - Detected post-render by `linkifyTextNodes()` using `FILE_PATH_REGEX`. Wrapped in `<span class="file-path-link">`. Click opens in VS Code editor.
+
+4. **Bare URLs** - Detected post-render by `linkifyTextNodes()` using `URL_REGEX`. Wrapped in `<span class="url-link">`. Click opens in browser.
+
+### `linkifyCodeElements()` Function
+
+Queries all inline `<code>` elements (excluding those inside `<pre>`) and checks if their entire text content matches a file path or URL regex. If it does, the `<code>` element itself gets the `file-path-link` or `url-link` class plus data attributes (`data-path` or `data-url`), making it clickable while preserving the inline code styling. Runs before `linkifyTextNodes()`.
 
 ### `linkifyTextNodes()` Function
 

@@ -23,9 +23,29 @@
     "AI",
     "Chat"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claui",
+          "title": "ClaUi",
+          "icon": "images/claui-activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "claui": [
+        {
+          "type": "webview",
+          "id": "claui.sidebarLauncher",
+          "name": "ClaUi"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "claudeMirror.startSession",
