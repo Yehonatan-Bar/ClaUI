@@ -45,7 +45,7 @@ const PURIFY_CONFIG = {
 function linkifyCodeElements(container: HTMLElement): void {
   const codeElements = container.querySelectorAll('code:not(pre code)');
 
-  for (const codeEl of codeElements) {
+  for (const codeEl of Array.from(codeElements)) {
     const text = (codeEl.textContent || '').trim();
     if (!text) continue;
 
