@@ -532,6 +532,12 @@ export function registerCommands(
       );
     }),
 
+    // Toggle Agent Teams panel on the active tab
+    vscode.commands.registerCommand('claudeMirror.toggleTeamPanel', () => {
+      // The webview handles the toggle logic via its own state
+      tabManager.postToActiveTab({ type: 'teamDetected', teamName: '' });
+    }),
+
     // Fork conversation from a specific message (opens a new tab)
     vscode.commands.registerCommand(
       'claudeMirror.forkFromMessage',

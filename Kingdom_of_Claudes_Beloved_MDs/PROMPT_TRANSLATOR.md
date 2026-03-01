@@ -110,6 +110,16 @@ Both PromptTranslator and MessageTranslator are hardcoded to `claude-sonnet-4-6`
 | `translatingMessageIds` | Set<string> | empty | No |
 | `showingTranslation` | Set<string> | empty | No |
 
+## Settings Sync Design
+
+Babel Fish acts as a **master switch** that controls both `promptTranslator.enabled` and `promptTranslator.autoTranslate`. The sync is enforced at three levels:
+
+1. **Panel toggle** (`setBabelFishEnabled` handler): Sends explicit values directly to the webview instead of reading from config, avoiding a race condition where async config updates haven't applied yet.
+
+2. **VS Code Settings UI** (config change handler): When `babelFish.enabled` is turned off, the handler also sets `promptTranslator.enabled` and `promptTranslator.autoTranslate` to `false` in VS Code config, preventing stale `true` values from re-enabling prompt translation on reload.
+
+3. **Initialization** (`sendBabelFishSettings`): When Babel Fish is off, the method also sends `promptTranslatorSettings` with `false` to ensure the webview state is consistent regardless of what the individual `promptTranslator` configs say.
+
 ## Important Notes
 
 - Auto-translation triggers on each `assistantMessage` event (intermediate + final), with deduplication via `babelFishTranslatedIds` Set to prevent re-translating when `--include-partial-messages` fires duplicate events for the same message ID

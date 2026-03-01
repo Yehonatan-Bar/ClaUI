@@ -364,3 +364,4 @@ interface ShareableProfile {
 **Webview -> Extension**: `githubSync`, `addFriend`, `removeFriend`, `refreshFriends`, `getCommunityData`, `copyShareCard`
 
 **Extension -> Webview**: `githubSyncStatus`, `communityData`, `friendActionResult`, `shareCardCopied`
+....

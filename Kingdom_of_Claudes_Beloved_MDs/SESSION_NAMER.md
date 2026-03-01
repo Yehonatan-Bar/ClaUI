@@ -140,3 +140,4 @@ All logs go to the `ClaUi` output channel with `[SessionNaming]` and `SessionNam
 The prompt **must** be piped via stdin. An earlier implementation passed the prompt as a CLI argument (`-p "Name this..."`) but `shell: true` on Windows caused the shell to mangle multi-line strings, quotes, and Hebrew characters. Haiku only received the first word ("Name") and responded with a confused message instead of a tab name.
 
 **Rule:** Never put the prompt in the `args` array. Always pipe via `stdin.write()` + `stdin.end()`.
+.

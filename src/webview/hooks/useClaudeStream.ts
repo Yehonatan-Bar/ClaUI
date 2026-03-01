@@ -79,6 +79,9 @@ export function useClaudeStream(): void {
     setUsageWidgetEnabled,
     setUsageData,
     setTokenRatioData,
+    setTeamState,
+    setTeamActive,
+    clearTeamState,
   } = useAppStore();
 
   useEffect(() => {
@@ -575,6 +578,23 @@ export function useClaudeStream(): void {
           setTokenRatioData(msg.samples, msg.summaries, msg.globalTurnCount, msg.cumulativeTokens, msg.cumulativeWeightedTokens);
           break;
 
+        // ----- Agent Teams -----
+        case 'teamStateUpdate':
+          setTeamState({
+            teamName: msg.teamName,
+            config: msg.config,
+            tasks: msg.tasks,
+            agentStatuses: msg.agentStatuses,
+            recentMessages: msg.recentMessages,
+          });
+          break;
+        case 'teamDetected':
+          setTeamActive(true, msg.teamName);
+          break;
+        case 'teamDismissed':
+          clearTeamState();
+          break;
+
         // ----- Bug Report -----
         case 'bugReportOpen':
           useAppStore.getState().setBugReportPanelOpen(true);
@@ -688,6 +708,9 @@ export function useClaudeStream(): void {
     setUsageWidgetEnabled,
     setUsageData,
     setTokenRatioData,
+    setTeamState,
+    setTeamActive,
+    clearTeamState,
   ]);
 }
 

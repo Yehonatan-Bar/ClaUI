@@ -790,11 +790,19 @@ export class MessageHandler {
           this.babelFishEnabled = enabled;
           this.log(`[BabelFish] Setting enabled to: ${enabled}`);
           const bfConfig = vscode.workspace.getConfiguration('claudeMirror');
-          void bfConfig.update('babelFish.enabled', enabled, true);
-          void bfConfig.update('promptTranslator.enabled', enabled, true);
-          void bfConfig.update('promptTranslator.autoTranslate', enabled, true);
-          this.sendBabelFishSettings();
-          this.sendPromptTranslatorSettings();
+          // Chain config updates sequentially to avoid race condition:
+          // concurrent writes to settings.json can clobber each other's changes.
+          bfConfig.update('babelFish.enabled', enabled, true)
+            .then(() => bfConfig.update('promptTranslator.enabled', enabled, true))
+            .then(() => bfConfig.update('promptTranslator.autoTranslate', enabled, true))
+            .then(
+              () => this.log(`[BabelFish] Config saved: enabled=${enabled}`),
+              (err: unknown) => this.log(`[BabelFish] Error saving config: ${err}`),
+            );
+          // Send explicit values to webview immediately (don't wait for config writes)
+          const bfLanguage = bfConfig.get<string>('translationLanguage', 'Hebrew');
+          this.webview.postMessage({ type: 'babelFishSettings', enabled, language: bfLanguage });
+          this.webview.postMessage({ type: 'promptTranslatorSettings', translateEnabled: enabled, autoTranslate: enabled });
           break;
         }
 
@@ -908,6 +916,43 @@ export class MessageHandler {
             this.bugReportService = null;
           }
           break;
+
+        // ----- Agent Teams -----
+        case 'teamPanelOpen':
+          this.log('[Teams] Panel open requested');
+          break;
+        case 'teamSendMessage': {
+          this.log(`[Teams] Send message to ${msg.agentName}`);
+          const teamActions = (this.webview as import('../session/SessionTab').SessionTab).getTeamActions?.();
+          if (teamActions) {
+            teamActions.sendMessage(msg.agentName, msg.content);
+          }
+          break;
+        }
+        case 'teamCreateTask': {
+          this.log(`[Teams] Create task: ${msg.subject}`);
+          const teamActions2 = (this.webview as import('../session/SessionTab').SessionTab).getTeamActions?.();
+          if (teamActions2) {
+            teamActions2.createTask({ subject: msg.subject, description: msg.description, status: 'pending' });
+          }
+          break;
+        }
+        case 'teamUpdateTask': {
+          this.log(`[Teams] Update task #${msg.taskId}`);
+          const teamActions3 = (this.webview as import('../session/SessionTab').SessionTab).getTeamActions?.();
+          if (teamActions3) {
+            teamActions3.updateTask(msg.taskId, msg.updates);
+          }
+          break;
+        }
+        case 'teamShutdownAgent': {
+          this.log(`[Teams] Shutdown agent: ${msg.agentName}`);
+          const teamActions4 = (this.webview as import('../session/SessionTab').SessionTab).getTeamActions?.();
+          if (teamActions4) {
+            teamActions4.shutdownAgent(msg.agentName);
+          }
+          break;
+        }
 
         case 'planApprovalResponse':
           this.log(`Plan approval response: action=${msg.action} toolName=${msg.toolName || '(none)'} pendingTool=${this.pendingApprovalTool || '(none)'}`);
@@ -1805,12 +1850,16 @@ export class MessageHandler {
     });
   }
 
-  /** Read prompt translator settings from VS Code config and send to webview */
+  /** Read prompt translator settings from VS Code config and send to webview.
+   *  Always respects babelFish.enabled as the master switch — if BabelFish is off,
+   *  prompt translation is forced off regardless of the individual promptTranslator config. */
   private sendPromptTranslatorSettings(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
-    const translateEnabled = config.get<boolean>('promptTranslator.enabled', false);
-    const autoTranslate = config.get<boolean>('promptTranslator.autoTranslate', false);
-    this.log(`Sending prompt translator settings: enabled=${translateEnabled}, auto=${autoTranslate}`);
+    const babelFishEnabled = config.get<boolean>('babelFish.enabled', false);
+    // BabelFish is the master switch: promptTranslator is only active when BabelFish is on
+    const translateEnabled = babelFishEnabled && config.get<boolean>('promptTranslator.enabled', false);
+    const autoTranslate = babelFishEnabled && config.get<boolean>('promptTranslator.autoTranslate', false);
+    this.log(`Sending prompt translator settings: enabled=${translateEnabled}, auto=${autoTranslate} (babelFish=${babelFishEnabled})`);
     this.webview.postMessage({
       type: 'promptTranslatorSettings',
       translateEnabled,
@@ -1818,7 +1867,8 @@ export class MessageHandler {
     });
   }
 
-  /** Read Babel Fish settings from VS Code config and send to webview */
+  /** Read Babel Fish settings from VS Code config and send to webview.
+   *  Also syncs promptTranslator state to ensure consistency. */
   private sendBabelFishSettings(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const enabled = config.get<boolean>('babelFish.enabled', false);
@@ -1830,6 +1880,14 @@ export class MessageHandler {
       enabled,
       language,
     });
+    // When Babel Fish is off, ensure prompt translator is also off in the webview
+    if (!enabled) {
+      this.webview.postMessage({
+        type: 'promptTranslatorSettings',
+        translateEnabled: false,
+        autoTranslate: false,
+      });
+    }
   }
 
   /** Read skill generation settings and send to webview */
@@ -2010,7 +2068,24 @@ export class MessageHandler {
         this.sendPromptTranslatorSettings();
       }
       if (e.affectsConfiguration('claudeMirror.babelFish')) {
-        this.sendBabelFishSettings();
+        const bfCfg = vscode.workspace.getConfiguration('claudeMirror');
+        const bfEnabled = bfCfg.get<boolean>('babelFish.enabled', false);
+        this.babelFishEnabled = bfEnabled;
+        // When Babel Fish is disabled via VS Code Settings, also disable promptTranslator
+        // settings — chain sequentially to avoid concurrent write race in settings.json
+        if (!bfEnabled) {
+          bfCfg.update('promptTranslator.enabled', false, true)
+            .then(() => bfCfg.update('promptTranslator.autoTranslate', false, true))
+            .then(undefined, (err: unknown) => this.log(`[BabelFish] Error syncing promptTranslator config: ${err}`));
+        }
+        const bfLang = bfCfg.get<string>('translationLanguage', 'Hebrew');
+        this.webview.postMessage({ type: 'babelFishSettings', enabled: bfEnabled, language: bfLang });
+        // Send synced prompt translator state
+        this.webview.postMessage({
+          type: 'promptTranslatorSettings',
+          translateEnabled: bfEnabled ? bfCfg.get<boolean>('promptTranslator.enabled', false) : false,
+          autoTranslate: bfEnabled ? bfCfg.get<boolean>('promptTranslator.autoTranslate', false) : false,
+        });
       }
       if (e.affectsConfiguration('claudeMirror.skillGen')) {
         this.sendSkillGenSettings();
@@ -2586,10 +2661,11 @@ export class MessageHandler {
     }
     this.pendingApprovalCycleResultObserved = true;
     this.log(`Approval cycle ${this.pendingApprovalCycleId}: result observed via ${source}`);
-    if (this.exitPlanApproveResumeFallbackCycleId === this.pendingApprovalCycleId) {
-      this.cancelExitPlanApproveResumeFallback();
-      this.log(`ExitPlanMode approve fallback cancelled - result observed (cycle ${this.pendingApprovalCycleId})`);
-    }
+    // Do NOT cancel the fallback timer here. If a timer is running, its
+    // callback now checks pendingApprovalCycleResultObserved and will send
+    // the proceed nudge when it fires (Bug 7 fix). Cancelling here would
+    // prevent the nudge from being sent when the CLI auto-resumed with
+    // brief text and went idle.
   }
 
   /** If ExitPlanMode approve does not auto-resume, send a delayed proceed nudge */
@@ -2602,12 +2678,33 @@ export class MessageHandler {
       this.log(`ExitPlanMode approve fallback skipped - stale cycle ${cycleId}, current=${this.pendingApprovalCycleId ?? 'none'}`);
       return;
     }
-    if (this.pendingApprovalCycleResumeObserved || this.pendingApprovalCycleResultObserved) {
-      this.log(`ExitPlanMode approve fallback skipped - execution already resumed/completed (cycle ${cycleId})`);
+    // If the CLI already completed (result/success observed), it is idle and
+    // waiting for input. Send the proceed nudge immediately — the delayed
+    // fallback would just skip because the flags are already set.
+    // Bug 7: previously, resumeObserved || resultObserved both caused a skip,
+    // but resultObserved means the CLI is idle and NEEDS a nudge.
+    if (this.pendingApprovalCycleResultObserved) {
+      this.log(`ExitPlanMode approve fallback - CLI already completed and idle, sending proceed nudge immediately (cycle ${cycleId})`);
+      try {
+        this.control.sendText('Yes, proceed with the plan.');
+        this.webview.postMessage({ type: 'processBusy', busy: true });
+      } catch (err) {
+        this.log(`ExitPlanMode approve immediate nudge failed: ${err}`);
+      } finally {
+        this.clearApprovalCycleState();
+      }
+      return;
+    }
+
+    // If the CLI auto-resumed (toolUseStart/textDelta observed) but has not
+    // yet completed (no result), it is actively working — no nudge needed.
+    if (this.pendingApprovalCycleResumeObserved) {
+      this.log(`ExitPlanMode approve fallback skipped - CLI is actively working (cycle ${cycleId})`);
       this.clearApprovalCycleState();
       return;
     }
 
+    // No activity observed yet — schedule a delayed fallback nudge.
     this.cancelExitPlanApproveResumeFallback();
     this.exitPlanApproveResumeFallbackCycleId = cycleId;
     this.log(`ExitPlanMode approve fallback scheduled in ${EXIT_PLANMODE_APPROVE_RESUME_FALLBACK_DELAY_MS}ms (cycle ${cycleId})`);
@@ -2619,8 +2716,22 @@ export class MessageHandler {
         this.log(`ExitPlanMode approve fallback aborted - cycle changed (expected ${cycleId}, current=${this.pendingApprovalCycleId ?? 'none'})`);
         return;
       }
-      if (this.pendingApprovalCycleResumeObserved || this.pendingApprovalCycleResultObserved) {
-        this.log(`ExitPlanMode approve fallback aborted - execution resumed/completed during wait (cycle ${cycleId})`);
+      // Re-check: if result arrived during the wait, CLI is idle — send nudge.
+      if (this.pendingApprovalCycleResultObserved) {
+        this.log(`ExitPlanMode approve fallback firing (result arrived during wait) - sending proceed nudge to CLI (cycle ${cycleId})`);
+        try {
+          this.control.sendText('Yes, proceed with the plan.');
+          this.webview.postMessage({ type: 'processBusy', busy: true });
+        } catch (err) {
+          this.log(`ExitPlanMode approve fallback send failed: ${err}`);
+        } finally {
+          this.clearApprovalCycleState();
+        }
+        return;
+      }
+      // If only resume observed (still working), don't interfere.
+      if (this.pendingApprovalCycleResumeObserved) {
+        this.log(`ExitPlanMode approve fallback aborted - CLI resumed during wait (cycle ${cycleId})`);
         this.clearApprovalCycleState();
         return;
       }

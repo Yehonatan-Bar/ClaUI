@@ -22,6 +22,10 @@ import { buildWebviewHtml } from '../webview/WebviewProvider';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import type { TokenUsageRatioTracker } from './TokenUsageRatioTracker';
 import { AuthManager } from '../auth/AuthManager';
+import { TeamWatcher } from '../teams/TeamWatcher';
+import { TeamDetector } from '../teams/TeamDetector';
+import { TeamActions } from '../teams/TeamActions';
+import type { TeamStateSnapshot } from '../teams/TeamTypes';
 import type { CliOutputEvent, AssistantMessage } from '../types/stream-json';
 import type {
   ExtensionToWebviewMessage,
@@ -77,8 +81,19 @@ export class SessionTab implements WebviewBridge {
   private readonly fileLogger: FileLogger | null = null;
   /** Fork initialization data (set before startSession when forking) */
   private forkInitData: { promptText: string; messages: SerializedChatMessage[] } | null = null;
+  /** When true, the process exit is from fork phase 1 (--fork-session) and phase 2 should auto-start */
+  private forkInProgress = false;
   /** Tracks whether stderr indicates Claude CLI is not installed */
   private claudeCliMissingDetected = false;
+  /** Agent Teams support */
+  private teamWatcher: TeamWatcher | null = null;
+  private teamDetector = new TeamDetector();
+  private teamActions: TeamActions | null = null;
+  private activeTeamName: string | null = null;
+  /** Guard: true once an auto-prompt has been sent for the current "all agents idle" state */
+  private teamAutoPromptSent = false;
+  /** Whether any agent has been seen as 'working' at least once (prevents triggering on fresh teams) */
+  private teamHadWorkingAgent = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -312,6 +327,9 @@ export class SessionTab implements WebviewBridge {
 
   /** Start a new Claude CLI session in this tab */
   async startSession(options?: { resume?: string; fork?: boolean; cwd?: string }): Promise<void> {
+    if (options?.fork) {
+      this.forkInProgress = true;
+    }
     await this.processManager.start(options);
     this.achievementService.onSessionStart(this.id);
     this.postMessage({
@@ -437,6 +455,11 @@ export class SessionTab implements WebviewBridge {
     }
     this.disposed = true;
     this.stopThinkingAnimation();
+    // Clean up team watcher
+    if (this.teamWatcher) {
+      this.teamWatcher.dispose();
+      this.teamWatcher = null;
+    }
     // Save analytics BEFORE stopping the process to ensure data is persisted
     this.saveProjectAnalytics();
     this.achievementService.onSessionEnd(this.id);
@@ -676,6 +699,44 @@ export class SessionTab implements WebviewBridge {
         return;
       }
 
+      // Fork phase 1 complete: --fork-session created the new session and exited.
+      // Phase 2: resume the forked session as a normal interactive session.
+      if (this.forkInProgress) {
+        this.forkInProgress = false;
+        const forkedSessionId = this.processManager.currentSessionId;
+        if (forkedSessionId) {
+          tabLog(`Fork phase 1 complete, new session: ${forkedSessionId}. Starting phase 2...`);
+          this.processManager
+            .start({ resume: forkedSessionId, skipReplay: true })
+            .then(() => {
+              tabLog(`Fork phase 2: interactive session started for ${forkedSessionId}`);
+              this.postMessage({
+                type: 'sessionStarted',
+                sessionId: forkedSessionId,
+                model: this.currentModel || 'connecting...',
+                isResume: false,
+              });
+            })
+            .catch((err: unknown) => {
+              const errMsg = err instanceof Error ? err.message : String(err);
+              tabLog(`Fork phase 2 failed: ${errMsg}`);
+              this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+              this.postMessage({
+                type: 'error',
+                message: `Fork failed: ${errMsg}`,
+              });
+            });
+        } else {
+          tabLog('Fork failed: no session ID captured from CLI');
+          this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+          this.postMessage({
+            type: 'error',
+            message: 'Fork failed: could not determine the new session ID.',
+          });
+        }
+        return;
+      }
+
       const config = vscode.workspace.getConfiguration('claudeMirror');
       const autoRestart = config.get<boolean>('autoRestart', true);
       const currentSessionId = this.processManager.currentSessionId;
@@ -885,7 +946,7 @@ export class SessionTab implements WebviewBridge {
       }
     });
 
-    this.demux.on('assistantMessage', (_event: AssistantMessage) => {
+    this.demux.on('assistantMessage', (event: AssistantMessage) => {
       if (this.disposed) return;
       try {
         if (this.panel.active) {
@@ -893,6 +954,32 @@ export class SessionTab implements WebviewBridge {
         }
       } catch {
         // Panel may have been disposed between our check and the access
+      }
+
+      // Detect team activity in assistant messages
+      if (event.message?.content) {
+        const detection = this.teamDetector.detectTeamActivity(event.message.content);
+        if (detection) {
+          if (detection.action === 'create' && detection.teamName) {
+            this.startTeamWatcher(detection.teamName);
+          } else if (detection.action === 'delete') {
+            this.stopTeamWatcher(detection.teamName);
+          }
+        }
+
+        // Stream-based idle detection: scan text blocks for idle_notification JSON.
+        // This is a backup mechanism for when file-based inbox reading misses notifications.
+        if (this.teamWatcher) {
+          for (const block of event.message.content) {
+            if (block.type !== 'text' || !block.text) continue;
+            try {
+              const parsed = JSON.parse(block.text);
+              if (parsed?.type === 'idle_notification' && typeof parsed.from === 'string') {
+                this.teamWatcher.markAgentIdle(parsed.from);
+              }
+            } catch { /* not JSON, skip */ }
+          }
+        }
       }
     });
   }
@@ -918,7 +1005,159 @@ export class SessionTab implements WebviewBridge {
 
       tabLog(`[SessionStore] Saving initial metadata: session=${event.session_id}, model=${event.model}`);
       this.persistSessionMetadata();
+
+      // Startup recovery: if this session already owns a team, start watching it.
+      // This covers VS Code reload and session resume scenarios.
+      if (!this.teamWatcher) {
+        this.recoverTeamForSession(event.session_id);
+      }
     });
+  }
+
+  // --- Agent Teams ---
+
+  /** Start watching a team's file system for real-time updates */
+  private startTeamWatcher(teamName: string): void {
+    // Don't restart if already watching this team
+    if (this.activeTeamName === teamName && this.teamWatcher) return;
+
+    this.stopTeamWatcher();
+    this.activeTeamName = teamName;
+    this.teamAutoPromptSent = false;
+    this.teamHadWorkingAgent = false;
+    this.log(`[Tab ${this.tabNumber}] Team detected: "${teamName}"`);
+
+    this.teamWatcher = new TeamWatcher(teamName, this.log);
+    this.teamActions = new TeamActions(teamName, this.log);
+
+    this.teamWatcher.on('stateChange', (snapshot: TeamStateSnapshot) => {
+      if (this.disposed) return;
+      this.postMessage({
+        type: 'teamStateUpdate',
+        teamName: snapshot.teamName,
+        config: snapshot.config,
+        tasks: snapshot.tasks,
+        agentStatuses: snapshot.agentStatuses,
+        recentMessages: snapshot.recentMessages,
+        lastUpdatedAt: snapshot.lastUpdatedAt,
+      });
+
+      // Auto-prompt: when all agents go idle and Claude is waiting for input,
+      // send an automatic prompt to trigger Claude to continue and report results.
+      this.checkAllAgentsIdleAutoPrompt(snapshot);
+    });
+
+    this.teamWatcher.start();
+    this.postMessage({ type: 'teamDetected', teamName });
+  }
+
+  /**
+   * Check whether all team agents are idle while Claude is waiting for input.
+   * If so, send an automatic prompt to trigger Claude to continue and report results.
+   */
+  private checkAllAgentsIdleAutoPrompt(snapshot: TeamStateSnapshot): void {
+    const members = snapshot.config?.members;
+    if (!members || members.length === 0) return;
+
+    const statuses = snapshot.agentStatuses;
+    const agentNames = members.map(m => m.name);
+
+    // Track if any agent has ever been 'working' (don't trigger on a brand-new team)
+    const hasWorking = agentNames.some(n => statuses[n] === 'working');
+    if (hasWorking) {
+      this.teamHadWorkingAgent = true;
+      // Reset the prompt guard since agents are working again
+      this.teamAutoPromptSent = false;
+      return;
+    }
+
+    // All agents must be idle
+    const allIdle = agentNames.every(n => statuses[n] === 'idle');
+    if (!allIdle) return;
+
+    // Guard: only trigger once per idle cycle, and only if agents actually worked
+    if (this.teamAutoPromptSent || !this.teamHadWorkingAgent) return;
+
+    // Only trigger when Claude is NOT busy (i.e., waiting for user input)
+    if (this.isBusy) return;
+
+    // At least one agent must have sent a message (evidence of work done)
+    if (!snapshot.recentMessages || snapshot.recentMessages.length === 0) return;
+
+    this.teamAutoPromptSent = true;
+    this.log(`[Tab ${this.tabNumber}] All agents idle — sending auto-prompt to Claude`);
+
+    const autoPromptText = 'All team agents have completed their work and are now idle. Please check the inbox messages, review the results, and provide a summary report.';
+
+    // Show the auto-prompt in the UI so the user sees what happened
+    this.postMessage({
+      type: 'userMessage',
+      content: [{ type: 'text', text: autoPromptText }],
+    });
+
+    // Send to Claude Code process
+    this.control.sendText(autoPromptText);
+
+    // Mark as busy
+    this.postMessage({ type: 'processBusy', busy: true });
+  }
+
+  /** Stop the team watcher and notify webview */
+  private stopTeamWatcher(teamName?: string): void {
+    if (this.teamWatcher) {
+      this.teamWatcher.dispose();
+      this.teamWatcher = null;
+    }
+    if (this.activeTeamName) {
+      const dismissedName = teamName || this.activeTeamName;
+      this.log(`[Tab ${this.tabNumber}] Team dismissed: "${dismissedName}"`);
+      this.postMessage({ type: 'teamDismissed', teamName: dismissedName });
+    }
+    this.activeTeamName = null;
+    this.teamActions = null;
+  }
+
+  /** Get the TeamActions instance (for MessageHandler delegation) */
+  getTeamActions(): TeamActions | null {
+    return this.teamActions;
+  }
+
+  /** Get the active team name */
+  getActiveTeamName(): string | null {
+    return this.activeTeamName;
+  }
+
+  /**
+   * Startup recovery: scan ~/.claude/teams/ for any team whose config.leadSessionId
+   * matches the given sessionId. If found, start watching that team so the widget
+   * appears after VS Code restart without waiting for a new TeamCreate event.
+   */
+  private recoverTeamForSession(sessionId: string): void {
+    try {
+      const homeDir = process.env.USERPROFILE || process.env.HOME || '';
+      const teamsDir = require('path').join(homeDir, '.claude', 'teams');
+      const fs = require('fs') as typeof import('fs');
+      if (!fs.existsSync(teamsDir)) return;
+
+      const entries = fs.readdirSync(teamsDir);
+      for (const entry of entries) {
+        const configPath = require('path').join(teamsDir, entry, 'config.json');
+        if (!fs.existsSync(configPath)) continue;
+        try {
+          const raw = fs.readFileSync(configPath, 'utf-8');
+          const config = JSON.parse(raw) as { leadSessionId?: string; name?: string };
+          if (config.leadSessionId === sessionId) {
+            const teamName = config.name || entry;
+            this.log(`[Tab ${this.tabNumber}] Startup recovery: found team "${teamName}" for session ${sessionId}`);
+            this.startTeamWatcher(teamName);
+            return;
+          }
+        } catch { /* skip unreadable configs */ }
+      }
+      this.log(`[Tab ${this.tabNumber}] Startup recovery: no team found for session ${sessionId}`);
+    } catch (err) {
+      this.log(`[Tab ${this.tabNumber}] Startup recovery error: ${err}`);
+    }
   }
 
   /** Update the panel title to include the session ID */

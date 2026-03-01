@@ -425,6 +425,38 @@ export interface SetUsageWidgetEnabledRequest {
   enabled: boolean;
 }
 
+// --- Agent Teams (Webview -> Extension) ---
+
+export interface TeamPanelOpenRequest {
+  type: 'teamPanelOpen';
+}
+
+export interface TeamSendMessageRequest {
+  type: 'teamSendMessage';
+  agentName: string;
+  content: string;
+}
+
+export interface TeamCreateTaskRequest {
+  type: 'teamCreateTask';
+  subject: string;
+  description?: string;
+}
+
+export interface TeamUpdateTaskRequest {
+  type: 'teamUpdateTask';
+  taskId: number;
+  updates: {
+    status?: 'pending' | 'in_progress' | 'completed' | 'blocked';
+    owner?: string;
+  };
+}
+
+export interface TeamShutdownAgentRequest {
+  type: 'teamShutdownAgent';
+  agentName: string;
+}
+
 // --- Bug Report (Webview -> Extension) ---
 
 export interface BugReportInitRequest {
@@ -542,7 +574,12 @@ export type WebviewToExtensionMessage =
   | BugReportApproveScriptRequest
   | BugReportSubmitRequest
   | BugReportGetPreviewRequest
-  | BugReportCloseRequest;
+  | BugReportCloseRequest
+  | TeamPanelOpenRequest
+  | TeamSendMessageRequest
+  | TeamCreateTaskRequest
+  | TeamUpdateTaskRequest
+  | TeamShutdownAgentRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -1202,6 +1239,54 @@ export interface ForceResampleTokenRatioRequest {
   type: 'forceResampleTokenRatio';
 }
 
+// --- Agent Teams (Extension -> Webview) ---
+
+export interface TeamStateUpdateMessage {
+  type: 'teamStateUpdate';
+  teamName: string;
+  config: {
+    name: string;
+    description?: string;
+    members: Array<{
+      agentId: string;
+      name: string;
+      agentType: string;
+      color?: string;
+    }>;
+  };
+  tasks: Array<{
+    id: number;
+    subject: string;
+    description?: string;
+    activeForm?: string;
+    owner?: string;
+    status: string;
+    blockedBy?: number[];
+    blocks?: number[];
+  }>;
+  agentStatuses: Record<string, string>;
+  recentMessages: Array<{
+    from: string;
+    to?: string;
+    text: string;
+    timestamp: string | number;
+    read?: boolean;
+    type?: string;
+    summary?: string;
+  }>;
+  lastUpdatedAt: number;
+}
+
+export interface TeamDetectedMessage {
+  type: 'teamDetected';
+  teamName: string;
+}
+
+export interface TeamDismissedMessage {
+  type: 'teamDismissed';
+  teamName: string;
+}
+
 // --- Bug Report (Extension -> Webview) ---
 
 export interface BugReportOpenMessage {
@@ -1328,4 +1413,7 @@ export type ExtensionToWebviewMessage =
   | BugReportChatResponseMessage
   | BugReportScriptResultMessage
   | BugReportPreviewMessage
-  | BugReportSubmitResultMessage;
+  | BugReportSubmitResultMessage
+  | TeamStateUpdateMessage
+  | TeamDetectedMessage
+  | TeamDismissedMessage;

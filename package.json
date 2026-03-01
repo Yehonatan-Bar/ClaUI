@@ -113,6 +113,10 @@
       {
         "command": "claudeMirror.discoverSessions",
         "title": "ClaUi: Discover All Sessions"
+      },
+      {
+        "command": "claudeMirror.toggleTeamPanel",
+        "title": "ClaUi: Toggle Agent Teams Panel"
       }
     ],
     "configuration": {
@@ -477,6 +481,23 @@
           "type": "boolean",
           "default": true,
           "description": "Use AI (Claude Sonnet) for ambiguous skill deduplication decisions"
+        },
+        "claudeMirror.teams.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Agent Teams visualization and flow control"
+        },
+        "claudeMirror.teams.autoOpenPanel": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically open the Teams panel when a team is detected"
+        },
+        "claudeMirror.teams.pollIntervalMs": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 500,
+          "maximum": 10000,
+          "description": "Polling interval in milliseconds for team file changes (Windows fallback)"
         }
       }
     },
@@ -546,6 +567,11 @@
         "command": "claudeMirror.discoverSessions",
         "key": "ctrl+alt+d",
         "mac": "cmd+alt+d"
+      },
+      {
+        "command": "claudeMirror.toggleTeamPanel",
+        "key": "ctrl+alt+t",
+        "mac": "cmd+alt+t"
       }
     ],
     "menus": {

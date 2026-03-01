@@ -101,6 +101,11 @@ claude-code-mirror/
 |   |   |   |   +-- PhaseC3IncrementalClustering.ts  #   AI incremental clustering via Claude CLI
 |   |   |   |   +-- PhaseC4CrossBucketMerge.ts       #   AI cross-bucket merging via Claude CLI
 |   |   |   |   +-- PhaseDSkillSynthesis.ts          #   AI skill synthesis via Claude CLI (parallelized)
+|   |   +-- teams/
+|   |   |   +-- TeamTypes.ts             #   Core types (AgentStatus, TeamMember, TeamConfig, TeamTask, InboxMessage, TeamStateSnapshot)
+|   |   |   +-- TeamDetector.ts          #   Scans ContentBlock[] for TeamCreate/TeamDelete tool_use
+|   |   |   +-- TeamWatcher.ts           #   File watcher for ~/.claude/teams/ and ~/.claude/tasks/ (EventEmitter, polling fallback)
+|   |   |   +-- TeamActions.ts           #   Write operations: sendMessage, createTask, updateTask, shutdownAgent
 |   |   +-- achievements/
 |   |   |   +-- AchievementCatalog.ts     #   30 achievement definitions, 7 categories
 |   |   |   +-- AchievementStore.ts       #   Persistence via VS Code globalState (8 counters, 15 levels)
@@ -188,6 +193,15 @@ claude-code-mirror/
 |       |   |   +-- charts/
 |       |   |       +-- RechartsWrappers.tsx  # 7 Recharts chart components
 |       |   |       +-- SemanticWidgets.tsx   # MoodTimeline, FrustrationAlert, BugRepeatTracker
+|       |   +-- Teams/
+|       |   |   +-- TeamPanel.tsx           #   Full-screen overlay with 4 tabs (Topology, Tasks, Messages, Activity)
+|       |   |   +-- TopologyTab.tsx         #   CSS Grid agent cards with status dots, badges, pulse animation
+|       |   |   +-- TasksTab.tsx            #   Kanban board (Pending/InProgress/Completed) with inline add form
+|       |   |   +-- MessagesTab.tsx         #   Chronological message feed with inline send form
+|       |   |   +-- ActivityTab.tsx         #   Per-agent activity sections with shutdown buttons
+|       |   |   +-- TeamStatusWidget.tsx    #   Draggable floating widget with progress bar
+|       |   |   +-- teamColors.ts           #   Color constants for agents, statuses, tasks
+|       |   |   +-- index.ts               #   Barrel exports
 |       |   +-- StatusBar/
 |       |   |   +-- StatusBar.tsx            #   Bottom status bar with responsive collapse
 |       |   |   +-- StatusBarGroupButton.tsx #   Reusable dropdown group button for collapsed mode
@@ -331,7 +345,7 @@ claude-code-mirror/
 **Editable Prompts** - Users can edit previously sent messages by hovering over a user message and clicking "Edit". The message content switches to an inline textarea. On send, all messages from the edit point onward are removed from the UI, the current CLI session is stopped, then **resumed** with `--resume <sessionId>` (without `--replay-user-messages` to avoid re-emitting old messages). The edited prompt is sent into the resumed session so Claude retains full prior conversation context. Only text-only user messages are editable (not images). The edit button is hidden while the assistant is busy.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**Fork Conversation** - Users can fork the conversation from any user message by hovering and clicking "Fork". The webview sends a truncated message history (everything before the selected user message) plus the selected message text. `claudeMirror.forkFromMessage` creates a new tab using the same provider as the source session. Claude tabs still fork via CLI resume/fork semantics; Codex tabs now use a simple UI-level fork (new Codex session, copied history snapshot in the webview, and the forked message prefilled in the input box, without resuming the original thread). Key files: `MessageBubble.tsx` (Fork button), `MessageList.tsx` (handler), `MessageHandler.ts` / `CodexMessageHandler.ts` (`forkFromMessage` routing), `commands.ts` (`claudeMirror.forkFromMessage`), `SessionTab.ts` / `CodexSessionTab.ts` (`setForkInit` + fork startup), `App.tsx` (fork completion logic), `InputArea.tsx` (`fork-set-input` listener).
+**Fork Conversation** - Users can fork the conversation from any user message by hovering and clicking "Fork". The webview sends a truncated message history (everything before the selected user message) plus the selected message text. `claudeMirror.forkFromMessage` creates a new tab using the same provider as the source session. Claude tabs use a **two-phase fork**: Phase 1 spawns `claude --resume <id> --fork-session` (without `--replay-user-messages`) which creates the fork and exits; the exit handler detects `forkInProgress`, captures the new session ID, then Phase 2 resumes the forked session interactively with `--resume <new-id> --skipReplay`. Codex tabs use a simple UI-level fork (new Codex session, copied history snapshot in the webview, and the forked message prefilled in the input box, without resuming the original thread). Key files: `MessageBubble.tsx` (Fork button), `MessageList.tsx` (handler), `MessageHandler.ts` / `CodexMessageHandler.ts` (`forkFromMessage` routing), `commands.ts` (`claudeMirror.forkFromMessage`), `SessionTab.ts` / `CodexSessionTab.ts` (`setForkInit` + two-phase fork startup), `App.tsx` (fork completion logic), `InputArea.tsx` (`fork-set-input` listener).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Session Vitals** - Visual session health dashboard with 5 components: Session Timeline (vertical color-coded minimap alongside messages, click-to-jump), Weather Widget (animated mood icon reflecting error/success patterns), Cost Heat Bar (gradient strip showing cost accumulation), Turn Intensity Borders (colored left border on assistant messages based on tool activity), and a Vitals toggle button in the StatusBar. The Vitals gear dropdown (`VitalsInfoPanel`) also hosts quick settings utilities including API key management and Claude CLI account Login/Logout/Refresh controls (status shown as email + subscription type when available). Data pipeline: `MessageHandler` builds `TurnRecord` on each CLI result event, sends to webview via `turnComplete` postMessage, stored in Zustand (`turnHistory[]`, `turnByMessageId{}`). Weather mood recalculated on each turn via sliding window algorithm. All components hidden when vitals disabled.
@@ -375,6 +389,9 @@ claude-code-mirror/
 
 **Full Bug Report** - Comprehensive in-extension bug reporting. 4th option in the Feedback QuickPick. Opens an overlay panel with two modes: Quick Report (required text description + auto-collected diagnostics) and AI-Assisted Report (chat with Claude Sonnet for guided diagnosis, with script suggestion approve/reject). Auto-collects system info, VS Code environment, CLI versions, and recent logs. Packages everything into a ZIP via `adm-zip` and submits via `FormspreeService`. Privacy-first: nothing sent until explicit user approval. Backend: `BugReportService`, `DiagnosticsCollector`. Frontend: `BugReportPanel`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/BUG_REPORT_FEATURE.md`
+
+**Agent Teams** -- Visualization and flow control for Claude Code's experimental Agent Teams feature. Auto-detects team creation/deletion from CLI stream (`TeamCreate`/`TeamDelete` tool_use blocks). Watches `~/.claude/teams/{name}/` and `~/.claude/tasks/{name}/` directories for live state updates (config, tasks, inbox messages) via `TeamWatcher` (EventEmitter, 100ms debounce, 2s polling fallback). Full-screen overlay panel with 4 tabs: Topology (agent cards with status dots and pulse animation), Tasks (kanban board with inline add), Messages (chronological feed with inline send), Activity (per-agent status with shutdown). Draggable floating widget shows team name, agent counts, and task progress bar. User actions (send message, create/update task, shutdown agent) write directly to team files on disk via `TeamActions`. Backend: `TeamDetector`, `TeamWatcher`, `TeamActions`, `TeamTypes`. Frontend: `TeamPanel`, `TeamStatusWidget`, `TopologyTab`, `TasksTab`, `MessagesTab`, `ActivityTab`. Keybinding: `Ctrl+Alt+T`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/AGENT_TEAMS.md`
 
 ---
 
@@ -424,6 +441,9 @@ claude-code-mirror/
 | `claudeMirror.skillGen.autoRun` | `true` | Automatically run pipeline when threshold reached |
 | `claudeMirror.skillGen.timeoutMs` | `300000` | Pipeline timeout in milliseconds (5 min default) |
 | `claudeMirror.skillGen.aiDeduplication` | `false` | Enable AI-powered deduplication (Tier 3) |
+| `claudeMirror.teams.enabled` | `true` | Enable Agent Teams detection and visualization |
+| `claudeMirror.teams.autoOpenPanel` | `true` | Auto-open team panel when a team is detected |
+| `claudeMirror.teams.pollIntervalMs` | `2000` | Polling interval for team file watching (ms) |
 
 ---
 

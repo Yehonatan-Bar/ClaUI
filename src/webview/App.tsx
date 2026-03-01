@@ -19,6 +19,7 @@ import { DashboardPanel } from './components/Dashboard';
 import { SkillGenPanel } from './components/SkillGen';
 import { BugReportPanel } from './components/BugReport';
 import { CodexConsultPanel } from './components/InputArea/CodexConsultPanel';
+import { TeamPanel, TeamStatusWidget } from './components/Teams';
 import { postToExtension } from './hooks/useClaudeStream';
 import { detectRtl } from './hooks/useRtlDetection';
 import { deriveTurnHistoryFromMessages } from './utils/turnVitals';
@@ -58,6 +59,8 @@ export const App: React.FC = () => {
     codexConsultPanelOpen,
     setCodexConsultPanelOpen,
     bugReportPanelOpen,
+    teamActive,
+    teamPanelOpen,
   } = useAppStore();
   const forkInit = useAppStore((s) => s.forkInit);
   const hasMessages = messages.length > 0 || streamingMessageId !== null;
@@ -118,6 +121,7 @@ export const App: React.FC = () => {
       {dashboardOpen && <DashboardPanel />}
       {skillGenPanelOpen && <SkillGenPanel />}
       {bugReportPanelOpen && <BugReportPanel />}
+      {teamPanelOpen && <TeamPanel />}
 
       {/* Error banner / setup guidance */}
       {lastError && (isClaudeCliMissingError ? (
@@ -241,6 +245,8 @@ export const App: React.FC = () => {
       {adventureEnabled && <AdventureWidget />}
       {/* Usage widget: floating display of subscription usage data, toggled via gear settings */}
       {usageWidgetEnabled && <UsageWidget />}
+      {/* Agent Teams widget: floating team status, appears when a team is active */}
+      {teamActive && <TeamStatusWidget />}
 
       {/* Always show messages if they exist, regardless of connection state */}
       {hasMessages ? (
