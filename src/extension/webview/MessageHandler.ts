@@ -184,8 +184,8 @@ export class MessageHandler {
   private promptTranslator: PromptTranslator | null = null;
   /** Babel Fish: unified bi-directional translation toggle */
   private babelFishEnabled = false;
-  /** Last assistant message content (for Babel Fish auto-translation on result) */
-  private lastAssistantContent: ContentBlock[] = [];
+  /** Babel Fish: track message IDs already sent for translation (dedup partial snapshots) */
+  private babelFishTranslatedIds = new Set<string>();
   /** Skill generation service (global, shared across tabs) */
   private skillGenService: SkillGenService | null = null;
   /** Global token-usage ratio tracker (shared across all tabs) */
@@ -2189,8 +2189,37 @@ export class MessageHandler {
         if (assistantText.trim()) {
           this.achievementService.onAssistantText(this.tabId, assistantText);
         }
-        // Store latest assistant content for Babel Fish auto-translation on result
-        this.lastAssistantContent = event.message.content;
+        // Babel Fish: auto-translate each assistant message as it arrives (intermediate + final)
+        if (this.babelFishEnabled && this.messageTranslator && !this.babelFishTranslatedIds.has(event.message.id)) {
+          this.babelFishTranslatedIds.add(event.message.id);
+          const textForTranslation = event.message.content
+            .filter((block) => block.type === 'text')
+            .map((block) => (block as any).text || '')
+            .join('\n\n')
+            .replace(/```[\w]*\n[\s\S]*?```/g, '')
+            .trim();
+          if (textForTranslation) {
+            const msgId = event.message.id;
+            const config = vscode.workspace.getConfiguration('claudeMirror');
+            const targetLang = config.get<string>('translationLanguage', 'Hebrew');
+            this.webview.postMessage({ type: 'autoTranslateStarted', messageId: msgId });
+            this.log(`[BabelFish] Auto-translating message ${msgId} to ${targetLang} (${textForTranslation.length} chars)`);
+            this.getApiKey().then((apiKey) =>
+              this.messageTranslator!.translate(textForTranslation, targetLang, apiKey)
+            ).then((translatedText) => {
+              this.webview.postMessage({
+                type: 'translationResult',
+                messageId: msgId,
+                translatedText,
+                success: !!translatedText,
+                error: translatedText ? undefined : 'Translation failed',
+              });
+              this.log(`[BabelFish] Auto-translation ${translatedText ? 'succeeded' : 'failed'} for message ${msgId}`);
+            }).catch((err) => {
+              this.log(`[BabelFish] Auto-translation error for message ${msgId}: ${err}`);
+            });
+          }
+        }
         this.recordToolUseFallbackFromAssistantMessage(event.message.content);
         this.log(`-> webview: assistantMessage id=${event.message.id} blocks=[${blockTypes}]`);
         this.webview.postMessage({
@@ -2354,35 +2383,8 @@ export class MessageHandler {
             const beat = this.adventureInterpreter.interpret(successTurn as TurnRecord);
             this.emitAdventureBeat(beat, 'resultSuccess');
           }
-          // Babel Fish: auto-translate the last assistant response
-          if (this.babelFishEnabled && this.messageTranslator && this.lastAssistantContent.length > 0) {
-            const textForTranslation = this.lastAssistantContent
-              .filter((block) => block.type === 'text')
-              .map((block) => (block as any).text || '')
-              .join('\n\n')
-              .replace(/```[\w]*\n[\s\S]*?```/g, '')
-              .trim();
-            if (textForTranslation && messageIdSnapshot) {
-              const config = vscode.workspace.getConfiguration('claudeMirror');
-              const targetLang = config.get<string>('translationLanguage', 'Hebrew');
-              this.webview.postMessage({ type: 'autoTranslateStarted', messageId: messageIdSnapshot });
-              this.log(`[BabelFish] Auto-translating response to ${targetLang} (${textForTranslation.length} chars)`);
-              this.getApiKey().then((apiKey) =>
-                this.messageTranslator!.translate(textForTranslation, targetLang, apiKey)
-              ).then((translatedText) => {
-                this.webview.postMessage({
-                  type: 'translationResult',
-                  messageId: messageIdSnapshot,
-                  translatedText,
-                  success: !!translatedText,
-                  error: translatedText ? undefined : 'Translation failed',
-                });
-                this.log(`[BabelFish] Auto-translation ${translatedText ? 'succeeded' : 'failed'} for message ${messageIdSnapshot}`);
-              }).catch((err) => {
-                this.log(`[BabelFish] Auto-translation error: ${err}`);
-              });
-            }
-          }
+          // Babel Fish: clear dedup set at end of turn
+          this.babelFishTranslatedIds.clear();
         } else {
           this.achievementService.onResult(this.tabId, false);
           const error = event as ResultError;

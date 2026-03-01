@@ -138,6 +138,10 @@ export interface AppState {
   translations: Record<string, string>;
   translatingMessageIds: Set<string>;
   showingTranslation: Set<string>;
+  /** Maps user message IDs to the original (pre-translation) text the user typed */
+  userOriginalTexts: Record<string, string>;
+  /** Holds the original text while waiting for the CLI to echo the translated message */
+  pendingOriginalText: string | null;
 
   // Session Vitals
   vitalsEnabled: boolean;
@@ -334,6 +338,8 @@ export interface AppState {
   setTranslation: (messageId: string, translatedText: string) => void;
   setTranslating: (messageId: string, translating: boolean) => void;
   toggleTranslationView: (messageId: string) => void;
+  setPendingOriginalText: (text: string | null) => void;
+  setUserOriginalText: (messageId: string, text: string) => void;
   setVitalsEnabled: (enabled: boolean) => void;
   setUsageWidgetEnabled: (enabled: boolean) => void;
   setUsageData: (stats: UsageStat[], fetchedAt: number, error?: string) => void;
@@ -560,6 +566,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   translations: {},
   translatingMessageIds: new Set(),
   showingTranslation: new Set(),
+  userOriginalTexts: {},
+  pendingOriginalText: null,
   vitalsEnabled: false,
   turnHistory: [],
   turnByMessageId: {},
@@ -762,17 +770,28 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
 
-    set((s) => ({
-      messages: [
-        ...s.messages,
-        {
-          id: `user-${Date.now()}`,
-          role: 'user' as const,
-          content: userVisibleContent,
-          timestamp: Date.now(),
-        },
-      ],
-    }));
+    const messageId = `user-${Date.now()}`;
+    const pending = get().pendingOriginalText;
+
+    set((s) => {
+      const updates: Partial<AppState> = {
+        messages: [
+          ...s.messages,
+          {
+            id: messageId,
+            role: 'user' as const,
+            content: userVisibleContent,
+            timestamp: Date.now(),
+          },
+        ],
+      };
+      // If there's a pending original text from Babel Fish translation, associate it
+      if (pending) {
+        updates.userOriginalTexts = { ...s.userOriginalTexts, [messageId]: pending };
+        updates.pendingOriginalText = null;
+      }
+      return updates;
+    });
   },
 
   /**
@@ -1094,6 +1113,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         translations: {},
         translatingMessageIds: new Set(),
         showingTranslation: new Set(),
+        userOriginalTexts: {},
+        pendingOriginalText: null,
       };
     }),
 
@@ -1124,6 +1145,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       return { showingTranslation: newSet };
     }),
+
+  setPendingOriginalText: (text) => set({ pendingOriginalText: text }),
+
+  setUserOriginalText: (messageId, text) =>
+    set((state) => ({
+      userOriginalTexts: { ...state.userOriginalTexts, [messageId]: text },
+    })),
 
   setVitalsEnabled: (enabled) =>
     set((state) => {
@@ -1359,6 +1387,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       translations: {},
       translatingMessageIds: new Set(),
       showingTranslation: new Set(),
+      userOriginalTexts: {},
+      pendingOriginalText: null,
       vitalsEnabled: state.vitalsEnabled,
       adventureEnabled: state.adventureEnabled,
       adventureBeats: [],

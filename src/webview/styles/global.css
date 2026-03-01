@@ -532,13 +532,13 @@ html, body, #root {
 /* Input area */
 .input-area {
   border-top: 1px solid var(--vscode-panel-border, #333);
-  padding: 12px 16px;
+  padding: 12px 8px;
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
 }
 
 .input-wrapper {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   align-items: flex-end;
   position: relative;
 }
@@ -967,8 +967,8 @@ html, body, #root {
 
 .input-textarea {
   flex: 1;
-  min-height: 40px;
-  max-height: 200px;
+  min-height: 80px;
+  max-height: 400px;
   padding: 8px 12px;
   background: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
@@ -5516,6 +5516,28 @@ html, body, #root {
   position: relative;
 }
 
+.status-bar-babelfish-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--vscode-descriptionForeground, #888);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.status-bar-babelfish-icon-btn:hover {
+  color: var(--vscode-foreground, #ccc);
+  background: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
+}
+
+.status-bar-babelfish-icon-btn.active {
+  color: var(--vscode-textLink-foreground, #3794ff);
+}
+
 .babel-fish-panel {
   position: absolute;
   bottom: 28px;
@@ -5626,4 +5648,28 @@ html, body, #root {
 
 .babel-fish-dot.off {
   background: #666;
+}
+
+/* Babel Fish: dual-line user message (original + translated) */
+.babel-fish-user-message {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.babel-fish-user-line {
+  padding: 4px 0;
+}
+
+.babel-fish-user-line + .babel-fish-user-line {
+  border-top: 1px solid var(--vscode-panel-border, #333);
+  padding-top: 8px;
+}
+
+.babel-fish-user-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground, #888);
+  margin-bottom: 2px;
 }

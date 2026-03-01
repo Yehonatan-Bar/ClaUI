@@ -469,11 +469,22 @@ export const StatusBar: React.FC<{
           )}
           <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={babelFishRef}>
             <button
-              className={`status-bar-vitals-btn ${babelFishEnabled ? 'active' : ''}`}
+              className={`status-bar-babelfish-icon-btn ${babelFishEnabled ? 'active' : ''}`}
               onClick={() => setBabelFishOpen((prev) => !prev)}
               data-tooltip="Babel Fish translation settings"
             >
-              Babel Fish
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {/* Ear - outer helix arc */}
+                <path d="M15 3Q23 3 23 12Q23 21 15 21" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                {/* Ear - inner fold */}
+                <path d="M16 7Q20 7 20 12Q20 17 16 17" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                {/* Fish body swimming right into ear */}
+                <path d="M15 12Q11 8.5 6 12Q11 15.5 15 12Z" fill="currentColor"/>
+                {/* Fish tail - forked */}
+                <path d="M6 12L3 9.5M6 12L3 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                {/* Fish eye */}
+                <circle cx="12.5" cy="11.2" r="0.7" fill="var(--vscode-editor-background, #1e1e1e)"/>
+              </svg>
             </button>
             {babelFishOpen && <BabelFishPanel onClose={() => setBabelFishOpen(false)} />}
           </div>
@@ -618,11 +629,22 @@ export const StatusBar: React.FC<{
       )}
       <div className="status-bar-babelfish-wrapper" ref={babelFishRef}>
         <button
-          className={`status-bar-vitals-btn ${babelFishEnabled ? 'active' : ''}`}
+          className={`status-bar-babelfish-icon-btn ${babelFishEnabled ? 'active' : ''}`}
           onClick={() => setBabelFishOpen((prev) => !prev)}
           data-tooltip="Babel Fish translation settings"
         >
-          Babel Fish
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            {/* Ear - outer helix arc */}
+            <path d="M15 3Q23 3 23 12Q23 21 15 21" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
+            {/* Ear - inner fold */}
+            <path d="M16 7Q20 7 20 12Q20 17 16 17" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+            {/* Fish body swimming right into ear */}
+            <path d="M15 12Q11 8.5 6 12Q11 15.5 15 12Z" fill="currentColor"/>
+            {/* Fish tail - forked */}
+            <path d="M6 12L3 9.5M6 12L3 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            {/* Fish eye */}
+            <circle cx="12.5" cy="11.2" r="0.7" fill="var(--vscode-editor-background, #1e1e1e)"/>
+          </svg>
         </button>
         {babelFishOpen && <BabelFishPanel onClose={() => setBabelFishOpen(false)} />}
       </div>

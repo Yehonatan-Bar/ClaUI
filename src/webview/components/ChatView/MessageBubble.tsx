@@ -48,6 +48,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   const translationLanguage = useAppStore((s) => s.translationLanguage);
 
   const babelFishEnabled = useAppStore((s) => s.babelFishEnabled);
+  const userOriginalText = useAppStore((s) => s.userOriginalTexts[message.id]);
   const isTranslating = translatingMessageIds.has(message.id);
   const hasTranslation = message.id in translations;
   const isShowingTranslation = showingTranslation.has(message.id);
@@ -249,6 +250,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
             <button className="edit-message-cancel" onClick={handleEditCancel} data-tooltip="Cancel editing">
               Cancel
             </button>
+          </div>
+        </div>
+      ) : isUser && userOriginalText ? (
+        <div className="babel-fish-user-message">
+          <div className="babel-fish-user-line" dir={isRtlLanguage ? 'rtl' : 'auto'}>
+            <span className="babel-fish-user-label">You wrote:</span>
+            <TextBlockRenderer text={userOriginalText} />
+          </div>
+          <div className="babel-fish-user-line">
+            <span className="babel-fish-user-label">Claude Code received:</span>
+            <TextBlockRenderer text={textContent} />
           </div>
         </div>
       ) : isShowingTranslation ? (

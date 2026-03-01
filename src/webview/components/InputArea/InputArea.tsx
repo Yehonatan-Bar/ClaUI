@@ -308,6 +308,8 @@ export const InputArea: React.FC = () => {
     if (promptTranslateEnabled && trimmed && !isTranslatingPrompt && !isLikelyEnglish(trimmed) && pendingImages.length === 0 && !pendingApproval) {
       setIsTranslatingPrompt(true);
       autoSendAfterTranslateRef.current = autoTranslateEnabled;
+      // Store original text so it can be shown alongside the translated version in the message bubble
+      useAppStore.getState().setPendingOriginalText(trimmed);
       // Safety timeout: reset isTranslatingPrompt if result never arrives (65s > backend 60s timeout)
       if (translateTimeoutRef.current) clearTimeout(translateTimeoutRef.current);
       translateTimeoutRef.current = setTimeout(() => {
@@ -818,6 +820,7 @@ export const InputArea: React.FC = () => {
           setText(enhanced);
           store.setIsTranslatingPrompt(true);
           autoSendAfterTranslateRef.current = store.autoTranslateEnabled;
+          store.setPendingOriginalText(enhanced);
           if (translateTimeoutRef.current) clearTimeout(translateTimeoutRef.current);
           translateTimeoutRef.current = setTimeout(() => {
             store.setIsTranslatingPrompt(false);
