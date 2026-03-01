@@ -513,6 +513,18 @@ export function useClaudeStream(): void {
           });
           break;
 
+        // --- Babel Fish ---
+        case 'babelFishSettings':
+          useAppStore.getState().setBabelFishEnabled(msg.enabled);
+          if (msg.language) {
+            useAppStore.getState().setTranslationLanguage(msg.language);
+          }
+          break;
+
+        case 'autoTranslateStarted':
+          setTranslating(msg.messageId, true);
+          break;
+
         // --- Skill Generation ---
         case 'skillGenSettings':
           setSkillGenSettings({ enabled: msg.enabled, threshold: msg.threshold });

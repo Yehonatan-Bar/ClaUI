@@ -190,6 +190,9 @@ export interface AppState {
   enhancerPopoverOpen: boolean;
   enhanceComparisonData: { originalText: string; enhancedText: string } | null;
 
+  // Babel Fish (unified translation toggle)
+  babelFishEnabled: boolean;
+
   // Prompt Translator
   isTranslatingPrompt: boolean;
   promptTranslateEnabled: boolean;
@@ -360,6 +363,7 @@ export interface AppState {
   setEnhancerPopoverOpen: (open: boolean) => void;
   setEnhanceComparisonData: (data: { originalText: string; enhancedText: string } | null) => void;
   setPromptEnhancerSettings: (settings: { autoEnhance: boolean; enhancerModel: string }) => void;
+  setBabelFishEnabled: (enabled: boolean) => void;
   setIsTranslatingPrompt: (translating: boolean) => void;
   setPromptTranslateEnabled: (enabled: boolean) => void;
   setAutoTranslateEnabled: (enabled: boolean) => void;
@@ -591,6 +595,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   enhancerModel: 'claude-sonnet-4-6',
   enhancerPopoverOpen: false,
   enhanceComparisonData: null,
+  babelFishEnabled: false,
   isTranslatingPrompt: false,
   promptTranslateEnabled: false,
   autoTranslateEnabled: false,
@@ -1267,6 +1272,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   setPromptEnhancerSettings: ({ autoEnhance, enhancerModel }) =>
     set({ autoEnhanceEnabled: autoEnhance, enhancerModel }),
 
+  setBabelFishEnabled: (enabled) => set({
+    babelFishEnabled: enabled,
+    promptTranslateEnabled: enabled,
+    autoTranslateEnabled: enabled,
+  }),
   setIsTranslatingPrompt: (translating) => set({ isTranslatingPrompt: translating }),
   setPromptTranslateEnabled: (enabled) => set({ promptTranslateEnabled: enabled }),
   setAutoTranslateEnabled: (enabled) => set({ autoTranslateEnabled: enabled }),
@@ -1380,6 +1390,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       enhanceComparisonData: null,
       autoEnhanceEnabled: state.autoEnhanceEnabled,
       enhancerModel: state.enhancerModel,
+      babelFishEnabled: state.babelFishEnabled,
       isTranslatingPrompt: false,
       sendSettingsPopoverOpen: false,
       promptTranslateEnabled: state.promptTranslateEnabled,

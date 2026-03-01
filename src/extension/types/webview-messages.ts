@@ -312,6 +312,13 @@ export interface SetEnhancerModelRequest {
   model: string;
 }
 
+// --- Babel Fish (Webview -> Extension) ---
+
+export interface SetBabelFishEnabledRequest {
+  type: 'setBabelFishEnabled';
+  enabled: boolean;
+}
+
 // --- Prompt Translation (Webview -> Extension) ---
 
 export interface TranslatePromptRequest {
@@ -505,6 +512,7 @@ export type WebviewToExtensionMessage =
   | EnhancePromptRequest
   | SetAutoEnhanceRequest
   | SetEnhancerModelRequest
+  | SetBabelFishEnabledRequest
   | TranslatePromptRequest
   | SetPromptTranslationEnabledRequest
   | SetAutoTranslateRequest
@@ -982,6 +990,19 @@ export interface PromptEnhancerSettingsMessage {
   enhancerModel: string;
 }
 
+// --- Babel Fish (Extension -> Webview) ---
+
+export interface BabelFishSettingsMessage {
+  type: 'babelFishSettings';
+  enabled: boolean;
+  language: string;
+}
+
+export interface AutoTranslateStartedMessage {
+  type: 'autoTranslateStarted';
+  messageId: string;
+}
+
 // --- Prompt Translation (Extension -> Webview) ---
 
 export interface TranslatePromptResultMessage {
@@ -1285,6 +1306,8 @@ export type ExtensionToWebviewMessage =
   | ProjectAnalyticsDataMessage
   | EnhancePromptResultMessage
   | PromptEnhancerSettingsMessage
+  | BabelFishSettingsMessage
+  | AutoTranslateStartedMessage
   | TranslatePromptResultMessage
   | PromptTranslatorSettingsMessage
   | SkillGenSettingsMessage

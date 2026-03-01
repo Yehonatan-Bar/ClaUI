@@ -182,6 +182,10 @@ export class MessageHandler {
   private promptEnhancer: PromptEnhancer | null = null;
   /** Prompt translator for translating prompts to English */
   private promptTranslator: PromptTranslator | null = null;
+  /** Babel Fish: unified bi-directional translation toggle */
+  private babelFishEnabled = false;
+  /** Last assistant message content (for Babel Fish auto-translation on result) */
+  private lastAssistantContent: ContentBlock[] = [];
   /** Skill generation service (global, shared across tabs) */
   private skillGenService: SkillGenService | null = null;
   /** Global token-usage ratio tracker (shared across all tabs) */
@@ -780,6 +784,19 @@ export class MessageHandler {
           this.log(`Setting auto-translate to: ${msg.enabled}`);
           vscode.workspace.getConfiguration('claudeMirror').update('promptTranslator.autoTranslate', msg.enabled, true);
           break;
+
+        case 'setBabelFishEnabled': {
+          const enabled = msg.enabled;
+          this.babelFishEnabled = enabled;
+          this.log(`[BabelFish] Setting enabled to: ${enabled}`);
+          const bfConfig = vscode.workspace.getConfiguration('claudeMirror');
+          void bfConfig.update('babelFish.enabled', enabled, true);
+          void bfConfig.update('promptTranslator.enabled', enabled, true);
+          void bfConfig.update('promptTranslator.autoTranslate', enabled, true);
+          this.sendBabelFishSettings();
+          this.sendPromptTranslatorSettings();
+          break;
+        }
 
         // --- Skill Generation ---
         case 'setSkillGenEnabled':
@@ -1460,6 +1477,8 @@ export class MessageHandler {
           this.sendPromptEnhancerSettings();
           // Send prompt translator settings
           this.sendPromptTranslatorSettings();
+          // Send Babel Fish settings
+          this.sendBabelFishSettings();
           // Send skill generation settings and status
           this.sendSkillGenSettings();
           this.sendSkillGenStatus();
@@ -1799,6 +1818,20 @@ export class MessageHandler {
     });
   }
 
+  /** Read Babel Fish settings from VS Code config and send to webview */
+  private sendBabelFishSettings(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const enabled = config.get<boolean>('babelFish.enabled', false);
+    const language = config.get<string>('translationLanguage', 'Hebrew');
+    this.babelFishEnabled = enabled;
+    this.log(`[BabelFish] Sending settings: enabled=${enabled}, language=${language}`);
+    this.webview.postMessage({
+      type: 'babelFishSettings',
+      enabled,
+      language,
+    });
+  }
+
   /** Read skill generation settings and send to webview */
   private sendSkillGenSettings(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -1975,6 +2008,9 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.promptTranslator')) {
         this.sendPromptTranslatorSettings();
+      }
+      if (e.affectsConfiguration('claudeMirror.babelFish')) {
+        this.sendBabelFishSettings();
       }
       if (e.affectsConfiguration('claudeMirror.skillGen')) {
         this.sendSkillGenSettings();
@@ -2153,6 +2189,8 @@ export class MessageHandler {
         if (assistantText.trim()) {
           this.achievementService.onAssistantText(this.tabId, assistantText);
         }
+        // Store latest assistant content for Babel Fish auto-translation on result
+        this.lastAssistantContent = event.message.content;
         this.recordToolUseFallbackFromAssistantMessage(event.message.content);
         this.log(`-> webview: assistantMessage id=${event.message.id} blocks=[${blockTypes}]`);
         this.webview.postMessage({
@@ -2315,6 +2353,35 @@ export class MessageHandler {
           if (this.adventureInterpreter) {
             const beat = this.adventureInterpreter.interpret(successTurn as TurnRecord);
             this.emitAdventureBeat(beat, 'resultSuccess');
+          }
+          // Babel Fish: auto-translate the last assistant response
+          if (this.babelFishEnabled && this.messageTranslator && this.lastAssistantContent.length > 0) {
+            const textForTranslation = this.lastAssistantContent
+              .filter((block) => block.type === 'text')
+              .map((block) => (block as any).text || '')
+              .join('\n\n')
+              .replace(/```[\w]*\n[\s\S]*?```/g, '')
+              .trim();
+            if (textForTranslation && messageIdSnapshot) {
+              const config = vscode.workspace.getConfiguration('claudeMirror');
+              const targetLang = config.get<string>('translationLanguage', 'Hebrew');
+              this.webview.postMessage({ type: 'autoTranslateStarted', messageId: messageIdSnapshot });
+              this.log(`[BabelFish] Auto-translating response to ${targetLang} (${textForTranslation.length} chars)`);
+              this.getApiKey().then((apiKey) =>
+                this.messageTranslator!.translate(textForTranslation, targetLang, apiKey)
+              ).then((translatedText) => {
+                this.webview.postMessage({
+                  type: 'translationResult',
+                  messageId: messageIdSnapshot,
+                  translatedText,
+                  success: !!translatedText,
+                  error: translatedText ? undefined : 'Translation failed',
+                });
+                this.log(`[BabelFish] Auto-translation ${translatedText ? 'succeeded' : 'failed'} for message ${messageIdSnapshot}`);
+              }).catch((err) => {
+                this.log(`[BabelFish] Auto-translation error: ${err}`);
+              });
+            }
           }
         } else {
           this.achievementService.onResult(this.tabId, false);

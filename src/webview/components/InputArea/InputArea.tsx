@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
-import { detectRtl } from '../../hooks/useRtlDetection';
+import { detectRtl, isLikelyEnglish } from '../../hooks/useRtlDetection';
 import { GitPushPanel } from './GitPushPanel';
 import { FileMentionPopup } from './FileMentionPopup';
 import { useFileMention } from '../../hooks/useFileMention';
@@ -304,7 +304,8 @@ export const InputArea: React.FC = () => {
     }
 
     // Translate: intercept send, translate first, then auto-send or show in input
-    if (promptTranslateEnabled && trimmed && !isTranslatingPrompt && pendingImages.length === 0 && !pendingApproval) {
+    // Skip translation if the text is already in English (Latin script)
+    if (promptTranslateEnabled && trimmed && !isTranslatingPrompt && !isLikelyEnglish(trimmed) && pendingImages.length === 0 && !pendingApproval) {
       setIsTranslatingPrompt(true);
       autoSendAfterTranslateRef.current = autoTranslateEnabled;
       // Safety timeout: reset isTranslatingPrompt if result never arrives (65s > backend 60s timeout)
@@ -812,7 +813,8 @@ export const InputArea: React.FC = () => {
         const store = useAppStore.getState();
 
         // Chain: enhance -> translate -> send (when both are enabled)
-        if (store.promptTranslateEnabled) {
+        // Skip translation if the enhanced text is already in English
+        if (store.promptTranslateEnabled && !isLikelyEnglish(enhanced)) {
           setText(enhanced);
           store.setIsTranslatingPrompt(true);
           autoSendAfterTranslateRef.current = store.autoTranslateEnabled;
@@ -1204,38 +1206,6 @@ export const InputArea: React.FC = () => {
             >
               {promptTranslateEnabled && !autoTranslateEnabled ? 'Translate' : 'Send'}
             </button>
-            <button
-              className="send-gear-button"
-              onClick={handleToggleSendSettings}
-              data-tooltip="Send settings"
-            >
-              {'\u2699'}
-            </button>
-            {sendSettingsPopoverOpen && (
-              <div className="send-settings-popover">
-                <div className="enhance-popover-row">
-                  <span className="enhance-popover-label">Translate to English</span>
-                  <button
-                    className={`enhance-toggle-btn ${promptTranslateEnabled ? 'on' : 'off'}`}
-                    onClick={handleTranslateToggle}
-                    data-tooltip={promptTranslateEnabled ? 'Disable translation' : 'Enable translation'}
-                  >
-                    <span className="enhance-toggle-knob" />
-                  </button>
-                </div>
-                <div className="enhance-popover-row">
-                  <span className="enhance-popover-label">Auto-send translated</span>
-                  <button
-                    className={`enhance-toggle-btn ${autoTranslateEnabled ? 'on' : 'off'}`}
-                    onClick={handleAutoTranslateToggle}
-                    disabled={!promptTranslateEnabled}
-                    data-tooltip={!promptTranslateEnabled ? 'Enable translation first' : autoTranslateEnabled ? 'Disable auto-send' : 'Enable auto-send'}
-                  >
-                    <span className="enhance-toggle-knob" />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

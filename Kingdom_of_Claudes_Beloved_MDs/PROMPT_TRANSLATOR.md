@@ -1,131 +1,112 @@
-# Prompt Translator
+# Babel Fish (Unified Translation Layer)
 
-Translates user prompts to native English before sending them to Claude. Uses a one-shot CLI call with a system prompt that rewrites text as a native English-speaking software engineer would naturally phrase it, preserving original intent, technical meaning, structure, and detail level. Hardcoded to Sonnet 4.6 (not configurable).
+Babel Fish is a unified bi-directional translation feature that lets users work in their native language while Claude Code exclusively receives and responds in English. When enabled, user prompts are auto-translated to English before sending, and Claude's responses are auto-translated back to the user's chosen language.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `src/extension/session/PromptTranslator.ts` | Backend service - spawns one-shot `claude -p` CLI process with Sonnet 4.6 |
-| `src/extension/webview/MessageHandler.ts` | Routes `translatePrompt` / `setPromptTranslationEnabled` / `setAutoTranslate` messages |
-| `src/extension/session/SessionTab.ts` | Wires PromptTranslator into the per-tab MessageHandler |
-| `src/webview/components/InputArea/InputArea.tsx` | UI: Send button group with gear popover, translate toggle, auto-translate toggle |
-| `src/webview/hooks/useClaudeStream.ts` | Dispatches `translatePromptResult` and `promptTranslatorSettings` to store |
-| `src/webview/state/store.ts` | Zustand state: `isTranslatingPrompt`, `promptTranslateEnabled`, `autoTranslateEnabled`, `sendSettingsPopoverOpen` |
-| `src/webview/styles/global.css` | CSS for `.send-button-group`, `.send-gear-button`, `.send-settings-popover`, `.textarea-container.translating` |
-| `src/extension/types/webview-messages.ts` | 5 message types (3 webview->ext, 2 ext->webview) |
+| `src/webview/components/BabelFish/BabelFishPanel.tsx` | Settings panel: master toggle, language selector, info (!) button |
+| `src/extension/session/PromptTranslator.ts` | Backend: translates user prompts to English (outbound) |
+| `src/extension/session/MessageTranslator.ts` | Backend: translates assistant responses to target language (inbound) |
+| `src/extension/webview/MessageHandler.ts` | Routes all translation messages; auto-translates responses in `result` handler |
+| `src/extension/session/SessionTab.ts` | Wires both translators into the per-tab MessageHandler |
+| `src/webview/components/StatusBar/StatusBar.tsx` | Renders "Babel Fish" button next to Vitals |
+| `src/webview/components/InputArea/InputArea.tsx` | Prompt translation intercept logic in `sendMessage()` |
+| `src/webview/hooks/useClaudeStream.ts` | Dispatches `babelFishSettings`, `autoTranslateStarted`, translation results |
+| `src/webview/state/store.ts` | Zustand state: `babelFishEnabled` + existing translation states |
+| `src/webview/styles/global.css` | CSS: `.babel-fish-panel`, `.babel-fish-*` classes |
+| `src/extension/types/webview-messages.ts` | Message types: `SetBabelFishEnabledRequest`, `BabelFishSettingsMessage`, `AutoTranslateStartedMessage` |
 
 ## Architecture
 
-Follows the same one-shot CLI pattern as `PromptEnhancer`, `SessionNamer`, `MessageTranslator`, and `TurnAnalyzer`:
-
+### Outbound (User -> English)
 ```
-InputArea (click Send / auto)
+User types in native language
+  -> InputArea.sendMessage() intercepts (promptTranslateEnabled + autoTranslateEnabled)
   -> postToExtension({ type: 'translatePrompt', text })
-  -> MessageHandler routes to PromptTranslator.translate()
-  -> PromptTranslator spawns `claude -p --model claude-sonnet-4-6`
-  -> Pipes system prompt + user text to stdin
-  -> Returns translated text via postMessage({ type: 'translatePromptResult' })
-  -> useClaudeStream dispatches CustomEvent('prompt-translated')
-  -> InputArea listener places translated text in input (or auto-sends if auto mode)
+  -> MessageHandler -> PromptTranslator.translate()
+  -> Spawns `claude -p --model claude-sonnet-4-6`
+  -> Returns translatePromptResult -> auto-sends translated text
 ```
 
-## Translation System Prompt
+### Inbound (English -> User Language)
+```
+Claude responds in English
+  -> StreamDemux emits 'assistantMessage' (stored as lastAssistantContent)
+  -> StreamDemux emits 'result' (turn complete)
+  -> MessageHandler checks babelFishEnabled
+  -> Posts autoTranslateStarted to webview (shows "Translating..." indicator)
+  -> Calls MessageTranslator.translate(text, targetLang)
+  -> Posts translationResult to webview
+  -> Zustand auto-adds to showingTranslation set -> UI shows translated text
+```
 
-The system prompt instructs Claude to:
-1. Rewrite text in English as a native English-speaking software engineer would phrase it
-2. Preserve original intent, technical meaning, structure, and level of detail
-3. Improve clarity, fluency, and terminology where appropriate
-4. Not summarize, expand, omit, or add new information
-5. Output only the rewritten text -- no explanations, comments, notes, labels, formatting, or quotation marks
+## Babel Fish Toggle Behavior
 
-Input is truncated to 3000 characters (with `[...truncated]` marker). Backend timeout is 60 seconds. Client-side safety timeout is 65 seconds (resets `isTranslatingPrompt` if backend result never arrives).
+When enabled:
+- Sets `babelFishEnabled: true` in store
+- Sets `promptTranslateEnabled: true` and `autoTranslateEnabled: true` (enables outbound)
+- Auto-translates every assistant response (inbound)
+- Hides per-message manual "Translate" button
+- Shows "Original" / language toggle on translated messages
 
-## UX Flows
+When disabled:
+- All three flags reset to false
+- Per-message manual translate button reappears
+- No auto-translation in either direction
 
-### Manual Translation (translate=ON, auto-send=OFF)
-1. User types prompt in any language
-2. Send button label changes to "Translate"
-3. User clicks "Translate" (or presses the send shortcut)
-4. Textarea dims with "Translating..." overlay, button shows spinner
-5. Translated English text is placed back in the input box for review
-6. User reviews, optionally edits, then clicks Send (which now sends normally since text is already translated)
+## Settings Panel (BabelFishPanel)
 
-### Auto Translation (translate=ON, auto-send=ON)
-1. User types prompt in any language, clicks Send
-2. Text is translated to English automatically
-3. Translated text is auto-sent immediately after translation completes
-4. If translation fails, the original text is sent as fallback
+Accessible via "Babel Fish" button in the status bar (next to Vitals). Contains:
+- Master toggle: Enable/disable Babel Fish
+- Language selector: 10 supported languages (Hebrew, Arabic, Russian, Spanish, French, German, Portuguese, Chinese, Japanese, Korean)
+- Info (!) button: Shows explanation callout when clicked
+- Status indicator: Green/gray dot with active direction summary
 
-### Enhance + Translate Pipeline
-When both Prompt Enhancer and Prompt Translator are enabled:
-1. Enhance runs first on the original text
-2. Translation runs on the enhanced output
-3. Result is placed in input (manual) or auto-sent (auto mode)
+## Translation Models
 
-### Send Button Gear Popover
-- Click gear icon on the Send button group -> popover appears above button group
-- Toggle: "Translate to English" on/off switch (persisted to VS Code settings)
-- Toggle: "Auto-send" on/off switch (persisted to VS Code settings, only visible when translate is enabled)
-- Click outside -> popover dismisses
+Both PromptTranslator and MessageTranslator are hardcoded to `claude-sonnet-4-6`. The outbound system prompt instructs the model to rewrite text as a native English-speaking software engineer would phrase it, preserving intent and technical meaning. The inbound system prompt translates to the target language while preserving markdown formatting and not translating technical terms.
 
 ## Message Protocol
 
 ### Webview -> Extension
-- `translatePrompt` - `{ text: string }` - triggers translation
-- `setPromptTranslationEnabled` - `{ enabled: boolean }` - persists translate toggle to config
-- `setAutoTranslate` - `{ enabled: boolean }` - persists auto-send toggle to config
+- `setBabelFishEnabled` - `{ enabled: boolean }` - master toggle
+- `translatePrompt` - `{ text: string }` - outbound translation request
+- `setTranslationLanguage` - `{ language: string }` - change target language
 
 ### Extension -> Webview
-- `translatePromptResult` - `{ translatedText: string | null, success: boolean, error?: string }`
-- `promptTranslatorSettings` - `{ translateEnabled: boolean, autoTranslate: boolean }` - sent on ready + config change
-
-## Zustand State
-
-| Field | Type | Default | Persists across reset? |
-|-------|------|---------|----------------------|
-| `isTranslatingPrompt` | boolean | false | No (cleared on reset) |
-| `promptTranslateEnabled` | boolean | false | Yes |
-| `autoTranslateEnabled` | boolean | false | Yes |
-| `sendSettingsPopoverOpen` | boolean | false | No (cleared on reset) |
+- `babelFishSettings` - `{ enabled: boolean, language: string }` - sent on ready + config change
+- `autoTranslateStarted` - `{ messageId: string }` - signals inbound translation in progress
+- `translationResult` - `{ messageId, translatedText, success, error }` - inbound translation result
+- `translatePromptResult` - `{ translatedText, success, error }` - outbound translation result
 
 ## VS Code Settings
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `claudeMirror.promptTranslator.enabled` | boolean | false | Translate prompts to English before sending them to Claude |
-| `claudeMirror.promptTranslator.autoTranslate` | boolean | false | Automatically send the translated prompt (requires translation enabled) |
+| `claudeMirror.babelFish.enabled` | boolean | false | Master toggle for Babel Fish |
+| `claudeMirror.translationLanguage` | string | "Hebrew" | Target language for translations |
+| `claudeMirror.promptTranslator.enabled` | boolean | false | Outbound translation (synced by Babel Fish) |
+| `claudeMirror.promptTranslator.autoTranslate` | boolean | false | Auto-send translated prompts (synced by Babel Fish) |
 
-## Differences from Prompt Enhancer
+## Zustand State
 
-| Aspect | Prompt Enhancer | Prompt Translator |
-|--------|----------------|------------------|
-| Purpose | Improve prompt quality (scaffolding, structure) | Translate to native English |
-| Model | Configurable (Haiku/Sonnet/Opus) | Hardcoded Sonnet 4.6 |
-| Manual result | Comparison panel (original vs enhanced) | Places translated text in input for review |
-| Send button label | Unchanged | Changes to "Translate" |
-| UI location | Separate sparkles button + gear | Gear popover on Send button group |
-| Keyboard shortcut | Ctrl+Shift+E | None (uses Send shortcut) |
-| Language preservation | Preserves original language | Always outputs English |
+| Field | Type | Default | Persists across reset? |
+|-------|------|---------|----------------------|
+| `babelFishEnabled` | boolean | false | Yes |
+| `isTranslatingPrompt` | boolean | false | No |
+| `promptTranslateEnabled` | boolean | false | Yes |
+| `autoTranslateEnabled` | boolean | false | Yes |
+| `translationLanguage` | string | "Hebrew" | Yes |
+| `translations` | Record<string, string> | {} | No |
+| `translatingMessageIds` | Set<string> | empty | No |
+| `showingTranslation` | Set<string> | empty | No |
 
-## Reliability Safeguards
+## Important Notes
 
-### Client-Side Safety Timeout
-A 65-second timeout in InputArea resets `isTranslatingPrompt` to false if the backend never sends `translatePromptResult`. This prevents the UI from getting permanently stuck in "Translating..." state. Both the `prompt-translated` and `prompt-translate-failed` event handlers clear the timeout.
-
-### Stdin Backpressure Handling
-The stdin write to the child process checks the return value of `write()`. If the buffer is full (`false` return), it waits for the `drain` event before calling `end()`. This prevents data loss on Windows with large prompts containing multi-byte characters.
-
-### Windows Process Kill
-On Windows with `shell: true`, `child.kill('SIGTERM')` only kills the `cmd.exe` wrapper. PromptTranslator uses `taskkill /F /T /PID` (same pattern as PromptEnhancer and ClaudeProcessManager) to kill the entire process tree on timeout.
-
-### Error Feedback
-- Auto-send failure: falls back to sending the original text
-- Manual translate failure: fires `prompt-translate-failed` CustomEvent, UI resets from "Translating..." state
-
-## CSS Components
-
-- `.send-button-group` - flex container for Send button + gear icon
-- `.send-gear-button` - gear icon, opens the settings popover
-- `.send-settings-popover` - absolute-positioned settings panel above Send button group
-- `.textarea-container.translating` - dims textarea, shows pulsing border + overlay during translation
+- Auto-translation of responses triggers on the `result` event (not `assistantMessage`), because `assistantMessage` fires multiple times as intermediate snapshots mid-stream
+- Code blocks (fenced ```) are stripped from the text before translation
+- MessageTranslator has a 30-second timeout; PromptTranslator has a 60-second timeout
+- Both translators use `buildClaudeCliEnv(apiKey)` from `envUtils.ts` for API key injection
+- Windows process tree kill uses `taskkill /F /T /PID` pattern (PromptTranslator only; MessageTranslator uses `child.kill('SIGTERM')`)

@@ -287,19 +287,6 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
       </div>
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
-        <span data-tooltip="Automatically translate Claude's responses to the selected language. A translate button will appear on each assistant message.">Translate to</span>
-        <select
-          className="vitals-info-language-select"
-          value={translationLanguage}
-          onChange={(e) => handleLanguageChange(e.target.value)}
-        >
-          {LANGUAGE_OPTIONS.map((lang) => (
-            <option key={lang} value={lang}>{lang}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
         <span data-tooltip="A pixel-art dungeon crawler that visualizes your coding session. Each Claude turn becomes a room: scrolls for reads, anvils for edits, traps for errors, dragons for 3+ errors.">Adventure Widget</span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {adventureEnabled && (
