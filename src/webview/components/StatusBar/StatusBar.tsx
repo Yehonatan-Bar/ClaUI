@@ -71,6 +71,7 @@ export const StatusBar: React.FC<{
     usageFetchedAt,
     usageError,
     babelFishEnabled,
+    teamActive,
   } = useAppStore();
 
   const { barRef, isCollapsed } = useStatusBarCollapse();
@@ -416,6 +417,11 @@ export const StatusBar: React.FC<{
           <button className="status-bar-group-dropdown-item" onClick={toggleDashboard} data-tooltip="Analytics Dashboard">
             Dashboard
           </button>
+          {teamActive && (
+            <button className="status-bar-group-dropdown-item" onClick={() => useAppStore.getState().setTeamPanelOpen(true)} data-tooltip="Agent Teams Panel">
+              Teams
+            </button>
+          )}
           {isConnected && showCodexConsult && (
             <button className="status-bar-group-dropdown-item" onClick={() => setCodexConsultPanelOpen(true)} data-tooltip="Consult Codex GPT expert">
               Consult Codex
@@ -588,6 +594,25 @@ export const StatusBar: React.FC<{
       >
         Dashboard
       </button>
+      {teamActive && (
+        <button
+          className="status-bar-team-btn"
+          data-tooltip="Agent Teams Panel"
+          aria-label="Open Agent Teams panel"
+          onClick={() => useAppStore.getState().setTeamPanelOpen(true)}
+          style={{
+            background: 'none',
+            border: '1px solid rgba(88, 166, 255, 0.3)',
+            color: '#58a6ff',
+            cursor: 'pointer',
+            padding: '2px 8px',
+            borderRadius: '4px',
+            fontSize: '12px',
+          }}
+        >
+          Teams
+        </button>
+      )}
       {skillGenEnabled && !isCodexUi && (
         <>
           <button

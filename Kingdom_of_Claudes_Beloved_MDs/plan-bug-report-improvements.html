@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bug Report - 4 Changes Plan</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 32px;
+    line-height: 1.7;
+  }
+  .container { max-width: 800px; margin: 0 auto; }
+  h1 {
+    color: #e94560;
+    font-size: 1.8em;
+    margin-bottom: 8px;
+    border-bottom: 2px solid #e94560;
+    padding-bottom: 12px;
+  }
+  .subtitle {
+    color: #888;
+    margin-bottom: 32px;
+    font-size: 0.95em;
+  }
+  .change-card {
+    background: #16213e;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    border-right: 4px solid #e94560;
+  }
+  .change-card h2 {
+    color: #0f3460;
+    background: #e94560;
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 6px;
+    font-size: 1em;
+    margin-bottom: 12px;
+    color: #fff;
+  }
+  .change-card h3 {
+    color: #53a8b6;
+    margin-bottom: 8px;
+    font-size: 1.05em;
+  }
+  .change-card p {
+    margin-bottom: 8px;
+  }
+  .problem { color: #ff6b6b; font-weight: 600; }
+  .solution { color: #51cf66; font-weight: 600; }
+  .detail-list {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0;
+  }
+  .detail-list li {
+    padding: 6px 16px;
+    position: relative;
+    margin-bottom: 4px;
+  }
+  .detail-list li::before {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #e94560;
+  }
+  .impact-box {
+    background: #0f3460;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 12px;
+  }
+  .impact-box strong { color: #ffd93d; }
+  .order-section {
+    background: #16213e;
+    border-radius: 12px;
+    padding: 24px;
+    margin-top: 24px;
+    border-right: 4px solid #53a8b6;
+  }
+  .order-section h2 { color: #53a8b6; margin-bottom: 12px; }
+  .order-list {
+    list-style: none;
+    counter-reset: step;
+    padding: 0;
+  }
+  .order-list li {
+    counter-increment: step;
+    padding: 10px 40px 10px 0;
+    position: relative;
+    border-bottom: 1px solid #1a1a2e;
+  }
+  .order-list li::before {
+    content: counter(step);
+    position: absolute;
+    right: 0;
+    top: 10px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #e94560;
+    color: #fff;
+    text-align: center;
+    line-height: 28px;
+    font-weight: 700;
+    font-size: 0.9em;
+  }
+  .files-count {
+    background: #0f3460;
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    margin-right: 8px;
+    color: #53a8b6;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>שיפורים למערכת דיווח באגים</h1>
+<p class="subtitle">4 שינויים לפתרון בעיית שליחת דוחות גדולים ושיפור חוויית הדיווח</p>
+
+<!-- Change 1 -->
+<div class="change-card">
+  <h2>שינוי 1: שליחה בחלקים</h2>
+  <h3>הבעיה</h3>
+  <p class="problem">משתמשים שמנסים לשלוח דוח מלא מקבלים שגיאה 413 - הדוח גדול מדי עבור שרת הקבלה (מוגבל ל-50KB).</p>
+  <h3>הפתרון</h3>
+  <p class="solution">המערכת תפצל אוטומטית את הדוח לחלקים קטנים ותשלח כל חלק בנפרד, עם הפסקה של דקה בין שליחות.</p>
+  <ul class="detail-list">
+    <li>כל חלק מזוהה עם מספר סידורי ומזהה דוח ייחודי, כך שהמפתח יכול לחבר את החלקים</li>
+    <li>התהליך שקוף לחלוטין - המשתמש רואה רק "שולח..." ואז "נשלח!" כרגיל</li>
+    <li>אם חלק נכשל - המערכת מדווחת למשתמש על כשלון השליחה</li>
+  </ul>
+  <div class="impact-box">
+    <strong>תוצאה:</strong> דוחות גדולים יגיעו למפתח בשלמותם, ללא שגיאות. המשתמש לא מרגיש שום שינוי.
+  </div>
+</div>
+
+<!-- Change 2 -->
+<div class="change-card">
+  <h2>שינוי 2: סוכן AI ממוקד יותר</h2>
+  <h3>הבעיה</h3>
+  <p class="problem">הסוכן שמאבחן באגים לפעמים שואל שאלות ארוכות, מדבר יותר מדי, וחורג מהנושא.</p>
+  <h3>הפתרון</h3>
+  <p class="solution">ההנחיות לסוכן יוחלפו בגרסה ממוקדת וחדה יותר.</p>
+  <ul class="detail-list">
+    <li>שאלה אחת בלבד בכל תגובה - לא שתיים או שלוש</li>
+    <li>1-3 משפטים מקסימום לכל תשובה</li>
+    <li>בלי שיחת חולין - ישר לעניין</li>
+    <li>דילוג על שאלות שהמשתמש כבר ענה עליהן</li>
+  </ul>
+  <div class="impact-box">
+    <strong>תוצאה:</strong> תהליך הדיווח יהיה מהיר ויעיל יותר עבור המשתמש.
+  </div>
+</div>
+
+<!-- Change 3 -->
+<div class="change-card">
+  <h2>שינוי 3: מגבלת 5 שאלות</h2>
+  <h3>הבעיה</h3>
+  <p class="problem">הסוכן יכול להמשיך לשאול שאלות ללא הגבלה, מה שמעייף את המשתמש ומאריך את התהליך.</p>
+  <h3>הפתרון</h3>
+  <p class="solution">הסוכן מוגבל ל-5 תשובות. בתשובה ה-5 הוא מסכם את הממצאים.</p>
+  <ul class="detail-list">
+    <li>ספירת שאלות חכמה - ניתוח פלט סקריפטים לא נספר כשאלה</li>
+    <li>בשאלה האחרונה הסוכן מקבל הנחיה לסכם הכל</li>
+    <li>לאחר 5 תשובות, שדה הכתיבה ננעל והמשתמש מופנה ללחוץ "שלח"</li>
+  </ul>
+  <div class="impact-box">
+    <strong>תוצאה:</strong> תהליך דיווח מסודר ומוגבל בזמן - לא יותר מ-5 שאלות.
+  </div>
+</div>
+
+<!-- Change 4 -->
+<div class="change-card">
+  <h2>שינוי 4: הנפשת כפתור שליחה</h2>
+  <h3>הבעיה</h3>
+  <p class="problem">המשתמש לא תמיד מבין שהוא כבר יכול לשלוח את הדוח אחרי שמספיק מידע נאסף.</p>
+  <h3>הפתרון</h3>
+  <p class="solution">לאחר השאלה הרביעית של הסוכן, כפתור "שלח דוח" מתחיל לפעום עם אפקט זוהר.</p>
+  <ul class="detail-list">
+    <li>אנימציה עדינה - זוהר אדום שפועם סביב הכפתור</li>
+    <li>הכפתור מעט גדל וקטן ברכות - מושך תשומת לב בלי להפריע</li>
+    <li>האנימציה פועלת רק כשהכפתור זמין ללחיצה</li>
+  </ul>
+  <div class="impact-box">
+    <strong>תוצאה:</strong> המשתמש מקבל רמז ויזואלי ברור שהגיע הזמן לשלוח.
+  </div>
+</div>
+
+<!-- Order -->
+<div class="order-section">
+  <h2>סדר ביצוע</h2>
+  <ol class="order-list">
+    <li>הנחיות AI ממוקדות <span class="files-count">קובץ 1</span> - שינוי טקסט בלבד, סיכון אפסי</li>
+    <li>מגבלת 5 שאלות <span class="files-count">2 קבצים</span> - לוגיקה בצד השרת + חסימת UI</li>
+    <li>הנפשת כפתור <span class="files-count">2 קבצים</span> - CSS + קלאס דינמי בכפתור</li>
+    <li>שליחה בחלקים <span class="files-count">7 קבצים</span> - המורכב ביותר, עצמאי משאר השינויים</li>
+  </ol>
+</div>
+
+</div>
+</body>
+</html>

@@ -66,9 +66,9 @@ export class ClaudeProcessManager extends EventEmitter {
       '--include-partial-messages',
     ];
 
-    // Skip replay when resuming for edit-and-resend to avoid re-emitting
-    // old messages into the webview (which already has the truncated history).
-    if (!options?.skipReplay) {
+    // Skip replay when forking (webview handles history via forkInit) or
+    // when resuming for edit-and-resend (webview already has truncated history).
+    if (!options?.skipReplay && !options?.fork) {
       args.push('--replay-user-messages');
     }
 

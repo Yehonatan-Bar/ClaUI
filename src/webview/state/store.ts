@@ -233,6 +233,52 @@ export interface AppState {
   claudeAuthSubscriptionType: string;
   setClaudeAuthStatus: (loggedIn: boolean, email: string, subscriptionType: string) => void;
 
+  // Agent Teams
+  teamActive: boolean;
+  teamName: string | null;
+  teamConfig: {
+    name: string;
+    description?: string;
+    members: Array<{
+      agentId: string;
+      name: string;
+      agentType: string;
+      color?: string;
+    }>;
+  } | null;
+  teamTasks: Array<{
+    id: number;
+    subject: string;
+    description?: string;
+    activeForm?: string;
+    owner?: string;
+    status: string;
+    blockedBy?: number[];
+    blocks?: number[];
+  }>;
+  teamAgentStatuses: Record<string, string>;
+  teamRecentMessages: Array<{
+    from: string;
+    to?: string;
+    text: string;
+    timestamp: string | number;
+    read?: boolean;
+    type?: string;
+    summary?: string;
+  }>;
+  teamPanelOpen: boolean;
+  teamPanelActiveTab: string;
+  setTeamState: (state: {
+    teamName: string;
+    config: AppState['teamConfig'];
+    tasks: AppState['teamTasks'];
+    agentStatuses: Record<string, string>;
+    recentMessages: AppState['teamRecentMessages'];
+  }) => void;
+  setTeamActive: (active: boolean, teamName?: string) => void;
+  setTeamPanelOpen: (open: boolean) => void;
+  clearTeamState: () => void;
+
   // Codex Consultation
   codexConsultPanelOpen: boolean;
   setCodexConsultPanelOpen: (open: boolean) => void;
@@ -631,6 +677,39 @@ export const useAppStore = create<AppState>((set, get) => ({
       claudeAuthSubscriptionType: subscriptionType,
     }),
 
+  // Agent Teams
+  teamActive: false,
+  teamName: null,
+  teamConfig: null,
+  teamTasks: [],
+  teamAgentStatuses: {},
+  teamRecentMessages: [],
+  teamPanelOpen: false,
+  teamPanelActiveTab: 'topology',
+  setTeamState: (teamState) => set({
+    teamActive: true,
+    teamName: teamState.teamName,
+    teamConfig: teamState.config,
+    teamTasks: teamState.tasks,
+    teamAgentStatuses: teamState.agentStatuses,
+    teamRecentMessages: teamState.recentMessages,
+  }),
+  setTeamActive: (active, teamName) => set({
+    teamActive: active,
+    ...(teamName ? { teamName } : {}),
+  }),
+  setTeamPanelOpen: (open) => set({ teamPanelOpen: open }),
+  clearTeamState: () => set({
+    teamActive: false,
+    teamName: null,
+    teamConfig: null,
+    teamTasks: [],
+    teamAgentStatuses: {},
+    teamRecentMessages: [],
+    teamPanelOpen: false,
+    teamPanelActiveTab: 'topology',
+  }),
+
   // Codex Consultation
   codexConsultPanelOpen: false,
   setCodexConsultPanelOpen: (open) => set({ codexConsultPanelOpen: open }),
@@ -727,6 +806,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         sessionActivityRunningSinceMs: null,
         weather: { mood: 'night' as WeatherMood, pulseRate: 'slow' as PulseRate },
         lastActivityAt: 0,
+        // Clear team state when the session ends - teammates die with the session
+        teamActive: false,
+        teamName: null,
+        teamConfig: null,
+        teamTasks: [],
+        teamAgentStatuses: {},
+        teamRecentMessages: [],
+        teamPanelOpen: false,
       };
     }),
 
@@ -1409,6 +1496,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Note: githubSyncStatus and communityFriends persist across resets
       friendActionPending: false,
       codexConsultPanelOpen: false,
+      // Agent Teams: clear on session reset
+      teamActive: false,
+      teamName: null,
+      teamConfig: null,
+      teamTasks: [],
+      teamAgentStatuses: {},
+      teamRecentMessages: [],
+      teamPanelOpen: false,
+      teamPanelActiveTab: 'topology',
       bugReportPanelOpen: false,
       bugReportPhase: 'idle' as 'idle' | 'collecting' | 'ready' | 'sending' | 'sent' | 'error',
       bugReportChatMessages: [],

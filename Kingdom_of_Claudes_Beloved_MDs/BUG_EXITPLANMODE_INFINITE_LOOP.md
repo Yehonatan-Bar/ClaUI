@@ -9,6 +9,7 @@ The plan approval bar (4 CLI-matching options) and AskUserQuestion interactive c
 **Date Third Fix**: 2026-02-24 (approval bar visibility)
 **Date Fourth Fix**: 2026-02-25 (stuck Thinking after plan approval)
 **Date Fifth Fix**: 2026-02-26 (approve click can be no-op if CLI did not auto-resume)
+**Date Seventh Fix**: 2026-03-01 (approve click no-op when CLI auto-resumed with brief text and went idle)
 **Severity**: Critical (blocks plan mode workflow)
 **Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`, `src/webview/components/InputArea/InputArea.tsx`
 
@@ -95,6 +96,27 @@ Both ExitPlanMode and AskUserQuestion bars were affected (AskUserQuestion was re
 
 **Why this doesn't cause the infinite loop**: The original loop was caused by sending "Yes, proceed with the plan." -- a message that made the model call ExitPlanMode again. Feedback provides actual user content ("change X in the plan") that directs the model to revise, not to re-approve.
 
+### Seventh Bug (2026-03-01): Approve Click No-Op When CLI Auto-Resumed With Brief Text
+
+**Cause**: After ExitPlanMode, the CLI auto-approved and the model started a new turn. But instead of implementing, the model only output a brief "The updated plan is ready for your review..." text and reached `result/success` (idle). The `textDelta` from this plan-presentation text was counted as "resume observed" (`pendingApprovalCycleResumeObserved = true`), and the subsequent `result/success` set `pendingApprovalCycleResultObserved = true`. The approval bar remained visible. When the user clicked approve (after reading the plan), `scheduleExitPlanApproveResumeFallback` checked:
+
+```
+if (resumeObserved || resultObserved) → skip
+```
+
+Both flags were true, so the fallback was skipped entirely. No text was sent to the CLI, no `processBusy:true` was posted. The click was a complete no-op while the CLI sat idle.
+
+**Root cause**: The fallback logic treated "resumed + completed" the same as "actively working". But `resultObserved = true` means the CLI turn completed and the CLI is idle -- it NEEDS a nudge, not a skip.
+
+**Fix**: Split the condition in `scheduleExitPlanApproveResumeFallback` into three cases:
+1. `resultObserved` (CLI completed and idle) -> send proceed nudge immediately
+2. `resumeObserved && !resultObserved` (CLI actively working) -> skip (don't interfere)
+3. Neither flag set (no activity yet) -> schedule delayed fallback (existing behavior)
+
+Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer. The timer callback now checks `pendingApprovalCycleResultObserved` itself and sends the nudge if the CLI went idle during the wait.
+
+**Why this doesn't cause the infinite loop**: The proceed nudge is only sent when the CLI is confirmed idle (`result/success` already received). The `exitPlanModeProcessed` flag prevents any subsequent ExitPlanMode call from showing a new approval bar, breaking the loop.
+
 ---
 
 ## Current Defense Layers
@@ -107,7 +129,9 @@ Both ExitPlanMode and AskUserQuestion bars were affected (AskUserQuestion was re
 | InputArea sends regular message (not feedback) | InputArea.tsx `sendMessage` | Text typed during ExitPlanMode goes as new user message, not dropped |
 | Skip `processBusy:true` for ExitPlanMode approve | MessageHandler.ts `planApprovalResponse` | Stuck "Thinking..." indicator after plan approval |
 | Send `processBusy:true` for ExitPlanMode feedback | MessageHandler.ts `planApprovalResponse` | UI shows thinking while Claude processes feedback |
-| Delayed approve fallback (only if no resume observed) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | ExitPlanMode approve click becoming a no-op |
+| Immediate nudge when CLI idle (resultObserved) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Approve click no-op when CLI auto-resumed with brief text and went idle |
+| Delayed approve fallback (only if no activity observed) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | ExitPlanMode approve click becoming a no-op (CLI never auto-resumed) |
+| Skip nudge when CLI actively working (resumeObserved only) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Spurious nudge while CLI is mid-implementation |
 
 The `messageStart` clearing was **removed** as a defense layer because it made the approval bar invisible.
 
@@ -175,7 +199,8 @@ if (isExitPlanMode) {
     // Approve/reject: close bar without sending text (CLI auto-approves).
     if (msg.action === 'approveClearBypass') this.control.compact();
     else if (msg.action === 'approveManual') { /* switch permission mode */ }
-    // Approve actions schedule delayed fallback nudge if no resume observed.
+    // Approve actions schedule fallback (immediate nudge if CLI idle,
+    // delayed nudge if no activity yet, skip if CLI actively working).
   }
 }
 // ... (non-ExitPlanMode branches send text to CLI) ...
@@ -187,6 +212,23 @@ const isExitPlanFeedback = isExitPlanMode && msg.action === 'feedback';
 if (!isExitPlanMode || isExitPlanFeedback) {
   this.webview.postMessage({ type: 'processBusy', busy: true });
 }
+```
+
+### scheduleExitPlanApproveResumeFallback (MessageHandler.ts)
+
+```typescript
+// If CLI already completed (result/success observed) -> idle -> nudge immediately
+if (this.pendingApprovalCycleResultObserved) {
+  this.control.sendText('Yes, proceed with the plan.');
+  this.webview.postMessage({ type: 'processBusy', busy: true });
+  return;
+}
+// If CLI actively working (resume observed, no result yet) -> skip
+if (this.pendingApprovalCycleResumeObserved) {
+  return;
+}
+// No activity yet -> schedule delayed fallback
+// Timer callback re-checks: resultObserved -> nudge, resumeObserved -> skip
 ```
 
 ---

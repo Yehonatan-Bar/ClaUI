@@ -83,4 +83,4 @@ Match the language of any file paths or context. Reply with ONLY the two lines.
 - Config check (`claudeMirror.activitySummary`) at `recordToolUse` time
 - 10-second timeout on Haiku process
 - `disposed` check in SessionTab callback prevents post-dispose crashes
-- Cost: ~$0.0002 per call, negligible
+- Cost: ~$0.0002 per call, negligible.

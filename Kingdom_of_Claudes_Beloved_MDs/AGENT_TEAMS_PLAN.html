@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaUi - Agent Teams - Plan</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap');
+
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-card: #1c2128;
+    --bg-card-hover: #21262d;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6e7681;
+    --blue: #58a6ff;
+    --green: #3fb950;
+    --purple: #bc8cff;
+    --orange: #f0883e;
+    --amber: #e3b341;
+    --red: #f85149;
+    --cyan: #56d4dd;
+    --pink: #f778ba;
+    --gradient-hero: linear-gradient(135deg, #1a1f36 0%, #0d1117 50%, #161b22 100%);
+    --gradient-blue: linear-gradient(135deg, #1f6feb22, #58a6ff11);
+    --gradient-green: linear-gradient(135deg, #238636aa, #3fb95044);
+    --gradient-purple: linear-gradient(135deg, #8957e5aa, #bc8cff44);
+    --shadow-lg: 0 16px 48px rgba(0,0,0,0.4);
+    --shadow-card: 0 4px 12px rgba(0,0,0,0.3);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Heebo', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  /* Hero Section */
+  .hero {
+    background: var(--gradient-hero);
+    padding: 80px 40px 60px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 30% 50%, #58a6ff08 0%, transparent 60%),
+                radial-gradient(ellipse at 70% 30%, #bc8cff08 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .hero-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #1f6feb33, #58a6ff22);
+    border: 1px solid #58a6ff44;
+    color: var(--blue);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 18px;
+    border-radius: 20px;
+    margin-bottom: 24px;
+    letter-spacing: 0.5px;
+  }
+
+  .hero h1 {
+    font-size: 48px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #e6edf3 0%, #58a6ff 50%, #bc8cff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 16px;
+    line-height: 1.2;
+  }
+
+  .hero p {
+    font-size: 20px;
+    color: var(--text-secondary);
+    max-width: 700px;
+    margin: 0 auto;
+    font-weight: 300;
+  }
+
+  /* Container */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 56px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 28px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .section-icon.blue { background: linear-gradient(135deg, #1f6feb44, #58a6ff22); color: var(--blue); }
+  .section-icon.green { background: linear-gradient(135deg, #23863644, #3fb95022); color: var(--green); }
+  .section-icon.purple { background: linear-gradient(135deg, #8957e544, #bc8cff22); color: var(--purple); }
+  .section-icon.orange { background: linear-gradient(135deg, #bd561288, #f0883e44); color: var(--orange); }
+  .section-icon.cyan { background: linear-gradient(135deg, #0d949988, #56d4dd44); color: var(--cyan); }
+  .section-icon.pink { background: linear-gradient(135deg, #db61a244, #f778ba22); color: var(--pink); }
+
+  .section h2 {
+    font-size: 26px;
+    font-weight: 700;
+  }
+
+  .section h2 small {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text-muted);
+    display: block;
+    margin-top: 2px;
+  }
+
+  /* Cards */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+    border-color: var(--blue);
+    box-shadow: var(--shadow-card);
+  }
+
+  .card h3 {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card p {
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .card .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  /* Feature highlight */
+  .feature-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    margin-bottom: 20px;
+  }
+
+  .feature-box h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+  }
+
+  .feature-box p {
+    color: var(--text-secondary);
+    font-size: 15px;
+  }
+
+  .feature-box .accent-line {
+    width: 40px;
+    height: 3px;
+    border-radius: 2px;
+    margin-bottom: 16px;
+  }
+
+  /* Topology Diagram */
+  .topology-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 40px;
+    margin: 24px 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .topology-container::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 40%, #58a6ff06 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .topology-title {
+    text-align: center;
+    font-size: 15px;
+    color: var(--text-muted);
+    margin-bottom: 32px;
+    font-weight: 500;
+  }
+
+  .topology-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .topology-lead {
+    background: linear-gradient(135deg, #1f6feb22, #58a6ff11);
+    border: 2px solid var(--blue);
+    border-radius: var(--radius);
+    padding: 20px 36px;
+    text-align: center;
+    box-shadow: 0 0 30px #58a6ff15;
+    position: relative;
+  }
+
+  .topology-lead .lead-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--blue);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  .topology-lead .lead-name {
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .topology-connections {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .topology-line {
+    width: 2px;
+    height: 32px;
+    background: linear-gradient(to bottom, var(--blue), var(--border));
+  }
+
+  .topology-agents {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .topology-agent {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px 24px;
+    text-align: center;
+    min-width: 140px;
+    transition: border-color 0.2s;
+  }
+
+  .topology-agent:nth-child(1) { border-right-color: var(--green); border-right-width: 3px; }
+  .topology-agent:nth-child(2) { border-right-color: var(--purple); border-right-width: 3px; }
+  .topology-agent:nth-child(3) { border-right-color: var(--orange); border-right-width: 3px; }
+
+  .topology-agent .agent-name {
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+
+  .topology-agent .agent-role {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .topology-agent .agent-status {
+    font-size: 12px;
+    margin-top: 8px;
+    padding: 3px 10px;
+    border-radius: 10px;
+    display: inline-block;
+  }
+
+  .status-working { background: #23863633; color: var(--green); }
+  .status-idle { background: #30363d; color: var(--text-muted); }
+
+  /* Kanban */
+  .kanban-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin: 24px 0;
+  }
+
+  .kanban-title {
+    text-align: center;
+    font-size: 15px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    font-weight: 500;
+  }
+
+  .kanban-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .kanban-column {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+  }
+
+  .kanban-column-header {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .kanban-column:nth-child(1) .kanban-column-header { border-color: var(--blue); color: var(--blue); }
+  .kanban-column:nth-child(2) .kanban-column-header { border-color: var(--amber); color: var(--amber); }
+  .kanban-column:nth-child(3) .kanban-column-header { border-color: var(--green); color: var(--green); }
+
+  .kanban-count {
+    background: #ffffff11;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+  }
+
+  .kanban-task {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin-bottom: 10px;
+    border-right: 3px solid transparent;
+    font-size: 13px;
+  }
+
+  .kanban-task:last-child { margin-bottom: 0; }
+
+  .kanban-task .task-id {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .kanban-task .task-title {
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .kanban-task .task-owner {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    display: inline-block;
+  }
+
+  .kanban-task .task-dep {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    display: inline-block;
+    margin-top: 4px;
+    background: #f0883e22;
+    color: var(--orange);
+  }
+
+  /* Messages Preview */
+  .messages-preview {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin: 24px 0;
+  }
+
+  .messages-title {
+    text-align: center;
+    font-size: 15px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    font-weight: 500;
+  }
+
+  .message-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+    transition: background 0.15s;
+  }
+
+  .message-row:hover {
+    background: #ffffff05;
+  }
+
+  .message-time {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'Consolas', monospace;
+    min-width: 65px;
+    flex-shrink: 0;
+    direction: ltr;
+  }
+
+  .message-sender {
+    font-weight: 600;
+    font-size: 13px;
+    min-width: 80px;
+    flex-shrink: 0;
+  }
+
+  .message-arrow {
+    color: var(--text-muted);
+    font-size: 13px;
+    flex-shrink: 0;
+    direction: ltr;
+  }
+
+  .message-target {
+    font-size: 13px;
+    min-width: 80px;
+    flex-shrink: 0;
+    color: var(--text-secondary);
+  }
+
+  .message-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+    flex: 1;
+  }
+
+  /* Floating Widget Preview */
+  .widget-preview-container {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 24px 0;
+  }
+
+  .widget-preview {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 24px;
+    min-width: 220px;
+    box-shadow: var(--shadow-lg);
+    position: relative;
+  }
+
+  .widget-preview::before {
+    content: 'Floating Widget';
+    position: absolute;
+    top: -24px;
+    right: 0;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .widget-team-name {
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 8px;
+    color: var(--blue);
+  }
+
+  .widget-stats {
+    display: flex;
+    gap: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .widget-stat-value {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .widget-progress {
+    margin-top: 10px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .widget-progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--green), var(--blue));
+    width: 40%;
+    transition: width 0.4s ease;
+  }
+
+  /* Status Badge Preview */
+  .status-badge-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse-dot 2s infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Phase Cards */
+  .phase-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+
+  .phase-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .phase-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 3px;
+  }
+
+  .phase-card:nth-child(1)::before { background: var(--blue); }
+  .phase-card:nth-child(2)::before { background: var(--purple); }
+  .phase-card:nth-child(3)::before { background: var(--green); }
+  .phase-card:nth-child(4)::before { background: var(--orange); }
+
+  .phase-number {
+    font-size: 32px;
+    font-weight: 800;
+    color: #ffffff11;
+    position: absolute;
+    top: 12px;
+    left: 16px;
+    line-height: 1;
+  }
+
+  .phase-card h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .phase-card p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .phase-card ul {
+    list-style: none;
+    margin-top: 10px;
+  }
+
+  .phase-card li {
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding: 3px 0;
+    padding-right: 16px;
+    position: relative;
+  }
+
+  .phase-card li::before {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 11px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+  }
+
+  /* Stats Grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+  }
+
+  .stat-value {
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .stat-label {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* Flow Control Section */
+  .flow-control-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .flow-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .flow-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .flow-card h4 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .flow-card p {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 40px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 32px; }
+    .hero p { font-size: 16px; }
+    .kanban-board { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .flow-control-grid { grid-template-columns: 1fr; }
+    .topology-agents { flex-direction: column; align-items: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="hero-badge">ClaUi Extension</div>
+  <h1>Agent Teams</h1>
+  <p>תמיכה בצוותי סוכנים - ניהול, ויזואליזציה ושליטה בצוותי Claude Code ישירות מתוך VS Code</p>
+</div>
+
+<div class="container">
+
+  <!-- What is Agent Teams -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon blue">&#x1F4A1;</div>
+      <h2>מה זה Agent Teams?
+        <small>סקירת הפיצ'ר</small>
+      </h2>
+    </div>
+
+    <div class="feature-box">
+      <div class="accent-line" style="background: var(--blue);"></div>
+      <h3>ריבוי סוכנים שעובדים במקביל</h3>
+      <p>
+        Agent Teams מאפשר להריץ מספר סשנים של Claude Code <strong>במקביל</strong>, כאשר סשן אחד משמש כ-<strong>מוביל הצוות</strong> (Team Lead)
+        והשאר הם <strong>חברי צוות</strong> (Teammates) שעובדים באופן עצמאי. כל סוכן מקבל הקשר עצמאי,
+        יכול לשלוח הודעות ישירות לסוכנים אחרים, ולעבוד על משימות מתוך רשימה משותפת.
+      </p>
+    </div>
+
+    <div class="card-grid">
+      <div class="card">
+        <h3><span class="dot" style="background: var(--blue);"></span> מוביל צוות</h3>
+        <p>הסשן הראשי שיוצר את הצוות, מחלק משימות, ומתאם בין הסוכנים. רואה את כל הפעילות ומנהל את מחזור החיים.</p>
+      </div>
+      <div class="card">
+        <h3><span class="dot" style="background: var(--green);"></span> חברי צוות</h3>
+        <p>סוכנים עצמאיים שמקבלים משימות, עובדים על קוד, ומדווחים תוצאות. כל אחד עם חלון הקשר נפרד ויכולת עבודה מלאה.</p>
+      </div>
+      <div class="card">
+        <h3><span class="dot" style="background: var(--purple);"></span> תקשורת ישירה</h3>
+        <p>הסוכנים יכולים לשלוח הודעות ישירות אחד לשני - לא רק דרך המוביל. שיתוף ממצאים ותיאום ללא צוואר בקבוק.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- The Problem -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon orange">&#x26A0;</div>
+      <h2>הבעיה
+        <small>למה צריך את הפיצ'ר הזה</small>
+      </h2>
+    </div>
+
+    <div class="feature-box">
+      <div class="accent-line" style="background: var(--orange);"></div>
+      <h3>הפעילות של הצוות בלתי נראית ב-VS Code</h3>
+      <p>
+        כרגע, כשמפעילים Agent Teams ב-ClaUi, המשתמש רואה רק את השיחה של מוביל הצוות.
+        <strong>אין שום ויזואליזציה</strong> של מה שקורה ברקע - אין מעקב אחרי סוכנים, אין תצוגת משימות,
+        אין הודעות בין-סוכנים. המשתמש עובד "בחושך" לגבי רוב הפעילות של הצוות שלו.
+      </p>
+    </div>
+  </div>
+
+  <!-- The Solution - Visual Preview -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon green">&#x2728;</div>
+      <h2>הפתרון - תצוגות חדשות
+        <small>ויזואליזציה של הצוות</small>
+      </h2>
+    </div>
+
+    <!-- Topology Diagram -->
+    <div class="topology-container">
+      <div class="topology-title">Topology Tab - מפת הסוכנים</div>
+      <div class="topology-grid">
+        <div class="topology-lead">
+          <div class="lead-label">Team Lead</div>
+          <div class="lead-name">team-lead</div>
+        </div>
+        <div class="topology-connections">
+          <div class="topology-line"></div>
+          <div style="width: 100px;"></div>
+          <div class="topology-line"></div>
+          <div style="width: 100px;"></div>
+          <div class="topology-line"></div>
+        </div>
+        <div class="topology-agents">
+          <div class="topology-agent">
+            <div class="agent-name">researcher</div>
+            <div class="agent-role">General Purpose</div>
+            <div class="agent-status status-working">Working</div>
+          </div>
+          <div class="topology-agent">
+            <div class="agent-name">implementer</div>
+            <div class="agent-role">General Purpose</div>
+            <div class="agent-status status-working">Working</div>
+          </div>
+          <div class="topology-agent">
+            <div class="agent-name">tester</div>
+            <div class="agent-role">General Purpose</div>
+            <div class="agent-status status-idle">Idle</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kanban Board -->
+    <div class="kanban-container">
+      <div class="kanban-title">Tasks Tab - לוח משימות</div>
+      <div class="kanban-board">
+        <div class="kanban-column">
+          <div class="kanban-column-header">
+            Pending
+            <span class="kanban-count">2</span>
+          </div>
+          <div class="kanban-task" style="border-right-color: var(--text-muted);">
+            <div class="task-id">#4</div>
+            <div class="task-title">Integration Tests</div>
+            <div class="task-dep">Blocked by #2</div>
+          </div>
+          <div class="kanban-task" style="border-right-color: var(--text-muted);">
+            <div class="task-id">#5</div>
+            <div class="task-title">Documentation</div>
+            <div class="task-dep">Blocked by #3</div>
+          </div>
+        </div>
+        <div class="kanban-column">
+          <div class="kanban-column-header">
+            In Progress
+            <span class="kanban-count">2</span>
+          </div>
+          <div class="kanban-task" style="border-right-color: var(--green);">
+            <div class="task-id">#2</div>
+            <div class="task-title">API Endpoints</div>
+            <div class="task-owner" style="background: #3fb95022; color: var(--green);">researcher</div>
+          </div>
+          <div class="kanban-task" style="border-right-color: var(--purple);">
+            <div class="task-id">#3</div>
+            <div class="task-title">Frontend Components</div>
+            <div class="task-owner" style="background: #bc8cff22; color: var(--purple);">implementer</div>
+          </div>
+        </div>
+        <div class="kanban-column">
+          <div class="kanban-column-header">
+            Completed
+            <span class="kanban-count">1</span>
+          </div>
+          <div class="kanban-task" style="border-right-color: var(--blue);">
+            <div class="task-id">#1</div>
+            <div class="task-title">Database Schema</div>
+            <div class="task-owner" style="background: #58a6ff22; color: var(--blue);">team-lead</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Messages Preview -->
+    <div class="messages-preview">
+      <div class="messages-title">Messages Tab - הודעות בין סוכנים</div>
+      <div class="message-row">
+        <span class="message-time">10:32:15</span>
+        <span class="message-sender" style="color: var(--blue);">team-lead</span>
+        <span class="message-arrow">&rarr;</span>
+        <span class="message-target">researcher</span>
+        <span class="message-text">Start analyzing the authentication module for security issues</span>
+      </div>
+      <div class="message-row">
+        <span class="message-time">10:33:42</span>
+        <span class="message-sender" style="color: var(--green);">researcher</span>
+        <span class="message-arrow">&rarr;</span>
+        <span class="message-target">team-lead</span>
+        <span class="message-text">Found 3 endpoints to review. Starting deep analysis...</span>
+      </div>
+      <div class="message-row">
+        <span class="message-time">10:34:18</span>
+        <span class="message-sender" style="color: var(--blue);">team-lead</span>
+        <span class="message-arrow">&rarr;</span>
+        <span class="message-target" style="color: var(--amber);">broadcast</span>
+        <span class="message-text">Everyone check the shared task list for new assignments</span>
+      </div>
+      <div class="message-row">
+        <span class="message-time">10:35:01</span>
+        <span class="message-sender" style="color: var(--purple);">implementer</span>
+        <span class="message-arrow">&rarr;</span>
+        <span class="message-target">researcher</span>
+        <span class="message-text">Can you share the endpoint schema when ready? I need it for the UI</span>
+      </div>
+    </div>
+
+    <!-- Floating Widget Preview -->
+    <div class="widget-preview-container">
+      <div class="widget-preview">
+        <div class="widget-team-name">auth-project</div>
+        <div class="widget-stats">
+          <div><span class="widget-stat-value">3</span> agents</div>
+          <div><span class="widget-stat-value">2</span> working</div>
+        </div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">Tasks: 2/5 completed</div>
+        <div class="widget-progress">
+          <div class="widget-progress-fill"></div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">Status Bar Badge:</div>
+        <div class="status-badge-preview">
+          <span class="badge-dot"></span>
+          Team: auth-project (3)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flow Control (Bonus) -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon cyan">&#x1F3AE;</div>
+      <h2>שליטה בזרימה
+        <small>BONUS - פעולות ישירות מהממשק</small>
+      </h2>
+    </div>
+
+    <div class="feature-box" style="margin-bottom: 24px;">
+      <div class="accent-line" style="background: var(--cyan);"></div>
+      <h3>לא רק צפייה - גם שליטה</h3>
+      <p>
+        המשתמש לא רק יראה מה קורה, אלא גם יוכל <strong>לפעול</strong> ישירות מהממשק:
+        לשלוח הודעות לסוכנים, ליצור משימות חדשות, לעדכן סטטוס, ואפילו לכבות סוכנים -
+        הכל בלחיצת כפתור, בלי לכתוב פקודות.
+      </p>
+    </div>
+
+    <div class="flow-control-grid">
+      <div class="flow-card">
+        <div class="flow-icon" style="background: #58a6ff22; color: var(--blue);">&#x2709;</div>
+        <div>
+          <h4>שליחת הודעות</h4>
+          <p>שליחת הודעה ישירה לסוכן ספציפי או שידור לכל הצוות - ישירות מלשונית ההודעות</p>
+        </div>
+      </div>
+      <div class="flow-card">
+        <div class="flow-icon" style="background: #3fb95022; color: var(--green);">&#x2795;</div>
+        <div>
+          <h4>יצירת משימות</h4>
+          <p>הוספת משימות חדשות ללוח הקנבן, כולל תיאור, עדיפות ותלויות</p>
+        </div>
+      </div>
+      <div class="flow-card">
+        <div class="flow-icon" style="background: #e3b34122; color: var(--amber);">&#x270F;</div>
+        <div>
+          <h4>עדכון משימות</h4>
+          <p>שינוי סטטוס משימה, הקצאה לסוכן אחר, או עדכון תיאור - ישירות מהכרטיס</p>
+        </div>
+      </div>
+      <div class="flow-card">
+        <div class="flow-icon" style="background: #f8514922; color: var(--red);">&#x23FB;</div>
+        <div>
+          <h4>כיבוי סוכנים</h4>
+          <p>שליחת בקשת כיבוי מסודרת לסוכן - הסוכן יכול לאשר או לדחות אם עדיין עובד</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Implementation Phases -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon purple">&#x1F3D7;</div>
+      <h2>שלבי מימוש
+        <small>ארבעה שלבים</small>
+      </h2>
+    </div>
+
+    <div class="phase-grid">
+      <div class="phase-card">
+        <div class="phase-number">1</div>
+        <h3 style="color: var(--blue);">זיהוי ומעקב</h3>
+        <p>תשתית לזיהוי צוותים ומעקב אחרי שינויים</p>
+        <ul>
+          <li>הגדרת טיפוסי נתונים</li>
+          <li>מעקב אחרי קבצי צוות בדיסק</li>
+          <li>זיהוי יצירת צוות בזרם CLI</li>
+          <li>פרוטוקול הודעות חדש</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <div class="phase-number">2</div>
+        <h3 style="color: var(--purple);">ממשק משתמש</h3>
+        <p>רכיבי React לתצוגת הצוות</p>
+        <ul>
+          <li>פאנל צוות עם לשוניות</li>
+          <li>מפת סוכנים (Topology)</li>
+          <li>לוח משימות (Kanban)</li>
+          <li>פיד הודעות ופעילות</li>
+          <li>וידג'ט צף + תג בשורת מצב</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <div class="phase-number">3</div>
+        <h3 style="color: var(--green);">שליטה בזרימה</h3>
+        <p>פעולות משתמש ישירות מהממשק</p>
+        <ul>
+          <li>שליחת הודעות לסוכנים</li>
+          <li>יצירה ועדכון משימות</li>
+          <li>כיבוי סוכנים</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <div class="phase-number">4</div>
+        <h3 style="color: var(--orange);">ליטוש</h3>
+        <p>שיפורים ויזואליים והגדרות</p>
+        <ul>
+          <li>התאמה לכל הערכות נושא</li>
+          <li>קיצורי מקלדת</li>
+          <li>הגדרות חדשות</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon pink">&#x1F4CA;</div>
+      <h2>סיכום כמותי
+        <small>היקף העבודה</small>
+      </h2>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" style="color: var(--blue);">12</div>
+        <div class="stat-label">קבצים חדשים</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color: var(--purple);">8</div>
+        <div class="stat-label">קבצים מעודכנים</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color: var(--green);">4</div>
+        <div class="stat-label">שלבי מימוש</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color: var(--orange);">4</div>
+        <div class="stat-label">תצוגות UI חדשות</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  ClaUi Agent Teams Plan &middot; March 2026
+</div>
+
+</body>
+</html>
