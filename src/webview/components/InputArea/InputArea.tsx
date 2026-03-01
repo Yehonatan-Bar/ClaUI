@@ -1206,6 +1206,38 @@ export const InputArea: React.FC = () => {
             >
               {promptTranslateEnabled && !autoTranslateEnabled ? 'Translate' : 'Send'}
             </button>
+            <button
+              className="send-gear-button"
+              onClick={handleToggleSendSettings}
+              data-tooltip="Send settings"
+            >
+              {'\u2699'}
+            </button>
+            {sendSettingsPopoverOpen && (
+              <div className="send-settings-popover">
+                <div className="enhance-popover-row">
+                  <span className="enhance-popover-label">Translate to English</span>
+                  <button
+                    className={`enhance-toggle-btn ${promptTranslateEnabled ? 'on' : 'off'}`}
+                    onClick={handleTranslateToggle}
+                    data-tooltip={promptTranslateEnabled ? 'Disable translation' : 'Enable translation'}
+                  >
+                    <span className="enhance-toggle-knob" />
+                  </button>
+                </div>
+                <div className="enhance-popover-row">
+                  <span className="enhance-popover-label">Auto-send translated</span>
+                  <button
+                    className={`enhance-toggle-btn ${autoTranslateEnabled ? 'on' : 'off'}`}
+                    onClick={handleAutoTranslateToggle}
+                    disabled={!promptTranslateEnabled}
+                    data-tooltip={!promptTranslateEnabled ? 'Enable translation first' : autoTranslateEnabled ? 'Disable auto-send' : 'Enable auto-send'}
+                  >
+                    <span className="enhance-toggle-knob" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
