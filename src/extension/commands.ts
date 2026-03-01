@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import type { TabManager } from './session/TabManager';
 import type { SessionStore } from './session/SessionStore';
 import type { ProviderId, SerializedChatMessage } from './types/webview-messages';
@@ -337,7 +338,7 @@ export function registerCommands(
       }
     }),
 
-    // Open HTML plan documents from Kingdom_of_Claudes_Beloved_MDs and project root in the default browser
+    // Open HTML plan documents from multiple locations in the default browser
     vscode.commands.registerCommand('claudeMirror.openPlanDocs', async () => {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -347,8 +348,9 @@ export function registerCommands(
 
       const workspaceRoot = workspaceFolders[0].uri.fsPath;
       const kingdomDir = path.join(workspaceRoot, 'Kingdom_of_Claudes_Beloved_MDs');
+      const claudePlansDir = path.join(os.homedir(), '.claude', 'plans');
 
-      // Collect HTML plan files from both Kingdom dir and project root
+      // Collect HTML plan files from all known plan directories
       const planFiles: Array<{ label: string; description: string; filePath: string; mtimeMs: number }> = [];
 
       const collectHtmlFiles = (dir: string, locationTag: string) => {
@@ -373,6 +375,7 @@ export function registerCommands(
 
       collectHtmlFiles(kingdomDir, 'Kingdom');
       collectHtmlFiles(workspaceRoot, 'Root');
+      collectHtmlFiles(claudePlansDir, '~/.claude/plans');
 
       // Sort all collected files by modification time (newest first)
       planFiles.sort((a, b) => b.mtimeMs - a.mtimeMs);

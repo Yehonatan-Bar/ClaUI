@@ -190,6 +190,12 @@ export interface AppState {
   enhancerPopoverOpen: boolean;
   enhanceComparisonData: { originalText: string; enhancedText: string } | null;
 
+  // Prompt Translator
+  isTranslatingPrompt: boolean;
+  promptTranslateEnabled: boolean;
+  autoTranslateEnabled: boolean;
+  sendSettingsPopoverOpen: boolean;
+
   // Turn analysis settings (mirrored from VS Code config)
   turnAnalysisEnabled: boolean;
   analysisModel: string;
@@ -354,6 +360,11 @@ export interface AppState {
   setEnhancerPopoverOpen: (open: boolean) => void;
   setEnhanceComparisonData: (data: { originalText: string; enhancedText: string } | null) => void;
   setPromptEnhancerSettings: (settings: { autoEnhance: boolean; enhancerModel: string }) => void;
+  setIsTranslatingPrompt: (translating: boolean) => void;
+  setPromptTranslateEnabled: (enabled: boolean) => void;
+  setAutoTranslateEnabled: (enabled: boolean) => void;
+  setSendSettingsPopoverOpen: (open: boolean) => void;
+  setPromptTranslatorSettings: (settings: { translateEnabled: boolean; autoTranslate: boolean }) => void;
   setTurnAnalysisSettings: (settings: { enabled: boolean; analysisModel: string }) => void;
   setSessionMetadata: (meta: { tools: string[]; model: string; cwd: string; mcpServers: string[] }) => void;
   setProjectSessions: (sessions: SessionSummary[]) => void;
@@ -580,6 +591,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   enhancerModel: 'claude-sonnet-4-6',
   enhancerPopoverOpen: false,
   enhanceComparisonData: null,
+  isTranslatingPrompt: false,
+  promptTranslateEnabled: false,
+  autoTranslateEnabled: false,
+  sendSettingsPopoverOpen: false,
   turnAnalysisEnabled: true,
   analysisModel: 'claude-haiku-4-5-20251001',
   sessionMetadata: null,
@@ -1252,6 +1267,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   setPromptEnhancerSettings: ({ autoEnhance, enhancerModel }) =>
     set({ autoEnhanceEnabled: autoEnhance, enhancerModel }),
 
+  setIsTranslatingPrompt: (translating) => set({ isTranslatingPrompt: translating }),
+  setPromptTranslateEnabled: (enabled) => set({ promptTranslateEnabled: enabled }),
+  setAutoTranslateEnabled: (enabled) => set({ autoTranslateEnabled: enabled }),
+  setSendSettingsPopoverOpen: (open) => set({ sendSettingsPopoverOpen: open }),
+  setPromptTranslatorSettings: ({ translateEnabled, autoTranslate }) =>
+    set({ promptTranslateEnabled: translateEnabled, autoTranslateEnabled: autoTranslate }),
+
   setTurnAnalysisSettings: ({ enabled, analysisModel }) =>
     set({ turnAnalysisEnabled: enabled, analysisModel }),
 
@@ -1358,6 +1380,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       enhanceComparisonData: null,
       autoEnhanceEnabled: state.autoEnhanceEnabled,
       enhancerModel: state.enhancerModel,
+      isTranslatingPrompt: false,
+      sendSettingsPopoverOpen: false,
+      promptTranslateEnabled: state.promptTranslateEnabled,
+      autoTranslateEnabled: state.autoTranslateEnabled,
       sessionMetadata: null,
       projectSessions: [],
       sessionActivityStarted: false,

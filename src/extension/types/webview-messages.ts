@@ -312,6 +312,23 @@ export interface SetEnhancerModelRequest {
   model: string;
 }
 
+// --- Prompt Translation (Webview -> Extension) ---
+
+export interface TranslatePromptRequest {
+  type: 'translatePrompt';
+  text: string;
+}
+
+export interface SetPromptTranslationEnabledRequest {
+  type: 'setPromptTranslationEnabled';
+  enabled: boolean;
+}
+
+export interface SetAutoTranslateRequest {
+  type: 'setAutoTranslate';
+  enabled: boolean;
+}
+
 // --- Skill Generation (Webview -> Extension) ---
 
 export interface SetSkillGenEnabledRequest {
@@ -488,6 +505,9 @@ export type WebviewToExtensionMessage =
   | EnhancePromptRequest
   | SetAutoEnhanceRequest
   | SetEnhancerModelRequest
+  | TranslatePromptRequest
+  | SetPromptTranslationEnabledRequest
+  | SetAutoTranslateRequest
   | SetSkillGenEnabledRequest
   | SetSkillGenThresholdRequest
   | SkillGenTriggerRequest
@@ -962,6 +982,21 @@ export interface PromptEnhancerSettingsMessage {
   enhancerModel: string;
 }
 
+// --- Prompt Translation (Extension -> Webview) ---
+
+export interface TranslatePromptResultMessage {
+  type: 'translatePromptResult';
+  translatedText: string | null;
+  success: boolean;
+  error?: string;
+}
+
+export interface PromptTranslatorSettingsMessage {
+  type: 'promptTranslatorSettings';
+  translateEnabled: boolean;
+  autoTranslate: boolean;
+}
+
 // --- Skill Generation (Extension -> Webview) ---
 
 export type SkillGenRunStatus = 'idle' | 'scanning' | 'preflight' | 'running' | 'installing' | 'succeeded' | 'failed' | 'cancelled';
@@ -1250,6 +1285,8 @@ export type ExtensionToWebviewMessage =
   | ProjectAnalyticsDataMessage
   | EnhancePromptResultMessage
   | PromptEnhancerSettingsMessage
+  | TranslatePromptResultMessage
+  | PromptTranslatorSettingsMessage
   | SkillGenSettingsMessage
   | SkillGenStatusMessage
   | SkillGenProgressMessage

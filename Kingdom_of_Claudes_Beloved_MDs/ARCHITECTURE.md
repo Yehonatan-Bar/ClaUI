@@ -432,12 +432,15 @@ SessionTab implements this interface, allowing each tab to provide its own panel
 5. Panel callbacks (`onClosed`, `onFocused`) feed back to TabManager
 
 ### Command Routing
-All commands (start, stop, send, compact, resume, sendFilePath, openPlanDocs) route through TabManager to the active (focused) tab. `startSession` and `resumeSession` always create a new tab. `openPlanDocs` is independent of tabs - it scans `Kingdom_of_Claudes_Beloved_MDs/` for `.html` files and opens the selected one in the default browser via `vscode.env.openExternal()`.
+All commands (start, stop, send, compact, resume, sendFilePath, openPlanDocs) route through TabManager to the active (focused) tab. `startSession` and `resumeSession` always create a new tab. `openPlanDocs` is independent of tabs - it scans multiple directories (`Kingdom_of_Claudes_Beloved_MDs/`, project root, and `~/.claude/plans/`) for `.html` files and opens the selected one in the default browser via `vscode.env.openExternal()`.
 
 ### Open Plan Docs (`commands.ts`)
 The `claudeMirror.openPlanDocs` command opens HTML plan documents in the default browser:
 1. Webview sends `openPlanDocs` message -> MessageHandler delegates to command
-2. Command reads workspace `Kingdom_of_Claudes_Beloved_MDs/` directory
+2. Command scans three directories for `.html` files:
+   - `<workspace>/Kingdom_of_Claudes_Beloved_MDs/` (tagged "Kingdom")
+   - `<workspace>/` project root (tagged "Root")
+   - `~/.claude/plans/` user-level plans dir (tagged "~/.claude/plans")
 3. Filters for `.html` files, sorts by modification time (newest first)
 4. Single file: opens directly. Multiple files: shows QuickPick with relative timestamps
 5. Opens via `vscode.env.openExternal(vscode.Uri.file(path))`
