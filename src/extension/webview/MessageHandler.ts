@@ -9,6 +9,7 @@ import type { AdventureInterpreter } from '../session/AdventureInterpreter';
 import type { TurnAnalyzer } from '../session/TurnAnalyzer';
 import type { MessageTranslator } from '../session/MessageTranslator';
 import type { PromptEnhancer } from '../session/PromptEnhancer';
+import type { PromptTranslator } from '../session/PromptTranslator';
 import type { PromptHistoryStore } from '../session/PromptHistoryStore';
 import type { ProjectAnalyticsStore } from '../session/ProjectAnalyticsStore';
 import type { AchievementService } from '../achievements/AchievementService';
@@ -179,6 +180,8 @@ export class MessageHandler {
   private turnAnalyzer: TurnAnalyzer | null = null;
   /** Prompt enhancer for AI-powered prompt improvement */
   private promptEnhancer: PromptEnhancer | null = null;
+  /** Prompt translator for translating prompts to English */
+  private promptTranslator: PromptTranslator | null = null;
   /** Skill generation service (global, shared across tabs) */
   private skillGenService: SkillGenService | null = null;
   /** Global token-usage ratio tracker (shared across all tabs) */
@@ -273,6 +276,11 @@ export class MessageHandler {
   /** Attach a PromptEnhancer for AI-powered prompt improvement */
   setPromptEnhancer(enhancer: PromptEnhancer): void {
     this.promptEnhancer = enhancer;
+  }
+
+  /** Attach a PromptTranslator for translating prompts to English */
+  setPromptTranslator(translator: PromptTranslator): void {
+    this.promptTranslator = translator;
   }
 
   /** Attach the global SkillGenService */
@@ -729,6 +737,50 @@ export class MessageHandler {
           vscode.workspace.getConfiguration('claudeMirror').update('promptEnhancer.model', msg.model, true);
           break;
 
+        // --- Prompt Translation ---
+        case 'translatePrompt': {
+          this.log(`Translate prompt request (${msg.text.length} chars)`);
+          if (!this.promptTranslator) {
+            this.webview.postMessage({
+              type: 'translatePromptResult',
+              translatedText: null,
+              success: false,
+              error: 'Prompt translator not available',
+            });
+            break;
+          }
+          this.getApiKey().then((apiKey) => this.promptTranslator!.translate(msg.text, apiKey))
+            .then((translated) => {
+              this.log(`Prompt translation result: success=${!!translated}, length=${translated?.length ?? 0}`);
+              this.webview.postMessage({
+                type: 'translatePromptResult',
+                translatedText: translated,
+                success: !!translated,
+                error: translated ? undefined : 'Translation failed',
+              });
+            })
+            .catch((err) => {
+              this.log(`Prompt translation error: ${err}`);
+              this.webview.postMessage({
+                type: 'translatePromptResult',
+                translatedText: null,
+                success: false,
+                error: `Translation error: ${err.message}`,
+              });
+            });
+          break;
+        }
+
+        case 'setPromptTranslationEnabled':
+          this.log(`Setting prompt translation to: ${msg.enabled}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('promptTranslator.enabled', msg.enabled, true);
+          break;
+
+        case 'setAutoTranslate':
+          this.log(`Setting auto-translate to: ${msg.enabled}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('promptTranslator.autoTranslate', msg.enabled, true);
+          break;
+
         // --- Skill Generation ---
         case 'setSkillGenEnabled':
           this.log(`[SkillGen:Msg][INFO] setSkillGenEnabled | enabled=${msg.enabled}`);
@@ -860,30 +912,45 @@ export class MessageHandler {
             this.exitPlanModeProcessed = true;
           }
 
-          // ExitPlanMode: DO NOT send user messages to the CLI for ANY action.
+          // ExitPlanMode: DO NOT send approve/reject text to the CLI.
           // The CLI already auto-approves ExitPlanMode (via bypassPermissions or
-          // allowedTools). Sending a user message creates a spurious conversation
-          // turn that causes the model to call ExitPlanMode again → infinite loop.
-          // This applies to approve, reject, AND feedback actions. By the time the
-          // user interacts with the bar, the CLI has already moved on. The user can
-          // still redirect the model by typing a new message (regular sendMessage path).
-          // Exception: on approve, a delayed fallback nudge is scheduled if no
+          // allowedTools). Sending "Yes, proceed" creates a spurious conversation
+          // turn that causes the model to call ExitPlanMode again (infinite loop).
+          // Exception 1: approve actions schedule a delayed fallback nudge if no
           // post-approval activity is observed within a short timeout.
+          // Exception 2: feedback IS sent to the CLI - it provides real user
+          // content that directs the model to revise the plan (not a loop risk).
           if (isExitPlanMode) {
-            this.log(`ExitPlanMode ${msg.action} - closing bar without sending user message (CLI auto-approves)`);
-            if (msg.action === 'approveClearBypass') {
-              this.log('Plan approval: also compacting context');
-              this.control.compact();
-            } else if (msg.action === 'approveManual') {
-              this.log('Plan approval: switching to supervised mode');
-              vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', 'supervised', true);
-              this.webview.postMessage({ type: 'permissionModeSetting', mode: 'supervised' });
-            }
-            // Don't send text - just close the bar
-            if (isApproveAction) {
-              scheduleExitPlanApproveFallback = true;
+            if (msg.action === 'feedback' && msg.feedback?.trim()) {
+              // Feedback provides real user content that should reach Claude so
+              // it can revise the plan. Unlike approve (which would loop),
+              // feedback directs the model to change course. Reset
+              // exitPlanModeProcessed so a new ExitPlanMode notification can
+              // appear after the model revises the plan.
+              this.exitPlanModeProcessed = false;
+              this.log(`ExitPlanMode feedback - sending user feedback to CLI`);
+              // Optimistic: show user message in UI immediately
+              this.webview.postMessage({
+                type: 'userMessage',
+                content: [{ type: 'text', text: msg.feedback.trim() } as ContentBlock],
+              });
+              this.control.sendText(msg.feedback.trim());
             } else {
-              this.cancelExitPlanApproveResumeFallback();
+              this.log(`ExitPlanMode ${msg.action} - closing bar without sending user message (CLI auto-approves)`);
+              if (msg.action === 'approveClearBypass') {
+                this.log('Plan approval: also compacting context');
+                this.control.compact();
+              } else if (msg.action === 'approveManual') {
+                this.log('Plan approval: switching to supervised mode');
+                vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', 'supervised', true);
+                this.webview.postMessage({ type: 'permissionModeSetting', mode: 'supervised' });
+              }
+              // Don't send text - just close the bar
+              if (isApproveAction) {
+                scheduleExitPlanApproveFallback = true;
+              } else {
+                this.cancelExitPlanApproveResumeFallback();
+              }
             }
           } else if (msg.action === 'approve') {
             this.control.sendText('Yes, proceed with the plan.');
@@ -915,14 +982,17 @@ export class MessageHandler {
           if (isExitPlanMode && scheduleExitPlanApproveFallback) {
             this.scheduleExitPlanApproveResumeFallback(approvalCycleId);
           }
-          // For ExitPlanMode: DON'T send processBusy:true. The CLI already
+          // For ExitPlanMode approve: DON'T send processBusy:true. The CLI already
           // auto-approved and may have already finished executing (sent result
           // with processBusy:false). Sending processBusy:true here would create
           // a stuck "Thinking..." indicator with no matching processBusy:false.
           // The delayed fallback above sends processBusy:true only if it
           // actually sends a proceed nudge to the CLI.
+          // For ExitPlanMode feedback: DO send processBusy:true - we just sent
+          // user text to the CLI and the model will respond.
           // For all other approvals: text was sent to the CLI, so we are busy.
-          if (!isExitPlanMode) {
+          const isExitPlanFeedback = isExitPlanMode && msg.action === 'feedback';
+          if (!isExitPlanMode || isExitPlanFeedback) {
             this.webview.postMessage({ type: 'processBusy', busy: true });
           }
           }
@@ -1388,6 +1458,8 @@ export class MessageHandler {
           this.sendTurnAnalysisSettings();
           // Send prompt enhancer settings
           this.sendPromptEnhancerSettings();
+          // Send prompt translator settings
+          this.sendPromptTranslatorSettings();
           // Send skill generation settings and status
           this.sendSkillGenSettings();
           this.sendSkillGenStatus();
@@ -1714,6 +1786,19 @@ export class MessageHandler {
     });
   }
 
+  /** Read prompt translator settings from VS Code config and send to webview */
+  private sendPromptTranslatorSettings(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const translateEnabled = config.get<boolean>('promptTranslator.enabled', false);
+    const autoTranslate = config.get<boolean>('promptTranslator.autoTranslate', false);
+    this.log(`Sending prompt translator settings: enabled=${translateEnabled}, auto=${autoTranslate}`);
+    this.webview.postMessage({
+      type: 'promptTranslatorSettings',
+      translateEnabled,
+      autoTranslate,
+    });
+  }
+
   /** Read skill generation settings and send to webview */
   private sendSkillGenSettings(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -1887,6 +1972,9 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.promptEnhancer')) {
         this.sendPromptEnhancerSettings();
+      }
+      if (e.affectsConfiguration('claudeMirror.promptTranslator')) {
+        this.sendPromptTranslatorSettings();
       }
       if (e.affectsConfiguration('claudeMirror.skillGen')) {
         this.sendSkillGenSettings();

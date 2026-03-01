@@ -342,6 +342,16 @@
           ],
           "description": "Model used for prompt enhancement"
         },
+        "claudeMirror.promptTranslator.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Translate prompts to English before sending them to Claude"
+        },
+        "claudeMirror.promptTranslator.autoTranslate": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically send the translated prompt (requires translation enabled)"
+        },
         "claudeMirror.turnAnalysis.enabled": {
           "type": "boolean",
           "default": true,

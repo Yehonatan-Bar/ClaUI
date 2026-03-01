@@ -66,6 +66,8 @@ export function useClaudeStream(): void {
     setProjectSessions,
     setIsEnhancing,
     setPromptEnhancerSettings,
+    setIsTranslatingPrompt,
+    setPromptTranslatorSettings,
     setSkillGenSettings,
     setSkillGenStatus,
     setSkillGenProgress,
@@ -490,6 +492,27 @@ export function useClaudeStream(): void {
           });
           break;
 
+        // --- Prompt Translation ---
+        case 'translatePromptResult':
+          setIsTranslatingPrompt(false);
+          if (msg.success && msg.translatedText) {
+            window.dispatchEvent(
+              new CustomEvent('prompt-translated', { detail: msg.translatedText })
+            );
+          } else {
+            window.dispatchEvent(
+              new CustomEvent('prompt-translate-failed', { detail: msg.error })
+            );
+          }
+          break;
+
+        case 'promptTranslatorSettings':
+          setPromptTranslatorSettings({
+            translateEnabled: msg.translateEnabled,
+            autoTranslate: msg.autoTranslate,
+          });
+          break;
+
         // --- Skill Generation ---
         case 'skillGenSettings':
           setSkillGenSettings({ enabled: msg.enabled, threshold: msg.threshold });
@@ -643,6 +666,8 @@ export function useClaudeStream(): void {
     setProjectSessions,
     setIsEnhancing,
     setPromptEnhancerSettings,
+    setIsTranslatingPrompt,
+    setPromptTranslatorSettings,
     setSkillGenSettings,
     setSkillGenStatus,
     setSkillGenProgress,

@@ -74,6 +74,7 @@ claude-code-mirror/
 |   |   |   +-- PromptHistoryStore.ts     #   Persists prompt history (project + global scope)
 |   |   |   +-- TurnAnalyzer.ts           #   Semantic turn analysis via Claude (mood, task type, outcome)
 |   |   |   +-- PromptEnhancer.ts         #   AI-powered prompt rewriting via one-shot CLI call
+|   |   |   +-- PromptTranslator.ts       #   Prompt-to-English translation via one-shot CLI call
 |   |   |   +-- TokenUsageRatioTracker.ts #   Correlates token consumption with usage % (global, persisted)
 |   |   |   +-- SessionDiscovery.ts       #   Discover all Claude sessions from ~/.claude/projects/ filesystem
 |   |   |   +-- SessionFork.ts            #   Phase 3 stub (rewind)
@@ -360,6 +361,9 @@ claude-code-mirror/
 **Prompt Enhancer** - AI-powered prompt rewriting that improves user prompts before sending. Uses a one-shot `claude -p` CLI call with a meta-prompt applying advanced prompt engineering (scaffolding, structure, context cues). Manual mode: sparkles button or Ctrl+Shift+E opens a comparison panel showing original and enhanced prompts stacked vertically for side-by-side review. Auto mode: intercepts Send, enhances, then auto-sends (falls back to original on failure). Gear popover with auto-enhance toggle and model selector. Configurable via `claudeMirror.promptEnhancer.*` settings.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/PROMPT_ENHANCER.md`
 
+**Prompt Translator** - Translates user prompts to native English before sending to Claude. Uses a one-shot `claude -p` CLI call (hardcoded Sonnet 4.6) with a system prompt that rewrites text as a native English-speaking software engineer would phrase it. Two modes: manual (Send button label changes to "Translate", places translated text in input for review) and auto-send (translates then sends automatically). When both Enhance and Translate are enabled, enhance runs first, then translation runs on the enhanced output. Settings controlled via a gear popover on the Send button group. Configurable via `claudeMirror.promptTranslator.*` settings.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/PROMPT_TRANSLATOR.md`
+
 **Codex Consultation** - Consult an external GPT expert (Codex) directly from the chat UI. A "Consult" button in the StatusBar opens an input panel where the user types a question. The question is sent to the Claude CLI session as a structured prompt instructing Claude to enrich it with system context and call the `mcp__codex__codex` MCP tool. The Codex response streams into the chat, and Claude continues development based on the advice.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_CONSULTATION.md`
 
@@ -402,6 +406,8 @@ claude-code-mirror/
 
 | `claudeMirror.promptEnhancer.autoEnhance` | `false` | Automatically enhance prompts before sending |
 | `claudeMirror.promptEnhancer.model` | `"claude-sonnet-4-6"` | Model used for prompt enhancement (Haiku/Sonnet 4.6/Sonnet 4.5/Opus 4.6) |
+| `claudeMirror.promptTranslator.enabled` | `false` | Translate prompts to English before sending them to Claude |
+| `claudeMirror.promptTranslator.autoTranslate` | `false` | Automatically send the translated prompt (requires translation enabled) |
 | `claudeMirror.gitPush.enabled` | `true` | Whether git push is configured and ready to use via the Git button |
 | `claudeMirror.gitPush.scriptPath` | `"scripts/git-push.ps1"` | Path to the git push script (relative to workspace root) |
 | `claudeMirror.gitPush.commitMessageTemplate` | `"{sessionName}"` | Commit message template ({sessionName} = tab name) |

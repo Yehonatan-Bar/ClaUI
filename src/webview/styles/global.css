@@ -3569,7 +3569,8 @@ html, body, #root {
 /* Prompt Enhancer                */
 /* ============================== */
 
-.textarea-container.enhancing .input-textarea {
+.textarea-container.enhancing .input-textarea,
+.textarea-container.translating .input-textarea {
   opacity: 0.5;
   pointer-events: none;
   border-color: var(--vscode-textLink-foreground, #3794ff);
@@ -3898,6 +3899,56 @@ html, body, #root {
 
 .enhance-comparison-btn.enhanced:hover {
   background: var(--vscode-button-hoverBackground);
+}
+
+/* ══════════════════════════════════════════════
+   Send Button Group & Prompt Translation
+   ══════════════════════════════════════════════ */
+
+.send-button-group {
+  display: flex;
+  position: relative;
+}
+
+.send-button-group .send-button {
+  border-radius: 6px 0 0 6px;
+}
+
+.send-gear-button {
+  width: 22px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0 6px 6px 0;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  opacity: 0.85;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.send-gear-button:hover {
+  opacity: 1;
+  background: var(--vscode-button-hoverBackground);
+}
+
+.send-settings-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  background: var(--vscode-editor-background, #1e1e1e);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 8px;
+  padding: 8px 10px;
+  z-index: 100;
+  min-width: 200px;
+  animation: enhancePopIn 0.15s ease-out;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
 }
 
 /* ═══════════════════════════════════════════════════

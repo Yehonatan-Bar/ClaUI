@@ -83,6 +83,18 @@ Both ExitPlanMode and AskUserQuestion bars were affected (AskUserQuestion was re
 
 **Follow-up (2026-02-26, same fix cycle)**: `messageStart` / `result` alone were too weak as a resume signal; Claude can emit a short empty turn and `result/success` immediately after `ExitPlanMode` without starting implementation. The fallback logic was tightened to cancel only on real progress (`toolUseStart` / `textDelta`), preventing false "already resumed" decisions.
 
+### Sixth Bug (2026-03-01): ExitPlanMode Feedback Silently Dropped
+
+**Cause**: When the user selected option 4 (feedback/comment on the plan), the `planApprovalResponse` handler treated ALL ExitPlanMode actions identically -- closing the bar without sending text to the CLI. The feedback text was silently discarded. The UI showed as "done" (no busy indicator, no activity), and the user's feedback never reached Claude.
+
+**Fix**: Carved out the feedback action from the ExitPlanMode "don't send text" block. For ExitPlanMode + feedback:
+1. The feedback text IS sent to the CLI via `sendText()` (unlike approve which would loop)
+2. An optimistic `userMessage` is posted to the webview so the user sees their feedback in the chat
+3. `processBusy: true` is sent so the UI shows "Thinking..." while Claude processes
+4. `exitPlanModeProcessed` is reset to `false` so a new ExitPlanMode cycle can trigger the approval bar after Claude revises the plan
+
+**Why this doesn't cause the infinite loop**: The original loop was caused by sending "Yes, proceed with the plan." -- a message that made the model call ExitPlanMode again. Feedback provides actual user content ("change X in the plan") that directs the model to revise, not to re-approve.
+
 ---
 
 ## Current Defense Layers
@@ -90,9 +102,11 @@ Both ExitPlanMode and AskUserQuestion bars were affected (AskUserQuestion was re
 | Layer | Location | What it prevents |
 |-------|----------|------------------|
 | `exitPlanModeProcessed` flag | MessageHandler.ts `notifyPlanApprovalRequired` | Stale re-triggers from late events/replays |
-| Block ALL ExitPlanMode text to CLI | MessageHandler.ts `planApprovalResponse` | Spurious user messages even if bar somehow appears |
+| Block ExitPlanMode approve/reject text to CLI | MessageHandler.ts `planApprovalResponse` | Spurious user messages for approve actions |
+| ExitPlanMode feedback DOES send text to CLI | MessageHandler.ts `planApprovalResponse` | Feedback is real user content, not a loop risk |
 | InputArea sends regular message (not feedback) | InputArea.tsx `sendMessage` | Text typed during ExitPlanMode goes as new user message, not dropped |
-| Skip `processBusy:true` for ExitPlanMode | MessageHandler.ts `planApprovalResponse` | Stuck "Thinking..." indicator after plan approval |
+| Skip `processBusy:true` for ExitPlanMode approve | MessageHandler.ts `planApprovalResponse` | Stuck "Thinking..." indicator after plan approval |
+| Send `processBusy:true` for ExitPlanMode feedback | MessageHandler.ts `planApprovalResponse` | UI shows thinking while Claude processes feedback |
 | Delayed approve fallback (only if no resume observed) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | ExitPlanMode approve click becoming a no-op |
 
 The `messageStart` clearing was **removed** as a defense layer because it made the approval bar invisible.
@@ -150,17 +164,27 @@ else if (pendingApproval) {
 if (isExitPlanMode) {
   this.planModeActive = false;
   this.exitPlanModeProcessed = true;
-  // ALL actions: close bar without immediate text. CLI usually auto-approves.
-  // Approve actions schedule a delayed fallback nudge only if no resume/result appears.
-  if (msg.action === 'approveClearBypass') this.control.compact();
-  else if (msg.action === 'approveManual') { /* switch permission mode */ }
+
+  if (msg.action === 'feedback' && msg.feedback?.trim()) {
+    // Feedback: send to CLI so Claude can revise the plan.
+    // Reset exitPlanModeProcessed so new ExitPlanMode cycle can show bar.
+    this.exitPlanModeProcessed = false;
+    this.webview.postMessage({ type: 'userMessage', content: [...] }); // optimistic
+    this.control.sendText(msg.feedback.trim());
+  } else {
+    // Approve/reject: close bar without sending text (CLI auto-approves).
+    if (msg.action === 'approveClearBypass') this.control.compact();
+    else if (msg.action === 'approveManual') { /* switch permission mode */ }
+    // Approve actions schedule delayed fallback nudge if no resume observed.
+  }
 }
 // ... (non-ExitPlanMode branches send text to CLI) ...
 this.clearApprovalTracking();
 this.approvalResponseProcessed = true;
-// Only send processBusy:true immediately for non-ExitPlanMode.
-// ExitPlanMode fallback sends processBusy:true only when it actually sends a nudge.
-if (!isExitPlanMode) {
+// Send processBusy:true for non-ExitPlanMode and ExitPlanMode feedback.
+// Skip for ExitPlanMode approve (CLI already auto-resumed).
+const isExitPlanFeedback = isExitPlanMode && msg.action === 'feedback';
+if (!isExitPlanMode || isExitPlanFeedback) {
   this.webview.postMessage({ type: 'processBusy', busy: true });
 }
 ```
@@ -170,7 +194,7 @@ if (!isExitPlanMode) {
 ## Bar Lifecycle
 
 The approval bar is cleared when:
-1. **User clicks a button** -> PlanApprovalBar calls `setPendingApproval(null)` directly. For non-ExitPlanMode, extension immediately sends text + `processBusy:true`. For ExitPlanMode, extension closes the bar and waits briefly for auto-resume; if none is observed, it sends a single proceed nudge + `processBusy:true`.
+1. **User clicks a button** -> PlanApprovalBar calls `setPendingApproval(null)` directly. For non-ExitPlanMode, extension immediately sends text + `processBusy:true`. For ExitPlanMode approve, extension closes the bar and waits briefly for auto-resume; if none is observed, it sends a single proceed nudge + `processBusy:true`. For ExitPlanMode feedback, extension sends the feedback text to CLI + `processBusy:true`.
 2. **User sends a regular message** -> `sendMessage` -> `processBusy: true` -> bar cleared
 3. **New `planApprovalRequired` replaces it** (e.g., AskUserQuestion replaced by ExitPlanMode)
 4. **Session resets**

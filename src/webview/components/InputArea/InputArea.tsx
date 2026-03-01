@@ -101,6 +101,14 @@ export const InputArea: React.FC = () => {
     setEnhancerModel,
     setEnhancerPopoverOpen,
     setEnhanceComparisonData,
+    isTranslatingPrompt,
+    promptTranslateEnabled,
+    autoTranslateEnabled,
+    sendSettingsPopoverOpen,
+    setIsTranslatingPrompt,
+    setPromptTranslateEnabled,
+    setAutoTranslateEnabled,
+    setSendSettingsPopoverOpen,
   } = useAppStore();
   const fileMention = useFileMention(textareaRef);
 
@@ -120,6 +128,11 @@ export const InputArea: React.FC = () => {
   const enhanceElapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Track prompt length for dynamic progress message
   const enhancePromptLenRef = useRef(0);
+
+  // Ref: tracks when auto-translate should auto-send after translation completes
+  const autoSendAfterTranslateRef = useRef(false);
+  // Ref: client-side safety timeout to reset isTranslatingPrompt if result never arrives
+  const translateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Seed prompt history from existing user messages on mount (covers messages
   // sent before this feature was deployed or before a reload)
@@ -240,6 +253,30 @@ export const InputArea: React.FC = () => {
     });
   }, [enhanceComparisonData, undoMgr, setEnhanceComparisonData]);
 
+  /** Toggle the send settings popover */
+  const handleToggleSendSettings = useCallback(() => {
+    setSendSettingsPopoverOpen(!sendSettingsPopoverOpen);
+  }, [sendSettingsPopoverOpen, setSendSettingsPopoverOpen]);
+
+  /** Toggle prompt translation */
+  const handleTranslateToggle = useCallback(() => {
+    const newVal = !promptTranslateEnabled;
+    setPromptTranslateEnabled(newVal);
+    postToExtension({ type: 'setPromptTranslationEnabled', enabled: newVal } as any);
+    // If turning off translation, also turn off auto-translate
+    if (!newVal && autoTranslateEnabled) {
+      setAutoTranslateEnabled(false);
+      postToExtension({ type: 'setAutoTranslate', enabled: false } as any);
+    }
+  }, [promptTranslateEnabled, autoTranslateEnabled, setPromptTranslateEnabled, setAutoTranslateEnabled]);
+
+  /** Toggle auto-translate */
+  const handleAutoTranslateToggle = useCallback(() => {
+    const newVal = !autoTranslateEnabled;
+    setAutoTranslateEnabled(newVal);
+    postToExtension({ type: 'setAutoTranslate', enabled: newVal } as any);
+  }, [autoTranslateEnabled, setAutoTranslateEnabled]);
+
   /** Send the current message to Claude (allowed even while busy, to interrupt).
    *  When a plan approval bar is active, the text is sent as plan feedback
    *  so the CLI interprets it in the approval context. */
@@ -263,6 +300,21 @@ export const InputArea: React.FC = () => {
         enhanceTimeoutRef.current = null;
       }, 65_000);
       postToExtension({ type: 'enhancePrompt', text: trimmed } as any);
+      return;
+    }
+
+    // Translate: intercept send, translate first, then auto-send or show in input
+    if (promptTranslateEnabled && trimmed && !isTranslatingPrompt && pendingImages.length === 0 && !pendingApproval) {
+      setIsTranslatingPrompt(true);
+      autoSendAfterTranslateRef.current = autoTranslateEnabled;
+      // Safety timeout: reset isTranslatingPrompt if result never arrives (65s > backend 60s timeout)
+      if (translateTimeoutRef.current) clearTimeout(translateTimeoutRef.current);
+      translateTimeoutRef.current = setTimeout(() => {
+        setIsTranslatingPrompt(false);
+        autoSendAfterTranslateRef.current = false;
+        translateTimeoutRef.current = null;
+      }, 65_000);
+      postToExtension({ type: 'translatePrompt', text: trimmed } as any);
       return;
     }
 
@@ -305,7 +357,7 @@ export const InputArea: React.FC = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [text, pendingImages, isConnected, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer]);
+  }, [text, pendingImages, isConnected, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer, promptTranslateEnabled, autoTranslateEnabled, isTranslatingPrompt, setIsTranslatingPrompt]);
 
   /** Cancel the in-flight request */
   const cancelRequest = useCallback(() => {
@@ -754,11 +806,27 @@ export const InputArea: React.FC = () => {
         enhanceTimeoutRef.current = null;
       }
 
-      // If auto-enhance triggered this, send immediately (no comparison)
+      // If auto-enhance triggered this, check if we also need to translate
       if (autoSendAfterEnhanceRef.current) {
         autoSendAfterEnhanceRef.current = false;
+        const store = useAppStore.getState();
+
+        // Chain: enhance -> translate -> send (when both are enabled)
+        if (store.promptTranslateEnabled) {
+          setText(enhanced);
+          store.setIsTranslatingPrompt(true);
+          autoSendAfterTranslateRef.current = store.autoTranslateEnabled;
+          if (translateTimeoutRef.current) clearTimeout(translateTimeoutRef.current);
+          translateTimeoutRef.current = setTimeout(() => {
+            store.setIsTranslatingPrompt(false);
+            autoSendAfterTranslateRef.current = false;
+            translateTimeoutRef.current = null;
+          }, 65_000);
+          postToExtension({ type: 'translatePrompt', text: enhanced } as any);
+          return;
+        }
+
         setTimeout(() => {
-          const store = useAppStore.getState();
           store.addToPromptHistory(enhanced);
           store.markSessionPromptSent();
           postToExtension({ type: 'sendMessage', text: enhanced });
@@ -820,7 +888,81 @@ export const InputArea: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [enhancerPopoverOpen, setEnhancerPopoverOpen]);
 
-  /** Toggle the prompt history panel */
+  // Listen for prompt translation results
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const translated = (e as CustomEvent<string>).detail;
+
+      // Clear safety timeout since result arrived
+      if (translateTimeoutRef.current) {
+        clearTimeout(translateTimeoutRef.current);
+        translateTimeoutRef.current = null;
+      }
+
+      // If auto-send, send translated text directly
+      if (autoSendAfterTranslateRef.current) {
+        autoSendAfterTranslateRef.current = false;
+        setTimeout(() => {
+          const store = useAppStore.getState();
+          store.addToPromptHistory(translated);
+          store.markSessionPromptSent();
+          postToExtension({ type: 'sendMessage', text: translated });
+          setText('');
+          undoMgr.reset();
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+          }
+        }, 0);
+        return;
+      }
+
+      // Manual translate: place translated text in the input box for review
+      setText(translated);
+      undoMgr.push(translated, translated.length);
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (el) {
+          el.style.height = 'auto';
+          el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+          el.focus();
+        }
+      });
+    };
+    window.addEventListener('prompt-translated', handler);
+    return () => window.removeEventListener('prompt-translated', handler);
+  }, [undoMgr]);
+
+  // Listen for prompt translation failures
+  useEffect(() => {
+    const handler = () => {
+      // Clear safety timeout since result arrived (even if failure)
+      if (translateTimeoutRef.current) {
+        clearTimeout(translateTimeoutRef.current);
+        translateTimeoutRef.current = null;
+      }
+
+      // Auto-send was pending but translation failed -- send original text
+      if (autoSendAfterTranslateRef.current) {
+        autoSendAfterTranslateRef.current = false;
+        sendMessage();
+      }
+    };
+    window.addEventListener('prompt-translate-failed', handler);
+    return () => window.removeEventListener('prompt-translate-failed', handler);
+  }, [sendMessage]);
+
+  // Close send settings popover on outside click
+  useEffect(() => {
+    if (!sendSettingsPopoverOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.send-button-group')) {
+        setSendSettingsPopoverOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [sendSettingsPopoverOpen, setSendSettingsPopoverOpen]);
 
   // Auto-dismiss git push result toast after 5 seconds
   useEffect(() => {
@@ -958,7 +1100,7 @@ export const InputArea: React.FC = () => {
             <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
           </svg>
         </button>
-        <div className={`textarea-container${isEnhancing ? ' enhancing' : ''}`}>
+        <div className={`textarea-container${isEnhancing ? ' enhancing' : ''}${isTranslatingPrompt ? ' translating' : ''}`}>
           <textarea
             ref={textareaRef}
             className="input-textarea"
@@ -989,6 +1131,11 @@ export const InputArea: React.FC = () => {
                     ? `Enhancing... ${enhanceElapsed}s`
                     : 'Enhancing...'}
               </span>
+            </div>
+          )}
+          {isTranslatingPrompt && (
+            <div className="enhance-overlay">
+              <span className="enhance-overlay-text">Translating...</span>
             </div>
           )}
         </div>
@@ -1048,14 +1195,48 @@ export const InputArea: React.FC = () => {
               Cancel
             </button>
           )}
-          <button
-            className="send-button"
-            onClick={sendMessage}
-            disabled={(!text.trim() && pendingImages.length === 0) || !isConnected || isEnhancing || !!enhanceComparisonData}
-            data-tooltip="Send message (Ctrl+Enter)"
-          >
-            Send
-          </button>
+          <div className="send-button-group">
+            <button
+              className="send-button"
+              onClick={sendMessage}
+              disabled={(!text.trim() && pendingImages.length === 0) || !isConnected || isEnhancing || isTranslatingPrompt || !!enhanceComparisonData}
+              data-tooltip={promptTranslateEnabled && !autoTranslateEnabled ? 'Translate to English (Ctrl+Enter)' : 'Send message (Ctrl+Enter)'}
+            >
+              {promptTranslateEnabled && !autoTranslateEnabled ? 'Translate' : 'Send'}
+            </button>
+            <button
+              className="send-gear-button"
+              onClick={handleToggleSendSettings}
+              data-tooltip="Send settings"
+            >
+              {'\u2699'}
+            </button>
+            {sendSettingsPopoverOpen && (
+              <div className="send-settings-popover">
+                <div className="enhance-popover-row">
+                  <span className="enhance-popover-label">Translate to English</span>
+                  <button
+                    className={`enhance-toggle-btn ${promptTranslateEnabled ? 'on' : 'off'}`}
+                    onClick={handleTranslateToggle}
+                    data-tooltip={promptTranslateEnabled ? 'Disable translation' : 'Enable translation'}
+                  >
+                    <span className="enhance-toggle-knob" />
+                  </button>
+                </div>
+                <div className="enhance-popover-row">
+                  <span className="enhance-popover-label">Auto-send translated</span>
+                  <button
+                    className={`enhance-toggle-btn ${autoTranslateEnabled ? 'on' : 'off'}`}
+                    onClick={handleAutoTranslateToggle}
+                    disabled={!promptTranslateEnabled}
+                    data-tooltip={!promptTranslateEnabled ? 'Enable translation first' : autoTranslateEnabled ? 'Disable auto-send' : 'Enable auto-send'}
+                  >
+                    <span className="enhance-toggle-knob" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
