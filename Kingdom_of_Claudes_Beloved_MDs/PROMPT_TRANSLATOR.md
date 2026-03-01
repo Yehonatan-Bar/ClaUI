@@ -9,7 +9,7 @@ Babel Fish is a unified bi-directional translation feature that lets users work 
 | `src/webview/components/BabelFish/BabelFishPanel.tsx` | Settings panel: master toggle, language selector, info (!) button |
 | `src/extension/session/PromptTranslator.ts` | Backend: translates user prompts to English (outbound) |
 | `src/extension/session/MessageTranslator.ts` | Backend: translates assistant responses to target language (inbound) |
-| `src/extension/webview/MessageHandler.ts` | Routes all translation messages; auto-translates responses in `result` handler |
+| `src/extension/webview/MessageHandler.ts` | Routes all translation messages; auto-translates each assistant message (intermediate + final) |
 | `src/extension/session/SessionTab.ts` | Wires both translators into the per-tab MessageHandler |
 | `src/webview/components/StatusBar/StatusBar.tsx` | Renders "Babel Fish" button next to Vitals |
 | `src/webview/components/InputArea/InputArea.tsx` | Prompt translation intercept logic in `sendMessage()` |
@@ -32,14 +32,21 @@ User types in native language
 
 ### Inbound (English -> User Language)
 ```
-Claude responds in English
-  -> StreamDemux emits 'assistantMessage' (stored as lastAssistantContent)
-  -> StreamDemux emits 'result' (turn complete)
-  -> MessageHandler checks babelFishEnabled
-  -> Posts autoTranslateStarted to webview (shows "Translating..." indicator)
-  -> Calls MessageTranslator.translate(text, targetLang)
-  -> Posts translationResult to webview
-  -> Zustand auto-adds to showingTranslation set -> UI shows translated text
+Claude responds in English (each API call in the agentic loop)
+  -> StreamDemux emits 'assistantMessage' (with unique message.id per API call)
+  -> MessageHandler checks babelFishEnabled + dedup (babelFishTranslatedIds Set)
+  -> If not yet translated for this ID:
+     -> Adds message.id to dedup set
+     -> Strips code blocks from text content
+     -> Posts autoTranslateStarted to webview (shows "Translating..." indicator)
+     -> Calls MessageTranslator.translate(text, targetLang)
+     -> Posts translationResult to webview
+     -> Zustand auto-adds to showingTranslation set -> UI shows translated text
+  -> On 'result' event: dedup set is cleared for next turn
+
+This means ALL intermediate text blocks between tool calls are translated,
+not just the final response. Each API call in a multi-tool turn gets its
+own translation (e.g., "I'll help you...", "Let me search...", "Based on my analysis...").
 ```
 
 ## Babel Fish Toggle Behavior
@@ -105,7 +112,8 @@ Both PromptTranslator and MessageTranslator are hardcoded to `claude-sonnet-4-6`
 
 ## Important Notes
 
-- Auto-translation of responses triggers on the `result` event (not `assistantMessage`), because `assistantMessage` fires multiple times as intermediate snapshots mid-stream
+- Auto-translation triggers on each `assistantMessage` event (intermediate + final), with deduplication via `babelFishTranslatedIds` Set to prevent re-translating when `--include-partial-messages` fires duplicate events for the same message ID
+- The dedup set is cleared on the `result` event (end of turn), ready for the next turn
 - Code blocks (fenced ```) are stripped from the text before translation
 - MessageTranslator has a 30-second timeout; PromptTranslator has a 60-second timeout
 - Both translators use `buildClaudeCliEnv(apiKey)` from `envUtils.ts` for API key injection
