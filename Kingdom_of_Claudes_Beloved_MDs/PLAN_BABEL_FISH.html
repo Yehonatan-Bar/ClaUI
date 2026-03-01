@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>Babel Fish - Plan</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+    line-height: 1.8;
+  }
+  h1 {
+    color: #4fc3f7;
+    border-bottom: 2px solid #4fc3f7;
+    padding-bottom: 10px;
+  }
+  h2 {
+    color: #81d4fa;
+    margin-top: 30px;
+  }
+  .section {
+    background: #16213e;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    border-right: 4px solid #4fc3f7;
+  }
+  .highlight {
+    background: #0f3460;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin: 8px 0;
+    border-right: 3px solid #e94560;
+  }
+  ul { padding-right: 20px; }
+  li { margin-bottom: 8px; }
+  .status {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: bold;
+  }
+  .new { background: #2e7d32; color: white; }
+  .modify { background: #e65100; color: white; }
+  .flow-box {
+    background: #0d1b2a;
+    border: 1px solid #4fc3f7;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 12px 0;
+    text-align: center;
+    font-size: 15px;
+    direction: ltr;
+    font-family: monospace;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+  }
+  th, td {
+    padding: 10px;
+    border: 1px solid #333;
+    text-align: right;
+  }
+  th { background: #0f3460; color: #4fc3f7; }
+  td { background: #16213e; }
+</style>
+</head>
+<body>
+
+<h1>Babel Fish - תוכנית פיתוח</h1>
+
+<div class="section">
+<h2>מה זה?</h2>
+<p>
+פיצ'ר חדש בשם <strong>"Babel Fish"</strong> שמאפשר למשתמשים לעבוד בשפת האם שלהם,
+בעוד שהמערכת מתרגמת אוטומטית את כל ההודעות לאנגלית לפני שהן מגיעות ל-Claude,
+ומתרגמת את כל התשובות חזרה לשפת המשתמש.
+</p>
+<p>
+בפועל: המשתמש כותב בעברית, Claude מקבל אנגלית. Claude עונה באנגלית, המשתמש רואה עברית.
+</p>
+</div>
+
+<div class="section">
+<h2>מה קיים היום?</h2>
+<ul>
+<li><strong>תרגום הודעות יוצאות</strong> -- קיים, אבל מופעל בנפרד דרך כפתור הגדרות ליד כפתור "שלח"</li>
+<li><strong>תרגום תשובות נכנסות</strong> -- קיים, אבל ידני בלבד (צריך ללחוץ על כל הודעה בנפרד)</li>
+<li><strong>ההגדרות פזורות</strong> -- חלק ב-popover של כפתור שלח, חלק בפאנל Vitals</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>מה ישתנה?</h2>
+<ul>
+<li><strong>כפתור אחד מאוחד</strong> -- "Babel Fish" בסרגל התחתון, ליד כפתור Vitals</li>
+<li><strong>תרגום אוטומטי דו-כיווני</strong> -- הפעלה אחת מפעילה תרגום גם של הודעות יוצאות וגם של תשובות נכנסות</li>
+<li><strong>פאנל הגדרות חדש</strong> -- עם מתג הפעלה, בחירת שפה, ואייקון "!" שמסביר את הפיצ'ר</li>
+<li><strong>ניקוי</strong> -- הסרת הגדרות תרגום מהמקומות הישנים (popover של כפתור שלח ופאנל Vitals)</li>
+</ul>
+</div>
+
+<h2>איך זה עובד?</h2>
+
+<div class="flow-box">
+User writes in Hebrew<br>
+&darr;<br>
+Sonnet 4.6 translates to English<br>
+&darr;<br>
+Claude Code receives English<br>
+&darr;<br>
+Claude Code responds in English<br>
+&darr;<br>
+Sonnet 4.6 translates to Hebrew<br>
+&darr;<br>
+User sees Hebrew response
+</div>
+
+<div class="section">
+<h2>פאנל ההגדרות החדש</h2>
+<p>נפתח בלחיצה על כפתור "Babel Fish" בסרגל התחתון. כולל:</p>
+<ul>
+<li><strong>מתג הפעלה/כיבוי</strong> -- מפעיל או מכבה את כל מערך התרגום</li>
+<li><strong>בחירת שפה</strong> -- תפריט נפתח עם 10 שפות (עברית, ערבית, רוסית, ספרדית, צרפתית, גרמנית, פורטוגזית, סינית, יפנית, קוריאנית)</li>
+<li><strong>כפתור "!"</strong> -- בלחיצה מציג הסבר: "פיצ'ר זה מאפשר לך לעבוד בשפת האם שלך בעוד Claude Code מקבל ומגיב אך ורק באנגלית -- השפה הטבעית של Claude Code."</li>
+<li><strong>מצב נוכחי</strong> -- נקודה ירוקה/אפורה עם טקסט סטטוס</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>סיכום שינויים</h2>
+<table>
+<tr>
+<th>קובץ</th>
+<th>פעולה</th>
+<th>תיאור</th>
+</tr>
+<tr>
+<td>BabelFishPanel.tsx</td>
+<td><span class="status new">חדש</span></td>
+<td>רכיב פאנל ההגדרות החדש</td>
+</tr>
+<tr>
+<td>MessageHandler.ts</td>
+<td><span class="status modify">שינוי</span></td>
+<td>לוגיקת תרגום אוטומטית של תשובות (הלב של הפיצ'ר)</td>
+</tr>
+<tr>
+<td>StatusBar.tsx</td>
+<td><span class="status modify">שינוי</span></td>
+<td>הוספת כפתור Babel Fish לסרגל</td>
+</tr>
+<tr>
+<td>store.ts</td>
+<td><span class="status modify">שינוי</span></td>
+<td>מצב חדש לאחסון הגדרות Babel Fish</td>
+</tr>
+<tr>
+<td>InputArea.tsx</td>
+<td><span class="status modify">שינוי</span></td>
+<td>הסרת הגדרות תרגום ישנות מה-popover</td>
+</tr>
+<tr>
+<td>VitalsInfoPanel.tsx</td>
+<td><span class="status modify">שינוי</span></td>
+<td>הסרת בורר שפה (עבר לפאנל החדש)</td>
+</tr>
+<tr>
+<td>MessageBubble.tsx</td>
+<td><span class="status modify">שינוי</span></td>
+<td>הסתרת כפתור תרגום ידני כשהפיצ'ר פעיל</td>
+</tr>
+<tr>
+<td>+5 קבצי תמיכה</td>
+<td><span class="status modify">שינוי</span></td>
+<td>הגדרות, טיפוסים, סגנונות, טיפול בהודעות</td>
+</tr>
+</table>
+</div>
+
+<div class="section">
+<h2>נקודה חשובה</h2>
+<div class="highlight">
+<p>
+התרגום האוטומטי של תשובות מתבצע רק אחרי שהתשובה המלאה מגיעה (לא באמצע הזרמה).
+המשתמש רואה קודם את התשובה באנגלית, ואז מיד אחרי זה מופיע התרגום.
+ניתן לעבור בין המקור (אנגלית) לתרגום בלחיצה.
+</p>
+</div>
+</div>
+
+<div class="section">
+<h2>אימות</h2>
+<ul>
+<li>בנייה ופריסה מקומית</li>
+<li>בדיקה שכפתור Babel Fish מופיע ועובד</li>
+<li>בדיקה שהודעות מתורגמות אוטומטית בשני הכיוונים</li>
+<li>בדיקה שהמתג הישן הוסר מהמקומות הישנים</li>
+<li>בדיקה שאפשר לעבור בין מקור לתרגום</li>
+</ul>
+</div>
+
+</body>
+</html>

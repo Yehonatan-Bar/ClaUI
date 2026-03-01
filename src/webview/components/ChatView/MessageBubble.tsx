@@ -47,6 +47,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   const toggleTranslationView = useAppStore((s) => s.toggleTranslationView);
   const translationLanguage = useAppStore((s) => s.translationLanguage);
 
+  const babelFishEnabled = useAppStore((s) => s.babelFishEnabled);
   const isTranslating = translatingMessageIds.has(message.id);
   const hasTranslation = message.id in translations;
   const isShowingTranslation = showingTranslation.has(message.id);
@@ -209,11 +210,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
             Fork
           </button>
         )}
-        {!isUser && textContent && providerCapabilities.supportsTranslation && (
+        {!isUser && textContent && providerCapabilities.supportsTranslation && !babelFishEnabled && (
           <button
             className={`translate-message-btn${isShowingTranslation ? ' showing-translation' : ''}${isTranslating ? ' translating' : ''}`}
             onClick={handleTranslate}
             data-tooltip={isShowingTranslation ? 'Show original' : `Translate to ${translationLanguage}`}
+            disabled={isTranslating}
+          >
+            {isTranslating ? 'Translating...' : isShowingTranslation ? 'Original' : translationLanguage}
+          </button>
+        )}
+        {!isUser && babelFishEnabled && (hasTranslation || isTranslating) && (
+          <button
+            className={`translate-message-btn${isShowingTranslation ? ' showing-translation' : ''}${isTranslating ? ' translating' : ''}`}
+            onClick={() => toggleTranslationView(message.id)}
+            data-tooltip={isShowingTranslation ? 'Show original (English)' : `Show ${translationLanguage}`}
             disabled={isTranslating}
           >
             {isTranslating ? 'Translating...' : isShowingTranslation ? 'Original' : translationLanguage}

@@ -7,6 +7,7 @@ import { CodexReasoningEffortSelector } from '../ModelSelector/CodexReasoningEff
 import { ProviderSelector } from '../ProviderSelector/ProviderSelector';
 import { PermissionModeSelector } from '../PermissionModeSelector/PermissionModeSelector';
 import { VitalsInfoPanel } from '../Vitals/VitalsInfoPanel';
+import { BabelFishPanel } from '../BabelFish/BabelFishPanel';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { t as tAch } from '../Achievements/achievementI18n';
 import { useStatusBarCollapse } from '../../hooks/useStatusBarCollapse';
@@ -32,6 +33,8 @@ export const StatusBar: React.FC<{
   const [tickMs, setTickMs] = React.useState(() => Date.now());
   const [vitalsInfoOpen, setVitalsInfoOpen] = React.useState(false);
   const vitalsInfoRef = React.useRef<HTMLDivElement>(null);
+  const [babelFishOpen, setBabelFishOpen] = React.useState(false);
+  const babelFishRef = React.useRef<HTMLDivElement>(null);
   const [usagePopoverOpen, setUsagePopoverOpen] = React.useState(false);
   const [usageLoading, setUsageLoading] = React.useState(false);
   const usageRef = React.useRef<HTMLDivElement>(null);
@@ -67,6 +70,7 @@ export const StatusBar: React.FC<{
     usageStats,
     usageFetchedAt,
     usageError,
+    babelFishEnabled,
   } = useAppStore();
 
   const { barRef, isCollapsed } = useStatusBarCollapse();
@@ -89,6 +93,18 @@ export const StatusBar: React.FC<{
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [vitalsInfoOpen]);
+
+  // Close Babel Fish panel on outside click
+  useEffect(() => {
+    if (!babelFishOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (babelFishRef.current && !babelFishRef.current.contains(e.target as Node)) {
+        setBabelFishOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [babelFishOpen]);
 
   // Close usage popover on outside click
   useEffect(() => {
@@ -451,6 +467,16 @@ export const StatusBar: React.FC<{
               {usagePopover}
             </div>
           )}
+          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={babelFishRef}>
+            <button
+              className={`status-bar-vitals-btn ${babelFishEnabled ? 'active' : ''}`}
+              onClick={() => setBabelFishOpen((prev) => !prev)}
+              data-tooltip="Babel Fish translation settings"
+            >
+              Babel Fish
+            </button>
+            {babelFishOpen && <BabelFishPanel onClose={() => setBabelFishOpen(false)} />}
+          </div>
           <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={vitalsInfoRef}>
             <button
               className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
@@ -590,6 +616,16 @@ export const StatusBar: React.FC<{
           {usagePopover}
         </div>
       )}
+      <div className="status-bar-babelfish-wrapper" ref={babelFishRef}>
+        <button
+          className={`status-bar-vitals-btn ${babelFishEnabled ? 'active' : ''}`}
+          onClick={() => setBabelFishOpen((prev) => !prev)}
+          data-tooltip="Babel Fish translation settings"
+        >
+          Babel Fish
+        </button>
+        {babelFishOpen && <BabelFishPanel onClose={() => setBabelFishOpen(false)} />}
+      </div>
       <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
         <div className="status-bar-vitals-controls">
           <button

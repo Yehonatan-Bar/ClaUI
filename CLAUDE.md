@@ -114,3 +114,5 @@ A task is NOT complete until SR-PTD documentation exists.
 Update the existing SR-PTD document instead of creating a new one.
 
 ---
+ אם המשתמש שואל איך לפרסם עדכון או גרסה לתוסף התשובה היא שיש לשלוח את הפקודה:
+vsce publish patch

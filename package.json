@@ -342,6 +342,11 @@
           ],
           "description": "Model used for prompt enhancement"
         },
+        "claudeMirror.babelFish.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Babel Fish: auto-translate prompts to English and responses to your language"
+        },
         "claudeMirror.promptTranslator.enabled": {
           "type": "boolean",
           "default": false,
