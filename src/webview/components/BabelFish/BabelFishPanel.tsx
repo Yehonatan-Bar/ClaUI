@@ -45,9 +45,9 @@ export const BabelFishPanel: React.FC<BabelFishPanelProps> = ({ onClose }) => {
 
       {showInfo && (
         <div className="babel-fish-info-box">
-          This feature lets you work in your native language while
-          Claude Code exclusively receives and responds in English
-          -- Claude Code's native language.
+          This feature adds a translation layer between you and Claude Code.
+          Your prompts are translated to English before reaching Claude Code,
+          and Claude Code's responses are translated back to your language.
         </div>
       )}
 
