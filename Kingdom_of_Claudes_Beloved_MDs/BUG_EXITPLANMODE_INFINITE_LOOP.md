@@ -12,6 +12,7 @@ The plan approval bar (4 CLI-matching options) and AskUserQuestion interactive c
 **Date Seventh Fix**: 2026-03-01 (approve click no-op when CLI auto-resumed with brief text and went idle)
 **Date Eighth Fix**: 2026-03-02 (typed text bypasses exitPlanModeProcessed guard)
 **Date Ninth Fix**: 2026-03-02 (exitPlanModeProcessed not reset after context compaction)
+**Date Tenth Fix**: 2026-03-02 (stale suppression deadlock after post-approval execution)
 **Severity**: Critical (blocks plan mode workflow)
 **Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`, `src/webview/components/InputArea/InputArea.tsx`
 
@@ -161,6 +162,17 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 
 **Why the reset is safe**: The `compactPending` flag ensures the reset only happens on the FIRST `messageStart` after compaction, not immediately. Pre-compaction late events (which fire before `messageStart`) are still suppressed by `exitPlanModeProcessed = true`. The reset only takes effect when the CLI starts a new turn after compaction completes.
 
+### Tenth Bug (2026-03-02): Stale Suppression Deadlock After Post-Approval Execution
+
+**Cause**: After the user approved ExitPlanMode, the model could start real implementation work (e.g., `TodoWrite`, `Read`) and then call `ExitPlanMode` again. `notifyPlanApprovalRequired` always suppressed this because `exitPlanModeProcessed` was still `true`, assuming the call was stale. In this case it was not stale: the model had already progressed into execution and then re-entered plan mode. The suppression hid the approval bar and the model got stuck asking for approval with no UI action available.
+
+**Fix**:
+1. Added `postExitPlanNonPlanActivityObserved` to track concrete non-plan tool activity after ExitPlanMode was approved.
+2. When non-plan tool activity is observed (and no approval bar is currently pending), mark the cycle as having post-approval execution.
+3. In `notifyPlanApprovalRequired`, if `ExitPlanMode` arrives while `exitPlanModeProcessed=true` **and** post-approval execution was observed, treat it as a fresh cycle: reset the processed guard and show the approval bar instead of suppressing it.
+
+**Why this is safe**: Truly stale replays still have no post-approval non-plan activity and remain suppressed. Only sessions that demonstrably moved into execution can re-open an ExitPlanMode approval cycle.
+
 ---
 
 ## Current Defense Layers
@@ -179,6 +191,7 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 | Skip nudge when CLI actively working (resumeObserved only) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Spurious nudge while CLI is mid-implementation |
 | Neutral nudge text | MessageHandler.ts all fallback paths | Prevents model from associating nudge with plan approval |
 | `compactPending` -> reset `exitPlanModeProcessed` on messageStart | MessageHandler.ts `messageStart` handler | Stuck plan mode after context compaction (Bug 9 fix) |
+| `postExitPlanNonPlanActivityObserved` re-opens ExitPlanMode cycle after real execution | MessageHandler.ts `toolUseStart` + `notifyPlanApprovalRequired` | Deadlock where legitimate ExitPlanMode is suppressed as stale (Bug 10 fix) |
 
 The `messageStart` clearing was **removed** as a defense layer because it made the approval bar invisible.
 
@@ -195,7 +208,13 @@ private notifyPlanApprovalRequired(toolName: string): void {
 
   const norm = toolName.trim().toLowerCase();
   const isExitPlanMode = norm === 'exitplanmode' || norm.endsWith('.exitplanmode');
-  if (isExitPlanMode && this.exitPlanModeProcessed) return;
+  if (isExitPlanMode && this.exitPlanModeProcessed) {
+    if (this.postExitPlanNonPlanActivityObserved) {
+      this.resetExitPlanModeProcessed('post-approval non-plan activity detected');
+    } else {
+      return;
+    }
+  }
 
   this.log(`Plan approval required: tool=${toolName}`);
   this.pendingApprovalTool = toolName;
@@ -239,8 +258,7 @@ case 'sendMessage':
   if (this.pendingApprovalTool) {
     const pendingNorm = this.pendingApprovalTool.trim().toLowerCase();
     if (pendingNorm === 'exitplanmode' || pendingNorm.endsWith('.exitplanmode')) {
-      this.planModeActive = false;
-      this.exitPlanModeProcessed = true;
+      this.markExitPlanModeProcessed('user sent text while ExitPlanMode approval bar was active');
     }
   }
   this.cancelExitPlanApproveResumeFallback();
@@ -252,13 +270,12 @@ case 'sendMessage':
 
 ```typescript
 if (isExitPlanMode) {
-  this.planModeActive = false;
-  this.exitPlanModeProcessed = true;
+  this.markExitPlanModeProcessed(`planApprovalResponse:${msg.action}`);
 
   if (msg.action === 'feedback' && msg.feedback?.trim()) {
     // Feedback: send to CLI so Claude can revise the plan.
     // Reset exitPlanModeProcessed so new ExitPlanMode cycle can show bar.
-    this.exitPlanModeProcessed = false;
+    this.resetExitPlanModeProcessed('ExitPlanMode feedback requested plan revision');
     this.webview.postMessage({ type: 'userMessage', content: [...] }); // optimistic
     this.control.sendText(msg.feedback.trim());
   } else {

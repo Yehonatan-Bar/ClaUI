@@ -167,7 +167,7 @@ export function registerCommands(
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         vscode.window.showErrorMessage(
-          `Failed to start ${provider === 'codex' ? 'Codex' : 'Claude'} session: ${errorMessage}`
+          `Failed to start ${provider === 'codex' ? 'Codex' : provider === 'remote' ? 'Remote' : 'Claude'} session: ${errorMessage}`
         );
       }
     }),
@@ -251,7 +251,7 @@ export function registerCommands(
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err);
           vscode.window.showErrorMessage(
-            `Failed to resume ${provider === 'codex' ? 'Codex' : 'Claude'} session: ${errorMessage}`
+            `Failed to resume ${provider === 'codex' ? 'Codex' : provider === 'remote' ? 'Remote' : 'Claude'} session: ${errorMessage}`
           );
         }
       }
@@ -313,7 +313,7 @@ export function registerCommands(
 
       const items = sessions.map(s => ({
         label: s.name || `Session ${s.sessionId.slice(0, 8)}`,
-        description: `${s.provider === 'codex' ? 'Codex' : 'Claude'} | ${s.model || 'unknown'}  ${formatRelativeTime(s.lastActiveAt)}`,
+        description: `${s.provider === 'codex' ? 'Codex' : s.provider === 'remote' ? 'Remote' : 'Claude'} | ${s.model || 'unknown'}  ${formatRelativeTime(s.lastActiveAt)}`,
         detail: s.firstPrompt || undefined,
         sessionId: s.sessionId,
         provider: s.provider,
@@ -334,7 +334,7 @@ export function registerCommands(
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err);
           vscode.window.showErrorMessage(
-            `Failed to resume ${picked.provider === 'codex' ? 'Codex' : 'Claude'} session: ${errorMessage}`
+            `Failed to resume ${picked.provider === 'codex' ? 'Codex' : picked.provider === 'remote' ? 'Remote' : 'Claude'} session: ${errorMessage}`
           );
         }
       }

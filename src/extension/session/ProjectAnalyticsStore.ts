@@ -31,7 +31,7 @@ export class ProjectAnalyticsStore {
       }
       sessions.push({
         ...(candidate as SessionSummary),
-        provider: candidate.provider === 'codex' ? 'codex' : 'claude',
+        provider: candidate.provider === 'codex' ? 'codex' : candidate.provider === 'remote' ? 'remote' : 'claude',
       });
     }
     return sessions.sort(

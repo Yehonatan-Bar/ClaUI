@@ -5,7 +5,7 @@
 import type { ContentBlock } from './stream-json';
 
 export type TypingTheme = 'terminal-hacker' | 'retro' | 'zen' | 'neo-zen';
-export type ProviderId = 'claude' | 'codex';
+export type ProviderId = 'claude' | 'codex' | 'remote';
 export type CodexReasoningEffort = '' | 'low' | 'medium' | 'high' | 'xhigh';
 export interface CodexModelOption {
   label: string;

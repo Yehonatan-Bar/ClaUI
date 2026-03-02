@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>Happy Coder - Simplification Plan</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; background: #f8f9fa; color: #333; line-height: 1.7; }
+  h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+  h2 { color: #2980b9; margin-top: 30px; }
+  .context { background: #eaf2f8; padding: 15px 20px; border-radius: 8px; border-right: 4px solid #3498db; margin: 20px 0; }
+  .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+  .before { background: #fdedec; padding: 15px; border-radius: 8px; border-right: 4px solid #e74c3c; }
+  .after { background: #eafaf1; padding: 15px; border-radius: 8px; border-right: 4px solid #27ae60; }
+  .step { background: white; padding: 15px 20px; border-radius: 8px; margin: 10px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .step-number { display: inline-block; background: #3498db; color: white; width: 28px; height: 28px; border-radius: 50%; text-align: center; line-height: 28px; font-weight: bold; margin-left: 10px; }
+  .highlight { background: #fef9e7; padding: 10px 15px; border-radius: 6px; border-right: 3px solid #f39c12; margin: 15px 0; }
+  ul { padding-right: 20px; }
+  li { margin: 5px 0; }
+</style>
+</head>
+<body>
+
+<h1>Happy Coder - Simplification Plan</h1>
+
+<div class="context">
+<strong>Background:</strong>
+The Happy Coder integration was built with an overly complex approach -- a custom WebSocket client, cryptographic authentication module, and dedicated message handling system (6 new files, 2 new libraries). In practice, the Happy CLI is simply a wrapper around the existing Claude CLI -- it accepts the same commands and produces the same output. This means we can reuse 100% of the existing infrastructure.
+</div>
+
+<h2>Before / After</h2>
+
+<div class="before-after">
+  <div class="before">
+    <strong>Before (current state):</strong>
+    <ul>
+      <li>6 new custom files</li>
+      <li>2 new library dependencies</li>
+      <li>Custom WebSocket connection</li>
+      <li>Custom cryptographic authentication</li>
+      <li>Custom message translation layer</li>
+      <li>Limited features (no forking, no compacting, no images)</li>
+    </ul>
+  </div>
+  <div class="after">
+    <strong>After (planned):</strong>
+    <ul>
+      <li>0 new files</li>
+      <li>0 new dependencies</li>
+      <li>Reuses existing Claude infrastructure</li>
+      <li>Only change: which CLI to launch</li>
+      <li>Full feature support (everything Claude can do)</li>
+      <li>Authentication via terminal QR code</li>
+    </ul>
+  </div>
+</div>
+
+<h2>Implementation Steps</h2>
+
+<div class="step">
+  <span class="step-number">1</span>
+  <strong>Delete unused files</strong> -- Remove the 6 overengineered files and 2 library dependencies that are no longer needed.
+</div>
+
+<div class="step">
+  <span class="step-number">2</span>
+  <strong>Allow alternative CLI path</strong> -- Add a small change to the process manager allowing it to run <code>happy</code> instead of <code>claude</code>. A single configuration point.
+</div>
+
+<div class="step">
+  <span class="step-number">3</span>
+  <strong>Route "Happy" provider to regular sessions</strong> -- When the user selects "Happy" in the dropdown, create a regular session tab that uses the <code>happy</code> CLI. All existing features (streaming, tools, cost tracking, forking, etc.) work automatically.
+</div>
+
+<div class="step">
+  <span class="step-number">4</span>
+  <strong>Add authentication command</strong> -- New command "ClaUi: Authenticate Happy Coder" opens a terminal where the user can scan a QR code for initial authentication.
+</div>
+
+<div class="step">
+  <span class="step-number">5</span>
+  <strong>Update UI labels</strong> -- Rename "Remote" to "Happy" in the provider dropdown and all display text.
+</div>
+
+<div class="step">
+  <span class="step-number">6</span>
+  <strong>Update settings</strong> -- Remove old unused settings (server URL, reconnect, keepalive). Add one new setting for the Happy CLI path.
+</div>
+
+<div class="step">
+  <span class="step-number">7</span>
+  <strong>Build, deploy, test</strong> -- Verify everything compiles, install the extension, and test the flow.
+</div>
+
+<div class="highlight">
+<strong>Key insight:</strong> Since the Happy CLI wraps Claude CLI and produces identical output, the entire existing chat system, streaming, tool handling, cost tracking, session history, and forking all work automatically. No need to rebuild any of it.
+</div>
+
+<h2>User Experience</h2>
+
+<ol>
+  <li>User selects "Happy" in the provider dropdown</li>
+  <li>Clicks "Start Session" (or it auto-starts)</li>
+  <li>If first time: shown a message to run "ClaUi: Authenticate Happy Coder" from the command palette</li>
+  <li>Terminal opens with QR code for scanning</li>
+  <li>After scanning: authentication is saved permanently</li>
+  <li>Session starts and works exactly like a regular Claude session, but connected to Happy Coder</li>
+</ol>
+
+</body>
+</html>

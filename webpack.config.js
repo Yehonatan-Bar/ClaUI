@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 const path = require('path');
+const webpack = require('webpack');
 
 /** @type {import('webpack').Configuration[]} */
 module.exports = [
@@ -17,6 +18,12 @@ module.exports = [
     externals: {
       vscode: 'commonjs vscode',
     },
+    plugins: [
+      // Suppress optional native addon warnings from ws (used by socket.io-client).
+      // These are performance-only and not needed in the VS Code extension context.
+      new webpack.IgnorePlugin({ resourceRegExp: /^bufferutil$/ }),
+      new webpack.IgnorePlugin({ resourceRegExp: /^utf-8-validate$/ }),
+    ],
     resolve: {
       extensions: ['.ts', '.js'],
     },

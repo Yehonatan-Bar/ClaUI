@@ -101,6 +101,8 @@ export class CodexMessageHandler {
   private bugReportService: BugReportService | null = null;
   private extensionVersion = '0.0.0';
   private logDir = '';
+  /** Dedup: last userMessage text posted to webview, with timestamp. */
+  private lastPostedUserMsg: { text: string; time: number } | null = null;
 
   /** Set extension metadata for bug reports */
   setExtensionMeta(version: string, logDir: string): void {
@@ -164,6 +166,21 @@ export class CodexMessageHandler {
           this.log(`Failed to post Codex webview message (${msg.type}): ${this.errMsg(err)}`);
         }
       });
+  }
+
+  /** Post a userMessage with dedup (same pattern as MessageHandler). */
+  private postUserMessage(content: ContentBlock[]): void {
+    const text = content
+      .filter((b) => b.type === 'text')
+      .map((b) => (b as any).text || '')
+      .join('');
+    const now = Date.now();
+    if (this.lastPostedUserMsg && this.lastPostedUserMsg.text === text && now - this.lastPostedUserMsg.time < 2000) {
+      this.log(`Suppressed duplicate userMessage: "${text.slice(0, 60)}..."`);
+      return;
+    }
+    this.lastPostedUserMsg = { text, time: now };
+    this.postToWebview({ type: 'userMessage', content });
   }
 
   initialize(): void {
@@ -233,10 +250,7 @@ export class CodexMessageHandler {
           this.log(`Codex sendMessage requested: len=${msg.text.length} preview="${msg.text.slice(0, 80).replace(/\s+/g, ' ')}"`);
           this.achievementService.onUserPrompt(this.tabId, msg.text);
           void this.promptHistoryStore.addPrompt(msg.text);
-          this.postToWebview({
-            type: 'userMessage',
-            content: [{ type: 'text', text: msg.text } as ContentBlock],
-          });
+          this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock]);
           this.postToWebview({ type: 'processBusy', busy: true });
           void this.session.sendText(msg.text).catch((err) => {
             this.log(`Codex sendText failed: ${this.errMsg(err)}`);
@@ -265,7 +279,7 @@ export class CodexMessageHandler {
               },
             });
           }
-          this.postToWebview({ type: 'userMessage', content });
+          this.postUserMessage(content);
           this.postToWebview({ type: 'processBusy', busy: true });
           void this.session.sendWithImages(msg.text, msg.images).catch((err) => {
             this.log(`Codex sendWithImages failed: ${this.errMsg(err)}`);
