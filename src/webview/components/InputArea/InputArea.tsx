@@ -129,6 +129,11 @@ export const InputArea: React.FC = () => {
   // Track prompt length for dynamic progress message
   const enhancePromptLenRef = useRef(0);
 
+  // Ref: guard against key-repeat / double-fire sending the same message twice.
+  // React's setText('') is async, so rapid keydown events can re-enter sendMessage
+  // before the state update takes effect.
+  const lastSentRef = useRef<{ text: string; time: number } | null>(null);
+
   // Ref: tracks when auto-translate should auto-send after translation completes
   const autoSendAfterTranslateRef = useRef(false);
   // Ref: client-side safety timeout to reset isTranslatingPrompt if result never arrives
@@ -283,6 +288,14 @@ export const InputArea: React.FC = () => {
   const sendMessage = useCallback(() => {
     const trimmed = text.trim();
     if ((!trimmed && pendingImages.length === 0) || !isConnected) return;
+
+    // Guard: block identical text sent within 500ms (key-repeat / double-fire).
+    // setText('') is async so rapid keydown events re-enter with stale text.
+    const now = Date.now();
+    if (lastSentRef.current && lastSentRef.current.text === trimmed && now - lastSentRef.current.time < 500) {
+      return;
+    }
+    lastSentRef.current = { text: trimmed, time: now };
 
     // Auto-enhance: intercept send, enhance first, then auto-send
     if (providerCapabilities.supportsPromptEnhancer && autoEnhanceEnabled && trimmed && !isEnhancing && pendingImages.length === 0 && !pendingApproval) {
