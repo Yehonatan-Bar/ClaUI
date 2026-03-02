@@ -118,6 +118,10 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       this.projectAnalyticsStore
     );
     this.messageHandler.setSecrets(context.secrets);
+    this.messageHandler.setExtensionMeta(
+      String((context.extension.packageJSON as { version?: unknown } | undefined)?.version ?? '0.0.0'),
+      logDir || '',
+    );
 
     if (logDir) {
       this.fileLogger = new FileLogger(logDir, `codex-session-${tabNumber}`);
