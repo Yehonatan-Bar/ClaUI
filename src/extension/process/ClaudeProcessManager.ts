@@ -9,6 +9,7 @@ export interface ProcessStartOptions {
   fork?: boolean;
   cwd?: string;
   model?: string;
+  cliPathOverride?: string;
   permissionMode?: 'full-access' | 'supervised';
   /** When true, omit --replay-user-messages so a resumed session does not
    *  re-emit old messages to the webview (used by edit-and-resend). */
@@ -53,7 +54,7 @@ export class ClaudeProcessManager extends EventEmitter {
     }
 
     const config = vscode.workspace.getConfiguration('claudeMirror');
-    const cliPath = config.get<string>('cliPath', 'claude');
+    const cliPath = options?.cliPathOverride || config.get<string>('cliPath', 'claude');
 
     const permissionMode = options?.permissionMode ||
       config.get<string>('permissionMode', 'full-access');

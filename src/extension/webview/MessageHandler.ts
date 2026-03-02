@@ -53,6 +53,10 @@ export interface WebviewBridge {
   switchModel?(model: string): Promise<void>;
   /** Save project analytics immediately (called before session clear/reset to avoid data loss) */
   saveProjectAnalyticsNow?(): void;
+  /** Optional per-tab CLI override (e.g. Happy provider uses `happy` instead of `claude`) */
+  getCliPathOverride?(): string | null;
+  /** Provider currently routed by this tab */
+  getProvider?(): ProviderId;
 }
 
 /**
@@ -370,6 +374,14 @@ export class MessageHandler {
     return `"${value.replace(/"/g, '\\"')}"`;
   }
 
+  private getActiveProvider(): ProviderId {
+    return this.webview.getProvider?.() ?? 'claude';
+  }
+
+  private getCliPathOverride(): string | undefined {
+    return this.webview.getCliPathOverride?.() ?? undefined;
+  }
+
   private async sendClaudeAuthStatus(): Promise<void> {
     const fallback = { loggedIn: false, email: '', subscriptionType: '' };
     if (!this.authManager) {
@@ -535,12 +547,15 @@ export class MessageHandler {
               type: 'sessionStarted',
               sessionId: this.processManager.currentSessionId || 'active',
               model: 'connected',
-              provider: 'claude',
+              provider: this.getActiveProvider(),
             });
             break;
           }
           this.processManager
-            .start({ cwd: msg.workspacePath })
+            .start({
+              cwd: msg.workspacePath,
+              cliPathOverride: this.getCliPathOverride(),
+            })
             .then(() => {
               this.achievementService.onSessionStart(this.tabId);
               this.log('Process started from webview button');
@@ -548,7 +563,7 @@ export class MessageHandler {
                 type: 'sessionStarted',
                 sessionId: this.processManager.currentSessionId || 'pending',
                 model: 'connecting...',
-                provider: 'claude',
+                provider: this.getActiveProvider(),
               });
             })
             .catch((err) => {
@@ -572,7 +587,10 @@ export class MessageHandler {
           this.firstMessageSent = false;
           this.achievementService.onSessionEnd(this.tabId);
           this.processManager
-            .start({ resume: msg.sessionId })
+            .start({
+              resume: msg.sessionId,
+              cliPathOverride: this.getCliPathOverride(),
+            })
             .then(() => {
               this.achievementService.onSessionStart(this.tabId);
             })
@@ -588,7 +606,11 @@ export class MessageHandler {
           this.firstMessageSent = false;
           this.achievementService.onSessionEnd(this.tabId);
           this.processManager
-            .start({ resume: msg.sessionId, fork: true })
+            .start({
+              resume: msg.sessionId,
+              fork: true,
+              cliPathOverride: this.getCliPathOverride(),
+            })
             .then(() => {
               this.achievementService.onSessionStart(this.tabId);
             })
@@ -619,7 +641,10 @@ export class MessageHandler {
           this.achievementService.onSessionEnd(this.tabId);
           this.processManager.stop();
           this.processManager
-            .start({ cwd: msg.workspacePath })
+            .start({
+              cwd: msg.workspacePath,
+              cliPathOverride: this.getCliPathOverride(),
+            })
             .then(() => {
               this.achievementService.onSessionStart(this.tabId);
               this.log('Process restarted after clear');
@@ -627,7 +652,7 @@ export class MessageHandler {
                 type: 'sessionStarted',
                 sessionId: this.processManager.currentSessionId || 'pending',
                 model: 'connecting...',
-                provider: 'claude',
+                provider: this.getActiveProvider(),
               });
             })
             .catch((err) => {
@@ -1173,8 +1198,12 @@ export class MessageHandler {
             this.processManager.stop();
             this.processManager
               .start(sessionToResume
-                ? { resume: sessionToResume, skipReplay: true }
-                : undefined)
+                ? {
+                  resume: sessionToResume,
+                  skipReplay: true,
+                  cliPathOverride: this.getCliPathOverride(),
+                }
+                : { cliPathOverride: this.getCliPathOverride() })
               .then(() => {
                 this.achievementService.onSessionStart(this.tabId);
                 this.log('Session resumed for edit-and-resend');
@@ -1182,7 +1211,7 @@ export class MessageHandler {
                   type: 'sessionStarted',
                   sessionId: this.processManager.currentSessionId || 'pending',
                   model: 'connecting...',
-                  provider: 'claude',
+                  provider: this.getActiveProvider(),
                 });
                 // Send the edited message immediately - don't wait for system/init.
                 // The CLI in pipe mode only emits init AFTER receiving the first message,
@@ -1624,7 +1653,7 @@ export class MessageHandler {
               type: 'sessionStarted',
               sessionId: this.processManager.currentSessionId,
               model: 'unknown',
-              provider: 'claude',
+              provider: this.getActiveProvider(),
             });
           }
           break;
@@ -2193,7 +2222,7 @@ export class MessageHandler {
           type: 'sessionStarted',
           sessionId: event.session_id,
           model: event.model,
-          provider: 'claude',
+          provider: this.getActiveProvider(),
         });
         // Send session metadata for Context Inspector tab
         const mcpNames = Array.isArray(event.mcp_servers)

@@ -56,15 +56,9 @@ claude-code-mirror/
 |   |   |   +-- envUtils.ts               #   Shared env sanitization & API key management
 |   |   |   +-- StreamDemux.ts            #   Parses JSON lines, routes events
 |   |   |   +-- ControlProtocol.ts        #   Higher-level command API
-|   |   +-- remote/
-|   |   |   +-- HappyTypes.ts             #   Happy Coder protocol type definitions
-|   |   |   +-- HappyCrypto.ts            #   E2E encryption (ed25519 + AES-256-GCM)
-|   |   |   +-- HappyClient.ts            #   Socket.IO client, auth, reconnection
-|   |   |   +-- RemoteDemux.ts            #   Translates Happy envelopes to internal events
 |   |   +-- webview/
 |   |   |   +-- WebviewProvider.ts        #   buildWebviewHtml() utility + legacy class
 |   |   |   +-- MessageHandler.ts         #   postMessage bridge (uses WebviewBridge interface)
-|   |   |   +-- RemoteMessageHandler.ts   #   Remote-session webview bridge
 |   |   +-- session/
 |   |   |   +-- SessionTab.ts             #   Per-tab bundle (process+demux+panel+handler)
 |   |   |   +-- TabManager.ts             #   Manages all tabs, tracks active tab
@@ -84,7 +78,6 @@ claude-code-mirror/
 |   |   |   +-- TokenUsageRatioTracker.ts #   Correlates token consumption with usage % (global, persisted)
 |   |   |   +-- SessionDiscovery.ts       #   Discover all Claude sessions from ~/.claude/projects/ filesystem
 |   |   |   +-- SessionFork.ts            #   Phase 3 stub (rewind)
-|   |   |   +-- RemoteSessionTab.ts      #   Per-tab bundle for Remote provider (Happy Coder relay)
 |   |   +-- terminal/                     #   Phase 2 stubs
 |   |   +-- feedback/
 |   |   |   +-- FormspreeService.ts      #   Formspree.io feedback submission (text + file attachments)
@@ -249,7 +242,7 @@ claude-code-mirror/
 
 ## Component Index
 
-**SessionTab** - Bundles all per-tab resources (process, demux, control, message handler, webview panel) and wires them together. Each tab is fully independent with its own CLI process. Generates a colored SVG icon for the VS Code tab bar and supports tab renaming via a hover button. Detects when the Claude CLI is not installed (via stderr pattern matching) and sends a specific "Claude CLI not found" error to the webview, which displays an informative setup banner with install instructions instead of a generic crash message.
+**SessionTab** - Bundles all per-tab resources (process, demux, control, message handler, webview panel) and wires them together. Each tab is fully independent with its own CLI process. Generates a colored SVG icon for the VS Code tab bar and supports tab renaming via a hover button. Supports per-tab CLI override (`cliPathOverride`) so Happy provider sessions can reuse the same pipeline while spawning `happy` instead of `claude`. Exposes `getCliPathOverride()` and `getProvider()` via `WebviewBridge`, stamps `sessionStarted` with the active provider, and persists provider-aware metadata/analytics (`claude` vs `remote`). Detects missing CLI binaries and Happy auth-required stderr patterns, suppresses known non-fatal CLI stderr notices (for example `Using Claude Code v... from npm`), and sends targeted guidance to the webview instead of generic noise.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **TabManager** - Manages all SessionTab instances. Tracks the active (focused) tab, provides create/close/closeAll methods, shares a single status bar item, assigns distinct colors from an 8-color palette, and groups tabs in the same editor column.
@@ -273,7 +266,7 @@ claude-code-mirror/
 **WebviewProvider / buildWebviewHtml** - `buildWebviewHtml()` is an exported utility that generates CSP-safe HTML for webview panels. WebviewProvider class is retained for backward compatibility. SessionTab uses `buildWebviewHtml()` directly.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**MessageHandler** - Bidirectional bridge translating webview postMessages into CLI commands and StreamDemux events into webview messages. Accepts a `WebviewBridge` interface (implemented by SessionTab). Triggers auto-naming on first user message. Detects plan approval pauses (ExitPlanMode/AskUserQuestion) and forwards approval responses.
+**MessageHandler** - Bidirectional bridge translating webview postMessages into CLI commands and StreamDemux events into webview messages. Accepts a `WebviewBridge` interface (implemented by SessionTab). Uses optional bridge hooks (`getCliPathOverride`, `getProvider`) so webview-triggered start/restart flows keep the tab's runtime routing (including Happy CLI override) and report the correct provider in `sessionStarted`. Triggers auto-naming on first user message. Detects plan approval pauses (ExitPlanMode/AskUserQuestion) and forwards approval responses.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **CodexMessageHandler** - Codex-specific webview/runtime bridge for `codex exec --json` sessions. Maps `CodexExecDemux` events into existing webview message types (including synthesized `messageStart`/`streamingText`/`messageStop` around complete Codex `agent_message` items), handles Codex settings/history/image sends, and serializes live turn message emission order. Additional hardening exists in the Codex tab and webview layers: `CodexSessionTab` now serializes actual `panel.webview.postMessage(...)` deliveries by awaiting the VS Code Thenable in a FIFO queue, and `useClaudeStream` applies a Codex-only fallback that immediately upserts complete `assistantMessage` payloads so replies remain visible even if finalize/clear events arrive out of order.
@@ -400,7 +393,7 @@ claude-code-mirror/
 **Agent Teams** -- Visualization and flow control for Claude Code's experimental Agent Teams feature. Auto-detects team creation/deletion from CLI stream (`TeamCreate`/`TeamDelete` tool_use blocks). Watches `~/.claude/teams/{name}/` and `~/.claude/tasks/{name}/` directories for live state updates (config, tasks, inbox messages) via `TeamWatcher` (EventEmitter, 100ms debounce, 2s polling fallback). Full-screen overlay panel with 4 tabs: Topology (agent cards with status dots and pulse animation), Tasks (kanban board with inline add), Messages (chronological feed with inline send), Activity (per-agent status with shutdown). Draggable floating widget shows team name, agent counts, and task progress bar. User actions (send message, create/update task, shutdown agent) write directly to team files on disk via `TeamActions`. Backend: `TeamDetector`, `TeamWatcher`, `TeamActions`, `TeamTypes`. Frontend: `TeamPanel`, `TeamStatusWidget`, `TopologyTab`, `TasksTab`, `MessagesTab`, `ActivityTab`. Keybinding: `Ctrl+Alt+T`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/AGENT_TEAMS.md`
 
-**Remote Sessions** -- Third provider type (`'remote'`) connecting ClaUi to a Happy Coder relay server via Socket.IO WebSocket. Enables monitoring and interacting with remote AI coding sessions from any machine. Architecture: `HappyClient` (Socket.IO + auth + reconnection), `HappyCrypto` (ed25519 keypair + AES-256-GCM encryption via VS Code SecretStorage), `RemoteDemux` (translates Happy envelopes to internal events), `RemoteMessageHandler` (webview bridge with `REMOTE_PROVIDER_CAPABILITIES`), `RemoteSessionTab` (orchestrator implementing `WebviewBridge` + `RemoteSessionController`). Settings: `claudeMirror.remote.serverUrl`, `claudeMirror.remote.autoReconnect`, `claudeMirror.remote.keepAliveIntervalMs`.
+**Happy Provider (remote)** -- The internal provider id remains `'remote'`, but implementation now reuses the standard `SessionTab` + `ClaudeProcessManager` pipeline and only swaps the executable path to Happy CLI via `ProcessStartOptions.cliPathOverride`. `TabManager.createRemoteTab()` creates a regular `SessionTab` and sets `claudeMirror.happy.cliPath` (default `happy`). Both command-driven and webview-driven start/restart paths honor this override. Auth flow is handled by spawning `happy auth` via command `claudeMirror.authenticateHappy`, and `SessionTab` detects auth-required stderr patterns to show targeted guidance.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/REMOTE_SESSIONS.md`
 
 ---
@@ -410,6 +403,7 @@ claude-code-mirror/
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `claudeMirror.cliPath` | `"claude"` | Path to Claude CLI executable |
+| `claudeMirror.happy.cliPath` | `"happy"` | Path to the Happy Coder CLI executable (used by provider `'remote'`) |
 | `claudeMirror.useCtrlEnterToSend` | `true` | Ctrl+Enter sends, Enter adds newline |
 | `claudeMirror.autoRestart` | `true` | Auto-restart process on crash |
 | `claudeMirror.chatFontSize` | `14` | Font size (px) for chat messages (10-32) |
@@ -454,9 +448,6 @@ claude-code-mirror/
 | `claudeMirror.teams.enabled` | `true` | Enable Agent Teams detection and visualization |
 | `claudeMirror.teams.autoOpenPanel` | `true` | Auto-open team panel when a team is detected |
 | `claudeMirror.teams.pollIntervalMs` | `2000` | Polling interval for team file watching (ms) |
-| `claudeMirror.remote.serverUrl` | `""` | URL of the Happy Coder relay server |
-| `claudeMirror.remote.autoReconnect` | `true` | Auto-reconnect on disconnection |
-| `claudeMirror.remote.keepAliveIntervalMs` | `30000` | Keepalive heartbeat interval (ms) |
 
 ---
 
@@ -473,8 +464,6 @@ claude-code-mirror/
 | webpack 5 | Bundling (dual-target) |
 | ts-loader | TypeScript compilation in webpack |
 | css-loader + style-loader | CSS bundling for webview |
-| socket.io-client | Socket.IO client for Happy Coder relay (Remote provider) |
-| tweetnacl | Ed25519 keypair + NaCl crypto for Remote auth |
 
 ---
 

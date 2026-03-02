@@ -1,6 +1,6 @@
 # ClaUi - Changelog
 
-## v0.1.68 - 2026-03-02
+## v0.1.69 - 2026-03-02
 
 **Bug Fix: Plan mode stuck after context compaction**
 

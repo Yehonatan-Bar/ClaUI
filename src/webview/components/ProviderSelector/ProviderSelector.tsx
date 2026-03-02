@@ -6,12 +6,12 @@ import type { ProviderId } from '../../../extension/types/webview-messages';
 const PROVIDER_OPTIONS: Array<{ label: string; value: ProviderId }> = [
   { label: 'Claude', value: 'claude' },
   { label: 'Codex', value: 'codex' },
-  { label: 'Remote', value: 'remote' },
+  { label: 'Happy', value: 'remote' },
 ];
 
 function providerLabel(provider: ProviderId | null): string {
   if (provider === 'codex') { return 'Codex'; }
-  if (provider === 'remote') { return 'Remote'; }
+  if (provider === 'remote') { return 'Happy'; }
   return 'Claude';
 }
 
