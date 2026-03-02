@@ -837,23 +837,31 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    // Deduplicate: if the last message is a recent user message with the same
-    // text, skip adding it (handles CLI echo after edit-and-resend which
-    // already added the message directly). The 5-second window avoids
-    // suppressing legitimate repeated messages (e.g., sending "yes" twice).
+    // Deduplicate: search recent messages (not just the last one) for a user
+    // message with matching text.  The optimistic display adds the user message
+    // immediately, but the CLI echo can arrive *after* assistant events
+    // (messageStart, textDelta, messageStop) have already been appended,
+    // so checking only the very last message is insufficient.
+    // The 15-second window is generous enough to cover slow CLI echoes while
+    // still allowing legitimate repeated messages sent minutes apart.
+    const DEDUP_WINDOW_MS = 15_000;
     const state = get();
-    const lastMsg = state.messages[state.messages.length - 1];
-    if (lastMsg?.role === 'user' && Date.now() - lastMsg.timestamp < 5000) {
-      const newText = userVisibleContent
+    const now = Date.now();
+    const newText = userVisibleContent
+      .filter((b) => b.type === 'text')
+      .map((b) => b.text || '')
+      .join('');
+
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+      const msg = state.messages[i];
+      if (now - msg.timestamp >= DEDUP_WINDOW_MS) break;
+      if (msg.role !== 'user') continue;
+      const existingText = msg.content
         .filter((b) => b.type === 'text')
         .map((b) => b.text || '')
         .join('');
-      const lastText = lastMsg.content
-        .filter((b) => b.type === 'text')
-        .map((b) => b.text || '')
-        .join('');
-      if (newText === lastText) {
-        return;
+      if (newText === existingText) {
+        return; // duplicate — suppress
       }
     }
 

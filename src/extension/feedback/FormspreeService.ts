@@ -90,6 +90,33 @@ export class FormspreeService {
     return this.postForm(this.buildFormBody(payload));
   }
 
+  /**
+   * Submit multiple payloads sequentially with a delay between each.
+   * Used when a large report is split into smaller parts that each fit
+   * within Formspree's size limit.
+   */
+  async submitChunked(
+    parts: FeedbackPayload[],
+    delayMs = 1500,
+  ): Promise<FeedbackResult> {
+    for (let i = 0; i < parts.length; i++) {
+      this.log(`[Feedback] Sending part ${i + 1}/${parts.length}`);
+      const result = await this.submit(parts[i]);
+      if (!result.ok) {
+        return {
+          ok: false,
+          error: `Part ${i + 1}/${parts.length} failed: ${result.error}`,
+        };
+      }
+      // Delay between parts to avoid rate limiting (skip after last)
+      if (i < parts.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+    this.log(`[Feedback] All ${parts.length} parts sent successfully`);
+    return { ok: true };
+  }
+
   // -----------------------------------------------------------------------
   // Private helpers
   // -----------------------------------------------------------------------

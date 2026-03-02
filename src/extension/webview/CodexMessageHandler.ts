@@ -1140,6 +1140,14 @@ export class CodexMessageHandler {
       if (!version) {
         continue;
       }
+      // Extension-bundled binaries may pass --version but fail on exec (e.g. missing
+      // internal resources). Run a quick exec-mode smoke test to filter them out.
+      if (candidate.source === 'official-extension-bundled') {
+        const execOk = await this.probeCodexCliExecCapability(candidate.path);
+        if (!execOk) {
+          continue;
+        }
+      }
       verified.push({ ...candidate, version });
     }
     // De-dupe by path while preserving order.
@@ -1279,6 +1287,32 @@ export class CodexMessageHandler {
     }
     const line = result.stdout.split(/\r?\n/).find((s) => s.trim())?.trim();
     return line || 'codex-cli';
+  }
+
+  /**
+   * Quick smoke test: spawn `codex exec --help` (or a minimal exec invocation) and check
+   * that it doesn't immediately fail with "The system cannot find the path specified" or
+   * similar OS-level errors that indicate the binary can't actually run exec mode.
+   */
+  private async probeCodexCliExecCapability(cliPath: string): Promise<boolean> {
+    const quoted = this.quoteForShell(cliPath);
+    // `codex exec --help` is lightweight and should return quickly if exec mode is functional.
+    // If the binary lacks internal resources, it will fail with an OS-level path error.
+    const result = await this.execShellCommand(`${quoted} exec --help`, 10000);
+    if (result.ok) {
+      return true;
+    }
+    const combined = `${result.stderr} ${result.stdout}`.toLowerCase();
+    // These OS-level errors indicate the binary is fundamentally broken for exec mode.
+    const fatalPatterns = [
+      /the system cannot find the (path|file) specified/i,
+      /\bno such file or directory\b/i,
+    ];
+    if (fatalPatterns.some((p) => p.test(combined))) {
+      return false;
+    }
+    // Other failures (e.g. auth errors, usage errors) mean the binary CAN run exec.
+    return true;
   }
 
   private pickPreferredCodexCliCandidate(candidates: CodexCliCandidate[]): CodexCliCandidate {
