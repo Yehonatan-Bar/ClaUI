@@ -10,6 +10,7 @@ The plan approval bar (4 CLI-matching options) and AskUserQuestion interactive c
 **Date Fourth Fix**: 2026-02-25 (stuck Thinking after plan approval)
 **Date Fifth Fix**: 2026-02-26 (approve click can be no-op if CLI did not auto-resume)
 **Date Seventh Fix**: 2026-03-01 (approve click no-op when CLI auto-resumed with brief text and went idle)
+**Date Eighth Fix**: 2026-03-02 (typed text bypasses exitPlanModeProcessed guard)
 **Severity**: Critical (blocks plan mode workflow)
 **Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`, `src/webview/components/InputArea/InputArea.tsx`
 
@@ -117,6 +118,27 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 
 **Why this doesn't cause the infinite loop**: The proceed nudge is only sent when the CLI is confirmed idle (`result/success` already received). The `exitPlanModeProcessed` flag prevents any subsequent ExitPlanMode call from showing a new approval bar, breaking the loop.
 
+### Eighth Bug (2026-03-02): Typed Text Bypasses exitPlanModeProcessed Guard
+
+**Cause**: When the user typed text (e.g., "Yes, proceed with the plan.") in the InputArea while the ExitPlanMode approval bar was visible, the text was sent as a regular `sendMessage` (line 347 of InputArea.tsx). The extension's `sendMessage` handler called `clearApprovalTracking()` but **never set `exitPlanModeProcessed = true`**. The button-click path sets this flag via the `planApprovalResponse` handler, but the typed-text path bypassed it entirely.
+
+**Sequence**:
+1. ExitPlanMode approval bar shown, `exitPlanModeProcessed = false`
+2. User types text, InputArea sends `sendMessage`
+3. `sendMessage` handler: `clearApprovalTracking()` clears `pendingApprovalTool` but `exitPlanModeProcessed` stays `false`
+4. `messageStart`: resets `approvalResponseProcessed = false`, `pendingApprovalTool = null`
+5. Model responds: calls TodoWrite, Bash (implementation) AND ExitPlanMode (spurious)
+6. `notifyPlanApprovalRequired` checks `exitPlanModeProcessed` -> **false** -> notification fires
+7. Approval bar re-appears -> loop
+
+**Fix** (two parts):
+
+1. **`sendMessage`/`sendMessageWithImages` handlers**: Before `clearApprovalTracking()`, check if `pendingApprovalTool` is ExitPlanMode. If so, set `planModeActive = false` and `exitPlanModeProcessed = true`. Also cancel any pending fallback timer. This ensures typed text has the same guard effect as clicking a button.
+
+2. **Fallback nudge text**: Changed from `"Yes, proceed with the plan."` to `"Continue with the implementation."` across all fallback paths. The old text sounded like a plan approval message, which could confuse the model into calling ExitPlanMode again. The new text is a neutral implementation directive.
+
+**Why this is the definitive fix**: The `exitPlanModeProcessed` flag was always the correct defense -- it was just never set in the typed-text code path. Now ALL paths that dismiss the ExitPlanMode approval bar (button clicks, typed text, images) set the flag, ensuring any subsequent ExitPlanMode calls from the model are suppressed regardless of how the user responded.
+
 ---
 
 ## Current Defense Layers
@@ -127,11 +149,13 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 | Block ExitPlanMode approve/reject text to CLI | MessageHandler.ts `planApprovalResponse` | Spurious user messages for approve actions |
 | ExitPlanMode feedback DOES send text to CLI | MessageHandler.ts `planApprovalResponse` | Feedback is real user content, not a loop risk |
 | InputArea sends regular message (not feedback) | InputArea.tsx `sendMessage` | Text typed during ExitPlanMode goes as new user message, not dropped |
+| `sendMessage` sets `exitPlanModeProcessed` | MessageHandler.ts `sendMessage` handler | Typed text bypassing the button-click guard (Bug 8 fix) |
 | Skip `processBusy:true` for ExitPlanMode approve | MessageHandler.ts `planApprovalResponse` | Stuck "Thinking..." indicator after plan approval |
 | Send `processBusy:true` for ExitPlanMode feedback | MessageHandler.ts `planApprovalResponse` | UI shows thinking while Claude processes feedback |
 | Immediate nudge when CLI idle (resultObserved) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Approve click no-op when CLI auto-resumed with brief text and went idle |
 | Delayed approve fallback (only if no activity observed) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | ExitPlanMode approve click becoming a no-op (CLI never auto-resumed) |
 | Skip nudge when CLI actively working (resumeObserved only) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Spurious nudge while CLI is mid-implementation |
+| Neutral nudge text | MessageHandler.ts all fallback paths | Prevents model from associating nudge with plan approval |
 
 The `messageStart` clearing was **removed** as a defense layer because it made the approval bar invisible.
 
@@ -176,10 +200,29 @@ if (pendingApproval.toolName === 'AskUserQuestion') {
   postToExtension({ type: 'planApprovalResponse', action: 'questionAnswer', ... });
 }
 // ExitPlanMode: clear bar, send as regular message
+// (extension's sendMessage handler sets exitPlanModeProcessed=true)
 else if (pendingApproval) {
   setPendingApproval(null);
   postToExtension({ type: 'sendMessage', text: trimmed });
 }
+```
+
+### sendMessage handler - ExitPlanMode guard (MessageHandler.ts)
+
+```typescript
+case 'sendMessage':
+  // If there was a pending ExitPlanMode approval, mark it as processed
+  // so subsequent ExitPlanMode calls from the model are suppressed.
+  if (this.pendingApprovalTool) {
+    const pendingNorm = this.pendingApprovalTool.trim().toLowerCase();
+    if (pendingNorm === 'exitplanmode' || pendingNorm.endsWith('.exitplanmode')) {
+      this.planModeActive = false;
+      this.exitPlanModeProcessed = true;
+    }
+  }
+  this.cancelExitPlanApproveResumeFallback();
+  this.clearApprovalTracking();
+  // ... send text to CLI ...
 ```
 
 ### planApprovalResponse handler (MessageHandler.ts)
@@ -219,7 +262,7 @@ if (!isExitPlanMode || isExitPlanFeedback) {
 ```typescript
 // If CLI already completed (result/success observed) -> idle -> nudge immediately
 if (this.pendingApprovalCycleResultObserved) {
-  this.control.sendText('Yes, proceed with the plan.');
+  this.control.sendText('Continue with the implementation.');
   this.webview.postMessage({ type: 'processBusy', busy: true });
   return;
 }

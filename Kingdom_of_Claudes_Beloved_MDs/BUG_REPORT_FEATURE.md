@@ -93,16 +93,44 @@ Dynamic `buildSystemPrompt()` in `BugReportService.ts` -- injects OS info at run
 - On macOS/Linux: uses bash commands
 - Responds in the user's language
 
+## Report Size Management -- Chunked Multi-Part Sending
+
+Formspree free-tier rejects payloads over ~100 KB (HTTP 413). Instead of truncating the report body, the submission pipeline splits large reports into multiple smaller submissions sent sequentially.
+
+### How it works
+
+1. The report is assembled as named sections (diagnostics, conversation, scripts, logs) with **no truncation** of conversations or logs.
+2. If the total report fits under `MAX_CHUNK_CHARS` (80,000 chars), it is sent as a single submission.
+3. If it exceeds the limit, `splitSectionsIntoChunks()` packs sections greedily into chunks that each fit under 80 KB.
+4. Each chunk is sent as a separate Formspree submission with subject `"Bug Report (mode) - Part N/M"` and a 1.5 s delay between parts.
+5. The ZIP file (full un-truncated data) is attached only to Part 1 (multipart upload, paid plans only).
+
+### Constants
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `MAX_SCRIPT_OUTPUT_CHARS` | 8,000 | Per-script cap applied at capture time. Prevents conversation history bloat. |
+| `MAX_CHUNK_CHARS` | 80,000 | Max chars per Formspree submission part |
+| `CHUNK_DELAY_MS` | 1,500 | Delay in ms between chunked submissions |
+
+### Splitting rules
+
+- Sections are kept intact when possible (split happens between sections, not mid-text).
+- If a single section exceeds the chunk budget, it is truncated (head-kept) to fit alone.
+- The header (extension version, timestamp, part label) is prepended to every chunk.
+- `FormspreeService.submitChunked()` sends each part sequentially and stops on the first failure.
+
 ## Script Execution Flow
 
 When the AI suggests a diagnostic command:
 1. AI response parsed for fenced code blocks (regex: `` ```cmd`` / `` ```bash`` etc.)
 2. Webview shows Approve/Reject buttons for each script
 3. On approve: `BugReportService.executeScript()` runs via `child_process.exec()` (CMD on Windows, shell default on others)
-4. Script output sent to webview as `bugReportScriptResult`
-5. **Auto-analysis**: AI is automatically called with the script output appended to conversation history -- no user action needed
-6. AI sees the result and can analyze it, suggest corrections if the command failed, or ask follow-up questions
-7. Webview shows "Thinking..." while AI processes the output
+4. Script output sent to webview as `bugReportScriptResult` (full output for UI display)
+5. Stored output is truncated to `MAX_SCRIPT_OUTPUT_CHARS` to prevent conversation/report bloat
+6. **Auto-analysis**: AI is automatically called with the (truncated) script output appended to conversation history -- no user action needed
+7. AI sees the result and can analyze it, suggest corrections if the command failed, or ask follow-up questions
+8. Webview shows "Thinking..." while AI processes the output
 
 ## RTL Support
 

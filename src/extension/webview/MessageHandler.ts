@@ -416,7 +416,20 @@ export class MessageHandler {
       switch (msg.type) {
         case 'sendMessage':
           this.log(`Sending user message: "${msg.text.slice(0, 80)}..."`);
-          // If there was a pending approval, the user's message implicitly responds to it
+          // If there was a pending ExitPlanMode approval, mark it as processed so
+          // subsequent ExitPlanMode calls from the model are suppressed. Without this,
+          // typing text (instead of clicking an approve button) leaves
+          // exitPlanModeProcessed=false, causing the approval bar to re-appear when
+          // the model spuriously calls ExitPlanMode in its response to the user text.
+          if (this.pendingApprovalTool) {
+            const pendingNorm = this.pendingApprovalTool.trim().toLowerCase();
+            if (pendingNorm === 'exitplanmode' || pendingNorm.endsWith('.exitplanmode')) {
+              this.planModeActive = false;
+              this.exitPlanModeProcessed = true;
+              this.log('ExitPlanMode marked as processed (user sent text while approval bar was active)');
+            }
+          }
+          this.cancelExitPlanApproveResumeFallback();
           this.clearApprovalTracking();
           this.achievementService.onUserPrompt(this.tabId, msg.text);
           // Optimistic: show user message in UI immediately (before CLI echoes it back)
@@ -433,7 +446,16 @@ export class MessageHandler {
 
         case 'sendMessageWithImages': {
           this.log(`Sending message with ${msg.images.length} images`);
-          // If there was a pending approval, the user's message implicitly responds to it
+          // Same ExitPlanMode guard as sendMessage (user may paste images while bar is active)
+          if (this.pendingApprovalTool) {
+            const pendingNorm2 = this.pendingApprovalTool.trim().toLowerCase();
+            if (pendingNorm2 === 'exitplanmode' || pendingNorm2.endsWith('.exitplanmode')) {
+              this.planModeActive = false;
+              this.exitPlanModeProcessed = true;
+              this.log('ExitPlanMode marked as processed (user sent images while approval bar was active)');
+            }
+          }
+          this.cancelExitPlanApproveResumeFallback();
           this.clearApprovalTracking();
           if (msg.text.trim()) {
             this.achievementService.onUserPrompt(this.tabId, msg.text);
@@ -1052,16 +1074,16 @@ export class MessageHandler {
               }
             }
           } else if (msg.action === 'approve') {
-            this.control.sendText('Yes, proceed with the plan.');
+            this.control.sendText('Continue with the implementation.');
           } else if (msg.action === 'approveClearBypass') {
             this.log('Plan approval: approving, then clearing context (compact)');
-            this.control.sendText('Yes, proceed with the plan. Please compact context to free up space.');
+            this.control.sendText('Continue with the implementation. Please compact context to free up space.');
             this.control.compact();
           } else if (msg.action === 'approveManual') {
             this.log('Plan approval: switching to supervised mode for manual edit approval');
             vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', 'supervised', true);
             this.webview.postMessage({ type: 'permissionModeSetting', mode: 'supervised' });
-            this.control.sendText('Yes, proceed with the plan.');
+            this.control.sendText('Continue with the implementation.');
           } else if (msg.action === 'reject') {
             this.control.sendText('No, I reject this plan. Please revise it.');
           } else if (msg.action === 'feedback') {
@@ -2723,7 +2745,7 @@ export class MessageHandler {
     if (this.pendingApprovalCycleResultObserved) {
       this.log(`ExitPlanMode approve fallback - CLI already completed and idle, sending proceed nudge immediately (cycle ${cycleId})`);
       try {
-        this.control.sendText('Yes, proceed with the plan.');
+        this.control.sendText('Continue with the implementation.');
         this.webview.postMessage({ type: 'processBusy', busy: true });
       } catch (err) {
         this.log(`ExitPlanMode approve immediate nudge failed: ${err}`);
@@ -2757,7 +2779,7 @@ export class MessageHandler {
       if (this.pendingApprovalCycleResultObserved) {
         this.log(`ExitPlanMode approve fallback firing (result arrived during wait) - sending proceed nudge to CLI (cycle ${cycleId})`);
         try {
-          this.control.sendText('Yes, proceed with the plan.');
+          this.control.sendText('Continue with the implementation.');
           this.webview.postMessage({ type: 'processBusy', busy: true });
         } catch (err) {
           this.log(`ExitPlanMode approve fallback send failed: ${err}`);
@@ -2775,7 +2797,7 @@ export class MessageHandler {
 
       this.log(`ExitPlanMode approve fallback firing - sending proceed nudge to CLI (cycle ${cycleId})`);
       try {
-        this.control.sendText('Yes, proceed with the plan.');
+        this.control.sendText('Continue with the implementation.');
         this.webview.postMessage({ type: 'processBusy', busy: true });
       } catch (err) {
         this.log(`ExitPlanMode approve fallback send failed: ${err}`);
@@ -2808,12 +2830,15 @@ export class MessageHandler {
     }
     // NOTE: We intentionally do NOT auto-approve ExitPlanMode by sending user
     // messages. The CLI already auto-approves ExitPlanMode (via bypassPermissions
-    // or allowedTools). Sending "Yes, proceed with the plan." as a user message
-    // creates a spurious conversation turn that causes the model to call
-    // ExitPlanMode again, leading to an infinite loop. Instead, we always show
-    // the approval bar and let the user interact with it. The approve action
-    // closes the bar immediately; a delayed fallback nudge only fires if no
-    // post-approval activity is observed within a short timeout.
+    // or allowedTools). Sending approval-sounding text as a user message creates
+    // a spurious conversation turn that causes the model to call ExitPlanMode
+    // again (infinite loop). Instead, we always show the approval bar and let
+    // the user interact with it. The approve action closes the bar; a delayed
+    // fallback nudge fires only if no post-approval activity is observed.
+    // IMPORTANT: Both button-click AND typed-text paths must set
+    // exitPlanModeProcessed=true to suppress re-triggers. The button path
+    // does this via planApprovalResponse; the typed-text path does this via
+    // the sendMessage handler (which checks pendingApprovalTool).
     this.cancelExitPlanApproveResumeFallback();
     this.pendingApprovalCycleId = this.nextApprovalCycleId++;
     this.pendingApprovalCycleResumeObserved = false;

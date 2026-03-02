@@ -953,6 +953,9 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       /\bcodex:\s+command not found\b/i,
       /\bspawn\b.*\bcodex\b.*\benoent\b/i,
       /\benoent\b.*\bcodex\b/i,
+      // Windows "The system cannot find the path/file specified" — often emitted by
+      // extension-bundled codex.exe binaries that pass --version but fail on exec.
+      /the system cannot find the (path|file) specified/i,
     ];
     return missingPatterns.some((pattern) => pattern.test(normalized));
   }

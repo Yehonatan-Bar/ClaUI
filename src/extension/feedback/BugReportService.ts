@@ -18,6 +18,13 @@ const AI_TIMEOUT_MS = 60_000;
 const SCRIPT_TIMEOUT_MS = 30_000;
 const SCRIPT_REGEX = /```(?:bash|powershell|cmd|sh)\n([\s\S]*?)```/g;
 
+// Per-script output cap (applied at capture time to prevent conversation bloat).
+const MAX_SCRIPT_OUTPUT_CHARS = 8_000;
+// Formspree free-tier rejects payloads over ~100 KB.  We keep each chunk well
+// under that and split into multiple submissions when the report is larger.
+const MAX_CHUNK_CHARS = 80_000;
+const CHUNK_DELAY_MS = 1_500;
+
 function buildSystemPrompt(): string {
   const isWindows = process.platform === 'win32';
   const osName = isWindows ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
@@ -58,6 +65,13 @@ Important rules:
 After gathering enough info, summarize your findings and tell the user the report is ready to send.
 Keep responses concise. One question at a time is preferred.
 Respond in the same language the user writes in.`;
+}
+
+/** Truncate text to `maxLen`, keeping the head (beginning) and appending a notice. */
+function truncateHead(text: string, maxLen: number, label = 'content'): string {
+  if (text.length <= maxLen) return text;
+  const omitted = text.length - maxLen;
+  return `${text.slice(0, maxLen)}\n... (${omitted} chars of remaining ${label} omitted)`;
 }
 
 export class BugReportService {
@@ -179,22 +193,25 @@ export class BugReportService {
       const result = await this.runCommand(command);
       scriptOutput = result.stdout;
       exitCode = result.exitCode;
-      this.scriptOutputs.push({ command, output: scriptOutput, exitCode });
-
-      if (this.disposed) return;
-      this.bridge.postMessage({ type: 'bugReportScriptResult', index, output: scriptOutput, exitCode });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.log(`[BugReport] Script execution failed: ${msg}`);
       scriptOutput = `Error: ${msg}`;
       exitCode = -1;
-      this.scriptOutputs.push({ command, output: scriptOutput, exitCode });
-      if (this.disposed) return;
-      this.bridge.postMessage({ type: 'bugReportScriptResult', index, output: scriptOutput, exitCode });
     }
 
-    // Feed result into conversation and auto-trigger AI to analyze the output
-    const outputMsg = `[Script output for "${command.slice(0, 60)}" (exit code ${exitCode})]:\n${scriptOutput}`;
+    // Truncate large script outputs to prevent conversation/report bloat.
+    // The full output still reaches the webview preview; only the stored
+    // copy used for conversation history and report submission is capped.
+    const cappedOutput = truncateHead(scriptOutput, MAX_SCRIPT_OUTPUT_CHARS, 'output');
+    this.scriptOutputs.push({ command, output: cappedOutput, exitCode });
+
+    if (this.disposed) return;
+    this.bridge.postMessage({ type: 'bugReportScriptResult', index, output: scriptOutput, exitCode });
+
+    // Feed result into conversation and auto-trigger AI to analyze the output.
+    // Use the capped version so the conversation history stays manageable.
+    const outputMsg = `[Script output for "${command.slice(0, 60)}" (exit code ${exitCode})]:\n${cappedOutput}`;
     this.conversationHistory.push({ role: 'user', content: outputMsg });
 
     // Auto-call AI so it can see and respond to the script output
@@ -268,65 +285,57 @@ export class BugReportService {
     this.postStatus('sending');
 
     try {
-      // Build a comprehensive text report (readable in email, no base64 needed)
-      const sections: string[] = [];
+      // ----- Build named sections (full content, no truncation) -----
+      const sections: Array<{ name: string; content: string }> = [];
 
-      sections.push(`=== ClaUi Bug Report (${mode} mode) ===`);
-      sections.push(`Extension: v${this.extensionVersion}`);
-      sections.push(`Timestamp: ${new Date().toISOString()}`);
-      sections.push('');
+      const header = [
+        `=== ClaUi Bug Report (${mode} mode) ===`,
+        `Extension: v${this.extensionVersion}`,
+        `Timestamp: ${new Date().toISOString()}`,
+        '',
+      ].join('\n');
 
-      // Diagnostics
       if (this.diagnostics) {
-        sections.push('--- System Diagnostics ---');
-        sections.push(this.diagnostics.systemInfo);
-        sections.push('');
+        sections.push({
+          name: 'diagnostics',
+          content: `--- System Diagnostics ---\n${this.diagnostics.systemInfo}\n`,
+        });
       }
 
-      // Description (quick mode)
       if (mode === 'quick' && description) {
-        sections.push('--- Bug Description ---');
-        sections.push(description);
-        sections.push('');
+        sections.push({
+          name: 'description',
+          content: `--- Bug Description ---\n${description}\n`,
+        });
       }
 
-      // AI conversation (ai mode)
       if (mode === 'ai' && this.conversationHistory.length > 0) {
-        sections.push('--- AI Diagnosis Conversation ---');
+        const lines: string[] = ['--- AI Diagnosis Conversation ---'];
         for (const msg of this.conversationHistory) {
-          sections.push(`[${msg.role.toUpperCase()}]:`);
-          sections.push(msg.content);
-          sections.push('');
+          lines.push(`[${msg.role.toUpperCase()}]:`, msg.content, '');
         }
+        sections.push({ name: 'conversation', content: lines.join('\n') });
       }
 
-      // Script outputs
       for (let i = 0; i < this.scriptOutputs.length; i++) {
         const s = this.scriptOutputs[i];
-        sections.push(`--- Script Output #${i + 1} (exit ${s.exitCode}) ---`);
-        sections.push(`$ ${s.command}`);
-        sections.push(s.output);
-        sections.push('');
+        sections.push({
+          name: `script_${i + 1}`,
+          content: `--- Script Output #${i + 1} (exit ${s.exitCode}) ---\n$ ${s.command}\n${s.output}\n`,
+        });
       }
 
-      // Recent logs (keep the LAST 50KB - most recent entries are most relevant)
       if (this.diagnostics?.recentLogs) {
-        const maxLen = 50_000;
-        const totalLen = this.diagnostics.recentLogs.length;
-        sections.push('--- Recent Logs ---');
-        if (totalLen > maxLen) {
-          sections.push(`... (oldest ${totalLen - maxLen} bytes omitted)`);
-          sections.push(this.diagnostics.recentLogs.slice(-maxLen));
-        } else {
-          sections.push(this.diagnostics.recentLogs);
-        }
-        sections.push('');
+        sections.push({
+          name: 'logs',
+          content: `--- Recent Logs ---\n${this.diagnostics.recentLogs}\n`,
+        });
       }
 
-      const fullMessage = sections.join('\n');
-      this.log(`[BugReport] Report assembled: ${fullMessage.length} chars`);
+      const totalChars = header.length + sections.reduce((sum, s) => sum + s.content.length, 0);
+      this.log(`[BugReport] Report: ${totalChars} chars across ${sections.length} sections`);
 
-      // Also build a ZIP for file upload (used on paid plans or for local save)
+      // ----- Build ZIP (for multipart upload on paid plans) -----
       const zip = new AdmZip();
       if (this.diagnostics) {
         zip.addFile('diagnostics.txt', Buffer.from(this.diagnostics.systemInfo, 'utf-8'));
@@ -344,35 +353,124 @@ export class BugReportService {
       }
       const zipBuffer = zip.toBuffer();
 
+      // ----- Show success immediately so the user can close the panel -----
+      this.log('[BugReport] Report assembled, showing success to user');
+      this.postStatus('sent');
+      this.bridge.postMessage({ type: 'bugReportSubmitResult', ok: true });
+
+      // ----- Send in the background (fire-and-forget) -----
       const formspree = new FormspreeService(FORMSPREE_FORM_ID);
       formspree.setLogger(this.log);
 
-      // Submit: try with file attachment first, then text-only fallback
-      const result = await formspree.submit({
-        message: fullMessage,
-        subject: `ClaUi Bug Report (${mode})`,
-        category: 'bug',
-        extensionVersion: this.extensionVersion,
-        attachments: [{ filename: 'bug-report.zip', content: zipBuffer, contentType: 'application/zip' }],
-      });
-
-      if (this.disposed) return;
-
-      if (result.ok) {
-        this.log('[BugReport] Report sent successfully');
-        this.postStatus('sent');
-        this.bridge.postMessage({ type: 'bugReportSubmitResult', ok: true });
-      } else {
-        this.log(`[BugReport] Submission failed: ${result.error}`);
-        this.postStatus('error', undefined, result.error);
-        this.bridge.postMessage({ type: 'bugReportSubmitResult', ok: false, error: result.error });
-      }
+      this.sendInBackground(formspree, mode, header, sections, zipBuffer);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.log(`[BugReport] Submit error: ${msg}`);
       this.postStatus('error', undefined, msg);
       this.bridge.postMessage({ type: 'bugReportSubmitResult', ok: false, error: msg });
     }
+  }
+
+  /**
+   * Fire-and-forget: send the report via Formspree in the background.
+   * The user already sees "sent" and can close the panel.
+   */
+  private sendInBackground(
+    formspree: FormspreeService,
+    mode: string,
+    header: string,
+    sections: Array<{ name: string; content: string }>,
+    zipBuffer: Buffer,
+  ): void {
+    const totalChars = header.length + sections.reduce((sum, s) => sum + s.content.length, 0);
+
+    const doSend = async () => {
+      if (totalChars <= MAX_CHUNK_CHARS) {
+        this.log('[BugReport] Background: single submission');
+        const fullMessage = header + sections.map(s => s.content).join('\n');
+        const result = await formspree.submit({
+          message: fullMessage,
+          subject: `ClaUi Bug Report (${mode})`,
+          category: 'bug',
+          extensionVersion: this.extensionVersion,
+          attachments: [{ filename: 'bug-report.zip', content: zipBuffer, contentType: 'application/zip' }],
+        });
+        if (!result.ok) {
+          this.log(`[BugReport] Background send failed: ${result.error}`);
+        } else {
+          this.log('[BugReport] Background send complete');
+        }
+      } else {
+        const chunks = this.splitSectionsIntoChunks(header, sections);
+        this.log(`[BugReport] Background: chunked submission (${chunks.length} parts)`);
+
+        const payloads = chunks.map((chunk, i) => ({
+          message: `${header}[Part ${i + 1} of ${chunks.length}]\n\n${chunk}`,
+          subject: `ClaUi Bug Report (${mode}) - Part ${i + 1}/${chunks.length}`,
+          category: 'bug',
+          extensionVersion: this.extensionVersion,
+          ...(i === 0
+            ? { attachments: [{ filename: 'bug-report.zip', content: zipBuffer, contentType: 'application/zip' }] }
+            : {}),
+        }));
+
+        const result = await formspree.submitChunked(payloads, CHUNK_DELAY_MS);
+        if (!result.ok) {
+          this.log(`[BugReport] Background chunked send failed: ${result.error}`);
+        } else {
+          this.log(`[BugReport] Background chunked send complete (${chunks.length} parts)`);
+        }
+      }
+    };
+
+    doSend().catch(err => {
+      this.log(`[BugReport] Background send error: ${err instanceof Error ? err.message : String(err)}`);
+    });
+  }
+
+  /**
+   * Split report sections into chunks where each chunk fits under MAX_CHUNK_CHARS.
+   * Sections are kept intact when possible; oversized sections are truncated.
+   */
+  private splitSectionsIntoChunks(
+    header: string,
+    sections: Array<{ name: string; content: string }>,
+  ): string[] {
+    // Reserve space for the header + "[Part N of M]\n\n" label per chunk
+    const overhead = header.length + 50;
+    const budget = MAX_CHUNK_CHARS - overhead;
+
+    const chunks: string[] = [];
+    let currentParts: string[] = [];
+    let currentSize = 0;
+
+    for (const section of sections) {
+      const len = section.content.length;
+
+      if (len > budget) {
+        // Single section exceeds budget — flush current chunk, then truncate
+        if (currentParts.length > 0) {
+          chunks.push(currentParts.join('\n'));
+          currentParts = [];
+          currentSize = 0;
+        }
+        chunks.push(truncateHead(section.content, budget, section.name));
+      } else if (currentSize + len > budget) {
+        // Adding this section would exceed the budget — start a new chunk
+        chunks.push(currentParts.join('\n'));
+        currentParts = [section.content];
+        currentSize = len;
+      } else {
+        currentParts.push(section.content);
+        currentSize += len;
+      }
+    }
+
+    if (currentParts.length > 0) {
+      chunks.push(currentParts.join('\n'));
+    }
+
+    return chunks;
   }
 
   // -----------------------------------------------------------------------
