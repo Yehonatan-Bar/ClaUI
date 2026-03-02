@@ -352,32 +352,66 @@ export function registerCommands(
       const kingdomDir = path.join(workspaceRoot, 'Kingdom_of_Claudes_Beloved_MDs');
       const claudePlansDir = path.join(os.homedir(), '.claude', 'plans');
 
-      // Collect HTML plan files from all known plan directories
+      // Collect HTML plan files from all known plan directories (deduplicated by path)
       const planFiles: Array<{ label: string; description: string; filePath: string; mtimeMs: number }> = [];
+      const seenPaths = new Set<string>();
 
-      const collectHtmlFiles = (dir: string, locationTag: string) => {
-        if (!fs.existsSync(dir)) return;
+      const collectHtmlFiles = (dir: string, locationTag: string, maxDepth = 1, currentDepth = 0) => {
+        if (currentDepth >= maxDepth || !fs.existsSync(dir)) return;
         try {
-          const allFiles = fs.readdirSync(dir);
-          for (const f of allFiles) {
-            if (!f.endsWith('.html')) continue;
-            const filePath = path.join(dir, f);
-            const stat = fs.statSync(filePath);
-            planFiles.push({
-              label: f,
-              description: `${locationTag} - ${formatRelativeTime(stat.mtime.toISOString())}`,
-              filePath,
-              mtimeMs: stat.mtimeMs,
-            });
+          const entries = fs.readdirSync(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isFile() && entry.name.endsWith('.html')) {
+              const normalized = fullPath.replace(/\\/g, '/').toLowerCase();
+              if (seenPaths.has(normalized)) continue;
+              seenPaths.add(normalized);
+              const stat = fs.statSync(fullPath);
+              planFiles.push({
+                label: entry.name,
+                description: `${locationTag} - ${formatRelativeTime(stat.mtime.toISOString())}`,
+                filePath: fullPath,
+                mtimeMs: stat.mtimeMs,
+              });
+            } else if (entry.isDirectory() && currentDepth + 1 < maxDepth) {
+              collectHtmlFiles(fullPath, locationTag, maxDepth, currentDepth + 1);
+            }
           }
         } catch {
           // Skip directories that can't be read
         }
       };
 
-      collectHtmlFiles(kingdomDir, 'Kingdom');
-      collectHtmlFiles(workspaceRoot, 'Root');
-      collectHtmlFiles(claudePlansDir, '~/.claude/plans');
+      // Find all directories named "plans" within the workspace (up to 3 levels deep)
+      const skipDirs = new Set(['node_modules', '.git', 'dist', '.vscode', 'Kingdom_of_Claudes_Beloved_MDs']);
+      const findPlansDirs = (dir: string, depth: number): string[] => {
+        if (depth <= 0) return [];
+        const results: string[] = [];
+        try {
+          const entries = fs.readdirSync(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (!entry.isDirectory() || skipDirs.has(entry.name)) continue;
+            const fullPath = path.join(dir, entry.name);
+            if (entry.name === 'plans') {
+              results.push(fullPath);
+            }
+            results.push(...findPlansDirs(fullPath, depth - 1));
+          }
+        } catch {
+          // Skip unreadable directories
+        }
+        return results;
+      };
+
+      const projectPlansDirs = findPlansDirs(workspaceRoot, 3);
+
+      collectHtmlFiles(kingdomDir, 'Kingdom', 3);
+      collectHtmlFiles(workspaceRoot, 'Root', 3);
+      for (const pd of projectPlansDirs) {
+        const relative = path.relative(workspaceRoot, pd).replace(/\\/g, '/');
+        collectHtmlFiles(pd, relative, 3);
+      }
+      collectHtmlFiles(claudePlansDir, '~/.claude/plans', 3);
 
       // Sort all collected files by modification time (newest first)
       planFiles.sort((a, b) => b.mtimeMs - a.mtimeMs);
