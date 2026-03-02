@@ -11,6 +11,7 @@ The plan approval bar (4 CLI-matching options) and AskUserQuestion interactive c
 **Date Fifth Fix**: 2026-02-26 (approve click can be no-op if CLI did not auto-resume)
 **Date Seventh Fix**: 2026-03-01 (approve click no-op when CLI auto-resumed with brief text and went idle)
 **Date Eighth Fix**: 2026-03-02 (typed text bypasses exitPlanModeProcessed guard)
+**Date Ninth Fix**: 2026-03-02 (exitPlanModeProcessed not reset after context compaction)
 **Severity**: Critical (blocks plan mode workflow)
 **Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`, `src/webview/components/InputArea/InputArea.tsx`
 
@@ -139,6 +140,27 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 
 **Why this is the definitive fix**: The `exitPlanModeProcessed` flag was always the correct defense -- it was just never set in the typed-text code path. Now ALL paths that dismiss the ExitPlanMode approval bar (button clicks, typed text, images) set the flag, ensuring any subsequent ExitPlanMode calls from the model are suppressed regardless of how the user responded.
 
+### Ninth Bug (2026-03-02): exitPlanModeProcessed Not Reset After Context Compaction
+
+**Cause**: After a full plan cycle (EnterPlanMode -> ExitPlanMode -> user approves -> implementation), `exitPlanModeProcessed` is `true`. When the context is later compacted (user-initiated or via approve+compact), the CLI summarizes the conversation and the model may re-enter plan mode. After compaction, the model calls `ExitPlanMode` without first calling `EnterPlanMode` (because compaction strips the conversation history and the model doesn't "remember" it needs to call EnterPlanMode). The `notifyPlanApprovalRequired` guard checks `exitPlanModeProcessed` -> `true` -> suppresses the notification. The approval bar never shows and the model is permanently stuck in plan mode.
+
+**Sequence**:
+1. First plan cycle completes: `exitPlanModeProcessed = true`
+2. Implementation proceeds, context grows
+3. Context compaction requested (any trigger: user, approve+compact)
+4. CLI compacts, model re-enters plan mode after compaction
+5. Model calls `ExitPlanMode` (no `EnterPlanMode` first -- compaction lost that context)
+6. `notifyPlanApprovalRequired`: `isExitPlanMode && this.exitPlanModeProcessed` -> `true` -> suppressed
+7. Log: `"Suppressing stale ExitPlanMode notification - already processed in this plan cycle"`
+8. Approval bar never shows. Model stuck in plan mode.
+
+**Fix**: Added a `compactPending` flag to MessageHandler:
+1. When compaction is requested (via `compact` webview message, ExitPlanMode `approveClearBypass`, or non-ExitPlanMode `approveClearBypass`), set `compactPending = true`
+2. In the `messageStart` handler, if `compactPending` is true, reset `exitPlanModeProcessed = false` and `compactPending = false`
+3. This ensures the first assistant turn after compaction gets a clean slate while late events from the pre-compaction turn are still suppressed
+
+**Why the reset is safe**: The `compactPending` flag ensures the reset only happens on the FIRST `messageStart` after compaction, not immediately. Pre-compaction late events (which fire before `messageStart`) are still suppressed by `exitPlanModeProcessed = true`. The reset only takes effect when the CLI starts a new turn after compaction completes.
+
 ---
 
 ## Current Defense Layers
@@ -156,6 +178,7 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 | Delayed approve fallback (only if no activity observed) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | ExitPlanMode approve click becoming a no-op (CLI never auto-resumed) |
 | Skip nudge when CLI actively working (resumeObserved only) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Spurious nudge while CLI is mid-implementation |
 | Neutral nudge text | MessageHandler.ts all fallback paths | Prevents model from associating nudge with plan approval |
+| `compactPending` -> reset `exitPlanModeProcessed` on messageStart | MessageHandler.ts `messageStart` handler | Stuck plan mode after context compaction (Bug 9 fix) |
 
 The `messageStart` clearing was **removed** as a defense layer because it made the approval bar invisible.
 

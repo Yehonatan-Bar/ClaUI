@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>תוכנית: חיבור מרחוק דרך Happy Coder</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f8f9fa; color: #333; line-height: 1.7; padding: 40px 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { color: #1a1a2e; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #4361ee; padding-bottom: 15px; }
+        .subtitle { color: #666; font-size: 1.1em; margin-bottom: 30px; }
+        h2 { color: #2d3436; font-size: 1.4em; margin-top: 35px; margin-bottom: 15px; padding-right: 10px; border-right: 4px solid #4361ee; }
+        h3 { color: #4361ee; font-size: 1.1em; margin-top: 20px; margin-bottom: 10px; }
+        p, li { font-size: 1em; margin-bottom: 8px; }
+        ul { padding-right: 25px; margin-bottom: 15px; }
+        li { margin-bottom: 6px; }
+        .highlight { background: #e8f0fe; border-radius: 8px; padding: 20px; margin: 20px 0; border-right: 4px solid #4361ee; }
+        .phase { background: white; border-radius: 10px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .phase-number { display: inline-block; background: #4361ee; color: white; width: 32px; height: 32px; border-radius: 50%; text-align: center; line-height: 32px; font-weight: bold; margin-left: 10px; }
+        .phase-title { font-weight: bold; font-size: 1.15em; color: #1a1a2e; }
+        .benefit { background: #d4edda; border-radius: 8px; padding: 15px; margin: 10px 0; }
+        .architecture { background: #2d3436; color: #dfe6e9; border-radius: 10px; padding: 20px; margin: 20px 0; font-family: 'Courier New', monospace; font-size: 0.9em; direction: ltr; text-align: left; white-space: pre; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        th { background: #4361ee; color: white; padding: 12px 15px; text-align: right; }
+        td { padding: 10px 15px; border-bottom: 1px solid #eee; }
+        tr:last-child td { border-bottom: none; }
+        .tag { display: inline-block; background: #4361ee; color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 2px; }
+        .tag.green { background: #27ae60; }
+        .tag.orange { background: #e67e22; }
+        .summary-box { background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); color: white; border-radius: 12px; padding: 25px; margin: 30px 0; }
+        .summary-box h2 { color: white; border-right-color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>תוכנית פיתוח: חיבור מרחוק דרך Happy Coder</h1>
+        <p class="subtitle">הוספת ספק חדש לתוסף ClaUi שמאפשר שליטה מרחוק בסשנים של Claude דרך שרת Happy Coder</p>
+
+        <div class="highlight">
+            <h3>מה זה בכלל?</h3>
+            <p>כיום, ClaUi מריץ את Claude באופן מקומי על המחשב. התוכנית הזו מוסיפה אפשרות שלישית: חיבור לסשן Claude שרץ על מחשב אחר, דרך שרת ממסר (relay) של Happy Coder. כל התקשורת מוצפנת מקצה לקצה.</p>
+        </div>
+
+        <h2>מה המשתמש יראה?</h2>
+        <ul>
+            <li>כפתור חדש <strong>"Happy"</strong> בבורר הספקים (ליד Claude ו-Codex)</li>
+            <li>בחירת "Happy" פותחת חלון שבו אפשר ליצור סשן חדש או להתחבר לסשן קיים</li>
+            <li>ממשק הצ'אט נשאר זהה לחלוטין -- הודעות, כלים, סטטוס -- הכל עובד אותו דבר</li>
+            <li>הגדרות חדשות: כתובת שרת, מצב הרשאות, חיבור אוטומטי</li>
+        </ul>
+
+        <h2>ארכיטקטורה</h2>
+        <p>הפתרון עוקב אחרי הדפוס הקיים בדיוק -- כמו שנוספה תמיכה ב-Codex כספק שני:</p>
+
+        <div class="architecture">
+         TabManager (מנהל הטאבים)
+              |
+   +----------+-----------+
+   |          |           |
+ Claude    Codex      Happy (חדש)
+ (מקומי)  (מקומי)   (מרחוק)
+   |          |           |
+ Process   Process    Connection
+ Manager   Manager    Manager
+ (תהליך)  (תהליך)   (Socket.IO)
+   |          |           |
+   +----------+-----------+
+              |
+          Webview (React)
+          ללא שינויים!</div>
+
+        <h2>רכיבים חדשים</h2>
+        <table>
+            <tr><th>רכיב</th><th>תפקיד</th></tr>
+            <tr><td><strong>מנהל חיבור</strong></td><td>מתחבר לשרת Happy דרך WebSocket, שולח ומקבל הודעות מוצפנות</td></tr>
+            <tr><td><strong>מודול הצפנה</strong></td><td>הצפנה מקצה לקצה -- השרת לא יכול לקרוא את התוכן</td></tr>
+            <tr><td><strong>ממיר אירועים</strong></td><td>מתרגם את אירועי Happy לפורמט של ClaUi כדי שהממשק יעבוד ללא שינוי</td></tr>
+            <tr><td><strong>מנהל הרשאות</strong></td><td>שומר על מצב ההרשאות ומונע שדרוג לאחור (מ-happy-patch)</td></tr>
+            <tr><td><strong>טוען הרשאות</strong></td><td>קורא את קובץ ההזדהות מהמחשב המקומי</td></tr>
+        </table>
+
+        <h2>הגנת הרשאות (מ-happy-patch)</h2>
+        <div class="benefit">
+            <p>אחד הלקחים החשובים מ-happy-patch: כשמשתמש מגדיר מצב "הרשאות מלאות", צריך להגן על ההגדרה הזו. הודעות נכנסות מהשרת יכולות לנסות להחזיר את ההרשאות ל"רגיל" -- המערכת תחסום ירידה כזו אוטומטית.</p>
+        </div>
+
+        <h2>שלבי ביצוע</h2>
+
+        <div class="phase">
+            <span class="phase-number">1</span>
+            <span class="phase-title">תשתית</span>
+            <p>התקנת ספריות, הגדרת טיפוסים, מודול הצפנה, טעינת הרשאות, מנהל הרשאות</p>
+            <span class="tag">5 קבצים חדשים</span>
+        </div>
+
+        <div class="phase">
+            <span class="phase-number">2</span>
+            <span class="phase-title">שכבת תקשורת</span>
+            <p>מנהל חיבור (REST API + WebSocket) וממיר אירועים</p>
+            <span class="tag">2 קבצים חדשים</span>
+        </div>
+
+        <div class="phase">
+            <span class="phase-number">3</span>
+            <span class="phase-title">אינטגרציה</span>
+            <p>טאב סשן Happy, מגשר הודעות בין הממיר לממשק המשתמש</p>
+            <span class="tag">2 קבצים חדשים</span>
+        </div>
+
+        <div class="phase">
+            <span class="phase-number">4</span>
+            <span class="phase-title">רישום וממשק</span>
+            <p>הוספת Happy לבורר הספקים, כפתורים בסרגל הסטטוס, הגדרות חדשות</p>
+            <span class="tag orange">5 קבצים קיימים לעדכון</span>
+        </div>
+
+        <div class="phase">
+            <span class="phase-number">5</span>
+            <span class="phase-title">בדיקות ואימות</span>
+            <p>בנייה, התקנה מקומית, בדיקת חיבור, בדיקת שליחה וקבלת הודעות</p>
+            <span class="tag green">אימות מלא</span>
+        </div>
+
+        <h2>מה לא משתנה</h2>
+        <ul>
+            <li>ממשק הצ'אט (React) -- <strong>אפס שינויים</strong></li>
+            <li>ספקי Claude ו-Codex הקיימים -- ללא שינוי בהתנהגות</li>
+            <li>מערכת הצוותים (Teams) -- ממשיכה לעבוד רגיל</li>
+            <li>היסטוריית סשנים מקומית -- ללא שינוי</li>
+        </ul>
+
+        <h2>תלויות חדשות</h2>
+        <table>
+            <tr><th>ספרייה</th><th>מטרה</th><th>גודל</th></tr>
+            <tr><td>socket.io-client</td><td>חיבור WebSocket לשרת Happy</td><td>קל (JavaScript טהור)</td></tr>
+            <tr><td>tweetnacl</td><td>הצפנת NaCl (מפתחות, חתימות)</td><td>קל מאוד (JavaScript טהור)</td></tr>
+        </table>
+
+        <div class="summary-box">
+            <h2>סיכום</h2>
+            <ul>
+                <li><strong>9 קבצים חדשים</strong> + עדכון ל-5 קבצים קיימים</li>
+                <li>הממשק הקיים לא משתנה -- רק מתווסף ספק שלישי</li>
+                <li>הצפנה מקצה לקצה -- השרת לא רואה את התוכן</li>
+                <li>הגנה מפני ירידה בהרשאות (לקח מ-happy-patch)</li>
+                <li>עוקב אחרי הדפוס המוכח של Codex -- סיכון נמוך</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
