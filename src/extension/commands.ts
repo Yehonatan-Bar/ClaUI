@@ -103,7 +103,7 @@ async function promptPlanFeatureActivation(
       { label: 'Hebrew', description: 'Plans will be generated in Hebrew', value: 'hebrew' },
       { label: 'English', description: 'Plans will be generated in English', value: 'english' },
     ],
-    { placeHolder: 'Which language should plans be written in?' }
+    { placeHolder: 'Which language should plans be written in?', ignoreFocusOut: true }
   );
 
   if (!language) {
@@ -273,6 +273,7 @@ export function registerCommands(
 
       const source = await vscode.window.showQuickPick(sourceItems, {
         placeHolder: 'Browse conversation history from...',
+        ignoreFocusOut: true,
       });
 
       if (!source) { return; }
@@ -322,6 +323,7 @@ export function registerCommands(
         placeHolder: 'Select a conversation to resume',
         matchOnDescription: true,
         matchOnDetail: true,
+        ignoreFocusOut: true,
       });
 
       if (picked) {
@@ -397,6 +399,7 @@ export function registerCommands(
       const picked = await vscode.window.showQuickPick(planFiles, {
         placeHolder: 'Select a plan document to open in browser',
         matchOnDescription: true,
+        ignoreFocusOut: true,
       });
 
       if (picked) {
