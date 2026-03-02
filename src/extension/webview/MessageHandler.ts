@@ -859,17 +859,26 @@ export class MessageHandler {
 
         case 'showHistory':
           this.log('Webview requested history view');
-          vscode.commands.executeCommand('claudeMirror.showHistory');
+          // Focus away from webview first to prevent QuickPick focus race
+          vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup').then(() => {
+            setTimeout(() => vscode.commands.executeCommand('claudeMirror.showHistory'), 120);
+          });
           break;
 
         case 'openPlanDocs':
           this.log('Webview requested plan docs viewer');
-          vscode.commands.executeCommand('claudeMirror.openPlanDocs');
+          // Focus away from webview first to prevent QuickPick focus race
+          vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup').then(() => {
+            setTimeout(() => vscode.commands.executeCommand('claudeMirror.openPlanDocs'), 120);
+          });
           break;
 
         case 'openFeedback':
           this.log('Webview requested feedback dialog');
-          vscode.commands.executeCommand('claudeMirror.sendFeedback');
+          // Focus away from webview first to prevent QuickPick focus race
+          vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup').then(() => {
+            setTimeout(() => vscode.commands.executeCommand('claudeMirror.sendFeedback'), 120);
+          });
           break;
 
         // ----- Bug Report -----
