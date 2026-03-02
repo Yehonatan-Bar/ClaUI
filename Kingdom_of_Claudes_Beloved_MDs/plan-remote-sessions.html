@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClaUi - Remote Sessions Plan</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      line-height: 1.7;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #58a6ff;
+      font-size: 2em;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #21262d;
+      padding-bottom: 12px;
+    }
+    .subtitle {
+      color: #8b949e;
+      font-size: 1.1em;
+      margin-bottom: 32px;
+    }
+    h2 {
+      color: #79c0ff;
+      font-size: 1.4em;
+      margin-top: 36px;
+      margin-bottom: 12px;
+      padding-right: 12px;
+      border-right: 4px solid #58a6ff;
+    }
+    h3 {
+      color: #d2a8ff;
+      font-size: 1.1em;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+    p { margin-bottom: 12px; }
+    .card {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card.highlight {
+      border-color: #58a6ff;
+      background: #0d1117;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 0.85em;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+    .badge-new { background: #238636; color: #fff; }
+    .badge-edit { background: #9e6a03; color: #fff; }
+    .badge-phase { background: #1f6feb; color: #fff; }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    ul li {
+      padding: 6px 0;
+      padding-right: 20px;
+      position: relative;
+    }
+    ul li::before {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 14px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #58a6ff;
+    }
+    .flow-diagram {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      direction: ltr;
+      margin: 16px 0;
+    }
+    .flow-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      margin: 8px 0;
+      flex-wrap: wrap;
+    }
+    .flow-box {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 0.9em;
+      color: #c9d1d9;
+    }
+    .flow-box.primary { border-color: #58a6ff; color: #58a6ff; }
+    .flow-box.new { border-color: #238636; color: #3fb950; }
+    .flow-box.server { border-color: #d2a8ff; color: #d2a8ff; }
+    .flow-arrow { color: #484f58; font-size: 1.2em; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+    }
+    th, td {
+      padding: 10px 14px;
+      text-align: right;
+      border-bottom: 1px solid #21262d;
+    }
+    th {
+      background: #161b22;
+      color: #79c0ff;
+      font-weight: 600;
+    }
+    tr:hover td { background: #161b2288; }
+    .phases {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 12px;
+    }
+    @media (max-width: 700px) {
+      .phases { grid-template-columns: 1fr; }
+    }
+    .phase-card {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .phase-card h3 {
+      margin-top: 0;
+    }
+    .phase-num {
+      display: inline-block;
+      background: #1f6feb;
+      color: #fff;
+      width: 28px;
+      height: 28px;
+      line-height: 28px;
+      text-align: center;
+      border-radius: 50%;
+      font-size: 0.85em;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+    .risk-low { color: #3fb950; }
+    .risk-med { color: #d29922; }
+    .summary-box {
+      background: #161b22;
+      border: 1px solid #238636;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 32px;
+    }
+    .summary-box h2 {
+      border-right-color: #238636;
+      color: #3fb950;
+    }
+    .deps-box {
+      direction: ltr;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 12px 16px;
+      font-family: 'Consolas', monospace;
+      font-size: 0.9em;
+      margin: 8px 0;
+      color: #8b949e;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <h1>Remote Sessions - ClaUi</h1>
+    <p class="subtitle">
+      תוכנית פיצ'ר: חיבור ClaUi כלקוח של Happy Coder לצפייה ושליטה מרחוק בסשנים של AI
+    </p>
+
+    <!-- What & Why -->
+    <h2>מה ולמה?</h2>
+    <div class="card highlight">
+      <p>
+        <strong>הבעיה:</strong> כיום ClaUi עובד רק עם תהליכי Claude/Codex מקומיים. אם רוצים לצפות בסשן AI ממכשיר אחר, או לשלוט בו מרחוק -- אין דרך.
+      </p>
+      <p>
+        <strong>הפתרון:</strong> הוספת ספק (Provider) שלישי בשם <strong>"Remote"</strong> שמתחבר לשרת <strong>Happy Coder</strong> דרך WebSocket. המשתמש יבחר "Remote" בתפריט הספקים, יזין כתובת שרת, ו-ClaUi יציג את הסשן המרוחק בדיוק כמו סשן מקומי -- עם הזרמת טקסט, פעילות כלים, ועלויות.
+      </p>
+      <p>
+        <strong>היתרון:</strong> ממשק ה-UI הקיים (React) כבר מנותק מהספק -- הוא מקבל הודעות מוגדרות ומציג אותן. כל מה שנדרש הוא "תרגום" של פרוטוקול Happy לאותן הודעות פנימיות.
+      </p>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <h2>ארכיטקטורה</h2>
+    <div class="flow-diagram">
+      <div class="flow-row">
+        <div class="flow-box server">Happy Server</div>
+        <div class="flow-arrow">&harr;</div>
+        <div class="flow-box new">HappyClient (Socket.IO)</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box new">RemoteDemux</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box new">RemoteMessageHandler</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box primary">Webview (React)</div>
+      </div>
+      <div style="margin-top: 12px; color: #8b949e; font-size: 0.85em;">
+        Green = new components &nbsp;|&nbsp; Blue = existing &nbsp;|&nbsp; Purple = external
+      </div>
+    </div>
+    <p>
+      הזרימה: השרת המרוחק שולח הודעות מוצפנות &larr; HappyClient מפענח ומעביר &larr; RemoteDemux מתרגם לאירועים פנימיים &larr; RemoteMessageHandler שולח לממשק המשתמש.
+    </p>
+
+    <!-- What Changes -->
+    <h2>מה משתנה?</h2>
+
+    <h3>קבצים חדשים <span class="badge badge-new">6 קבצים</span></h3>
+    <table>
+      <tr><th>קובץ</th><th>תפקיד</th></tr>
+      <tr><td>HappyTypes.ts</td><td>הגדרות טיפוסים לפרוטוקול Happy</td></tr>
+      <tr><td>HappyCrypto.ts</td><td>הצפנה מקצה לקצה (AES-256-GCM + ed25519)</td></tr>
+      <tr><td>HappyClient.ts</td><td>לקוח WebSocket -- חיבור, אימות, שליחה/קבלה, התחברות מחדש</td></tr>
+      <tr><td>RemoteDemux.ts</td><td>מתרגם אירועי Happy לאירועים פנימיים של ClaUi</td></tr>
+      <tr><td>RemoteSessionTab.ts</td><td>טאב שלישי (כמו Claude/Codex) -- מנהל את כל מחזור החיים</td></tr>
+      <tr><td>RemoteMessageHandler.ts</td><td>גשר בין אירועים פנימיים לממשק המשתמש</td></tr>
+    </table>
+
+    <h3>קבצים מעודכנים <span class="badge badge-edit">5 קבצים</span></h3>
+    <table>
+      <tr><th>קובץ</th><th>שינוי</th></tr>
+      <tr><td>webview-messages.ts</td><td>הוספת 'remote' לרשימת הספקים</td></tr>
+      <tr><td>TabManager.ts</td><td>ניתוב ליצירת טאב מרוחק + עדכון טיפוסים</td></tr>
+      <tr><td>package.json</td><td>הגדרות חדשות (כתובת שרת, התחברות מחדש)</td></tr>
+      <tr><td>ProviderSelector.tsx</td><td>הוספת אפשרות "Remote" לתפריט</td></tr>
+      <tr><td>commands.ts</td><td>טיפול בתצוגת ספק "Remote"</td></tr>
+    </table>
+
+    <p><strong>ללא שינוי:</strong> ממשק React, חנות Zustand, הוקים -- הם כבר מנותקים מהספק ולא צריכים שינוי.</p>
+
+    <!-- Phases -->
+    <h2>שלבי ביצוע</h2>
+    <div class="phases">
+      <div class="phase-card">
+        <h3><span class="phase-num">1</span> בסיס: טיפוסים והצפנה</h3>
+        <ul>
+          <li>הגדרת כל הטיפוסים של הפרוטוקול</li>
+          <li>מודול הצפנה (מפתח, חתימה, הצפנה/פענוח)</li>
+          <li>התקנת ספריות: socket.io-client, tweetnacl</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <h3><span class="phase-num">2</span> לקוח ותעלת אירועים</h3>
+        <ul>
+          <li>לקוח Socket.IO עם אימות</li>
+          <li>מתרגם אירועים (RemoteDemux)</li>
+          <li>חיבור, שליחה, קבלת הודעות</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <h3><span class="phase-num">3</span> טאב וגשר הודעות</h3>
+        <ul>
+          <li>RemoteSessionTab -- טאב שלישי</li>
+          <li>RemoteMessageHandler -- גשר ל-UI</li>
+          <li>שליחת הודעות משתמש + הזרמת תשובות</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <h3><span class="phase-num">4</span> אינטגרציה ותיעוד</h3>
+        <ul>
+          <li>עדכון TabManager, package.json, ProviderSelector</li>
+          <li>חיבור מחדש אוטומטי</li>
+          <li>תיעוד טכני ו-SR-PTD</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Security -->
+    <h2>אבטחה</h2>
+    <div class="card">
+      <ul>
+        <li><strong>הצפנה מקצה לקצה:</strong> כל ההודעות מוצפנות ב-AES-256-GCM לפני שנשלחות. השרת לעולם לא רואה טקסט גלוי.</li>
+        <li><strong>אימות קריפטוגרפי:</strong> חתימה דיגיטלית ed25519 (ללא סיסמאות). המפתח הפרטי נשמר ב-SecretStorage המוגן של VS Code.</li>
+        <li><strong>חיבור מוצפן:</strong> WebSocket דרך HTTPS/WSS.</li>
+      </ul>
+    </div>
+
+    <!-- Dependencies -->
+    <h2>תלויות חדשות</h2>
+    <div class="deps-box">
+      socket.io-client (~56KB) -- WebSocket client<br>
+      tweetnacl (~7KB) -- Ed25519 + encryption
+    </div>
+    <p>שתי ספריות קטנות בלבד. AES-256-GCM משתמש ב-crypto המובנה של Node.js.</p>
+
+    <!-- Risks -->
+    <h2>סיכונים</h2>
+    <table>
+      <tr><th>סיכון</th><th>רמה</th><th>מענה</th></tr>
+      <tr>
+        <td>פרוטוקול Happy ישתנה</td>
+        <td class="risk-low">נמוך</td>
+        <td>הטיפוסים מרוכזים ב-HappyTypes.ts -- קל לעדכן</td>
+      </tr>
+      <tr>
+        <td>ניתוק רשת</td>
+        <td class="risk-low">נמוך</td>
+        <td>התחברות מחדש אוטומטית עם backoff אקספוננציאלי</td>
+      </tr>
+      <tr>
+        <td>כשל בפענוח הצפנה</td>
+        <td class="risk-low">נמוך</td>
+        <td>הודעת שגיאה בצ'אט, לא קריסה</td>
+      </tr>
+      <tr>
+        <td>שבירת ספקים קיימים</td>
+        <td class="risk-low">נמוך</td>
+        <td>קוד מבודד לחלוטין -- אין נגיעה בקוד Claude/Codex</td>
+      </tr>
+    </table>
+
+    <!-- Summary -->
+    <div class="summary-box">
+      <h2>סיכום</h2>
+      <p>
+        הפיצ'ר מוסיף יכולת צפייה ושליטה מרחוק בסשנים של AI דרך שרת Happy Coder.
+        הוא מבוסס על אותה ארכיטקטורה שכבר הוכחה בהוספת ספק Codex --
+        6 קבצים חדשים, 5 עדכונים קטנים, אפס שינויים בממשק React.
+        הקוד מבודד לחלוטין ולא משפיע על הפונקציונליות הקיימת.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>

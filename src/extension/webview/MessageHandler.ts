@@ -157,6 +157,9 @@ export class MessageHandler {
   private pendingApprovalCycleResultObserved = false;
   /** Delayed fallback: nudge Claude to proceed if ExitPlanMode approve did not auto-resume */
   private exitPlanApproveResumeFallbackTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Set when a compact request is sent to CLI. On next messageStart, resets exitPlanModeProcessed
+   *  so the model can call ExitPlanMode again after compaction re-activates plan mode. */
+  private compactPending = false;
   private exitPlanApproveResumeFallbackCycleId: number | null = null;
 
   /** Activity summarizer: periodically summarizes tool activity via Haiku */
@@ -499,6 +502,7 @@ export class MessageHandler {
           break;
 
         case 'compact':
+          this.compactPending = true;
           this.control.compact(msg.instructions);
           break;
 
@@ -1060,6 +1064,7 @@ export class MessageHandler {
               this.log(`ExitPlanMode ${msg.action} - closing bar without sending user message (CLI auto-approves)`);
               if (msg.action === 'approveClearBypass') {
                 this.log('Plan approval: also compacting context');
+                this.compactPending = true;
                 this.control.compact();
               } else if (msg.action === 'approveManual') {
                 this.log('Plan approval: switching to supervised mode');
@@ -1077,6 +1082,7 @@ export class MessageHandler {
             this.control.sendText('Continue with the implementation.');
           } else if (msg.action === 'approveClearBypass') {
             this.log('Plan approval: approving, then clearing context (compact)');
+            this.compactPending = true;
             this.control.sendText('Continue with the implementation. Please compact context to free up space.');
             this.control.compact();
           } else if (msg.action === 'approveManual') {
@@ -2385,6 +2391,14 @@ export class MessageHandler {
         this.currentMessageToolNames = [];
         this.pendingApprovalTool = null;
         this.approvalResponseProcessed = false;
+        // After context compaction, the model may re-enter plan mode and call
+        // ExitPlanMode without first calling EnterPlanMode. Reset the guard so
+        // the approval bar can show again. See BUG_EXITPLANMODE_INFINITE_LOOP.md Bug 9.
+        if (this.compactPending) {
+          this.log('Post-compact messageStart: resetting exitPlanModeProcessed');
+          this.exitPlanModeProcessed = false;
+          this.compactPending = false;
+        }
         this.toolBlockNames.clear();
         this.toolBlockContexts.clear();
         this.currentAdventureArtifacts.clear();
