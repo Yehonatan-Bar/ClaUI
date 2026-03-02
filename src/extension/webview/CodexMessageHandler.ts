@@ -11,6 +11,7 @@ import type { WebviewBridge } from './MessageHandler';
 import type { ContentBlock } from '../types/stream-json';
 import { setStoredApiKey, maskApiKey } from '../process/envUtils';
 import { MessageTranslator } from '../session/MessageTranslator';
+import { BugReportService } from '../feedback/BugReportService';
 import type {
   CodexReasoningEffort,
   CodexModelOption,
@@ -97,6 +98,15 @@ export class CodexMessageHandler {
   private autoSetupCodexCliInProgress = false;
   private webviewPostQueue: Promise<void> = Promise.resolve();
   private messageTranslator: MessageTranslator | null = null;
+  private bugReportService: BugReportService | null = null;
+  private extensionVersion = '0.0.0';
+  private logDir = '';
+
+  /** Set extension metadata for bug reports */
+  setExtensionMeta(version: string, logDir: string): void {
+    this.extensionVersion = version;
+    this.logDir = logDir;
+  }
 
   /** Provide SecretStorage for API key management */
   setSecrets(secrets: vscode.SecretStorage): void {
@@ -495,6 +505,94 @@ export class CodexMessageHandler {
             .catch((err) => {
               this.webview.postMessage({ type: 'error', message: `Edit-and-resend failed: ${this.errMsg(err)}` });
             });
+          break;
+
+        case 'openFeedback':
+          vscode.commands.executeCommand('claudeMirror.sendFeedback');
+          break;
+
+        case 'feedbackAction': {
+          const action = msg.action;
+          this.log(`Codex feedback action: ${action}`);
+          if (action === 'bug') {
+            void (async () => {
+              try {
+                await vscode.commands.executeCommand('vscode.openIssueReporter', {
+                  extensionId: 'JhonBar.claude-code-mirror',
+                });
+              } catch {
+                try {
+                  await vscode.commands.executeCommand('workbench.action.openIssueReporter');
+                } catch {
+                  await vscode.env.openExternal(vscode.Uri.parse('https://github.com/Yehonatan-Bar/ClaUI/issues'));
+                }
+              }
+            })();
+          } else if (action === 'feature') {
+            const url = 'https://github.com/Yehonatan-Bar/ClaUI/issues/new'
+              + '?labels=enhancement'
+              + '&title=Feature%20request%3A%20'
+              + '&body=' + encodeURIComponent(
+                ['## What would you like to see?', '', '', '## Why is it useful?', '', '', '## Additional context / screenshots', ''].join('\n')
+              );
+            void vscode.env.openExternal(vscode.Uri.parse(url));
+          } else if (action === 'email') {
+            const mailSubject = encodeURIComponent('ClaUi Feedback');
+            const mailBody = encodeURIComponent(
+              ['Hi,', '', 'Feedback for ClaUi:', '', '', `Extension version: ${this.extensionVersion}`, `VS Code version: ${vscode.version}`, '', '(Optional) Steps to reproduce / context:', ''].join('\n')
+            );
+            void vscode.env.openExternal(vscode.Uri.parse(`mailto:yonzbar@gmail.com?subject=${mailSubject}&body=${mailBody}`));
+          } else if (action === 'fullBugReport') {
+            this.webview.postMessage({ type: 'bugReportOpen' });
+          }
+          break;
+        }
+
+        case 'openPlanDocs':
+          vscode.commands.executeCommand('claudeMirror.openPlanDocs');
+          break;
+
+        // ----- Bug Report (Codex) -----
+        case 'bugReportInit': {
+          this.log('[BugReport] Codex init requested');
+          void (async () => {
+            const apiKey = await this.getApiKey();
+            this.bugReportService = new BugReportService(
+              this.webview,
+              this.log,
+              this.extensionVersion,
+              this.logDir,
+              apiKey,
+            );
+            this.bugReportService.startAutoCollection();
+          })();
+          break;
+        }
+        case 'bugReportChat':
+          if (this.bugReportService) {
+            this.bugReportService.handleChatMessage(msg.message);
+          }
+          break;
+        case 'bugReportApproveScript':
+          if (this.bugReportService) {
+            this.bugReportService.executeScript(msg.command, msg.index);
+          }
+          break;
+        case 'bugReportSubmit':
+          if (this.bugReportService) {
+            this.bugReportService.submit(msg.mode, msg.description);
+          }
+          break;
+        case 'bugReportGetPreview':
+          if (this.bugReportService) {
+            this.bugReportService.getPreview();
+          }
+          break;
+        case 'bugReportClose':
+          if (this.bugReportService) {
+            this.bugReportService.dispose();
+            this.bugReportService = null;
+          }
           break;
 
         default:
