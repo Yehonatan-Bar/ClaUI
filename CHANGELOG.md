@@ -1,5 +1,19 @@
 # ClaUi - Changelog
 
+## v0.1.68 - 2026-03-02
+
+**Bug Fix: Plan mode stuck after context compaction**
+
+After a plan cycle completed and context was later compacted, the model could get permanently stuck in plan mode. The `exitPlanModeProcessed` guard (which prevents infinite ExitPlanMode loops) was never reset after compaction, so when the model re-entered plan mode and called ExitPlanMode, the approval bar was suppressed and the user had no way to proceed.
+
+Fix: Added a `compactPending` flag that resets `exitPlanModeProcessed` on the first assistant turn after compaction, giving the model a clean slate to trigger the approval bar again.
+
+**Bug Fix: ExitPlanMode stale-suppression deadlock after approval**
+
+In some sessions, Claude started implementation after plan approval (`TodoWrite`/`Read`) and then called `ExitPlanMode` again. The extension still treated that call as stale because `exitPlanModeProcessed` remained true, so the approval bar was suppressed and the session deadlocked in plan mode.
+
+Fix: Track post-approval non-plan activity and, when detected, treat a later `ExitPlanMode` call as a fresh cycle (reset stale guard + show approval bar) instead of suppressing it.
+
 ## v0.1.67 - 2026-03-02
 
 **Bug Fix: Duplicate user prompt display**

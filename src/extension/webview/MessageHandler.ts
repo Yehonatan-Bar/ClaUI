@@ -147,6 +147,8 @@ export class MessageHandler {
    *  Reset to false when EnterPlanMode is detected (new plan cycle starts).
    *  Used to suppress stale re-triggers from late assistantMessage events or replayed sessions. */
   private exitPlanModeProcessed = false;
+  /** True once non-plan tool activity is seen after ExitPlanMode was approved. */
+  private postExitPlanNonPlanActivityObserved = false;
   /** Monotonic ID for approval-bar cycles (ExitPlanMode / AskUserQuestion) */
   private nextApprovalCycleId = 1;
   /** Cycle ID for the currently visible/preserved approval bar */
@@ -200,6 +202,9 @@ export class MessageHandler {
   private lastUserMessageText = '';
   /** Ring buffer of last 5 user message texts (for bug-repeat detection) */
   private recentUserMessages: string[] = [];
+  /** Dedup: last userMessage text posted to webview, with timestamp.
+   *  Prevents duplicate display from key-repeat, CLI echo, or any other source. */
+  private lastPostedUserMsg: { text: string; time: number } | null = null;
 
   /** Turn counter for Session Vitals (reset on session clear) */
   private turnIndex = 0;
@@ -403,6 +408,26 @@ export class MessageHandler {
     return records;
   }
 
+  /**
+   * Post a userMessage to the webview, deduplicating identical text within 2 s.
+   * This is the single chokepoint for ALL user-message display: optimistic send,
+   * CLI echo, edit-and-resend, and plan-feedback -- so dedup here catches every
+   * duplicate source (key-repeat, CLI echo after optimistic, double postMessage, etc.).
+   */
+  private postUserMessage(content: ContentBlock[]): void {
+    const text = content
+      .filter((b) => b.type === 'text')
+      .map((b) => (b as any).text || '')
+      .join('');
+    const now = Date.now();
+    if (this.lastPostedUserMsg && this.lastPostedUserMsg.text === text && now - this.lastPostedUserMsg.time < 2000) {
+      this.log(`Suppressed duplicate userMessage: "${text.slice(0, 60)}..."`);
+      return;
+    }
+    this.lastPostedUserMsg = { text, time: now };
+    this.webview.postMessage({ type: 'userMessage', content });
+  }
+
   /** Wire up all event listeners */
   initialize(): void {
     this.bindWebviewMessages();
@@ -427,19 +452,14 @@ export class MessageHandler {
           if (this.pendingApprovalTool) {
             const pendingNorm = this.pendingApprovalTool.trim().toLowerCase();
             if (pendingNorm === 'exitplanmode' || pendingNorm.endsWith('.exitplanmode')) {
-              this.planModeActive = false;
-              this.exitPlanModeProcessed = true;
-              this.log('ExitPlanMode marked as processed (user sent text while approval bar was active)');
+              this.markExitPlanModeProcessed('user sent text while ExitPlanMode approval bar was active');
             }
           }
           this.cancelExitPlanApproveResumeFallback();
           this.clearApprovalTracking();
           this.achievementService.onUserPrompt(this.tabId, msg.text);
           // Optimistic: show user message in UI immediately (before CLI echoes it back)
-          this.webview.postMessage({
-            type: 'userMessage',
-            content: [{ type: 'text', text: msg.text } as ContentBlock],
-          });
+          this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock]);
           this.control.sendText(msg.text);
           this.webview.postMessage({ type: 'processBusy', busy: true });
           this.triggerSessionNaming(msg.text);
@@ -453,9 +473,7 @@ export class MessageHandler {
           if (this.pendingApprovalTool) {
             const pendingNorm2 = this.pendingApprovalTool.trim().toLowerCase();
             if (pendingNorm2 === 'exitplanmode' || pendingNorm2.endsWith('.exitplanmode')) {
-              this.planModeActive = false;
-              this.exitPlanModeProcessed = true;
-              this.log('ExitPlanMode marked as processed (user sent images while approval bar was active)');
+              this.markExitPlanModeProcessed('user sent images while ExitPlanMode approval bar was active');
             }
           }
           this.cancelExitPlanApproveResumeFallback();
@@ -478,7 +496,7 @@ export class MessageHandler {
               },
             } as ContentBlock);
           }
-          this.webview.postMessage({ type: 'userMessage', content: imgContent });
+          this.postUserMessage(imgContent);
           this.control.sendWithImages(msg.text, msg.images);
           this.webview.postMessage({ type: 'processBusy', busy: true });
           this.triggerSessionNaming(msg.text);
@@ -1033,8 +1051,7 @@ export class MessageHandler {
 
           if (isExitPlanMode) {
             // Plan mode cycle complete
-            this.planModeActive = false;
-            this.exitPlanModeProcessed = true;
+            this.markExitPlanModeProcessed(`planApprovalResponse:${msg.action}`);
           }
 
           // ExitPlanMode: DO NOT send approve/reject text to the CLI.
@@ -1052,13 +1069,10 @@ export class MessageHandler {
               // feedback directs the model to change course. Reset
               // exitPlanModeProcessed so a new ExitPlanMode notification can
               // appear after the model revises the plan.
-              this.exitPlanModeProcessed = false;
+              this.resetExitPlanModeProcessed('ExitPlanMode feedback requested plan revision');
               this.log(`ExitPlanMode feedback - sending user feedback to CLI`);
               // Optimistic: show user message in UI immediately
-              this.webview.postMessage({
-                type: 'userMessage',
-                content: [{ type: 'text', text: msg.feedback.trim() } as ContentBlock],
-              });
+              this.postUserMessage([{ type: 'text', text: msg.feedback.trim() } as ContentBlock]);
               this.control.sendText(msg.feedback.trim());
             } else {
               this.log(`ExitPlanMode ${msg.action} - closing bar without sending user message (CLI auto-approves)`);
@@ -1142,7 +1156,7 @@ export class MessageHandler {
           this.webview.saveProjectAnalyticsNow?.();
           this.clearApprovalTracking();
           this.planModeActive = false;
-          this.exitPlanModeProcessed = false;
+          this.resetExitPlanModeProcessed('edit-and-resend restart');
           this.activitySummarizer?.reset();
           this.turnRecords = [];
           this.achievementService.abandonSession(this.tabId);
@@ -2223,8 +2237,10 @@ export class MessageHandler {
         // Track plan mode: EnterPlanMode sets the flag so ExitPlanMode knows it's legitimate
         if (isEnterPlanModeTool(data.toolName)) {
           this.planModeActive = true;
-          this.exitPlanModeProcessed = false;
+          this.resetExitPlanModeProcessed('EnterPlanMode detected');
           this.log('Plan mode activated (EnterPlanMode detected)');
+        } else {
+          this.notePostExitPlanNonPlanActivity(data.toolName);
         }
         // Track for activity summarizer enrichment
         this.toolBlockNames.set(data.blockIndex, data.toolName);
@@ -2396,7 +2412,7 @@ export class MessageHandler {
         // the approval bar can show again. See BUG_EXITPLANMODE_INFINITE_LOOP.md Bug 9.
         if (this.compactPending) {
           this.log('Post-compact messageStart: resetting exitPlanModeProcessed');
-          this.exitPlanModeProcessed = false;
+          this.resetExitPlanModeProcessed('post-compact messageStart');
           this.compactPending = false;
         }
         this.toolBlockNames.clear();
@@ -2430,10 +2446,12 @@ export class MessageHandler {
         const userText = extractTextFromContent(event.message.content).slice(0, 600);
         this.lastUserMessageText = userText;
         this.recentUserMessages = [...this.recentUserMessages.slice(-4), userText];
-        this.webview.postMessage({
-          type: 'userMessage',
-          content: event.message.content,
-        });
+        // Post to webview (postUserMessage deduplicates against the optimistic send)
+        this.postUserMessage(
+          Array.isArray(event.message.content)
+            ? event.message.content
+            : [{ type: 'text', text: String(event.message.content) } as ContentBlock]
+        );
       }
     );
 
@@ -2682,6 +2700,33 @@ export class MessageHandler {
     };
   }
 
+  /** Mark ExitPlanMode as handled by the user and start stale-event suppression. */
+  private markExitPlanModeProcessed(reason: string): void {
+    this.planModeActive = false;
+    this.exitPlanModeProcessed = true;
+    this.postExitPlanNonPlanActivityObserved = false;
+    this.log(`ExitPlanMode marked as processed (${reason})`);
+  }
+
+  /** Reset ExitPlanMode stale-event suppression state. */
+  private resetExitPlanModeProcessed(reason: string): void {
+    this.exitPlanModeProcessed = false;
+    this.postExitPlanNonPlanActivityObserved = false;
+    this.log(`ExitPlanMode processed flag reset (${reason})`);
+  }
+
+  /** Track concrete post-approval execution so a future ExitPlanMode is treated as a new cycle. */
+  private notePostExitPlanNonPlanActivity(toolName: string): void {
+    if (!this.exitPlanModeProcessed || this.postExitPlanNonPlanActivityObserved || this.pendingApprovalTool) {
+      return;
+    }
+    if (isApprovalToolName(toolName) || isEnterPlanModeTool(toolName)) {
+      return;
+    }
+    this.postExitPlanNonPlanActivityObserved = true;
+    this.log(`ExitPlanMode cycle: observed post-approval non-plan activity via ${toolName}`);
+  }
+
   /** Reset tool name tracking and pending approval state */
   private clearApprovalTracking(options?: { preserveApprovalCycle?: boolean }): void {
     this.currentMessageToolNames = [];
@@ -2833,14 +2878,19 @@ export class MessageHandler {
       return;
     }
     // Suppress stale ExitPlanMode notifications when an ExitPlanMode cycle already
-    // completed in this session. This prevents re-triggers from late assistantMessage
-    // events, replayed sessions, or the fallback detection path after messageStart
-    // resets other guards. Only reset when EnterPlanMode starts a new plan cycle.
+    // completed in this session. If we already saw concrete non-plan activity
+    // after that approval (e.g., TodoWrite/Read), treat the new ExitPlanMode call
+    // as a fresh cycle instead of a stale replay to avoid deadlock in plan mode.
     const norm = toolName.trim().toLowerCase();
     const isExitPlanMode = norm === 'exitplanmode' || norm.endsWith('.exitplanmode');
     if (isExitPlanMode && this.exitPlanModeProcessed) {
-      this.log(`Suppressing stale ExitPlanMode notification - already processed in this plan cycle`);
-      return;
+      if (this.postExitPlanNonPlanActivityObserved) {
+        this.log('ExitPlanMode detected after post-approval execution activity; treating as a new approval cycle');
+        this.resetExitPlanModeProcessed('post-approval non-plan activity detected');
+      } else {
+        this.log(`Suppressing stale ExitPlanMode notification - already processed in this plan cycle`);
+        return;
+      }
     }
     // NOTE: We intentionally do NOT auto-approve ExitPlanMode by sending user
     // messages. The CLI already auto-approves ExitPlanMode (via bypassPermissions

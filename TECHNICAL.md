@@ -56,9 +56,15 @@ claude-code-mirror/
 |   |   |   +-- envUtils.ts               #   Shared env sanitization & API key management
 |   |   |   +-- StreamDemux.ts            #   Parses JSON lines, routes events
 |   |   |   +-- ControlProtocol.ts        #   Higher-level command API
+|   |   +-- remote/
+|   |   |   +-- HappyTypes.ts             #   Happy Coder protocol type definitions
+|   |   |   +-- HappyCrypto.ts            #   E2E encryption (ed25519 + AES-256-GCM)
+|   |   |   +-- HappyClient.ts            #   Socket.IO client, auth, reconnection
+|   |   |   +-- RemoteDemux.ts            #   Translates Happy envelopes to internal events
 |   |   +-- webview/
 |   |   |   +-- WebviewProvider.ts        #   buildWebviewHtml() utility + legacy class
 |   |   |   +-- MessageHandler.ts         #   postMessage bridge (uses WebviewBridge interface)
+|   |   |   +-- RemoteMessageHandler.ts   #   Remote-session webview bridge
 |   |   +-- session/
 |   |   |   +-- SessionTab.ts             #   Per-tab bundle (process+demux+panel+handler)
 |   |   |   +-- TabManager.ts             #   Manages all tabs, tracks active tab
@@ -78,6 +84,7 @@ claude-code-mirror/
 |   |   |   +-- TokenUsageRatioTracker.ts #   Correlates token consumption with usage % (global, persisted)
 |   |   |   +-- SessionDiscovery.ts       #   Discover all Claude sessions from ~/.claude/projects/ filesystem
 |   |   |   +-- SessionFork.ts            #   Phase 3 stub (rewind)
+|   |   |   +-- RemoteSessionTab.ts      #   Per-tab bundle for Remote provider (Happy Coder relay)
 |   |   +-- terminal/                     #   Phase 2 stubs
 |   |   +-- feedback/
 |   |   |   +-- FormspreeService.ts      #   Formspree.io feedback submission (text + file attachments)
@@ -335,7 +342,7 @@ claude-code-mirror/
 **File Mention (@)** - Inline autocomplete triggered by typing `@` in the chat textarea. Searches workspace files via `vscode.workspace.findFiles()` with 150ms debounce, showing results in a popup above the input. Navigate with ArrowUp/Down, select with Enter/Tab/click. Replaces `@query` with the relative file path. Uses custom DOM events for extension-to-webview communication (same pattern as prompt history). All state is local to the `useFileMention` hook (not in Zustand).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/FILE_MENTION.md`
 
-**Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'` and shows a CLI-matching 4-option approval bar: (1) clear context + bypass permissions, (2) bypass permissions, (3) manually approve edits, (4) type feedback. For `ExitPlanMode`, approve actions close the bar without immediately sending user messages (the CLI usually auto-approves via bypassPermissions/allowedTools; immediate text would create spurious turns causing infinite loops). A delayed fallback nudge sends `"Yes, proceed with the plan."` only if no post-approval **meaningful progress** (tool activity or streamed text) is observed within a short timeout; `messageStart` / `result` alone are not treated as sufficient evidence of execution because Claude can emit an empty post-ExitPlanMode turn. Reject/feedback actions send text to the CLI. For `AskUserQuestion`, responses are sent as user messages. Option 1 also triggers context compaction. Option 3 switches to supervised permission mode. Context usage percentage is shown when token data is available. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON.
+**Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'` and shows a CLI-matching 4-option approval bar: (1) clear context + bypass permissions, (2) bypass permissions, (3) manually approve edits, (4) type feedback. For `ExitPlanMode`, approve actions close the bar without immediately sending user messages (the CLI usually auto-approves via bypassPermissions/allowedTools; immediate text would create spurious turns causing infinite loops). A delayed fallback nudge sends `"Continue with the implementation."` only if no post-approval **meaningful progress** is observed within a short timeout; if `result/success` already arrived (idle), it nudges immediately. `messageStart` / `result` alone are not treated as sufficient evidence of active execution because Claude can emit an empty post-ExitPlanMode turn. If non-plan execution activity (e.g., `TodoWrite`, `Read`) is observed after approval, a later `ExitPlanMode` call is treated as a fresh cycle (not stale suppression) so the approval bar can reappear instead of deadlocking. Reject/feedback actions send text to the CLI. For `AskUserQuestion`, responses are sent as user messages. Option 1 also triggers context compaction. Option 3 switches to supervised permission mode. Context usage percentage is shown when token data is available. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 > Bug history: `Kingdom_of_Claudes_Beloved_MDs/BUG_EXITPLANMODE_INFINITE_LOOP.md`
 
@@ -393,6 +400,9 @@ claude-code-mirror/
 **Agent Teams** -- Visualization and flow control for Claude Code's experimental Agent Teams feature. Auto-detects team creation/deletion from CLI stream (`TeamCreate`/`TeamDelete` tool_use blocks). Watches `~/.claude/teams/{name}/` and `~/.claude/tasks/{name}/` directories for live state updates (config, tasks, inbox messages) via `TeamWatcher` (EventEmitter, 100ms debounce, 2s polling fallback). Full-screen overlay panel with 4 tabs: Topology (agent cards with status dots and pulse animation), Tasks (kanban board with inline add), Messages (chronological feed with inline send), Activity (per-agent status with shutdown). Draggable floating widget shows team name, agent counts, and task progress bar. User actions (send message, create/update task, shutdown agent) write directly to team files on disk via `TeamActions`. Backend: `TeamDetector`, `TeamWatcher`, `TeamActions`, `TeamTypes`. Frontend: `TeamPanel`, `TeamStatusWidget`, `TopologyTab`, `TasksTab`, `MessagesTab`, `ActivityTab`. Keybinding: `Ctrl+Alt+T`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/AGENT_TEAMS.md`
 
+**Remote Sessions** -- Third provider type (`'remote'`) connecting ClaUi to a Happy Coder relay server via Socket.IO WebSocket. Enables monitoring and interacting with remote AI coding sessions from any machine. Architecture: `HappyClient` (Socket.IO + auth + reconnection), `HappyCrypto` (ed25519 keypair + AES-256-GCM encryption via VS Code SecretStorage), `RemoteDemux` (translates Happy envelopes to internal events), `RemoteMessageHandler` (webview bridge with `REMOTE_PROVIDER_CAPABILITIES`), `RemoteSessionTab` (orchestrator implementing `WebviewBridge` + `RemoteSessionController`). Settings: `claudeMirror.remote.serverUrl`, `claudeMirror.remote.autoReconnect`, `claudeMirror.remote.keepAliveIntervalMs`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/REMOTE_SESSIONS.md`
+
 ---
 
 ## Configuration
@@ -444,6 +454,9 @@ claude-code-mirror/
 | `claudeMirror.teams.enabled` | `true` | Enable Agent Teams detection and visualization |
 | `claudeMirror.teams.autoOpenPanel` | `true` | Auto-open team panel when a team is detected |
 | `claudeMirror.teams.pollIntervalMs` | `2000` | Polling interval for team file watching (ms) |
+| `claudeMirror.remote.serverUrl` | `""` | URL of the Happy Coder relay server |
+| `claudeMirror.remote.autoReconnect` | `true` | Auto-reconnect on disconnection |
+| `claudeMirror.remote.keepAliveIntervalMs` | `30000` | Keepalive heartbeat interval (ms) |
 
 ---
 
@@ -460,6 +473,8 @@ claude-code-mirror/
 | webpack 5 | Bundling (dual-target) |
 | ts-loader | TypeScript compilation in webpack |
 | css-loader + style-loader | CSS bundling for webview |
+| socket.io-client | Socket.IO client for Happy Coder relay (Remote provider) |
+| tweetnacl | Ed25519 keypair + NaCl crypto for Remote auth |
 
 ---
 
