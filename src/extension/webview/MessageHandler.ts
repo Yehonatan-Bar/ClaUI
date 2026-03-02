@@ -859,27 +859,55 @@ export class MessageHandler {
 
         case 'showHistory':
           this.log('Webview requested history view');
-          // Focus away from webview first to prevent QuickPick focus race
-          vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup').then(() => {
-            setTimeout(() => vscode.commands.executeCommand('claudeMirror.showHistory'), 120);
-          });
+          vscode.commands.executeCommand('claudeMirror.showHistory');
           break;
 
         case 'openPlanDocs':
           this.log('Webview requested plan docs viewer');
-          // Focus away from webview first to prevent QuickPick focus race
-          vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup').then(() => {
-            setTimeout(() => vscode.commands.executeCommand('claudeMirror.openPlanDocs'), 120);
-          });
+          vscode.commands.executeCommand('claudeMirror.openPlanDocs');
           break;
 
         case 'openFeedback':
-          this.log('Webview requested feedback dialog');
-          // Focus away from webview first to prevent QuickPick focus race
-          vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup').then(() => {
-            setTimeout(() => vscode.commands.executeCommand('claudeMirror.sendFeedback'), 120);
-          });
+          this.log('Webview requested feedback dialog (legacy)');
+          vscode.commands.executeCommand('claudeMirror.sendFeedback');
           break;
+
+        case 'feedbackAction': {
+          const action = msg.action;
+          this.log(`Webview feedback action: ${action}`);
+          if (action === 'bug') {
+            void (async () => {
+              try {
+                await vscode.commands.executeCommand('vscode.openIssueReporter', {
+                  extensionId: 'JhonBar.claude-code-mirror',
+                });
+              } catch {
+                try {
+                  await vscode.commands.executeCommand('workbench.action.openIssueReporter');
+                } catch {
+                  await vscode.env.openExternal(vscode.Uri.parse('https://github.com/Yehonatan-Bar/ClaUI/issues'));
+                }
+              }
+            })();
+          } else if (action === 'feature') {
+            const url = 'https://github.com/Yehonatan-Bar/ClaUI/issues/new'
+              + '?labels=enhancement'
+              + '&title=Feature%20request%3A%20'
+              + '&body=' + encodeURIComponent(
+                ['## What would you like to see?', '', '', '## Why is it useful?', '', '', '## Additional context / screenshots', ''].join('\n')
+              );
+            void vscode.env.openExternal(vscode.Uri.parse(url));
+          } else if (action === 'email') {
+            const mailSubject = encodeURIComponent('ClaUi Feedback');
+            const mailBody = encodeURIComponent(
+              ['Hi,', '', 'Feedback for ClaUi:', '', '', `Extension version: ${this.extensionVersion}`, `VS Code version: ${vscode.version}`, '', '(Optional) Steps to reproduce / context:', ''].join('\n')
+            );
+            void vscode.env.openExternal(vscode.Uri.parse(`mailto:yonzbar@gmail.com?subject=${mailSubject}&body=${mailBody}`));
+          } else if (action === 'fullBugReport') {
+            this.webview.postMessage({ type: 'bugReportOpen' });
+          }
+          break;
+        }
 
         // ----- Bug Report -----
         case 'bugReportInit': {

@@ -141,6 +141,13 @@ export interface OpenFeedbackRequest {
   type: 'openFeedback';
 }
 
+export type FeedbackActionValue = 'bug' | 'feature' | 'email' | 'fullBugReport';
+
+export interface FeedbackActionRequest {
+  type: 'feedbackAction';
+  action: FeedbackActionValue;
+}
+
 export interface GetPromptHistoryRequest {
   type: 'getPromptHistory';
   scope: 'project' | 'global';
@@ -511,6 +518,7 @@ export type WebviewToExtensionMessage =
   | OpenFileRequest
   | OpenUrlRequest
   | OpenFeedbackRequest
+  | FeedbackActionRequest
   | GetPromptHistoryRequest
   | EditAndResendRequest
   | RequestSessionRecapSnapshot
