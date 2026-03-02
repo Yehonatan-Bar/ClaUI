@@ -77,6 +77,7 @@ export const StatusBar: React.FC<{
   const { barRef, isCollapsed } = useStatusBarCollapse();
   const [navOpen, setNavOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setTickMs(Date.now()), 1000);
@@ -143,8 +144,13 @@ export const StatusBar: React.FC<{
     postToExtension({ type: 'openPlanDocs' });
   };
 
-  const handleFeedback = () => {
-    postToExtension({ type: 'openFeedback' });
+  const handleFeedbackToggle = () => {
+    setFeedbackOpen(!feedbackOpen);
+  };
+
+  const handleFeedbackAction = (action: 'bug' | 'feature' | 'email' | 'fullBugReport') => {
+    setFeedbackOpen(false);
+    postToExtension({ type: 'feedbackAction', action });
   };
 
   const handleGitPush = () => {
@@ -368,8 +374,17 @@ export const StatusBar: React.FC<{
         {clockElement}
 
         <StatusBarGroupButton label="More" isOpen={navOpen} onToggle={handleNavToggle}>
-          <button className="status-bar-group-dropdown-item" onClick={handleFeedback} data-tooltip="Send feedback or report a bug">
-            Feedback
+          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('bug')} data-tooltip="Open bug report">
+            Report Bug
+          </button>
+          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('feature')} data-tooltip="Request a new feature">
+            Feature Request
+          </button>
+          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('email')} data-tooltip="Send email feedback">
+            Email Feedback
+          </button>
+          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('fullBugReport')} data-tooltip="Collect diagnostics and send full report">
+            Full Bug Report
           </button>
           <button className="status-bar-group-dropdown-item" onClick={handleOpenPlans} data-tooltip="Open plan document in browser">
             Plans
@@ -543,9 +558,20 @@ export const StatusBar: React.FC<{
       <button className="status-bar-plans-btn" onClick={handleOpenPlans} data-tooltip="Open plan document in browser">
         Plans
       </button>
-      <button className="status-bar-feedback-btn" onClick={handleFeedback} data-tooltip="Send feedback or report a bug">
-        Feedback
-      </button>
+      <StatusBarGroupButton label="Feedback" isOpen={feedbackOpen} onToggle={handleFeedbackToggle}>
+        <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('bug')} data-tooltip="Open bug report">
+          Report Bug
+        </button>
+        <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('feature')} data-tooltip="Request a new feature">
+          Feature Request
+        </button>
+        <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('email')} data-tooltip="Send email feedback">
+          Email Feedback
+        </button>
+        <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('fullBugReport')} data-tooltip="Collect diagnostics and send full report">
+          Full Bug Report
+        </button>
+      </StatusBarGroupButton>
       {isConnected && showCodexConsult && (
         <button
           className="status-bar-consult-btn"
