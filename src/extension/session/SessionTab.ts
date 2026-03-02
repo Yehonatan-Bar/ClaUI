@@ -29,6 +29,7 @@ import type { TeamStateSnapshot } from '../teams/TeamTypes';
 import type { CliOutputEvent, AssistantMessage } from '../types/stream-json';
 import type {
   ExtensionToWebviewMessage,
+  ProviderId,
   WebviewToExtensionMessage,
   SerializedChatMessage,
   SessionSummary,
@@ -85,6 +86,8 @@ export class SessionTab implements WebviewBridge {
   private forkInProgress = false;
   /** Tracks whether stderr indicates Claude CLI is not installed */
   private claudeCliMissingDetected = false;
+  /** Tracks whether stderr indicates Happy CLI authentication is required */
+  private happyAuthDetected = false;
   /** Agent Teams support */
   private teamWatcher: TeamWatcher | null = null;
   private teamDetector = new TeamDetector();
@@ -94,6 +97,8 @@ export class SessionTab implements WebviewBridge {
   private teamAutoPromptSent = false;
   /** Whether any agent has been seen as 'working' at least once (prevents triggering on fresh teams) */
   private teamHadWorkingAgent = false;
+  /** Per-tab CLI override (used by Happy provider to spawn `happy` instead of `claude`) */
+  private cliPathOverride: string | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -266,16 +271,20 @@ export class SessionTab implements WebviewBridge {
     if (this.disposed || !this.panel) {
       return;
     }
+    const outbound =
+      msg.type === 'sessionStarted'
+        ? { ...msg, provider: this.getProvider() }
+        : msg;
     // Intercept processBusy messages to update the tab title indicator
-    if (msg.type === 'processBusy') {
-      this.setBusy(msg.busy);
+    if (outbound.type === 'processBusy') {
+      this.setBusy(outbound.busy);
     }
     if (!this.isWebviewReady) {
-      this.pendingMessages.push(msg);
+      this.pendingMessages.push(outbound);
       return;
     }
     try {
-      void this.panel.webview.postMessage(msg);
+      void this.panel.webview.postMessage(outbound);
     } catch {
       // Panel may have been disposed between our flag check and the actual call
       this.disposed = true;
@@ -288,6 +297,14 @@ export class SessionTab implements WebviewBridge {
 
   setSuppressNextExit(suppress: boolean): void {
     this.suppressNextExit = suppress;
+  }
+
+  getProvider(): ProviderId {
+    return this.isHappyCliSession() ? 'remote' : 'claude';
+  }
+
+  getCliPathOverride(): string | null {
+    return this.cliPathOverride;
   }
 
   saveProjectAnalyticsNow(): void {
@@ -307,7 +324,11 @@ export class SessionTab implements WebviewBridge {
     this.processManager.stop();
 
     try {
-      await this.processManager.start({ resume: sessionToResume, model });
+      await this.processManager.start({
+        resume: sessionToResume,
+        model,
+        cliPathOverride: this.cliPathOverride ?? undefined,
+      });
       this.log(`[Tab ${this.tabNumber}] Session resumed with model "${model}"`);
       await vscode.workspace.getConfiguration('claudeMirror').update('model', model, true);
     } catch (err: unknown) {
@@ -325,18 +346,28 @@ export class SessionTab implements WebviewBridge {
     this.forkInitData = init;
   }
 
-  /** Start a new Claude CLI session in this tab */
+  setCliPathOverride(path: string): void {
+    this.cliPathOverride = path;
+  }
+
+  /** Start a new CLI session in this tab (Claude by default, Happy when overridden) */
   async startSession(options?: { resume?: string; fork?: boolean; cwd?: string }): Promise<void> {
     if (options?.fork) {
       this.forkInProgress = true;
     }
-    await this.processManager.start(options);
+    this.claudeCliMissingDetected = false;
+    this.happyAuthDetected = false;
+    await this.processManager.start({
+      ...(options ?? {}),
+      cliPathOverride: this.cliPathOverride ?? undefined,
+    });
     this.achievementService.onSessionStart(this.id);
     this.postMessage({
       type: 'sessionStarted',
       sessionId: this.processManager.currentSessionId || 'pending',
       model: 'connecting...',
       isResume: !!options?.resume,
+      provider: this.getProvider(),
     });
 
     // If this is a fork, send the conversation history and prompt text
@@ -482,7 +513,7 @@ export class SessionTab implements WebviewBridge {
       sessionId: sid,
       name: name || existing?.name || `Session ${this.tabNumber}`,
       model: this.currentModel,
-      provider: 'claude',
+      provider: this.getProvider(),
       startedAt: existing?.startedAt || this.sessionStartedAt || new Date().toISOString(),
       lastActiveAt: new Date().toISOString(),
       firstPrompt: this.firstPrompt || existing?.firstPrompt,
@@ -687,7 +718,10 @@ export class SessionTab implements WebviewBridge {
         // Auto-resume the session so the user can keep chatting
         if (sessionToResume) {
           this.processManager
-            .start({ resume: sessionToResume })
+            .start({
+              resume: sessionToResume,
+              cliPathOverride: this.cliPathOverride ?? undefined,
+            })
             .then(() => {
               tabLog('Session auto-resumed after cancel');
             })
@@ -707,7 +741,11 @@ export class SessionTab implements WebviewBridge {
         if (forkedSessionId) {
           tabLog(`Fork phase 1 complete, new session: ${forkedSessionId}. Starting phase 2...`);
           this.processManager
-            .start({ resume: forkedSessionId, skipReplay: true })
+            .start({
+              resume: forkedSessionId,
+              skipReplay: true,
+              cliPathOverride: this.cliPathOverride ?? undefined,
+            })
             .then(() => {
               tabLog(`Fork phase 2: interactive session started for ${forkedSessionId}`);
               this.postMessage({
@@ -715,6 +753,7 @@ export class SessionTab implements WebviewBridge {
                 sessionId: forkedSessionId,
                 model: this.currentModel || 'connecting...',
                 isResume: false,
+                provider: this.getProvider(),
               });
             })
             .catch((err: unknown) => {
@@ -752,9 +791,20 @@ export class SessionTab implements WebviewBridge {
           this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
           this.postMessage({
             type: 'error',
-            message: 'Claude CLI not found. Install Claude Code CLI by running: npm install -g @anthropic-ai/claude-code',
+            message: this.getCliMissingMessage(),
           });
           this.claudeCliMissingDetected = false;
+          return;
+        }
+
+        if (this.happyAuthDetected && this.isHappyCliSession()) {
+          tabLog('Happy CLI authentication required - showing auth guidance');
+          this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+          this.postMessage({
+            type: 'error',
+            message: 'Happy Coder requires authentication. Run "ClaUi: Authenticate Happy Coder" from the Command Palette.',
+          });
+          this.happyAuthDetected = false;
           return;
         }
 
@@ -775,7 +825,10 @@ export class SessionTab implements WebviewBridge {
             .then(async (choice) => {
               if (choice === 'Restart') {
                 try {
-                  await this.processManager.start({ resume: currentSessionId });
+                  await this.processManager.start({
+                    resume: currentSessionId,
+                    cliPathOverride: this.cliPathOverride ?? undefined,
+                  });
                 } catch {
                   vscode.window.showErrorMessage(
                     `Tab ${this.tabNumber}: Failed to restart Claude session.`
@@ -798,16 +851,31 @@ export class SessionTab implements WebviewBridge {
     });
 
     this.processManager.on('stderr', (text: string) => {
-      tabLog(`STDERR: ${text}`);
+      const trimmed = text.trim();
+      if (!trimmed) {
+        return;
+      }
+      const normalized = this.stripAnsi(trimmed).trim();
+      tabLog(`STDERR: ${trimmed}`);
+      if (this.isKnownNonFatalCliStderr(normalized)) {
+        tabLog('Ignoring known non-fatal CLI stderr notice');
+        return;
+      }
       // Detect Claude CLI not installed/not in PATH
-      if (this.isLikelyClaudeCliMissing(text)) {
+      if (this.isLikelyClaudeCliMissing(normalized)) {
         this.claudeCliMissingDetected = true;
         tabLog('Detected Claude CLI missing from stderr');
         // Don't forward raw stderr - the exit handler will send a better message
         return;
       }
+      if (this.isHappyCliSession() && this.isLikelyHappyAuthIssue(normalized)) {
+        this.happyAuthDetected = true;
+        tabLog('Detected Happy auth requirement from stderr');
+        // Don't forward raw stderr - the exit handler will send actionable auth guidance
+        return;
+      }
       this.achievementService.onRuntimeError(this.id);
-      this.postMessage({ type: 'error', message: text.trim() });
+      this.postMessage({ type: 'error', message: normalized || trimmed });
     });
 
     this.processManager.on('error', (err: Error) => {
@@ -823,13 +891,24 @@ export class SessionTab implements WebviewBridge {
         tabLog('Claude CLI not found - showing install guidance');
         this.postMessage({
           type: 'error',
-          message: 'Claude CLI not found. Install Claude Code CLI by running: npm install -g @anthropic-ai/claude-code',
+          message: this.getCliMissingMessage(),
         });
         this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
         return;
       }
+      if (this.isHappyCliSession() && this.isLikelyHappyAuthIssue(err.message)) {
+        tabLog('Happy CLI authentication required - showing auth guidance');
+        this.happyAuthDetected = true;
+        this.postMessage({
+          type: 'error',
+          message: 'Happy Coder requires authentication. Run "ClaUi: Authenticate Happy Coder" from the Command Palette.',
+        });
+        this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+        return;
+      }
+      const cliCommand = this.isHappyCliSession() ? 'happy' : 'claude';
       vscode.window.showErrorMessage(
-        `Claude CLI error (Tab ${this.tabNumber}): ${err.message}. Is "claude" in your PATH?`
+        `Claude CLI error (Tab ${this.tabNumber}): ${err.message}. Is "${cliCommand}" in your PATH?`
       );
       this.postMessage({ type: 'error', message: `Process error: ${err.message}` });
       this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
@@ -838,14 +917,54 @@ export class SessionTab implements WebviewBridge {
 
   /** Check if stderr/error text indicates Claude CLI is not installed or not in PATH */
   private isLikelyClaudeCliMissing(text: string): boolean {
+    const normalized = this.stripAnsi(text);
     const missingPatterns = [
       /'claude'\s+is not recognized as an internal or external command/i,
+      /'happy'\s+is not recognized as an internal or external command/i,
       /\bclaude:\s+command not found\b/i,
+      /\bhappy:\s+command not found\b/i,
       /\bspawn\b.*\bclaude\b.*\benoent\b/i,
+      /\bspawn\b.*\bhappy\b.*\benoent\b/i,
       /\benoent\b.*\bclaude\b/i,
+      /\benoent\b.*\bhappy\b/i,
       /command not found.*claude/i,
+      /command not found.*happy/i,
     ];
-    return missingPatterns.some((pattern) => pattern.test(text));
+    return missingPatterns.some((pattern) => pattern.test(normalized));
+  }
+
+  private isHappyCliSession(): boolean {
+    return this.cliPathOverride !== null;
+  }
+
+  private isLikelyHappyAuthIssue(text: string): boolean {
+    const normalized = this.stripAnsi(text);
+    const authPatterns = [
+      /auth(entication)?\s+required/i,
+      /not authenticated/i,
+      /please authenticate/i,
+      /qr\s*code/i,
+      /token expired/i,
+    ];
+    return authPatterns.some((pattern) => pattern.test(normalized));
+  }
+
+  private isKnownNonFatalCliStderr(text: string): boolean {
+    const knownNoisePatterns = [
+      /^Using Claude Code v[\w.\-]+ from npm$/i,
+    ];
+    return knownNoisePatterns.some((pattern) => pattern.test(text));
+  }
+
+  private stripAnsi(text: string): string {
+    return text.replace(/\u001b\[[0-9;]*m/g, '');
+  }
+
+  private getCliMissingMessage(): string {
+    if (this.isHappyCliSession()) {
+      return 'Happy Coder CLI not found. Install Happy Coder CLI or set "claudeMirror.happy.cliPath" to the correct executable path.';
+    }
+    return 'Claude CLI not found. Install Claude Code CLI by running: npm install -g @anthropic-ai/claude-code';
   }
 
   /** Build and persist a SessionSummary from accumulated TurnRecords */
@@ -905,7 +1024,7 @@ export class SessionTab implements WebviewBridge {
     const totalTurns = turnRecords.length;
     const summary: SessionSummary = {
       sessionId,
-      provider: 'claude',
+      provider: this.getProvider(),
       sessionName: this.baseTitle || `Session ${this.tabNumber}`,
       model: this.currentModel || 'unknown',
       startedAt: this.sessionStartedAt || now,

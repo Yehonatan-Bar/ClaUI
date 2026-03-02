@@ -117,6 +117,10 @@
       {
         "command": "claudeMirror.toggleTeamPanel",
         "title": "ClaUi: Toggle Agent Teams Panel"
+      },
+      {
+        "command": "claudeMirror.authenticateHappy",
+        "title": "ClaUi: Authenticate Happy Coder"
       }
     ],
     "configuration": {
@@ -138,26 +142,14 @@
           "enumDescriptions": [
             "Claude (current runtime)",
             "Codex (UI/settings only for now)",
-            "Remote (Happy Coder relay server)"
+            "Happy Coder (remote AI coding relay)"
           ],
           "description": "Default provider for new sessions."
         },
-        "claudeMirror.remote.serverUrl": {
+        "claudeMirror.happy.cliPath": {
           "type": "string",
-          "default": "",
-          "description": "URL of the Happy Coder relay server (e.g. https://happy.example.com). Required for Remote provider."
-        },
-        "claudeMirror.remote.autoReconnect": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically reconnect to the remote server on disconnection."
-        },
-        "claudeMirror.remote.keepAliveIntervalMs": {
-          "type": "number",
-          "default": 30000,
-          "minimum": 5000,
-          "maximum": 300000,
-          "description": "Interval in milliseconds for sending keepalive heartbeats to the remote server."
+          "default": "happy",
+          "description": "Path to the Happy Coder CLI executable"
         },
         "claudeMirror.codex.cliPath": {
           "type": "string",
@@ -656,8 +648,6 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "recharts": "^3.7.0",
-    "socket.io-client": "^4.8.3",
-    "tweetnacl": "^1.0.3",
     "zustand": "^4.5.0"
   }
 }

@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { SessionTab } from './SessionTab';
 import { CodexSessionTab } from './CodexSessionTab';
-import { RemoteSessionTab } from './RemoteSessionTab';
 import type { SessionStore } from './SessionStore';
 import type { ProjectAnalyticsStore } from './ProjectAnalyticsStore';
 import type { PromptHistoryStore } from './PromptHistoryStore';
@@ -27,7 +26,7 @@ const TAB_COLORS = [
  * Tracks the active (focused) tab and provides command routing helpers.
  */
 export class TabManager {
-  private tabs = new Map<string, SessionTab | CodexSessionTab | RemoteSessionTab>();
+  private tabs = new Map<string, SessionTab | CodexSessionTab>();
   private activeTabId: string | null = null;
   private nextTabNumber = 1;
   private readonly statusBarItem: vscode.StatusBarItem;
@@ -58,7 +57,7 @@ export class TabManager {
   }
 
   /** Create a new tab routed by provider */
-  createTabForProvider(provider: ProviderId): SessionTab | CodexSessionTab | RemoteSessionTab {
+  createTabForProvider(provider: ProviderId): SessionTab | CodexSessionTab {
     if (provider === 'codex') { return this.createCodexTab(); }
     if (provider === 'remote') { return this.createRemoteTab(); }
     return this.createClaudeTab();
@@ -133,41 +132,19 @@ export class TabManager {
     return tab;
   }
 
-  /** Create a new Remote tab */
-  createRemoteTab(): RemoteSessionTab {
-    const tabNumber = this.nextTabNumber++;
-    const tabColor = TAB_COLORS[(tabNumber - 1) % TAB_COLORS.length];
-
-    const existingTab = this.getActiveTab() ?? this.getAnyTab();
-    const viewColumn = existingTab?.viewColumn ?? vscode.ViewColumn.Beside;
-
-    const tab = new RemoteSessionTab(
-      this.context,
-      tabNumber,
-      viewColumn,
-      tabColor,
-      this.log,
-      this.statusBarItem,
-      {
-        onClosed: (tabId) => this.handleTabClosed(tabId),
-        onFocused: (tabId) => this.handleTabFocused(tabId),
-      },
-      this.sessionStore,
-      this.projectAnalyticsStore,
-      this.promptHistoryStore,
-      this.achievementService,
-      this.logDir,
-      this.skillGenService
-    );
-
-    this.tabs.set(tab.id, tab);
-    this.activeTabId = tab.id;
-    this.log(`Remote tab created: ${tab.id} color=${tabColor} column=${viewColumn} (total: ${this.tabs.size})`);
+  /** Create a new Happy tab (remote provider routed through SessionTab + CLI override) */
+  createRemoteTab(): SessionTab {
+    const tab = this.createClaudeTab();
+    const happyCliPath = vscode.workspace
+      .getConfiguration('claudeMirror')
+      .get<string>('happy.cliPath', 'happy');
+    tab.setCliPathOverride(happyCliPath);
+    this.log(`Happy provider tab created: ${tab.id} cliPath=${happyCliPath}`);
     return tab;
   }
 
   /** Get the currently focused tab, or null if none (skips disposed zombie tabs) */
-  getActiveTab(): SessionTab | CodexSessionTab | RemoteSessionTab | null {
+  getActiveTab(): SessionTab | CodexSessionTab | null {
     if (!this.activeTabId) {
       return null;
     }
@@ -186,7 +163,7 @@ export class TabManager {
   }
 
   /** Get or create: returns active tab if one exists, otherwise creates a new one */
-  getOrCreateTab(): SessionTab | CodexSessionTab | RemoteSessionTab {
+  getOrCreateTab(): SessionTab | CodexSessionTab {
     const active = this.getActiveTab();
     if (active) {
       return active;
@@ -227,7 +204,7 @@ export class TabManager {
   // --- Internal helpers ---
 
   /** Get any existing tab (used to find the column for new tabs) */
-  private getAnyTab(): SessionTab | CodexSessionTab | RemoteSessionTab | null {
+  private getAnyTab(): SessionTab | CodexSessionTab | null {
     const first = this.tabs.values().next();
     return first.done ? null : first.value;
   }
