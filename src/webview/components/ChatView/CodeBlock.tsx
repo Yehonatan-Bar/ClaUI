@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { renderTextWithFileLinks } from './filePathLinks';
+import { postToExtension } from '../../hooks/useClaudeStream';
 
 /** Lines shown when code block is collapsed */
 const COLLAPSED_LINE_COUNT = 4;
@@ -23,6 +24,12 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
 
   const visibleCode = expanded ? code : lines.slice(0, COLLAPSED_LINE_COUNT).join('\n');
   const hiddenLineCount = lines.length - COLLAPSED_LINE_COUNT;
+
+  const isHtml = language?.toLowerCase() === 'html';
+
+  const handlePreview = useCallback(() => {
+    postToExtension({ type: 'openHtmlPreview', html: code });
+  }, [code]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -54,6 +61,15 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ code, language }) => {
             <span className="code-block-line-count">
               {lines.length} lines
             </span>
+          )}
+          {isHtml && (
+            <button
+              className="copy-button preview-button"
+              onClick={handlePreview}
+              data-tooltip="Preview rendered HTML"
+            >
+              Preview
+            </button>
           )}
           <button
             className="copy-button"

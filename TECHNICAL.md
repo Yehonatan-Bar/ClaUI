@@ -59,6 +59,7 @@ claude-code-mirror/
 |   |   +-- webview/
 |   |   |   +-- WebviewProvider.ts        #   buildWebviewHtml() utility + legacy class
 |   |   |   +-- MessageHandler.ts         #   postMessage bridge (uses WebviewBridge interface)
+|   |   |   +-- HtmlPreviewPanel.ts       #   Opens HTML code blocks as rendered preview tabs
 |   |   +-- session/
 |   |   |   +-- SessionTab.ts             #   Per-tab bundle (process+demux+panel+handler)
 |   |   |   +-- TabManager.ts             #   Manages all tabs, tracks active tab
@@ -133,7 +134,7 @@ claude-code-mirror/
 |       |   |   +-- ToolUseBlock.tsx      #   Tool use display (collapsible, plan-aware)
 |       |   |   +-- PlanApprovalBar.tsx  #   CLI-matching plan approval (4 options: clear+bypass, bypass, manual, feedback) or question UI (option buttons + custom answer)
 |       |   |   +-- PromptHistoryPanel.tsx #  3-tab prompt history overlay (session/project/global)
-|       |   |   +-- CodeBlock.tsx         #   Syntax block with copy button
+|       |   |   +-- CodeBlock.tsx         #   Syntax block with copy + HTML preview button
 |       |   |   +-- MarkdownContent.tsx  #   Markdown rendering with sanitization and link detection
 |       |   |   +-- filePathLinks.tsx   #   Clickable file path and URL detection and rendering
 |       |   +-- InputArea/
@@ -269,7 +270,7 @@ claude-code-mirror/
 **MessageHandler** - Bidirectional bridge translating webview postMessages into CLI commands and StreamDemux events into webview messages. Accepts a `WebviewBridge` interface (implemented by SessionTab). Uses optional bridge hooks (`getCliPathOverride`, `getProvider`) so webview-triggered start/restart flows keep the tab's runtime routing (including Happy CLI override) and report the correct provider in `sessionStarted`. Triggers auto-naming on first user message. Detects plan approval pauses (ExitPlanMode/AskUserQuestion) and forwards approval responses.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**CodexMessageHandler** - Codex-specific webview/runtime bridge for `codex exec --json` sessions. Maps `CodexExecDemux` events into existing webview message types (including synthesized `messageStart`/`streamingText`/`messageStop` around complete Codex `agent_message` items), handles Codex settings/history/image sends, and serializes live turn message emission order. Additional hardening exists in the Codex tab and webview layers: `CodexSessionTab` now serializes actual `panel.webview.postMessage(...)` deliveries by awaiting the VS Code Thenable in a FIFO queue, and `useClaudeStream` applies a Codex-only fallback that immediately upserts complete `assistantMessage` payloads so replies remain visible even if finalize/clear events arrive out of order.
+**CodexMessageHandler** - Codex-specific webview/runtime bridge for `codex exec --json` sessions. Maps `CodexExecDemux` events into existing webview message types (including synthesized `messageStart`/`streamingText`/`messageStop` around complete Codex `agent_message` items), handles Codex settings/history/image sends, and serializes live turn message emission order. Additional hardening exists in the Codex tab and webview layers: `CodexSessionTab` serializes actual `panel.webview.postMessage(...)` deliveries by awaiting the VS Code Thenable in a FIFO queue, adds a turn-complete exit watchdog (force-stop if process lingers after `turn.completed`), and recovers idle-but-running stale turns before starting a new one; `CodexMessageHandler` now keeps `processBusy` aligned with runtime state on send failures via `session.isTurnRunning()`. `useClaudeStream` also applies a Codex-only fallback that immediately upserts complete `assistantMessage` payloads so replies remain visible even if finalize/clear events arrive out of order.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_INTEGRATION_PROGRESS.md`
 
 **SessionNamer** - Spawns a one-shot `claude -p` process using Haiku to generate a 1-3 word tab name from the user's first message. Matches the language of the message (Hebrew/English). 10-second timeout, sanitized output, all errors silently logged.

@@ -35,6 +35,7 @@ export interface CodexSessionController {
   isSessionActive(): boolean;
   getSessionId(): string | null;
   getCurrentModel(): string;
+  isTurnRunning(): boolean;
 }
 
 function codexTurnCategory(hasCommands: boolean): TurnCategory {
@@ -253,9 +254,10 @@ export class CodexMessageHandler {
           this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock]);
           this.postToWebview({ type: 'processBusy', busy: true });
           void this.session.sendText(msg.text).catch((err) => {
-            this.log(`Codex sendText failed: ${this.errMsg(err)}`);
-            this.postToWebview({ type: 'processBusy', busy: false });
-            this.postToWebview({ type: 'error', message: `Failed to send Codex message: ${this.errMsg(err)}` });
+            const message = this.errMsg(err);
+            this.log(`Codex sendText failed: ${message}`);
+            this.postToWebview({ type: 'processBusy', busy: this.session.isTurnRunning() });
+            this.postToWebview({ type: 'error', message: `Failed to send Codex message: ${message}` });
           });
           break;
 
@@ -282,9 +284,10 @@ export class CodexMessageHandler {
           this.postUserMessage(content);
           this.postToWebview({ type: 'processBusy', busy: true });
           void this.session.sendWithImages(msg.text, msg.images).catch((err) => {
-            this.log(`Codex sendWithImages failed: ${this.errMsg(err)}`);
-            this.postToWebview({ type: 'processBusy', busy: false });
-            this.postToWebview({ type: 'error', message: `Failed to send Codex message with images: ${this.errMsg(err)}` });
+            const message = this.errMsg(err);
+            this.log(`Codex sendWithImages failed: ${message}`);
+            this.postToWebview({ type: 'processBusy', busy: this.session.isTurnRunning() });
+            this.postToWebview({ type: 'error', message: `Failed to send Codex message with images: ${message}` });
           });
           break;
         }
@@ -438,8 +441,9 @@ export class CodexMessageHandler {
             const configPrompt = `Please help me configure git push for this VS Code extension project. The settings are VS Code settings under "claudeMirror.gitPush.*": enabled (boolean), scriptPath (string, relative to workspace), commitMessageTemplate (string, supports {sessionName} placeholder). ${msg.instruction}`;
             this.webview.postMessage({ type: 'processBusy', busy: true });
             void this.session.sendText(configPrompt).catch((err) => {
-              this.webview.postMessage({ type: 'processBusy', busy: false });
-              this.webview.postMessage({ type: 'error', message: `Failed to send Codex message: ${this.errMsg(err)}` });
+              const message = this.errMsg(err);
+              this.postToWebview({ type: 'processBusy', busy: this.session.isTurnRunning() });
+              this.postToWebview({ type: 'error', message: `Failed to send Codex message: ${message}` });
             });
           }
           break;

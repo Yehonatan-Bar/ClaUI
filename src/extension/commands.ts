@@ -5,6 +5,7 @@ import * as os from 'os';
 import type { TabManager } from './session/TabManager';
 import type { SessionStore } from './session/SessionStore';
 import type { ProviderId, SerializedChatMessage } from './types/webview-messages';
+import { openHtmlPreviewPanel } from './webview/HtmlPreviewPanel';
 
 function collectUrisFromArgs(args: unknown[]): vscode.Uri[] {
   const uris: vscode.Uri[] = [];
@@ -432,10 +433,11 @@ export function registerCommands(
         return;
       }
 
-      // Single file: open directly
+      // Single file: open directly in preview panel
       if (planFiles.length === 1) {
         log(`Opening single plan doc: ${planFiles[0].filePath}`);
-        await vscode.env.openExternal(vscode.Uri.file(planFiles[0].filePath));
+        const html = fs.readFileSync(planFiles[0].filePath, 'utf-8');
+        openHtmlPreviewPanel(html, planFiles[0].label);
         return;
       }
 
@@ -448,7 +450,8 @@ export function registerCommands(
 
       if (picked) {
         log(`Opening plan doc: ${picked.filePath}`);
-        await vscode.env.openExternal(vscode.Uri.file(picked.filePath));
+        const html = fs.readFileSync(picked.filePath, 'utf-8');
+        openHtmlPreviewPanel(html, picked.label);
       }
     }),
 
