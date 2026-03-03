@@ -18,6 +18,7 @@ import { getStoredApiKey, setStoredApiKey, maskApiKey } from '../process/envUtil
 import type { TokenUsageRatioTracker } from '../session/TokenUsageRatioTracker';
 import { AuthManager } from '../auth/AuthManager';
 import { BugReportService } from '../feedback/BugReportService';
+import { openHtmlPreviewPanel } from './HtmlPreviewPanel';
 import type {
   AdventureBeatMessage,
   ExtensionToWebviewMessage,
@@ -67,6 +68,9 @@ export interface WebviewBridge {
 /** Tool names that require user approval when the CLI pauses after calling them */
 const APPROVAL_TOOLS = ['ExitPlanMode', 'AskUserQuestion'];
 /** If ExitPlanMode approve does not auto-resume quickly, send a proceed nudge */
+/** Max times Bug 10 can re-open an ExitPlanMode approval cycle before permanently suppressing.
+ *  Without this limit, the model can loop: work -> ExitPlanMode -> approve -> work -> ExitPlanMode... */
+const MAX_EXITPLANMODE_REOPENS = 2;
 const EXIT_PLANMODE_APPROVE_RESUME_FALLBACK_DELAY_MS = 5000;
 
 function isApprovalToolName(name: string): boolean {
@@ -153,6 +157,10 @@ export class MessageHandler {
   private exitPlanModeProcessed = false;
   /** True once non-plan tool activity is seen after ExitPlanMode was approved. */
   private postExitPlanNonPlanActivityObserved = false;
+  /** How many times Bug 10 re-open logic fired in the current macro-session.
+   *  After MAX_EXITPLANMODE_REOPENS, further re-opens are suppressed. Reset on
+   *  EnterPlanMode or session restart. */
+  private exitPlanModeReopenCount = 0;
   /** Monotonic ID for approval-bar cycles (ExitPlanMode / AskUserQuestion) */
   private nextApprovalCycleId = 1;
   /** Cycle ID for the currently visible/preserved approval bar */
@@ -456,6 +464,7 @@ export class MessageHandler {
       switch (msg.type) {
         case 'sendMessage':
           this.log(`Sending user message: "${msg.text.slice(0, 80)}..."`);
+          this.logApprovalState('sendMessage-entry');
           // If there was a pending ExitPlanMode approval, mark it as processed so
           // subsequent ExitPlanMode calls from the model are suppressed. Without this,
           // typing text (instead of clicking an approve button) leaves
@@ -1062,6 +1071,7 @@ export class MessageHandler {
 
         case 'planApprovalResponse':
           this.log(`Plan approval response: action=${msg.action} toolName=${msg.toolName || '(none)'} pendingTool=${this.pendingApprovalTool || '(none)'}`);
+          this.logApprovalState('planApprovalResponse-entry');
           {
           // Use msg.toolName from webview as primary source - it's reliable because
           // the webview stores it when the approval bar is shown. Fall back to
@@ -1181,6 +1191,7 @@ export class MessageHandler {
           this.webview.saveProjectAnalyticsNow?.();
           this.clearApprovalTracking();
           this.planModeActive = false;
+          this.exitPlanModeReopenCount = 0;
           this.resetExitPlanModeProcessed('edit-and-resend restart');
           this.activitySummarizer?.reset();
           this.turnRecords = [];
@@ -1307,6 +1318,11 @@ export class MessageHandler {
             () => this.log('Copied to clipboard'),
             (err) => this.log(`Clipboard write failed: ${err}`)
           );
+          break;
+
+        case 'openHtmlPreview':
+          this.log(`Opening HTML preview (${((msg as any).html || '').length} chars)`);
+          openHtmlPreviewPanel((msg as any).html || '');
           break;
 
         case 'gitPush':
@@ -2266,8 +2282,9 @@ export class MessageHandler {
         // Track plan mode: EnterPlanMode sets the flag so ExitPlanMode knows it's legitimate
         if (isEnterPlanModeTool(data.toolName)) {
           this.planModeActive = true;
+          this.exitPlanModeReopenCount = 0;
           this.resetExitPlanModeProcessed('EnterPlanMode detected');
-          this.log('Plan mode activated (EnterPlanMode detected)');
+          this.log('Plan mode activated (EnterPlanMode detected, reopen counter reset)');
         } else {
           this.notePostExitPlanNonPlanActivity(data.toolName);
         }
@@ -2357,6 +2374,8 @@ export class MessageHandler {
             name => isApprovalToolName(name)
           );
           if (approvalTool) {
+            this.log(`messageDelta: detected approval tool=${approvalTool} in tools=[${this.currentMessageToolNames.join(',')}]`);
+            this.logApprovalState('messageDelta-before-notify');
             this.notifyPlanApprovalRequired(approvalTool);
           }
         }
@@ -2420,6 +2439,8 @@ export class MessageHandler {
             (block) => block.type === 'tool_use' && !!block.name && isApprovalToolName(block.name)
           );
           if (approvalToolBlock?.name) {
+            this.log(`assistantMessage fallback: detected approval tool=${approvalToolBlock.name}`);
+            this.logApprovalState('assistantMessage-fallback-before-notify');
             this.notifyPlanApprovalRequired(approvalToolBlock.name);
           }
         }
@@ -2432,6 +2453,7 @@ export class MessageHandler {
       'messageStart',
       (data: { messageId: string; model: string }) => {
         this.log(`-> webview: messageStart id=${data.messageId}`);
+        this.logApprovalState('messageStart');
         this.lastMessageId = data.messageId;
         this.currentMessageToolNames = [];
         this.pendingApprovalTool = null;
@@ -2441,6 +2463,7 @@ export class MessageHandler {
         // the approval bar can show again. See BUG_EXITPLANMODE_INFINITE_LOOP.md Bug 9.
         if (this.compactPending) {
           this.log('Post-compact messageStart: resetting exitPlanModeProcessed');
+          this.exitPlanModeReopenCount = 0;
           this.resetExitPlanModeProcessed('post-compact messageStart');
           this.compactPending = false;
         }
@@ -2494,6 +2517,7 @@ export class MessageHandler {
           this.log(`[CODEX_CONSULT] Result received: elapsed=${elapsed}ms, subtype=${event.subtype}, codexToolUsed=${hadCodexTool}, tools=[${this.currentMessageToolNames.join(',')}]`);
           this._codexConsultStartedAt = null;
         }
+        this.logApprovalState(`result:${event.subtype}`);
         // Snapshot BEFORE clearing (clearApprovalTracking resets the array)
         const toolNamesSnapshot = [...this.currentMessageToolNames];
         const adventureSnapshot = this.snapshotAdventureMetadata();
@@ -2744,16 +2768,46 @@ export class MessageHandler {
     this.log(`ExitPlanMode processed flag reset (${reason})`);
   }
 
+  /** Dump all approval-related state for diagnostics. Call at key lifecycle moments. */
+  private logApprovalState(context: string): void {
+    this.log(
+      `[APPROVAL_STATE] ${context} | ` +
+      `pendingTool=${this.pendingApprovalTool ?? 'null'} ` +
+      `approvalRespProcessed=${this.approvalResponseProcessed} ` +
+      `planModeActive=${this.planModeActive} ` +
+      `exitPlanProcessed=${this.exitPlanModeProcessed} ` +
+      `postActivity=${this.postExitPlanNonPlanActivityObserved} ` +
+      `reopenCount=${this.exitPlanModeReopenCount}/${MAX_EXITPLANMODE_REOPENS} ` +
+      `cycleId=${this.pendingApprovalCycleId ?? 'null'} ` +
+      `resumeObs=${this.pendingApprovalCycleResumeObserved} ` +
+      `resultObs=${this.pendingApprovalCycleResultObserved} ` +
+      `compactPending=${this.compactPending} ` +
+      `tools=[${this.currentMessageToolNames.join(',')}]`
+    );
+  }
+
   /** Track concrete post-approval execution so a future ExitPlanMode is treated as a new cycle. */
   private notePostExitPlanNonPlanActivity(toolName: string): void {
-    if (!this.exitPlanModeProcessed || this.postExitPlanNonPlanActivityObserved || this.pendingApprovalTool) {
+    if (!this.exitPlanModeProcessed) {
+      return; // Not post-approval yet; skip silently (would be extremely noisy)
+    }
+    if (this.postExitPlanNonPlanActivityObserved) {
+      return; // Already tracked once; skip silently
+    }
+    if (this.pendingApprovalTool) {
+      // IMPORTANT: this means the CLI auto-resumed (started a new turn with non-plan tools)
+      // BEFORE the user clicked approve. The timing gap between CLI auto-approval and user
+      // click means this tool won't be counted as post-approval activity.
+      // If this shows up in logs frequently, it indicates a race between CLI speed and user
+      // click speed — which is why Bug 10 re-open tracking may not work as expected.
+      this.log(`[EPM_TRACK] notePostExitPlanNonPlanActivity(${toolName}): skipped - approval bar still visible (pendingApprovalTool=${this.pendingApprovalTool}). CLI ran tool before user clicked approve.`);
       return;
     }
     if (isApprovalToolName(toolName) || isEnterPlanModeTool(toolName)) {
-      return;
+      return; // Plan-related tools don't count as implementation activity
     }
     this.postExitPlanNonPlanActivityObserved = true;
-    this.log(`ExitPlanMode cycle: observed post-approval non-plan activity via ${toolName}`);
+    this.log(`[EPM_TRACK] ExitPlanMode cycle: post-approval non-plan activity observed via ${toolName} (exitPlanModeProcessed=${this.exitPlanModeProcessed} reopenCount=${this.exitPlanModeReopenCount})`);
   }
 
   /** Reset tool name tracking and pending approval state */
@@ -2791,13 +2845,16 @@ export class MessageHandler {
     // After the approval bar is shown, `pendingApprovalTool` remains set until a
     // new assistant turn starts or the user clicks a button.
     if (this.pendingApprovalTool) {
+      // The CLI auto-resumed into a new turn while the approval bar is still visible
+      // (user hasn't clicked yet). This is the race condition window.
+      this.log(`[EPM_CYCLE] markApprovalCycleResumeObserved(${source}): skipped - approval bar still visible (pendingApprovalTool=${this.pendingApprovalTool}). CLI resumed before user click.`);
       return;
     }
     this.pendingApprovalCycleResumeObserved = true;
-    this.log(`Approval cycle ${this.pendingApprovalCycleId}: resume observed via ${source}`);
+    this.log(`[EPM_CYCLE] Approval cycle ${this.pendingApprovalCycleId}: resume observed via ${source}`);
     if (this.exitPlanApproveResumeFallbackCycleId === this.pendingApprovalCycleId) {
       this.cancelExitPlanApproveResumeFallback();
-      this.log(`ExitPlanMode approve fallback cancelled - auto-resume observed (cycle ${this.pendingApprovalCycleId})`);
+      this.log(`[EPM_CYCLE] ExitPlanMode approve fallback cancelled - auto-resume observed (cycle ${this.pendingApprovalCycleId})`);
     }
   }
 
@@ -2807,7 +2864,7 @@ export class MessageHandler {
       return;
     }
     this.pendingApprovalCycleResultObserved = true;
-    this.log(`Approval cycle ${this.pendingApprovalCycleId}: result observed via ${source}`);
+    this.log(`[EPM_CYCLE] Approval cycle ${this.pendingApprovalCycleId}: result observed via ${source} (pendingApprovalTool=${this.pendingApprovalTool ?? 'null'})`);
     // Do NOT cancel the fallback timer here. If a timer is running, its
     // callback now checks pendingApprovalCycleResultObserved and will send
     // the proceed nudge when it fires (Bug 7 fix). Cancelling here would
@@ -2910,14 +2967,29 @@ export class MessageHandler {
     // completed in this session. If we already saw concrete non-plan activity
     // after that approval (e.g., TodoWrite/Read), treat the new ExitPlanMode call
     // as a fresh cycle instead of a stale replay to avoid deadlock in plan mode.
+    // Bug 11 fix: limit re-opens to MAX_EXITPLANMODE_REOPENS to prevent the model
+    // from looping: work -> ExitPlanMode -> approve -> work -> ExitPlanMode...
     const norm = toolName.trim().toLowerCase();
     const isExitPlanMode = norm === 'exitplanmode' || norm.endsWith('.exitplanmode');
     if (isExitPlanMode && this.exitPlanModeProcessed) {
       if (this.postExitPlanNonPlanActivityObserved) {
-        this.log('ExitPlanMode detected after post-approval execution activity; treating as a new approval cycle');
+        if (this.exitPlanModeReopenCount >= MAX_EXITPLANMODE_REOPENS) {
+          this.log(
+            `Suppressing ExitPlanMode reopen - hit max reopens (${this.exitPlanModeReopenCount}/${MAX_EXITPLANMODE_REOPENS}). ` +
+            `Model is likely in an ExitPlanMode loop. Will not show approval bar again until EnterPlanMode.`
+          );
+          this.logApprovalState('reopen-limit-hit');
+          return;
+        }
+        this.exitPlanModeReopenCount++;
+        this.log(
+          `ExitPlanMode detected after post-approval execution activity; ` +
+          `treating as a new approval cycle (reopen ${this.exitPlanModeReopenCount}/${MAX_EXITPLANMODE_REOPENS})`
+        );
         this.resetExitPlanModeProcessed('post-approval non-plan activity detected');
       } else {
         this.log(`Suppressing stale ExitPlanMode notification - already processed in this plan cycle`);
+        this.logApprovalState('stale-suppression');
         return;
       }
     }
@@ -2937,6 +3009,7 @@ export class MessageHandler {
     this.pendingApprovalCycleResumeObserved = false;
     this.pendingApprovalCycleResultObserved = false;
     this.log(`Plan approval required: tool=${toolName} cycle=${this.pendingApprovalCycleId}`);
+    this.logApprovalState('showing-approval-bar');
     this.pendingApprovalTool = toolName;
     this.webview.postMessage({
       type: 'planApprovalRequired',

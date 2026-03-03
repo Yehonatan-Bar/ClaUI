@@ -387,3 +387,16 @@ Verification note:
   - it now queues deliveries and awaits the VS Code `Thenable<boolean>` from `panel.webview.postMessage(...)`
   - `flushPendingMessages()` also routes through the same queue
   - this preserves message order at the real async delivery layer (not only at `CodexMessageHandler` call order)
+
+## 2026-03-02 - Codex long-session "stuck" turn recovery hardening
+
+- Investigated recurring reports where long Codex sessions appear idle/stuck and follow-up sends fail with `A Codex turn is already running`.
+- Added runtime recovery in `CodexSessionTab`:
+  - turn-complete exit watchdog (`10s`) now force-stops lingering Codex processes that do not exit after `turn.completed`
+  - `sendTurn(...)` now detects stale idle-running state (`isTurnRunning=true` while tab busy state is false) and force-stops before retrying the new turn
+- Added busy-state alignment in `CodexMessageHandler`:
+  - introduced `CodexSessionController.isTurnRunning()`
+  - send failure paths (`sendMessage`, `sendMessageWithImages`, `gitPushConfig`) now set `processBusy` based on real runtime state instead of forcing `false`
+- Goal of these changes:
+  - prevent false-idle UI while a process is still alive
+  - reduce stuck loops where new sends are blocked by a zombie/lingering process

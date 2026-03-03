@@ -1,5 +1,16 @@
 # ClaUi - Changelog
 
+## v0.1.70 - 2026-03-02
+
+**Feature: Happy provider integration (remote)**
+
+Added a first-class Happy flow while keeping provider id `remote` for compatibility:
+- New Happy tabs now use the existing `SessionTab` + `ClaudeProcessManager` pipeline with CLI override (`happy` instead of `claude`)
+- Added `claudeMirror.happy.cliPath` setting and `ClaUi: Authenticate Happy Coder` command (`happy auth`)
+- Webview-initiated start/resume/restart flows now preserve provider routing correctly
+- Provider labels updated in UI from `Remote` to `Happy`
+- Added targeted Happy auth/missing-CLI guidance and filtered non-fatal stderr noise (for example `Using Claude Code v... from npm`) from red error banners
+
 ## v0.1.69 - 2026-03-02
 
 **Bug Fix: Plan mode stuck after context compaction**

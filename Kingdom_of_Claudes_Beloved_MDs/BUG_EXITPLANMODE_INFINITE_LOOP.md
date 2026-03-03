@@ -13,6 +13,7 @@ The plan approval bar (4 CLI-matching options) and AskUserQuestion interactive c
 **Date Eighth Fix**: 2026-03-02 (typed text bypasses exitPlanModeProcessed guard)
 **Date Ninth Fix**: 2026-03-02 (exitPlanModeProcessed not reset after context compaction)
 **Date Tenth Fix**: 2026-03-02 (stale suppression deadlock after post-approval execution)
+**Date Eleventh Fix**: 2026-03-03 (infinite reopen loop from unbounded Bug 10 re-open logic + deeper logging)
 **Severity**: Critical (blocks plan mode workflow)
 **Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`, `src/webview/components/InputArea/InputArea.tsx`
 
@@ -173,6 +174,30 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 
 **Why this is safe**: Truly stale replays still have no post-approval non-plan activity and remain suppressed. Only sessions that demonstrably moved into execution can re-open an ExitPlanMode approval cycle.
 
+### Eleventh Bug (2026-03-03): Infinite Reopen Loop (Bug 10 Re-open Has No Limit)
+
+**Cause**: Bug 10's fix detects post-approval non-plan activity and re-opens the ExitPlanMode approval cycle. But it has **no limit on how many times it can re-open**. If the model enters a pattern of: do some work -> call ExitPlanMode -> user approves -> do some work -> call ExitPlanMode again, the Bug 10 fix fires every time (because `postExitPlanNonPlanActivityObserved = true` after each round of work), creating an infinite loop of approval bars.
+
+**Sequence**:
+1. ExitPlanMode called -> approval bar shown
+2. User approves -> `exitPlanModeProcessed = true`, `postExitPlanNonPlanActivityObserved = false`
+3. Model calls TodoWrite (or other non-plan tool) -> `postExitPlanNonPlanActivityObserved = true`
+4. Model calls ExitPlanMode again -> Bug 10 detects post-approval activity -> resets guard -> bar shown
+5. User approves again -> cycle restarts at step 2
+6. Steps 2-5 repeat indefinitely
+
+**Root cause**: Bug 10's re-open logic was unbounded. Every round of {approve, do work, ExitPlanMode} qualified as a "fresh cycle", allowing infinite re-opens.
+
+**Fix**:
+1. Added `exitPlanModeReopenCount` counter to track how many times Bug 10's re-open logic fires
+2. Added `MAX_EXITPLANMODE_REOPENS = 2` constant
+3. In `notifyPlanApprovalRequired`, when Bug 10 would re-open: check `exitPlanModeReopenCount >= MAX_EXITPLANMODE_REOPENS`. If exceeded, suppress the notification instead of re-opening
+4. Reset counter to 0 when `EnterPlanMode` is detected (legitimate new plan cycle), on compaction, or on session restart (edit-and-resend)
+
+**Why this is safe**: The first 2 re-opens are still allowed (covers legitimate re-entries like context compaction or the model genuinely needing to re-plan). After 2 re-opens, the model is likely in a loop and further ExitPlanMode calls are suppressed. A fresh `EnterPlanMode` resets the counter, so if the model properly enters plan mode again, the approval bar will work normally.
+
+**Deeper logging**: Added `logApprovalState()` diagnostic method that dumps ALL approval-related flags at key lifecycle moments (messageStart, messageDelta, result, sendMessage, planApprovalResponse, notifyPlanApprovalRequired). This makes future debugging much easier -- every state transition is captured in the Output -> ClaUi log.
+
 ---
 
 ## Current Defense Layers
@@ -192,6 +217,8 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 | Neutral nudge text | MessageHandler.ts all fallback paths | Prevents model from associating nudge with plan approval |
 | `compactPending` -> reset `exitPlanModeProcessed` on messageStart | MessageHandler.ts `messageStart` handler | Stuck plan mode after context compaction (Bug 9 fix) |
 | `postExitPlanNonPlanActivityObserved` re-opens ExitPlanMode cycle after real execution | MessageHandler.ts `toolUseStart` + `notifyPlanApprovalRequired` | Deadlock where legitimate ExitPlanMode is suppressed as stale (Bug 10 fix) |
+| `exitPlanModeReopenCount` limits Bug 10 re-opens to MAX_EXITPLANMODE_REOPENS | MessageHandler.ts `notifyPlanApprovalRequired` | Infinite reopen loop from unbounded Bug 10 logic (Bug 11 fix) |
+| `logApprovalState()` diagnostic dumps at every lifecycle point | MessageHandler.ts throughout | Comprehensive state visibility for debugging (Bug 11 enhancement) |
 
 The `messageStart` clearing was **removed** as a defense layer because it made the approval bar invisible.
 
@@ -210,13 +237,20 @@ private notifyPlanApprovalRequired(toolName: string): void {
   const isExitPlanMode = norm === 'exitplanmode' || norm.endsWith('.exitplanmode');
   if (isExitPlanMode && this.exitPlanModeProcessed) {
     if (this.postExitPlanNonPlanActivityObserved) {
+      // Bug 11 fix: limit re-opens to prevent infinite loop
+      if (this.exitPlanModeReopenCount >= MAX_EXITPLANMODE_REOPENS) {
+        // Suppress - model is likely in a loop
+        return;
+      }
+      this.exitPlanModeReopenCount++;
       this.resetExitPlanModeProcessed('post-approval non-plan activity detected');
     } else {
       return;
     }
   }
 
-  this.log(`Plan approval required: tool=${toolName}`);
+  this.log(`Plan approval required: tool=${toolName} cycle=${this.pendingApprovalCycleId}`);
+  this.logApprovalState('showing-approval-bar');
   this.pendingApprovalTool = toolName;
   this.webview.postMessage({ type: 'planApprovalRequired', toolName });
 }
@@ -349,5 +383,10 @@ If the model calls AskUserQuestion and then ExitPlanMode in quick succession (co
 4. Click any approve button -> verify model continues without bar re-appearing
 5. **Verify NO stuck "Thinking..."** -> after clicking approve, the indicator should NOT show "Thinking..." indefinitely. If the CLI already finished, no indicator should show. If still executing, tool activity messages should appear. If the CLI fails to auto-resume, the delayed fallback should start execution within a few seconds.
 6. Test typing text while bar is visible -> verify it sends as regular message (not dropped)
-7. Check logs (`Output -> ClaUi`): should see the ExitPlanMode close-bar log, plus either an auto-resume/result observation log or `"ExitPlanMode approve fallback firing - sending proceed nudge to CLI"`
+7. Check logs (`Output -> ClaUi`) for these diagnostic prefixes:
+   - `[APPROVAL_STATE]` - full state dump at every key lifecycle moment (messageStart, result, sendMessage, planApprovalResponse, messageDelta, assistantMessage fallback, notifyPlanApprovalRequired)
+   - `[EPM_TRACK]` - `notePostExitPlanNonPlanActivity` skip/track decisions (shows whether CLI ran tools before user clicked)
+   - `[EPM_CYCLE]` - `markApprovalCycleResumeObserved` / `markApprovalCycleResultObserved` decisions (shows CLI resume/idle detection)
+   - Look for `reopenCount=N/2` in `[APPROVAL_STATE]` lines to confirm Bug 11 counter is working
 8. Test AskUserQuestion: give a task that triggers a question, verify option buttons appear. After answering, "Thinking..." should show (text IS sent to CLI for AskUserQuestion).
+9. Test multi-cycle plan mode (model does work then re-plans): verify up to 2 re-opens work (approval bar shows), and the 3rd re-open is suppressed with log `"Suppressing ExitPlanMode reopen - hit max reopens"`.

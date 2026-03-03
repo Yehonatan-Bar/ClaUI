@@ -48,6 +48,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private thinkingAnimTimer: ReturnType<typeof setInterval> | null = null;
   private thinkingFrame = 0;
   private static readonly THINKING_FRAMES = ['|', '/', '-', '\\'];
+  private static readonly TURN_COMPLETE_EXIT_WATCHDOG_MS = 10_000;
+  private turnCompletedExitWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly fileLogger: FileLogger | null = null;
   private readonly sessionNamer: CodexSessionNamer;
   private sessionActive = false;
@@ -241,6 +243,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
   async clearSession(options?: { cwd?: string }): Promise<void> {
     this.saveProjectAnalytics();
+    this.clearTurnCompletedExitWatchdog();
     if (this.processManager.isTurnRunning) {
       this.processManager.cancelTurn();
     }
@@ -255,6 +258,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
   stopSession(): void {
     this.saveProjectAnalytics();
+    this.clearTurnCompletedExitWatchdog();
     if (this.processManager.isTurnRunning) {
       this.processManager.cancelTurn();
     }
@@ -281,7 +285,17 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       await this.startSession();
     }
     if (this.processManager.isTurnRunning) {
-      throw new Error('A Codex turn is already running');
+      if (!this.isBusy) {
+        this.log(
+          `[Codex Tab ${this.tabNumber}] sendTurn requested while process is still running but UI is idle; forcing stop() before retry`
+        );
+        this.noteTurnDiagnosticsActivity('lifecycle', 'sendTurn idle-running recovery: forcing stop()');
+        this.clearTurnCompletedExitWatchdog();
+        this.processManager.stop();
+      }
+      if (this.processManager.isTurnRunning) {
+        throw new Error('A Codex turn is already running');
+      }
     }
 
     if (!this.firstPrompt) {
@@ -294,6 +308,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.currentModel = this.getCurrentModel();
     this.triggerSessionNaming(text);
     this.resetTurnFailureCapture();
+    this.clearTurnCompletedExitWatchdog();
     this.beginTurnDiagnostics(text);
     const tempImages = images?.length ? this.processManager.createTempImageFiles(images) : null;
     let cleanupOnce: (() => void) | null = null;
@@ -370,6 +385,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       return;
     }
     this.disposed = true;
+    this.clearTurnCompletedExitWatchdog();
     this.endTurnDiagnostics('tab dispose()');
     this.stopThinkingAnimation();
     this.saveProjectAnalytics();
@@ -605,6 +621,10 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     return configured || '';
   }
 
+  isTurnRunning(): boolean {
+    return this.processManager.isTurnRunning;
+  }
+
   private wireWebviewEvents(): void {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.panel.webview.onDidReceiveMessage((message: any) => {
@@ -632,6 +652,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.panel.onDidDispose(() => {
       this.disposed = true;
       try {
+        this.clearTurnCompletedExitWatchdog();
         this.endTurnDiagnostics('panel onDidDispose');
         this.stopThinkingAnimation();
         this.saveProjectAnalytics();
@@ -651,6 +672,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       tabLog(`Codex JSON: ${event.type}`);
       this.noteTurnDiagnosticsActivity('json', event.type);
       if (event.type === 'turn.started') {
+        this.clearTurnCompletedExitWatchdog();
         this.turnStructuredErrorDetected = false;
       }
       if (event.type === 'error' || event.type === 'turn.failed') {
@@ -658,6 +680,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       }
       if (event.type === 'turn.completed') {
         this.turnStructuredErrorDetected = false;
+        this.scheduleTurnCompletedExitWatchdog();
       }
       this.demux.handleEvent(event);
     });
@@ -701,6 +724,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
     this.processManager.on('exit', (info: { code: number | null; signal: string | null }) => {
       tabLog(`Codex turn process exited: code=${info.code}, signal=${info.signal}`);
+      this.clearTurnCompletedExitWatchdog();
       this.noteTurnDiagnosticsActivity('lifecycle', `process exit code=${info.code ?? 'null'} signal=${info.signal ?? 'null'}`);
       this.endTurnDiagnostics(`process exit code=${info.code ?? 'null'} signal=${info.signal ?? 'null'}`);
       if (this.processManager.cancelledByUser) {
@@ -751,6 +775,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
     this.processManager.on('error', (err: Error) => {
       tabLog(`Codex process error: ${err.message}`);
+      this.clearTurnCompletedExitWatchdog();
       this.noteTurnDiagnosticsActivity('lifecycle', `process error: ${err.message}`);
       this.endTurnDiagnostics(`process error: ${err.message}`);
       this.captureTurnFailureText(err.message);
@@ -813,6 +838,42 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.turnDiagHeartbeatTimer = setInterval(() => {
       this.logTurnDiagnosticsHeartbeat();
     }, 15000);
+  }
+
+  private clearTurnCompletedExitWatchdog(): void {
+    if (this.turnCompletedExitWatchdogTimer) {
+      clearTimeout(this.turnCompletedExitWatchdogTimer);
+      this.turnCompletedExitWatchdogTimer = null;
+    }
+  }
+
+  private scheduleTurnCompletedExitWatchdog(): void {
+    this.clearTurnCompletedExitWatchdog();
+    const activeDiagId = this.activeTurnDiag?.id ?? null;
+    this.turnCompletedExitWatchdogTimer = setTimeout(() => {
+      this.turnCompletedExitWatchdogTimer = null;
+      if (this.disposed) {
+        return;
+      }
+      if (!this.processManager.isTurnRunning) {
+        return;
+      }
+      if (activeDiagId !== null && this.activeTurnDiag?.id !== activeDiagId) {
+        return;
+      }
+      this.log(
+        `[Codex Tab ${this.tabNumber}] Turn-complete watchdog fired after ` +
+          `${CodexSessionTab.TURN_COMPLETE_EXIT_WATCHDOG_MS}ms; forcing stop()`
+      );
+      this.noteTurnDiagnosticsActivity(
+        'lifecycle',
+        `turn-complete watchdog forced stop after ${CodexSessionTab.TURN_COMPLETE_EXIT_WATCHDOG_MS}ms`
+      );
+      this.endTurnDiagnostics('turn-complete watchdog forced stop');
+      this.processManager.stop();
+      this.postMessage({ type: 'processBusy', busy: false });
+      this.resetTurnFailureCapture();
+    }, CodexSessionTab.TURN_COMPLETE_EXIT_WATCHDOG_MS);
   }
 
   private noteTurnDiagnosticsActivity(

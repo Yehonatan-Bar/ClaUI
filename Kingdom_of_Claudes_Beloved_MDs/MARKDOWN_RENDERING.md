@@ -24,7 +24,7 @@ Raw text (from CLI)
   v
 parseTextWithCodeBlocks(text)   [MessageBubble.tsx]
   |
-  +-- code segments --> CodeBlock component (copy, collapse, language label)
+  +-- code segments --> CodeBlock component (copy, collapse, language label, HTML preview)
   |
   +-- text segments --> MarkdownContent component
                           |
@@ -41,7 +41,7 @@ parseTextWithCodeBlocks(text)   [MessageBubble.tsx]
 
 ### Why This Architecture
 
-1. **Fenced code blocks are extracted BEFORE Markdown parsing.** This preserves the existing `CodeBlock` component with its copy button, collapse/expand, and file path detection. `marked` never sees fenced code blocks.
+1. **Fenced code blocks are extracted BEFORE Markdown parsing.** This preserves the existing `CodeBlock` component with its copy button, collapse/expand, file path detection, and HTML preview. `marked` never sees fenced code blocks. For HTML code blocks, a "Preview" button opens the content in a new VS Code webview tab via `HtmlPreviewPanel.ts`.
 
 2. **`marked` + `DOMPurify` instead of `react-markdown`.** The `react-markdown` ecosystem pulls in 15+ packages (~80-120KB). `marked` is a single ~40KB dependency. Combined with `DOMPurify` (~15KB), the total is ~55KB.
 

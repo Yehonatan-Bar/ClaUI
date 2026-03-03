@@ -349,7 +349,7 @@ A visual session health dashboard with 5 components:
 ## 19. Markdown Rendering
 
 - **Full GFM support** - Bold, italic, headers, lists, tables, blockquotes, inline code, links, horizontal rules
-- **Fenced code blocks** - Extracted first and rendered by `CodeBlock` component with syntax highlighting, copy button, and collapse toggle
+- **Fenced code blocks** - Extracted first and rendered by `CodeBlock` component with syntax highlighting, copy button, collapse toggle, and HTML preview button (opens rendered HTML in a new VS Code tab)
 - **HTML sanitization** - DOMPurify for XSS prevention on all rendered markdown
 - **Clickable file paths** - Bare file paths and URLs in rendered markdown are auto-linkified via DOM post-processing (`filePathLinks.tsx`)
 - **RTL/Hebrew support** - Full directional overrides for blockquotes, lists, and code blocks. Dedicated `rtl.css` with markdown-specific RTL rules

@@ -261,6 +261,11 @@ export interface CopyToClipboardRequest {
   text: string;
 }
 
+export interface OpenHtmlPreviewRequest {
+  type: 'openHtmlPreview';
+  html: string;
+}
+
 export interface OpenCodexLoginRequest {
   type: 'openCodexLogin';
 }
@@ -539,6 +544,7 @@ export type WebviewToExtensionMessage =
   | OpenSettingsRequest
   | OpenTerminalRequest
   | CopyToClipboardRequest
+  | OpenHtmlPreviewRequest
   | OpenCodexLoginRequest
   | ClaudeAuthLoginRequest
   | ClaudeAuthLogoutRequest

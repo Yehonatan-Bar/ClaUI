@@ -443,6 +443,10 @@ html, body, #root {
   color: var(--vscode-editor-foreground);
 }
 
+.preview-button {
+  color: var(--vscode-textLink-foreground);
+}
+
 /* Collapsible code blocks */
 .code-block-collapsed {
   max-height: none; /* height is controlled by visible lines, not max-height */
