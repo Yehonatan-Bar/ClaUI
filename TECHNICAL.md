@@ -125,7 +125,7 @@ claude-code-mirror/
 |       |   +-- useClaudeStream.ts        #   postMessage event dispatcher
 |       |   +-- useRtlDetection.ts        #   detectRtl() helper for InputArea (messages use dir="auto")
 |       |   +-- useFileMention.ts         #   @ file mention trigger detection, debounced search, popup state
-|       |   +-- useStatusBarCollapse.ts  #   ResizeObserver hook for responsive status bar collapse
+|       |   +-- useStatusBarCollapse.ts  #   4-stage responsive layout hook (hysteresis + overflow guard)
 |       +-- components/
 |       |   +-- ChatView/
 |       |   |   +-- MessageList.tsx       #   Scrollable message list with scroll-to-bottom button
@@ -205,7 +205,7 @@ claude-code-mirror/
 |       |   |   +-- index.ts               #   Barrel exports
 |       |   +-- StatusBar/
 |       |   |   +-- StatusBar.tsx            #   Bottom status bar with responsive collapse
-|       |   |   +-- StatusBarGroupButton.tsx #   Reusable dropdown group button for collapsed mode
+|       |   |   +-- StatusBarGroupButton.tsx #   Reusable dropdown group button for responsive status-bar modes
 |       |   +-- TextSettingsBar/
 |       |       +-- TextSettingsBar.tsx   #   Font size/family/theme controls
 |       +-- styles/
@@ -297,7 +297,7 @@ claude-code-mirror/
 **React Chat UI** - React 18 components for message display, streaming text, tool use blocks, code blocks, image display, and RTL-aware input. The input area supports sending prompts while Claude is busy (interrupt), matching Claude Code CLI behavior. Ctrl+V pastes images from clipboard as base64 attachments (shown as thumbnails above the input, removable before sending) when the active provider capability `supportsImages` is enabled (Claude + Codex). In Codex tabs, image attachments are converted to temporary files and passed to `codex exec` / `codex exec resume` via repeatable `--image` flags. Clipboard shortcut/paste diagnostics from `InputArea` can be forwarded to the extension log as `[UiDebug][InputArea] ...` entries for troubleshooting paste/image issues in the webview. Both Send and Cancel buttons are visible during processing; Escape cancels the current response.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**StatusBar (Responsive)** - Bottom status bar extracted into its own component (`StatusBar/StatusBar.tsx`). Uses a `ResizeObserver` hook (`useStatusBarCollapse`) to detect panel width. At full width, all 15 items display inline. Below ~620px, items collapse into two dropdown groups: **"More"** (Feedback, Plans, History, Prompts, Model, Permissions, Costs, Dashboard) and **"Tools"** (Skills, Trophy, Vitals). Always-visible items: Active Clock, Git, Aa (TextSettings), Tokens. Provider-specific gating is applied in the webview: in Codex UI mode, the `SkillDocs` button, adjacent `!` info button, and Anthropic `Usage` button are hidden (expanded + collapsed layouts). If a provider does not support Git Push, the Git controls remain visible but are disabled with tooltips (instead of disappearing). Dropdowns open upward with click-outside dismiss, mutual exclusivity, and Escape key support.
+**StatusBar (Responsive)** - Bottom status bar extracted into its own component (`StatusBar/StatusBar.tsx`). Uses a `ResizeObserver` hook (`useStatusBarCollapse`) with 4 layout stages and hysteresis thresholds (`~1350`, `~860`, `~480`). Layout transitions are driven purely by width thresholds with hysteresis gaps (~40px each) to prevent flicker. No `scrollWidth` overflow detection. Stage 1 (`full`): existing full-width layout. Stage 2 (`medium`): inline `Clock`, `History`, `Prompts`, `Feedback`, `Plans`, Babel Fish icon, Vitals gear, `Aa`, and token counters; a **More** dropdown contains provider selectors, model/permission selectors, Git, Dashboard, Teams, Consult, SkillDocs, Achievements, Usage, and Vitals toggle. Stage 3 (`collapsed`): two dropdowns (**More** + **Tools**) plus always-visible Active Clock, Vitals gear, Aa, and token counters. Stage 4 (`minimal`): a single **Menu** dropdown plus Vitals gear only. Provider-specific gating is applied in the webview: in Codex UI mode, the `SkillDocs` button, adjacent `!` info button, and Anthropic `Usage` button are hidden (across responsive stages where they appear). If a provider does not support Git Push, the Git controls remain visible but are disabled with tooltips (instead of disappearing). Dropdowns open upward with click-outside dismiss, mutual exclusivity, and Escape key support.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Global Tooltip System** - Unified, VS Code-themed tooltip rendered via a single `GlobalTooltip` React component mounted at the App root. Uses document-level event delegation to detect `mouseover` on any element with a `data-tooltip` attribute, then renders a positioned tooltip via `createPortal`. 400ms hover delay, auto-flips above/below trigger, shifts horizontally to stay within viewport, hides on scroll. Accessible (`role="tooltip"`, dynamic `aria-describedby`). Touch-device guard. All ~25 component files use `data-tooltip="..."` instead of native `title` attributes.

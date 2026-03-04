@@ -1,5 +1,13 @@
 # ClaUi - Changelog
 
+## v0.1.71 - 2026-03-03
+
+**Feature: HTML Preview inside VS Code**
+
+- HTML code blocks in chat now show a "Preview" button that opens the rendered HTML in a new VS Code tab (no external browser needed)
+- Plan documents (HTML) now open in an in-editor preview tab instead of launching the default browser
+- Full HTML documents (with `<!DOCTYPE html>`) are rendered directly; code snippets get a minimal wrapper with a permissive CSP
+
 ## v0.1.70 - 2026-03-02
 
 **Feature: Happy provider integration (remote)**

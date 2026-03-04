@@ -421,25 +421,29 @@ A visual session health dashboard with 5 components:
 
 ## 25. Responsive Status Bar
 
-### 25.1 Always-Visible Items
+### 25.1 Stage 1 - Full Width
 
-- **Active Session Timer** - Real-time elapsed clock (HH:MM:SS) showing session duration
-- **Git** - One-click git push button
-- **Aa** - Text settings (font size, font family, typing theme)
-- **Token Counters** - Live "In: X Out: Y" showing input/output token counts
+- Original full layout with all status controls visible inline
 
-### 25.2 Full-Width Items (visible above ~620px)
+### 25.2 Stage 2 - Medium Width
 
-- Feedback, Plans, History, Prompts, Model selector, Permissions, Costs, Dashboard, SkillDocs, Trophy, Vitals, Consult, Usage
+- Shows only: **History**, **Feedback**, **Plans**, **Babel Fish** icon
+- Vitals **gear** remains visible outside
 
-### 25.3 Collapsed Mode (below ~620px)
+### 25.3 Stage 3 - Collapsed
 
-- **"More" dropdown** - Feedback, Plans, History, Prompts, Model, Permissions, Costs, Dashboard
-- **"Tools" dropdown** - Skills, Trophy, Vitals
+- **"More" dropdown** - Feedback, Plans, History, Prompts, Provider/Model/Permissions, Dashboard, Teams/Consult
+- **"Tools" dropdown** - Git, SkillDocs, Trophy, Usage, Babel Fish, Vitals toggle
+- Always visible: Active Session Timer, Vitals gear, Aa, Token counters
 
-### 25.4 Behavior
+### 25.4 Stage 4 - Minimal
 
-- Uses `ResizeObserver` hook (`useStatusBarCollapse`) to detect panel width
+- **Single "Menu" dropdown** containing all actions
+- Only one extra always-visible control: Vitals gear
+
+### 25.5 Behavior
+
+- Uses `ResizeObserver` hook (`useStatusBarCollapse`) with hysteresis thresholds and overflow guard
 - Dropdowns open upward with click-outside dismiss, mutual exclusivity, and Escape key support
 - Provider-specific gating: Codex mode hides SkillDocs, "!" info button, and Usage button
 - Disabled with tooltips (instead of disappearing) when a feature is unavailable for the current provider

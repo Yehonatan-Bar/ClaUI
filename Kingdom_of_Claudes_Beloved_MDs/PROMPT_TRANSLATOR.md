@@ -11,7 +11,7 @@ Babel Fish is a unified bi-directional translation feature that lets users work 
 | `src/extension/session/MessageTranslator.ts` | Backend: translates assistant responses to target language (inbound) |
 | `src/extension/webview/MessageHandler.ts` | Routes all translation messages; auto-translates each assistant message (intermediate + final) |
 | `src/extension/session/SessionTab.ts` | Wires both translators into the per-tab MessageHandler |
-| `src/webview/components/StatusBar/StatusBar.tsx` | Renders "Babel Fish" button next to Vitals |
+| `src/webview/components/StatusBar/StatusBar.tsx` | Renders "Babel Fish" control across responsive status-bar stages |
 | `src/webview/components/InputArea/InputArea.tsx` | Prompt translation intercept logic in `sendMessage()` |
 | `src/webview/hooks/useClaudeStream.ts` | Dispatches `babelFishSettings`, `autoTranslateStarted`, translation results |
 | `src/webview/state/store.ts` | Zustand state: `babelFishEnabled` + existing translation states |
@@ -65,7 +65,7 @@ When disabled:
 
 ## Settings Panel (BabelFishPanel)
 
-Accessible via "Babel Fish" button in the status bar (next to Vitals). Contains:
+Accessible via the "Babel Fish" control in the status bar (placement depends on responsive stage). Contains:
 - Master toggle: Enable/disable Babel Fish
 - Language selector: 10 supported languages (Hebrew, Arabic, Russian, Spanish, French, German, Portuguese, Chinese, Japanese, Korean)
 - Info (!) button: Shows explanation callout when clicked

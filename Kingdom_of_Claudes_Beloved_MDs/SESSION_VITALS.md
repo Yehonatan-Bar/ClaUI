@@ -64,7 +64,7 @@ Wrapper that conditionally renders WeatherWidget + AdventureWidget + CostHeatBar
 - AdventureWidget additionally requires `adventureEnabled` to be true
 
 ### VitalsInfoPanel
-Dropdown panel opened by clicking the "Vitals" button in the StatusBar. Shows explanations of all vitals components and toggle switches.
+Dropdown panel opened by clicking the gear settings button in the StatusBar. Shows explanations of all vitals components and toggle switches.
 
 - **File**: `src/webview/components/Vitals/VitalsInfoPanel.tsx`
 - **Content**: Explains weather icon, cost heat bar, timeline, intensity borders, and adventure widget
@@ -143,7 +143,7 @@ export interface TurnRecord {
 ## Toggle
 
 - **Setting**: `claudeMirror.sessionVitals` (boolean, default `false`)
-- **UI**: "Vitals" button in the StatusBar opens a `VitalsInfoPanel` dropdown with explanations and a toggle switch (active state highlighted with link color)
+- **UI**: "Vitals" button in the StatusBar toggles vitals on/off; the adjacent gear button opens `VitalsInfoPanel` with explanations and settings
 - **Behavior**: Hides ALL vitals components (timeline, weather, cost bar, intensity borders) when disabled
 - **Sync**: Two-way sync between VS Code settings and webview (same pattern as other settings)
 
