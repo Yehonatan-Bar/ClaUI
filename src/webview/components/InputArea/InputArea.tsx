@@ -935,6 +935,7 @@ export const InputArea: React.FC = () => {
       }
 
       // Manual translate: place translated text in the input box for review
+      useAppStore.getState().setIsTranslatingPrompt(false);
       setText(translated);
       undoMgr.push(translated, translated.length);
       requestAnimationFrame(() => {

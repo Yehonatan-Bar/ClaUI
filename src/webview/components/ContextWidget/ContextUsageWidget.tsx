@@ -62,6 +62,9 @@ export const ContextUsageWidget: React.FC = () => {
   const pct = maxCtx > 0 ? Math.min((inputTokens / maxCtx) * 100, 100) : 0;
   const barColor = getContextColor(pct);
 
+  // Diagnostic logging for context bar debugging
+  console.log(`%c[CTX-BAR] model=${model} rawIn=${rawIn} inputTokens=${inputTokens} maxCtx=${maxCtx} pct=${pct.toFixed(1)}% color=${barColor}`, 'color: #ff9800; font-weight: bold');
+
   const [position, setPosition] = useState<WidgetPosition | null>(loadPosition);
   const [dragging, setDragging] = useState(false);
 
