@@ -6,6 +6,7 @@ import { GitPushPanel } from './GitPushPanel';
 import { FileMentionPopup } from './FileMentionPopup';
 import { useFileMention } from '../../hooks/useFileMention';
 import type { WebviewImageData } from '../../../extension/types/webview-messages';
+import { getModelMaxContext, getContextColor } from '../../utils/modelContextLimits';
 
 /**
  * Manages an undo/redo stack for a textarea controlled by React state.
@@ -109,8 +110,21 @@ export const InputArea: React.FC = () => {
     setPromptTranslateEnabled,
     setAutoTranslateEnabled,
     setSendSettingsPopoverOpen,
+    contextWidgetVisible,
   } = useAppStore();
   const fileMention = useFileMention(textareaRef);
+
+  // Context bar: poll store every 5s to keep bar current (same pattern as ContextUsageWidget)
+  const [, setContextTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setContextTick((t) => t + 1), 5000);
+    return () => clearInterval(id);
+  }, []);
+  const { inputTokens: ctxInputTokens } = useAppStore.getState().cost;
+  const ctxModel = useAppStore.getState().model;
+  const ctxMaxTokens = getModelMaxContext(ctxModel ?? '');
+  const ctxPct = ctxMaxTokens > 0 ? Math.min(((ctxInputTokens ?? 0) / ctxMaxTokens) * 100, 100) : 0;
+  const ctxBarColor = getContextColor(ctxPct);
 
   // History navigation: -1 = not browsing, 0..N = index into promptHistory (0 = oldest)
   const historyIndexRef = useRef(-1);
@@ -1003,6 +1017,31 @@ export const InputArea: React.FC = () => {
 
   return (
     <div className="input-area">
+      {/* Context usage bar: thin line at the top of the input area, visible when contextWidgetVisible is on */}
+      {contextWidgetVisible && (
+        <div
+          data-tooltip={`Context: ${ctxPct.toFixed(1)}%`}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: 2,
+            overflow: 'hidden',
+            pointerEvents: 'none',
+            zIndex: 10,
+          }}
+        >
+          <div
+            style={{
+              width: `${ctxPct}%`,
+              height: '100%',
+              background: ctxBarColor,
+              transition: 'width 1s ease, background 1s ease',
+            }}
+          />
+        </div>
+      )}
       {/* Image thumbnails preview */}
       {pendingImages.length > 0 && (
         <div className="pending-images">
