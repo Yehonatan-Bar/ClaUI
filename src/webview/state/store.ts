@@ -149,6 +149,9 @@ export interface AppState {
   turnByMessageId: Record<string, TurnRecord>;
   weather: WeatherState;
 
+  // Context usage widget
+  contextWidgetVisible: boolean;
+
   // Usage widget
   usageWidgetEnabled: boolean;
   usageStats: UsageStat[];
@@ -387,6 +390,7 @@ export interface AppState {
   setPendingOriginalText: (text: string | null) => void;
   setUserOriginalText: (messageId: string, text: string) => void;
   setVitalsEnabled: (enabled: boolean) => void;
+  setContextWidgetVisible: (visible: boolean) => void;
   setUsageWidgetEnabled: (enabled: boolean) => void;
   setUsageData: (stats: UsageStat[], fetchedAt: number, error?: string) => void;
   rebuildTurnHistoryFromMessages: (messages?: ChatMessage[]) => void;
@@ -618,6 +622,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   turnHistory: [],
   turnByMessageId: {},
   weather: { ...initialWeather },
+  contextWidgetVisible: false,
   usageWidgetEnabled: false,
   usageStats: [],
   usageFetchedAt: null,
@@ -1262,6 +1267,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
+  setContextWidgetVisible: (visible) => set({ contextWidgetVisible: visible }),
   setUsageWidgetEnabled: (enabled) => set({ usageWidgetEnabled: enabled }),
 
   setUsageData: (stats, fetchedAt, error) =>

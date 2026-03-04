@@ -10,6 +10,7 @@ import { VitalsInfoPanel } from '../Vitals/VitalsInfoPanel';
 import { BabelFishPanel } from '../BabelFish/BabelFishPanel';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { t as tAch } from '../Achievements/achievementI18n';
+import { getModelMaxContext, getContextColor } from '../../utils/modelContextLimits';
 import { useStatusBarCollapse } from '../../hooks/useStatusBarCollapse';
 import { StatusBarGroupButton } from './StatusBarGroupButton';
 
@@ -72,6 +73,9 @@ export const StatusBar: React.FC<{
     usageError,
     babelFishEnabled,
     teamActive,
+    contextWidgetVisible,
+    setContextWidgetVisible,
+    model,
   } = useAppStore();
 
   const { barRef, layoutMode } = useStatusBarCollapse();
@@ -351,6 +355,18 @@ export const StatusBar: React.FC<{
     ? Math.max(...usageStats.map((s) => s.percentage))
     : null;
 
+  // Context usage computation
+  const ctxMax = getModelMaxContext(model ?? '');
+  const ctxTokens = cost?.inputTokens ?? 0;
+  const ctxPct = ctxMax > 0 ? Math.min((ctxTokens / ctxMax) * 100, 100) : 0;
+  const ctxColor = getContextColor(ctxPct);
+  const ctxHasData = ctxTokens > 0;
+
+  const handleContextWidgetToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setContextWidgetVisible(!contextWidgetVisible);
+  };
+
   // Inline popover for the Usage button
   const usagePopover = usagePopoverOpen ? (
     <div className="status-bar-usage-popover">
@@ -393,6 +409,28 @@ export const StatusBar: React.FC<{
       ) : (
         <div className="status-bar-usage-popover-empty">No data — click {'\u21BB'} to load</div>
       )}
+      {/* Context usage section */}
+      <div className="status-bar-usage-context-section">
+        <div className="status-bar-usage-stat-header">
+          <span className="status-bar-usage-stat-label">Context window</span>
+          <span className="status-bar-usage-stat-pct" style={{ color: ctxHasData ? ctxColor : 'var(--vscode-descriptionForeground)' }}>
+            {ctxHasData ? `${ctxPct.toFixed(1)}%` : '—'}
+          </span>
+        </div>
+        <div className="status-bar-usage-bar-bg" style={{ marginBottom: 6 }}>
+          <div
+            className="status-bar-usage-bar-fill"
+            style={{ width: `${ctxPct}%`, background: ctxColor, transition: 'width 0.5s ease, background 0.5s ease' }}
+          />
+        </div>
+        <button
+          className={`status-bar-context-widget-toggle ${contextWidgetVisible ? 'active' : ''}`}
+          onClick={handleContextWidgetToggle}
+          data-tooltip={contextWidgetVisible ? 'Hide floating context bar' : 'Show floating context bar'}
+        >
+          {contextWidgetVisible ? 'Hide widget' : 'Show widget'}
+        </button>
+      </div>
     </div>
   ) : null;
 
@@ -513,7 +551,13 @@ export const StatusBar: React.FC<{
                 onClick={handleUsageClick}
                 data-tooltip="Usage Data"
               >
-                {maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}
+                <span className="usage-btn-label">{maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}</span>
+                {ctxHasData && (
+                  <span
+                    className="usage-btn-context-strip"
+                    style={{ background: ctxColor, width: `${ctxPct}%` }}
+                  />
+                )}
               </button>
               {usagePopover}
             </div>
@@ -679,7 +723,13 @@ export const StatusBar: React.FC<{
                 onClick={handleUsageClick}
                 data-tooltip="Usage Data"
               >
-                {maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}
+                <span className="usage-btn-label">{maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}</span>
+                {ctxHasData && (
+                  <span
+                    className="usage-btn-context-strip"
+                    style={{ background: ctxColor, width: `${ctxPct}%` }}
+                  />
+                )}
               </button>
               {usagePopover}
             </div>
@@ -849,7 +899,13 @@ export const StatusBar: React.FC<{
                 onClick={handleUsageClick}
                 data-tooltip="Usage Data"
               >
-                {maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}
+                <span className="usage-btn-label">{maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}</span>
+                {ctxHasData && (
+                  <span
+                    className="usage-btn-context-strip"
+                    style={{ background: ctxColor, width: `${ctxPct}%` }}
+                  />
+                )}
               </button>
               {usagePopover}
             </div>
