@@ -166,7 +166,13 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ text }) => {
 
   const sanitizedHtml = useMemo(() => {
     const rawHtml = marked.parse(text, { async: false }) as string;
-    return DOMPurify.sanitize(rawHtml, PURIFY_CONFIG);
+    let html = DOMPurify.sanitize(rawHtml, PURIFY_CONFIG);
+    // Highlight "ultrathink" keyword with animated glow effect
+    html = html.replace(
+      /\b(ultrathink)\b/gi,
+      '<span class="ultrathink-glow">$1</span>'
+    );
+    return html;
   }, [text]);
 
   useEffect(() => {

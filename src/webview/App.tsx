@@ -13,7 +13,7 @@ import { ShareCard } from './components/Achievements/ShareCard';
 import { VitalsContainer } from './components/Vitals/VitalsContainer';
 import { AdventureWidget } from './components/Vitals/AdventureWidget';
 import { UsageWidget } from './components/Usage/UsageWidget';
-import { ContextUsageWidget } from './components/ContextWidget/ContextUsageWidget';
+// ContextUsageWidget floating strip removed - context bar now lives in InputArea
 import { SessionTimeline } from './components/Vitals/SessionTimeline';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { DashboardPanel } from './components/Dashboard';
@@ -247,8 +247,7 @@ export const App: React.FC = () => {
       {adventureEnabled && <AdventureWidget />}
       {/* Usage widget: floating display of subscription usage data, toggled via gear settings */}
       {usageWidgetEnabled && <UsageWidget />}
-      {/* Context usage widget: floating draggable bar showing conversation context consumption */}
-      {contextWidgetVisible && <ContextUsageWidget />}
+      {/* Context usage strip is now rendered inside InputArea (bar above textarea) */}
       {/* Agent Teams widget: floating team status, appears when a team is active */}
       {teamActive && <TeamStatusWidget />}
 

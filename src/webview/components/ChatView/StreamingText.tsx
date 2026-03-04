@@ -42,13 +42,24 @@ export const StreamingText: React.FC<StreamingTextProps> = ({ text }) => {
     [text, typingTheme, visibleLength]
   );
 
+  /** Split text around "ultrathink" so we can render it with glow styling */
+  const renderedContent = useMemo(() => {
+    const parts = displayText.split(/\b(ultrathink)\b/gi);
+    if (parts.length === 1) return displayText;
+    return parts.map((part, i) =>
+      /^ultrathink$/i.test(part)
+        ? <span key={i} className="ultrathink-glow">{part}</span>
+        : part
+    );
+  }, [displayText]);
+
   return (
     <div
       className={`text-content streaming-text streaming-text-${typingTheme}`}
       dir="auto"
       style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
     >
-      {displayText}
+      {renderedContent}
       <span className="streaming-cursor" />
     </div>
   );

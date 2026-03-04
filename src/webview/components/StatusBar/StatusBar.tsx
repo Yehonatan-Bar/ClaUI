@@ -428,9 +428,9 @@ export const StatusBar: React.FC<{
         <button
           className={`status-bar-context-widget-toggle ${contextWidgetVisible ? 'active' : ''}`}
           onClick={handleContextWidgetToggle}
-          data-tooltip={contextWidgetVisible ? 'Hide floating context bar' : 'Show floating context bar'}
+          data-tooltip={contextWidgetVisible ? 'Hide context strip' : 'Show context strip'}
         >
-          {contextWidgetVisible ? 'Hide widget' : 'Show widget'}
+          {contextWidgetVisible ? 'Hide strip' : 'Show strip'}
         </button>
       </div>
     </div>

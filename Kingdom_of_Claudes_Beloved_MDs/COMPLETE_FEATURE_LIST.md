@@ -11,6 +11,7 @@ A comprehensive catalog of every feature and capability in the ClaUi VS Code ext
 - **Auto-naming** - Tabs are automatically named based on your first message using a lightweight AI call (Haiku for Claude, codex exec for Codex)
 - **Manual tab renaming** - Pencil icon in the top-right corner of any tab to rename it
 - **Activity indicator** - Spinning indicator in the tab title while Claude is working, with a human-readable summary of current activity
+- **Ultrathink button** - Brain icon button between browse/paperclip and textarea that injects "ultrathink" keyword with a random animation (Rocket Launch, Brain on Fire, Wizard Staff, or Turbo/NOS)
 - **Clear session** - Button in the input area to reset all UI state (messages, cost, streaming) and restart the CLI process from scratch
 - **Session store** - Session metadata (ID, name, model, timestamps, first prompt) persisted in VS Code globalState, capped at 100 entries, sorted by most recent
 

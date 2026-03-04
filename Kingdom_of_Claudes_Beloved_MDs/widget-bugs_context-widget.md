@@ -4,6 +4,39 @@
 
 ---
 
+## Bug 6 (FIXED): Context Bar - Gradient, Tooltip, and Location
+
+### Trigger
+> The context usage indicator needed: (1) floating widget hidden, only thin bar above input area, (2) color starting from blue with gradual transition, (3) tooltip on hover near the bar showing percentage.
+
+### Root Cause (3 rounds of fixes)
+**Round 1** (previous agent): Changed the floating `ContextUsageWidget` to a thin strip, added gradient and `data-tooltip`. But the gradient used triple-nested divs with overflow:hidden clipping that didn't render. The `data-tooltip` had `pointerEvents: 'none'` on the outer div, blocking all mouse events.
+
+**Round 2** (wrong target): Fixed gradient and tooltip on the floating `ContextUsageWidget` component. But the ACTUAL bar the user wanted fixed was in `InputArea.tsx` (the bar above the textarea), not the floating draggable widget.
+
+**Round 3** (correct fix): Identified that the context bar in `InputArea.tsx` (lines 1047-1071) had TWO blocking issues:
+1. `pointerEvents: 'none'` on the outer div -- prevents ALL mouse events, tooltip can never trigger
+2. Uses `getContextColor(pct)` which returns solid green/yellow/red at harsh thresholds -- not the blue gradient
+
+### Fix Applied (Round 3 - Final)
+- **Removed floating widget**: Removed `<ContextUsageWidget />` rendering from `App.tsx`. The floating draggable strip is no longer shown.
+- **Gradient**: Replaced `getContextColor()` solid color with `backgroundImage: linear-gradient(90deg, #3794ff 0%, #41b5ff 35%, #63c97a 62%, #d29922 82%, #f85149 100%)`. Used `backgroundSize: ${(100/ctxPct)*100}% 100%` to make the gradient span the full track width so it reveals progressively (blue at low usage, full spectrum at 100%).
+- **Hover zone**: Replaced the 2px `pointerEvents: 'none'` div with a 12px tall hover zone (visible bar is still 2px at the top, the bottom 10px is an invisible hover area). Hover zone has normal pointer events.
+- **Tooltip**: Added local React tooltip with `useState` for hover tracking + `onMouseEnter`/`onMouseLeave`. Renders an absolutely-positioned tooltip above the bar showing `Context: XX.X%`. Styled with VS Code theme CSS vars.
+
+### Files Changed
+- `src/webview/App.tsx` - removed ContextUsageWidget rendering and import
+- `src/webview/components/InputArea/InputArea.tsx` - gradient, hover zone, tooltip
+- `src/webview/components/StatusBar/StatusBar.tsx` - toggle copy "widget" to "strip"
+
+### Key Decision
+**Data path untouched**: The token source (`useAppStore.getState().cost`), polling strategy (5s interval), and percentage computation remained exactly on the same stable path. Only presentation/interaction layers were changed.
+
+### Key Insight
+**Identify the correct target element**: The floating `ContextUsageWidget` and the `InputArea` bar are two separate context displays controlled by the same toggle. The user's visible bar was in InputArea, not the floating widget. Always verify WHICH element the user is referring to before making changes.
+
+---
+
 ## Bug 1 (v0.1.76, COMMITTED): Context Widget Not Re-Rendering
 
 ### Trigger
