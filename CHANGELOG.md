@@ -1,5 +1,15 @@
 # ClaUi - Changelog
 
+## v0.1.73 - 2026-03-04
+
+**Feature: Visual TodoWrite cards in chat**
+
+- `TodoWrite` tool blocks now render as a visual, user-friendly task card instead of raw JSON
+- Added progress UI: completion bar plus summary chips (`%`, `done`, `doing`, `queued`)
+- Todos are shown as color-coded rows by status (`completed`, `in_progress`, `pending`) with cleaner readability
+- `activeForm` text is displayed as a secondary line per task when available
+- `TodoWrite` blocks open expanded by default (still collapsible), while all other tool blocks keep existing behavior
+
 ## v0.1.72 - 2026-03-04
 
 **Fix: StatusBar responsive collapse rework**
