@@ -1,5 +1,16 @@
 # ClaUi - Changelog
 
+## v0.1.72 - 2026-03-04
+
+**Fix: StatusBar responsive collapse rework**
+
+- Fixed collapse stages triggering at wrong widths (stage 3 showing when stage 1 should be active)
+- Root cause: `scrollWidth` overflow guard created a feedback loop, cascading through all stages on a single resize event. Removed overflow detection entirely; stages now use pure width thresholds with hysteresis gaps
+- Raised full-to-medium threshold (1080 -> 1350) so the transition fires before buttons clip
+- Added a **More** dropdown to medium mode (stage 2) containing all items that move out of the inline layout (provider/model/permission selectors, Git, Dashboard, Teams, Consult, SkillDocs, Achievements, Usage, Vitals toggle)
+- Lowered minimal threshold (680 -> 480) so stage 3 (collapsed) stays active longer before everything collapses into a single Menu dropdown
+- All 4 stages now transition correctly in both directions when resizing
+
 ## v0.1.71 - 2026-03-03
 
 **Feature: HTML Preview inside VS Code**
