@@ -1,10 +1,10 @@
 # Git Push Button
 
-One-click git add/commit/push from the webview UI, driven by VS Code configuration.
+One-click git add/commit/push from the status bar UI, driven by VS Code configuration.
 
 ## What It Does
 
-A "Git" button in the InputArea executes `scripts/git-push.ps1` which:
+A "Git" control in the status bar executes `scripts/git-push.ps1` which:
 1. Stages all changes (`git add -A`)
 2. Commits with the session tab name as the commit message
 3. Pushes to the remote
@@ -13,7 +13,7 @@ A "Git" button in the InputArea executes `scripts/git-push.ps1` which:
 
 | File | Role |
 |------|------|
-| `src/webview/App.tsx` | Git button and gear toggle in the StatusBar component |
+| `src/webview/components/StatusBar/StatusBar.tsx` | Git button group rendering and collapsed-mode placement |
 | `src/webview/components/InputArea/InputArea.tsx` | Git push toast notification, config panel rendering, settings request on mount |
 | `src/webview/components/InputArea/GitPushPanel.tsx` | Configuration panel component |
 | `src/extension/webview/MessageHandler.ts` | `handleGitPush()` executes the script, `sendGitPushSettings()` syncs config |
@@ -34,7 +34,10 @@ A "Git" button in the InputArea executes `scripts/git-push.ps1` which:
 ## UI Components
 
 ### Git Button
-- Location: Bottom status bar, next to History and Plans buttons
+- Location: Bottom status bar
+- Expanded mode: visible inline as a joined `Git` + `*` control group
+- Collapsed mode: moved into the `Tools` dropdown group
+- Minimal mode: moved into the single `Menu` dropdown
 - When configured (`enabled=true`): clicking executes the push script
 - When not configured: clicking opens the config panel
 - Shows "..." while the push is running

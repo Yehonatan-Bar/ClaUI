@@ -74,9 +74,10 @@ export const StatusBar: React.FC<{
     teamActive,
   } = useAppStore();
 
-  const { barRef, isCollapsed } = useStatusBarCollapse();
+  const { barRef, layoutMode } = useStatusBarCollapse();
   const [navOpen, setNavOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [minimalOpen, setMinimalOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   useEffect(() => {
@@ -120,13 +121,21 @@ export const StatusBar: React.FC<{
     return () => document.removeEventListener('mousedown', handler);
   }, [usagePopoverOpen]);
 
-  // Close dropdowns when expanding back
+  // Close dropdowns when leaving their layout modes
   useEffect(() => {
-    if (!isCollapsed) {
+    if (layoutMode !== 'collapsed' && layoutMode !== 'medium') {
       setNavOpen(false);
+    }
+    if (layoutMode !== 'collapsed') {
       setToolsOpen(false);
     }
-  }, [isCollapsed]);
+    if (layoutMode !== 'minimal') {
+      setMinimalOpen(false);
+    }
+    if (layoutMode !== 'full' && layoutMode !== 'medium') {
+      setFeedbackOpen(false);
+    }
+  }, [layoutMode]);
 
   const activityMs = sessionActivityElapsedMs + (
     sessionActivityRunningSinceMs ? Math.max(0, tickMs - sessionActivityRunningSinceMs) : 0
@@ -145,7 +154,11 @@ export const StatusBar: React.FC<{
   };
 
   const handleFeedbackToggle = () => {
-    setFeedbackOpen(!feedbackOpen);
+    setFeedbackOpen((p) => !p);
+    setNavOpen(false);
+    setToolsOpen(false);
+    setMinimalOpen(false);
+    setVitalsInfoOpen(false);
   };
 
   const handleFeedbackAction = (action: 'bug' | 'feature' | 'email' | 'fullBugReport') => {
@@ -202,13 +215,29 @@ export const StatusBar: React.FC<{
   const handleNavToggle = () => {
     setNavOpen((p) => !p);
     setToolsOpen(false);
+    setMinimalOpen(false);
     setVitalsInfoOpen(false);
   };
 
   const handleToolsToggle = () => {
     setToolsOpen((p) => !p);
     setNavOpen(false);
+    setMinimalOpen(false);
+    setFeedbackOpen(false);
     setVitalsInfoOpen(false);
+  };
+
+  const handleMinimalToggle = () => {
+    setMinimalOpen((p) => !p);
+    setNavOpen(false);
+    setToolsOpen(false);
+    setVitalsInfoOpen(false);
+  };
+
+  const handleVitalsSettingsToggle = () => {
+    setVitalsInfoOpen((prev) => !prev);
+    setNavOpen(false);
+    setToolsOpen(false);
   };
 
   const handleOpenProviderTab = (targetProvider: 'claude' | 'codex') => {
@@ -367,8 +396,340 @@ export const StatusBar: React.FC<{
     </div>
   ) : null;
 
-  // --- COLLAPSED mode ---
-  if (isCollapsed) {
+  // --- MINIMAL mode (Stage 4) ---
+  if (layoutMode === 'minimal') {
+    return (
+      <div className="status-bar status-bar-collapsed" ref={barRef}>
+        <StatusBarGroupButton label="Menu" isOpen={minimalOpen} onToggle={handleMinimalToggle}>
+          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('bug')} data-tooltip="Open bug report">
+            Report Bug
+          </button>
+          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('feature')} data-tooltip="Request a new feature">
+            Feature Request
+          </button>
+          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('email')} data-tooltip="Send email feedback">
+            Email Feedback
+          </button>
+          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('fullBugReport')} data-tooltip="Collect diagnostics and send full report">
+            Full Bug Report
+          </button>
+          <button className="status-bar-group-dropdown-item" onClick={handleOpenPlans} data-tooltip="Open plan document in browser">
+            Plans
+          </button>
+          <button className="status-bar-group-dropdown-item" onClick={handleHistory} data-tooltip="Conversation History (Ctrl+Shift+H)">
+            History
+          </button>
+          <button className="status-bar-group-dropdown-item" onClick={handlePromptHistory} disabled={!isConnected} data-tooltip="Prompt History">
+            Prompts
+          </button>
+          <div className="status-bar-group-dropdown-separator" />
+          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+            <ProviderSelector />
+          </div>
+          <button
+            className={`status-bar-group-dropdown-item ${selectedProvider === 'claude' ? 'active' : ''}`}
+            onClick={handleSetClaudeProvider}
+            disabled={isBusy}
+            data-tooltip={claudeButtonTitle}
+          >
+            Claude
+          </button>
+          <button
+            className={`status-bar-group-dropdown-item ${selectedProvider === 'codex' ? 'active' : ''}`}
+            onClick={handleSetCodexProvider}
+            disabled={isBusy}
+            data-tooltip={codexButtonTitle}
+          >
+            Codex
+          </button>
+          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+            {modelSelectorElement}
+          </div>
+          {codexReasoningSelectorElement && (
+            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+              {codexReasoningSelectorElement}
+            </div>
+          )}
+          {permissionSelectorElement && (
+            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+              {permissionSelectorElement}
+            </div>
+          )}
+          <div className="status-bar-group-dropdown-separator" />
+          <button className="status-bar-group-dropdown-item" onClick={toggleDashboard} data-tooltip="Analytics Dashboard">
+            Dashboard
+          </button>
+          {teamActive && (
+            <button className="status-bar-group-dropdown-item" onClick={() => useAppStore.getState().setTeamPanelOpen(true)} data-tooltip="Agent Teams Panel">
+              Teams
+            </button>
+          )}
+          {isConnected && showCodexConsult && (
+            <button className="status-bar-group-dropdown-item" onClick={() => setCodexConsultPanelOpen(true)} data-tooltip="Consult Codex GPT expert">
+              Consult Codex
+            </button>
+          )}
+          <div className="status-bar-group-dropdown-separator" />
+          {showGitPush && (
+            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+              {gitGroup}
+            </div>
+          )}
+          {skillGenEnabled && !isCodexUi && (
+            <div className="status-bar-group-dropdown-item-row">
+              <button
+                className={`status-bar-group-dropdown-item ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''}`}
+                onClick={() => {
+                  postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'panelOpened', data: { source: 'statusbar-minimal', pendingDocs: skillGenPendingDocs, threshold: skillGenThreshold } });
+                  postToExtension({ type: 'getSkillGenStatus' });
+                  setSkillGenPanelOpen(true);
+                }}
+              >
+                SkillDocs {skillGenPendingDocs}/{skillGenThreshold}
+              </button>
+              <button
+                className="skillgen-info-btn"
+                data-tooltip="How Skills work"
+                onClick={() => {
+                  postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'infoOpened', data: { source: 'statusbar-minimal' } });
+                  postToExtension({ type: 'getSkillGenStatus' });
+                  setSkillGenShowInfo(true);
+                  setSkillGenPanelOpen(true);
+                }}
+              >
+                !
+              </button>
+            </div>
+          )}
+          {achievementsEnabled && (
+            <button className="status-bar-group-dropdown-item" onClick={handleAchievements}>
+              {tAch(achievementLanguage).trophy} {achievementProfile.totalAchievements}
+            </button>
+          )}
+          {!isCodexUi && (
+            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={usageRef}>
+              <button
+                className={`status-bar-vitals-btn ${usagePopoverOpen ? 'active' : ''}`}
+                onClick={handleUsageClick}
+                data-tooltip="Usage Data"
+              >
+                {maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}
+              </button>
+              {usagePopover}
+            </div>
+          )}
+          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={babelFishRef}>
+            <button
+              className={`status-bar-babelfish-icon-btn ${babelFishEnabled ? 'active' : ''}`}
+              onClick={() => setBabelFishOpen((prev) => !prev)}
+              data-tooltip="Babel Fish translation settings"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15 3Q23 3 23 12Q23 21 15 21" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                <path d="M16 7Q20 7 20 12Q20 17 16 17" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                <path d="M15 12Q11 8.5 6 12Q11 15.5 15 12Z" fill="currentColor"/>
+                <path d="M6 12L3 9.5M6 12L3 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="12.5" cy="11.2" r="0.7" fill="var(--vscode-editor-background, #1e1e1e)"/>
+              </svg>
+            </button>
+            {babelFishOpen && <BabelFishPanel onClose={() => setBabelFishOpen(false)} />}
+          </div>
+          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+            <button
+              className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
+              onClick={handleToggleVitals}
+              data-tooltip={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
+            >
+              Vitals
+            </button>
+          </div>
+        </StatusBarGroupButton>
+
+        <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
+          <button
+            className="status-bar-vitals-settings-btn"
+            onClick={handleVitalsSettingsToggle}
+            data-tooltip="Vitals settings"
+            aria-label="Vitals settings"
+          >
+            {'\u2699'}
+          </button>
+          {vitalsInfoOpen && <VitalsInfoPanel onClose={() => setVitalsInfoOpen(false)} />}
+        </div>
+      </div>
+    );
+  }
+
+  // --- MEDIUM mode (Stage 2) ---
+  if (layoutMode === 'medium') {
+    return (
+      <div className="status-bar status-bar-collapsed" ref={barRef}>
+        {clockElement}
+        <button className="status-bar-history-btn" onClick={handleHistory} data-tooltip="Conversation History (Ctrl+Shift+H)">
+          History
+        </button>
+        <button className="status-bar-prompt-history-btn" onClick={handlePromptHistory} data-tooltip="Prompt History" disabled={!isConnected}>
+          Prompts
+        </button>
+        <StatusBarGroupButton label="Feedback" isOpen={feedbackOpen} onToggle={handleFeedbackToggle}>
+          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('bug')} data-tooltip="Open bug report">
+            Report Bug
+          </button>
+          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('feature')} data-tooltip="Request a new feature">
+            Feature Request
+          </button>
+          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('email')} data-tooltip="Send email feedback">
+            Email Feedback
+          </button>
+          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('fullBugReport')} data-tooltip="Collect diagnostics and send full report">
+            Full Bug Report
+          </button>
+        </StatusBarGroupButton>
+        <button className="status-bar-plans-btn" onClick={handleOpenPlans} data-tooltip="Open plan document in browser">
+          Plans
+        </button>
+
+        <StatusBarGroupButton label="More" isOpen={navOpen} onToggle={handleNavToggle}>
+          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+            <ProviderSelector />
+          </div>
+          <button
+            className={`status-bar-group-dropdown-item ${selectedProvider === 'claude' ? 'active' : ''}`}
+            onClick={handleSetClaudeProvider}
+            disabled={isBusy}
+            data-tooltip={claudeButtonTitle}
+          >
+            Claude
+          </button>
+          <button
+            className={`status-bar-group-dropdown-item ${selectedProvider === 'codex' ? 'active' : ''}`}
+            onClick={handleSetCodexProvider}
+            disabled={isBusy}
+            data-tooltip={codexButtonTitle}
+          >
+            Codex
+          </button>
+          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+            {modelSelectorElement}
+          </div>
+          {codexReasoningSelectorElement && (
+            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+              {codexReasoningSelectorElement}
+            </div>
+          )}
+          {permissionSelectorElement && (
+            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+              {permissionSelectorElement}
+            </div>
+          )}
+          <div className="status-bar-group-dropdown-separator" />
+          {isConnected && showCodexConsult && (
+            <button className="status-bar-group-dropdown-item" onClick={() => setCodexConsultPanelOpen(true)} data-tooltip="Consult Codex GPT expert">
+              Consult Codex
+            </button>
+          )}
+          {showGitPush && (
+            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+              {gitGroup}
+            </div>
+          )}
+          <button className="status-bar-group-dropdown-item" onClick={toggleDashboard} data-tooltip="Analytics Dashboard">
+            Dashboard
+          </button>
+          {teamActive && (
+            <button className="status-bar-group-dropdown-item" onClick={() => useAppStore.getState().setTeamPanelOpen(true)} data-tooltip="Agent Teams Panel">
+              Teams
+            </button>
+          )}
+          {skillGenEnabled && !isCodexUi && (
+            <div className="status-bar-group-dropdown-item-row">
+              <button
+                className={`status-bar-group-dropdown-item ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''}`}
+                onClick={() => {
+                  postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'panelOpened', data: { source: 'statusbar-medium', pendingDocs: skillGenPendingDocs, threshold: skillGenThreshold } });
+                  postToExtension({ type: 'getSkillGenStatus' });
+                  setSkillGenPanelOpen(true);
+                }}
+              >
+                SkillDocs {skillGenPendingDocs}/{skillGenThreshold}
+              </button>
+              <button
+                className="skillgen-info-btn"
+                data-tooltip="How Skills work"
+                onClick={() => {
+                  postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'infoOpened', data: { source: 'statusbar-medium' } });
+                  postToExtension({ type: 'getSkillGenStatus' });
+                  setSkillGenShowInfo(true);
+                  setSkillGenPanelOpen(true);
+                }}
+              >
+                !
+              </button>
+            </div>
+          )}
+          {achievementsEnabled && (
+            <button className="status-bar-group-dropdown-item" onClick={handleAchievements}>
+              {tAch(achievementLanguage).trophy} {achievementProfile.totalAchievements}
+            </button>
+          )}
+          {!isCodexUi && (
+            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={usageRef}>
+              <button
+                className={`status-bar-vitals-btn ${usagePopoverOpen ? 'active' : ''}`}
+                onClick={handleUsageClick}
+                data-tooltip="Usage Data"
+              >
+                {maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}
+              </button>
+              {usagePopover}
+            </div>
+          )}
+          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+            <button
+              className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
+              onClick={handleToggleVitals}
+              data-tooltip={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
+            >
+              Vitals
+            </button>
+          </div>
+        </StatusBarGroupButton>
+
+        <div className="status-bar-babelfish-wrapper" ref={babelFishRef}>
+          <button
+            className={`status-bar-babelfish-icon-btn ${babelFishEnabled ? 'active' : ''}`}
+            onClick={() => setBabelFishOpen((prev) => !prev)}
+            data-tooltip="Babel Fish translation settings"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 3Q23 3 23 12Q23 21 15 21" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
+              <path d="M16 7Q20 7 20 12Q20 17 16 17" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+              <path d="M15 12Q11 8.5 6 12Q11 15.5 15 12Z" fill="currentColor"/>
+              <path d="M6 12L3 9.5M6 12L3 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <circle cx="12.5" cy="11.2" r="0.7" fill="var(--vscode-editor-background, #1e1e1e)"/>
+            </svg>
+          </button>
+          {babelFishOpen && <BabelFishPanel onClose={() => setBabelFishOpen(false)} />}
+        </div>
+        <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
+          <button
+            className="status-bar-vitals-settings-btn"
+            onClick={handleVitalsSettingsToggle}
+            data-tooltip="Vitals settings"
+            aria-label="Vitals settings"
+          >
+            {'\u2699'}
+          </button>
+          {vitalsInfoOpen && <VitalsInfoPanel onClose={() => setVitalsInfoOpen(false)} />}
+        </div>
+        <TextSettingsBar />
+        {tokensElement}
+      </div>
+    );
+  }
+
+  // --- COLLAPSED mode (Stage 3) ---
+  if (layoutMode === 'collapsed') {
     return (
       <div className="status-bar status-bar-collapsed" ref={barRef}>
         {clockElement}
@@ -445,6 +806,11 @@ export const StatusBar: React.FC<{
         </StatusBarGroupButton>
 
         <StatusBarGroupButton label="Tools" isOpen={toolsOpen} onToggle={handleToolsToggle} alignRight>
+          {showGitPush && (
+            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+              {gitGroup}
+            </div>
+          )}
           {skillGenEnabled && !isCodexUi && (
             <div className="status-bar-group-dropdown-item-row">
               <button
@@ -509,7 +875,7 @@ export const StatusBar: React.FC<{
             </button>
             {babelFishOpen && <BabelFishPanel onClose={() => setBabelFishOpen(false)} />}
           </div>
-          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={vitalsInfoRef}>
+          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
             <button
               className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
               onClick={handleToggleVitals}
@@ -517,26 +883,27 @@ export const StatusBar: React.FC<{
             >
               Vitals
             </button>
-            <button
-              className="status-bar-vitals-settings-btn"
-              onClick={() => setVitalsInfoOpen((prev) => !prev)}
-              data-tooltip="Vitals settings"
-              aria-label="Vitals settings"
-            >
-              {'\u2699'}
-            </button>
-            {vitalsInfoOpen && <VitalsInfoPanel onClose={() => setVitalsInfoOpen(false)} />}
           </div>
         </StatusBarGroupButton>
 
-        {showGitPush && gitGroup}
+        <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
+          <button
+            className="status-bar-vitals-settings-btn"
+            onClick={handleVitalsSettingsToggle}
+            data-tooltip="Vitals settings"
+            aria-label="Vitals settings"
+          >
+            {'\u2699'}
+          </button>
+          {vitalsInfoOpen && <VitalsInfoPanel onClose={() => setVitalsInfoOpen(false)} />}
+        </div>
         <TextSettingsBar />
         {tokensElement}
       </div>
     );
   }
 
-  // --- EXPANDED mode (original layout) ---
+  // --- FULL mode (Stage 1) ---
   return (
     <div className="status-bar" ref={barRef}>
       {clockElement}
@@ -710,7 +1077,7 @@ export const StatusBar: React.FC<{
           </button>
           <button
             className="status-bar-vitals-settings-btn"
-            onClick={() => setVitalsInfoOpen((prev) => !prev)}
+            onClick={handleVitalsSettingsToggle}
             data-tooltip="Vitals settings"
             aria-label="Vitals settings"
           >
