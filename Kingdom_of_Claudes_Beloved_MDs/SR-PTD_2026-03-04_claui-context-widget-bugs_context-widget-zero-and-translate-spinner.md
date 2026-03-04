@@ -195,6 +195,47 @@ undoMgr.push(translated, translated.length);
 
 ---
 
+## Bug 5 (FIXED): Context Widget Shows 100% on Short Conversations (Cumulative vs Per-Call Tokens)
+
+### Trigger
+> After all previous fixes, the context widget now updates live and shows non-zero values. However, it shows the bar as completely full (100%) even for short conversations that shouldn't be anywhere near the 200k context limit.
+
+### Root Cause
+The Claude CLI's `result` event reports **cumulative** token usage across ALL API calls within a turn (confirmed by the `num_turns` field in the `result` event). In a multi-tool turn with N API calls, `result.usage.input_tokens` = sum of input tokens from all N calls.
+
+**Example**: A turn with 4 tool calls:
+| API call | Context window (actual) | Cumulative in result.usage |
+|----------|------------------------|---------------------------|
+| Call 1 | 40k | 40k |
+| Call 2 | 55k | 95k |
+| Call 3 | 70k | 165k |
+| Call 4 | 80k | **245k** |
+
+The widget calculated `245k / 200k = 122%` (capped to 100%), when the actual context usage was only 80k (40%).
+
+**The irony**: During the agentic run, the widget showed the correct growing value (from `messageStart` live updates - Bug 4 fix). But the moment the turn completed, `costUpdate` overwrote it with the inflated cumulative value from `result.usage`.
+
+### Code Before Fix
+```typescript
+const resolvedInputTokens = resultTotalInput || this.lastAssistantInputTokens;
+// resultTotalInput = cumulative (245k) - ALWAYS used since > 0
+// lastAssistantInputTokens = per-call (80k) - never reached as fallback
+```
+
+### Fix Applied
+Reversed the priority: prefer `lastAssistantInputTokens` (last `messageStart` per-call value = actual context window size), fall back to `resultTotalInput` only when no `messageStart` was seen:
+```typescript
+const contextWindowTokens = this.lastAssistantInputTokens || resultTotalInput;
+```
+
+### Files Changed
+- `src/extension/webview/MessageHandler.ts` (reversed fallback priority in costUpdate)
+
+### Key Insight
+**`result.usage` is cumulative, `message_start.usage` is per-call**: The CLI's `result` event aggregates token usage across all API calls in a turn (matching how `cost_usd` is the turn's total cost). For context window display, the last `message_start` event's usage reflects the actual prompt size. Always use per-call data for context window metrics, and cumulative data for cost/billing metrics.
+
+---
+
 ## Key Patterns From This Session
 
 ### Pattern 1: Zustand Selector vs getState() Polling
@@ -219,7 +260,13 @@ undoMgr.push(translated, translated.length);
 - **Rule**: Never rely on a single CLI event as the sole source of truth for any field
 - **Pattern**: Build a fallback chain: `message_start.usage` -> `assistant.usage` -> `result.usage`
 
-### Pattern 5: State Cleanup After Async Operations
+### Pattern 5: Cumulative vs Per-Call Token Metrics
+- **Problem**: CLI `result.usage` reports cumulative tokens across all API calls in a turn, not the last call's tokens
+- **Rule**: For context window display, use per-call data (`message_start.usage`). For cost/billing, use cumulative data (`result.usage`)
+- **Diagnostic**: If a percentage metric seems too high after multi-tool turns, check whether the source value is cumulative
+- **Pattern**: Track per-call values in a member variable (e.g., `lastAssistantInputTokens`), prefer it over cumulative sources
+
+### Pattern 6: State Cleanup After Async Operations
 - **Problem**: Loading state set to `true` before async op, never set to `false` on completion
 - **Prevention**: When adding a loading flag, immediately write both the `set(true)` and `set(false)` lines, then fill in the async code between them
 

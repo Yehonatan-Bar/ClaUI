@@ -2563,17 +2563,21 @@ export class MessageHandler {
         if (event.subtype === 'success') {
           this.achievementService.onResult(this.tabId, true);
           const success = event as ResultSuccess;
-          // Total context = input_tokens + cache_creation + cache_read
+          // result.usage is CUMULATIVE across all API calls in the turn.
+          // For context-window display we need the LAST API call's input
+          // tokens (= actual prompt size). lastAssistantInputTokens is set
+          // from the most recent message_start event and reflects that.
+          // Only fall back to the cumulative value when no messageStart was seen.
           const resultTotalInput = (success.usage?.input_tokens ?? 0)
             + (success.usage?.cache_creation_input_tokens ?? 0)
             + (success.usage?.cache_read_input_tokens ?? 0);
-          const resolvedInputTokens = resultTotalInput || this.lastAssistantInputTokens;
-          this.log(`costUpdate: result.total=${resultTotalInput} (input=${success.usage?.input_tokens} cache_create=${success.usage?.cache_creation_input_tokens} cache_read=${success.usage?.cache_read_input_tokens}) lastAssistant=${this.lastAssistantInputTokens} resolved=${resolvedInputTokens}`);
+          const contextWindowTokens = this.lastAssistantInputTokens || resultTotalInput;
+          this.log(`costUpdate: result.total=${resultTotalInput} (input=${success.usage?.input_tokens} cache_create=${success.usage?.cache_creation_input_tokens} cache_read=${success.usage?.cache_read_input_tokens}) lastAssistant=${this.lastAssistantInputTokens} contextWindow=${contextWindowTokens}`);
           this.webview.postMessage({
             type: 'costUpdate',
             costUsd: success.cost_usd ?? 0,
             totalCostUsd: success.total_cost_usd ?? 0,
-            inputTokens: resolvedInputTokens,
+            inputTokens: contextWindowTokens,
             outputTokens: success.usage?.output_tokens ?? 0,
           });
           // Session Vitals: emit turn completion record
