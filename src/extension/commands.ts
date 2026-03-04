@@ -445,7 +445,7 @@ export function registerCommands(
       const picked = await vscode.window.showQuickPick(planFiles, {
         placeHolder: 'Select a plan document to open in browser',
         matchOnDescription: true,
-        ignoreFocusOut: true,
+        ignoreFocusOut: false,
       });
 
       if (picked) {

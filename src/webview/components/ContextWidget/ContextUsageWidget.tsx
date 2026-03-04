@@ -3,9 +3,9 @@ import { useAppStore } from '../../state/store';
 import { getModelMaxContext, getContextColor } from '../../utils/modelContextLimits';
 
 const STORAGE_KEY = 'claui-context-widget-pos';
-const WIDGET_WIDTH = 220;
+const WIDGET_WIDTH = 160;
+const WIDGET_HEIGHT = 10;
 const DEFAULT_MARGIN = 16;
-const DEFAULT_TOP = 60;
 
 interface WidgetPosition {
   left: number;
@@ -14,7 +14,7 @@ interface WidgetPosition {
 
 function clampPosition(pos: WidgetPosition): WidgetPosition {
   const maxLeft = Math.max(0, window.innerWidth - WIDGET_WIDTH);
-  const maxTop = Math.max(0, window.innerHeight - 80);
+  const maxTop = Math.max(0, window.innerHeight - WIDGET_HEIGHT);
   return {
     left: Math.max(0, Math.min(pos.left, maxLeft)),
     top: Math.max(0, Math.min(pos.top, maxTop)),
@@ -46,18 +46,19 @@ export function resetContextWidgetPosition(): void {
   } catch { /* ignore */ }
 }
 
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
-}
-
 export const ContextUsageWidget: React.FC = () => {
-  const cost = useAppStore((s) => s.cost);
-  const model = useAppStore((s) => s.model);
+  // Force re-read from store every 5 seconds
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  const { inputTokens: rawIn, outputTokens: rawOut, costUsd, totalCostUsd } = useAppStore.getState().cost;
+  const model = useAppStore.getState().model;
 
   const maxCtx = getModelMaxContext(model ?? '');
-  const inputTokens = cost.inputTokens ?? 0;
+  const inputTokens = rawIn ?? 0;
   const pct = maxCtx > 0 ? Math.min((inputTokens / maxCtx) * 100, 100) : 0;
   const barColor = getContextColor(pct);
 
@@ -67,7 +68,6 @@ export const ContextUsageWidget: React.FC = () => {
   const widgetRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
 
-  // Re-clamp on window resize
   useEffect(() => {
     const onResize = () => {
       setPosition((prev) => prev ? clampPosition(prev) : null);
@@ -76,7 +76,6 @@ export const ContextUsageWidget: React.FC = () => {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Document-level drag handlers, only active while dragging
   useEffect(() => {
     if (!dragging) return;
 
@@ -113,99 +112,36 @@ export const ContextUsageWidget: React.FC = () => {
     e.preventDefault();
   }, []);
 
-  // Default position: bottom-right corner (distinct from UsageWidget at top-right)
   const computedLeft = position?.left ?? Math.max(0, window.innerWidth - WIDGET_WIDTH - DEFAULT_MARGIN);
-  const computedTop = position?.top ?? Math.max(0, window.innerHeight - 130 - DEFAULT_TOP);
-
-  const hasSession = inputTokens > 0;
+  const computedTop = position?.top ?? Math.max(0, window.innerHeight - 40);
 
   return (
     <div
       ref={widgetRef}
       onMouseDown={handleMouseDown}
+      data-tooltip={`Context: ${pct.toFixed(1)}%`}
       style={{
         position: 'fixed',
         left: computedLeft,
         top: computedTop,
         zIndex: 900,
-        background: 'var(--vscode-sideBar-background, #1e1e1e)',
-        border: `1px solid ${hasSession ? barColor + '55' : 'var(--vscode-panel-border, rgba(255,255,255,0.15))'}`,
-        borderRadius: 8,
-        padding: '10px 12px',
         width: WIDGET_WIDTH,
-        boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+        height: WIDGET_HEIGHT,
+        borderRadius: 5,
+        background: 'rgba(255,255,255,0.08)',
+        overflow: 'hidden',
         cursor: dragging ? 'grabbing' : 'grab',
         userSelect: 'none',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
       }}
     >
-      {/* Header */}
       <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{
-            fontSize: 10,
-            color: 'var(--vscode-descriptionForeground)',
-            opacity: 0.4,
-            letterSpacing: 1,
-          }}>
-            {'\u2847'}
-          </span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--vscode-foreground)' }}>
-            Context
-          </span>
-        </div>
-        <span style={{ fontSize: 11, fontWeight: 700, color: hasSession ? barColor : 'var(--vscode-descriptionForeground)' }}>
-          {hasSession ? `${pct.toFixed(1)}%` : '—'}
-        </span>
-      </div>
-
-      {/* Progress bar */}
-      <div style={{
-        background: 'rgba(255,255,255,0.08)',
-        borderRadius: 3,
-        height: 7,
-        overflow: 'hidden',
-        marginBottom: 7,
-      }}>
-        <div style={{
-          width: `${pct}%`,
-          height: '100%',
-          background: barColor,
-          borderRadius: 3,
-          transition: 'width 0.5s ease, background 0.5s ease',
-        }} />
-      </div>
-
-      {/* Token counts */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        fontSize: 10,
-        color: 'var(--vscode-descriptionForeground)',
-        opacity: 0.75,
-      }}>
-        <span>{hasSession ? formatTokens(inputTokens) : '—'}</span>
-        <span>/ {formatTokens(maxCtx)}</span>
-      </div>
-
-      {/* Model name */}
-      {model && (
-        <div style={{
-          marginTop: 6,
-          fontSize: 9,
-          color: 'var(--vscode-descriptionForeground)',
-          opacity: 0.45,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
-          {model}
-        </div>
-      )}
+        width: `${pct}%`,
+        height: '100%',
+        background: barColor,
+        borderRadius: 5,
+        transition: 'width 0.5s ease, background 0.5s ease',
+      }} />
     </div>
   );
 };
