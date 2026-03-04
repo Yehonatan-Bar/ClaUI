@@ -6,7 +6,7 @@ import { GitPushPanel } from './GitPushPanel';
 import { FileMentionPopup } from './FileMentionPopup';
 import { useFileMention } from '../../hooks/useFileMention';
 import type { WebviewImageData } from '../../../extension/types/webview-messages';
-import { getModelMaxContext, getContextColor } from '../../utils/modelContextLimits';
+import { getModelMaxContext } from '../../utils/modelContextLimits';
 
 /**
  * Manages an undo/redo stack for a textarea controlled by React state.
@@ -75,6 +75,7 @@ export const InputArea: React.FC = () => {
   const [pendingImages, setPendingImages] = useState<WebviewImageData[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoMgr = useMemo(() => new UndoManager(), []);
+  const [ultrathinkAnim, setUltrathinkAnim] = useState<string | null>(null);
   const {
     provider,
     selectedProvider,
@@ -124,7 +125,7 @@ export const InputArea: React.FC = () => {
   const ctxModel = useAppStore.getState().model;
   const ctxMaxTokens = getModelMaxContext(ctxModel ?? '');
   const ctxPct = ctxMaxTokens > 0 ? Math.min(((ctxInputTokens ?? 0) / ctxMaxTokens) * 100, 100) : 0;
-  const ctxBarColor = getContextColor(ctxPct);
+  const [ctxHovered, setCtxHovered] = useState(false);
 
   // History navigation: -1 = not browsing, 0..N = index into promptHistory (0 = oldest)
   const historyIndexRef = useRef(-1);
@@ -761,6 +762,32 @@ export const InputArea: React.FC = () => {
     postToExtension({ type: 'clearSession' });
   }, []);
 
+  /** Inject "ultrathink" keyword with a random animation */
+  const handleUltrathink = useCallback(() => {
+    if (ultrathinkAnim) return; // Guard against double-click during animation
+    const anims = ['rocket', 'brain', 'wizard', 'turbo'];
+    const picked = anims[Math.floor(Math.random() * anims.length)];
+    setUltrathinkAnim(picked);
+    setTimeout(() => {
+      setText((prev) => {
+        if (prev.toLowerCase().startsWith('ultrathink')) return prev;
+        const newText = 'ultrathink ' + prev;
+        undoMgr.push(newText, 'ultrathink '.length);
+        return newText;
+      });
+      setUltrathinkAnim(null);
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (el) {
+          el.style.height = 'auto';
+          el.style.height = el.scrollHeight + 'px';
+          el.focus();
+          el.selectionStart = el.selectionEnd = el.value.length;
+        }
+      });
+    }, 1200);
+  }, [ultrathinkAnim, undoMgr]);
+
   // Consume file paths inserted by picker or Explorer context command
   useEffect(() => {
     if (!pendingFilePaths || pendingFilePaths.length === 0) return;
@@ -1020,26 +1047,67 @@ export const InputArea: React.FC = () => {
       {/* Context usage bar: thin line at the top of the input area, visible when contextWidgetVisible is on */}
       {contextWidgetVisible && (
         <div
-          data-tooltip={`Context: ${ctxPct.toFixed(1)}%`}
+          onMouseEnter={() => setCtxHovered(true)}
+          onMouseLeave={() => setCtxHovered(false)}
           style={{
             position: 'absolute',
             top: 0,
             left: 0,
             width: '100%',
-            height: 2,
-            overflow: 'hidden',
-            pointerEvents: 'none',
+            height: 12,
             zIndex: 10,
+            cursor: 'default',
           }}
         >
+          {/* Visible 2px bar track */}
           <div
             style={{
-              width: `${ctxPct}%`,
-              height: '100%',
-              background: ctxBarColor,
-              transition: 'width 1s ease, background 1s ease',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: 2,
+              overflow: 'hidden',
+              background: 'rgba(255, 255, 255, 0.08)',
+              pointerEvents: 'none',
             }}
-          />
+          >
+            {/* Fill with gradient: spans full track width, clipped by fill div bounds */}
+            <div
+              style={{
+                width: `${ctxPct}%`,
+                height: '100%',
+                backgroundImage: 'linear-gradient(90deg, #3794ff 0%, #41b5ff 35%, #63c97a 62%, #d29922 82%, #f85149 100%)',
+                backgroundSize: ctxPct > 0 ? `${(100 / ctxPct) * 100}% 100%` : '100% 100%',
+                backgroundRepeat: 'no-repeat',
+                transition: 'width 1s ease',
+              }}
+            />
+          </div>
+          {/* Tooltip on hover */}
+          {ctxHovered && (
+            <div
+              style={{
+                position: 'absolute',
+                top: -24,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'var(--vscode-editorWidget-background, #252526)',
+                border: '1px solid var(--vscode-editorWidget-border, #454545)',
+                borderRadius: 4,
+                padding: '2px 8px',
+                fontSize: 11,
+                lineHeight: '16px',
+                color: 'var(--vscode-editorWidget-foreground, #cccccc)',
+                whiteSpace: 'nowrap' as const,
+                pointerEvents: 'none' as const,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.36)',
+                zIndex: 10001,
+              }}
+            >
+              {`Context: ${ctxPct.toFixed(1)}%`}
+            </div>
+          )}
         </div>
       )}
       {/* Image thumbnails preview */}
@@ -1157,6 +1225,22 @@ export const InputArea: React.FC = () => {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
           </svg>
+        </button>
+        <button
+          className={`ultrathink-button${ultrathinkAnim ? ' animating' : ''}`}
+          onClick={handleUltrathink}
+          disabled={!isConnected || !!ultrathinkAnim}
+          data-tooltip="Ultrathink - boost reasoning power"
+        >
+          <span className="ut-default-icon">&#x1F9E0;</span>
+          {ultrathinkAnim && (
+            <div className={`ultrathink-anim ultrathink-anim-${ultrathinkAnim}`}>
+              {ultrathinkAnim === 'rocket' && <span className="ut-emoji">&#x1F680;</span>}
+              {ultrathinkAnim === 'brain' && <span className="ut-emoji">&#x1F9E0;</span>}
+              {ultrathinkAnim === 'wizard' && <span className="ut-emoji">&#x1FA84;</span>}
+              {ultrathinkAnim === 'turbo' && <span className="ut-emoji">&#x26A1;</span>}
+            </div>
+          )}
         </button>
         <div className={`textarea-container${isEnhancing ? ' enhancing' : ''}${isTranslatingPrompt ? ' translating' : ''}`}>
           <textarea

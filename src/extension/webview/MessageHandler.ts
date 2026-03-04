@@ -2915,13 +2915,24 @@ export class MessageHandler {
       this.log(`ExitPlanMode approve fallback skipped - stale cycle ${cycleId}, current=${this.pendingApprovalCycleId ?? 'none'}`);
       return;
     }
-    // If the CLI already completed (result/success observed), it is idle and
-    // waiting for input. Send the proceed nudge immediately — the delayed
-    // fallback would just skip because the flags are already set.
-    // Bug 7: previously, resumeObserved || resultObserved both caused a skip,
-    // but resultObserved means the CLI is idle and NEEDS a nudge.
+    // Bug 13 fix: Check resumeObserved BEFORE resultObserved.
+    // The CLI auto-approves ExitPlanMode and may start a new turn immediately.
+    // If resume activity was observed (textDelta/toolUseStart from the new turn),
+    // the CLI has already moved on — sending a nudge would inject a spurious
+    // user message mid-execution. Previously (Bug 7), resultObserved was checked
+    // first, but resultObserved refers to the ExitPlanMode turn's result, not the
+    // current turn. When both flags are true, the CLI already started new work
+    // after the ExitPlanMode turn completed — no nudge needed.
+    if (this.pendingApprovalCycleResumeObserved) {
+      this.log(`ExitPlanMode approve fallback skipped - CLI has already resumed work (cycle ${cycleId})`);
+      this.clearApprovalCycleState();
+      return;
+    }
+
+    // If the CLI completed the ExitPlanMode turn (result observed) but has NOT
+    // started new work (no resume), it is idle and waiting — send nudge now.
     if (this.pendingApprovalCycleResultObserved) {
-      this.log(`ExitPlanMode approve fallback - CLI already completed and idle, sending proceed nudge immediately (cycle ${cycleId})`);
+      this.log(`ExitPlanMode approve fallback - CLI completed and idle (no resume), sending proceed nudge immediately (cycle ${cycleId})`);
       try {
         this.control.sendText('Continue with the implementation.');
         this.webview.postMessage({ type: 'processBusy', busy: true });
@@ -2930,14 +2941,6 @@ export class MessageHandler {
       } finally {
         this.clearApprovalCycleState();
       }
-      return;
-    }
-
-    // If the CLI auto-resumed (toolUseStart/textDelta observed) but has not
-    // yet completed (no result), it is actively working — no nudge needed.
-    if (this.pendingApprovalCycleResumeObserved) {
-      this.log(`ExitPlanMode approve fallback skipped - CLI is actively working (cycle ${cycleId})`);
-      this.clearApprovalCycleState();
       return;
     }
 
@@ -2953,9 +2956,15 @@ export class MessageHandler {
         this.log(`ExitPlanMode approve fallback aborted - cycle changed (expected ${cycleId}, current=${this.pendingApprovalCycleId ?? 'none'})`);
         return;
       }
-      // Re-check: if result arrived during the wait, CLI is idle — send nudge.
+      // Bug 13 fix: same priority as above — check resume before result.
+      if (this.pendingApprovalCycleResumeObserved) {
+        this.log(`ExitPlanMode approve fallback aborted - CLI resumed during wait (cycle ${cycleId})`);
+        this.clearApprovalCycleState();
+        return;
+      }
+      // CLI completed but hasn't resumed new work — it's idle, send nudge.
       if (this.pendingApprovalCycleResultObserved) {
-        this.log(`ExitPlanMode approve fallback firing (result arrived during wait) - sending proceed nudge to CLI (cycle ${cycleId})`);
+        this.log(`ExitPlanMode approve fallback firing (result arrived, no resume) - sending proceed nudge to CLI (cycle ${cycleId})`);
         try {
           this.control.sendText('Continue with the implementation.');
           this.webview.postMessage({ type: 'processBusy', busy: true });
@@ -2964,12 +2973,6 @@ export class MessageHandler {
         } finally {
           this.clearApprovalCycleState();
         }
-        return;
-      }
-      // If only resume observed (still working), don't interfere.
-      if (this.pendingApprovalCycleResumeObserved) {
-        this.log(`ExitPlanMode approve fallback aborted - CLI resumed during wait (cycle ${cycleId})`);
-        this.clearApprovalCycleState();
         return;
       }
 
