@@ -148,6 +148,8 @@ export class MessageHandler {
   private pendingApprovalTool: string | null = null;
   /** Set after user responds to approval - suppresses stale re-notifications from late events */
   private approvalResponseProcessed = false;
+  /** Last known input_tokens from AssistantMessage (always present, unlike ResultSuccess.usage) */
+  private lastAssistantInputTokens = 0;
   /** Tracks whether EnterPlanMode was called in this session */
   private planModeActive = false;
   /** Tracks whether an ExitPlanMode approval cycle completed in this session.
@@ -2425,7 +2427,18 @@ export class MessageHandler {
           }
         }
         this.recordToolUseFallbackFromAssistantMessage(event.message.content);
-        this.log(`-> webview: assistantMessage id=${event.message.id} blocks=[${blockTypes}]`);
+        // Track input tokens for context usage indicator (always present in AssistantMessage)
+        // Total context = input_tokens + cache_creation + cache_read
+        const assistUsage = event.message.usage;
+        if (assistUsage) {
+          const totalAssistInput = (assistUsage.input_tokens ?? 0)
+            + (assistUsage.cache_creation_input_tokens ?? 0)
+            + (assistUsage.cache_read_input_tokens ?? 0);
+          if (totalAssistInput > 0) {
+            this.lastAssistantInputTokens = totalAssistInput;
+          }
+        }
+        this.log(`-> webview: assistantMessage id=${event.message.id} blocks=[${blockTypes}] usage=${JSON.stringify(event.message.usage)}`);
         this.webview.postMessage({
           type: 'assistantMessage',
           messageId: event.message.id,
@@ -2451,8 +2464,12 @@ export class MessageHandler {
 
     this.demux.on(
       'messageStart',
-      (data: { messageId: string; model: string }) => {
-        this.log(`-> webview: messageStart id=${data.messageId}`);
+      (data: { messageId: string; model: string; inputTokens?: number }) => {
+        this.log(`-> webview: messageStart id=${data.messageId} inputTokens=${data.inputTokens}`);
+        // Track input tokens from message_start (reliable during live streaming)
+        if (data.inputTokens && data.inputTokens > 0) {
+          this.lastAssistantInputTokens = data.inputTokens;
+        }
         this.logApprovalState('messageStart');
         this.lastMessageId = data.messageId;
         this.currentMessageToolNames = [];
@@ -2510,6 +2527,8 @@ export class MessageHandler {
     this.demux.on(
       'result',
       (event: ResultSuccess | ResultError) => {
+        this.log(`[RESULT_HANDLER] Entered result handler: subtype=${event.subtype} raw=${JSON.stringify(event).slice(0, 500)}`);
+        try {
         // Codex consultation: log result timing if a consultation was in flight
         if (this._codexConsultStartedAt) {
           const elapsed = Date.now() - this._codexConsultStartedAt;
@@ -2543,11 +2562,17 @@ export class MessageHandler {
         if (event.subtype === 'success') {
           this.achievementService.onResult(this.tabId, true);
           const success = event as ResultSuccess;
+          // Total context = input_tokens + cache_creation + cache_read
+          const resultTotalInput = (success.usage?.input_tokens ?? 0)
+            + (success.usage?.cache_creation_input_tokens ?? 0)
+            + (success.usage?.cache_read_input_tokens ?? 0);
+          const resolvedInputTokens = resultTotalInput || this.lastAssistantInputTokens;
+          this.log(`costUpdate: result.total=${resultTotalInput} (input=${success.usage?.input_tokens} cache_create=${success.usage?.cache_creation_input_tokens} cache_read=${success.usage?.cache_read_input_tokens}) lastAssistant=${this.lastAssistantInputTokens} resolved=${resolvedInputTokens}`);
           this.webview.postMessage({
             type: 'costUpdate',
             costUsd: success.cost_usd ?? 0,
             totalCostUsd: success.total_cost_usd ?? 0,
-            inputTokens: success.usage?.input_tokens ?? 0,
+            inputTokens: resolvedInputTokens,
             outputTokens: success.usage?.output_tokens ?? 0,
           });
           // Session Vitals: emit turn completion record
@@ -2663,6 +2688,9 @@ export class MessageHandler {
         // Clear tool activity indicator before marking idle
         this.webview.postMessage({ type: 'toolActivity', toolName: '', detail: '' });
         this.webview.postMessage({ type: 'processBusy', busy: false });
+        } catch (err) {
+          this.log(`[RESULT_HANDLER] ERROR in result handler: ${err instanceof Error ? err.stack || err.message : String(err)}`);
+        }
       }
     );
   }

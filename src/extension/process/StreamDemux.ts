@@ -92,9 +92,16 @@ export class StreamDemux extends EventEmitter {
 
   private handleMessageStart(event: MessageStart): void {
     this.currentMessageId = event.message.id;
+    const usage = event.message.usage;
+    // Total context = input_tokens + cache_creation + cache_read
+    // input_tokens alone is only the non-cached portion (often 1-5)
+    const totalInputTokens = (usage?.input_tokens ?? 0)
+      + (usage?.cache_creation_input_tokens ?? 0)
+      + (usage?.cache_read_input_tokens ?? 0);
     this.emit('messageStart', {
       messageId: event.message.id,
       model: event.message.model,
+      inputTokens: totalInputTokens || undefined,
     });
   }
 

@@ -691,6 +691,18 @@ export class SessionTab implements WebviewBridge {
           const block = (inner as import('../types/stream-json').ContentBlockStart).content_block;
           detail += ` (${block.type}${block.name ? ': ' + block.name : ''})`;
         }
+        // Diagnostic: log raw message_start to see if it has usage/input_tokens
+        if (inner.type === 'message_start') {
+          tabLog(`[DIAG] message_start raw: ${JSON.stringify(inner).slice(0, 500)}`);
+        }
+      }
+      // Diagnostic: log raw result event
+      if (event.type === 'result') {
+        tabLog(`[DIAG] result raw: ${JSON.stringify(event).slice(0, 500)}`);
+      }
+      // Diagnostic: log raw assistant message usage
+      if (event.type === 'assistant') {
+        tabLog(`[DIAG] assistant raw usage: ${JSON.stringify((event as any).message?.usage).slice(0, 300)}`);
       }
       tabLog(`CLI: ${detail}`);
       this.demux.handleEvent(event);
