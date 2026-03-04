@@ -2496,6 +2496,7 @@ export class MessageHandler {
           type: 'messageStart',
           messageId: data.messageId,
           model: data.model,
+          inputTokens: data.inputTokens,
         });
       }
     );

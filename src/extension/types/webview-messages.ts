@@ -678,6 +678,7 @@ export interface MessageStartMessage {
   type: 'messageStart';
   messageId: string;
   model: string;
+  inputTokens?: number;  // Total context tokens (input + cache_creation + cache_read) for real-time widget update
 }
 
 export interface MessageStopMessage {
