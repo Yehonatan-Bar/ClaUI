@@ -1,5 +1,15 @@
 # ClaUi - Changelog
 
+## v0.1.75 - 2026-03-04
+
+**Fix: Stale plan approval bar persisting during execution**
+
+- Fixed the "Plan Ready for Review" approval bar staying visible after the model already moved on to executing the plan
+- Root cause: the CLI auto-approves ExitPlanMode and resumes execution, but the webview never received a signal to dismiss the bar (only user-initiated actions sent `processBusy: true`)
+- Added a 5-second delayed auto-dismiss timer: when `messageStart` arrives while an ExitPlanMode bar is showing, the bar auto-clears after 5s if the user hasn't interacted
+- AskUserQuestion bars are unaffected (user's answer is content-meaningful)
+- Timer is safely cancelled on user interaction, new approval, or cleanup
+
 ## v0.1.74 - 2026-03-04
 
 **Feature: Context window usage indicator**

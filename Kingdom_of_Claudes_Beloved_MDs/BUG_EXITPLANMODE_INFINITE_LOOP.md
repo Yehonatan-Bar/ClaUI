@@ -14,6 +14,7 @@ The plan approval bar (4 CLI-matching options) and AskUserQuestion interactive c
 **Date Ninth Fix**: 2026-03-02 (exitPlanModeProcessed not reset after context compaction)
 **Date Tenth Fix**: 2026-03-02 (stale suppression deadlock after post-approval execution)
 **Date Eleventh Fix**: 2026-03-03 (infinite reopen loop from unbounded Bug 10 re-open logic + deeper logging)
+**Date Twelfth Fix**: 2026-03-04 (stale approval bar persists during execution - display-only)
 **Severity**: Critical (blocks plan mode workflow)
 **Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`, `src/webview/components/InputArea/InputArea.tsx`
 
@@ -198,6 +199,22 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 
 **Deeper logging**: Added `logApprovalState()` diagnostic method that dumps ALL approval-related flags at key lifecycle moments (messageStart, messageDelta, result, sendMessage, planApprovalResponse, notifyPlanApprovalRequired). This makes future debugging much easier -- every state transition is captured in the Output -> ClaUi log.
 
+### Twelfth Bug (2026-03-04): Stale Approval Bar Persists During Execution (Display-Only)
+
+**Cause**: After ExitPlanMode was detected, the extension sent `planApprovalRequired` to the webview, which showed the approval bar and set `isBusy = false`. The CLI auto-approved and the model started a new turn, but the extension's `messageStart` handler only sent a `messageStart` event to the webview -- NOT `processBusy: true`. The webview's `messageStart` handler intentionally did NOT clear `pendingApproval` (Bug 3 fix). Since `processBusy: true` is only sent on user-initiated actions (sendMessage, planApprovalResponse), it was never sent during CLI auto-resume. Result: the approval bar stayed visible indefinitely while the model executed Steps 1-5+.
+
+**Root cause**: The webview had no mechanism to auto-dismiss ExitPlanMode bars when the model moved on. The Bug 3 fix (don't clear on messageStart) was correct for preventing the bar from flashing too fast, but it left no fallback for when the user simply doesn't interact.
+
+**Fix**: Added a 5-second delayed auto-dismiss timer in the webview's `messageStart` handler (`useClaudeStream.ts`):
+
+1. When `messageStart` arrives while `pendingApproval` is set for ExitPlanMode, start a 5-second timer
+2. When the timer fires, if the same `pendingApproval` object is still active (user didn't interact), clear it
+3. Timer is cancelled when: user clicks a button (`processBusy` handler clears it), a new `planApprovalRequired` arrives, or the effect cleans up
+4. Uses object reference comparison (`s.pendingApproval === ref`) to avoid clearing a different/newer approval bar
+5. Only applies to ExitPlanMode bars, NOT AskUserQuestion (where the user's answer is content-meaningful)
+
+**Why this is safe**: The timer only clears the bar if the EXACT same approval object is still active after 5 seconds. If the user clicks any button, `setPendingApproval(null)` is called (different reference). If a new `planApprovalRequired` arrives, the timer is cancelled explicitly. The 5-second window gives ample time for users to click an option, while ensuring stale bars don't persist indefinitely. AskUserQuestion bars are unaffected.
+
 ---
 
 ## Current Defense Layers
@@ -219,8 +236,9 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 | `postExitPlanNonPlanActivityObserved` re-opens ExitPlanMode cycle after real execution | MessageHandler.ts `toolUseStart` + `notifyPlanApprovalRequired` | Deadlock where legitimate ExitPlanMode is suppressed as stale (Bug 10 fix) |
 | `exitPlanModeReopenCount` limits Bug 10 re-opens to MAX_EXITPLANMODE_REOPENS | MessageHandler.ts `notifyPlanApprovalRequired` | Infinite reopen loop from unbounded Bug 10 logic (Bug 11 fix) |
 | `logApprovalState()` diagnostic dumps at every lifecycle point | MessageHandler.ts throughout | Comprehensive state visibility for debugging (Bug 11 enhancement) |
+| `exitPlanAutoDismissTimer` (5s delayed auto-dismiss) | useClaudeStream.ts `messageStart` handler | Stale ExitPlanMode bar persisting during execution when user doesn't interact (Bug 12 fix) |
 
-The `messageStart` clearing was **removed** as a defense layer because it made the approval bar invisible.
+The `messageStart` clearing was **removed** as an immediate defense layer because it made the approval bar invisible. The delayed auto-dismiss (Bug 12) replaces it.
 
 ---
 
