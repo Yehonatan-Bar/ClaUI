@@ -175,6 +175,13 @@ export function useClaudeStream(): void {
             }
           }
           handleMessageStart(msg.messageId, msg.model);
+          // Real-time context widget update during long agentic runs.
+          // costUpdate only fires on turn completion (result event), so during a
+          // multi-tool-call run the widget would stay frozen. Updating inputTokens
+          // here on every message_start keeps the bar live throughout the run.
+          if (msg.inputTokens && msg.inputTokens > 0) {
+            updateCost({ ...useAppStore.getState().cost, inputTokens: msg.inputTokens });
+          }
           logState('after messageStart');
           break;
         }

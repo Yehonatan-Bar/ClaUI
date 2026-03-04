@@ -120,7 +120,56 @@ const resolvedInputTokens = resultTotalInput || this.lastAssistantInputTokens;
 
 ---
 
-## Bug 3 (UNCOMMITTED): Translate Loading Spinner Stuck After Manual Translation
+## Bug 4 (FIXED): Context Widget Frozen During Long Agentic Runs
+
+### Trigger
+> In a session running a long coding task (many tool calls in one turn), the context widget shows nothing or stays frozen. It only updates at turn end — useless for long agent runs.
+
+### Root Cause
+`costUpdate` is only sent on `result` event (turn completion). During an agentic run, Claude may make 20–30 tool calls before the turn completes. The widget had no real-time input.
+
+Meanwhile, every tool call fires a `message_start` (and thus a `messageStart` event) which carries full `inputTokens` data — but the webview `messageStart` message type (`MessageStartMessage`) didn't include `inputTokens`, so it was never forwarded.
+
+### Fix Applied
+Three-step pipe to connect `messageStart.inputTokens` → webview store → widget:
+
+**1. `webview-messages.ts`** — added `inputTokens` to `MessageStartMessage`:
+```typescript
+export interface MessageStartMessage {
+  type: 'messageStart';
+  messageId: string;
+  model: string;
+  inputTokens?: number;
+}
+```
+
+**2. `MessageHandler.ts`** — include `inputTokens` in the `postMessage` call:
+```typescript
+this.webview.postMessage({
+  type: 'messageStart',
+  messageId: data.messageId,
+  model: data.model,
+  inputTokens: data.inputTokens,
+});
+```
+
+**3. `useClaudeStream.ts`** — call `updateCost` on messageStart with live inputTokens:
+```typescript
+if (msg.inputTokens && msg.inputTokens > 0) {
+  updateCost({ ...useAppStore.getState().cost, inputTokens: msg.inputTokens });
+}
+```
+
+Result: the widget now updates on every tool-call step, not just at turn end.
+
+### Files Changed
+- `src/extension/types/webview-messages.ts` (added `inputTokens` to `MessageStartMessage`)
+- `src/extension/webview/MessageHandler.ts` (forward `inputTokens` in webview postMessage)
+- `src/webview/hooks/useClaudeStream.ts` (call `updateCost` on messageStart)
+
+---
+
+## Bug 3 (UNCOMMITTED -> FIXED): Translate Loading Spinner Stuck After Manual Translation
 
 ### Trigger
 > After using the manual translate feature in the input area, the loading spinner kept spinning indefinitely. The translated text appeared in the box correctly, but the UI was stuck in "translating" state.

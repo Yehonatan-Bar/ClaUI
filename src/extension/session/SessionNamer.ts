@@ -71,12 +71,17 @@ export class SessionNamer {
         return;
       }
 
-      // 10-second timeout
+      // 25-second timeout (CLI startup + API call can take 10-15s)
       const timer = setTimeout(() => {
-        this.log('SessionNamer: timeout (10s), killing process');
+        this.log('SessionNamer: timeout (25s), killing process');
+        // If we already received stdout, try to use it instead of returning null
+        const fallback = stdout ? this.sanitize(stdout) : null;
+        if (fallback) {
+          this.log(`SessionNamer: timeout but using accumulated stdout: "${fallback}"`);
+        }
         child.kill('SIGTERM');
-        finish(null);
-      }, 10_000);
+        finish(fallback);
+      }, 25_000);
 
       child.stdout?.on('data', (chunk: Buffer) => {
         const text = chunk.toString('utf-8');
