@@ -85,6 +85,9 @@ export function useClaudeStream(): void {
   } = useAppStore();
 
   useEffect(() => {
+    /** Timer for auto-dismissing ExitPlanMode approval bar after model resumes */
+    let exitPlanAutoDismissTimer: ReturnType<typeof setTimeout> | null = null;
+
     function handleMessage(event: MessageEvent<ExtensionToWebviewMessage>) {
       const msg = event.data;
 
@@ -140,19 +143,37 @@ export function useClaudeStream(): void {
 
         case 'messageStart': {
           logState('before messageStart');
-          // Do NOT clear ExitPlanMode approval bars here. The CLI auto-approves
-          // ExitPlanMode and the model starts implementing, but the user still
-          // wants to see the 4 approval options (compact context, bypass
-          // permissions, supervised mode, or type feedback). The infinite loop
-          // is prevented by two other defenses:
-          //   1. `exitPlanModeProcessed` flag in MessageHandler suppresses stale re-triggers
-          //   2. ExitPlanMode planApprovalResponse handler blocks ALL text to CLI
-          // The bar is cleared when the user clicks an option, sends a message
-          // (processBusy), or when a new planApprovalRequired replaces it.
+          // Do NOT clear ExitPlanMode approval bars immediately. The CLI
+          // auto-approves ExitPlanMode and messageStart arrives ~50ms later,
+          // so clearing here would make the bar invisible (Bug 3).
           //
-          // AskUserQuestion bars are also preserved - the CLI truly pauses and
-          // waits for user input, so no new messageStart should arrive until
-          // the user responds.
+          // Instead, start a delayed auto-dismiss for ExitPlanMode bars.
+          // This gives the user time to interact (choose permission mode,
+          // send feedback) while ensuring stale bars don't persist forever
+          // when the model has moved on to execution.
+          //
+          // AskUserQuestion bars are NOT auto-dismissed - the user's answer
+          // is content-meaningful and should not be skipped.
+          {
+            const currentApproval = useAppStore.getState().pendingApproval;
+            if (currentApproval) {
+              const tn = currentApproval.toolName.trim().toLowerCase();
+              const isExitPlan = tn === 'exitplanmode' || tn.endsWith('.exitplanmode');
+              if (isExitPlan) {
+                // Cancel any previous timer (e.g., from a rapid messageStart sequence)
+                if (exitPlanAutoDismissTimer) clearTimeout(exitPlanAutoDismissTimer);
+                const ref = currentApproval;
+                exitPlanAutoDismissTimer = setTimeout(() => {
+                  exitPlanAutoDismissTimer = null;
+                  const s = useAppStore.getState();
+                  if (s.pendingApproval === ref) {
+                    console.log('%c[STREAM] Auto-dismissing stale ExitPlanMode approval bar', 'color: orange');
+                    s.setPendingApproval(null);
+                  }
+                }, 5000);
+              }
+            }
+          }
           handleMessageStart(msg.messageId, msg.model);
           logState('after messageStart');
           break;
@@ -243,6 +264,7 @@ export function useClaudeStream(): void {
           if (msg.busy) {
             // Process becomes busy (e.g. user sent a message) -
             // clear any pending approval bar and previous activity summary
+            if (exitPlanAutoDismissTimer) { clearTimeout(exitPlanAutoDismissTimer); exitPlanAutoDismissTimer = null; }
             setPendingApproval(null);
             setActivitySummary(null);
           } else {
@@ -311,6 +333,8 @@ export function useClaudeStream(): void {
           break;
 
         case 'planApprovalRequired': {
+          // Cancel any pending auto-dismiss timer (new approval replaces old)
+          if (exitPlanAutoDismissTimer) { clearTimeout(exitPlanAutoDismissTimer); exitPlanAutoDismissTimer = null; }
           // Extract plan text from streaming blocks before finalizing
           const currentState = useAppStore.getState();
           const planBlock = currentState.streamingBlocks.find(
@@ -643,6 +667,7 @@ export function useClaudeStream(): void {
 
     return () => {
       window.removeEventListener('message', handleMessage);
+      if (exitPlanAutoDismissTimer) clearTimeout(exitPlanAutoDismissTimer);
     };
   }, [
     setSession,
