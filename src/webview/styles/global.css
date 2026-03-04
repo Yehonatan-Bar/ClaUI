@@ -3454,6 +3454,8 @@ html, body, #root {
   font-weight: 600;
   line-height: 1.4;
   transition: color 0.15s, border-color 0.15s;
+  position: relative;
+  overflow: hidden;
 }
 
 .status-bar-vitals-btn.active {
@@ -5309,6 +5311,55 @@ html, body, #root {
   color: var(--vscode-descriptionForeground);
   opacity: 0.65;
   margin-top: 2px;
+}
+
+/* Context usage section inside usage popover */
+.status-bar-usage-context-section {
+  border-top: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+/* Toggle button for context widget inside usage popover */
+.status-bar-context-widget-toggle {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  background: none;
+  border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.15));
+  border-radius: 3px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 10px;
+  padding: 3px 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.status-bar-context-widget-toggle:hover {
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+  color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.status-bar-context-widget-toggle.active {
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+  color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.usage-btn-label {
+  position: relative;
+  z-index: 1;
+}
+
+/* Thin colored strip at bottom of the Usage button showing context % */
+.usage-btn-context-strip {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  transition: width 0.5s ease, background 0.5s ease;
+  pointer-events: none;
 }
 
 /* ============================================================

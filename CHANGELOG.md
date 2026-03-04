@@ -1,5 +1,16 @@
 # ClaUi - Changelog
 
+## v0.1.74 - 2026-03-04
+
+**Feature: Context window usage indicator**
+
+- Added a real-time context consumption indicator showing how much of the AI's conversation memory has been used
+- **Usage button mini-strip**: a thin colored bar appears at the bottom of the Usage button reflecting current context % at a glance
+- **Usage popover section**: opening the Usage button now shows a "Context window" progress bar with exact percentage and a toggle for the floating widget
+- **Floating draggable widget**: a compact panel showing the context bar, token count (`used / max`), and model name — draggable anywhere on screen, position persists across reloads
+- Color coding: green < 50%, yellow 50–80%, red > 80%
+- No backend changes required — data comes from the existing `inputTokens` field already emitted per turn
+
 ## v0.1.73 - 2026-03-04
 
 **Feature: Visual TodoWrite cards in chat**
