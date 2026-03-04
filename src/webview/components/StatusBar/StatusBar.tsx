@@ -4,8 +4,8 @@ import { TextSettingsBar } from '../TextSettingsBar/TextSettingsBar';
 import { ModelSelector } from '../ModelSelector/ModelSelector';
 import { CodexModelSelector } from '../ModelSelector/CodexModelSelector';
 import { CodexReasoningEffortSelector } from '../ModelSelector/CodexReasoningEffortSelector';
-import { ProviderSelector } from '../ProviderSelector/ProviderSelector';
 import { PermissionModeSelector } from '../PermissionModeSelector/PermissionModeSelector';
+import type { ProviderId } from '../../../extension/types/webview-messages';
 import { VitalsInfoPanel } from '../Vitals/VitalsInfoPanel';
 import { BabelFishPanel } from '../BabelFish/BabelFishPanel';
 import { postToExtension } from '../../hooks/useClaudeStream';
@@ -244,8 +244,10 @@ export const StatusBar: React.FC<{
     setToolsOpen(false);
   };
 
-  const handleOpenProviderTab = (targetProvider: 'claude' | 'codex') => {
-    const targetLabel = targetProvider === 'codex' ? 'Codex' : 'Claude';
+  const providerLabel = (p: ProviderId): string => p === 'codex' ? 'Codex' : p === 'remote' ? 'Happy' : 'Claude';
+
+  const handleOpenProviderTab = (targetProvider: ProviderId) => {
+    const targetLabel = providerLabel(targetProvider);
 
     if (provider === targetProvider || isBusy) {
       const reason = provider === targetProvider ? `current-tab-is-${targetProvider}` : 'busy';
@@ -282,18 +284,18 @@ export const StatusBar: React.FC<{
 
   const handleSetClaudeProvider = () => handleOpenProviderTab('claude');
   const handleSetCodexProvider = () => handleOpenProviderTab('codex');
+  const handleSetHappyProvider = () => handleOpenProviderTab('remote');
 
-  const claudeButtonTitle = provider === 'claude'
-    ? 'Claude is the current provider'
-    : selectedProvider === 'claude'
-      ? 'Open a new Claude tab'
-      : 'Switch default provider to Claude and open a new Claude tab';
+  const providerButtonTitle = (p: ProviderId): string => {
+    const label = providerLabel(p);
+    if (provider === p) { return `${label} is the current provider`; }
+    if (selectedProvider === p) { return `Open a new ${label} tab`; }
+    return `Switch default provider to ${label} and open a new ${label} tab`;
+  };
 
-  const codexButtonTitle = provider === 'codex'
-    ? 'Codex is the current provider'
-    : selectedProvider === 'codex'
-      ? 'Open a new Codex tab'
-      : 'Switch default provider to Codex and open a new Codex tab';
+  const claudeButtonTitle = providerButtonTitle('claude');
+  const codexButtonTitle = providerButtonTitle('codex');
+  const happyButtonTitle = providerButtonTitle('remote');
 
   const isCodexUi = provider === 'codex' || !providerCapabilities.supportsPermissionModeSelector;
   const modelSelectorElement = isCodexUi ? <CodexModelSelector /> : <ModelSelector />;
@@ -461,9 +463,6 @@ export const StatusBar: React.FC<{
             Prompts
           </button>
           <div className="status-bar-group-dropdown-separator" />
-          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-            <ProviderSelector />
-          </div>
           <button
             className={`status-bar-group-dropdown-item ${selectedProvider === 'claude' ? 'active' : ''}`}
             onClick={handleSetClaudeProvider}
@@ -479,6 +478,14 @@ export const StatusBar: React.FC<{
             data-tooltip={codexButtonTitle}
           >
             Codex
+          </button>
+          <button
+            className={`status-bar-group-dropdown-item ${selectedProvider === 'remote' ? 'active' : ''}`}
+            onClick={handleSetHappyProvider}
+            disabled={isBusy}
+            data-tooltip={happyButtonTitle}
+          >
+            Happy
           </button>
           <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
             {modelSelectorElement}
@@ -634,9 +641,6 @@ export const StatusBar: React.FC<{
         </button>
 
         <StatusBarGroupButton label="More" isOpen={navOpen} onToggle={handleNavToggle}>
-          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-            <ProviderSelector />
-          </div>
           <button
             className={`status-bar-group-dropdown-item ${selectedProvider === 'claude' ? 'active' : ''}`}
             onClick={handleSetClaudeProvider}
@@ -652,6 +656,14 @@ export const StatusBar: React.FC<{
             data-tooltip={codexButtonTitle}
           >
             Codex
+          </button>
+          <button
+            className={`status-bar-group-dropdown-item ${selectedProvider === 'remote' ? 'active' : ''}`}
+            onClick={handleSetHappyProvider}
+            disabled={isBusy}
+            data-tooltip={happyButtonTitle}
+          >
+            Happy
           </button>
           <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
             {modelSelectorElement}
@@ -807,9 +819,6 @@ export const StatusBar: React.FC<{
             Prompts
           </button>
           <div className="status-bar-group-dropdown-separator" />
-          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-            <ProviderSelector />
-          </div>
           <button
             className={`status-bar-group-dropdown-item ${selectedProvider === 'claude' ? 'active' : ''}`}
             onClick={handleSetClaudeProvider}
@@ -825,6 +834,14 @@ export const StatusBar: React.FC<{
             data-tooltip={codexButtonTitle}
           >
             Codex
+          </button>
+          <button
+            className={`status-bar-group-dropdown-item ${selectedProvider === 'remote' ? 'active' : ''}`}
+            onClick={handleSetHappyProvider}
+            disabled={isBusy}
+            data-tooltip={happyButtonTitle}
+          >
+            Happy
           </button>
           <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
             {modelSelectorElement}
@@ -1021,7 +1038,14 @@ export const StatusBar: React.FC<{
       >
         Codex
       </button>
-      <ProviderSelector />
+      <button
+        className={`status-bar-provider-quick-btn ${selectedProvider === 'remote' ? 'active' : ''}`}
+        onClick={handleSetHappyProvider}
+        disabled={isBusy}
+        data-tooltip={happyButtonTitle}
+      >
+        Happy
+      </button>
       {modelSelectorElement}
       {codexReasoningSelectorElement}
       {permissionSelectorElement}
