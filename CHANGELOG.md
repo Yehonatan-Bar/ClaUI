@@ -1,5 +1,13 @@
 # ClaUi - Changelog
 
+## v0.1.76 - 2026-03-04
+
+**Fix: Context widget not updating + simplified to minimal bar**
+
+- Fixed the floating context widget not re-rendering when new token data arrived — now polls the store every 5 seconds via `getState()` instead of relying on zustand selector reactivity
+- Simplified the floating widget to a pure progress bar strip (160x10px) with no text, labels, or background box — just a colored bar that grows as context fills up
+- Tooltip on hover still shows the exact percentage
+
 ## v0.1.75 - 2026-03-04
 
 **Fix: Stale plan approval bar persisting during execution**
