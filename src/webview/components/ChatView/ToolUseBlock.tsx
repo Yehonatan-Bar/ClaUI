@@ -1,14 +1,31 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { renderTextWithFileLinks } from './filePathLinks';
 
 /** Tool names that represent plan approval / question flows */
 const PLAN_TOOLS = ['ExitPlanMode', 'AskUserQuestion'];
+const TODO_TOOL = 'TodoWrite';
 
 /** Friendly display labels for plan tools */
 const PLAN_TOOL_LABELS: Record<string, string> = {
   ExitPlanMode: 'Plan',
   AskUserQuestion: 'Question',
 };
+
+type TodoStatus = 'completed' | 'in_progress' | 'pending' | 'unknown';
+
+interface TodoItem {
+  content: string;
+  status: TodoStatus;
+  activeForm?: string;
+}
+
+interface TodoStats {
+  total: number;
+  completed: number;
+  inProgress: number;
+  pending: number;
+  percent: number;
+}
 
 interface ToolUseBlockProps {
   toolName: string;
@@ -28,21 +45,32 @@ export const ToolUseBlock: React.FC<ToolUseBlockProps> = ({
   partialInput,
   isStreaming,
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(() => toolName !== TODO_TOOL);
   const isPlanTool = PLAN_TOOLS.includes(toolName);
+  const isTodoTool = toolName === TODO_TOOL;
+  const todoItems = useMemo(
+    () => (isTodoTool ? extractTodos(input, partialInput) : null),
+    [isTodoTool, input, partialInput]
+  );
+  const hasTodoPayload = todoItems !== null;
+  const todoStats = useMemo(() => buildTodoStats(todoItems || []), [todoItems]);
 
   // For plan tools, try to extract readable plan text instead of raw JSON
   let displayContent: string;
   if (isPlanTool) {
     displayContent = extractPlanText(input, partialInput);
+  } else if (isTodoTool && !hasTodoPayload) {
+    displayContent = input
+      ? JSON.stringify(input, null, 2)
+      : partialInput || '';
   } else {
     displayContent = input
       ? JSON.stringify(input, null, 2)
       : partialInput || '';
   }
 
-  const displayName = PLAN_TOOL_LABELS[toolName] || toolName;
-  const blockClass = `tool-use-block${isPlanTool ? ' plan-tool' : ''}`;
+  const displayName = isTodoTool ? 'Todo' : PLAN_TOOL_LABELS[toolName] || toolName;
+  const blockClass = `tool-use-block${isPlanTool ? ' plan-tool' : ''}${isTodoTool ? ' todo-tool' : ''}`;
 
   return (
     <div className={blockClass}>
@@ -54,13 +82,22 @@ export const ToolUseBlock: React.FC<ToolUseBlockProps> = ({
       >
         <span className={`tool-collapse-indicator${isCollapsed ? '' : ' expanded'}`} />
         <span className="tool-use-name">{displayName}</span>
+        {isTodoTool && hasTodoPayload && (
+          <TodoSummaryChips stats={todoStats} />
+        )}
         {isStreaming && (
           <span style={{ opacity: 0.5, fontSize: 11 }}>
-            {isPlanTool ? 'preparing...' : 'running...'}
+            {isPlanTool ? 'preparing...' : isTodoTool ? 'updating...' : 'running...'}
           </span>
         )}
       </div>
-      {!isCollapsed && displayContent && (
+      {!isCollapsed && hasTodoPayload && (
+        <div className="tool-use-body">
+          <TodoListRenderer todos={todoItems || []} stats={todoStats} />
+          {isStreaming && <span className="streaming-cursor" />}
+        </div>
+      )}
+      {!isCollapsed && !hasTodoPayload && displayContent && (
         <div className="tool-use-body">
           {renderTextWithFileLinks(displayContent)}
           {isStreaming && <span className="streaming-cursor" />}
@@ -99,4 +136,130 @@ function extractPlanText(
   }
 
   return '';
+}
+
+function extractTodos(
+  input?: Record<string, unknown>,
+  partialInput?: string
+): TodoItem[] | null {
+  let source: unknown = input;
+
+  if (!isRecord(source) && partialInput) {
+    try {
+      source = JSON.parse(partialInput);
+    } catch {
+      return null;
+    }
+  }
+
+  if (!isRecord(source) || !Array.isArray(source.todos)) {
+    return null;
+  }
+
+  return source.todos
+    .map((todo) => normalizeTodo(todo))
+    .filter((todo): todo is TodoItem => Boolean(todo));
+}
+
+function normalizeTodo(todo: unknown): TodoItem | null {
+  if (!isRecord(todo)) return null;
+
+  const content = asNonEmptyString(todo.content) || asNonEmptyString(todo.title);
+  if (!content) return null;
+
+  const status = normalizeTodoStatus(asNonEmptyString(todo.status) || 'pending');
+  const activeForm = asNonEmptyString(todo.activeForm);
+
+  return {
+    content,
+    status,
+    ...(activeForm ? { activeForm } : {}),
+  };
+}
+
+function normalizeTodoStatus(status: string): TodoStatus {
+  const normalized = status.toLowerCase();
+  if (normalized === 'completed' || normalized === 'done' || normalized === 'complete') return 'completed';
+  if (normalized === 'in_progress' || normalized === 'in-progress' || normalized === 'active') return 'in_progress';
+  if (normalized === 'pending' || normalized === 'todo' || normalized === 'open') return 'pending';
+  return 'unknown';
+}
+
+function buildTodoStats(todos: TodoItem[]): TodoStats {
+  const total = todos.length;
+  const completed = todos.filter((todo) => todo.status === 'completed').length;
+  const inProgress = todos.filter((todo) => todo.status === 'in_progress').length;
+  const pending = Math.max(0, total - completed - inProgress);
+  const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+  return {
+    total,
+    completed,
+    inProgress,
+    pending,
+    percent,
+  };
+}
+
+function asNonEmptyString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+const TodoSummaryChips: React.FC<{ stats: TodoStats }> = ({ stats }) => (
+  <div className="todo-tool-summary">
+    <span className="todo-chip todo-chip-progress">{stats.percent}%</span>
+    <span className="todo-chip todo-chip-done">{stats.completed} done</span>
+    <span className="todo-chip todo-chip-doing">{stats.inProgress} doing</span>
+    <span className="todo-chip todo-chip-queued">{stats.pending} queued</span>
+  </div>
+);
+
+const TodoListRenderer: React.FC<{
+  todos: TodoItem[];
+  stats: TodoStats;
+}> = ({ todos, stats }) => {
+  if (todos.length === 0) {
+    return <div className="todo-empty">No todos found in this update.</div>;
+  }
+
+  return (
+    <div className="todo-visual">
+      <div className="todo-progress-row">
+        <div className="todo-progress-track">
+          <div className="todo-progress-fill" style={{ width: `${stats.percent}%` }} />
+        </div>
+        <span className="todo-progress-label">
+          {stats.completed}/{stats.total} done
+        </span>
+      </div>
+
+      <div className="todo-list">
+        {todos.map((todo, index) => (
+          <div key={`${todo.content}-${index}`} className={`todo-item todo-item-${todo.status}`}>
+            <span className="todo-status-dot" />
+            <div className="todo-item-content">
+              <div className="todo-item-text">{renderTextWithFileLinks(todo.content)}</div>
+              {todo.activeForm && (
+                <div className="todo-item-active">{renderTextWithFileLinks(todo.activeForm)}</div>
+              )}
+            </div>
+            <span className="todo-item-status">{statusLabel(todo.status)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+function statusLabel(status: TodoStatus): string {
+  if (status === 'completed') return 'done';
+  if (status === 'in_progress') return 'doing';
+  if (status === 'pending') return 'queued';
+  return 'other';
 }

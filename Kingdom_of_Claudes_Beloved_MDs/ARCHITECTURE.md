@@ -239,7 +239,7 @@ Exports `detectRtl(text)` which checks for Hebrew (U+0590-U+05FF) and Arabic (U+
 
 **StreamingText** - Renders in-progress text with a blinking cursor animation at the end.
 
-**ToolUseBlock** - Collapsible panel showing tool name and input JSON, **collapsed by default** with a disclosure triangle to expand. Shows "running..." indicator during streaming. Plan tools (`ExitPlanMode`, `AskUserQuestion`) get distinct blue styling, friendly labels ("Plan" / "Question"), and display extracted plan text instead of raw JSON. File paths inside tool content are rendered as clickable links.
+**ToolUseBlock** - Collapsible panel showing tool name and input JSON, **collapsed by default** with a disclosure triangle to expand (except `TodoWrite`, which opens expanded by default for readability). Shows "running..." indicator during streaming. Plan tools (`ExitPlanMode`, `AskUserQuestion`) get distinct blue styling, friendly labels ("Plan" / "Question"), and display extracted plan text instead of raw JSON. `TodoWrite` tool input is parsed into a visual todo card with progress bar, status chips, and color-coded rows (`done` / `doing` / `queued`). File paths inside tool content are rendered as clickable links.
 
 **PlanApprovalBar** - Dual-mode action bar shown when `pendingApproval` is set in the store. Renders different UI based on `toolName`:
 - **ExitPlanMode**: Displays "Plan Ready for Review" with three buttons: Approve, Reject, and Give Feedback. Feedback mode expands a textarea. When the tool input contains `allowedPrompts`, these are parsed and displayed as a "Requested permissions" section showing each permission's tool name and description (e.g., `Bash: run tests`).

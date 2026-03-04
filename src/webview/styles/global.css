@@ -2621,6 +2621,179 @@ html, body, #root {
   color: var(--vscode-textLink-foreground, #3794ff);
 }
 
+/* TodoWrite visualization */
+.tool-use-block.todo-tool {
+  border-color: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 45%, var(--vscode-panel-border, #333));
+}
+
+.tool-use-block.todo-tool .tool-use-header {
+  flex-wrap: wrap;
+  row-gap: 6px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 16%, var(--vscode-sideBarSectionHeader-background, #252526)),
+    var(--vscode-sideBarSectionHeader-background, #252526)
+  );
+}
+
+.tool-use-block.todo-tool .tool-use-name {
+  color: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 74%, var(--vscode-editor-foreground, #d4d4d4));
+}
+
+.todo-tool-summary {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.todo-chip {
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--vscode-editor-foreground, #d4d4d4);
+  background: color-mix(in srgb, var(--vscode-editor-background, #1e1e1e) 80%, transparent);
+}
+
+.todo-chip-progress {
+  border-color: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 60%, var(--vscode-panel-border, #333));
+  color: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 75%, var(--vscode-editor-foreground, #d4d4d4));
+}
+
+.todo-chip-done {
+  border-color: color-mix(in srgb, var(--vscode-charts-green, #4caf50) 60%, var(--vscode-panel-border, #333));
+  color: color-mix(in srgb, var(--vscode-charts-green, #4caf50) 75%, var(--vscode-editor-foreground, #d4d4d4));
+}
+
+.todo-chip-doing {
+  border-color: color-mix(in srgb, var(--vscode-charts-orange, #ff9800) 60%, var(--vscode-panel-border, #333));
+  color: color-mix(in srgb, var(--vscode-charts-orange, #ff9800) 75%, var(--vscode-editor-foreground, #d4d4d4));
+}
+
+.todo-chip-queued {
+  border-color: color-mix(in srgb, var(--vscode-descriptionForeground, #999) 60%, var(--vscode-panel-border, #333));
+  color: var(--vscode-descriptionForeground, #999);
+}
+
+.todo-visual {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.todo-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.todo-progress-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--vscode-editor-foreground, #d4d4d4) 12%, transparent);
+  overflow: hidden;
+}
+
+.todo-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 75%, transparent),
+    color-mix(in srgb, var(--vscode-charts-green, #4caf50) 85%, transparent)
+  );
+  transition: width 180ms ease;
+}
+
+.todo-progress-label {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #999);
+  white-space: nowrap;
+}
+
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.todo-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--vscode-panel-border, #333) 70%, transparent);
+  background: color-mix(in srgb, var(--vscode-editor-background, #1e1e1e) 88%, var(--vscode-input-background, #2d2d2d));
+}
+
+.todo-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 5px;
+  background: var(--vscode-descriptionForeground, #999);
+}
+
+.todo-item-completed {
+  border-color: color-mix(in srgb, var(--vscode-charts-green, #4caf50) 55%, var(--vscode-panel-border, #333));
+}
+
+.todo-item-completed .todo-status-dot {
+  background: var(--vscode-charts-green, #4caf50);
+}
+
+.todo-item-in_progress {
+  border-color: color-mix(in srgb, var(--vscode-charts-orange, #ff9800) 55%, var(--vscode-panel-border, #333));
+}
+
+.todo-item-in_progress .todo-status-dot {
+  background: var(--vscode-charts-orange, #ff9800);
+}
+
+.todo-item-pending .todo-status-dot,
+.todo-item-unknown .todo-status-dot {
+  background: var(--vscode-descriptionForeground, #999);
+}
+
+.todo-item-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.todo-item-text {
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.todo-item-active {
+  color: var(--vscode-descriptionForeground, #999);
+  font-size: 11px;
+  font-style: italic;
+  word-break: break-word;
+}
+
+.todo-item-status {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--vscode-descriptionForeground, #999);
+  margin-top: 1px;
+}
+
+.todo-empty {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground, #999);
+}
+
 /* Copy message button - appears on hover for both user and assistant messages */
 .copy-message-btn {
   float: right;
