@@ -284,7 +284,7 @@ export function registerCommands(
 
       const source = await vscode.window.showQuickPick(sourceItems, {
         placeHolder: 'Browse conversation history from...',
-        ignoreFocusOut: true,
+        ignoreFocusOut: false,
       });
 
       if (!source) { return; }
@@ -334,7 +334,7 @@ export function registerCommands(
         placeHolder: 'Select a conversation to resume',
         matchOnDescription: true,
         matchOnDetail: true,
-        ignoreFocusOut: true,
+        ignoreFocusOut: false,
       });
 
       if (picked) {
