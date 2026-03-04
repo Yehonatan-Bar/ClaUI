@@ -1,5 +1,23 @@
 # ClaUi - Changelog
 
+## v0.1.78 - 2026-03-04
+
+**Fix: Context widget always showing 0% (cache token summation)**
+
+- Fixed the context usage bar permanently stuck at 0% despite token data arriving correctly
+- Root cause: the Anthropic API splits input tokens into three fields when prompt caching is active — `input_tokens` (non-cached, typically 1–5), `cache_creation_input_tokens`, and `cache_read_input_tokens`. The code only read `input_tokens`, so a turn consuming ~40K tokens reported just 3, yielding 0.0025% — invisible
+- Fixed `StreamDemux.handleMessageStart()` to sum all three token fields before emitting `messageStart`
+- Fixed `MessageHandler` assistant-event handler to sum all three fields when updating `lastAssistantInputTokens`
+- Fixed `MessageHandler` result-event handler to sum all three fields before the final fallback resolution
+- Real context usage is now correctly calculated as `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`
+- Enhanced `costUpdate` diagnostic log to show all three components and the resolved total
+
+**Fix: Translate spinner stuck after manual translation**
+
+- Fixed loading spinner continuing to spin after a successful manual translation
+- Root cause: the manual translate code path set the translated text in the textarea but forgot to call `setIsTranslatingPrompt(false)`, leaving the UI permanently in "translating" state
+- Added the missing state clear before the `setText()` call in `InputArea.tsx`
+
 ## v0.1.76 - 2026-03-04
 
 **Fix: Context widget not updating + simplified to minimal bar**
