@@ -177,6 +177,11 @@ export class MessageHandler {
    *  so the model can call ExitPlanMode again after compaction re-activates plan mode. */
   private compactPending = false;
   private exitPlanApproveResumeFallbackCycleId: number | null = null;
+  /** True while the CLI is between messageStart and result (assistant turn in progress) */
+  private inAssistantTurn = false;
+  /** Separate timer for post-approve nudge, decoupled from approval cycle state so it
+   *  won't be cancelled by result-handler cleanup or markApprovalCycleResumeObserved. */
+  private postApproveNudgeTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Activity summarizer: periodically summarizes tool activity via Haiku */
   private activitySummarizer: ActivitySummarizer | null = null;
@@ -479,6 +484,7 @@ export class MessageHandler {
             }
           }
           this.cancelExitPlanApproveResumeFallback();
+          this.cancelPostApproveNudge();
           this.clearApprovalTracking();
           this.achievementService.onUserPrompt(this.tabId, msg.text);
           // Optimistic: show user message in UI immediately (before CLI echoes it back)
@@ -500,6 +506,7 @@ export class MessageHandler {
             }
           }
           this.cancelExitPlanApproveResumeFallback();
+          this.cancelPostApproveNudge();
           this.clearApprovalTracking();
           if (msg.text.trim()) {
             this.achievementService.onUserPrompt(this.tabId, msg.text);
@@ -1127,6 +1134,7 @@ export class MessageHandler {
                 scheduleExitPlanApproveFallback = true;
               } else {
                 this.cancelExitPlanApproveResumeFallback();
+                this.cancelPostApproveNudge();
               }
             }
           } else if (msg.action === 'approve') {
@@ -2466,6 +2474,7 @@ export class MessageHandler {
       'messageStart',
       (data: { messageId: string; model: string; inputTokens?: number }) => {
         this.log(`-> webview: messageStart id=${data.messageId} inputTokens=${data.inputTokens}`);
+        this.inAssistantTurn = true;
         // Track input tokens from message_start (reliable during live streaming)
         if (data.inputTokens && data.inputTokens > 0) {
           this.lastAssistantInputTokens = data.inputTokens;
@@ -2529,6 +2538,7 @@ export class MessageHandler {
       'result',
       (event: ResultSuccess | ResultError) => {
         this.log(`[RESULT_HANDLER] Entered result handler: subtype=${event.subtype} raw=${JSON.stringify(event).slice(0, 500)}`);
+        this.inAssistantTurn = false;
         try {
         // Codex consultation: log result timing if a consultation was in flight
         if (this._codexConsultStartedAt) {
@@ -2814,6 +2824,7 @@ export class MessageHandler {
       `cycleId=${this.pendingApprovalCycleId ?? 'null'} ` +
       `resumeObs=${this.pendingApprovalCycleResumeObserved} ` +
       `resultObs=${this.pendingApprovalCycleResultObserved} ` +
+      `inAssistantTurn=${this.inAssistantTurn} ` +
       `compactPending=${this.compactPending} ` +
       `tools=[${this.currentMessageToolNames.join(',')}]`
     );
@@ -2869,6 +2880,14 @@ export class MessageHandler {
     this.exitPlanApproveResumeFallbackCycleId = null;
   }
 
+  /** Cancel the post-approve nudge timer (separate from approval cycle state) */
+  private cancelPostApproveNudge(): void {
+    if (this.postApproveNudgeTimer) {
+      clearTimeout(this.postApproveNudgeTimer);
+      this.postApproveNudgeTimer = null;
+    }
+  }
+
   /** Record post-approval meaningful progress (tool/text activity) */
   private markApprovalCycleResumeObserved(source: string): void {
     if (this.pendingApprovalCycleId == null || this.pendingApprovalCycleResumeObserved) {
@@ -2905,7 +2924,15 @@ export class MessageHandler {
     // brief text and went idle.
   }
 
-  /** If ExitPlanMode approve does not auto-resume, send a delayed proceed nudge */
+  /** If ExitPlanMode approve does not auto-resume, send a delayed proceed nudge.
+   *
+   * Bug 14 fix: Uses inAssistantTurn instead of resumeObserved/resultObserved.
+   * Previous logic (Bug 13) checked resumeObserved first and skipped the nudge,
+   * but this failed when the CLI auto-resumed with brief text and then went idle:
+   * resumeObserved was true (from the brief turn's textDelta) AND resultObserved
+   * was true (from the ExitPlanMode turn's result), so the code skipped the nudge
+   * even though the CLI was idle. The inAssistantTurn flag directly reflects whether
+   * the CLI is between messageStart and result — a reliable idle/busy indicator. */
   private scheduleExitPlanApproveResumeFallback(cycleId: number | null): void {
     if (cycleId == null) {
       this.log('ExitPlanMode approve fallback skipped - no approval cycle id');
@@ -2915,75 +2942,45 @@ export class MessageHandler {
       this.log(`ExitPlanMode approve fallback skipped - stale cycle ${cycleId}, current=${this.pendingApprovalCycleId ?? 'none'}`);
       return;
     }
-    // Bug 13 fix: Check resumeObserved BEFORE resultObserved.
-    // The CLI auto-approves ExitPlanMode and may start a new turn immediately.
-    // If resume activity was observed (textDelta/toolUseStart from the new turn),
-    // the CLI has already moved on — sending a nudge would inject a spurious
-    // user message mid-execution. Previously (Bug 7), resultObserved was checked
-    // first, but resultObserved refers to the ExitPlanMode turn's result, not the
-    // current turn. When both flags are true, the CLI already started new work
-    // after the ExitPlanMode turn completed — no nudge needed.
-    if (this.pendingApprovalCycleResumeObserved) {
-      this.log(`ExitPlanMode approve fallback skipped - CLI has already resumed work (cycle ${cycleId})`);
-      this.clearApprovalCycleState();
-      return;
-    }
 
-    // If the CLI completed the ExitPlanMode turn (result observed) but has NOT
-    // started new work (no resume), it is idle and waiting — send nudge now.
-    if (this.pendingApprovalCycleResultObserved) {
-      this.log(`ExitPlanMode approve fallback - CLI completed and idle (no resume), sending proceed nudge immediately (cycle ${cycleId})`);
+    this.cancelPostApproveNudge();
+
+    // Primary check: is the CLI currently between messageStart and result?
+    if (!this.inAssistantTurn) {
+      // CLI is idle — send nudge immediately.
+      this.log(`ExitPlanMode approve - CLI idle (inAssistantTurn=false), sending proceed nudge (cycle ${cycleId})`);
+      this.logApprovalState('approve-nudge-immediate');
       try {
         this.control.sendText('Continue with the implementation.');
         this.webview.postMessage({ type: 'processBusy', busy: true });
       } catch (err) {
-        this.log(`ExitPlanMode approve immediate nudge failed: ${err}`);
+        this.log(`ExitPlanMode approve nudge failed: ${err}`);
       } finally {
         this.clearApprovalCycleState();
       }
       return;
     }
 
-    // No activity observed yet — schedule a delayed fallback nudge.
-    this.cancelExitPlanApproveResumeFallback();
-    this.exitPlanApproveResumeFallbackCycleId = cycleId;
-    this.log(`ExitPlanMode approve fallback scheduled in ${EXIT_PLANMODE_APPROVE_RESUME_FALLBACK_DELAY_MS}ms (cycle ${cycleId})`);
-    this.exitPlanApproveResumeFallbackTimer = setTimeout(() => {
-      this.exitPlanApproveResumeFallbackTimer = null;
-      this.exitPlanApproveResumeFallbackCycleId = null;
-
-      if (this.pendingApprovalCycleId !== cycleId) {
-        this.log(`ExitPlanMode approve fallback aborted - cycle changed (expected ${cycleId}, current=${this.pendingApprovalCycleId ?? 'none'})`);
-        return;
-      }
-      // Bug 13 fix: same priority as above — check resume before result.
-      if (this.pendingApprovalCycleResumeObserved) {
-        this.log(`ExitPlanMode approve fallback aborted - CLI resumed during wait (cycle ${cycleId})`);
-        this.clearApprovalCycleState();
-        return;
-      }
-      // CLI completed but hasn't resumed new work — it's idle, send nudge.
-      if (this.pendingApprovalCycleResultObserved) {
-        this.log(`ExitPlanMode approve fallback firing (result arrived, no resume) - sending proceed nudge to CLI (cycle ${cycleId})`);
+    // CLI is in an active turn. Schedule a delayed check.
+    // The timer uses postApproveNudgeTimer (decoupled from approval cycle state)
+    // so it won't be cancelled by result-handler cleanup or markApprovalCycleResumeObserved.
+    this.log(`ExitPlanMode approve - CLI busy (inAssistantTurn=true), scheduling delayed nudge in ${EXIT_PLANMODE_APPROVE_RESUME_FALLBACK_DELAY_MS}ms (cycle ${cycleId})`);
+    this.logApprovalState('approve-nudge-deferred');
+    this.postApproveNudgeTimer = setTimeout(() => {
+      this.postApproveNudgeTimer = null;
+      if (!this.inAssistantTurn) {
+        // CLI went idle — send nudge.
+        this.log(`ExitPlanMode approve deferred nudge - CLI idle, sending proceed`);
         try {
           this.control.sendText('Continue with the implementation.');
           this.webview.postMessage({ type: 'processBusy', busy: true });
         } catch (err) {
-          this.log(`ExitPlanMode approve fallback send failed: ${err}`);
-        } finally {
-          this.clearApprovalCycleState();
+          this.log(`ExitPlanMode approve deferred nudge failed: ${err}`);
         }
-        return;
-      }
-
-      this.log(`ExitPlanMode approve fallback firing - sending proceed nudge to CLI (cycle ${cycleId})`);
-      try {
-        this.control.sendText('Continue with the implementation.');
-        this.webview.postMessage({ type: 'processBusy', busy: true });
-      } catch (err) {
-        this.log(`ExitPlanMode approve fallback send failed: ${err}`);
-      } finally {
-        this.clearApprovalCycleState();
+      } else {
+        // CLI is still in a turn after the delay. It's implementing (not just
+        // a brief plan summary). No nudge needed.
+        this.log(`ExitPlanMode approve deferred nudge - CLI still in turn, skipping (likely implementing)`);
       }
     }, EXIT_PLANMODE_APPROVE_RESUME_FALLBACK_DELAY_MS);
   }
@@ -3041,6 +3038,7 @@ export class MessageHandler {
     // does this via planApprovalResponse; the typed-text path does this via
     // the sendMessage handler (which checks pendingApprovalTool).
     this.cancelExitPlanApproveResumeFallback();
+    this.cancelPostApproveNudge();
     this.pendingApprovalCycleId = this.nextApprovalCycleId++;
     this.pendingApprovalCycleResumeObserved = false;
     this.pendingApprovalCycleResultObserved = false;
