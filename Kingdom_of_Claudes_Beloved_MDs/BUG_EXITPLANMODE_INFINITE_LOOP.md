@@ -16,6 +16,7 @@ The plan approval bar (4 CLI-matching options) and AskUserQuestion interactive c
 **Date Eleventh Fix**: 2026-03-03 (infinite reopen loop from unbounded Bug 10 re-open logic + deeper logging)
 **Date Twelfth Fix**: 2026-03-04 (stale approval bar persists during execution - display-only)
 **Date Thirteenth Fix**: 2026-03-04 (approval bar auto-dismissed by 5s timer before user can interact)
+**Date Fourteenth Fix**: 2026-03-05 (approve click no-op when CLI auto-resumed AND completed - resumeObserved masks idle state)
 **Severity**: Critical (blocks plan mode workflow)
 **Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`, `src/webview/components/InputArea/InputArea.tsx`
 
@@ -230,6 +231,27 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 
 **Why this is safe**: The bar is still cleared by all user-initiated actions: clicking approve/reject/feedback buttons (`PlanApprovalBar` calls `setPendingApproval(null)`), typing a message (`processBusy: true` clears `pendingApproval`), or a new `planApprovalRequired` replacing it. The `exitPlanModeProcessed` flag still prevents stale re-triggers. When the user clicks approve after the model has already completed execution, `scheduleExitPlanApproveResumeFallback` correctly skips the nudge (either `resumeObserved` is true, or the approval cycle state was already cleared by the post-ExitPlanMode turn's result handler).
 
+### Fourteenth Bug (2026-03-05): Approve Click No-Op When CLI Auto-Resumed AND Completed
+
+**Cause**: Bug 13's fix checked `resumeObserved` first and skipped the nudge when true, assuming the CLI was "actively working". But when the CLI auto-resumed with brief plan-summary text and then completed, BOTH `resumeObserved` and `resultObserved` were true. The code skipped the nudge (because `resumeObserved` was checked first), even though the CLI was idle. Neither `processBusy:true` nor a nudge text was sent. The user saw the approval bar disappear with no subsequent activity.
+
+**Why both flags are true**: After ExitPlanMode is detected, `notifyPlanApprovalRequired` sets `pendingApprovalTool = 'ExitPlanMode'`. The CLI auto-approves, the ExitPlanMode turn completes (result -> `resultObserved = true`), and a new turn starts (`messageStart` clears `pendingApprovalTool = null`). During the new turn, text output (`textDelta`) calls `markApprovalCycleResumeObserved`, which now passes the `pendingApprovalTool` guard (because it's null) and sets `resumeObserved = true`. When the brief turn completes, the CLI goes idle. By the time the user clicks approve, both flags are true but the CLI is idle.
+
+**Root cause**: `resumeObserved` and `resultObserved` are lifecycle flags that track what HAPPENED during the approval cycle, not the CLI's CURRENT state. When both are true, the CLI was working but has since finished. The Bug 13 priority (`resumeObserved` first) incorrectly treated this as "actively working".
+
+**Fix**: Replaced the fragile `resumeObserved`/`resultObserved` logic in `scheduleExitPlanApproveResumeFallback` with a direct `inAssistantTurn` flag that tracks whether the CLI is between `messageStart` and `result` events:
+
+1. **Added `inAssistantTurn` flag** to MessageHandler: set `true` on `messageStart`, `false` on `result`. This is a direct, real-time idle/busy indicator.
+
+2. **Rewrote `scheduleExitPlanApproveResumeFallback`**:
+   - If `!inAssistantTurn` (CLI idle): send nudge immediately
+   - If `inAssistantTurn` (CLI busy): schedule a delayed check via `postApproveNudgeTimer`
+   - Timer callback: if CLI went idle, send nudge; if still busy (implementing), skip
+
+3. **Decoupled timer from approval cycle state**: The new `postApproveNudgeTimer` is separate from the existing `exitPlanApproveResumeFallbackTimer`. It is NOT cancelled by `clearApprovalCycleState()` (called by the result handler) or `markApprovalCycleResumeObserved()`. This prevents the result handler from prematurely cancelling the pending nudge. The timer is only cancelled by: user sending a message (`sendMessage`/`sendMessageWithImages`), a new approval bar appearing (`notifyPlanApprovalRequired`), or a non-approve ExitPlanMode response.
+
+**Why this doesn't cause the infinite loop**: The `exitPlanModeProcessed` flag is still set when the user clicks approve (`markExitPlanModeProcessed` in `planApprovalResponse`). Any subsequent ExitPlanMode calls from the model after the nudge are suppressed by this flag. The nudge text ("Continue with the implementation.") is a neutral implementation directive, not an approval message.
+
 ---
 
 ## Current Defense Layers
@@ -243,9 +265,8 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 | `sendMessage` sets `exitPlanModeProcessed` | MessageHandler.ts `sendMessage` handler | Typed text bypassing the button-click guard (Bug 8 fix) |
 | Skip `processBusy:true` for ExitPlanMode approve | MessageHandler.ts `planApprovalResponse` | Stuck "Thinking..." indicator after plan approval |
 | Send `processBusy:true` for ExitPlanMode feedback | MessageHandler.ts `planApprovalResponse` | UI shows thinking while Claude processes feedback |
-| Resume-first priority in fallback | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Spurious nudge when CLI already resumed after ExitPlanMode (Bug 13 fix) |
-| Nudge only when CLI idle (resultObserved, no resume) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Approve click no-op when CLI hasn't auto-resumed |
-| Delayed approve fallback (only if no activity observed) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | ExitPlanMode approve click becoming a no-op (CLI never auto-resumed) |
+| `inAssistantTurn` flag for approve nudge | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Approve click no-op: uses direct idle/busy check instead of fragile resumeObserved/resultObserved (Bug 14 fix) |
+| `postApproveNudgeTimer` (decoupled from cycle state) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Delayed nudge survives result-handler cleanup (Bug 14 fix) |
 | Neutral nudge text | MessageHandler.ts all fallback paths | Prevents model from associating nudge with plan approval |
 | `compactPending` -> reset `exitPlanModeProcessed` on messageStart | MessageHandler.ts `messageStart` handler | Stuck plan mode after context compaction (Bug 9 fix) |
 | `postExitPlanNonPlanActivityObserved` re-opens ExitPlanMode cycle after real execution | MessageHandler.ts `toolUseStart` + `notifyPlanApprovalRequired` | Deadlock where legitimate ExitPlanMode is suppressed as stale (Bug 10 fix) |
@@ -371,19 +392,17 @@ if (!isExitPlanMode || isExitPlanFeedback) {
 ### scheduleExitPlanApproveResumeFallback (MessageHandler.ts)
 
 ```typescript
-// Bug 13 fix: check resumeObserved BEFORE resultObserved.
-// If CLI resumed (started new work after ExitPlanMode), don't nudge.
-if (this.pendingApprovalCycleResumeObserved) {
-  return; // CLI already moved on, approve is informational only
-}
-// CLI completed ExitPlanMode turn but hasn't started new work -> idle -> nudge
-if (this.pendingApprovalCycleResultObserved) {
+// Bug 14 fix: Use inAssistantTurn instead of resumeObserved/resultObserved.
+// inAssistantTurn is true between messageStart and result — a direct idle/busy indicator.
+if (!this.inAssistantTurn) {
+  // CLI is idle — send nudge immediately
   this.control.sendText('Continue with the implementation.');
   this.webview.postMessage({ type: 'processBusy', busy: true });
   return;
 }
-// No activity yet -> schedule delayed fallback
-// Timer callback re-checks with same priority: resumeObserved -> skip, resultObserved -> nudge
+// CLI is in an active turn — schedule delayed check via postApproveNudgeTimer
+// (decoupled from approval cycle state, survives result-handler cleanup)
+// Timer callback: !inAssistantTurn -> nudge, inAssistantTurn -> skip (implementing)
 ```
 
 ---

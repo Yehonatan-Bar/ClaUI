@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClaUi - Skill Indicator Plan</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Heebo', sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      line-height: 1.7;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+      position: relative;
+    }
+
+    .header::after {
+      content: '';
+      display: block;
+      width: 120px;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #e040fb, transparent);
+      margin: 20px auto 0;
+    }
+
+    .header h1 {
+      font-size: 32px;
+      font-weight: 700;
+      color: #f0f6fc;
+      margin-bottom: 8px;
+    }
+
+    .header .subtitle {
+      font-size: 16px;
+      color: #8b949e;
+      font-weight: 300;
+    }
+
+    .header .badge {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 4px 16px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(224, 64, 251, 0.12);
+      color: #e040fb;
+      border: 1px solid rgba(224, 64, 251, 0.3);
+    }
+
+    /* Section */
+    .section {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 28px 32px;
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .section::before {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      border-radius: 12px 0 0 12px;
+    }
+
+    .section.magenta::before { background: #e040fb; }
+    .section.blue::before { background: #58a6ff; }
+    .section.green::before { background: #3fb950; }
+    .section.orange::before { background: #d29922; }
+    .section.cyan::before { background: #56d4dd; }
+
+    .section h2 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #f0f6fc;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section h2 .icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .section.magenta h2 .icon { background: rgba(224, 64, 251, 0.15); color: #e040fb; }
+    .section.blue h2 .icon { background: rgba(88, 166, 255, 0.15); color: #58a6ff; }
+    .section.green h2 .icon { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
+    .section.orange h2 .icon { background: rgba(210, 153, 34, 0.15); color: #d29922; }
+    .section.cyan h2 .icon { background: rgba(86, 212, 221, 0.15); color: #56d4dd; }
+
+    .section p {
+      color: #8b949e;
+      margin-bottom: 12px;
+      font-size: 15px;
+    }
+
+    .section p strong {
+      color: #c9d1d9;
+    }
+
+    /* Cards Grid */
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .card {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      transition: border-color 0.2s;
+    }
+
+    .card:hover {
+      border-color: #e040fb55;
+    }
+
+    .card .card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      margin: 0 auto 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .card:nth-child(1) .card-icon { background: linear-gradient(135deg, rgba(224, 64, 251, 0.2), rgba(224, 64, 251, 0.05)); color: #e040fb; }
+    .card:nth-child(2) .card-icon { background: linear-gradient(135deg, rgba(88, 166, 255, 0.2), rgba(88, 166, 255, 0.05)); color: #58a6ff; }
+    .card:nth-child(3) .card-icon { background: linear-gradient(135deg, rgba(63, 185, 80, 0.2), rgba(63, 185, 80, 0.05)); color: #3fb950; }
+
+    .card h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f0f6fc;
+      margin-bottom: 6px;
+    }
+
+    .card p {
+      font-size: 12px;
+      color: #8b949e;
+      margin: 0;
+    }
+
+    /* Mockup */
+    .mockup {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-x: auto;
+      direction: ltr;
+      text-align: left;
+    }
+
+    .mockup .line {
+      display: flex;
+      gap: 8px;
+      padding: 2px 0;
+    }
+
+    .mockup .border-magenta {
+      border-right: 3px solid #e040fb;
+      padding-right: 12px;
+      margin-right: 4px;
+    }
+
+    .mockup .tool-block {
+      background: #161b22;
+      border: 1px solid rgba(224, 64, 251, 0.35);
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin: 8px 0;
+    }
+
+    .mockup .tool-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(90deg, rgba(224, 64, 251, 0.12), transparent);
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-bottom: 4px;
+    }
+
+    .mockup .diamond {
+      color: #e040fb;
+      font-weight: bold;
+    }
+
+    .mockup .tool-name {
+      color: rgba(224, 64, 251, 0.85);
+      font-weight: 600;
+    }
+
+    .mockup .chip {
+      margin-right: auto;
+      padding: 1px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      border: 1px solid rgba(224, 64, 251, 0.4);
+      color: rgba(224, 64, 251, 0.9);
+      background: rgba(224, 64, 251, 0.08);
+    }
+
+    .mockup .status-bar {
+      background: #161b22;
+      border-top: 1px solid #30363d;
+      padding: 4px 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11px;
+      color: #8b949e;
+      margin-top: 12px;
+      border-radius: 0 0 8px 8px;
+    }
+
+    .mockup .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 1px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(224, 64, 251, 0.4);
+      background: rgba(224, 64, 251, 0.08);
+      color: rgba(224, 64, 251, 0.85);
+      font-weight: 600;
+    }
+
+    .mockup .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #e040fb;
+      display: inline-block;
+      box-shadow: 0 0 6px #e040fb;
+    }
+
+    .mockup .timeline {
+      width: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+
+    .mockup .timeline-seg {
+      width: 100%;
+      border-radius: 2px;
+    }
+
+    /* List */
+    .feature-list {
+      list-style: none;
+      margin-top: 12px;
+    }
+
+    .feature-list li {
+      padding: 10px 16px;
+      border-bottom: 1px solid #21262d;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .feature-list li:last-child {
+      border-bottom: none;
+    }
+
+    .feature-list .dot-marker {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 7px;
+      flex-shrink: 0;
+    }
+
+    .feature-list .dot-magenta { background: #e040fb; }
+    .feature-list .dot-blue { background: #58a6ff; }
+    .feature-list .dot-green { background: #3fb950; }
+
+    .feature-list .text {
+      font-size: 14px;
+    }
+
+    .feature-list .text strong {
+      color: #f0f6fc;
+    }
+
+    /* Table */
+    .info-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    .info-table th {
+      text-align: right;
+      padding: 10px 14px;
+      background: #0d1117;
+      color: #8b949e;
+      font-weight: 500;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .info-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #21262d;
+      color: #c9d1d9;
+    }
+
+    .info-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      margin-top: 40px;
+      padding-top: 24px;
+      border-top: 1px solid #21262d;
+      color: #484f58;
+      font-size: 12px;
+    }
+
+    /* Color categories reference */
+    .color-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .color-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      background: #0d1117;
+      border: 1px solid #30363d;
+    }
+
+    .color-chip .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+
+    .highlight-new {
+      position: relative;
+    }
+
+    .highlight-new::after {
+      content: 'NEW';
+      position: absolute;
+      top: -6px;
+      left: -6px;
+      font-size: 8px;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: #e040fb;
+      color: #0d1117;
+      letter-spacing: 0.5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <h1>ClaUi - Skill Indicator</h1>
+      <div class="subtitle">תכנון פיצ'ר חדש: חיווי ויזואלי לשימוש ב-Skills</div>
+      <div class="badge">Feature Plan</div>
+    </div>
+
+    <!-- What is a Skill -->
+    <div class="section magenta">
+      <h2><span class="icon">?</span> מה זה Skill?</h2>
+      <p>
+        כשקלוד קוד מזהה שהמשימה שלך דורשת ידע מתמחה (למשל: עיצוב ממשק, עבודה עם PDF, ניתוח שגיאות), הוא <strong>מפעיל "מיומנות" (Skill)</strong> - חבילת ידע מותאמת שמעשירה אותו ביכולות מקצועיות ספציפיות.
+      </p>
+      <p>
+        <strong>הבעיה:</strong> כרגע, הפעלת Skill נראית בדיוק כמו כל כלי אחר (Read, Write, Bash...) - בלוק אפור גנרי. המשתמש לא יודע שקלוד "התמקצע" לטובתו.
+      </p>
+      <p>
+        <strong>הפתרון:</strong> חיווי ויזואלי ייחודי ובולט שיאפשר למשתמש לראות מיד מתי Skill מופעל, איזה Skill, ואיפה זה קורה בזמן אמת.
+      </p>
+    </div>
+
+    <!-- Three Layers -->
+    <div class="section blue">
+      <h2><span class="icon">3</span> שלוש שכבות חיווי</h2>
+      <p>הפיצ'ר מציג את השימוש ב-Skill בשלושה מקומות בו-זמנית:</p>
+
+      <div class="cards">
+        <div class="card">
+          <div class="card-icon">1</div>
+          <h3>כרטיס Skill בצ'אט</h3>
+          <p>בתוך השיחה, במקום בלוק כלי רגיל - כרטיס צבעוני ייחודי עם שם ה-Skill</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">2</div>
+          <h3>אינדיקטור בשורת מצב</h3>
+          <p>כפתור קטן מהבהב בתחתית המסך עם שם ה-Skill הפעיל</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">3</div>
+          <h3>קטגוריית תור חדשה</h3>
+          <p>צבע מג'נטה ייחודי בציר הזמן ובגבולות ההודעות</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Visual Mockup -->
+    <div class="section magenta">
+      <h2><span class="icon">*</span> דוגמה ויזואלית</h2>
+      <p>כך ייראה השימוש ב-Skill בממשק:</p>
+
+      <div class="mockup">
+        <div style="display: flex;">
+          <!-- Timeline -->
+          <div class="timeline">
+            <div class="timeline-seg" style="height: 24px; background: #2196f3; opacity: 0.5;"></div>
+            <div class="timeline-seg" style="height: 18px; background: #9c27b0; opacity: 0.7;"></div>
+            <div class="timeline-seg" style="height: 30px; background: #e040fb; opacity: 0.9; box-shadow: 0 0 4px rgba(224,64,251,0.3);"></div>
+          </div>
+
+          <!-- Chat Content -->
+          <div style="flex: 1;">
+            <!-- Assistant message with magenta intensity border -->
+            <div class="border-magenta">
+              <div style="color: #8b949e; font-size: 11px; margin-bottom: 4px;">Assistant  14:32  claude-opus-4-6</div>
+              <div style="color: #c9d1d9; margin-bottom: 8px;">Let me use the frontend design skill for this task.</div>
+
+              <!-- Skill Tool Block -->
+              <div class="tool-block">
+                <div class="tool-header">
+                  <span class="diamond">&#9670;</span>
+                  <span class="tool-name">Skill: frontend-design</span>
+                  <span class="chip">frontend-design</span>
+                </div>
+                <div style="font-size: 11px; color: #484f58; padding: 2px 8px;">
+                  invoking...
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+          <span>00:02:14</span>
+          <span class="pill"><span class="dot"></span> frontend-design</span>
+          <span style="margin-right: auto;">$0.0234</span>
+          <span>opus-4-6</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature Details -->
+    <div class="section green">
+      <h2><span class="icon">i</span> פרטי התכנון</h2>
+
+      <ul class="feature-list">
+        <li>
+          <div class="dot-marker dot-magenta"></div>
+          <div class="text">
+            <strong>כרטיס Skill בצ'אט</strong> - כשקלוד מפעיל Skill, במקום בלוק כלי רגיל מופיע כרטיס עם רקע מדורג במג'נטה, שם ה-Skill מוצג כ-chip עגול, ואנימציית הופעה עדינה. הכרטיס ניתן לפתיחה לצפייה בפרמטרים המלאים.
+          </div>
+        </li>
+        <li>
+          <div class="dot-marker dot-blue"></div>
+          <div class="text">
+            <strong>אינדיקטור בשורת המצב</strong> - כפתור pill עגול בתחתית המסך עם נקודה זוהרת ושם ה-Skill. מופיע בזמן ההפעלה ונעלם כשהתור מסתיים. האנימציה עדינה ולא מסיחה.
+          </div>
+        </li>
+        <li>
+          <div class="dot-marker dot-green"></div>
+          <div class="text">
+            <strong>קטגוריית תור חדשה</strong> - צבע מג'נטה (#e040fb) מתווסף למערכת הקטגוריות הקיימת. מופיע בציר הזמן (Timeline) ובגבולות העוצמה (Intensity Borders) של הודעות.
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Color Categories -->
+    <div class="section cyan">
+      <h2><span class="icon">#</span> מפת צבעים - קטגוריות תור</h2>
+      <p>מערכת הצבעים הקיימת + התוספת החדשה:</p>
+      <div class="color-row">
+        <div class="color-chip">
+          <span class="swatch" style="background: #4caf50;"></span>
+          <span>הצלחה</span>
+        </div>
+        <div class="color-chip">
+          <span class="swatch" style="background: #f44336;"></span>
+          <span>שגיאה</span>
+        </div>
+        <div class="color-chip">
+          <span class="swatch" style="background: #2196f3;"></span>
+          <span>דיון</span>
+        </div>
+        <div class="color-chip">
+          <span class="swatch" style="background: #9c27b0;"></span>
+          <span>כתיבת קוד</span>
+        </div>
+        <div class="color-chip">
+          <span class="swatch" style="background: #ff9800;"></span>
+          <span>מחקר</span>
+        </div>
+        <div class="color-chip">
+          <span class="swatch" style="background: #00bcd4;"></span>
+          <span>פקודה</span>
+        </div>
+        <div class="color-chip highlight-new">
+          <span class="swatch" style="background: #e040fb;"></span>
+          <span style="color: #e040fb; font-weight: 600;">Skill</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scope -->
+    <div class="section orange">
+      <h2><span class="icon">~</span> היקף העבודה</h2>
+
+      <table class="info-table">
+        <tr>
+          <th>מדד</th>
+          <th>פרטים</th>
+        </tr>
+        <tr>
+          <td><strong>קבצים לשינוי</strong></td>
+          <td>11 קבצים (10 עדכון + 1 חדש הוא רק CSS)</td>
+        </tr>
+        <tr>
+          <td><strong>שורות קוד חדשות (הערכה)</strong></td>
+          <td>~120 TypeScript + ~60 CSS = ~180 שורות</td>
+        </tr>
+        <tr>
+          <td><strong>רכיבים חדשים</strong></td>
+          <td>אין - הכל הרחבה של רכיבים קיימים (בהתאם לדפוס הקיים)</td>
+        </tr>
+        <tr>
+          <td><strong>שבירת תאימות</strong></td>
+          <td>אין - תוספת בלבד, ללא שינוי בהתנהגות קיימת</td>
+        </tr>
+        <tr>
+          <td><strong>סיכון</strong></td>
+          <td>נמוך - פיצ'ר תצוגה בלבד, לא משנה לוגיקה עסקית</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- How it works -->
+    <div class="section blue">
+      <h2><span class="icon">></span> איך זה עובד - תהליך מקצה לקצה</h2>
+      <ul class="feature-list">
+        <li>
+          <div class="dot-marker dot-magenta"></div>
+          <div class="text">
+            <strong>1. זיהוי</strong> - כשקלוד מפעיל כלי עם השם "Skill", המערכת מזהה את זה מיידית בזרם הנתונים מה-CLI
+          </div>
+        </li>
+        <li>
+          <div class="dot-marker dot-magenta"></div>
+          <div class="text">
+            <strong>2. חילוץ שם</strong> - הפרמטרים של הכלי (JSON) זורמים בזמן אמת. ברגע שהשם זמין, הוא מוצג בממשק
+          </div>
+        </li>
+        <li>
+          <div class="dot-marker dot-magenta"></div>
+          <div class="text">
+            <strong>3. תצוגה</strong> - הכרטיס בצ'אט, הכפתור בשורת המצב, והצבע בציר הזמן מתעדכנים בו-זמנית
+          </div>
+        </li>
+        <li>
+          <div class="dot-marker dot-magenta"></div>
+          <div class="text">
+            <strong>4. סיום</strong> - כשהתור מסתיים, הכפתור בשורת המצב נעלם. הכרטיס והצבעים נשארים כחלק מהיסטוריית השיחה
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      ClaUi Extension &middot; Skill Indicator Plan &middot; March 2026
+    </div>
+
+  </div>
+</body>
+</html>
