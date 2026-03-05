@@ -7,8 +7,7 @@ export type HandoffStage =
   | 'collecting_context'
   | 'creating_target_tab'
   | 'starting_target_session'
-  | 'injecting_handoff_prompt'
-  | 'awaiting_first_reply'
+  | 'arming_first_user_prompt'
   | 'completed'
   | 'failed';
 
@@ -94,7 +93,6 @@ export interface HandoffSessionRequest {
   sourceTabId?: string;
   targetProvider: HandoffProvider;
   keepSourceOpen?: boolean;
-  autoSend?: boolean;
 }
 
 export function isHandoffProvider(provider: ProviderId): provider is HandoffProvider {

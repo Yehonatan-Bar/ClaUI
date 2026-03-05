@@ -398,12 +398,18 @@ export class SessionTab implements WebviewBridge {
     this.forkInitData = init;
   }
 
+  /** Stage one-time handoff context to inject on the first user message in this tab. */
+  setPendingHandoffPrompt(prompt: string): void {
+    this.messageHandler.setPendingHandoffPrompt(prompt);
+  }
+
   setCliPathOverride(path: string): void {
     this.cliPathOverride = path;
   }
 
   /** Start a new CLI session in this tab (Claude by default, Happy when overridden) */
   async startSession(options?: { resume?: string; fork?: boolean; cwd?: string }): Promise<void> {
+    this.messageHandler.clearPendingHandoffPrompt();
     if (options?.fork) {
       this.forkInProgress = true;
     }

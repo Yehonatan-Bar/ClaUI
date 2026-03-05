@@ -259,8 +259,7 @@ export const StatusBar: React.FC<{
     collecting_context: 'Collecting context',
     creating_target_tab: 'Creating target tab',
     starting_target_session: 'Starting target session',
-    injecting_handoff_prompt: 'Injecting handoff prompt',
-    awaiting_first_reply: 'Waiting for first reply',
+    arming_first_user_prompt: 'Preparing first-user context',
     completed: 'Handoff completed',
     failed: 'Handoff failed',
   };
@@ -312,7 +311,6 @@ export const StatusBar: React.FC<{
       type: 'switchProviderWithContext',
       targetProvider,
       keepSourceOpen: true,
-      autoSend: true,
     });
   };
 

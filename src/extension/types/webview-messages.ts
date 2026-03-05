@@ -11,8 +11,7 @@ export type HandoffStage =
   | 'collecting_context'
   | 'creating_target_tab'
   | 'starting_target_session'
-  | 'injecting_handoff_prompt'
-  | 'awaiting_first_reply'
+  | 'arming_first_user_prompt'
   | 'completed'
   | 'failed';
 export type CodexReasoningEffort = '' | 'low' | 'medium' | 'high' | 'xhigh';
@@ -114,7 +113,6 @@ export interface SwitchProviderWithContextRequest {
   type: 'switchProviderWithContext';
   targetProvider: 'claude' | 'codex';
   keepSourceOpen?: boolean;
-  autoSend?: boolean;
 }
 
 export interface SetCodexReasoningEffortRequest {

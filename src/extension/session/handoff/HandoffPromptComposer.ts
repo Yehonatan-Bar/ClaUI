@@ -24,7 +24,8 @@ export class HandoffPromptComposer {
     const files = capsule.touchedFiles.length > 0 ? capsule.touchedFiles.join(', ') : 'Not explicitly captured';
 
     return [
-      'You are continuing an in-progress task migrated from another coding agent.',
+      'Handoff context from a previous provider session.',
+      'Use this as prior conversation history/context for the next user message in this tab.',
       '',
       'Handoff goals:',
       `- Objective: ${objective}`,
@@ -37,9 +38,6 @@ export class HandoffPromptComposer {
       '```json',
       clamped.json,
       '```',
-      '',
-      'First response must confirm understanding and propose immediate next action.',
-      'If a fact is missing, ask before acting.',
     ].join('\n');
   }
 }

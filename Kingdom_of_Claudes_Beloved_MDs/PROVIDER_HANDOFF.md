@@ -11,8 +11,9 @@ Allow switching providers mid-session while preserving practical task continuity
 3. Source tab snapshot is collected and normalized.
 4. A `HandoffCapsule` is built and (optionally) persisted as JSON/Markdown artifact under managed logs.
 5. Target provider tab is opened with `forkInit` history copy for visual continuity.
-6. Target starts a clean session and receives an opening handoff prompt.
-7. System waits for the first target assistant reply, then marks handoff completed.
+6. Target starts a clean session and stages one-time handoff context in memory (no automatic send to the model).
+7. On the first user message in the target tab, the staged context is prepended to that user turn payload and consumed.
+8. Handoff is marked completed immediately after staging; UI continues as a normal chat flow.
 
 ## State Machine
 
@@ -20,8 +21,7 @@ Allow switching providers mid-session while preserving practical task continuity
 - `collecting_context`
 - `creating_target_tab`
 - `starting_target_session`
-- `injecting_handoff_prompt`
-- `awaiting_first_reply`
+- `arming_first_user_prompt`
 - `completed`
 - `failed`
 
@@ -36,7 +36,6 @@ Allow switching providers mid-session while preserving practical task continuity
 ## Settings
 
 - `claudeMirror.handoff.enabled`
-- `claudeMirror.handoff.autoSend`
 - `claudeMirror.handoff.storeArtifacts`
 
 ## Main Files

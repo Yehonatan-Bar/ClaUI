@@ -178,7 +178,7 @@ export function registerCommands(
     // Switch provider in-place with structured handoff capsule transfer
     vscode.commands.registerCommand(
       'claudeMirror.switchProviderWithContext',
-      async (args?: { sourceTabId?: string; targetProvider?: 'claude' | 'codex'; keepSourceOpen?: boolean; autoSend?: boolean }) => {
+      async (args?: { sourceTabId?: string; targetProvider?: 'claude' | 'codex'; keepSourceOpen?: boolean }) => {
         const sourceTab = args?.sourceTabId ? tabManager.getTabById(args.sourceTabId) : tabManager.getActiveTab();
         if (!sourceTab) {
           vscode.window.showWarningMessage('No active ClaUi tab for provider handoff.');
@@ -210,7 +210,6 @@ export function registerCommands(
         }
 
         const keepSourceOpen = args?.keepSourceOpen ?? true;
-        const autoSend = args?.autoSend ?? vscode.workspace.getConfiguration('claudeMirror').get<boolean>('handoff.autoSend', true);
 
         try {
           await vscode.workspace.getConfiguration('claudeMirror').update('provider', targetProvider, true);
@@ -218,7 +217,6 @@ export function registerCommands(
             sourceTabId: sourceTab.id,
             targetProvider,
             keepSourceOpen,
-            autoSend,
           });
           const artifactHint = result.artifactPath ? ` Artifact: ${result.artifactPath}` : '';
           vscode.window.showInformationMessage(

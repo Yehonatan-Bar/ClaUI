@@ -401,6 +401,19 @@ Verification note:
   - prevent false-idle UI while a process is still alive
   - reduce stuck loops where new sends are blocked by a zombie/lingering process
 
+## 2026-03-05 - Codex live reply missing fix (message-id reuse across turns)
+
+- Reproduced "stuck" reports where Codex actually completed the turn and wrote the reply to history/jsonl, but the live webview did not show a new assistant bubble.
+- Root cause:
+  - Codex `agent_message.id` values are not globally unique across a session (frequent repeats like `item_1` on later turns).
+  - webview state uses assistant `messageId` for upsert semantics, so reused IDs caused new replies to overwrite earlier assistant messages instead of appending.
+- Fix in `CodexMessageHandler`:
+  - stop using raw `agent_message.id` as the UI message ID
+  - always generate a fresh UI message ID via `nextMessageId()` per emitted assistant message
+  - keep raw Codex ID in logs (`rawId=...`) for diagnostics
+- Result:
+  - completed replies now consistently appear live in long Codex sessions instead of being silently overwritten in-place.
+
 ## 2026-03-05 - Codex mid-turn steer support (Stop + Steer parity)
 
 - Implemented approved mid-turn steering for Codex tabs instead of hard-failing with `A Codex turn is already running`.
@@ -445,8 +458,16 @@ Implemented cross-provider switching with structured context transfer (`Handoff 
   - `ClaUi: Switch Provider (Carry Context)`
 - New settings:
   - `claudeMirror.handoff.enabled`
-  - `claudeMirror.handoff.autoSend`
   - `claudeMirror.handoff.storeArtifacts`
+
+### 2026-03-05 - Handoff flow correction: no automatic model prompt on switch
+
+- Updated provider handoff to be UI-only during switch (no immediate LLM prompt injection).
+- New behavior:
+  - handoff capsule/prompt is staged as deferred context in target tab runtime
+  - first user `sendMessage` (or image send) in target tab carries that staged context
+  - staged context is consumed after the first successful user send
+- This prevents unintended autonomous execution right after provider switch and keeps the UX aligned with normal chat turns.
 
 ### Known Limitations
 

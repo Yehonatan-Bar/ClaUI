@@ -14,8 +14,7 @@ export interface HandoffTargetRuntime {
   sessionId: string | null;
   setForkInit(init: { promptText: string; messages: SerializedChatMessage[] }): void;
   startSession(options?: { cwd?: string }): Promise<void>;
-  sendText(text: string): void | Promise<void>;
-  waitForNextAssistantReply(timeoutMs: number): Promise<boolean>;
+  stageDeferredHandoffPrompt(prompt: string): void;
 }
 
 export class HandoffOrchestrator {
@@ -29,7 +28,6 @@ export class HandoffOrchestrator {
   async run(params: {
     source: HandoffSourceSnapshot;
     targetProvider: HandoffProvider;
-    autoSend: boolean;
     createTargetTab: (provider: HandoffProvider) => HandoffTargetRuntime;
     onProgress: (update: HandoffProgressUpdate) => void;
   }): Promise<HandoffRunResult> {
@@ -64,27 +62,26 @@ export class HandoffOrchestrator {
       });
       targetTab = params.createTargetTab(params.targetProvider);
       targetTab.setForkInit({
-        promptText: capsule.task.objective || '',
+        promptText: '',
         messages: params.source.messages,
       });
 
       emit({ stage: 'starting_target_session', detail: 'Starting fresh target session', artifactPath });
       await targetTab.startSession({ cwd: params.source.cwd });
 
-      emit({ stage: 'injecting_handoff_prompt', detail: 'Injecting handoff opening prompt', artifactPath });
-      if (params.autoSend) {
-        await Promise.resolve(targetTab.sendText(prompt));
-      }
+      emit({
+        stage: 'arming_first_user_prompt',
+        detail: 'Staging handoff context for the first user message',
+        artifactPath,
+      });
+      targetTab.stageDeferredHandoffPrompt(prompt);
 
-      if (params.autoSend) {
-        emit({ stage: 'awaiting_first_reply', detail: 'Waiting for first target reply', artifactPath });
-        const gotReply = await targetTab.waitForNextAssistantReply(120_000);
-        if (!gotReply) {
-          throw new Error('Timed out while waiting for first reply from target session');
-        }
-      }
-
-      emit({ stage: 'completed', detail: 'Handoff completed', artifactPath, manualPrompt: prompt });
+      emit({
+        stage: 'completed',
+        detail: 'Handoff completed (context will be sent with first user message)',
+        artifactPath,
+        manualPrompt: prompt,
+      });
       this.log(`[Handoff] completed source=${params.source.tabId} target=${targetTab.id} durationMs=${Date.now() - startedAt}`);
 
       return {

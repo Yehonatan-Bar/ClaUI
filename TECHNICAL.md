@@ -281,7 +281,7 @@ claude-code-mirror/
 **MessageHandler** - Bidirectional bridge translating webview postMessages into CLI commands and StreamDemux events into webview messages. Accepts a `WebviewBridge` interface (implemented by SessionTab). Uses optional bridge hooks (`getCliPathOverride`, `getProvider`) so webview-triggered start/restart flows keep the tab's runtime routing (including Happy CLI override) and report the correct provider in `sessionStarted`. Triggers auto-naming on first user message. Detects plan approval pauses (ExitPlanMode/AskUserQuestion) and forwards approval responses.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**CodexMessageHandler** - Codex-specific webview/runtime bridge for `codex exec --json` sessions. Maps `CodexExecDemux` events into existing webview message types (including synthesized `messageStart`/`streamingText`/`messageStop` around complete Codex `agent_message` items), handles Codex settings/history/image sends, and serializes live turn message emission order. Additional hardening exists in the Codex tab and webview layers: `CodexSessionTab` serializes actual `panel.webview.postMessage(...)` deliveries by awaiting the VS Code Thenable in a FIFO queue, adds a turn-complete exit watchdog (force-stop if process lingers after `turn.completed`), recovers idle-but-running stale turns before starting a new one, and now supports approved mid-turn steering by cancelling the active turn before dispatching the new one. `CodexMessageHandler` keeps `processBusy` aligned with runtime state on send failures via `session.isTurnRunning()` and enforces a Codex-specific steer gate (`Stop`/`Steer`) when a turn is still active. `useClaudeStream` also applies a Codex-only fallback that immediately upserts complete `assistantMessage` payloads so replies remain visible even if finalize/clear events arrive out of order.
+**CodexMessageHandler** - Codex-specific webview/runtime bridge for `codex exec --json` sessions. Maps `CodexExecDemux` events into existing webview message types (including synthesized `messageStart`/`streamingText`/`messageStop` around complete Codex `agent_message` items), handles Codex settings/history/image sends, and serializes live turn message emission order. Additional hardening exists in the Codex tab and webview layers: `CodexSessionTab` serializes actual `panel.webview.postMessage(...)` deliveries by awaiting the VS Code Thenable in a FIFO queue, adds a turn-complete exit watchdog (force-stop if process lingers after `turn.completed`), recovers idle-but-running stale turns before starting a new one, and now supports approved mid-turn steering by cancelling the active turn before dispatching the new one. `CodexMessageHandler` keeps `processBusy` aligned with runtime state on send failures via `session.isTurnRunning()` and enforces a Codex-specific steer gate (`Stop`/`Steer`) when a turn is still active. It also assigns a fresh UI message ID for each Codex assistant message (instead of reusing raw `agent_message.id`, which can repeat across turns like `item_1`) to prevent long-session reply overwrite in the webview store. `useClaudeStream` also applies a Codex-only fallback that immediately upserts complete `assistantMessage` payloads so replies remain visible even if finalize/clear events arrive out of order.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_INTEGRATION_PROGRESS.md`
 
 **SessionNamer** - Spawns a one-shot `claude -p` process using Haiku to generate a 1-3 word tab name from the user's first message. Matches the language of the message (Hebrew/English). 10-second timeout, sanitized output, all errors silently logged.
@@ -345,6 +345,9 @@ claude-code-mirror/
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Prompt History Panel** - Modal overlay with 3 tabs (Session / Project / Global) showing prompt history. Session tab uses in-memory `promptHistory` from the Zustand store. Project and Global tabs fetch from `PromptHistoryStore` via extension messaging. Includes text filter and click-to-insert into the input textarea. Opened via the "Prompts" button in the status bar (next to "History"). In collapsed mode, appears under the "More" dropdown.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**Error Banner Behavior** - Runtime errors from extension/webview messaging are stored in `store.lastError` and rendered by `App.tsx` as a top banner. Setup guidance errors (missing Claude/Codex CLI) stay persistent with action buttons. Generic command failures matching `Command failed (exit N)` auto-dismiss after 10 seconds, while still allowing manual dismiss.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **File Mention (@)** - Inline autocomplete triggered by typing `@` in the chat textarea. Searches workspace files via `vscode.workspace.findFiles()` with 150ms debounce, showing results in a popup above the input. Navigate with ArrowUp/Down, select with Enter/Tab/click. Replaces `@query` with the relative file path. Uses custom DOM events for extension-to-webview communication (same pattern as prompt history). All state is local to the `useFileMention` hook (not in Zustand).
@@ -741,13 +744,13 @@ npm install -g @vscode/vsce
   - Integrates `HandoffOrchestrator` and posts `handoffProgress` stage events to source webview.
   - Links source/target session metadata for audit/debug.
 - `src/extension/session/SessionTab.ts`
-  - Added handoff snapshot API (`collectHandoffSnapshot()`), busy getter (`isBusyState()`), and first-reply waiter (`waitForNextAssistantReply()`).
+  - Added handoff snapshot API (`collectHandoffSnapshot()`), busy getter (`isBusyState()`), and deferred-context staging API (`setPendingHandoffPrompt()`).
 - `src/extension/session/CodexSessionTab.ts`
-  - Added handoff snapshot API, provider getter (`getProvider()`), and first-reply waiter.
+  - Added handoff snapshot API, provider getter (`getProvider()`), and deferred-context staging API.
 - `src/extension/webview/MessageHandler.ts`
-  - Added `switchProviderWithContext` request handling (routes to command).
+  - Added `switchProviderWithContext` request handling and deferred handoff-context injection on first user turn.
 - `src/extension/webview/CodexMessageHandler.ts`
-  - Added `switchProviderWithContext` handling and clipboard support for handoff fallback.
+  - Added `switchProviderWithContext` handling, deferred handoff-context injection on first user turn, and clipboard support for handoff fallback.
 - `src/extension/commands.ts`
   - Added command: `claudeMirror.switchProviderWithContext` (explicit command-palette flow).
 - `src/extension/types/webview-messages.ts`
@@ -790,13 +793,12 @@ Added command in `package.json`:
 Added settings:
 
 - `claudeMirror.handoff.enabled` (default: `true`)
-- `claudeMirror.handoff.autoSend` (default: `true`)
 - `claudeMirror.handoff.storeArtifacts` (default: `true`)
 
 ### Runtime Notes
 
 - Cross-provider resume is still clean-session based (no shared hidden memory transfer).
-- Context transfer uses `HandoffCapsule` + opening prompt injection.
+- Context transfer uses `HandoffCapsule` + deferred first-user-turn injection (no automatic send on switch).
 - On failure, target tab remains open and manual capsule prompt is available for copy/send fallback.
 
 ### Detail Doc
