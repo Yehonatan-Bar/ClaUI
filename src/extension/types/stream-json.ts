@@ -13,13 +13,14 @@ export interface SystemInitEvent {
   model: string;
   cwd: string;
   mcp_servers: Record<string, unknown>[];
+  thinking_effort?: string;
 }
 
 export interface ContentBlockStart {
   type: 'content_block_start';
   index: number;
   content_block: {
-    type: 'text' | 'tool_use';
+    type: 'text' | 'tool_use' | 'thinking';
     id?: string;
     text?: string;
     name?: string;
@@ -31,9 +32,10 @@ export interface ContentBlockDelta {
   type: 'content_block_delta';
   index: number;
   delta: {
-    type: 'text_delta' | 'input_json_delta';
+    type: 'text_delta' | 'input_json_delta' | 'thinking_delta';
     text?: string;
     partial_json?: string;
+    thinking?: string;
   };
 }
 
@@ -86,7 +88,7 @@ export interface StreamEvent {
 }
 
 export interface ContentBlock {
-  type: 'text' | 'tool_use' | 'tool_result' | 'image';
+  type: 'text' | 'tool_use' | 'tool_result' | 'image' | 'thinking';
   text?: string;
   id?: string;
   name?: string;

@@ -32,6 +32,7 @@ export function categorizeTurn(toolNames: string[], isError: boolean): TurnCateg
   if (isError) return 'error';
   if (toolNames.length === 0) return 'discussion';
   const baseNames = toolNames.map((name) => (name.includes('__') ? name.split('__').pop() || name : name));
+  if (baseNames.some((name) => name === 'Skill')) return 'skill';
   if (baseNames.some((name) => CODE_WRITE_TOOLS.has(name))) return 'code-write';
   if (baseNames.some((name) => COMMAND_TOOLS.has(name))) return 'command';
   if (baseNames.some((name) => RESEARCH_TOOLS.has(name))) return 'research';

@@ -70,6 +70,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
     'code-write': ['#9c27b0', '#9c27b0b3', '#9c27b066'],
     research:     ['#ff9800', '#ff9800b3', '#ff980066'],
     command:      ['#00bcd4', '#00bcd4b3', '#00bcd466'],
+    skill:        ['#e040fb', '#e040fbb3', '#e040fb66'],
   };
 
   const vitalsBorderStyle = useMemo((): React.CSSProperties | undefined => {
@@ -87,11 +88,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
     const catLabels: Record<TurnCategory, string> = {
       success: 'Success', error: 'Error', discussion: 'Discussion',
       'code-write': 'Code-write', research: 'Research', command: 'Command',
+      skill: 'Skill',
     };
     const cat = catLabels[resolvedTurnData.category];
     const n = resolvedTurnData.toolCount;
     const w = n === 0 ? 'thin' : n <= 3 ? 'medium' : 'thick';
-    return `Intensity Border: ${cat} turn, ${n} tools (${w})\n\nColors:\nGreen = success\nRed = error\nBlue = discussion (no tools)\nPurple = code-write\nOrange = research\nCyan = command\n\nWidth: thin = 0 tools, medium = 1-3, thick = 4+`;
+    return `Intensity Border: ${cat} turn, ${n} tools (${w})\n\nColors:\nGreen = success\nRed = error\nBlue = discussion (no tools)\nPurple = code-write\nOrange = research\nCyan = command\nMagenta = skill\n\nWidth: thin = 0 tools, medium = 1-3, thick = 4+`;
   }, [vitalsBorderStyle, resolvedTurnData]);
 
   const handleTranslate = useCallback(() => {
@@ -182,6 +184,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
         {message.model && (
           <span style={{ marginLeft: 8, fontWeight: 400, opacity: 0.7 }}>
             {message.model}
+          </span>
+        )}
+        {!isUser && message.thinkingEffort && (
+          <span className={`thinking-effort-badge thinking-effort-${message.thinkingEffort}`}>
+            {message.thinkingEffort}
           </span>
         )}
         {textContent && (

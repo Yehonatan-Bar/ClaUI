@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { spawn, ChildProcess } from 'child_process';
 import type { TurnSemantics } from '../types/webview-messages';
 import { buildClaudeCliEnv } from '../process/envUtils';
+import { killProcessTree } from '../process/killTree';
 
 export interface TurnAnalysisInput {
   messageId: string;
@@ -178,7 +179,7 @@ export class TurnAnalyzer {
 
       const timer = setTimeout(() => {
         this.log(`[TurnAnalyzer] timeout (${this.timeoutMs}ms), killing process`);
-        child.kill('SIGTERM');
+        killProcessTree(child);
         finish(null);
       }, this.timeoutMs);
 

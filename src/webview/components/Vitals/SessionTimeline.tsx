@@ -8,6 +8,7 @@ const CATEGORY_COLORS: Record<TurnCategory, string> = {
   'code-write': '#9c27b0',
   research: '#ff9800',
   command: '#00bcd4',
+  skill: '#e040fb',
 };
 
 const CATEGORY_LABELS: Record<TurnCategory, string> = {
@@ -17,6 +18,7 @@ const CATEGORY_LABELS: Record<TurnCategory, string> = {
   'code-write': 'Code Write',
   research: 'Research',
   command: 'Command',
+  skill: 'Skill',
 };
 
 interface SessionTimelineProps {

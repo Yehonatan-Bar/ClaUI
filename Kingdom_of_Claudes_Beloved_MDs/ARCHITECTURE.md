@@ -107,10 +107,14 @@ Demultiplexes raw `CliOutputEvent` objects into typed, semantic events.
 | `stream_event` -> content_block_delta (json) | `toolUseDelta` | `{ messageId, blockIndex, partialJson }` |
 | `stream_event` -> content_block_stop | `blockStop` | `{ blockIndex }` |
 | `stream_event` -> message_delta | `messageDelta` | `{ stopReason }` |
+| `stream_event` -> content_block_start (thinking) | `thinkingDetected` | `{ effort }` |
+| `stream_event` -> content_block_delta (thinking_delta) | (silently consumed) | -- |
 | `stream_event` -> message_stop | `messageStop` | (none) |
 | `assistant` | `assistantMessage` | Full `AssistantMessage` |
 | `user` | `userMessage` | Full `UserMessage` |
 | `result` | `result` | `ResultSuccess` or `ResultError` |
+
+**Thinking effort detection:** When `content_block_start` has `type: 'thinking'`, the demux tracks the block index and emits `thinkingDetected` with the effort level (defaults to `'high'` when thinking is present). All `thinking_delta` events are silently consumed (not forwarded to the webview). The effort level is also checked from `SystemInitEvent.thinking_effort` if available. `getThinkingEffort()` exposes the current effort for the MessageHandler to include in `assistantMessage` and `messageStart` forwarding.
 
 ---
 
@@ -535,3 +539,70 @@ Controls whether Claude has full tool access or is restricted to read-only tools
 ### Deactivation
 1. `deactivate()` calls `tabManager.closeAllTabs()`
 2. Each tab disposes its process and panel
+
+---
+
+## 2026-03-05 - Cross-Provider Handoff Sequence (Claude <-> Codex)
+
+Added a provider-neutral handoff orchestration layer above existing runtimes.
+The runtime managers (`ClaudeProcessManager`, `CodexExecProcessManager`) remain unchanged.
+
+### Sequence
+
+```
+[Webview StatusBar]
+  switchProviderWithContext(targetProvider)
+          |
+          v
+[MessageHandler / CodexMessageHandler]
+  -> vscode command: claudeMirror.switchProviderWithContext
+          |
+          v
+[commands.ts]
+  -> TabManager.handoffSession(...)
+          |
+          v
+[TabManager + HandoffOrchestrator]
+  1) collecting_context
+     - sourceTab.collectHandoffSnapshot()
+     - HandoffContextBuilder.buildCapsule(...)
+     - HandoffArtifactStore.save(JSON+MD)
+
+  2) creating_target_tab
+     - create target provider tab
+     - setForkInit(history copy for visual continuity)
+
+  3) starting_target_session
+     - start clean target session (no cross-provider resume)
+
+  4) injecting_handoff_prompt
+     - HandoffPromptComposer.compose(...)
+     - sendText(prompt) to target (if autoSend)
+
+  5) awaiting_first_reply
+     - waitForNextAssistantReply(timeout)
+
+  6) completed|failed
+     - post `handoffProgress` to source webview
+     - persist source<->target metadata links in SessionStore
+     - expose fallback manual prompt on failure
+```
+
+### State Machine
+
+- `idle`
+- `collecting_context`
+- `creating_target_tab`
+- `starting_target_session`
+- `injecting_handoff_prompt`
+- `awaiting_first_reply`
+- `completed`
+- `failed`
+
+### Guardrails
+
+- Busy-source block: handoff is denied while source tab is processing.
+- Per-tab lock: prevents double-click/concurrent handoff runs.
+- Cooldown: short anti ping-pong window between switches.
+- Artifact redaction: API keys/tokens/private keys are scrubbed before persistence.
+- Managed storage only: artifacts are written under ClaUi managed log path (or memory-only when disabled by setting).

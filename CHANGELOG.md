@@ -1,5 +1,28 @@
 # ClaUi - Changelog
 
+## v0.1.84 - 2026-03-05
+
+**Feature: Mid-session provider handoff with context (Claude <-> Codex)**
+
+- Added explicit provider handoff flow that preserves task continuity using a structured `Handoff Capsule` (instead of unsupported cross-provider hidden-memory resume)
+- Added a full handoff pipeline in the extension (`HandoffTypes`, `HandoffContextBuilder`, `HandoffPromptComposer`, `HandoffArtifactStore`, `HandoffOrchestrator`) and integrated it into `TabManager`
+- Added stage-based handoff state machine and progress updates to the webview: `collecting_context` -> `creating_target_tab` -> `starting_target_session` -> `injecting_handoff_prompt` -> `awaiting_first_reply` -> `completed|failed`
+- Added source/target metadata linking in `SessionStore` for audit/debug (`handoffSource*`, `handoffTarget*`, `handoffArtifactPath`, `handoffCompletedAt`)
+- Added command palette action: `ClaUi: Switch Provider (Carry Context)`
+- Added webview status bar UX split:
+  - `Switch (Carry Context)` for migration
+  - Existing provider buttons remain clean-session open flow
+- Added input lock during active handoff stages and a manual fallback (`Send capsule manually`) when handoff fails
+- Added new settings:
+  - `claudeMirror.handoff.enabled`
+  - `claudeMirror.handoff.autoSend`
+  - `claudeMirror.handoff.storeArtifacts`
+
+**Fixes included in v0.1.84 (Plan Approval reliability)**
+
+- Fixed plan approval click no-op cases where options disappeared and implementation did not continue (Bug 14)
+- Hardened ExitPlanMode approve fallback for compact/busy edge cases with retry/final-nudge behavior (Bug 15)
+
 ## v0.1.82 - 2026-03-04
 
 **Feature: Ultrathink button with random animations**

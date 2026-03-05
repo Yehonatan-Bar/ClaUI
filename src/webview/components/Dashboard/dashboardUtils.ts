@@ -23,6 +23,7 @@ export const CATEGORY_COLORS: Record<TurnCategory, string> = {
   research: DASH_COLORS.amber,
   command: DASH_COLORS.teal,
   error: DASH_COLORS.red,
+  skill: '#e040fb',
 };
 
 export const MOOD_COLORS: Record<string, string> = {

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { spawn, type ChildProcess } from 'child_process';
 import type { SessionSnapshot } from './AchievementEngine';
 import { buildClaudeCliEnv, getStoredApiKey } from '../process/envUtils';
+import { killProcessTree } from '../process/killTree';
 
 export interface InsightResult {
   sessionQuality: 'exceptional' | 'productive' | 'steady' | 'exploratory' | 'struggling';
@@ -150,7 +151,7 @@ export class AchievementInsightAnalyzer {
 
       const timer = setTimeout(() => {
         this.log(`[InsightAnalyzer] timeout (${TIMEOUT_MS}ms), killing process`);
-        child.kill('SIGTERM');
+        killProcessTree(child);
         finish(null);
       }, TIMEOUT_MS);
 

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import { spawn, exec } from 'child_process';
+import { spawn } from 'child_process';
 import { buildClaudeCliEnv } from '../process/envUtils';
+import { killProcessTree } from '../process/killTree';
 
 const TRANSLATOR_SYSTEM_PROMPT = `You are a translation-only tool. Your SOLE function is to rewrite non-English text into English.
 
@@ -83,20 +84,10 @@ export class PromptTranslator {
         return;
       }
 
-      // Kill the entire process tree (Windows shell:true workaround)
-      const killTree = () => {
-        if (!child.pid) return;
-        if (process.platform === 'win32') {
-          exec(`taskkill /F /T /PID ${child.pid}`, () => {});
-        } else {
-          child.kill('SIGTERM');
-        }
-      };
-
       // 60-second timeout
       const timer = setTimeout(() => {
         this.log(`[PromptTranslator] timeout (60s), killing process. stdout=${stdout.length} chars, stderr=${stderrBuf.length} chars`);
-        killTree();
+        killProcessTree(child);
         finish(null);
       }, 60_000);
 

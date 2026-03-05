@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import { spawn, exec } from 'child_process';
+import { spawn } from 'child_process';
 import { buildClaudeCliEnv } from '../process/envUtils';
+import { killProcessTree } from '../process/killTree';
 
 export interface ClaudeCliCallOptions {
   prompt: string;
@@ -74,19 +75,9 @@ export class ClaudeCliCaller {
         return;
       }
 
-      // Kill the entire process tree (Windows shell:true workaround)
-      const killTree = () => {
-        if (!child.pid) return;
-        if (process.platform === 'win32') {
-          exec(`taskkill /F /T /PID ${child.pid}`, () => {});
-        } else {
-          child.kill('SIGTERM');
-        }
-      };
-
       const timer = setTimeout(() => {
         this.log(`[ClaudeCliCaller] timeout (${timeoutMs}ms), killing process`);
-        killTree();
+        killProcessTree(child);
         finish(null, `Claude CLI timed out after ${Math.round(timeoutMs / 1000)}s`);
       }, timeoutMs);
 

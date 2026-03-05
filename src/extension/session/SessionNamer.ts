@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import { buildClaudeCliEnv } from '../process/envUtils';
+import { killProcessTree } from '../process/killTree';
 
 /**
  * Spawns a lightweight one-shot Claude CLI process to generate
@@ -79,7 +80,7 @@ export class SessionNamer {
         if (fallback) {
           this.log(`SessionNamer: timeout but using accumulated stdout: "${fallback}"`);
         }
-        child.kill('SIGTERM');
+        killProcessTree(child);
         finish(fallback);
       }, 25_000);
 

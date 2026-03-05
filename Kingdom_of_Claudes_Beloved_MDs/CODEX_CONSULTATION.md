@@ -54,13 +54,33 @@ INSTRUCTIONS:
    - Background context about the system/codebase you are working on
    - The specific problem or question described below
    - Any relevant code context from our recent conversation
-2. Call the mcp__codex__codex tool with this enriched prompt
+2. Call the mcp__codex__codex tool with this enriched prompt.
+   CRITICAL: You MUST pass these parameters to prevent the Codex session from hanging:
+   - "approval-policy": "never"  (there is no interactive user to approve shell commands)
+   - "sandbox": "workspace-write"  (allow read/write access for code analysis)
 3. Present the Codex response clearly to the user
 4. Then analyze the response and continue with implementation based on the advice
 
 USER'S QUESTION:
 {question}
 ```
+
+## Timeout Protection
+
+Consultations have a **120-second timeout** to prevent indefinite hangs. If the Codex MCP session does not return a result within 2 minutes, the extension automatically:
+
+1. Cancels the in-flight request via `control.cancel()`
+2. Clears the `processBusy` state
+3. Shows an error message to the user explaining the timeout
+
+The timeout is cleared when:
+- A result is received from the CLI (normal completion)
+- The user sends a new message (overrides the consultation)
+- The user manually cancels the request
+
+### Why This Is Needed
+
+The Codex MCP server (`@openai/codex`) runs GPT models that can dispatch `shell_command` function calls. When running as an MCP server (non-interactive), there is no user to approve these commands. With `approval_policy: "on-request"`, commands hang forever waiting for approval that never comes. The prompt now instructs Claude to pass `approval-policy: "never"` to prevent this deadlock.
 
 ## UI Behavior
 

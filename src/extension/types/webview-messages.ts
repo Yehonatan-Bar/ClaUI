@@ -6,6 +6,15 @@ import type { ContentBlock } from './stream-json';
 
 export type TypingTheme = 'terminal-hacker' | 'retro' | 'zen' | 'neo-zen';
 export type ProviderId = 'claude' | 'codex' | 'remote';
+export type HandoffStage =
+  | 'idle'
+  | 'collecting_context'
+  | 'creating_target_tab'
+  | 'starting_target_session'
+  | 'injecting_handoff_prompt'
+  | 'awaiting_first_reply'
+  | 'completed'
+  | 'failed';
 export type CodexReasoningEffort = '' | 'low' | 'medium' | 'high' | 'xhigh';
 export interface CodexModelOption {
   label: string;
@@ -33,12 +42,16 @@ export interface ProviderCapabilities {
 export interface SendTextMessage {
   type: 'sendMessage';
   text: string;
+  /** Codex only: user approved interrupting a running turn to steer the next prompt. */
+  steer?: boolean;
 }
 
 export interface SendMessageWithImages {
   type: 'sendMessageWithImages';
   text: string;
   images: WebviewImageData[];
+  /** Codex only: user approved interrupting a running turn to steer the next prompt. */
+  steer?: boolean;
 }
 
 export interface CancelRequest {
@@ -95,6 +108,13 @@ export interface SetProviderRequest {
 export interface OpenProviderTabRequest {
   type: 'openProviderTab';
   provider: ProviderId;
+}
+
+export interface SwitchProviderWithContextRequest {
+  type: 'switchProviderWithContext';
+  targetProvider: 'claude' | 'codex';
+  keepSourceOpen?: boolean;
+  autoSend?: boolean;
 }
 
 export interface SetCodexReasoningEffortRequest {
@@ -515,6 +535,7 @@ export type WebviewToExtensionMessage =
   | SetModelRequest
   | SetProviderRequest
   | OpenProviderTabRequest
+  | SwitchProviderWithContextRequest
   | SetCodexReasoningEffortRequest
   | SetTypingThemeRequest
   | ShowHistoryRequest
@@ -627,6 +648,7 @@ export interface AssistantCompleteMessage {
   messageId: string;
   content: ContentBlock[];
   model: string;
+  thinkingEffort?: string;
 }
 
 export interface UserMessageDisplay {
@@ -679,10 +701,16 @@ export interface MessageStartMessage {
   messageId: string;
   model: string;
   inputTokens?: number;  // Total context tokens (input + cache_creation + cache_read) for real-time widget update
+  thinkingEffort?: string;
 }
 
 export interface MessageStopMessage {
   type: 'messageStop';
+}
+
+export interface ThinkingEffortUpdateMessage {
+  type: 'thinkingEffortUpdate';
+  effort: string;
 }
 
 export interface FilePathsPickedMessage {
@@ -714,6 +742,17 @@ export interface ProviderSettingMessage {
 export interface ProviderCapabilitiesMessage {
   type: 'providerCapabilities';
   capabilities: ProviderCapabilities;
+}
+
+export interface HandoffProgressMessage {
+  type: 'handoffProgress';
+  stage: HandoffStage;
+  sourceProvider: 'claude' | 'codex';
+  targetProvider: 'claude' | 'codex';
+  detail?: string;
+  artifactPath?: string;
+  manualPrompt?: string;
+  error?: string;
 }
 
 export interface CodexReasoningEffortSettingMessage {
@@ -876,7 +915,8 @@ export type TurnCategory =
   | 'discussion'    // Blue - text-only, no tool usage
   | 'code-write'    // Purple - Write, Edit, NotebookEdit tools
   | 'research'      // Orange - Read, Grep, Glob, WebSearch, WebFetch
-  | 'command';      // Cyan - Bash tool usage
+  | 'command'       // Cyan - Bash tool usage
+  | 'skill';        // Magenta - Skill tool invocation
 
 /** Semantic analysis signals for a turn, populated asynchronously by TurnAnalyzer */
 export interface TurnSemantics {
@@ -1355,6 +1395,7 @@ export interface SerializedChatMessage {
   content: ContentBlock[];
   model?: string;
   timestamp: number;
+  thinkingEffort?: string;
 }
 
 export type ExtensionToWebviewMessage =
@@ -1371,12 +1412,14 @@ export type ExtensionToWebviewMessage =
   | ProcessBusyMessage
   | MessageStartMessage
   | MessageStopMessage
+  | ThinkingEffortUpdateMessage
   | FilePathsPickedMessage
   | TextSettingsMessage
   | TypingThemeSettingMessage
   | ModelSettingMessage
   | ProviderSettingMessage
   | ProviderCapabilitiesMessage
+  | HandoffProgressMessage
   | CodexReasoningEffortSettingMessage
   | CodexModelOptionsMessage
   | PlanApprovalRequiredMessage

@@ -17,6 +17,7 @@ Vertical 24px strip rendered alongside the message list (right side). Each turn 
   - `code-write` = purple (#9c27b0) / "Code Write"
   - `research` = orange (#ff9800) / "Research"
   - `command` = cyan (#00bcd4) / "Command"
+  - `skill` = magenta (#e040fb) / "Skill"
 - **Opacity**: Scales with turn cost relative to session max (`0.35 + 0.65 * costRatio`)
 - **Position marker**: White triangle tracks current scroll position
 - **Click-to-jump**: Clicking a segment scrolls the corresponding message into view
@@ -56,6 +57,7 @@ Colored left border on each assistant message bubble, reflecting the turn's cate
 - **File**: Logic in `src/webview/components/ChatView/MessageBubble.tsx`
 - **Width**: 2px (no tools) / 3px (1-3 tools) / 4px (4+ tools)
 - **Color**: Category color with opacity based on tool count (40% / 70% / 100%)
+- **Tooltip**: Hover text explains the category, tool count, width, and lists all 7 category colors including magenta for skill
 
 ### VitalsContainer
 Wrapper that conditionally renders WeatherWidget + AdventureWidget + CostHeatBar when vitals are enabled.
@@ -114,9 +116,10 @@ React components (SessionTimeline, WeatherWidget, CostHeatBar, MessageBubble)
 
 ### Turn Categorization
 Helper function `categorizeTurn()` in `MessageHandler.ts`:
-- Priority: error > discussion (no tools) > code-write > command > research > success
+- Priority: error > discussion (no tools) > skill > code-write > command > research > success
 - MCP tool name prefixes (e.g., `mcp__codex__codex`) are stripped to get the base tool name
 - Tool classification:
+  - Skill: Skill (the Claude Skill tool)
   - Code-write: Write, Edit, NotebookEdit, MultiEdit
   - Research: Read, Grep, Glob, WebSearch, WebFetch
   - Command: Bash, Terminal
@@ -124,7 +127,7 @@ Helper function `categorizeTurn()` in `MessageHandler.ts`:
 ### TurnRecord Type
 Defined in `src/extension/types/webview-messages.ts`:
 ```typescript
-export type TurnCategory = 'success' | 'error' | 'discussion' | 'code-write' | 'research' | 'command';
+export type TurnCategory = 'success' | 'error' | 'discussion' | 'code-write' | 'research' | 'command' | 'skill';
 
 export interface TurnRecord {
   turnIndex: number;

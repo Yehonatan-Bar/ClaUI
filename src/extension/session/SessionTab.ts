@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import { ClaudeProcessManager } from '../process/ClaudeProcessManager';
 import { StreamDemux } from '../process/StreamDemux';
 import { ControlProtocol } from '../process/ControlProtocol';
@@ -35,6 +36,7 @@ import type {
   SessionSummary,
   TurnRecord,
 } from '../types/webview-messages';
+import type { HandoffProvider, HandoffSourceSnapshot } from './handoff/HandoffTypes';
 
 export interface SessionTabCallbacks {
   onClosed: (tabId: string) => void;
@@ -99,6 +101,8 @@ export class SessionTab implements WebviewBridge {
   private teamHadWorkingAgent = false;
   /** Per-tab CLI override (used by Happy provider to spawn `happy` instead of `claude`) */
   private cliPathOverride: string | null = null;
+  /** Waiters that resolve when the next assistant reply arrives (handoff orchestration). */
+  private assistantReplyWaiters: Array<(ok: boolean) => void> = [];
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -279,6 +283,9 @@ export class SessionTab implements WebviewBridge {
     if (outbound.type === 'processBusy') {
       this.setBusy(outbound.busy);
     }
+    if (outbound.type === 'assistantMessage') {
+      this.resolveAssistantReplyWaiters(true);
+    }
     if (!this.isWebviewReady) {
       this.pendingMessages.push(outbound);
       return;
@@ -305,6 +312,51 @@ export class SessionTab implements WebviewBridge {
 
   getCliPathOverride(): string | null {
     return this.cliPathOverride;
+  }
+
+  isBusyState(): boolean {
+    return this.isBusy;
+  }
+
+  async collectHandoffSnapshot(): Promise<HandoffSourceSnapshot> {
+    const provider = this.getProvider();
+    if (provider !== 'claude' && provider !== 'codex') {
+      throw new Error(`Provider "${provider}" does not support context handoff.`);
+    }
+
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const sessionId = this.processManager.currentSessionId || undefined;
+    const reader = new ConversationReader((msg) => this.log(`[Tab ${this.tabNumber}] ${msg}`));
+    const messages = sessionId ? reader.readSession(sessionId, workspacePath) : [];
+    const repoRoot = this.detectGitRepoRoot(workspacePath);
+    const branch = this.detectGitBranch(repoRoot || workspacePath);
+
+    return {
+      provider: provider as HandoffProvider,
+      tabId: this.id,
+      sessionId,
+      cwd: workspacePath,
+      repoRoot,
+      branch,
+      model: this.currentModel || undefined,
+      messages,
+      createdAtIso: new Date().toISOString(),
+    };
+  }
+
+  waitForNextAssistantReply(timeoutMs = 120_000): Promise<boolean> {
+    if (this.disposed) {
+      return Promise.resolve(false);
+    }
+    return new Promise<boolean>((resolve) => {
+      const waiter = (ok: boolean) => {
+        clearTimeout(timer);
+        this.assistantReplyWaiters = this.assistantReplyWaiters.filter((w) => w !== waiter);
+        resolve(ok);
+      };
+      const timer = setTimeout(() => waiter(false), timeoutMs);
+      this.assistantReplyWaiters.push(waiter);
+    });
   }
 
   saveProjectAnalyticsNow(): void {
@@ -486,6 +538,7 @@ export class SessionTab implements WebviewBridge {
     }
     this.disposed = true;
     this.stopThinkingAnimation();
+    this.resolveAssistantReplyWaiters(false);
     // Clean up team watcher
     if (this.teamWatcher) {
       this.teamWatcher.dispose();
@@ -499,6 +552,53 @@ export class SessionTab implements WebviewBridge {
     this.processManager.stop();
     this.fileLogger?.dispose();
     this.panel.dispose();
+  }
+
+  private resolveAssistantReplyWaiters(ok: boolean): void {
+    if (this.assistantReplyWaiters.length === 0) {
+      return;
+    }
+    const waiters = [...this.assistantReplyWaiters];
+    this.assistantReplyWaiters = [];
+    for (const waiter of waiters) {
+      try {
+        waiter(ok);
+      } catch {
+        // no-op
+      }
+    }
+  }
+
+  private detectGitBranch(cwd?: string): string | undefined {
+    if (!cwd) {
+      return undefined;
+    }
+    try {
+      const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+        cwd,
+        stdio: ['ignore', 'pipe', 'ignore'],
+        encoding: 'utf8',
+      }).trim();
+      return branch || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private detectGitRepoRoot(cwd?: string): string | undefined {
+    if (!cwd) {
+      return undefined;
+    }
+    try {
+      const repoRoot = execSync('git rev-parse --show-toplevel', {
+        cwd,
+        stdio: ['ignore', 'pipe', 'ignore'],
+        encoding: 'utf8',
+      }).trim();
+      return repoRoot || undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   /** Persist session metadata to the session store, preserving existing fields */
@@ -649,6 +749,7 @@ export class SessionTab implements WebviewBridge {
       this.disposed = true;
       try {
         this.stopThinkingAnimation();
+        this.resolveAssistantReplyWaiters(false);
         // Save analytics BEFORE stopping the process to ensure data is persisted
         this.saveProjectAnalytics();
         this.achievementService.onSessionEnd(this.id);

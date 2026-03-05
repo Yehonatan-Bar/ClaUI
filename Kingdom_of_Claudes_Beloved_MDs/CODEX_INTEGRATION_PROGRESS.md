@@ -400,3 +400,56 @@ Verification note:
 - Goal of these changes:
   - prevent false-idle UI while a process is still alive
   - reduce stuck loops where new sends are blocked by a zombie/lingering process
+
+## 2026-03-05 - Codex mid-turn steer support (Stop + Steer parity)
+
+- Implemented approved mid-turn steering for Codex tabs instead of hard-failing with `A Codex turn is already running`.
+- Webview/Input changes (`InputArea.tsx`):
+  - when provider is Codex and a turn is active, button labels now match Codex UX intent: `Stop` + `Steer`
+  - pressing `Steer` is now a two-step flow (`Steer` -> `Confirm Steer`) before dispatch
+  - steer sends now carry `steer: true` on `sendMessage` / `sendMessageWithImages`
+  - auto-enhance / prompt-translate interception is skipped while Codex is busy so steer action is immediate
+- Message contract update (`webview-messages.ts`):
+  - added optional `steer?: boolean` on `SendTextMessage` and `SendMessageWithImages`
+- Runtime/session changes:
+  - `CodexMessageHandler` now enforces steer gating when a Codex turn is active+busy (non-steer sends are rejected with a steer/stop hint)
+  - `CodexSessionTab.sendTurn(...)` now accepts steer mode and performs: cancel current turn -> wait for stop (timeout guarded) -> dispatch new turn
+  - this preserves the existing stale-idle recovery path while adding explicit behavior for true in-flight turns
+- Result:
+  - users can send guidance mid-turn in Codex tabs with explicit approval, matching expected `Stop`/`Steer` workflow.
+
+## 2026-03-05 - Claude <-> Codex Mid-Session Handoff Implemented
+
+Implemented cross-provider switching with structured context transfer (`Handoff Capsule`) instead of unsupported cross-provider hidden-memory resume.
+
+### Delivered
+
+- New extension handoff module:
+  - `HandoffTypes`, `HandoffContextBuilder`, `HandoffPromptComposer`, `HandoffArtifactStore`, `HandoffOrchestrator`.
+- `TabManager.handoffSession(...)`:
+  - source busy guard
+  - per-tab lock + cooldown
+  - stage progress logging and UI updates
+  - source/target metadata linking in `SessionStore`
+- `SessionTab` + `CodexSessionTab` additions:
+  - `collectHandoffSnapshot()`
+  - `waitForNextAssistantReply()`
+  - handoff-aware provider/busy accessors
+- Webview protocol and UX:
+  - new request: `switchProviderWithContext`
+  - new event: `handoffProgress`
+  - status bar action split: `Switch (Carry Context)` vs clean provider-open path
+  - input lock during active handoff stages
+  - failed-handoff fallback: copy capsule prompt for manual send
+- Explicit command palette flow:
+  - `ClaUi: Switch Provider (Carry Context)`
+- New settings:
+  - `claudeMirror.handoff.enabled`
+  - `claudeMirror.handoff.autoSend`
+  - `claudeMirror.handoff.storeArtifacts`
+
+### Known Limitations
+
+- Cross-provider transfer remains prompt/capsule based; no shared internal model memory is possible.
+- Metadata linking depends on available persisted session IDs; very early failures may produce partial linkage.
+- Capsule quality depends on recoverable text/history; very long sessions are deterministically truncated and marked `truncated=true`.

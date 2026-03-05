@@ -28,14 +28,19 @@ export interface CodexSessionController {
   startSession(options?: { resume?: string; cwd?: string }): Promise<void>;
   stopSession(): void;
   clearSession(options?: { cwd?: string }): Promise<void>;
-  sendText(text: string): Promise<void>;
-  sendWithImages(text: string, images: Array<{ base64: string; mediaType: string }>): Promise<void>;
+  sendText(text: string, options?: { steer?: boolean }): Promise<void>;
+  sendWithImages(
+    text: string,
+    images: Array<{ base64: string; mediaType: string }>,
+    options?: { steer?: boolean }
+  ): Promise<void>;
   cancelRequest(): void;
   openCodexLoginTerminal(): void;
   isSessionActive(): boolean;
   getSessionId(): string | null;
   getCurrentModel(): string;
   isTurnRunning(): boolean;
+  isBusyState(): boolean;
 }
 
 function codexTurnCategory(hasCommands: boolean): TurnCategory {
@@ -249,11 +254,18 @@ export class CodexMessageHandler {
 
         case 'sendMessage':
           this.log(`Codex sendMessage requested: len=${msg.text.length} preview="${msg.text.slice(0, 80).replace(/\s+/g, ' ')}"`);
+          if (this.session.isTurnRunning() && this.session.isBusyState() && !msg.steer) {
+            this.postToWebview({
+              type: 'error',
+              message: 'Codex is already running a turn. Click Steer to interrupt it, or Stop to cancel it.',
+            });
+            break;
+          }
           this.achievementService.onUserPrompt(this.tabId, msg.text);
           void this.promptHistoryStore.addPrompt(msg.text);
           this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock]);
           this.postToWebview({ type: 'processBusy', busy: true });
-          void this.session.sendText(msg.text).catch((err) => {
+          void this.session.sendText(msg.text, { steer: !!msg.steer }).catch((err) => {
             const message = this.errMsg(err);
             this.log(`Codex sendText failed: ${message}`);
             this.postToWebview({ type: 'processBusy', busy: this.session.isTurnRunning() });
@@ -263,6 +275,13 @@ export class CodexMessageHandler {
 
         case 'sendMessageWithImages': {
           this.log(`Codex sendMessageWithImages requested: images=${msg.images.length} textLen=${msg.text.length}`);
+          if (this.session.isTurnRunning() && this.session.isBusyState() && !msg.steer) {
+            this.postToWebview({
+              type: 'error',
+              message: 'Codex is already running a turn. Click Steer to interrupt it, or Stop to cancel it.',
+            });
+            break;
+          }
           if (msg.text.trim()) {
             this.achievementService.onUserPrompt(this.tabId, msg.text);
             void this.promptHistoryStore.addPrompt(msg.text);
@@ -283,7 +302,7 @@ export class CodexMessageHandler {
           }
           this.postUserMessage(content);
           this.postToWebview({ type: 'processBusy', busy: true });
-          void this.session.sendWithImages(msg.text, msg.images).catch((err) => {
+          void this.session.sendWithImages(msg.text, msg.images, { steer: !!msg.steer }).catch((err) => {
             const message = this.errMsg(err);
             this.log(`Codex sendWithImages failed: ${message}`);
             this.postToWebview({ type: 'processBusy', busy: this.session.isTurnRunning() });
@@ -332,6 +351,23 @@ export class CodexMessageHandler {
               this.log(`Failed to save provider setting before opening tab "${msg.provider}" (Codex handler): ${message}`);
               this.webview.postMessage({ type: 'error', message: `Failed to open ${msg.provider} tab: ${message}` });
             });
+          break;
+
+        case 'switchProviderWithContext':
+          this.log(`Switch provider with context requested: "${msg.targetProvider}" (Codex handler)`);
+          void vscode.commands.executeCommand('claudeMirror.switchProviderWithContext', {
+            sourceTabId: this.tabId,
+            targetProvider: msg.targetProvider,
+            keepSourceOpen: msg.keepSourceOpen ?? true,
+            autoSend: msg.autoSend ?? true,
+          }).then(
+            () => undefined,
+            (err: unknown) => {
+              const message = this.errMsg(err);
+              this.log(`Failed switchProviderWithContext (Codex handler): ${message}`);
+              this.webview.postMessage({ type: 'error', message: `Provider handoff failed: ${message}` });
+            },
+          );
           break;
 
         case 'setModel':
@@ -387,6 +423,15 @@ export class CodexMessageHandler {
 
         case 'openUrl':
           this.handleOpenUrl(msg.url);
+          break;
+
+        case 'copyToClipboard':
+          void vscode.env.clipboard.writeText(msg.text).then(() => {
+            this.log(`Copied text to clipboard (Codex handler): ${msg.text.length} chars`);
+          }, (err: unknown) => {
+            this.log(`Failed to copy text to clipboard (Codex handler): ${this.errMsg(err)}`);
+            this.webview.postMessage({ type: 'error', message: 'Failed to copy text to clipboard.' });
+          });
           break;
 
         case 'openSettings':

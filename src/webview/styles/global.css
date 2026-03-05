@@ -6251,3 +6251,176 @@ html, body, #root {
   color: var(--vscode-descriptionForeground, #888);
   margin-bottom: 2px;
 }
+
+/* --- Thinking Effort Badge --- */
+
+.thinking-effort-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+  /* Neutral default for unknown effort values */
+  background: color-mix(in srgb, var(--vscode-editor-foreground) 15%, transparent);
+  color: var(--vscode-editor-foreground);
+}
+
+.thinking-effort-low {
+  background: color-mix(in srgb, #4caf50 20%, transparent);
+  color: #4caf50;
+}
+
+.thinking-effort-medium {
+  background: color-mix(in srgb, #ffc107 20%, transparent);
+  color: #ffc107;
+}
+
+.thinking-effort-high {
+  background: color-mix(in srgb, #ff9800 20%, transparent);
+  color: #ff9800;
+}
+
+/* Pulsing animation for live streaming badges */
+.thinking-effort-live {
+  animation: thinking-effort-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes thinking-effort-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ========================================================
+   Skill Tool Visual Indicator
+   ======================================================== */
+
+/* Layer 1: SkillBadge in message stream */
+.tool-use-block.skill-tool {
+  border-left: 3px solid #e040fb;
+  background: linear-gradient(90deg, rgba(224, 64, 251, 0.08) 0%, transparent 60%);
+}
+
+.tool-use-block.skill-tool .tool-use-header {
+  color: #e9e9e9;
+}
+
+.skill-name-chip {
+  display: inline-block;
+  background: rgba(224, 64, 251, 0.18);
+  color: #e040fb;
+  border: 1px solid rgba(224, 64, 251, 0.35);
+  border-radius: 10px;
+  padding: 1px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 8px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  letter-spacing: 0.3px;
+}
+
+/* Layer 2: Skill pills row (above input toolbar) */
+.skill-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 8px 2px;
+  align-items: center;
+}
+
+.skill-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(224, 64, 251, 0.10);
+  border: 1px solid rgba(224, 64, 251, 0.35);
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #e040fb;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: skill-pill-pulse 2s ease-in-out infinite;
+  cursor: default;
+}
+
+.skill-pill-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e040fb;
+  box-shadow: 0 0 6px 2px rgba(224, 64, 251, 0.6);
+  animation: skill-dot-glow 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes skill-pill-pulse {
+  0%, 100% { border-color: rgba(224, 64, 251, 0.35); }
+  50% { border-color: rgba(224, 64, 251, 0.7); }
+}
+
+@keyframes skill-dot-glow {
+  0%, 100% { box-shadow: 0 0 4px 1px rgba(224, 64, 251, 0.4); }
+  50% { box-shadow: 0 0 8px 3px rgba(224, 64, 251, 0.8); }
+}
+
+/* Provider handoff UX */
+.status-bar-handoff-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 8px;
+  font-size: 11px;
+  border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.18));
+  border-radius: 4px;
+  background: var(--vscode-editorWidget-background, rgba(30, 30, 30, 0.8));
+  color: var(--vscode-descriptionForeground, #bdbdbd);
+}
+
+.status-bar-handoff-banner.is-success {
+  border-color: rgba(63, 185, 80, 0.55);
+}
+
+.status-bar-handoff-banner.is-error {
+  border-color: rgba(248, 81, 73, 0.75);
+  color: var(--vscode-errorForeground, #f85149);
+}
+
+.status-bar-handoff-banner-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-bar-handoff-fallback-btn {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.18));
+  border-radius: 4px;
+  background: var(--vscode-button-secondaryBackground, #2d2d30);
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+  cursor: pointer;
+}
+
+.handoff-lock-banner {
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.18));
+  border-radius: 6px;
+  background: var(--vscode-editorWidget-background, rgba(30, 30, 30, 0.8));
+  color: var(--vscode-descriptionForeground, #bdbdbd);
+}

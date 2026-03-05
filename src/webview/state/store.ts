@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { ContentBlock } from '../../extension/types/stream-json';
-import type { CodexReasoningEffort, ProviderCapabilities, ProviderId, TypingTheme } from '../../extension/types/webview-messages';
+import type { CodexReasoningEffort, HandoffStage, ProviderCapabilities, ProviderId, TypingTheme } from '../../extension/types/webview-messages';
 import type {
   AchievementAwardPayload,
   AchievementGoalPayload,
@@ -29,6 +29,7 @@ export interface ChatMessage {
   content: ContentBlock[];
   model?: string;
   timestamp: number;
+  thinkingEffort?: string;
 }
 
 export interface StreamingBlock {
@@ -79,6 +80,11 @@ export interface AppState {
   isConnected: boolean;
   isBusy: boolean;
   lastActivityAt: number;
+  handoffStage: HandoffStage;
+  handoffTargetProvider: ProviderId | null;
+  handoffError: string | null;
+  handoffArtifactPath: string | null;
+  handoffManualPrompt: string | null;
 
   // Messages
   messages: ChatMessage[];
@@ -117,6 +123,9 @@ export interface AppState {
 
   // Real-time tool activity (lightweight, no API calls)
   currentToolActivity: string | null;
+
+  // Thinking effort level detected for the current streaming message
+  currentThinkingEffort: string | null;
 
   // Activity summary (from Haiku)
   activitySummary: { shortLabel: string; fullSummary: string } | null;
@@ -286,6 +295,10 @@ export interface AppState {
   codexConsultPanelOpen: boolean;
   setCodexConsultPanelOpen: (open: boolean) => void;
 
+  // Active Skill indicator (accumulated across session, pills persist)
+  sessionSkills: string[];
+  addSessionSkill: (name: string) => void;
+
   // Skill Generation
   skillGenEnabled: boolean;
   skillGenThreshold: number;
@@ -327,7 +340,7 @@ export interface AppState {
   setSession: (sessionId: string, model: string) => void;
   endSession: (reason: string) => void;
   addUserMessage: (content: string | ContentBlock[]) => void;
-  addAssistantMessage: (messageId: string, content: ContentBlock[], model: string) => void;
+  addAssistantMessage: (messageId: string, content: ContentBlock[], model: string, thinkingEffort?: string) => void;
 
   // Streaming lifecycle
   handleMessageStart: (messageId: string, model: string) => void;
@@ -356,6 +369,15 @@ export interface AppState {
   clearStreaming: () => void;
 
   setBusy: (busy: boolean) => void;
+  setHandoffProgress: (progress: {
+    stage: HandoffStage;
+    targetProvider: 'claude' | 'codex';
+    artifactPath?: string;
+    manualPrompt?: string;
+    error?: string;
+    detail?: string;
+  }) => void;
+  clearHandoffProgress: () => void;
   markActivity: () => void;
   updateCost: (cost: CostInfo) => void;
   setError: (message: string | null) => void;
@@ -373,6 +395,7 @@ export interface AppState {
   setPendingApproval: (approval: { toolName: string; planText: string } | null) => void;
   truncateFromMessage: (messageId: string) => void;
   setToolActivity: (detail: string | null) => void;
+  setThinkingEffort: (effort: string | null) => void;
   setActivitySummary: (summary: { shortLabel: string; fullSummary: string } | null) => void;
   setPromptHistoryPanelOpen: (open: boolean) => void;
   setPermissionMode: (mode: 'full-access' | 'supervised') => void;
@@ -514,7 +537,7 @@ function calculateWeather(turns: TurnRecord[]): WeatherState {
   const momentumScore = Math.min(1, Math.max(0, (durRatio - 1) / 2));
 
   // 4. Productivity flow (0-1): low ratio of productive turns = worse
-  const productiveCategories = new Set(['code-write', 'research', 'command', 'success']);
+  const productiveCategories = new Set(['code-write', 'research', 'command', 'success', 'skill']);
   const productiveCount = recent.filter(t => productiveCategories.has(t.category)).length;
   const flowScore = 1 - (productiveCount / recentLen);
 
@@ -589,6 +612,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   isConnected: false,
   isBusy: false,
   lastActivityAt: 0,
+  handoffStage: 'idle',
+  handoffTargetProvider: null,
+  handoffError: null,
+  handoffArtifactPath: null,
+  handoffManualPrompt: null,
   messages: [],
   streamingMessageId: null,
   streamingBlocks: [],
@@ -605,6 +633,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   projectPromptHistory: [],
   globalPromptHistory: [],
   currentToolActivity: null,
+  currentThinkingEffort: null,
   activitySummary: null,
   permissionMode: 'full-access' as const,
   gitPushSettings: null,
@@ -719,6 +748,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   codexConsultPanelOpen: false,
   setCodexConsultPanelOpen: (open) => set({ codexConsultPanelOpen: open }),
 
+  // Active Skill indicator (accumulated across session)
+  sessionSkills: [],
+  addSessionSkill: (name) => set((state) => {
+    if (state.sessionSkills.includes(name)) return state;
+    return { sessionSkills: [...state.sessionSkills, name] };
+  }),
+
   // Skill Generation
   skillGenEnabled: true,
   skillGenThreshold: 30,
@@ -806,11 +842,18 @@ export const useAppStore = create<AppState>((set, get) => ({
         lastAssistantSnapshot: null,
         pendingApproval: null,
         currentToolActivity: null,
+        currentThinkingEffort: null,
         activitySummary: null,
+        sessionSkills: [],
         sessionActivityElapsedMs: finalElapsed,
         sessionActivityRunningSinceMs: null,
         weather: { mood: 'night' as WeatherMood, pulseRate: 'slow' as PulseRate },
         lastActivityAt: 0,
+        handoffStage: 'idle' as HandoffStage,
+        handoffTargetProvider: null,
+        handoffError: null,
+        handoffArtifactPath: null,
+        handoffManualPrompt: null,
         // Clear team state when the session ends - teammates die with the session
         teamActive: false,
         teamName: null,
@@ -898,7 +941,7 @@ export const useAppStore = create<AppState>((set, get) => ({
    * Add a complete assistant message directly to the messages array.
    * Used for replayed messages during session resume (no streaming pipeline).
    */
-  addAssistantMessage: (messageId, content, model) => {
+  addAssistantMessage: (messageId, content, model, thinkingEffort?) => {
     // Normalize content defensively
     const normalizedContent: ContentBlock[] = Array.isArray(content)
       ? content
@@ -910,6 +953,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       content: normalizedContent,
       model,
       timestamp: Date.now(),
+      thinkingEffort: thinkingEffort || get().currentThinkingEffort || undefined,
     };
 
     set((state) => {
@@ -942,6 +986,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       streamingMessageId: messageId,
       streamingBlocks: [],
       lastAssistantSnapshot: null,
+      currentThinkingEffort: null,
     });
   },
 
@@ -1043,6 +1088,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       content,
       model,
       timestamp: Date.now(),
+      thinkingEffort: state.currentThinkingEffort || undefined,
     };
 
     // Upsert into messages (in case the same message ID was already finalized)
@@ -1068,6 +1114,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       streamingMessageId: null,
       streamingBlocks: [],
       lastAssistantSnapshot: null,
+      currentThinkingEffort: null,
     });
   },
 
@@ -1084,6 +1131,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       lastAssistantSnapshot: null,
       isResuming: false,
       currentToolActivity: null,
+      // sessionSkills intentionally NOT reset here - pills persist across turns
     });
   },
 
@@ -1118,6 +1166,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       return { isBusy: busy, ...(!busy ? { currentToolActivity: null } : {}) };
+    }),
+
+  setHandoffProgress: (progress) =>
+    set(() => ({
+      handoffStage: progress.stage,
+      handoffTargetProvider: progress.targetProvider,
+      handoffError: progress.error ?? null,
+      handoffArtifactPath: progress.artifactPath ?? null,
+      handoffManualPrompt: progress.manualPrompt ?? null,
+    })),
+
+  clearHandoffProgress: () =>
+    set({
+      handoffStage: 'idle',
+      handoffTargetProvider: null,
+      handoffError: null,
+      handoffArtifactPath: null,
+      handoffManualPrompt: null,
     }),
 
   markActivity: () => set({ lastActivityAt: Date.now() }),
@@ -1186,6 +1252,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
 
   setToolActivity: (detail) => set({ currentToolActivity: detail }),
+
+  setThinkingEffort: (effort) => set({ currentThinkingEffort: effort }),
 
   setActivitySummary: (summary) => set({ activitySummary: summary }),
 
@@ -1461,6 +1529,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       isConnected: false,
       isBusy: false,
       lastActivityAt: 0,
+      handoffStage: 'idle' as HandoffStage,
+      handoffTargetProvider: null,
+      handoffError: null,
+      handoffArtifactPath: null,
+      handoffManualPrompt: null,
       messages: [],
       streamingMessageId: null,
       streamingBlocks: [],
@@ -1479,6 +1552,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       globalPromptHistory: [],
       currentToolActivity: null,
       activitySummary: null,
+      sessionSkills: [],
       permissionMode: 'full-access' as const,
       gitPushSettings: null,
       gitPushResult: null,

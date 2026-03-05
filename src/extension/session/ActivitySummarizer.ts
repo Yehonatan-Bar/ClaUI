@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import { buildClaudeCliEnv } from '../process/envUtils';
+import { killProcessTree } from '../process/killTree';
 
 export interface ActivitySummary {
   /** Short label for the tab title (3-6 words) */
@@ -200,7 +201,7 @@ export class ActivitySummarizer {
       // Timeout guard (Haiku calls can be noticeably slower on busy systems)
       const timer = setTimeout(() => {
         this.log(`[ActivitySummarizer] timeout (${this.timeoutMs}ms), killing process`);
-        child.kill('SIGTERM');
+        killProcessTree(child);
         finish(null);
       }, this.timeoutMs);
 

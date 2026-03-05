@@ -4,6 +4,7 @@ import { renderTextWithFileLinks } from './filePathLinks';
 /** Tool names that represent plan approval / question flows */
 const PLAN_TOOLS = ['ExitPlanMode', 'AskUserQuestion'];
 const TODO_TOOL = 'TodoWrite';
+const SKILL_TOOL = 'Skill';
 
 /** Friendly display labels for plan tools */
 const PLAN_TOOL_LABELS: Record<string, string> = {
@@ -48,12 +49,18 @@ export const ToolUseBlock: React.FC<ToolUseBlockProps> = ({
   const [isCollapsed, setIsCollapsed] = useState(() => toolName !== TODO_TOOL);
   const isPlanTool = PLAN_TOOLS.includes(toolName);
   const isTodoTool = toolName === TODO_TOOL;
+  const isSkillTool = toolName === SKILL_TOOL || toolName.endsWith('__Skill');
   const todoItems = useMemo(
     () => (isTodoTool ? extractTodos(input, partialInput) : null),
     [isTodoTool, input, partialInput]
   );
   const hasTodoPayload = todoItems !== null;
   const todoStats = useMemo(() => buildTodoStats(todoItems || []), [todoItems]);
+
+  const skillName = useMemo(
+    () => (isSkillTool ? extractSkillName(input, partialInput) : null),
+    [isSkillTool, input, partialInput]
+  );
 
   // For plan tools, try to extract readable plan text instead of raw JSON
   let displayContent: string;
@@ -69,8 +76,8 @@ export const ToolUseBlock: React.FC<ToolUseBlockProps> = ({
       : partialInput || '';
   }
 
-  const displayName = isTodoTool ? 'Todo' : PLAN_TOOL_LABELS[toolName] || toolName;
-  const blockClass = `tool-use-block${isPlanTool ? ' plan-tool' : ''}${isTodoTool ? ' todo-tool' : ''}`;
+  const displayName = isSkillTool ? 'Skill' : isTodoTool ? 'Todo' : PLAN_TOOL_LABELS[toolName] || toolName;
+  const blockClass = `tool-use-block${isPlanTool ? ' plan-tool' : ''}${isTodoTool ? ' todo-tool' : ''}${isSkillTool ? ' skill-tool' : ''}`;
 
   return (
     <div className={blockClass}>
@@ -82,12 +89,15 @@ export const ToolUseBlock: React.FC<ToolUseBlockProps> = ({
       >
         <span className={`tool-collapse-indicator${isCollapsed ? '' : ' expanded'}`} />
         <span className="tool-use-name">{displayName}</span>
+        {isSkillTool && (
+          <span className="skill-name-chip">{skillName || 'Skill'}</span>
+        )}
         {isTodoTool && hasTodoPayload && (
           <TodoSummaryChips stats={todoStats} />
         )}
         {isStreaming && (
           <span style={{ opacity: 0.5, fontSize: 11 }}>
-            {isPlanTool ? 'preparing...' : isTodoTool ? 'updating...' : 'running...'}
+            {isPlanTool ? 'preparing...' : isTodoTool ? 'updating...' : isSkillTool ? 'invoking...' : 'running...'}
           </span>
         )}
       </div>
@@ -136,6 +146,23 @@ function extractPlanText(
   }
 
   return '';
+}
+
+function extractSkillName(
+  input?: Record<string, unknown>,
+  partialInput?: string
+): string | null {
+  if (input && typeof input.skill === 'string') return input.skill;
+  if (partialInput) {
+    try {
+      const parsed = JSON.parse(partialInput);
+      if (typeof parsed.skill === 'string') return parsed.skill;
+    } catch {
+      const match = partialInput.match(/"skill"\s*:\s*"([^"]+)"/);
+      return match?.[1] ?? null;
+    }
+  }
+  return null;
 }
 
 function extractTodos(

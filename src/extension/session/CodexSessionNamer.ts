@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import { exec, spawn } from 'child_process';
+import { spawn } from 'child_process';
 import { buildSanitizedEnv } from '../process/envUtils';
+import { killProcessTree } from '../process/killTree';
 
 /**
  * Spawns a lightweight one-shot Codex CLI process to generate
@@ -77,31 +78,9 @@ export class CodexSessionNamer {
         return;
       }
 
-      const killProcessTree = () => {
-        if (!child.pid) {
-          try {
-            child.kill('SIGTERM');
-          } catch {
-            // ignore
-          }
-          return;
-        }
-        if (process.platform === 'win32') {
-          exec(`taskkill /F /T /PID ${child.pid}`, () => {
-            // ignore failures (process may already be dead)
-          });
-          return;
-        }
-        try {
-          child.kill('SIGTERM');
-        } catch {
-          // ignore
-        }
-      };
-
       timer = setTimeout(() => {
         this.log('CodexSessionNamer: timeout (15s), killing process');
-        killProcessTree();
+        killProcessTree(child);
         finish(null);
       }, 15_000);
 

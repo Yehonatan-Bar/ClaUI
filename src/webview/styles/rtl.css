@@ -68,3 +68,9 @@
   margin-right: 0;
   margin-left: 0.4em;
 }
+
+/* Skill name chip margin flip in RTL */
+[dir="rtl"] .skill-name-chip {
+  margin-left: 0;
+  margin-right: 8px;
+}
