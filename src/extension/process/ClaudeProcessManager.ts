@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
-import { ChildProcess, spawn, exec } from 'child_process';
+import { ChildProcess, spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import type { CliOutputEvent, CliInputMessage } from '../types/stream-json';
 import { buildClaudeCliEnv, getStoredApiKey } from './envUtils';
+import { killProcessTree } from './killTree';
 
 export interface ProcessStartOptions {
   resume?: string;
@@ -201,25 +202,13 @@ export class ClaudeProcessManager extends EventEmitter {
     });
   }
 
-  /** Kill the entire process tree.
-   *  On Windows with shell:true, process.kill('SIGTERM') only kills the
-   *  cmd.exe wrapper -- the actual CLI child process becomes an orphan.
-   *  Use taskkill /F /T to kill the full tree instead. */
-  private killProcessTree(): void {
-    if (!this.process?.pid) {
+  /** Kill the entire process tree via the shared killTree utility. */
+  private killTree(): void {
+    if (!this.process) {
       return;
     }
-    const pid = this.process.pid;
-    if (process.platform === 'win32') {
-      this.log(`Killing process tree (taskkill /F /T /PID ${pid})`);
-      exec(`taskkill /F /T /PID ${pid}`, (err) => {
-        if (err) {
-          this.log(`taskkill failed (process may already be dead): ${err.message}`);
-        }
-      });
-    } else {
-      try { this.process.kill('SIGTERM'); } catch { /* already dead */ }
-    }
+    this.log(`Killing process tree for PID ${this.process.pid ?? 'unknown'}`);
+    killProcessTree(this.process);
   }
 
   /** Cancel the current request by killing the process.
@@ -236,14 +225,14 @@ export class ClaudeProcessManager extends EventEmitter {
 
     // Close stdin + kill the entire process tree to guarantee it stops
     try { this.process.stdin?.end(); } catch { /* already closed */ }
-    this.killProcessTree();
+    this.killTree();
   }
 
   /** Gracefully stop the process */
   stop(): void {
     if (this.process) {
       try { this.process.stdin?.end(); } catch { /* already closed */ }
-      this.killProcessTree();
+      this.killTree();
       this.process = null;
       this.sessionId = null;
     }

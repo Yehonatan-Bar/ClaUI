@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { SessionTab } from './SessionTab';
 import { CodexSessionTab } from './CodexSessionTab';
 import type { SessionStore } from './SessionStore';
@@ -8,6 +9,12 @@ import type { ExtensionToWebviewMessage, ProviderId } from '../types/webview-mes
 import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import type { TokenUsageRatioTracker } from './TokenUsageRatioTracker';
+import { HandoffContextBuilder } from './handoff/HandoffContextBuilder';
+import { HandoffPromptComposer } from './handoff/HandoffPromptComposer';
+import { HandoffArtifactStore } from './handoff/HandoffArtifactStore';
+import { HandoffOrchestrator, type HandoffTargetRuntime } from './handoff/HandoffOrchestrator';
+import type { HandoffProvider, HandoffSessionRequest } from './handoff/HandoffTypes';
+import { isHandoffProvider } from './handoff/HandoffTypes';
 
 /** Distinct colors for tab header bars, cycling through the palette */
 const TAB_COLORS = [
@@ -21,15 +28,22 @@ const TAB_COLORS = [
   '#BE5046', // brick
 ];
 
+const HANDOFF_COOLDOWN_MS = 4_000;
+
+type ManagedTab = SessionTab | CodexSessionTab;
+
 /**
  * Manages all open SessionTab instances.
  * Tracks the active (focused) tab and provides command routing helpers.
  */
 export class TabManager {
-  private tabs = new Map<string, SessionTab | CodexSessionTab>();
+  private tabs = new Map<string, ManagedTab>();
   private activeTabId: string | null = null;
   private nextTabNumber = 1;
   private readonly statusBarItem: vscode.StatusBarItem;
+  private readonly handoffOrchestrator: HandoffOrchestrator;
+  private readonly handoffLocks = new Set<string>();
+  private readonly handoffLastByTab = new Map<string, number>();
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -49,6 +63,17 @@ export class TabManager {
     );
     this.statusBarItem.text = '$(loading~spin) Claude thinking...';
     context.subscriptions.push(this.statusBarItem);
+
+    const artifactsRoot = this.logDir || path.join(context.globalStorageUri.fsPath, 'logs', 'ClaUiLogs');
+    const storeArtifacts = vscode.workspace
+      .getConfiguration('claudeMirror')
+      .get<boolean>('handoff.storeArtifacts', true);
+    this.handoffOrchestrator = new HandoffOrchestrator(
+      new HandoffContextBuilder(this.log),
+      new HandoffPromptComposer(),
+      new HandoffArtifactStore(artifactsRoot, this.log, { persistToDisk: storeArtifacts }),
+      this.log,
+    );
   }
 
   /** Create a new tab with its own independent Claude session */
@@ -144,7 +169,7 @@ export class TabManager {
   }
 
   /** Get the currently focused tab, or null if none (skips disposed zombie tabs) */
-  getActiveTab(): SessionTab | CodexSessionTab | null {
+  getActiveTab(): ManagedTab | null {
     if (!this.activeTabId) {
       return null;
     }
@@ -163,7 +188,7 @@ export class TabManager {
   }
 
   /** Get or create: returns active tab if one exists, otherwise creates a new one */
-  getOrCreateTab(): SessionTab | CodexSessionTab {
+  getOrCreateTab(): ManagedTab {
     const active = this.getActiveTab();
     if (active) {
       return active;
@@ -179,6 +204,107 @@ export class TabManager {
     }
     tab.dispose();
     // onClosed callback handles map cleanup and active selection
+  }
+
+  getTabById(tabId: string): ManagedTab | null {
+    const tab = this.tabs.get(tabId);
+    if (!tab) {
+      return null;
+    }
+    if (tab.isDisposed) {
+      this.tabs.delete(tabId);
+      if (this.activeTabId === tabId) {
+        this.activeTabId = null;
+      }
+      return null;
+    }
+    return tab;
+  }
+
+  async handoffSession(request: HandoffSessionRequest): Promise<{ targetTabId: string; artifactPath?: string }> {
+    const sourceTab = request.sourceTabId ? this.getTabById(request.sourceTabId) : this.getActiveTab();
+    if (!sourceTab) {
+      throw new Error('No source tab found for provider handoff.');
+    }
+
+    const enabled = vscode.workspace.getConfiguration('claudeMirror').get<boolean>('handoff.enabled', true);
+    if (!enabled) {
+      throw new Error('Provider handoff is disabled by settings (claudeMirror.handoff.enabled=false).');
+    }
+
+    const sourceProvider = sourceTab.getProvider();
+    if (!isHandoffProvider(sourceProvider)) {
+      throw new Error(`Current provider "${sourceProvider}" does not support context handoff.`);
+    }
+
+    if (sourceProvider === request.targetProvider) {
+      throw new Error('Source and target providers are identical.');
+    }
+
+    if (sourceTab.isBusyState()) {
+      throw new Error('Finish or stop the current turn before switching provider with context.');
+    }
+
+    if (this.handoffLocks.has(sourceTab.id)) {
+      throw new Error('A provider handoff is already in progress for this tab.');
+    }
+
+    const now = Date.now();
+    const lastAt = this.handoffLastByTab.get(sourceTab.id) ?? 0;
+    if (now - lastAt < HANDOFF_COOLDOWN_MS) {
+      throw new Error('Please wait a moment before switching providers again.');
+    }
+
+    this.handoffLocks.add(sourceTab.id);
+    const keepSourceOpen = request.keepSourceOpen ?? true;
+    const autoSend = request.autoSend ?? vscode.workspace.getConfiguration('claudeMirror').get<boolean>('handoff.autoSend', true);
+    let targetTabId = '';
+    let artifactPath: string | undefined;
+
+    try {
+      this.log(`[Handoff] start tab=${sourceTab.id} source=${sourceProvider} target=${request.targetProvider}`);
+      const sourceSnapshot = await sourceTab.collectHandoffSnapshot();
+      const startedAt = Date.now();
+      const result = await this.handoffOrchestrator.run({
+        source: sourceSnapshot,
+        targetProvider: request.targetProvider,
+        autoSend,
+        createTargetTab: (provider) => this.wrapHandoffTargetRuntime(this.createTabForProvider(provider)),
+        onProgress: (update) => {
+          const durationMs = Date.now() - startedAt;
+          this.log(
+            `[Handoff] stage=${update.stage} tab=${sourceTab.id} source=${update.sourceProvider} target=${update.targetProvider} durationMs=${durationMs}`,
+          );
+          sourceTab.postMessage({
+            type: 'handoffProgress',
+            ...update,
+          });
+        },
+      });
+
+      targetTabId = result.targetTabId;
+      artifactPath = result.artifact?.markdownPath ?? result.artifact?.jsonPath;
+      await this.linkHandoffMetadata({
+        sourceSessionId: sourceSnapshot.sessionId,
+        sourceProvider,
+        sourceTabId: sourceTab.id,
+        targetSessionId: result.targetSessionId,
+        targetProvider: request.targetProvider,
+        targetTabId: result.targetTabId,
+        artifactPath,
+      });
+
+      this.handoffLastByTab.set(sourceTab.id, Date.now());
+      this.handoffLastByTab.set(result.targetTabId, Date.now());
+
+      if (!keepSourceOpen) {
+        this.closeTab(sourceTab.id);
+      }
+
+      return { targetTabId: result.targetTabId, artifactPath };
+    } finally {
+      this.handoffLocks.delete(sourceTab.id);
+    }
   }
 
   /** Dispose all tabs (used during extension deactivation) */
@@ -204,9 +330,60 @@ export class TabManager {
   // --- Internal helpers ---
 
   /** Get any existing tab (used to find the column for new tabs) */
-  private getAnyTab(): SessionTab | CodexSessionTab | null {
+  private getAnyTab(): ManagedTab | null {
     const first = this.tabs.values().next();
     return first.done ? null : first.value;
+  }
+
+  private wrapHandoffTargetRuntime(tab: ManagedTab): HandoffTargetRuntime {
+    return {
+      id: tab.id,
+      get sessionId() {
+        return tab.sessionId;
+      },
+      setForkInit: (init) => tab.setForkInit(init),
+      startSession: (options) => tab.startSession({ cwd: options?.cwd }),
+      sendText: (text) => tab.sendText(text),
+      waitForNextAssistantReply: (timeoutMs) => tab.waitForNextAssistantReply(timeoutMs),
+    };
+  }
+
+  private async linkHandoffMetadata(args: {
+    sourceSessionId?: string;
+    sourceProvider: HandoffProvider;
+    sourceTabId: string;
+    targetSessionId?: string;
+    targetProvider: HandoffProvider;
+    targetTabId: string;
+    artifactPath?: string;
+  }): Promise<void> {
+    const completedAt = new Date().toISOString();
+
+    if (args.sourceSessionId) {
+      const existing = this.sessionStore.getSession(args.sourceSessionId);
+      if (existing) {
+        await this.sessionStore.saveSession({
+          ...existing,
+          handoffTargetTabId: args.targetTabId,
+          handoffTargetProvider: args.targetProvider,
+          handoffArtifactPath: args.artifactPath,
+          handoffCompletedAt: completedAt,
+        });
+      }
+    }
+
+    if (args.targetSessionId) {
+      const existing = this.sessionStore.getSession(args.targetSessionId);
+      if (existing) {
+        await this.sessionStore.saveSession({
+          ...existing,
+          handoffSourceTabId: args.sourceTabId,
+          handoffSourceProvider: args.sourceProvider,
+          handoffArtifactPath: args.artifactPath,
+          handoffCompletedAt: completedAt,
+        });
+      }
+    }
   }
 
   // --- Internal handlers ---

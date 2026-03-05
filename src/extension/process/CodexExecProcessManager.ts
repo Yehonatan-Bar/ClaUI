@@ -2,10 +2,11 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { ChildProcess, exec, spawn } from 'child_process';
+import { ChildProcess, spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import type { CodexExecJsonEvent } from '../types/codex-exec-json';
 import { buildSanitizedEnv } from './envUtils';
+import { killProcessTree } from './killTree';
 
 export interface CodexRunTurnOptions {
   prompt: string;
@@ -163,7 +164,7 @@ export class CodexExecProcessManager extends EventEmitter {
     } catch {
       // ignore
     }
-    this.killProcessTree();
+    this.killTree();
   }
 
   stop(): void {
@@ -176,7 +177,7 @@ export class CodexExecProcessManager extends EventEmitter {
     } catch {
       // ignore
     }
-    this.killProcessTree();
+    this.killTree();
     this.process = null;
   }
 
@@ -339,25 +340,12 @@ export class CodexExecProcessManager extends EventEmitter {
     }
   }
 
-  private killProcessTree(): void {
-    if (!this.process?.pid) {
+  private killTree(): void {
+    if (!this.process) {
       return;
     }
-    const pid = this.process.pid;
-    if (process.platform === 'win32') {
-      this.log(`Killing Codex process tree (taskkill /F /T /PID ${pid})`);
-      exec(`taskkill /F /T /PID ${pid}`, (err) => {
-        if (err) {
-          this.log(`taskkill failed (Codex process may already be dead): ${err.message}`);
-        }
-      });
-      return;
-    }
-    try {
-      this.process.kill('SIGTERM');
-    } catch {
-      // already dead
-    }
+    this.log(`Killing Codex process tree for PID ${this.process.pid ?? 'unknown'}`);
+    killProcessTree(this.process);
   }
 
   private resetRunStats(): void {

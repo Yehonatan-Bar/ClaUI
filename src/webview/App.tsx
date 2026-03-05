@@ -63,6 +63,7 @@ export const App: React.FC = () => {
     bugReportPanelOpen,
     teamActive,
     teamPanelOpen,
+    currentThinkingEffort,
   } = useAppStore();
   const forkInit = useAppStore((s) => s.forkInit);
   const hasMessages = messages.length > 0 || streamingMessageId !== null;
@@ -285,7 +286,9 @@ export const App: React.FC = () => {
                   {isBusy ? (
                     isResuming ? 'Resuming conversation...' : (
                       currentToolActivity ? currentToolActivity + '...' : (
-                        activitySummary ? activitySummary.shortLabel + '...' : 'Thinking...'
+                        activitySummary ? activitySummary.shortLabel + '...' : (
+                          currentThinkingEffort ? `Thinking with ${currentThinkingEffort} effort...` : 'Thinking...'
+                        )
                       )
                     )
                   ) : (

@@ -2,6 +2,7 @@ import * as cp from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { PhaseId, PhaseResult } from './types';
+import { killProcessTree } from '../../process/killTree';
 
 /**
  * Script-to-args mapping for each non-AI Python phase.
@@ -180,13 +181,7 @@ export class PythonPhaseRunner {
 
   private killActive(): void {
     if (!this.activeProcess) return;
-    try {
-      if (process.platform === 'win32' && this.activeProcess.pid) {
-        cp.execSync(`taskkill /F /T /PID ${this.activeProcess.pid}`, { stdio: 'ignore' });
-      } else {
-        this.activeProcess.kill('SIGTERM');
-      }
-    } catch { /* process may already be gone */ }
+    killProcessTree(this.activeProcess);
     this.activeProcess = null;
   }
 }

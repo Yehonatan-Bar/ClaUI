@@ -197,12 +197,14 @@ A visual session health dashboard with 5 components:
   - Purple = code-write tools (Write/Edit/MultiEdit/NotebookEdit)
   - Orange = research tools (Read/Grep/Glob/WebSearch/WebFetch)
   - Cyan = command tools (Bash/Terminal)
+  - Magenta = skill tool (Skill invocations)
   - Click any segment to jump to that message
 - **Cost Heat Bar** - Gradient strip showing cumulative cost accumulation over the session
-- **Turn Intensity Borders** - Colored left border on assistant messages using the same category colors as the timeline. Border width reflects tool activity:
+- **Turn Intensity Borders** - Colored left border on assistant messages using the same category colors as the timeline (including magenta for skill turns). Border width reflects tool activity:
   - Thin/light = 0 tools
   - Medium = 1-3 tools
   - Thick/strong = 4+ tools
+- **Skill Visual Indicator** - Three-layer system for Skill tool invocations: (1) Magenta-accented card with skill name chip in the message stream, (2) Animated magenta pill with glowing dot in the status bar during active invocation, (3) Magenta turn category in timeline, intensity borders, and dashboard charts
 - **Vitals toggle** - Button in the StatusBar to show/hide all vitals components
 
 ---

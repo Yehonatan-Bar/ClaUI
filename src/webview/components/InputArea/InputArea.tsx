@@ -73,6 +73,7 @@ class UndoManager {
 export const InputArea: React.FC = () => {
   const [text, setText] = useState('');
   const [pendingImages, setPendingImages] = useState<WebviewImageData[]>([]);
+  const [codexSteerArmed, setCodexSteerArmed] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoMgr = useMemo(() => new UndoManager(), []);
   const [ultrathinkAnim, setUltrathinkAnim] = useState<string | null>(null);
@@ -112,6 +113,9 @@ export const InputArea: React.FC = () => {
     setAutoTranslateEnabled,
     setSendSettingsPopoverOpen,
     contextWidgetVisible,
+    sessionSkills,
+    handoffStage,
+    handoffTargetProvider,
   } = useAppStore();
   const fileMention = useFileMention(textareaRef);
 
@@ -177,6 +181,17 @@ export const InputArea: React.FC = () => {
   // Auto-detect RTL for the input text
   const direction = text ? (detectRtl(text) ? 'rtl' : 'ltr') : 'auto';
   const effectiveProvider = provider ?? selectedProvider;
+  const isCodexBusy = effectiveProvider === 'codex' && isBusy;
+  const inputLockedByHandoff =
+    handoffStage !== 'idle' &&
+    handoffStage !== 'completed' &&
+    handoffStage !== 'failed';
+
+  useEffect(() => {
+    if (!isCodexBusy || pendingApproval) {
+      setCodexSteerArmed(false);
+    }
+  }, [isCodexBusy, pendingApproval]);
 
   const logUiDebug = useCallback((event: string, payload?: Record<string, unknown>) => {
     postToExtension({
@@ -297,12 +312,12 @@ export const InputArea: React.FC = () => {
     postToExtension({ type: 'setAutoTranslate', enabled: newVal } as any);
   }, [autoTranslateEnabled, setAutoTranslateEnabled]);
 
-  /** Send the current message to Claude (allowed even while busy, to interrupt).
+  /** Send the current message to Claude/Codex (allowed even while busy, to interrupt).
    *  When a plan approval bar is active, the text is sent as plan feedback
    *  so the CLI interprets it in the approval context. */
   const sendMessage = useCallback(() => {
     const trimmed = text.trim();
-    if ((!trimmed && pendingImages.length === 0) || !isConnected) return;
+    if ((!trimmed && pendingImages.length === 0) || !isConnected || inputLockedByHandoff) return;
 
     // Guard: block identical text sent within 500ms (key-repeat / double-fire).
     // setText('') is async so rapid keydown events re-enter with stale text.
@@ -313,7 +328,15 @@ export const InputArea: React.FC = () => {
     lastSentRef.current = { text: trimmed, time: now };
 
     // Auto-enhance: intercept send, enhance first, then auto-send
-    if (providerCapabilities.supportsPromptEnhancer && autoEnhanceEnabled && trimmed && !isEnhancing && pendingImages.length === 0 && !pendingApproval) {
+    if (
+      providerCapabilities.supportsPromptEnhancer &&
+      autoEnhanceEnabled &&
+      trimmed &&
+      !isEnhancing &&
+      pendingImages.length === 0 &&
+      !pendingApproval &&
+      !isCodexBusy
+    ) {
       setIsEnhancing(true);
       autoSendAfterEnhanceRef.current = true;
       originalTextBeforeEnhanceRef.current = trimmed;
@@ -333,7 +356,15 @@ export const InputArea: React.FC = () => {
 
     // Translate: intercept send, translate first, then auto-send or show in input
     // Skip translation if the text is already in English (Latin script)
-    if (promptTranslateEnabled && trimmed && !isTranslatingPrompt && !isLikelyEnglish(trimmed) && pendingImages.length === 0 && !pendingApproval) {
+    if (
+      promptTranslateEnabled &&
+      trimmed &&
+      !isTranslatingPrompt &&
+      !isLikelyEnglish(trimmed) &&
+      pendingImages.length === 0 &&
+      !pendingApproval &&
+      !isCodexBusy
+    ) {
       setIsTranslatingPrompt(true);
       autoSendAfterTranslateRef.current = autoTranslateEnabled;
       // Store original text so it can be shown alongside the translated version in the message bubble
@@ -347,6 +378,24 @@ export const InputArea: React.FC = () => {
       }, 65_000);
       postToExtension({ type: 'translatePrompt', text: trimmed } as any);
       return;
+    }
+
+    let steerRequested = false;
+    if (isCodexBusy && !pendingApproval) {
+      if (!codexSteerArmed) {
+        setCodexSteerArmed(true);
+        logUiDebug('codexSteerArmed', {
+          textLength: trimmed.length,
+          imageCount: pendingImages.length,
+        });
+        return;
+      }
+      steerRequested = true;
+      setCodexSteerArmed(false);
+      logUiDebug('codexSteerConfirmed', {
+        textLength: trimmed.length,
+        imageCount: pendingImages.length,
+      });
     }
 
     if (trimmed) {
@@ -375,23 +424,25 @@ export const InputArea: React.FC = () => {
       postToExtension({ type: 'sendMessage', text: trimmed });
     } else if (pendingImages.length > 0) {
       markSessionPromptSent();
-      postToExtension({ type: 'sendMessageWithImages', text: trimmed, images: pendingImages });
+      postToExtension({ type: 'sendMessageWithImages', text: trimmed, images: pendingImages, steer: steerRequested || undefined });
       setPendingImages([]);
     } else {
       markSessionPromptSent();
-      postToExtension({ type: 'sendMessage', text: trimmed });
+      postToExtension({ type: 'sendMessage', text: trimmed, steer: steerRequested || undefined });
     }
     setText('');
+    setCodexSteerArmed(false);
     undoMgr.reset();
 
     // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [text, pendingImages, isConnected, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer, promptTranslateEnabled, autoTranslateEnabled, isTranslatingPrompt, setIsTranslatingPrompt]);
+  }, [text, pendingImages, isConnected, inputLockedByHandoff, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer, promptTranslateEnabled, autoTranslateEnabled, isTranslatingPrompt, setIsTranslatingPrompt, isCodexBusy, codexSteerArmed, logUiDebug]);
 
   /** Cancel the in-flight request */
   const cancelRequest = useCallback(() => {
+    setCodexSteerArmed(false);
     postToExtension({ type: 'cancelRequest' });
   }, []);
 
@@ -595,6 +646,9 @@ export const InputArea: React.FC = () => {
   const handleInput = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newValue = e.target.value;
+      if (codexSteerArmed) {
+        setCodexSteerArmed(false);
+      }
       setText(newValue);
       undoMgr.push(newValue, e.target.selectionStart);
       // Any manual typing exits history browsing mode
@@ -605,7 +659,7 @@ export const InputArea: React.FC = () => {
       // Notify file mention hook for @ trigger detection
       fileMention.handleTextChange(newValue, e.target.selectionStart);
     },
-    [undoMgr, fileMention]
+    [undoMgr, fileMention, codexSteerArmed]
   );
 
   /** Handle right-click to paste clipboard content (VS Code webview blocks native context menu) */
@@ -1044,6 +1098,11 @@ export const InputArea: React.FC = () => {
 
   return (
     <div className="input-area">
+      {inputLockedByHandoff && (
+        <div className="handoff-lock-banner">
+          Switching provider{handoffTargetProvider ? ` -> ${handoffTargetProvider}` : ''}... {handoffStage.replace(/_/g, ' ')}
+        </div>
+      )}
       {/* Context usage bar: thin line at the top of the input area, visible when contextWidgetVisible is on */}
       {contextWidgetVisible && (
         <div
@@ -1193,6 +1252,17 @@ export const InputArea: React.FC = () => {
         </div>
       )}
 
+      {sessionSkills.length > 0 && (
+        <div className="skill-pills-row">
+          {sessionSkills.map((skill) => (
+            <span key={skill} className="skill-pill" data-tooltip={`Skill: ${skill}`}>
+              <span className="skill-pill-dot" />
+              {skill}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="input-wrapper">
         {fileMention.isOpen && (
           <FileMentionPopup
@@ -1211,7 +1281,7 @@ export const InputArea: React.FC = () => {
         <button
           className="clear-session-button"
           onClick={handleClearSession}
-          disabled={!isConnected}
+          disabled={!isConnected || inputLockedByHandoff}
           data-tooltip="Clear session and start fresh"
         >
           Clear
@@ -1219,7 +1289,7 @@ export const InputArea: React.FC = () => {
         <button
           className="browse-button"
           onClick={handleBrowseFiles}
-          disabled={!isConnected}
+          disabled={!isConnected || inputLockedByHandoff}
           data-tooltip="Browse files to paste their paths"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1229,7 +1299,7 @@ export const InputArea: React.FC = () => {
         <button
           className={`ultrathink-button${ultrathinkAnim ? ' animating' : ''}`}
           onClick={handleUltrathink}
-          disabled={!isConnected || !!ultrathinkAnim}
+          disabled={!isConnected || !!ultrathinkAnim || inputLockedByHandoff}
           data-tooltip="Ultrathink - boost reasoning power"
         >
           <span className="ut-default-icon">&#x1F9E0;</span>
@@ -1253,15 +1323,19 @@ export const InputArea: React.FC = () => {
             onPaste={handlePaste}
             onContextMenu={handleContextMenu}
             placeholder={
-              pendingApproval
+              inputLockedByHandoff
+                ? `Switching provider${handoffTargetProvider ? ` -> ${handoffTargetProvider}` : ''}...`
+                : pendingApproval
                 ? (pendingApproval.toolName === 'AskUserQuestion'
                   ? 'Type your answer... (Ctrl+Enter to send)'
                   : 'Type feedback or approve/reject above... (Ctrl+Enter to send)')
                 : isBusy
-                  ? 'Type to interrupt... (Ctrl+Enter to send)'
+                  ? (isCodexBusy
+                      ? (codexSteerArmed ? 'Press Ctrl+Enter again to confirm steer...' : 'Type to steer Codex... (Ctrl+Enter to confirm)')
+                      : 'Type to interrupt... (Ctrl+Enter to send)')
                   : 'Type a message... (Ctrl+Enter to send)'
             }
-            disabled={!isConnected}
+            disabled={!isConnected || inputLockedByHandoff}
             rows={1}
           />
           {isEnhancing && (
@@ -1287,7 +1361,7 @@ export const InputArea: React.FC = () => {
               <button
                 className={`enhance-button${isEnhancing ? ' enhancing' : ''}${autoEnhanceEnabled ? ' auto-active' : ''}`}
                 onClick={handleEnhancePrompt}
-                disabled={!text.trim() || isEnhancing || !isConnected}
+                disabled={!text.trim() || isEnhancing || !isConnected || inputLockedByHandoff}
                 data-tooltip={autoEnhanceEnabled ? 'Auto-enhance is ON (Ctrl+Shift+E)' : 'Enhance prompt (Ctrl+Shift+E)'}
               >
                 {isEnhancing ? '\u21BB' : '\u2728'}
@@ -1332,23 +1406,32 @@ export const InputArea: React.FC = () => {
             <button
               className="cancel-button"
               onClick={cancelRequest}
-              data-tooltip="Cancel current response (Esc)"
+              data-tooltip={isCodexBusy ? 'Stop current Codex turn (Esc)' : 'Cancel current response (Esc)'}
             >
-              Cancel
+              {isCodexBusy ? 'Stop' : 'Cancel'}
             </button>
           )}
           <div className="send-button-group">
             <button
               className="send-button"
               onClick={sendMessage}
-              disabled={(!text.trim() && pendingImages.length === 0) || !isConnected || isEnhancing || isTranslatingPrompt || !!enhanceComparisonData}
-              data-tooltip={promptTranslateEnabled && !autoTranslateEnabled ? 'Translate to English (Ctrl+Enter)' : 'Send message (Ctrl+Enter)'}
+              disabled={(!text.trim() && pendingImages.length === 0) || !isConnected || isEnhancing || isTranslatingPrompt || !!enhanceComparisonData || inputLockedByHandoff}
+              data-tooltip={
+                isCodexBusy
+                  ? (codexSteerArmed
+                      ? 'Confirm Steer: stop current turn and send this prompt (Ctrl+Enter)'
+                      : 'Steer Codex: click once to arm, click again to confirm (Ctrl+Enter)')
+                  : (promptTranslateEnabled && !autoTranslateEnabled ? 'Translate to English (Ctrl+Enter)' : 'Send message (Ctrl+Enter)')
+              }
             >
-              {promptTranslateEnabled && !autoTranslateEnabled ? 'Translate' : 'Send'}
+              {isCodexBusy
+                ? (codexSteerArmed ? 'Confirm Steer' : 'Steer')
+                : (promptTranslateEnabled && !autoTranslateEnabled ? 'Translate' : 'Send')}
             </button>
             <button
               className="send-gear-button"
               onClick={handleToggleSendSettings}
+              disabled={inputLockedByHandoff}
               data-tooltip="Send settings"
             >
               {'\u2699'}

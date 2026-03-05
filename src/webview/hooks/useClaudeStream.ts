@@ -25,6 +25,8 @@ export function useClaudeStream(): void {
     finalizeStreamingMessage,
     clearStreaming,
     setBusy,
+    setHandoffProgress,
+    clearHandoffProgress,
     markActivity,
     updateCost,
     setError,
@@ -68,6 +70,7 @@ export function useClaudeStream(): void {
     setPromptEnhancerSettings,
     setIsTranslatingPrompt,
     setPromptTranslatorSettings,
+    addSessionSkill,
     setSkillGenSettings,
     setSkillGenStatus,
     setSkillGenProgress,
@@ -82,6 +85,7 @@ export function useClaudeStream(): void {
     setTeamState,
     setTeamActive,
     clearTeamState,
+    setThinkingEffort,
   } = useAppStore();
 
   useEffect(() => {
@@ -151,6 +155,10 @@ export function useClaudeStream(): void {
           // scheduleExitPlanApproveResumeFallback handles it gracefully
           // (skips nudge if CLI already resumed, sends nudge only if idle).
           handleMessageStart(msg.messageId, msg.model);
+          // Forward thinking effort from system init (if present on messageStart)
+          if (msg.thinkingEffort) {
+            setThinkingEffort(msg.thinkingEffort);
+          }
           // Real-time context widget update during long agentic runs.
           // costUpdate only fires on turn completion (result event), so during a
           // multi-tool-call run the widget would stay frozen. Updating inputTokens
@@ -172,17 +180,21 @@ export function useClaudeStream(): void {
             'type:', typeof msg.content,
             'blocks:', Array.isArray(msg.content) ? msg.content.map((b: ContentBlock) => b.type) : msg.content
           );
+          // Forward thinking effort for this message
+          if (msg.thinkingEffort) {
+            setThinkingEffort(msg.thinkingEffort);
+          }
           const currentState = useAppStore.getState();
           const isCodexMode = currentState.provider === 'codex';
           if (!currentState.streamingMessageId) {
             // No active streaming message - this is a replayed/complete message
             // (e.g. during session resume). Add directly to the messages array.
-            addAssistantMessage(msg.messageId, msg.content, msg.model);
+            addAssistantMessage(msg.messageId, msg.content, msg.model, msg.thinkingEffort);
           } else if (isCodexMode) {
             // Codex emits complete agent messages (not incremental snapshots).
             // Upsert immediately so the reply survives any end-of-turn ordering race
             // between messageStop/costUpdate/processBusy messages.
-            addAssistantMessage(msg.messageId, msg.content, msg.model);
+            addAssistantMessage(msg.messageId, msg.content, msg.model, msg.thinkingEffort);
             updateAssistantSnapshot(msg.messageId, msg.content, msg.model);
           } else {
             // Mid-stream snapshot during live streaming - store for metadata only.
@@ -215,10 +227,24 @@ export function useClaudeStream(): void {
             msg.toolName,
             msg.toolId
           );
+          // Track Skill invocation - accumulate across session
+          if (msg.toolName === 'Skill' || msg.toolName.endsWith('__Skill')) {
+            pendingSkillExtraction = true;
+          }
           break;
 
         case 'toolUseInput':
           appendToolInput(msg.messageId, msg.blockIndex, msg.partialJson);
+          // Extract skill name from accumulated partial JSON (not just the delta chunk)
+          if (pendingSkillExtraction) {
+            const accumulated = useAppStore.getState().streamingBlocks
+              .find((b) => b.blockIndex === msg.blockIndex)?.partialJson ?? '';
+            const extracted = extractSkillNameFromPartial(accumulated);
+            if (extracted) {
+              addSessionSkill(extracted);
+              pendingSkillExtraction = false;
+            }
+          }
           break;
 
         case 'costUpdate':
@@ -253,6 +279,22 @@ export function useClaudeStream(): void {
             // Process becomes idle (e.g. cancel or result) -
             // finalize any in-progress streaming so partial content is preserved
             clearStreaming();
+          }
+          break;
+
+        case 'handoffProgress':
+          setHandoffProgress({
+            stage: msg.stage,
+            targetProvider: msg.targetProvider,
+            artifactPath: msg.artifactPath,
+            manualPrompt: msg.manualPrompt,
+            error: msg.error,
+            detail: msg.detail,
+          });
+          if (msg.stage === 'completed') {
+            window.setTimeout(() => {
+              clearHandoffProgress();
+            }, 6000);
           }
           break;
 
@@ -353,6 +395,7 @@ export function useClaudeStream(): void {
               content: m.content,
               model: m.model,
               timestamp: m.timestamp,
+              thinkingEffort: m.thinkingEffort,
             }));
             useAppStore.setState({
               messages: hydratedMessages,
@@ -374,6 +417,7 @@ export function useClaudeStream(): void {
               content: m.content,
               model: m.model,
               timestamp: m.timestamp,
+              thinkingEffort: m.thinkingEffort,
             }));
             useAppStore.setState({
               messages: hydratedMessages,
@@ -637,6 +681,10 @@ export function useClaudeStream(): void {
             ...(msg.error ? { bugReportError: msg.error } : {}),
           });
           break;
+
+        case 'thinkingEffortUpdate':
+          setThinkingEffort(msg.effort);
+          break;
       }
     }
 
@@ -705,6 +753,7 @@ export function useClaudeStream(): void {
     setPromptEnhancerSettings,
     setIsTranslatingPrompt,
     setPromptTranslatorSettings,
+    addSessionSkill,
     setSkillGenSettings,
     setSkillGenStatus,
     setSkillGenProgress,
@@ -716,6 +765,7 @@ export function useClaudeStream(): void {
     setTeamState,
     setTeamActive,
     clearTeamState,
+    setThinkingEffort,
   ]);
 }
 
@@ -727,8 +777,28 @@ export function postToExtension(
     console.warn('[WEBVIEW->EXT] VS Code API unavailable; message dropped', message);
     return;
   }
-  if (message.type === 'setProvider' || message.type === 'startSession' || message.type === 'openProviderTab') {
+  if (
+    message.type === 'setProvider' ||
+    message.type === 'startSession' ||
+    message.type === 'openProviderTab' ||
+    message.type === 'planApprovalResponse'
+  ) {
     console.log(`%c[WEBVIEW->EXT] ${message.type}`, 'color: #7ee787; font-weight: bold', JSON.parse(JSON.stringify(message)));
   }
   vscodeApi.postMessage(message);
+}
+
+/** Tracks whether a Skill tool_use block is waiting for its name from streaming input */
+let pendingSkillExtraction = false;
+
+/** Extract skill name from streaming partial JSON input of a Skill tool */
+function extractSkillNameFromPartial(partialJson: string): string | null {
+  try {
+    const parsed = JSON.parse(partialJson);
+    if (typeof parsed.skill === 'string') return parsed.skill;
+  } catch {
+    const match = partialJson.match(/"skill"\s*:\s*"([^"]+)"/);
+    return match?.[1] ?? null;
+  }
+  return null;
 }

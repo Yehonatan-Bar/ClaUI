@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import { CodexExecProcessManager } from '../process/CodexExecProcessManager';
 import { CodexExecDemux } from '../process/CodexExecDemux';
 import { CodexMessageHandler, type CodexSessionController } from '../webview/CodexMessageHandler';
@@ -25,6 +25,7 @@ import type {
   WebviewToExtensionMessage,
 } from '../types/webview-messages';
 import type { CodexExecJsonEvent } from '../types/codex-exec-json';
+import type { HandoffProvider, HandoffSourceSnapshot } from './handoff/HandoffTypes';
 
 /**
  * Codex runtime tab (Stage 2 MVP): logical session per tab, one `codex exec` process per turn.
@@ -49,6 +50,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private thinkingFrame = 0;
   private static readonly THINKING_FRAMES = ['|', '/', '-', '\\'];
   private static readonly TURN_COMPLETE_EXIT_WATCHDOG_MS = 10_000;
+  private static readonly STEER_CANCEL_TIMEOUT_MS = 8_000;
   private turnCompletedExitWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly fileLogger: FileLogger | null = null;
   private readonly sessionNamer: CodexSessionNamer;
@@ -89,6 +91,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     sawTurnStarted: boolean;
     sawTurnCompleted: boolean;
   } | null = null;
+  /** Waiters that resolve on the next assistant reply (used by provider handoff orchestration). */
+  private assistantReplyWaiters: Array<(ok: boolean) => void> = [];
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -174,6 +178,9 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     if (this.disposed) {
       return;
     }
+    if (msg.type === 'assistantMessage') {
+      this.resolveAssistantReplyWaiters(true);
+    }
     if (msg.type === 'processBusy') {
       this.setBusy(msg.busy);
     }
@@ -199,6 +206,10 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   async switchModel(model: string): Promise<void> {
     this.currentModel = model;
     await vscode.workspace.getConfiguration('claudeMirror').update('codex.model', model, true);
+  }
+
+  getProvider(): HandoffProvider {
+    return 'codex';
   }
 
   async startSession(options?: { resume?: string; fork?: boolean; cwd?: string }): Promise<void> {
@@ -272,15 +283,19 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.postMessage({ type: 'sessionEnded', reason: 'stopped' });
   }
 
-  async sendText(text: string): Promise<void> {
-    await this.sendTurn(text);
+  async sendText(text: string, options?: { steer?: boolean }): Promise<void> {
+    await this.sendTurn(text, undefined, options);
   }
 
-  async sendWithImages(text: string, images: Array<{ base64: string; mediaType: string }>): Promise<void> {
-    await this.sendTurn(text, images as WebviewImageData[]);
+  async sendWithImages(
+    text: string,
+    images: Array<{ base64: string; mediaType: string }>,
+    options?: { steer?: boolean }
+  ): Promise<void> {
+    await this.sendTurn(text, images as WebviewImageData[], options);
   }
 
-  private async sendTurn(text: string, images?: WebviewImageData[]): Promise<void> {
+  private async sendTurn(text: string, images?: WebviewImageData[], options?: { steer?: boolean }): Promise<void> {
     if (!this.sessionActive) {
       await this.startSession();
     }
@@ -292,6 +307,25 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         this.noteTurnDiagnosticsActivity('lifecycle', 'sendTurn idle-running recovery: forcing stop()');
         this.clearTurnCompletedExitWatchdog();
         this.processManager.stop();
+      }
+      if (this.processManager.isTurnRunning) {
+        if (!options?.steer) {
+          throw new Error('A Codex turn is already running');
+        }
+        this.log(
+          `[Codex Tab ${this.tabNumber}] Steer requested while turn is busy; canceling active turn before retry`
+        );
+        this.noteTurnDiagnosticsActivity('lifecycle', 'steer requested: cancel active turn');
+        this.clearTurnCompletedExitWatchdog();
+        this.processManager.cancelTurn();
+        const turnStopped = await this.waitForTurnStop(CodexSessionTab.STEER_CANCEL_TIMEOUT_MS);
+        if (!turnStopped && this.processManager.isTurnRunning) {
+          this.noteTurnDiagnosticsActivity(
+            'lifecycle',
+            `steer cancel timeout after ${CodexSessionTab.STEER_CANCEL_TIMEOUT_MS}ms`
+          );
+          throw new Error('Could not stop the current Codex turn in time. Click Stop and retry.');
+        }
       }
       if (this.processManager.isTurnRunning) {
         throw new Error('A Codex turn is already running');
@@ -341,6 +375,30 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.noteTurnDiagnosticsActivity('lifecycle', 'runTurn dispatched');
   }
 
+  private waitForTurnStop(timeoutMs: number): Promise<boolean> {
+    if (!this.processManager.isTurnRunning) {
+      return Promise.resolve(true);
+    }
+    return new Promise<boolean>((resolve) => {
+      let settled = false;
+      const finish = (stopped: boolean) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        this.processManager.off('exit', onExit);
+        this.processManager.off('error', onError);
+        resolve(stopped);
+      };
+      const onExit = () => finish(true);
+      const onError = () => finish(true);
+      const timer = setTimeout(() => finish(!this.processManager.isTurnRunning), timeoutMs);
+      this.processManager.once('exit', onExit);
+      this.processManager.once('error', onError);
+    });
+  }
+
   cancelRequest(): void {
     this.noteTurnDiagnosticsActivity('lifecycle', 'cancelRequest');
     this.postMessage({ type: 'processBusy', busy: false });
@@ -388,6 +446,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.clearTurnCompletedExitWatchdog();
     this.endTurnDiagnostics('tab dispose()');
     this.stopThinkingAnimation();
+    this.resolveAssistantReplyWaiters(false);
     this.saveProjectAnalytics();
     this.processManager.stop();
     this.achievementService.onSessionEnd(this.id);
@@ -625,6 +684,46 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     return this.processManager.isTurnRunning;
   }
 
+  isBusyState(): boolean {
+    return this.isBusy;
+  }
+
+  async collectHandoffSnapshot(): Promise<HandoffSourceSnapshot> {
+    const sessionId = this.threadId || undefined;
+    const workspacePath = this.sessionCwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const reader = new CodexConversationReader((msg) => this.log(`[Codex Tab ${this.tabNumber}] ${msg}`));
+    const messages = sessionId ? reader.readSession(sessionId, workspacePath) : [];
+    const repoRoot = this.detectGitRepoRoot(workspacePath);
+    const branch = this.detectGitBranch(repoRoot || workspacePath);
+
+    return {
+      provider: 'codex',
+      tabId: this.id,
+      sessionId,
+      cwd: workspacePath,
+      repoRoot,
+      branch,
+      model: this.currentModel || this.getCurrentModel() || undefined,
+      messages,
+      createdAtIso: new Date().toISOString(),
+    };
+  }
+
+  waitForNextAssistantReply(timeoutMs = 120_000): Promise<boolean> {
+    if (this.disposed) {
+      return Promise.resolve(false);
+    }
+    return new Promise<boolean>((resolve) => {
+      const waiter = (ok: boolean) => {
+        clearTimeout(timer);
+        this.assistantReplyWaiters = this.assistantReplyWaiters.filter((w) => w !== waiter);
+        resolve(ok);
+      };
+      const timer = setTimeout(() => waiter(false), timeoutMs);
+      this.assistantReplyWaiters.push(waiter);
+    });
+  }
+
   private wireWebviewEvents(): void {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.panel.webview.onDidReceiveMessage((message: any) => {
@@ -655,6 +754,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         this.clearTurnCompletedExitWatchdog();
         this.endTurnDiagnostics('panel onDidDispose');
         this.stopThinkingAnimation();
+        this.resolveAssistantReplyWaiters(false);
         this.saveProjectAnalytics();
         this.processManager.stop();
         this.achievementService.onSessionEnd(this.id);
@@ -1125,6 +1225,53 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       return;
     }
     terminal.sendText(`printf '%s\\n' '${escaped}'`, true);
+  }
+
+  private resolveAssistantReplyWaiters(ok: boolean): void {
+    if (this.assistantReplyWaiters.length === 0) {
+      return;
+    }
+    const waiters = [...this.assistantReplyWaiters];
+    this.assistantReplyWaiters = [];
+    for (const waiter of waiters) {
+      try {
+        waiter(ok);
+      } catch {
+        // no-op
+      }
+    }
+  }
+
+  private detectGitBranch(cwd?: string): string | undefined {
+    if (!cwd) {
+      return undefined;
+    }
+    try {
+      const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+        cwd,
+        stdio: ['ignore', 'pipe', 'ignore'],
+        encoding: 'utf8',
+      }).trim();
+      return branch || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private detectGitRepoRoot(cwd?: string): string | undefined {
+    if (!cwd) {
+      return undefined;
+    }
+    try {
+      const repoRoot = execSync('git rev-parse --show-toplevel', {
+        cwd,
+        stdio: ['ignore', 'pipe', 'ignore'],
+        encoding: 'utf8',
+      }).trim();
+      return repoRoot || undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   private wireDemuxStatusBar(): void {

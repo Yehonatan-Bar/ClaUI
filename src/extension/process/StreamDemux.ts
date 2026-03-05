@@ -29,11 +29,15 @@ import type {
  *  - 'toolUseDelta'     ({ messageId, blockIndex, partialJson })
  *  - 'blockStop'        ({ blockIndex })
  *  - 'messageDelta'     ({ stopReason })
- *  - 'messageStart'     ({ messageId, model })
+ *  - 'messageStart'     ({ messageId, model, thinkingEffort? })
  *  - 'messageStop'      ()
+ *  - 'thinkingDetected'  ({ effort })
  */
 export class StreamDemux extends EventEmitter {
   private currentMessageId: string | null = null;
+  private currentThinkingEffort: string | null = null;
+  /** Set of block indices that are thinking blocks (silently consumed) */
+  private thinkingBlockIndices = new Set<number>();
 
   /** Feed a parsed CLI output event into the demuxer */
   handleEvent(event: CliOutputEvent): void {
@@ -59,6 +63,10 @@ export class StreamDemux extends EventEmitter {
   private handleSystemEvent(event: SystemInitEvent): void {
     // Only emit 'init' for actual init events, not hook_started/hook_response
     if (event.subtype === 'init') {
+      // Capture thinking effort from system init if available
+      if (event.thinking_effort) {
+        this.currentThinkingEffort = event.thinking_effort;
+      }
       this.emit('init', event);
     }
     // All system events (including hooks) are emitted generically
@@ -92,6 +100,8 @@ export class StreamDemux extends EventEmitter {
 
   private handleMessageStart(event: MessageStart): void {
     this.currentMessageId = event.message.id;
+    this.currentThinkingEffort = null;
+    this.thinkingBlockIndices.clear();
     const usage = event.message.usage;
     // Total context = input_tokens + cache_creation + cache_read
     // input_tokens alone is only the non-cached portion (often 1-5)
@@ -108,6 +118,19 @@ export class StreamDemux extends EventEmitter {
   private handleContentBlockStart(event: ContentBlockStart): void {
     const block = event.content_block;
 
+    if (block.type === 'thinking') {
+      // Track this block index as thinking so deltas are silently consumed
+      this.thinkingBlockIndices.add(event.index);
+      if (!this.currentThinkingEffort) {
+        // First thinking block in this message - detect effort from budget token
+        // The CLI may include a budget hint; for now, mark as detected and
+        // let the init event or system-level config provide the effort label
+        this.currentThinkingEffort = 'high'; // default when thinking is present
+        this.emit('thinkingDetected', { effort: this.currentThinkingEffort });
+      }
+      return;
+    }
+
     if (block.type === 'tool_use') {
       this.emit('toolUseStart', {
         messageId: this.currentMessageId,
@@ -120,6 +143,11 @@ export class StreamDemux extends EventEmitter {
   }
 
   private handleContentBlockDelta(event: ContentBlockDelta): void {
+    // Silently consume thinking deltas (don't display thinking content)
+    if (this.thinkingBlockIndices.has(event.index) || event.delta.type === 'thinking_delta') {
+      return;
+    }
+
     const delta = event.delta;
 
     if (delta.type === 'text_delta' && delta.text) {
@@ -150,6 +178,11 @@ export class StreamDemux extends EventEmitter {
   private handleMessageStop(): void {
     this.currentMessageId = null;
     this.emit('messageStop');
+  }
+
+  /** Get the thinking effort detected for the current/last message */
+  getThinkingEffort(): string | null {
+    return this.currentThinkingEffort;
   }
 
   private handleAssistantMessage(event: AssistantMessage): void {

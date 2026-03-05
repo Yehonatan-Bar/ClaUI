@@ -54,6 +54,8 @@ claude-code-mirror/
 |   |   |   +-- ClaudeProcessManager.ts   #   Spawns and manages CLI process
 |   |   |   +-- CodexExecProcessManager.ts #  Spawns and manages Codex exec processes
 |   |   |   +-- envUtils.ts               #   Shared env sanitization & API key management
+|   |   |   +-- killTree.ts              #   Shared cross-platform process tree kill utility
+|   |   |   +-- orphanCleanup.ts         #   Startup cleanup of orphaned ClaUi processes
 |   |   |   +-- StreamDemux.ts            #   Parses JSON lines, routes events
 |   |   |   +-- ControlProtocol.ts        #   Higher-level command API
 |   |   +-- webview/
@@ -138,7 +140,7 @@ claude-code-mirror/
 |       |   |   +-- MarkdownContent.tsx  #   Markdown rendering with sanitization and link detection
 |       |   |   +-- filePathLinks.tsx   #   Clickable file path and URL detection and rendering
 |       |   +-- InputArea/
-|       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt, image paste, @ file mentions, ultrathink button
+|       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt/steer, image paste, @ file mentions, ultrathink button
 |       |   |   +-- FileMentionPopup.tsx  #   Autocomplete popup for @ file mentions
 |       |   |   +-- GitPushPanel.tsx      #   Config panel for git push (status, ask Claude to configure)
 |       |   |   +-- CodexConsultPanel.tsx #   Input panel for Codex GPT expert consultation
@@ -236,6 +238,7 @@ claude-code-mirror/
     +-- MESSAGE_TRANSLATION.md           #   Hebrew translation via Sonnet CLI
     +-- SESSION_NAMER.md                  #   Auto-naming feature (data flow, gotchas, debugging)
     +-- SESSION_VITALS.md                 #   Session health dashboard (timeline, weather, cost bar)
+    +-- SKILL_VISUAL_INDICATOR.md        #   Skill tool invocation visual indicators (badge, pill, category)
     +-- STREAM_JSON_PROTOCOL.md           #   CLI protocol reference
     +-- PROMPT_ENHANCER.md               #   AI prompt enhancement feature
     +-- SKILL_GENERATION.md             #   Auto skill generation from SR-PTD docs
@@ -257,13 +260,19 @@ claude-code-mirror/
 **AuthManager** - Claude account auth helper for the extension host. Reads `.claude/.credentials.json` presence (legacy stub behavior) and now runs `claude auth status --json` / `claude auth logout` via `execFile` with a 10s timeout. Returns normalized `{ loggedIn, email, subscriptionType }` to `MessageHandler`, which forwards status to the webview and triggers logout refresh.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CLAUDE_AUTH_LOGIN_LOGOUT.md`
 
-**ClaudeProcessManager** - Spawns the Claude CLI child process with stream-json flags, handles stdin/stdout piping, process lifecycle, and crash detection. Uses `taskkill /F /T` on Windows to kill the entire process tree (required because `shell: true` creates a cmd.exe wrapper that SIGTERM alone cannot penetrate). Reads the user's API key from SecretStorage before each spawn and passes it via `buildClaudeCliEnv()`. Instantiated per-tab by SessionTab.
+**ClaudeProcessManager** - Spawns the Claude CLI child process with stream-json flags, handles stdin/stdout piping, process lifecycle, and crash detection. Uses the shared `killProcessTree()` utility on Windows to kill the entire process tree (required because `shell: true` creates a cmd.exe wrapper that SIGTERM alone cannot penetrate). Reads the user's API key from SecretStorage before each spawn and passes it via `buildClaudeCliEnv()`. Instantiated per-tab by SessionTab.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**Process Tree Kill (`killTree.ts`)** - Shared utility for cross-platform child process tree termination. On Windows, uses `taskkill /F /T /PID` to kill the cmd.exe wrapper AND all descendant processes. On Unix, uses standard `SIGTERM`. Used by all 12 CLI spawn points: `ClaudeProcessManager`, `CodexExecProcessManager`, `SessionNamer`, `CodexSessionNamer`, `ActivitySummarizer`, `MessageTranslator`, `TurnAnalyzer`, `PromptEnhancer`, `PromptTranslator`, `ClaudeCliCaller`, `AchievementInsightAnalyzer`, `PythonPhaseRunner`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/PROCESS_LIFECYCLE.md`
+
+**Orphan Cleanup (`orphanCleanup.ts`)** - Runs on extension activation. Scans for orphaned node.exe processes from previous ClaUi sessions (identified by `stream-json` CLI flag in command line) whose parent process is dead, and kills them. Prevents zombie process accumulation when VS Code crashes or extension host dies without running `deactivate()`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/PROCESS_LIFECYCLE.md`
 
 **Environment Sanitization & API Key Management** - Shared utility (`envUtils.ts`) that sanitizes inherited environment variables for all spawned CLI processes. Strips `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, and `ANTHROPIC_API_KEY` (case-insensitive on Windows) from the inherited env. Two modes: `buildSanitizedEnv()` for Codex processes (no key injection), `buildClaudeCliEnv(apiKey?)` for Claude CLI processes (optional key injection). API key is stored in VS Code SecretStorage (OS keychain) and managed through the Settings panel UI. Used by all 9 CLI spawn points.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/API_KEY_MANAGEMENT.md`
 
-**StreamDemux** - Receives raw CLI JSON events and demultiplexes them into typed, semantic events (textDelta, toolUseStart, messageDelta, assistantMessage, etc.) for UI consumers. Instantiated per-tab.
+**StreamDemux** - Receives raw CLI JSON events and demultiplexes them into typed, semantic events (textDelta, toolUseStart, messageDelta, assistantMessage, thinkingDetected, etc.) for UI consumers. Detects `thinking` content blocks, silently consumes thinking deltas, and emits `thinkingDetected` with effort level. Instantiated per-tab.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **WebviewProvider / buildWebviewHtml** - `buildWebviewHtml()` is an exported utility that generates CSP-safe HTML for webview panels. WebviewProvider class is retained for backward compatibility. SessionTab uses `buildWebviewHtml()` directly.
@@ -272,7 +281,7 @@ claude-code-mirror/
 **MessageHandler** - Bidirectional bridge translating webview postMessages into CLI commands and StreamDemux events into webview messages. Accepts a `WebviewBridge` interface (implemented by SessionTab). Uses optional bridge hooks (`getCliPathOverride`, `getProvider`) so webview-triggered start/restart flows keep the tab's runtime routing (including Happy CLI override) and report the correct provider in `sessionStarted`. Triggers auto-naming on first user message. Detects plan approval pauses (ExitPlanMode/AskUserQuestion) and forwards approval responses.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**CodexMessageHandler** - Codex-specific webview/runtime bridge for `codex exec --json` sessions. Maps `CodexExecDemux` events into existing webview message types (including synthesized `messageStart`/`streamingText`/`messageStop` around complete Codex `agent_message` items), handles Codex settings/history/image sends, and serializes live turn message emission order. Additional hardening exists in the Codex tab and webview layers: `CodexSessionTab` serializes actual `panel.webview.postMessage(...)` deliveries by awaiting the VS Code Thenable in a FIFO queue, adds a turn-complete exit watchdog (force-stop if process lingers after `turn.completed`), and recovers idle-but-running stale turns before starting a new one; `CodexMessageHandler` now keeps `processBusy` aligned with runtime state on send failures via `session.isTurnRunning()`. `useClaudeStream` also applies a Codex-only fallback that immediately upserts complete `assistantMessage` payloads so replies remain visible even if finalize/clear events arrive out of order.
+**CodexMessageHandler** - Codex-specific webview/runtime bridge for `codex exec --json` sessions. Maps `CodexExecDemux` events into existing webview message types (including synthesized `messageStart`/`streamingText`/`messageStop` around complete Codex `agent_message` items), handles Codex settings/history/image sends, and serializes live turn message emission order. Additional hardening exists in the Codex tab and webview layers: `CodexSessionTab` serializes actual `panel.webview.postMessage(...)` deliveries by awaiting the VS Code Thenable in a FIFO queue, adds a turn-complete exit watchdog (force-stop if process lingers after `turn.completed`), recovers idle-but-running stale turns before starting a new one, and now supports approved mid-turn steering by cancelling the active turn before dispatching the new one. `CodexMessageHandler` keeps `processBusy` aligned with runtime state on send failures via `session.isTurnRunning()` and enforces a Codex-specific steer gate (`Stop`/`Steer`) when a turn is still active. `useClaudeStream` also applies a Codex-only fallback that immediately upserts complete `assistantMessage` payloads so replies remain visible even if finalize/clear events arrive out of order.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_INTEGRATION_PROGRESS.md`
 
 **SessionNamer** - Spawns a one-shot `claude -p` process using Haiku to generate a 1-3 word tab name from the user's first message. Matches the language of the message (Hebrew/English). 10-second timeout, sanitized output, all errors silently logged.
@@ -296,7 +305,7 @@ claude-code-mirror/
 **Markdown Rendering** - Text content in messages is rendered as formatted Markdown using `marked` (parser) and `DOMPurify` (sanitizer). Supports bold, italic, headers, lists, tables, blockquotes, inline code, links, and horizontal rules. Fenced code blocks are extracted first and rendered by `CodeBlock` (with copy/collapse); remaining text segments go through `MarkdownContent`. Bare file paths and URLs in rendered Markdown are linkified via DOM post-processing. Full RTL/Hebrew support with directional overrides for blockquotes, lists, and code.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/MARKDOWN_RENDERING.md`
 
-**React Chat UI** - React 18 components for message display, streaming text, tool use blocks, code blocks, image display, and RTL-aware input. The input area supports sending prompts while Claude is busy (interrupt), matching Claude Code CLI behavior. Ctrl+V pastes images from clipboard as base64 attachments (shown as thumbnails above the input, removable before sending) when the active provider capability `supportsImages` is enabled (Claude + Codex). In Codex tabs, image attachments are converted to temporary files and passed to `codex exec` / `codex exec resume` via repeatable `--image` flags. Clipboard shortcut/paste diagnostics from `InputArea` can be forwarded to the extension log as `[UiDebug][InputArea] ...` entries for troubleshooting paste/image issues in the webview. Both Send and Cancel buttons are visible during processing; Escape cancels the current response.
+**React Chat UI** - React 18 components for message display, streaming text, tool use blocks, code blocks, image display, and RTL-aware input. The input area supports sending prompts while busy (interrupt/steer). In Codex tabs, when a turn is active the controls switch to `Stop` + `Steer`; pressing `Steer` asks for approval and then interrupts the running turn before sending the new prompt. Ctrl+V pastes images from clipboard as base64 attachments (shown as thumbnails above the input, removable before sending) when the active provider capability `supportsImages` is enabled (Claude + Codex). In Codex tabs, image attachments are converted to temporary files and passed to `codex exec` / `codex exec resume` via repeatable `--image` flags. Clipboard shortcut/paste diagnostics from `InputArea` can be forwarded to the extension log as `[UiDebug][InputArea] ...` entries for troubleshooting paste/image issues in the webview. Both Send/Steer and Cancel/Stop buttons are visible during processing; Escape cancels/stops the current response.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **StatusBar (Responsive)** - Bottom status bar extracted into its own component (`StatusBar/StatusBar.tsx`). Uses a `ResizeObserver` hook (`useStatusBarCollapse`) with 4 layout stages and hysteresis thresholds (`~1350`, `~860`, `~480`). Layout transitions are driven purely by width thresholds with hysteresis gaps (~40px each) to prevent flicker. No `scrollWidth` overflow detection. Stage 1 (`full`): existing full-width layout. Stage 2 (`medium`): inline `Clock`, `History`, `Prompts`, `Feedback`, `Plans`, Babel Fish icon, Vitals gear, `Aa`, and token counters; a **More** dropdown contains provider selectors, model/permission selectors, Git, Dashboard, Teams, Consult, SkillDocs, Achievements, Usage, and Vitals toggle. Stage 3 (`collapsed`): two dropdowns (**More** + **Tools**) plus always-visible Active Clock, Vitals gear, Aa, and token counters. Stage 4 (`minimal`): a single **Menu** dropdown plus Vitals gear only. Provider-specific gating is applied in the webview: in Codex UI mode, the `SkillDocs` button, adjacent `!` info button, and Anthropic `Usage` button are hidden (across responsive stages where they appear). If a provider does not support Git Push, the Git controls remain visible but are disabled with tooltips (instead of disappearing). Dropdowns open upward with click-outside dismiss, mutual exclusivity, and Escape key support. The Usage popover also toggles the context strip (`ContextUsageWidget`) and now labels it as a strip (not a widget) for copy consistency.
@@ -341,7 +350,7 @@ claude-code-mirror/
 **File Mention (@)** - Inline autocomplete triggered by typing `@` in the chat textarea. Searches workspace files via `vscode.workspace.findFiles()` with 150ms debounce, showing results in a popup above the input. Navigate with ArrowUp/Down, select with Enter/Tab/click. Replaces `@query` with the relative file path. Uses custom DOM events for extension-to-webview communication (same pattern as prompt history). All state is local to the `useFileMention` hook (not in Zustand).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/FILE_MENTION.md`
 
-**Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'` and shows a CLI-matching 4-option approval bar: (1) clear context + bypass permissions, (2) bypass permissions, (3) manually approve edits, (4) type feedback. The bar **persists until user interaction** (button click, typed message, or a new `planApprovalRequired` replacing it). For `ExitPlanMode`, approve actions close the bar without immediately sending user messages (the CLI usually auto-approves via bypassPermissions/allowedTools; immediate text would create spurious turns causing infinite loops). A delayed fallback nudge sends `"Continue with the implementation."` only if no post-approval CLI resume activity is observed; resume-check has priority over result-check to avoid spurious nudges when the CLI has already started new work. If non-plan execution activity (e.g., `TodoWrite`, `Read`) is observed after approval, a later `ExitPlanMode` call is treated as a fresh cycle (not stale suppression) so the approval bar can reappear instead of deadlocking. Reject/feedback actions send text to the CLI. For `AskUserQuestion`, responses are sent as user messages. Option 1 also triggers context compaction. Option 3 switches to supervised permission mode. Context usage percentage is shown when token data is available. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON. `TodoWrite` blocks now render as a dedicated visual task card with progress bar, status counters, and color-coded todo rows instead of raw JSON.
+**Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, the extension detects this via the `messageDelta` event with `stop_reason: 'tool_use'` and shows a CLI-matching 4-option approval bar: (1) clear context + bypass permissions, (2) bypass permissions, (3) manually approve edits, (4) type feedback. The bar **persists until user interaction** (button click, typed message, or a new `planApprovalRequired` replacing it). For `ExitPlanMode`, approve actions close the bar without immediately sending user messages (the CLI usually auto-approves via bypassPermissions/allowedTools; immediate text would create spurious turns causing infinite loops). The approve fallback now re-checks while the CLI is busy and sends `"Continue with the implementation."` when the CLI becomes idle with no non-plan execution progress, with a 30s max-wait failsafe to prevent click no-op deadlocks. If non-plan execution activity (e.g., `TodoWrite`, `Read`) is observed after approval, the nudge is skipped and a later `ExitPlanMode` call is treated as a fresh cycle (not stale suppression) so the approval bar can reappear instead of deadlocking. Reject/feedback actions send text to the CLI. For `AskUserQuestion`, responses are sent as user messages. Option 1 also triggers context compaction. Option 3 switches to supervised permission mode. Context usage percentage is shown when token data is available. Debugging adds explicit approval-path logs (`[EPM_APPROVE]`, `[APPROVAL_STATE]`) and webview click telemetry (`[UiDebug][PlanApprovalBar]`) in `Output -> ClaUi`. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON. `TodoWrite` blocks now render as a dedicated visual task card with progress bar, status counters, and color-coded todo rows instead of raw JSON.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 > Bug history: `Kingdom_of_Claudes_Beloved_MDs/BUG_EXITPLANMODE_INFINITE_LOOP.md`
 
@@ -356,6 +365,9 @@ claude-code-mirror/
 
 **Session Vitals** - Visual session health dashboard with 5 components: Session Timeline (vertical color-coded minimap alongside messages, click-to-jump), Weather Widget (animated mood icon reflecting error/success patterns), Cost Heat Bar (gradient strip showing cost accumulation), Turn Intensity Borders (colored left border on assistant messages based on tool activity), and a Vitals toggle button in the StatusBar. The Vitals gear dropdown (`VitalsInfoPanel`) also hosts quick settings utilities including API key management and Claude CLI account Login/Logout/Refresh controls (status shown as email + subscription type when available). Data pipeline: `MessageHandler` builds `TurnRecord` on each CLI result event, sends to webview via `turnComplete` postMessage, stored in Zustand (`turnHistory[]`, `turnByMessageId{}`). Weather mood recalculated on each turn via sliding window algorithm. All components hidden when vitals disabled.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_VITALS.md`
+
+**Skill Visual Indicator** - Three-layer visual system for Skill tool invocations: (1) SkillBadge in the message stream -- magenta-accented card with skill name chip and "invoking..." streaming label; (2) Status bar skill pill -- animated magenta pill with glowing dot, appears during active invocation, disappears on turn completion; (3) Turn category integration -- `'skill'` category with magenta color (`#e040fb`) in timeline segments, intensity borders, and dashboard charts.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/SKILL_VISUAL_INDICATOR.md`
 
 **Adventure Widget** - Pixel-art dungeon crawler that visualizes session activity as a thin-wall maze grid. Each CLI turn extends the maze and maps to an encounter: scrolls (Read), anvils (Edit), traps (errors), dragons (3+ errors), treasure (recovery). Canvas 2D engine with 4x4 mini sprites on a 40x40 cell maze, PICO-8 palette, BFS pathfinding, state machine (IDLE/WALKING/ENCOUNTER/RESOLUTION). Extension-side `AdventureInterpreter` converts `TurnRecord` to `AdventureBeat` via deterministic rules. Toggleable separately from main vitals.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ADVENTURE_WIDGET.md`
@@ -704,3 +716,89 @@ npm install -g @vscode/vsce
 | **4. Input** | Partial | File picker + Explorer send-path + keyboard shortcut (done), send-while-busy interrupt (done), image paste via Ctrl+V (done), RTL enhancements (done), editable prompts (done) |
 | **5. Accounts** | Stub | Multi-account, compact mode, cost tracking |
 | **6. Polish** | Pending | Virtualized scrolling, error recovery, theming |
+
+---
+
+## 2026-03-05 - Provider Handoff (Claude <-> Codex) Mid-Session
+
+### New Components (Component Index Additions)
+
+- `src/extension/session/handoff/HandoffTypes.ts`
+  - Unified handoff capsule/stage contracts.
+- `src/extension/session/handoff/HandoffContextBuilder.ts`
+  - Builds provider-neutral `HandoffCapsule` from source tab snapshot/history.
+- `src/extension/session/handoff/HandoffPromptComposer.ts`
+  - Composes the target-session opening prompt from capsule data.
+- `src/extension/session/handoff/HandoffArtifactStore.ts`
+  - Saves handoff artifacts (`.json` + `.md`) under managed logs with secret redaction and size budgeting.
+- `src/extension/session/handoff/HandoffOrchestrator.ts`
+  - End-to-end handoff state machine (`collecting_context` -> `completed|failed`).
+
+### Updated Components
+
+- `src/extension/session/TabManager.ts`
+  - Added `handoffSession(...)` API with per-tab lock + cooldown.
+  - Integrates `HandoffOrchestrator` and posts `handoffProgress` stage events to source webview.
+  - Links source/target session metadata for audit/debug.
+- `src/extension/session/SessionTab.ts`
+  - Added handoff snapshot API (`collectHandoffSnapshot()`), busy getter (`isBusyState()`), and first-reply waiter (`waitForNextAssistantReply()`).
+- `src/extension/session/CodexSessionTab.ts`
+  - Added handoff snapshot API, provider getter (`getProvider()`), and first-reply waiter.
+- `src/extension/webview/MessageHandler.ts`
+  - Added `switchProviderWithContext` request handling (routes to command).
+- `src/extension/webview/CodexMessageHandler.ts`
+  - Added `switchProviderWithContext` handling and clipboard support for handoff fallback.
+- `src/extension/commands.ts`
+  - Added command: `claudeMirror.switchProviderWithContext` (explicit command-palette flow).
+- `src/extension/types/webview-messages.ts`
+  - Added `switchProviderWithContext` request and `handoffProgress` extension event.
+- `src/webview/state/store.ts`
+  - Added handoff UI state (`handoffStage`, target, error, artifact/manual prompt).
+- `src/webview/hooks/useClaudeStream.ts`
+  - Handles `handoffProgress` and auto-clears completed state.
+- `src/webview/components/StatusBar/StatusBar.tsx`
+  - Added clear action split:
+    - `Switch (Carry Context)`
+    - existing provider buttons keep `Open Clean Session` behavior.
+  - Added one-line handoff progress/failure banner and manual fallback button.
+- `src/webview/components/InputArea/InputArea.tsx`
+  - Locks input/actions during active handoff stages and shows lock/progress indicator.
+- `src/extension/session/SessionStore.ts`
+  - Added handoff metadata fields:
+    - `handoffSourceTabId`, `handoffSourceProvider`
+    - `handoffTargetTabId`, `handoffTargetProvider`
+    - `handoffArtifactPath`, `handoffCompletedAt`
+
+### Directory Structure Delta
+
+Under `src/extension/session/`:
+
+- Added folder: `handoff/`
+- Added files:
+  - `HandoffTypes.ts`
+  - `HandoffContextBuilder.ts`
+  - `HandoffPromptComposer.ts`
+  - `HandoffArtifactStore.ts`
+  - `HandoffOrchestrator.ts`
+
+### Manifest/Settings Delta
+
+Added command in `package.json`:
+
+- `claudeMirror.switchProviderWithContext` (`ClaUi: Switch Provider (Carry Context)`)
+
+Added settings:
+
+- `claudeMirror.handoff.enabled` (default: `true`)
+- `claudeMirror.handoff.autoSend` (default: `true`)
+- `claudeMirror.handoff.storeArtifacts` (default: `true`)
+
+### Runtime Notes
+
+- Cross-provider resume is still clean-session based (no shared hidden memory transfer).
+- Context transfer uses `HandoffCapsule` + opening prompt injection.
+- On failure, target tab remains open and manual capsule prompt is available for copy/send fallback.
+
+### Detail Doc
+
+- `Kingdom_of_Claudes_Beloved_MDs/PROVIDER_HANDOFF.md`

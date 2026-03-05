@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import { buildClaudeCliEnv } from '../process/envUtils';
+import { killProcessTree } from '../process/killTree';
 
 /** RTL languages that need dir="rtl" when displaying translations */
 export const RTL_LANGUAGES = new Set(['Hebrew', 'Arabic']);
@@ -80,7 +81,7 @@ export class MessageTranslator {
       // 30-second timeout (translations can be lengthy)
       const timer = setTimeout(() => {
         this.log('[MessageTranslator] timeout (30s), killing process');
-        child.kill('SIGTERM');
+        killProcessTree(child);
         finish(null);
       }, 30_000);
 

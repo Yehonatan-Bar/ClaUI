@@ -137,6 +137,10 @@ export class ConversationReader {
       const data = assistantBlocks.get(msgId);
       if (!data || data.blocks.length === 0) continue;
 
+      // Detect thinking effort from the presence of thinking blocks
+      const hasThinking = data.blocks.some(b => b.type === 'thinking');
+      const thinkingEffort = hasThinking ? 'high' : undefined;
+
       // Filter out thinking blocks (not displayed in UI)
       const visibleBlocks = data.blocks.filter(b =>
         b.type === 'text' || b.type === 'tool_use'
@@ -150,6 +154,7 @@ export class ConversationReader {
         content: visibleBlocks,
         model: data.model,
         timestamp: Date.now() - 1000000 + messages.length * 100,
+        thinkingEffort,
       });
     }
 

@@ -14,7 +14,7 @@ interface MessageListProps {
 }
 
 export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange }) => {
-  const { messages, streamingMessageId, streamingBlocks, isBusy, truncateFromMessage, addUserMessage, markSessionPromptSent } = useAppStore();
+  const { messages, streamingMessageId, streamingBlocks, isBusy, truncateFromMessage, addUserMessage, markSessionPromptSent, currentThinkingEffort } = useAppStore();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const userScrolledUp = useRef(false);
@@ -111,6 +111,11 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
             <span className="message-timestamp">
               {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
+            {currentThinkingEffort && (
+              <span className={`thinking-effort-badge thinking-effort-${currentThinkingEffort} thinking-effort-live`}>
+                {currentThinkingEffort}
+              </span>
+            )}
           </div>
           {streamingBlocks.map((block) =>
             block.type === 'text' ? (

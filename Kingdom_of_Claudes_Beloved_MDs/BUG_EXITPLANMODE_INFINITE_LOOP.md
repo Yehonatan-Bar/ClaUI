@@ -17,8 +17,9 @@ The plan approval bar (4 CLI-matching options) and AskUserQuestion interactive c
 **Date Twelfth Fix**: 2026-03-04 (stale approval bar persists during execution - display-only)
 **Date Thirteenth Fix**: 2026-03-04 (approval bar auto-dismissed by 5s timer before user can interact)
 **Date Fourteenth Fix**: 2026-03-05 (approve click no-op when CLI auto-resumed AND completed - resumeObserved masks idle state)
+**Date Fifteenth Fix**: 2026-03-05 (approve click no-op when one-shot delayed check fires during compact/busy turn)
 **Severity**: Critical (blocks plan mode workflow)
-**Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`, `src/webview/components/InputArea/InputArea.tsx`
+**Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`, `src/webview/components/ChatView/PlanApprovalBar.tsx`
 
 ---
 
@@ -252,6 +253,22 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 
 **Why this doesn't cause the infinite loop**: The `exitPlanModeProcessed` flag is still set when the user clicks approve (`markExitPlanModeProcessed` in `planApprovalResponse`). Any subsequent ExitPlanMode calls from the model after the nudge are suppressed by this flag. The nudge text ("Continue with the implementation.") is a neutral implementation directive, not an approval message.
 
+### Fifteenth Bug (2026-03-05): Approve Click No-Op When Busy Check Happens During Compact/Non-Executing Turn
+
+**Cause**: Bug 14 used a single delayed check when `inAssistantTurn=true`. If that one check fired while the CLI was still busy (for example, during context compaction after option 1), the nudge was skipped permanently. After the busy turn ended, no further check ran, so the approval click remained a no-op.
+
+**Root cause**: The fallback had only one retry point. Busy-at-check-time was treated as "implementation is already progressing", which is not always true.
+
+**Fix** (three parts):
+1. `scheduleExitPlanApproveResumeFallback` now retries while CLI is busy **and** no non-plan execution activity was observed.
+2. Added a max wait (`EXIT_PLANMODE_APPROVE_MAX_WAIT_MS = 30000`): if still no non-plan progress, force a final `"Continue with the implementation."` nudge.
+3. Added explicit error handling/logging for approve-path `sendText`/`compact` failures and webview telemetry for button clicks.
+
+**Why this is safe**:
+- If real implementation already started (`postExitPlanNonPlanActivityObserved=true`), nudge is skipped.
+- If the CLI is truly idle/no-progress, the user gets a deterministic continuation instead of silent no-op.
+- The `exitPlanModeProcessed` guard still prevents infinite ExitPlanMode re-triggers.
+
 ---
 
 ## Current Defense Layers
@@ -265,9 +282,12 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 | `sendMessage` sets `exitPlanModeProcessed` | MessageHandler.ts `sendMessage` handler | Typed text bypassing the button-click guard (Bug 8 fix) |
 | Skip `processBusy:true` for ExitPlanMode approve | MessageHandler.ts `planApprovalResponse` | Stuck "Thinking..." indicator after plan approval |
 | Send `processBusy:true` for ExitPlanMode feedback | MessageHandler.ts `planApprovalResponse` | UI shows thinking while Claude processes feedback |
-| `inAssistantTurn` flag for approve nudge | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Approve click no-op: uses direct idle/busy check instead of fragile resumeObserved/resultObserved (Bug 14 fix) |
-| `postApproveNudgeTimer` (decoupled from cycle state) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Delayed nudge survives result-handler cleanup (Bug 14 fix) |
+| `inAssistantTurn` + retry loop for approve nudge | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Approve click no-op when one-shot busy check misses idle transition (Bug 15 fix) |
+| `EXIT_PLANMODE_APPROVE_MAX_WAIT_MS` forced nudge | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Stuck/no-progress sessions where CLI stays busy or misses idle signal (Bug 15 fix) |
+| `postApproveNudgeTimer` (re-check scheduler) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Repeated busy-state rechecks until idle/progress/timeout (Bug 15 fix) |
 | Neutral nudge text | MessageHandler.ts all fallback paths | Prevents model from associating nudge with plan approval |
+| Approve-path try/catch with error postMessage | MessageHandler.ts `planApprovalResponse` + fallback nudge | Silent failures when send/compact throws |
+| PlanApprovalBar click telemetry | PlanApprovalBar.tsx (`uiDebugLog`) | Distinguishes "click never reached extension" vs "extension handled but stalled" |
 | `compactPending` -> reset `exitPlanModeProcessed` on messageStart | MessageHandler.ts `messageStart` handler | Stuck plan mode after context compaction (Bug 9 fix) |
 | `postExitPlanNonPlanActivityObserved` re-opens ExitPlanMode cycle after real execution | MessageHandler.ts `toolUseStart` + `notifyPlanApprovalRequired` | Deadlock where legitimate ExitPlanMode is suppressed as stale (Bug 10 fix) |
 | `exitPlanModeReopenCount` limits Bug 10 re-opens to MAX_EXITPLANMODE_REOPENS | MessageHandler.ts `notifyPlanApprovalRequired` | Infinite reopen loop from unbounded Bug 10 logic (Bug 11 fix) |
@@ -392,17 +412,22 @@ if (!isExitPlanMode || isExitPlanFeedback) {
 ### scheduleExitPlanApproveResumeFallback (MessageHandler.ts)
 
 ```typescript
-// Bug 14 fix: Use inAssistantTurn instead of resumeObserved/resultObserved.
-// inAssistantTurn is true between messageStart and result — a direct idle/busy indicator.
-if (!this.inAssistantTurn) {
-  // CLI is idle — send nudge immediately
-  this.control.sendText('Continue with the implementation.');
-  this.webview.postMessage({ type: 'processBusy', busy: true });
+// Bug 15 fix: retry until idle/progress/timeout (not one-shot).
+if (!this.inAssistantTurn && !this.postExitPlanNonPlanActivityObserved) {
+  sendProceedNudgeNow();
   return;
 }
-// CLI is in an active turn — schedule delayed check via postApproveNudgeTimer
-// (decoupled from approval cycle state, survives result-handler cleanup)
-// Timer callback: !inAssistantTurn -> nudge, inAssistantTurn -> skip (implementing)
+if (this.postExitPlanNonPlanActivityObserved) {
+  // Real implementation started -> skip nudge.
+  return;
+}
+if (elapsedMs >= EXIT_PLANMODE_APPROVE_MAX_WAIT_MS) {
+  // Stuck/no-progress failsafe.
+  sendProceedNudgeNow();
+  return;
+}
+// Busy + no progress -> schedule another re-check.
+this.postApproveNudgeTimer = setTimeout(recheck, EXIT_PLANMODE_APPROVE_RESUME_FALLBACK_DELAY_MS);
 ```
 
 ---
@@ -410,7 +435,7 @@ if (!this.inAssistantTurn) {
 ## Bar Lifecycle
 
 The approval bar is cleared when:
-1. **User clicks a button** -> PlanApprovalBar calls `setPendingApproval(null)` directly. For non-ExitPlanMode, extension immediately sends text + `processBusy:true`. For ExitPlanMode approve, extension closes the bar and waits briefly for auto-resume; if none is observed, it sends a single proceed nudge + `processBusy:true`. For ExitPlanMode feedback, extension sends the feedback text to CLI + `processBusy:true`.
+1. **User clicks a button** -> PlanApprovalBar calls `setPendingApproval(null)` directly. For non-ExitPlanMode, extension immediately sends text + `processBusy:true`. For ExitPlanMode approve, extension closes the bar and runs retry-based fallback checks (idle/progress/timeout) before nudging. For ExitPlanMode feedback, extension sends the feedback text to CLI + `processBusy:true`.
 2. **User sends a regular message** -> `sendMessage` -> `processBusy: true` -> bar cleared
 3. **New `planApprovalRequired` replaces it** (e.g., AskUserQuestion replaced by ExitPlanMode)
 4. **Session resets**
@@ -438,12 +463,17 @@ If the model calls AskUserQuestion and then ExitPlanMode in quick succession (co
 2. Give a task that triggers plan mode (e.g., ask Claude to plan a complex feature)
 3. When the approval bar appears with 4 options, verify it stays visible
 4. Click any approve button -> verify model continues without bar re-appearing
-5. **Verify NO stuck "Thinking..."** -> after clicking approve, the indicator should NOT show "Thinking..." indefinitely. If the CLI already finished, no indicator should show. If still executing, tool activity messages should appear. If the CLI fails to auto-resume, the delayed fallback should start execution within a few seconds.
+5. **Verify NO click no-op** -> after clicking approve, either Claude continues immediately, or fallback retries and eventually nudges (max ~30s). The action must not silently disappear with zero follow-up.
 6. Test typing text while bar is visible -> verify it sends as regular message (not dropped)
 7. Check logs (`Output -> ClaUi`) for these diagnostic prefixes:
    - `[APPROVAL_STATE]` - full state dump at every key lifecycle moment (messageStart, result, sendMessage, planApprovalResponse, messageDelta, assistantMessage fallback, notifyPlanApprovalRequired)
    - `[EPM_TRACK]` - `notePostExitPlanNonPlanActivity` skip/track decisions (shows whether CLI ran tools before user clicked)
    - `[EPM_CYCLE]` - `markApprovalCycleResumeObserved` / `markApprovalCycleResultObserved` decisions (shows CLI resume/idle detection)
+   - `[EPM_APPROVE]` - approve-path control actions and fallback scheduling decisions
+   - `[UiDebug][PlanApprovalBar]` - webview click telemetry (which option was clicked, toolName, feedback length)
    - Look for `reopenCount=N/2` in `[APPROVAL_STATE]` lines to confirm Bug 11 counter is working
+   - Live log panel: VS Code -> `Output` -> select `ClaUi`
+   - Persisted Output history: `%APPDATA%\\Code\\logs\\<VS Code session>\\windowN\\exthost\\output_logging_<timestamp>\\1-ClaUi.log`
+   - Extension rolling logs: `C:\\Users\\yoni.bar\\AppData\\Roaming\\Code\\User\\globalStorage\\claude-code-mirror.claude-code-mirror\\logs\\ClaUiLogs`
 8. Test AskUserQuestion: give a task that triggers a question, verify option buttons appear. After answering, "Thinking..." should show (text IS sent to CLI for AskUserQuestion).
 9. Test multi-cycle plan mode (model does work then re-plans): verify up to 2 re-opens work (approval bar shows), and the 3rd re-open is suppressed with log `"Suppressing ExitPlanMode reopen - hit max reopens"`.

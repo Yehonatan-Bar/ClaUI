@@ -11,6 +11,12 @@ export interface SessionMetadata {
   lastActiveAt: string; // ISO date string
   firstPrompt?: string; // First line of the user's first message
   workspacePath?: string; // Workspace folder path when the session was created
+  handoffSourceTabId?: string;
+  handoffSourceProvider?: ProviderId;
+  handoffTargetTabId?: string;
+  handoffTargetProvider?: ProviderId;
+  handoffArtifactPath?: string;
+  handoffCompletedAt?: string;
 }
 
 type StoredSessionMetadata = Omit<SessionMetadata, 'provider'> & {

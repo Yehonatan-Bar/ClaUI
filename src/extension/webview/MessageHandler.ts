@@ -72,6 +72,7 @@ const APPROVAL_TOOLS = ['ExitPlanMode', 'AskUserQuestion'];
  *  Without this limit, the model can loop: work -> ExitPlanMode -> approve -> work -> ExitPlanMode... */
 const MAX_EXITPLANMODE_REOPENS = 2;
 const EXIT_PLANMODE_APPROVE_RESUME_FALLBACK_DELAY_MS = 5000;
+const EXIT_PLANMODE_APPROVE_MAX_WAIT_MS = 30000;
 
 function isApprovalToolName(name: string): boolean {
   const normalized = name.trim().toLowerCase();
@@ -110,6 +111,7 @@ function categorizeTurn(toolNames: string[], isError: boolean): TurnCategory {
   if (isError) return 'error';
   if (toolNames.length === 0) return 'discussion';
   const baseNames = toolNames.map(n => n.includes('__') ? n.split('__').pop()! : n);
+  if (baseNames.some(n => n === 'Skill')) return 'skill';
   if (baseNames.some(n => CODE_WRITE_TOOLS.includes(n))) return 'code-write';
   if (baseNames.some(n => COMMAND_TOOLS.includes(n))) return 'command';
   if (baseNames.some(n => RESEARCH_TOOLS.includes(n))) return 'research';
@@ -179,6 +181,8 @@ export class MessageHandler {
   private exitPlanApproveResumeFallbackCycleId: number | null = null;
   /** True while the CLI is between messageStart and result (assistant turn in progress) */
   private inAssistantTurn = false;
+  /** Thinking effort level detected from system init or content blocks */
+  private currentThinkingEffort: string | null = null;
   /** Separate timer for post-approve nudge, decoupled from approval cycle state so it
    *  won't be cancelled by result-handler cleanup or markApprovalCycleResumeObserved. */
   private postApproveNudgeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -234,6 +238,10 @@ export class MessageHandler {
 
   /** Codex consultation: timestamp when the request was sent (for latency tracking) */
   private _codexConsultStartedAt: number | null = null;
+  /** Codex consultation: timeout timer to cancel hung MCP calls */
+  private _codexConsultTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Codex consultation timeout in ms (default: 120 seconds) */
+  private static readonly CODEX_CONSULT_TIMEOUT_MS = 120_000;
 
   /** Extension-side TurnRecord accumulator for project analytics persistence */
   private turnRecords: TurnRecord[] = [];
@@ -486,6 +494,8 @@ export class MessageHandler {
           this.cancelExitPlanApproveResumeFallback();
           this.cancelPostApproveNudge();
           this.clearApprovalTracking();
+          this.clearCodexConsultTimeout();
+          this._codexConsultStartedAt = null;
           this.achievementService.onUserPrompt(this.tabId, msg.text);
           // Optimistic: show user message in UI immediately (before CLI echoes it back)
           this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock]);
@@ -541,6 +551,8 @@ export class MessageHandler {
           // Immediate UI feedback so the user sees the cancel take effect
           this.webview.postMessage({ type: 'processBusy', busy: false });
           this.clearApprovalTracking();
+          this.clearCodexConsultTimeout();
+          this._codexConsultStartedAt = null;
           this.achievementService.onCancel(this.tabId);
           try {
             this.control.cancel();
@@ -720,6 +732,23 @@ export class MessageHandler {
               this.log(`Failed to save provider setting before opening tab "${msg.provider}": ${message}`);
               this.webview.postMessage({ type: 'error', message: `Failed to open ${msg.provider} tab: ${message}` });
             });
+          break;
+
+        case 'switchProviderWithContext':
+          this.log(`Switch provider with context requested: "${msg.targetProvider}"`);
+          void vscode.commands.executeCommand('claudeMirror.switchProviderWithContext', {
+            sourceTabId: this.tabId,
+            targetProvider: msg.targetProvider,
+            keepSourceOpen: msg.keepSourceOpen ?? true,
+            autoSend: msg.autoSend ?? true,
+          }).then(
+            () => undefined,
+            (err: unknown) => {
+              const message = err instanceof Error ? err.message : String(err);
+              this.log(`Failed switchProviderWithContext: ${message}`);
+              this.webview.postMessage({ type: 'error', message: `Provider handoff failed: ${message}` });
+            },
+          );
           break;
 
         case 'setTypingTheme':
@@ -1082,6 +1111,21 @@ export class MessageHandler {
           this.log(`Plan approval response: action=${msg.action} toolName=${msg.toolName || '(none)'} pendingTool=${this.pendingApprovalTool || '(none)'}`);
           this.logApprovalState('planApprovalResponse-entry');
           {
+          const sendApprovalText = (text: string, context: string): boolean => {
+            try {
+              this.control.sendText(text);
+              this.log(`[EPM_APPROVE] Sent text (${context}): "${text.slice(0, 120)}"`);
+              return true;
+            } catch (err) {
+              const errorText = err instanceof Error ? err.message : String(err);
+              this.log(`[EPM_APPROVE] Failed to send text (${context}): ${errorText}`);
+              this.webview.postMessage({
+                type: 'error',
+                message: `Plan approval action failed (${context}): ${errorText}`,
+              });
+              return false;
+            }
+          };
           // Use msg.toolName from webview as primary source - it's reliable because
           // the webview stores it when the approval bar is shown. Fall back to
           // this.pendingApprovalTool which may have been cleared by a `result` event
@@ -1117,13 +1161,23 @@ export class MessageHandler {
               this.log(`ExitPlanMode feedback - sending user feedback to CLI`);
               // Optimistic: show user message in UI immediately
               this.postUserMessage([{ type: 'text', text: msg.feedback.trim() } as ContentBlock]);
-              this.control.sendText(msg.feedback.trim());
+              sendApprovalText(msg.feedback.trim(), 'ExitPlanMode feedback');
             } else {
               this.log(`ExitPlanMode ${msg.action} - closing bar without sending user message (CLI auto-approves)`);
               if (msg.action === 'approveClearBypass') {
                 this.log('Plan approval: also compacting context');
                 this.compactPending = true;
-                this.control.compact();
+                try {
+                  this.control.compact();
+                  this.log('[EPM_APPROVE] Compact request sent');
+                } catch (err) {
+                  const errorText = err instanceof Error ? err.message : String(err);
+                  this.log(`[EPM_APPROVE] Compact request failed: ${errorText}`);
+                  this.webview.postMessage({
+                    type: 'error',
+                    message: `Plan approval action failed (compact): ${errorText}`,
+                  });
+                }
               } else if (msg.action === 'approveManual') {
                 this.log('Plan approval: switching to supervised mode');
                 vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', 'supervised', true);
@@ -1138,26 +1192,35 @@ export class MessageHandler {
               }
             }
           } else if (msg.action === 'approve') {
-            this.control.sendText('Continue with the implementation.');
+            sendApprovalText('Continue with the implementation.', 'approve');
           } else if (msg.action === 'approveClearBypass') {
             this.log('Plan approval: approving, then clearing context (compact)');
             this.compactPending = true;
-            this.control.sendText('Continue with the implementation. Please compact context to free up space.');
-            this.control.compact();
+            sendApprovalText('Continue with the implementation. Please compact context to free up space.', 'approveClearBypass');
+            try {
+              this.control.compact();
+            } catch (err) {
+              const errorText = err instanceof Error ? err.message : String(err);
+              this.log(`[EPM_APPROVE] Non-ExitPlan compact request failed: ${errorText}`);
+              this.webview.postMessage({
+                type: 'error',
+                message: `Plan approval action failed (compact): ${errorText}`,
+              });
+            }
           } else if (msg.action === 'approveManual') {
             this.log('Plan approval: switching to supervised mode for manual edit approval');
             vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', 'supervised', true);
             this.webview.postMessage({ type: 'permissionModeSetting', mode: 'supervised' });
-            this.control.sendText('Continue with the implementation.');
+            sendApprovalText('Continue with the implementation.', 'approveManual');
           } else if (msg.action === 'reject') {
-            this.control.sendText('No, I reject this plan. Please revise it.');
+            sendApprovalText('No, I reject this plan. Please revise it.', 'reject');
           } else if (msg.action === 'feedback') {
-            this.control.sendText(msg.feedback || 'Please revise the plan.');
+            sendApprovalText(msg.feedback || 'Please revise the plan.', 'feedback');
           } else if (msg.action === 'questionAnswer') {
             // User selected option(s) from an AskUserQuestion prompt
             const answer = msg.selectedOptions?.join(', ') || msg.feedback || '';
             this.log(`Question answer: "${answer}"`);
-            this.control.sendText(answer);
+            sendApprovalText(answer, 'questionAnswer');
           }
           this.clearApprovalTracking({
             preserveApprovalCycle: isExitPlanMode && scheduleExitPlanApproveFallback,
@@ -1166,6 +1229,7 @@ export class MessageHandler {
           // that may arrive after the user has already responded.
           this.approvalResponseProcessed = true;
           if (isExitPlanMode && scheduleExitPlanApproveFallback) {
+            this.log(`[EPM_APPROVE] Scheduling ExitPlan fallback: action=${msg.action} cycle=${approvalCycleId ?? 'null'}`);
             this.scheduleExitPlanApproveResumeFallback(approvalCycleId);
           }
           // For ExitPlanMode approve: DON'T send processBusy:true. The CLI already
@@ -1559,7 +1623,10 @@ export class MessageHandler {
             '   - Background context about the system/codebase you are working on',
             '   - The specific problem or question described below',
             '   - Any relevant code context from our recent conversation',
-            '2. Call the mcp__codex__codex tool with this enriched prompt',
+            '2. Call the mcp__codex__codex tool with this enriched prompt.',
+            '   CRITICAL: You MUST pass these parameters to prevent the Codex session from hanging:',
+            '   - "approval-policy": "never"  (there is no interactive user to approve shell commands)',
+            '   - "sandbox": "workspace-write"  (allow read/write access for code analysis)',
             '3. Present the Codex response clearly to the user',
             '4. Then analyze the response and continue with implementation based on the advice',
             '',
@@ -1568,6 +1635,7 @@ export class MessageHandler {
           ].join('\n');
           this.log(`[CODEX_CONSULT] Built prompt (${codexPrompt.length} chars), sending to CLI...`);
           this._codexConsultStartedAt = Date.now();
+          this.clearCodexConsultTimeout();
           this.clearApprovalTracking();
           try {
             this.control.sendText(codexPrompt);
@@ -1578,6 +1646,25 @@ export class MessageHandler {
             break;
           }
           this.webview.postMessage({ type: 'processBusy', busy: true });
+          // Start a timeout to cancel the consultation if it hangs (e.g., approval deadlock)
+          this._codexConsultTimeoutTimer = setTimeout(() => {
+            if (this._codexConsultStartedAt) {
+              const elapsed = Date.now() - this._codexConsultStartedAt;
+              this.log(`[CODEX_CONSULT] TIMEOUT after ${elapsed}ms - cancelling hung consultation`);
+              this._codexConsultStartedAt = null;
+              this._codexConsultTimeoutTimer = null;
+              try {
+                this.control.cancel();
+              } catch (cancelErr) {
+                this.log(`[CODEX_CONSULT] Error cancelling request: ${cancelErr instanceof Error ? cancelErr.message : String(cancelErr)}`);
+              }
+              this.webview.postMessage({
+                type: 'error',
+                message: 'Codex consultation timed out after 2 minutes. The Codex MCP session may have hung (e.g., waiting for shell command approval). The request has been cancelled.',
+              });
+            }
+          }, MessageHandler.CODEX_CONSULT_TIMEOUT_MS);
+          this.log(`[CODEX_CONSULT] Timeout set for ${MessageHandler.CODEX_CONSULT_TIMEOUT_MS}ms`);
           break;
         }
 
@@ -2243,6 +2330,11 @@ export class MessageHandler {
       'init',
       (event: SystemInitEvent) => {
         this.log(`system/init received: session=${event.session_id}, model=${event.model}`);
+        // Capture thinking effort from system init if available
+        if (event.thinking_effort) {
+          this.currentThinkingEffort = event.thinking_effort;
+          this.log(`system/init thinking_effort=${event.thinking_effort}`);
+        }
         // Update webview with real session info (replaces the "connecting..." placeholder)
         this.webview.postMessage({
           type: 'sessionStarted',
@@ -2446,12 +2538,19 @@ export class MessageHandler {
             this.lastAssistantInputTokens = totalAssistInput;
           }
         }
-        this.log(`-> webview: assistantMessage id=${event.message.id} blocks=[${blockTypes}] usage=${JSON.stringify(event.message.usage)}`);
+        // Detect thinking effort from content blocks (presence of 'thinking' type blocks)
+        const hasThinkingBlocks = event.message.content.some((b: any) => b.type === 'thinking');
+        if (hasThinkingBlocks && !this.currentThinkingEffort) {
+          this.currentThinkingEffort = 'high';
+        }
+        const effortForMessage = this.currentThinkingEffort || this.demux.getThinkingEffort() || undefined;
+        this.log(`-> webview: assistantMessage id=${event.message.id} blocks=[${blockTypes}] usage=${JSON.stringify(event.message.usage)} thinkingEffort=${effortForMessage}`);
         this.webview.postMessage({
           type: 'assistantMessage',
           messageId: event.message.id,
           content: event.message.content,
           model: event.message.model,
+          thinkingEffort: effortForMessage,
         });
         // Fallback for CLI variants that don't emit (or reorder) message_delta.
         // Detect approval waits directly from assistant stop_reason + tool blocks.
@@ -2475,6 +2574,8 @@ export class MessageHandler {
       (data: { messageId: string; model: string; inputTokens?: number }) => {
         this.log(`-> webview: messageStart id=${data.messageId} inputTokens=${data.inputTokens}`);
         this.inAssistantTurn = true;
+        // Reset per-message thinking effort (will be set if thinking blocks arrive)
+        this.currentThinkingEffort = null;
         // Track input tokens from message_start (reliable during live streaming)
         if (data.inputTokens && data.inputTokens > 0) {
           this.lastAssistantInputTokens = data.inputTokens;
@@ -2519,6 +2620,18 @@ export class MessageHandler {
     );
 
     this.demux.on(
+      'thinkingDetected',
+      (data: { effort: string }) => {
+        this.log(`-> webview: thinkingDetected effort=${data.effort}`);
+        this.currentThinkingEffort = data.effort;
+        this.webview.postMessage({
+          type: 'thinkingEffortUpdate',
+          effort: data.effort,
+        });
+      }
+    );
+
+    this.demux.on(
       'userMessage',
       (event: UserMessage) => {
         // Capture user message text for TurnAnalyzer context
@@ -2546,6 +2659,7 @@ export class MessageHandler {
           const hadCodexTool = this.currentMessageToolNames.some(n => n.includes('codex'));
           this.log(`[CODEX_CONSULT] Result received: elapsed=${elapsed}ms, subtype=${event.subtype}, codexToolUsed=${hadCodexTool}, tools=[${this.currentMessageToolNames.join(',')}]`);
           this._codexConsultStartedAt = null;
+          this.clearCodexConsultTimeout();
         }
         this.logApprovalState(`result:${event.subtype}`);
         // Snapshot BEFORE clearing (clearApprovalTracking resets the array)
@@ -2863,6 +2977,14 @@ export class MessageHandler {
     }
   }
 
+  /** Clear the Codex consultation timeout timer */
+  private clearCodexConsultTimeout(): void {
+    if (this._codexConsultTimeoutTimer) {
+      clearTimeout(this._codexConsultTimeoutTimer);
+      this._codexConsultTimeoutTimer = null;
+    }
+  }
+
   /** Reset approval-cycle metadata and any delayed ExitPlanMode fallback nudge */
   private clearApprovalCycleState(): void {
     this.pendingApprovalCycleId = null;
@@ -2924,16 +3046,18 @@ export class MessageHandler {
     // brief text and went idle.
   }
 
-  /** If ExitPlanMode approve does not auto-resume, send a delayed proceed nudge.
+  /** If ExitPlanMode approve does not auto-resume, send a proceed nudge.
    *
-   * Bug 14 fix: Uses inAssistantTurn instead of resumeObserved/resultObserved.
-   * Previous logic (Bug 13) checked resumeObserved first and skipped the nudge,
-   * but this failed when the CLI auto-resumed with brief text and then went idle:
-   * resumeObserved was true (from the brief turn's textDelta) AND resultObserved
-   * was true (from the ExitPlanMode turn's result), so the code skipped the nudge
-   * even though the CLI was idle. The inAssistantTurn flag directly reflects whether
-   * the CLI is between messageStart and result — a reliable idle/busy indicator. */
-  private scheduleExitPlanApproveResumeFallback(cycleId: number | null): void {
+   * Bug 15 fix: one delayed check was not enough. If it fired while the CLI
+   * was still inside a non-executing turn (for example compaction), the nudge
+   * was skipped permanently and the click became a no-op. This logic now
+   * re-checks until either real non-plan progress is observed, CLI goes idle,
+   * or a max-wait timeout forces one final nudge. */
+  private scheduleExitPlanApproveResumeFallback(
+    cycleId: number | null,
+    startedAt = Date.now(),
+    attempt = 1
+  ): void {
     if (cycleId == null) {
       this.log('ExitPlanMode approve fallback skipped - no approval cycle id');
       return;
@@ -2944,45 +3068,80 @@ export class MessageHandler {
     }
 
     this.cancelPostApproveNudge();
+    const elapsedMs = Math.max(0, Date.now() - startedAt);
+    const sawNonPlanProgress = this.postExitPlanNonPlanActivityObserved;
 
     // Primary check: is the CLI currently between messageStart and result?
     if (!this.inAssistantTurn) {
-      // CLI is idle — send nudge immediately.
-      this.log(`ExitPlanMode approve - CLI idle (inAssistantTurn=false), sending proceed nudge (cycle ${cycleId})`);
+      if (sawNonPlanProgress) {
+        this.log(`ExitPlanMode approve nudge skipped - CLI idle but non-plan progress already observed (cycle ${cycleId}, elapsed=${elapsedMs}ms)`);
+        this.logApprovalState('approve-nudge-skip-idle-progress');
+        this.clearApprovalCycleState();
+        return;
+      }
+      // CLI is idle and there was no post-approval execution progress: nudge now.
+      this.log(`ExitPlanMode approve - CLI idle (attempt=${attempt}, elapsed=${elapsedMs}ms), sending proceed nudge (cycle ${cycleId})`);
       this.logApprovalState('approve-nudge-immediate');
       try {
         this.control.sendText('Continue with the implementation.');
         this.webview.postMessage({ type: 'processBusy', busy: true });
       } catch (err) {
-        this.log(`ExitPlanMode approve nudge failed: ${err}`);
+        const errorText = err instanceof Error ? err.message : String(err);
+        this.log(`ExitPlanMode approve nudge failed: ${errorText}`);
+        this.webview.postMessage({
+          type: 'error',
+          message: `Plan approval follow-up failed: ${errorText}`,
+        });
       } finally {
         this.clearApprovalCycleState();
       }
       return;
     }
 
-    // CLI is in an active turn. Schedule a delayed check.
-    // The timer uses postApproveNudgeTimer (decoupled from approval cycle state)
-    // so it won't be cancelled by result-handler cleanup or markApprovalCycleResumeObserved.
-    this.log(`ExitPlanMode approve - CLI busy (inAssistantTurn=true), scheduling delayed nudge in ${EXIT_PLANMODE_APPROVE_RESUME_FALLBACK_DELAY_MS}ms (cycle ${cycleId})`);
-    this.logApprovalState('approve-nudge-deferred');
+    // CLI is currently busy. If real non-plan progress is already observed,
+    // do not inject any nudge; implementation is underway.
+    if (sawNonPlanProgress) {
+      this.log(`ExitPlanMode approve nudge skipped - CLI busy and non-plan progress observed (cycle ${cycleId}, elapsed=${elapsedMs}ms)`);
+      this.logApprovalState('approve-nudge-skip-busy-progress');
+      this.clearApprovalCycleState();
+      return;
+    }
+
+    // No post-approval execution progress yet. Retry while waiting for idle,
+    // and force one last nudge if we exceed the max wait.
+    if (elapsedMs >= EXIT_PLANMODE_APPROVE_MAX_WAIT_MS) {
+      this.log(
+        `ExitPlanMode approve nudge timeout - forcing proceed nudge after ${elapsedMs}ms ` +
+        `(cycle ${cycleId}, attempt=${attempt}, inAssistantTurn=${this.inAssistantTurn})`
+      );
+      this.logApprovalState('approve-nudge-timeout-force');
+      try {
+        this.control.sendText('Continue with the implementation.');
+        this.webview.postMessage({ type: 'processBusy', busy: true });
+      } catch (err) {
+        const errorText = err instanceof Error ? err.message : String(err);
+        this.log(`ExitPlanMode approve forced nudge failed: ${errorText}`);
+        this.webview.postMessage({
+          type: 'error',
+          message: `Plan approval follow-up failed after timeout: ${errorText}`,
+        });
+      } finally {
+        this.clearApprovalCycleState();
+      }
+      return;
+    }
+
+    const remainingMs = EXIT_PLANMODE_APPROVE_MAX_WAIT_MS - elapsedMs;
+    const nextDelayMs = Math.min(EXIT_PLANMODE_APPROVE_RESUME_FALLBACK_DELAY_MS, remainingMs);
+    this.log(
+      `ExitPlanMode approve - CLI busy with no non-plan progress yet; retrying nudge check in ${nextDelayMs}ms ` +
+      `(cycle ${cycleId}, attempt=${attempt}, elapsed=${elapsedMs}ms)`
+    );
+    this.logApprovalState('approve-nudge-retry-scheduled');
     this.postApproveNudgeTimer = setTimeout(() => {
       this.postApproveNudgeTimer = null;
-      if (!this.inAssistantTurn) {
-        // CLI went idle — send nudge.
-        this.log(`ExitPlanMode approve deferred nudge - CLI idle, sending proceed`);
-        try {
-          this.control.sendText('Continue with the implementation.');
-          this.webview.postMessage({ type: 'processBusy', busy: true });
-        } catch (err) {
-          this.log(`ExitPlanMode approve deferred nudge failed: ${err}`);
-        }
-      } else {
-        // CLI is still in a turn after the delay. It's implementing (not just
-        // a brief plan summary). No nudge needed.
-        this.log(`ExitPlanMode approve deferred nudge - CLI still in turn, skipping (likely implementing)`);
-      }
-    }, EXIT_PLANMODE_APPROVE_RESUME_FALLBACK_DELAY_MS);
+      this.scheduleExitPlanApproveResumeFallback(cycleId, startedAt, attempt + 1);
+    }, nextDelayMs);
   }
 
   /** Notify webview that user approval is required for a plan/question tool */

@@ -14,6 +14,7 @@ import { TokenUsageRatioTracker } from './session/TokenUsageRatioTracker';
 import { registerCommands } from './commands';
 import { registerDiscoverCommand } from './session/SessionDiscovery';
 import { ClaUiSidebarViewProvider } from './sidebar/ClaUiSidebarViewProvider';
+import { cleanupOrphanedProcesses } from './process/orphanCleanup';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -133,6 +134,9 @@ export function activate(context: vscode.ExtensionContext): void {
   launcherItem.command = 'claudeMirror.startSession';
   launcherItem.show();
   context.subscriptions.push(launcherItem);
+
+  // Kill orphaned ClaUi processes from previous sessions that weren't cleaned up
+  cleanupOrphanedProcesses(log);
 
   log('Extension activated');
 }

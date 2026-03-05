@@ -121,6 +121,10 @@
       {
         "command": "claudeMirror.authenticateHappy",
         "title": "ClaUi: Authenticate Happy Coder"
+      },
+      {
+        "command": "claudeMirror.switchProviderWithContext",
+        "title": "ClaUi: Switch Provider (Carry Context)"
       }
     ],
     "configuration": {
@@ -150,6 +154,21 @@
           "type": "string",
           "default": "happy",
           "description": "Path to the Happy Coder CLI executable"
+        },
+        "claudeMirror.handoff.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable cross-provider session handoff (Claude <-> Codex) with context capsule transfer."
+        },
+        "claudeMirror.handoff.autoSend": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically send the generated handoff prompt in the target provider session."
+        },
+        "claudeMirror.handoff.storeArtifacts": {
+          "type": "boolean",
+          "default": true,
+          "description": "Persist handoff artifacts (JSON + Markdown) under ClaUi managed logs for debugging and replay."
         },
         "claudeMirror.codex.cliPath": {
           "type": "string",
@@ -609,6 +628,9 @@
         },
         {
           "command": "claudeMirror.sendFeedback"
+        },
+        {
+          "command": "claudeMirror.switchProviderWithContext"
         }
       ],
       "issue/reporter": [

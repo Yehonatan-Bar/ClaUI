@@ -76,6 +76,11 @@ export const StatusBar: React.FC<{
     contextWidgetVisible,
     setContextWidgetVisible,
     model,
+    handoffStage,
+    handoffTargetProvider,
+    handoffError,
+    handoffArtifactPath,
+    handoffManualPrompt,
   } = useAppStore();
 
   const { barRef, layoutMode } = useStatusBarCollapse();
@@ -245,12 +250,26 @@ export const StatusBar: React.FC<{
   };
 
   const providerLabel = (p: ProviderId): string => p === 'codex' ? 'Codex' : p === 'remote' ? 'Happy' : 'Claude';
+  const isHandoffRunning =
+    handoffStage !== 'idle' &&
+    handoffStage !== 'completed' &&
+    handoffStage !== 'failed';
+  const handoffStageLabel: Record<string, string> = {
+    idle: 'Idle',
+    collecting_context: 'Collecting context',
+    creating_target_tab: 'Creating target tab',
+    starting_target_session: 'Starting target session',
+    injecting_handoff_prompt: 'Injecting handoff prompt',
+    awaiting_first_reply: 'Waiting for first reply',
+    completed: 'Handoff completed',
+    failed: 'Handoff failed',
+  };
 
   const handleOpenProviderTab = (targetProvider: ProviderId) => {
     const targetLabel = providerLabel(targetProvider);
 
-    if (provider === targetProvider || isBusy) {
-      const reason = provider === targetProvider ? `current-tab-is-${targetProvider}` : 'busy';
+    if (provider === targetProvider || isBusy || isHandoffRunning) {
+      const reason = provider === targetProvider ? `current-tab-is-${targetProvider}` : isBusy ? 'busy' : 'handoff-running';
       console.log(`[StatusBar] ${targetLabel} button ignored`, {
         reason,
         targetProvider,
@@ -261,8 +280,8 @@ export const StatusBar: React.FC<{
       postToExtension({
         type: 'diag',
         phase: `statusbar.${targetProvider}.click.ignored`,
-        detail: `reason=${reason} target=${targetProvider} selected=${selectedProvider} current=${provider ?? 'none'} busy=${isBusy}`,
-      } as any);
+      detail: `reason=${reason} target=${targetProvider} selected=${selectedProvider} current=${provider ?? 'none'} busy=${isBusy}`,
+    } as any);
       return;
     }
     console.log(`[StatusBar] ${targetLabel} button clicked -> open new ${targetLabel} tab`, {
@@ -282,6 +301,34 @@ export const StatusBar: React.FC<{
     postToExtension({ type: 'openProviderTab', provider: targetProvider });
   };
 
+  const handleSwitchProviderWithContext = (targetProvider: ProviderId) => {
+    if (targetProvider !== 'claude' && targetProvider !== 'codex') {
+      return;
+    }
+    if (provider === targetProvider || isBusy || isHandoffRunning) {
+      return;
+    }
+    postToExtension({
+      type: 'switchProviderWithContext',
+      targetProvider,
+      keepSourceOpen: true,
+      autoSend: true,
+    });
+  };
+
+  const fallbackTarget: ProviderId = provider === 'claude' ? 'codex' : 'claude';
+  const carryTarget: ProviderId = selectedProvider === provider ? fallbackTarget : selectedProvider;
+  const handleCarryContextToSelected = () => {
+    handleSwitchProviderWithContext(carryTarget);
+  };
+
+  const handleCopyManualCapsule = () => {
+    if (!handoffManualPrompt) {
+      return;
+    }
+    postToExtension({ type: 'copyToClipboard', text: handoffManualPrompt });
+  };
+
   const handleSetClaudeProvider = () => handleOpenProviderTab('claude');
   const handleSetCodexProvider = () => handleOpenProviderTab('codex');
   const handleSetHappyProvider = () => handleOpenProviderTab('remote');
@@ -292,6 +339,33 @@ export const StatusBar: React.FC<{
     if (selectedProvider === p) { return `Open a new ${label} tab`; }
     return `Switch default provider to ${label} and open a new ${label} tab`;
   };
+
+  const handoffBanner = handoffStage !== 'idle' ? (
+    <div className={`status-bar-handoff-banner ${handoffStage === 'failed' ? 'is-error' : handoffStage === 'completed' ? 'is-success' : ''}`}>
+      <span className="status-bar-handoff-banner-text">
+        Handoff: {handoffStageLabel[handoffStage] || handoffStage}
+        {handoffTargetProvider ? ` -> ${providerLabel(handoffTargetProvider)}` : ''}
+        {handoffArtifactPath ? ` | Artifact: ${handoffArtifactPath}` : ''}
+        {handoffError ? ` | ${handoffError}` : ''}
+      </span>
+      {handoffStage === 'failed' && handoffManualPrompt && (
+        <button
+          className="status-bar-handoff-fallback-btn"
+          onClick={handleCopyManualCapsule}
+          data-tooltip="Copy capsule prompt for manual send"
+        >
+          Send capsule manually
+        </button>
+      )}
+    </div>
+  ) : null;
+  const canCarryContext =
+    !!isConnected &&
+    !isBusy &&
+    !isHandoffRunning &&
+    (provider === 'claude' || provider === 'codex') &&
+    (carryTarget === 'claude' || carryTarget === 'codex') &&
+    carryTarget !== provider;
 
   const claudeButtonTitle = providerButtonTitle('claude');
   const codexButtonTitle = providerButtonTitle('codex');
@@ -440,6 +514,7 @@ export const StatusBar: React.FC<{
   if (layoutMode === 'minimal') {
     return (
       <div className="status-bar status-bar-collapsed" ref={barRef}>
+        {handoffBanner}
         <StatusBarGroupButton label="Menu" isOpen={minimalOpen} onToggle={handleMinimalToggle}>
           <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('bug')} data-tooltip="Open bug report">
             Report Bug
@@ -464,9 +539,17 @@ export const StatusBar: React.FC<{
           </button>
           <div className="status-bar-group-dropdown-separator" />
           <button
+            className="status-bar-group-dropdown-item"
+            onClick={handleCarryContextToSelected}
+            disabled={!canCarryContext}
+            data-tooltip="Switch current tab to selected provider with context"
+          >
+            Switch (Carry Context)
+          </button>
+          <button
             className={`status-bar-group-dropdown-item ${selectedProvider === 'claude' ? 'active' : ''}`}
             onClick={handleSetClaudeProvider}
-            disabled={isBusy}
+            disabled={isBusy || isHandoffRunning}
             data-tooltip={claudeButtonTitle}
           >
             Claude
@@ -474,7 +557,7 @@ export const StatusBar: React.FC<{
           <button
             className={`status-bar-group-dropdown-item ${selectedProvider === 'codex' ? 'active' : ''}`}
             onClick={handleSetCodexProvider}
-            disabled={isBusy}
+            disabled={isBusy || isHandoffRunning}
             data-tooltip={codexButtonTitle}
           >
             Codex
@@ -482,7 +565,7 @@ export const StatusBar: React.FC<{
           <button
             className={`status-bar-group-dropdown-item ${selectedProvider === 'remote' ? 'active' : ''}`}
             onClick={handleSetHappyProvider}
-            disabled={isBusy}
+            disabled={isBusy || isHandoffRunning}
             data-tooltip={happyButtonTitle}
           >
             Happy
@@ -615,6 +698,7 @@ export const StatusBar: React.FC<{
   if (layoutMode === 'medium') {
     return (
       <div className="status-bar status-bar-collapsed" ref={barRef}>
+        {handoffBanner}
         {clockElement}
         <button className="status-bar-history-btn" onClick={handleHistory} data-tooltip="Conversation History (Ctrl+Shift+H)">
           History
@@ -642,9 +726,17 @@ export const StatusBar: React.FC<{
 
         <StatusBarGroupButton label="More" isOpen={navOpen} onToggle={handleNavToggle}>
           <button
+            className="status-bar-group-dropdown-item"
+            onClick={handleCarryContextToSelected}
+            disabled={!canCarryContext}
+            data-tooltip="Switch current tab to selected provider with context"
+          >
+            Switch (Carry Context)
+          </button>
+          <button
             className={`status-bar-group-dropdown-item ${selectedProvider === 'claude' ? 'active' : ''}`}
             onClick={handleSetClaudeProvider}
-            disabled={isBusy}
+            disabled={isBusy || isHandoffRunning}
             data-tooltip={claudeButtonTitle}
           >
             Claude
@@ -652,7 +744,7 @@ export const StatusBar: React.FC<{
           <button
             className={`status-bar-group-dropdown-item ${selectedProvider === 'codex' ? 'active' : ''}`}
             onClick={handleSetCodexProvider}
-            disabled={isBusy}
+            disabled={isBusy || isHandoffRunning}
             data-tooltip={codexButtonTitle}
           >
             Codex
@@ -660,7 +752,7 @@ export const StatusBar: React.FC<{
           <button
             className={`status-bar-group-dropdown-item ${selectedProvider === 'remote' ? 'active' : ''}`}
             onClick={handleSetHappyProvider}
-            disabled={isBusy}
+            disabled={isBusy || isHandoffRunning}
             data-tooltip={happyButtonTitle}
           >
             Happy
@@ -794,6 +886,7 @@ export const StatusBar: React.FC<{
   if (layoutMode === 'collapsed') {
     return (
       <div className="status-bar status-bar-collapsed" ref={barRef}>
+        {handoffBanner}
         {clockElement}
 
         <StatusBarGroupButton label="More" isOpen={navOpen} onToggle={handleNavToggle}>
@@ -820,9 +913,17 @@ export const StatusBar: React.FC<{
           </button>
           <div className="status-bar-group-dropdown-separator" />
           <button
+            className="status-bar-group-dropdown-item"
+            onClick={handleCarryContextToSelected}
+            disabled={!canCarryContext}
+            data-tooltip="Switch current tab to selected provider with context"
+          >
+            Switch (Carry Context)
+          </button>
+          <button
             className={`status-bar-group-dropdown-item ${selectedProvider === 'claude' ? 'active' : ''}`}
             onClick={handleSetClaudeProvider}
-            disabled={isBusy}
+            disabled={isBusy || isHandoffRunning}
             data-tooltip={claudeButtonTitle}
           >
             Claude
@@ -830,7 +931,7 @@ export const StatusBar: React.FC<{
           <button
             className={`status-bar-group-dropdown-item ${selectedProvider === 'codex' ? 'active' : ''}`}
             onClick={handleSetCodexProvider}
-            disabled={isBusy}
+            disabled={isBusy || isHandoffRunning}
             data-tooltip={codexButtonTitle}
           >
             Codex
@@ -838,7 +939,7 @@ export const StatusBar: React.FC<{
           <button
             className={`status-bar-group-dropdown-item ${selectedProvider === 'remote' ? 'active' : ''}`}
             onClick={handleSetHappyProvider}
-            disabled={isBusy}
+            disabled={isBusy || isHandoffRunning}
             data-tooltip={happyButtonTitle}
           >
             Happy
@@ -979,6 +1080,7 @@ export const StatusBar: React.FC<{
   // --- FULL mode (Stage 1) ---
   return (
     <div className="status-bar" ref={barRef}>
+      {handoffBanner}
       {clockElement}
       {achievementsEnabled && (
         <button
@@ -1025,7 +1127,7 @@ export const StatusBar: React.FC<{
       <button
         className={`status-bar-provider-quick-btn ${selectedProvider === 'claude' ? 'active' : ''}`}
         onClick={handleSetClaudeProvider}
-        disabled={isBusy}
+        disabled={isBusy || isHandoffRunning}
         data-tooltip={claudeButtonTitle}
       >
         Claude
@@ -1033,7 +1135,7 @@ export const StatusBar: React.FC<{
       <button
         className={`status-bar-provider-quick-btn ${selectedProvider === 'codex' ? 'active' : ''}`}
         onClick={handleSetCodexProvider}
-        disabled={isBusy}
+        disabled={isBusy || isHandoffRunning}
         data-tooltip={codexButtonTitle}
       >
         Codex
@@ -1041,10 +1143,18 @@ export const StatusBar: React.FC<{
       <button
         className={`status-bar-provider-quick-btn ${selectedProvider === 'remote' ? 'active' : ''}`}
         onClick={handleSetHappyProvider}
-        disabled={isBusy}
+        disabled={isBusy || isHandoffRunning}
         data-tooltip={happyButtonTitle}
       >
         Happy
+      </button>
+      <button
+        className="status-bar-provider-quick-btn"
+        onClick={handleCarryContextToSelected}
+        disabled={!canCarryContext}
+        data-tooltip="Switch current tab to selected provider and carry context"
+      >
+        Carry
       </button>
       {modelSelectorElement}
       {codexReasoningSelectorElement}

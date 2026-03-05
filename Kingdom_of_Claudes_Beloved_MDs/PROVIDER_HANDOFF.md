@@ -1,0 +1,53 @@
+# Provider Handoff (Claude <-> Codex)
+
+## Goal
+
+Allow switching providers mid-session while preserving practical task continuity via a structured handoff capsule.
+
+## What Happens
+
+1. User triggers `Switch (Carry Context)` from status bar (or command palette command).
+2. Extension validates source tab is idle and handoff feature is enabled.
+3. Source tab snapshot is collected and normalized.
+4. A `HandoffCapsule` is built and (optionally) persisted as JSON/Markdown artifact under managed logs.
+5. Target provider tab is opened with `forkInit` history copy for visual continuity.
+6. Target starts a clean session and receives an opening handoff prompt.
+7. System waits for the first target assistant reply, then marks handoff completed.
+
+## State Machine
+
+- `idle`
+- `collecting_context`
+- `creating_target_tab`
+- `starting_target_session`
+- `injecting_handoff_prompt`
+- `awaiting_first_reply`
+- `completed`
+- `failed`
+
+## Safety/Hardening
+
+- Busy guard: cannot switch while current turn is running.
+- Per-tab lock: prevents duplicate concurrent switches.
+- Cooldown: prevents rapid ping-pong switching.
+- Secret redaction before artifact persistence.
+- Failure fallback: user can copy manual capsule prompt and send manually.
+
+## Settings
+
+- `claudeMirror.handoff.enabled`
+- `claudeMirror.handoff.autoSend`
+- `claudeMirror.handoff.storeArtifacts`
+
+## Main Files
+
+- `src/extension/session/handoff/HandoffTypes.ts`
+- `src/extension/session/handoff/HandoffContextBuilder.ts`
+- `src/extension/session/handoff/HandoffPromptComposer.ts`
+- `src/extension/session/handoff/HandoffArtifactStore.ts`
+- `src/extension/session/handoff/HandoffOrchestrator.ts`
+- `src/extension/session/TabManager.ts`
+- `src/webview/components/StatusBar/StatusBar.tsx`
+- `src/webview/components/InputArea/InputArea.tsx`
+- `src/webview/state/store.ts`
+- `src/extension/types/webview-messages.ts`

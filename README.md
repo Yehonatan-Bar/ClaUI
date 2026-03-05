@@ -43,7 +43,7 @@ Run multiple Claude conversations in parallel, each isolated in its own VS Code 
 - **@file mentions** -- type `@` to trigger workspace file search with autocomplete; navigate with arrows, select with Enter/Tab
 - **Prompt history** -- 3-tier history panel (Session / Project / Global) with search; cycle through recent prompts with Arrow Up/Down
 - **Prompt Enhancer** -- AI-powered prompt rewriting with manual (review before sending) and auto modes; configurable model (Haiku to Opus)
-- **Cancel / interrupt** -- press Escape or click Cancel to stop Claude mid-response; send a new prompt while Claude is still working
+- **Cancel / interrupt / steer** -- press Escape or click Cancel/Stop to halt an in-flight turn; in Codex tabs, use **Steer** (with approval) to redirect mid-turn
 - **File sending** -- three methods: right-click in Explorer, "+" button, or `Ctrl+Alt+Shift+C` shortcut
 - **Plan approval** -- 4-option inline approval bar matching the Claude CLI (bypass permissions, supervised mode, feedback text, clear context)
 

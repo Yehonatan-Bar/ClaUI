@@ -101,25 +101,42 @@ export const PlanApprovalBar: React.FC = () => {
   if (!pendingApproval) return null;
 
   const approvalToolName = pendingApproval.toolName;
+  const logApprovalUi = (event: string, payload?: Record<string, unknown>) => {
+    postToExtension({
+      type: 'uiDebugLog',
+      source: 'PlanApprovalBar',
+      event,
+      payload: {
+        toolName: approvalToolName,
+        isQuestion,
+        ...(payload || {}),
+      },
+      ts: Date.now(),
+    });
+  };
 
   // --- Plan approval handlers (4 CLI-matching options) ---
   const handleApproveClearBypass = () => {
+    logApprovalUi('clickOption', { action: 'approveClearBypass' });
     postToExtension({ type: 'planApprovalResponse', action: 'approveClearBypass', toolName: approvalToolName });
     setPendingApproval(null);
   };
 
   const handleApproveBypass = () => {
+    logApprovalUi('clickOption', { action: 'approve' });
     postToExtension({ type: 'planApprovalResponse', action: 'approve', toolName: approvalToolName });
     setPendingApproval(null);
   };
 
   const handleApproveManual = () => {
+    logApprovalUi('clickOption', { action: 'approveManual' });
     postToExtension({ type: 'planApprovalResponse', action: 'approveManual', toolName: approvalToolName });
     setPendingApproval(null);
   };
 
   const handleSendFeedback = () => {
     if (!feedbackText.trim()) return;
+    logApprovalUi('clickOption', { action: 'feedback', feedbackLength: feedbackText.trim().length });
     postToExtension({
       type: 'planApprovalResponse',
       action: 'feedback',
@@ -144,6 +161,7 @@ export const PlanApprovalBar: React.FC = () => {
 
   // --- Question answer handlers ---
   const handleOptionClick = (label: string) => {
+    logApprovalUi('questionOptionClick', { label, multiSelect: !!questionData?.multiSelect });
     if (questionData?.multiSelect) {
       setSelectedOptions(prev => {
         const next = new Set(prev);
@@ -167,6 +185,7 @@ export const PlanApprovalBar: React.FC = () => {
 
   const handleSubmitMultiSelect = () => {
     if (selectedOptions.size === 0) return;
+    logApprovalUi('questionSubmitMultiSelect', { selectedCount: selectedOptions.size });
     postToExtension({
       type: 'planApprovalResponse',
       action: 'questionAnswer',
@@ -179,6 +198,7 @@ export const PlanApprovalBar: React.FC = () => {
 
   const handleSendCustomAnswer = () => {
     if (!feedbackText.trim()) return;
+    logApprovalUi('questionCustomAnswer', { answerLength: feedbackText.trim().length });
     postToExtension({
       type: 'planApprovalResponse',
       action: 'questionAnswer',
