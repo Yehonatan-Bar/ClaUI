@@ -167,10 +167,13 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ text }) => {
   const sanitizedHtml = useMemo(() => {
     const rawHtml = marked.parse(text, { async: false }) as string;
     let html = DOMPurify.sanitize(rawHtml, PURIFY_CONFIG);
-    // Highlight "ultrathink" keyword with animated glow effect
+    // Highlight "ultrathink" keyword with randomly-chosen glow variant
     html = html.replace(
       /\b(ultrathink)\b/gi,
-      '<span class="ultrathink-glow">$1</span>'
+      () => {
+        const v = Math.floor(Math.random() * 6) + 1;
+        return `<span class="ultrathink-glow ut-glow-v${v}">ultrathink</span>`;
+      }
     );
     return html;
   }, [text]);

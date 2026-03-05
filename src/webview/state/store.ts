@@ -622,7 +622,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   turnHistory: [],
   turnByMessageId: {},
   weather: { ...initialWeather },
-  contextWidgetVisible: false,
+  contextWidgetVisible: true,
   usageWidgetEnabled: false,
   usageStats: [],
   usageFetchedAt: null,

@@ -1,5 +1,19 @@
 # ClaUi - Changelog
 
+## v0.1.82 - 2026-03-04
+
+**Feature: Ultrathink button with random animations**
+
+- Added a brain icon button between the browse/paperclip button and the textarea in the input area
+- Clicking the button injects the `ultrathink` keyword (boosts Claude's reasoning effort) into the prompt
+- Each click randomly plays one of 4 CSS animations for 1.2 seconds before prepending the text:
+  - Rocket Launch - rocket flies upward with an orange flame trail
+  - Brain on Fire - brain pulses with fiery glow and drop-shadows
+  - Wizard Staff - wand rotates with purple lightning spark particles
+  - Turbo/NOS - shakes with blue energy charge and speed lines
+- Guards against double-click during animation, skips prepend if "ultrathink" already present
+- The word "ultrathink" also renders with an animated rainbow glow effect in chat messages (both completed and streaming)
+
 ## v0.1.78 - 2026-03-04
 
 **Fix: Context widget always showing 0% (cache token summation)**
