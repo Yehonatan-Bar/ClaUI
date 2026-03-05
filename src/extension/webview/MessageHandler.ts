@@ -228,6 +228,8 @@ export class MessageHandler {
   /** Dedup: last userMessage text posted to webview, with timestamp.
    *  Prevents duplicate display from key-repeat, CLI echo, or any other source. */
   private lastPostedUserMsg: { text: string; time: number } | null = null;
+  /** One-time handoff context staged by provider switch. Appended only to the first user turn. */
+  private pendingHandoffPrompt: string | null = null;
 
   /** Turn counter for Session Vitals (reset on session clear) */
   private turnIndex = 0;
@@ -270,6 +272,18 @@ export class MessageHandler {
 
   setLogger(logger: (msg: string) => void): void {
     this.log = logger;
+  }
+
+  /** Stage one-time handoff context to be injected into the next user turn. */
+  setPendingHandoffPrompt(prompt: string): void {
+    const trimmed = prompt.trim();
+    this.pendingHandoffPrompt = trimmed || null;
+    this.log(`[Handoff] staged deferred context: chars=${trimmed.length}`);
+  }
+
+  /** Clear staged one-time handoff context (called on fresh/restarted sessions). */
+  clearPendingHandoffPrompt(): void {
+    this.pendingHandoffPrompt = null;
   }
 
   /** Attach a SessionNamer for auto-generating tab titles */
@@ -463,6 +477,36 @@ export class MessageHandler {
     this.webview.postMessage({ type: 'userMessage', content });
   }
 
+  /**
+   * Inject staged handoff context into the first outgoing user turn after provider switch.
+   * The webview still shows only the user's raw text; this affects only the payload sent to CLI.
+   */
+  private consumeDeferredHandoffContext(userText: string, opts?: { imageCount?: number }): string {
+    const staged = this.pendingHandoffPrompt;
+    if (!staged) {
+      return userText;
+    }
+
+    this.pendingHandoffPrompt = null;
+    const trimmedUser = userText.trim();
+    const userPayload =
+      trimmedUser ||
+      ((opts?.imageCount ?? 0) > 0
+        ? '[User attached image(s) without additional text.]'
+        : '[User sent an empty message.]');
+
+    this.log(
+      `[Handoff] injecting deferred context into first user turn: contextChars=${staged.length} userChars=${trimmedUser.length} images=${opts?.imageCount ?? 0}`,
+    );
+
+    return [
+      'Context migrated from a previous provider session. Treat it as prior conversation history for this chat.',
+      staged,
+      'New user message:',
+      userPayload,
+    ].join('\n\n');
+  }
+
   /** Wire up all event listeners */
   initialize(): void {
     this.bindWebviewMessages();
@@ -499,7 +543,7 @@ export class MessageHandler {
           this.achievementService.onUserPrompt(this.tabId, msg.text);
           // Optimistic: show user message in UI immediately (before CLI echoes it back)
           this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock]);
-          this.control.sendText(msg.text);
+          this.control.sendText(this.consumeDeferredHandoffContext(msg.text));
           this.webview.postMessage({ type: 'processBusy', busy: true });
           this.triggerSessionNaming(msg.text);
           // Persist prompt to project and global history
@@ -537,7 +581,10 @@ export class MessageHandler {
             } as ContentBlock);
           }
           this.postUserMessage(imgContent);
-          this.control.sendWithImages(msg.text, msg.images);
+          this.control.sendWithImages(
+            this.consumeDeferredHandoffContext(msg.text, { imageCount: msg.images.length }),
+            msg.images,
+          );
           this.webview.postMessage({ type: 'processBusy', busy: true });
           this.triggerSessionNaming(msg.text);
           if (msg.text.trim()) {
@@ -568,6 +615,7 @@ export class MessageHandler {
 
         case 'startSession':
           this.firstMessageSent = false;
+          this.clearPendingHandoffPrompt();
           this.activitySummarizer?.reset();
           this.adventureInterpreter?.reset();
           // If already running, just sync the webview state
@@ -605,6 +653,7 @@ export class MessageHandler {
           break;
 
         case 'stopSession':
+          this.clearPendingHandoffPrompt();
           this.processManager.stop();
           this.achievementService.onSessionEnd(this.tabId);
           this.webview.postMessage({
@@ -615,6 +664,7 @@ export class MessageHandler {
 
         case 'resumeSession':
           this.firstMessageSent = false;
+          this.clearPendingHandoffPrompt();
           this.achievementService.onSessionEnd(this.tabId);
           this.processManager
             .start({
@@ -634,6 +684,7 @@ export class MessageHandler {
 
         case 'forkSession':
           this.firstMessageSent = false;
+          this.clearPendingHandoffPrompt();
           this.achievementService.onSessionEnd(this.tabId);
           this.processManager
             .start({
@@ -664,6 +715,7 @@ export class MessageHandler {
           // Save analytics for the current session BEFORE clearing records
           this.webview.saveProjectAnalyticsNow?.();
           this.firstMessageSent = false;
+          this.clearPendingHandoffPrompt();
           this.activitySummarizer?.reset();
           this.adventureInterpreter?.reset();
           this.turnRecords = [];
@@ -740,7 +792,6 @@ export class MessageHandler {
             sourceTabId: this.tabId,
             targetProvider: msg.targetProvider,
             keepSourceOpen: msg.keepSourceOpen ?? true,
-            autoSend: msg.autoSend ?? true,
           }).then(
             () => undefined,
             (err: unknown) => {

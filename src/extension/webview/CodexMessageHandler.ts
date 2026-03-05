@@ -109,6 +109,8 @@ export class CodexMessageHandler {
   private logDir = '';
   /** Dedup: last userMessage text posted to webview, with timestamp. */
   private lastPostedUserMsg: { text: string; time: number } | null = null;
+  /** One-time handoff context staged by provider switch. Injected on first user turn only. */
+  private pendingHandoffPrompt: string | null = null;
 
   /** Set extension metadata for bug reports */
   setExtensionMeta(version: string, logDir: string): void {
@@ -158,6 +160,18 @@ export class CodexMessageHandler {
     this.log = logger;
   }
 
+  /** Stage one-time handoff context to be injected into the next user turn. */
+  setPendingHandoffPrompt(prompt: string): void {
+    const trimmed = prompt.trim();
+    this.pendingHandoffPrompt = trimmed || null;
+    this.log(`[Handoff] staged deferred context (Codex): chars=${trimmed.length}`);
+  }
+
+  /** Clear staged one-time handoff context (called on fresh/restarted sessions). */
+  clearPendingHandoffPrompt(): void {
+    this.pendingHandoffPrompt = null;
+  }
+
   /**
    * Serialize Codex live UI messages to avoid end-of-turn ordering races in the
    * webview (agent_message + turn.completed can arrive back-to-back).
@@ -187,6 +201,36 @@ export class CodexMessageHandler {
     }
     this.lastPostedUserMsg = { text, time: now };
     this.postToWebview({ type: 'userMessage', content });
+  }
+
+  /**
+   * Build the first-turn payload with deferred handoff context.
+   * Returns whether this payload should consume the staged context on successful send.
+   */
+  private buildDeferredHandoffPayload(userText: string, opts?: { imageCount?: number }): { text: string; consumeOnSuccess: boolean } {
+    const staged = this.pendingHandoffPrompt;
+    if (!staged) {
+      return { text: userText, consumeOnSuccess: false };
+    }
+
+    const trimmedUser = userText.trim();
+    const userPayload =
+      trimmedUser ||
+      ((opts?.imageCount ?? 0) > 0
+        ? '[User attached image(s) without additional text.]'
+        : '[User sent an empty message.]');
+
+    const text = [
+      'Context migrated from a previous provider session. Treat it as prior conversation history for this chat.',
+      staged,
+      'New user message:',
+      userPayload,
+    ].join('\n\n');
+
+    this.log(
+      `[Handoff] prepared deferred context injection (Codex): contextChars=${staged.length} userChars=${trimmedUser.length} images=${opts?.imageCount ?? 0}`,
+    );
+    return { text, consumeOnSuccess: true };
   }
 
   initialize(): void {
@@ -231,22 +275,26 @@ export class CodexMessageHandler {
         }
 
         case 'startSession':
+          this.clearPendingHandoffPrompt();
           void this.session.startSession({ cwd: msg.workspacePath }).catch((err) => {
             this.webview.postMessage({ type: 'error', message: `Failed to start Codex session: ${this.errMsg(err)}` });
           });
           break;
 
         case 'resumeSession':
+          this.clearPendingHandoffPrompt();
           void this.session.startSession({ resume: msg.sessionId }).catch((err) => {
             this.webview.postMessage({ type: 'error', message: `Failed to resume Codex session: ${this.errMsg(err)}` });
           });
           break;
 
         case 'stopSession':
+          this.clearPendingHandoffPrompt();
           this.session.stopSession();
           break;
 
         case 'clearSession':
+          this.clearPendingHandoffPrompt();
           void this.session.clearSession({ cwd: msg.workspacePath }).catch((err) => {
             this.webview.postMessage({ type: 'error', message: `Failed to clear Codex session: ${this.errMsg(err)}` });
           });
@@ -265,12 +313,21 @@ export class CodexMessageHandler {
           void this.promptHistoryStore.addPrompt(msg.text);
           this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock]);
           this.postToWebview({ type: 'processBusy', busy: true });
-          void this.session.sendText(msg.text, { steer: !!msg.steer }).catch((err) => {
-            const message = this.errMsg(err);
-            this.log(`Codex sendText failed: ${message}`);
-            this.postToWebview({ type: 'processBusy', busy: this.session.isTurnRunning() });
-            this.postToWebview({ type: 'error', message: `Failed to send Codex message: ${message}` });
-          });
+          {
+            const deferred = this.buildDeferredHandoffPayload(msg.text);
+            void this.session.sendText(deferred.text, { steer: !!msg.steer })
+              .then(() => {
+                if (deferred.consumeOnSuccess) {
+                  this.pendingHandoffPrompt = null;
+                }
+              })
+              .catch((err) => {
+                const message = this.errMsg(err);
+                this.log(`Codex sendText failed: ${message}`);
+                this.postToWebview({ type: 'processBusy', busy: this.session.isTurnRunning() });
+                this.postToWebview({ type: 'error', message: `Failed to send Codex message: ${message}` });
+              });
+          }
           break;
 
         case 'sendMessageWithImages': {
@@ -302,12 +359,21 @@ export class CodexMessageHandler {
           }
           this.postUserMessage(content);
           this.postToWebview({ type: 'processBusy', busy: true });
-          void this.session.sendWithImages(msg.text, msg.images, { steer: !!msg.steer }).catch((err) => {
-            const message = this.errMsg(err);
-            this.log(`Codex sendWithImages failed: ${message}`);
-            this.postToWebview({ type: 'processBusy', busy: this.session.isTurnRunning() });
-            this.postToWebview({ type: 'error', message: `Failed to send Codex message with images: ${message}` });
-          });
+          {
+            const deferred = this.buildDeferredHandoffPayload(msg.text, { imageCount: msg.images.length });
+            void this.session.sendWithImages(deferred.text, msg.images, { steer: !!msg.steer })
+              .then(() => {
+                if (deferred.consumeOnSuccess) {
+                  this.pendingHandoffPrompt = null;
+                }
+              })
+              .catch((err) => {
+                const message = this.errMsg(err);
+                this.log(`Codex sendWithImages failed: ${message}`);
+                this.postToWebview({ type: 'processBusy', busy: this.session.isTurnRunning() });
+                this.postToWebview({ type: 'error', message: `Failed to send Codex message with images: ${message}` });
+              });
+          }
           break;
         }
 
@@ -359,7 +425,6 @@ export class CodexMessageHandler {
             sourceTabId: this.tabId,
             targetProvider: msg.targetProvider,
             keepSourceOpen: msg.keepSourceOpen ?? true,
-            autoSend: msg.autoSend ?? true,
           }).then(
             () => undefined,
             (err: unknown) => {
@@ -686,10 +751,13 @@ export class CodexMessageHandler {
 
     this.demux.on('agentMessage', (data: { id: string; text: string }) => {
       this.currentTurnHadAgentMessage = true;
-      const messageId = data.id || this.nextMessageId();
+      // Codex item ids (e.g. item_1) can repeat across turns, so do not use them
+      // as UI message ids or replies will overwrite earlier messages in the store.
+      const messageId = this.nextMessageId();
       this.lastMessageId = messageId;
       const model = this.getConfiguredCodexModelLabel();
-      this.log(`Codex agent_message: id=${messageId} len=${data.text.length}`);
+      const rawMessageId = data.id || '(none)';
+      this.log(`Codex agent_message: rawId=${rawMessageId} uiId=${messageId} len=${data.text.length}`);
       this.postToWebview({ type: 'messageStart', messageId, model });
       // Codex exec emits complete agent messages (not text deltas). Synthesize a single
       // streamingText block so the existing webview finalize path persists the message.

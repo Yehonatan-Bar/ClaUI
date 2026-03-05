@@ -78,6 +78,11 @@ export const App: React.FC = () => {
     typeof lastError === 'string' && /codex cli not found/i.test(lastError);
   const isClaudeCliMissingError =
     typeof lastError === 'string' && /claude cli not found/i.test(lastError);
+  const isAutoDismissCommandError =
+    typeof lastError === 'string' &&
+    /command failed\s*\(exit\s*\d+\)/i.test(lastError) &&
+    !isCodexCliMissingError &&
+    !isClaudeCliMissingError;
 
   const handleTimelineTurnClick = React.useCallback((messageId: string) => {
     const el = document.querySelector(`[data-message-id="${messageId}"]`);
@@ -97,6 +102,16 @@ export const App: React.FC = () => {
     }
     useAppStore.getState().setForkInit(null);
   }, [forkInit]);
+
+  useEffect(() => {
+    if (!isAutoDismissCommandError || !lastError) return;
+    const timer = window.setTimeout(() => {
+      if (useAppStore.getState().lastError === lastError) {
+        setError(null);
+      }
+    }, 10_000);
+    return () => window.clearTimeout(timer);
+  }, [isAutoDismissCommandError, lastError, setError]);
 
   console.log(`%c[App] render`, 'color: white; font-weight: bold; background: #333; padding: 2px 6px', {
     isConnected,

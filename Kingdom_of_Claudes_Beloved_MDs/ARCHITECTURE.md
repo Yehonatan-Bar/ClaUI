@@ -231,6 +231,8 @@ Central state for the React UI:
 
 Listens for `window.message` events (postMessages from extension host) and dispatches them to the Zustand store. Also exports `postToExtension()` for sending messages back.
 
+Error events (`type: 'error'`) are written to `store.lastError`, then rendered by `App.tsx` as a top banner. `App.tsx` treats CLI-setup errors (missing Claude/Codex CLI) as persistent setup notices with action buttons, while generic command failures matching `Command failed (exit N)` auto-dismiss after 10 seconds (and can still be dismissed manually).
+
 ### RTL Detection (`hooks/useRtlDetection.ts`)
 
 Exports `detectRtl(text)` which checks for Hebrew (U+0590-U+05FF) and Arabic (U+0600-U+06FF) characters. Used only by InputArea for per-keystroke textarea direction. Message bubbles and streaming text use the browser's native `dir="auto"` (first-strong-character algorithm) instead, so a mostly-English message containing a few Hebrew words stays LTR. MarkdownContent applies `dir="auto"` to each block-level element (p, li, headings, td) for per-paragraph direction detection.
@@ -575,14 +577,12 @@ The runtime managers (`ClaudeProcessManager`, `CodexExecProcessManager`) remain 
   3) starting_target_session
      - start clean target session (no cross-provider resume)
 
-  4) injecting_handoff_prompt
+  4) arming_first_user_prompt
      - HandoffPromptComposer.compose(...)
-     - sendText(prompt) to target (if autoSend)
+     - stage deferred prompt/context in target tab runtime
+     - no automatic model message is sent during provider switch
 
-  5) awaiting_first_reply
-     - waitForNextAssistantReply(timeout)
-
-  6) completed|failed
+  5) completed|failed
      - post `handoffProgress` to source webview
      - persist source<->target metadata links in SessionStore
      - expose fallback manual prompt on failure
@@ -594,8 +594,7 @@ The runtime managers (`ClaudeProcessManager`, `CodexExecProcessManager`) remain 
 - `collecting_context`
 - `creating_target_tab`
 - `starting_target_session`
-- `injecting_handoff_prompt`
-- `awaiting_first_reply`
+- `arming_first_user_prompt`
 - `completed`
 - `failed`
 

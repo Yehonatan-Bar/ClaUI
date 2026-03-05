@@ -257,7 +257,6 @@ export class TabManager {
 
     this.handoffLocks.add(sourceTab.id);
     const keepSourceOpen = request.keepSourceOpen ?? true;
-    const autoSend = request.autoSend ?? vscode.workspace.getConfiguration('claudeMirror').get<boolean>('handoff.autoSend', true);
     let targetTabId = '';
     let artifactPath: string | undefined;
 
@@ -268,7 +267,6 @@ export class TabManager {
       const result = await this.handoffOrchestrator.run({
         source: sourceSnapshot,
         targetProvider: request.targetProvider,
-        autoSend,
         createTargetTab: (provider) => this.wrapHandoffTargetRuntime(this.createTabForProvider(provider)),
         onProgress: (update) => {
           const durationMs = Date.now() - startedAt;
@@ -343,8 +341,7 @@ export class TabManager {
       },
       setForkInit: (init) => tab.setForkInit(init),
       startSession: (options) => tab.startSession({ cwd: options?.cwd }),
-      sendText: (text) => tab.sendText(text),
-      waitForNextAssistantReply: (timeoutMs) => tab.waitForNextAssistantReply(timeoutMs),
+      stageDeferredHandoffPrompt: (prompt) => tab.setPendingHandoffPrompt(prompt),
     };
   }
 

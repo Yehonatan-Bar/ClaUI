@@ -160,11 +160,6 @@
           "default": true,
           "description": "Enable cross-provider session handoff (Claude <-> Codex) with context capsule transfer."
         },
-        "claudeMirror.handoff.autoSend": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically send the generated handoff prompt in the target provider session."
-        },
         "claudeMirror.handoff.storeArtifacts": {
           "type": "boolean",
           "default": true,

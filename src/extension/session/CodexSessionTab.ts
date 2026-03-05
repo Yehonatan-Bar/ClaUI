@@ -212,7 +212,13 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     return 'codex';
   }
 
+  /** Stage one-time handoff context to inject on the first user message in this tab. */
+  setPendingHandoffPrompt(prompt: string): void {
+    this.messageHandler.setPendingHandoffPrompt(prompt);
+  }
+
   async startSession(options?: { resume?: string; fork?: boolean; cwd?: string }): Promise<void> {
+    this.messageHandler.clearPendingHandoffPrompt();
     const isFork = !!options?.fork;
 
     this.sessionCwd =
