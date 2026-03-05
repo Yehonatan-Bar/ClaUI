@@ -48,7 +48,7 @@ export const StreamingText: React.FC<StreamingTextProps> = ({ text }) => {
     if (parts.length === 1) return displayText;
     return parts.map((part, i) =>
       /^ultrathink$/i.test(part)
-        ? <span key={i} className="ultrathink-glow">{part}</span>
+        ? <span key={i} className={`ultrathink-glow ut-glow-v${Math.floor(Math.random() * 6) + 1}`}>{part}</span>
         : part
     );
   }, [displayText]);
