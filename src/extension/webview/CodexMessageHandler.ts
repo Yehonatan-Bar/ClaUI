@@ -483,7 +483,7 @@ export class CodexMessageHandler {
           break;
 
         case 'openFile':
-          this.handleOpenFile(msg.filePath);
+          void this.handleOpenFile(msg.filePath);
           break;
 
         case 'openUrl':
@@ -1054,33 +1054,143 @@ export class CodexMessageHandler {
       });
   }
 
-  private handleOpenFile(rawPath: string): void {
-    let filePath = rawPath;
-    let line: number | undefined;
-    let col: number | undefined;
+  private parseOpenFileTarget(rawPath: string): { filePath: string; line?: number; col?: number } | null {
+    let value = rawPath.trim();
+    if (!value) return null;
 
-    const lineColMatch = filePath.match(/:(\d+)(?::(\d+))?$/);
-    if (lineColMatch) {
-      line = parseInt(lineColMatch[1], 10);
-      col = lineColMatch[2] ? parseInt(lineColMatch[2], 10) : undefined;
-      filePath = filePath.slice(0, lineColMatch.index);
-    }
-
-    const isAbsolute = /^[A-Za-z]:[\\/]/.test(filePath) || filePath.startsWith('/');
-    if (!isAbsolute) {
-      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (workspaceRoot) {
-        filePath = require('path').resolve(workspaceRoot, filePath);
+    if (/^file:\/\//i.test(value)) {
+      try {
+        value = vscode.Uri.parse(value).fsPath;
+      } catch {
+        // Keep original value if URI parsing fails.
       }
     }
 
-    const uri = vscode.Uri.file(filePath);
+    if (/%[0-9A-Fa-f]{2}/.test(value)) {
+      try {
+        value = decodeURIComponent(value);
+      } catch {
+        // Keep original value if decoding fails.
+      }
+    }
+
+    const stripPairs: Array<[string, string]> = [
+      ['`', '`'],
+      ['"', '"'],
+      ["'", "'"],
+      ['<', '>'],
+      ['(', ')'],
+      ['[', ']'],
+    ];
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const trimmed = value.trim();
+      for (const [left, right] of stripPairs) {
+        if (trimmed.startsWith(left) && trimmed.endsWith(right) && trimmed.length >= left.length + right.length) {
+          value = trimmed.slice(left.length, trimmed.length - right.length);
+          changed = true;
+          break;
+        }
+      }
+    }
+
+    value = value.trim().replace(/^[,:;]+(?=[A-Za-z0-9_./\\-])/, '');
+    value = value.replace(/[.,;!?]+$/, '').trim();
+    if (!value) return null;
+
+    let line: number | undefined;
+    let col: number | undefined;
+
+    const hashLineMatch = value.match(/#L(\d+)(?:C(\d+))?(?:-L\d+(?:C\d+)?)?$/i);
+    if (hashLineMatch) {
+      line = parseInt(hashLineMatch[1], 10);
+      col = hashLineMatch[2] ? parseInt(hashLineMatch[2], 10) : undefined;
+      value = value.slice(0, hashLineMatch.index).trim();
+    }
+
+    const lineColMatch = value.match(/:(\d+)(?::(\d+))?$/);
+    if (lineColMatch) {
+      line = parseInt(lineColMatch[1], 10);
+      col = lineColMatch[2] ? parseInt(lineColMatch[2], 10) : col;
+      value = value.slice(0, lineColMatch.index).trim();
+    }
+
+    value = value.replace(/^:+/, '').trim();
+    if (!value) return null;
+
+    return { filePath: value, line, col };
+  }
+
+  private async resolveOpenFilePath(filePath: string): Promise<string> {
+    const isAbsolute = /^[A-Za-z]:[\\/]/.test(filePath) || filePath.startsWith('/');
+    if (isAbsolute && fs.existsSync(filePath)) {
+      return filePath;
+    }
+
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceRoot) {
+      return filePath;
+    }
+
+    const directCandidates = [path.resolve(workspaceRoot, filePath)];
+    if (/\.(xcodeproj|xcworkspace)$/i.test(workspaceRoot)) {
+      directCandidates.push(path.resolve(workspaceRoot, '..', filePath));
+    }
+    for (const candidate of directCandidates) {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    const basename = path.basename(filePath);
+    const normalizedSuffix = filePath.replace(/\\/g, '/').toLowerCase();
+    const searchBases = new Set<string>([workspaceRoot]);
+    if (/\.(xcodeproj|xcworkspace)$/i.test(workspaceRoot)) {
+      searchBases.add(path.resolve(workspaceRoot, '..'));
+    }
+
+    for (const base of Array.from(searchBases)) {
+      try {
+        const found = await vscode.workspace.findFiles(
+          new vscode.RelativePattern(base, `**/${basename}`),
+          '**/{.git,node_modules,dist,build,DerivedData}/**',
+          25
+        );
+        if (found.length > 0) {
+          const suffixMatch = found.find((uri) =>
+            uri.fsPath.replace(/\\/g, '/').toLowerCase().endsWith(normalizedSuffix)
+          );
+          return (suffixMatch ?? found[0]).fsPath;
+        }
+      } catch (err) {
+        this.log(`File lookup fallback failed under "${base}": ${this.errMsg(err)}`);
+      }
+    }
+
+    return directCandidates[0];
+  }
+
+  private async handleOpenFile(rawPath: string): Promise<void> {
+    const parsed = this.parseOpenFileTarget(rawPath);
+    if (!parsed) {
+      this.log(`Codex openFile parse failed: "${rawPath}"`);
+      return;
+    }
+
+    const resolvedPath = await this.resolveOpenFilePath(parsed.filePath);
+    const uri = vscode.Uri.file(resolvedPath);
     const openOptions: vscode.TextDocumentShowOptions = {};
-    if (line !== undefined) {
-      const pos = new vscode.Position(line - 1, (col ?? 1) - 1);
+    if (parsed.line !== undefined) {
+      const line = Math.max(1, parsed.line);
+      const col = Math.max(1, parsed.col ?? 1);
+      const pos = new vscode.Position(line - 1, col - 1);
       openOptions.selection = new vscode.Range(pos, pos);
     }
-    void vscode.commands.executeCommand('vscode.open', uri, openOptions);
+    void vscode.commands.executeCommand('vscode.open', uri, openOptions).then(
+      () => this.log(`Opened file (Codex handler): ${resolvedPath}${parsed.line ? `:${parsed.line}` : ''}`),
+      (err) => this.log(`Failed to open file (Codex handler): ${this.errMsg(err)}`)
+    );
   }
 
   private handleOpenUrl(url: string): void {

@@ -23,24 +23,48 @@ interface UsageEntry {
 }
 
 interface UsageApiResponse {
-  five_hour?: UsageEntry | null;
-  seven_day?: UsageEntry | null;
-  seven_day_opus?: UsageEntry | null;
-  seven_day_sonnet?: UsageEntry | null;
-  seven_day_oauth_apps?: UsageEntry | null;
-  seven_day_cowork?: UsageEntry | null;
   [key: string]: unknown;
 }
 
-/** Human-readable labels for each bucket key returned by the API */
-const LABEL_MAP: Record<string, string> = {
-  five_hour: 'Current session',
-  seven_day: 'Current week (all models)',
-  seven_day_opus: 'Current week (Opus only)',
-  seven_day_sonnet: 'Current week (Sonnet only)',
-  seven_day_oauth_apps: 'Current week (OAuth apps)',
-  seven_day_cowork: 'Current week (CoWork)',
+/**
+ * Known period prefixes in longest-first order to avoid partial matches.
+ * The key is the API response field prefix; label is the human-readable period name.
+ */
+const PERIOD_PREFIXES: Array<{ key: string; label: string }> = [
+  { key: 'sixty_day',     label: '2 Months' },
+  { key: 'thirty_day',    label: '30 Days' },
+  { key: 'fourteen_day',  label: '14 Days' },
+  { key: 'seven_day',     label: '7 Days' },
+  { key: 'one_day',       label: '24 Hours' },
+  { key: 'five_hour',     label: '5 Hours' },
+];
+
+/** Map from model suffix (after period prefix) to human-readable model name */
+const MODEL_LABELS: Record<string, string> = {
+  opus:       'Opus',
+  sonnet:     'Sonnet',
+  haiku:      'Haiku',
+  oauth_apps: 'OAuth Apps',
+  cowork:     'CoWork',
 };
+
+/**
+ * Parse an API response key into its period and model components.
+ * Returns null if the key doesn't match any known period prefix.
+ */
+function parseApiKey(key: string): { period: string; modelLabel: string } | null {
+  for (const { key: prefix, label: periodLabel } of PERIOD_PREFIXES) {
+    if (key === prefix) {
+      return { period: periodLabel, modelLabel: 'All Models' };
+    }
+    if (key.startsWith(prefix + '_')) {
+      const suffix = key.slice(prefix.length + 1);
+      const modelLabel = MODEL_LABELS[suffix] ?? suffix;
+      return { period: periodLabel, modelLabel };
+    }
+  }
+  return null;
+}
 
 /**
  * Format an ISO datetime string into a compact reset-time label.
@@ -159,16 +183,23 @@ export class UsageFetcher {
     });
   }
 
-  /** Map raw API response fields to UsageStat[] */
+  /** Map raw API response fields to UsageStat[], parsing all known period/model keys */
   private parseResponse(data: UsageApiResponse): UsageStat[] {
     const stats: UsageStat[] = [];
 
-    for (const [key, label] of Object.entries(LABEL_MAP)) {
-      const entry = data[key] as UsageEntry | null | undefined;
+    for (const [key, value] of Object.entries(data)) {
+      const parsed = parseApiKey(key);
+      if (!parsed) continue;
+
+      const entry = value as UsageEntry | null | undefined;
       if (!entry || typeof entry.utilization !== 'number') continue;
 
+      const { period, modelLabel } = parsed;
       stats.push({
-        label,
+        label: modelLabel,
+        period,
+        modelLabel,
+        bucketKey: key,
         percentage: Math.round(entry.utilization),
         resetsAt: entry.resets_at ? formatResetsAt(entry.resets_at) : '',
       });

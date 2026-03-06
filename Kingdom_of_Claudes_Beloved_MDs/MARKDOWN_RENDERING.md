@@ -67,6 +67,16 @@ parseTextWithCodeBlocks(text)   [MessageBubble.tsx]
 
 4. **Bare URLs** - Detected post-render by `linkifyTextNodes()` using `URL_REGEX`. Wrapped in `<span class="url-link">`. Click opens in browser.
 
+### `openFile` Target Parsing (extension-side)
+
+`openFile` requests from the webview are normalized in both `MessageHandler` (Claude tabs) and `CodexMessageHandler` (Codex tabs) before opening:
+
+- Trims wrappers/encoding noise (`\`...\``, quotes, `<...>`, `( ... )`, URI-encoded values)
+- Strips leading punctuation that often precedes inline mentions (for example: `:LocalModelServer.swift#L103`)
+- Supports both classic suffixes (`file.ts:42`, `file.ts:42:7`) and GitHub anchors (`file.ts#L42`, `file.ts#L42C7`, range suffixes)
+- Resolves relative paths from workspace root, then falls back to basename/suffix search
+- For `.xcodeproj` / `.xcworkspace` roots, also searches the parent folder so links can resolve when sources live outside the package folder
+
 ### `linkifyCodeElements()` Function
 
 Queries all inline `<code>` elements (excluding those inside `<pre>`) and checks if their entire text content matches a file path or URL regex. If it does, the `<code>` element itself gets the `file-path-link` or `url-link` class plus data attributes (`data-path` or `data-url`), making it clickable while preserving the inline code styling. Runs before `linkifyTextNodes()`.

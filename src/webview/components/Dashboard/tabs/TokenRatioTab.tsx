@@ -5,14 +5,43 @@ import { postToExtension } from '../../../hooks/useClaudeStream';
 import { DASH_COLORS, formatTokens } from '../dashboardUtils';
 import type { TokenUsageRatioSample, TokenRatioBucketSummary } from '../../../../extension/types/webview-messages';
 
-const BUCKET_COLORS: Record<string, string> = {
-  five_hour: DASH_COLORS.blue,
-  seven_day: DASH_COLORS.green,
-  seven_day_opus: DASH_COLORS.purple,
-  seven_day_sonnet: DASH_COLORS.amber,
-  seven_day_oauth_apps: DASH_COLORS.orange,
-  seven_day_cowork: DASH_COLORS.teal,
+/** Preferred display order for time periods */
+const PERIOD_ORDER = ['5 Hours', '24 Hours', '7 Days', '14 Days', '30 Days', '2 Months'];
+
+const PERIOD_PREFIXES_UI: Array<{ key: string; label: string }> = [
+  { key: 'sixty_day',    label: '2 Months' },
+  { key: 'thirty_day',   label: '30 Days' },
+  { key: 'fourteen_day', label: '14 Days' },
+  { key: 'seven_day',    label: '7 Days' },
+  { key: 'one_day',      label: '24 Hours' },
+  { key: 'five_hour',    label: '5 Hours' },
+];
+
+const MODEL_SUFFIX_LABELS: Record<string, string> = {
+  opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku',
+  oauth_apps: 'OAuth Apps', cowork: 'CoWork',
 };
+
+/** Color assigned per model label (not per bucket key) */
+const MODEL_COLORS: Record<string, string> = {
+  'All Models':  DASH_COLORS.green,
+  'Opus':        DASH_COLORS.purple,
+  'Sonnet':      DASH_COLORS.amber,
+  'Haiku':       DASH_COLORS.blue,
+  'OAuth Apps':  DASH_COLORS.orange,
+  'CoWork':      DASH_COLORS.teal,
+};
+
+function parseBucketKey(bucket: string): { period: string; modelLabel: string } | null {
+  for (const { key: prefix, label: periodLabel } of PERIOD_PREFIXES_UI) {
+    if (bucket === prefix) return { period: periodLabel, modelLabel: 'All Models' };
+    if (bucket.startsWith(prefix + '_')) {
+      const suffix = bucket.slice(prefix.length + 1);
+      return { period: periodLabel, modelLabel: MODEL_SUFFIX_LABELS[suffix] ?? suffix };
+    }
+  }
+  return null;
+}
 
 function getTrendArrow(trend: TokenRatioBucketSummary['trend']): string {
   switch (trend) {
@@ -44,7 +73,9 @@ function formatShortTime(ts: number): string {
 
 // --- Summary Card ---
 const SummaryCard: React.FC<{ summary: TokenRatioBucketSummary }> = ({ summary }) => {
-  const color = BUCKET_COLORS[summary.bucket] || DASH_COLORS.textMuted;
+  const parsed = parseBucketKey(summary.bucket);
+  const modelLabel = parsed?.modelLabel ?? summary.bucketLabel;
+  const color = MODEL_COLORS[modelLabel] || DASH_COLORS.textMuted;
   return (
     <div style={{
       background: DASH_COLORS.cardBg,
@@ -56,7 +87,7 @@ const SummaryCard: React.FC<{ summary: TokenRatioBucketSummary }> = ({ summary }
       flex: '1 1 200px',
     }}>
       <div style={{ fontSize: 12, color: DASH_COLORS.textMuted, marginBottom: 6 }}>
-        {summary.bucketLabel}
+        {modelLabel}
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span style={{ fontSize: 28, fontWeight: 700, color: DASH_COLORS.text }}>
@@ -80,15 +111,20 @@ const SummaryCard: React.FC<{ summary: TokenRatioBucketSummary }> = ({ summary }
 };
 
 // --- Chart data builder ---
-function buildChartData(samples: TokenUsageRatioSample[]): Array<Record<string, unknown>> {
-  // Group samples by timestamp (approximate - same batch)
+// Builds chart data for a specific period's buckets, keyed by model label for clean legend display
+function buildChartData(
+  samples: TokenUsageRatioSample[],
+  periodBuckets: Set<string>
+): Array<Record<string, unknown>> {
   const byTime = new Map<number, Record<string, unknown>>();
   for (const s of samples) {
+    if (!periodBuckets.has(s.bucket)) continue;
     if (s.tokensPerPercent === null) continue;
-    const key = s.timestamp;
-    const entry = byTime.get(key) || { timestamp: key, time: formatShortTime(key) };
-    entry[s.bucket] = s.tokensPerPercent;
-    byTime.set(key, entry);
+    const parsed = parseBucketKey(s.bucket);
+    const modelKey = parsed?.modelLabel ?? s.bucket;
+    const entry = byTime.get(s.timestamp) || { timestamp: s.timestamp, time: formatShortTime(s.timestamp) };
+    entry[modelKey] = s.tokensPerPercent;
+    byTime.set(s.timestamp, entry);
   }
   return Array.from(byTime.values()).sort((a, b) => (a.timestamp as number) - (b.timestamp as number));
 }
@@ -99,29 +135,56 @@ export const TokenRatioTab: React.FC = () => {
   const globalTurnCount = useAppStore((s) => s.tokenRatioGlobalTurnCount);
   const cumulativeTokens = useAppStore((s) => s.tokenRatioCumulativeTokens);
   const cumulativeWeightedTokens = useAppStore((s) => s.tokenRatioCumulativeWeightedTokens);
+  const [selectedPeriod, setSelectedPeriod] = React.useState<string | null>(null);
 
-  // Request data on mount
   useEffect(() => {
     postToExtension({ type: 'getTokenRatioData' } as any);
   }, []);
 
-  const chartData = buildChartData(samples);
-  const bucketKeys = [...new Set(samples.filter(s => s.tokensPerPercent !== null).map(s => s.bucket))];
-  const recentSamples = samples.slice(-50).reverse();
+  const handleClear = () => postToExtension({ type: 'clearTokenRatioData' } as any);
+  const handleResample = () => postToExtension({ type: 'forceResampleTokenRatio' } as any);
+
+  const hasValidRatio = samples.some(s => s.tokensPerPercent !== null);
   const totalTokens = cumulativeTokens
     ? cumulativeTokens.input + cumulativeTokens.output + cumulativeTokens.cacheCreation + cumulativeTokens.cacheRead
     : 0;
 
-  const handleClear = () => {
-    postToExtension({ type: 'clearTokenRatioData' } as any);
-  };
+  // Build period → bucket[] map from summaries (which reflect what data we actually have)
+  const periods = React.useMemo(() => {
+    const periodMap = new Map<string, string[]>();
+    for (const s of summaries) {
+      const parsed = parseBucketKey(s.bucket);
+      if (!parsed) continue;
+      const arr = periodMap.get(parsed.period) || [];
+      arr.push(s.bucket);
+      periodMap.set(parsed.period, arr);
+    }
+    const known = PERIOD_ORDER.filter(p => periodMap.has(p));
+    const unknown = [...periodMap.keys()].filter(p => !PERIOD_ORDER.includes(p));
+    return [...known, ...unknown].map(p => ({ label: p, buckets: periodMap.get(p) ?? [] }));
+  }, [summaries]);
 
-  const handleResample = () => {
-    postToExtension({ type: 'forceResampleTokenRatio' } as any);
-  };
+  // Auto-select first available period
+  useEffect(() => {
+    if (periods.length > 0) {
+      setSelectedPeriod(prev =>
+        prev && periods.some(p => p.label === prev) ? prev : periods[0].label
+      );
+    }
+  }, [periods]);
 
-  // Check if all samples are baselines (no valid ratio yet)
-  const hasValidRatio = samples.some(s => s.tokensPerPercent !== null);
+  const activePeriodEntry = periods.find(p => p.label === selectedPeriod) ?? periods[0] ?? null;
+  const activeBuckets = new Set(activePeriodEntry?.buckets ?? []);
+  const activeSummaries = summaries.filter(s => activeBuckets.has(s.bucket));
+  const chartData = buildChartData(samples, activeBuckets);
+  // Model labels in the active period (for Line components)
+  const activeModelLabels = activeSummaries
+    .map(s => parseBucketKey(s.bucket)?.modelLabel ?? s.bucket)
+    .filter((v, i, a) => a.indexOf(v) === i);
+  // Filter samples table to active period
+  const recentSamples = samples
+    .filter(s => activeBuckets.size === 0 || activeBuckets.has(s.bucket))
+    .slice(-50).reverse();
 
   if (samples.length === 0 && globalTurnCount < 2) {
     return (
@@ -161,7 +224,7 @@ export const TokenRatioTab: React.FC = () => {
         {'. This correlates more accurately with actual usage %.'}
       </div>
 
-      {/* Baseline notice: shown when samples exist but no ratio computed yet */}
+      {/* Baseline notice */}
       {samples.length > 0 && !hasValidRatio && (
         <div style={{
           background: 'rgba(210, 153, 34, 0.10)',
@@ -200,10 +263,38 @@ export const TokenRatioTab: React.FC = () => {
         </div>
       )}
 
-      {/* Summary Cards */}
-      {summaries.length > 0 && (
+      {/* Period selector tabs */}
+      {periods.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {periods.map(({ label }) => {
+            const isActive = label === activePeriodEntry?.label;
+            return (
+              <button
+                key={label}
+                onClick={() => setSelectedPeriod(label)}
+                style={{
+                  background: isActive ? DASH_COLORS.blue : DASH_COLORS.cardBg,
+                  color: isActive ? '#fff' : DASH_COLORS.textMuted,
+                  border: `1px solid ${isActive ? DASH_COLORS.blue : DASH_COLORS.border}`,
+                  borderRadius: 6,
+                  padding: '5px 14px',
+                  fontSize: 12,
+                  fontWeight: isActive ? 700 : 400,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Summary Cards for active period */}
+      {activeSummaries.length > 0 && (
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {summaries.map((s) => <SummaryCard key={s.bucket} summary={s} />)}
+          {activeSummaries.map((s) => <SummaryCard key={s.bucket} summary={s} />)}
         </div>
       )}
 
@@ -253,7 +344,7 @@ export const TokenRatioTab: React.FC = () => {
         )}
       </div>
 
-      {/* Trend Line Chart */}
+      {/* Trend Line Chart - filtered to active period */}
       {chartData.length > 1 && (
         <div style={{
           background: DASH_COLORS.cardBg,
@@ -263,6 +354,11 @@ export const TokenRatioTab: React.FC = () => {
         }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: DASH_COLORS.text, marginBottom: 12, paddingLeft: 8 }}>
             Weighted Tokens per 1% Usage Over Time
+            {activePeriodEntry && (
+              <span style={{ fontWeight: 400, color: DASH_COLORS.textMuted, marginLeft: 8 }}>
+                ({activePeriodEntry.label})
+              </span>
+            )}
           </div>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={chartData}>
@@ -279,12 +375,12 @@ export const TokenRatioTab: React.FC = () => {
                 formatter={(value: number | undefined) => [formatTokens(value ?? 0), '']}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              {bucketKeys.map((bucket) => (
+              {activeModelLabels.map((modelLabel) => (
                 <Line
-                  key={bucket}
+                  key={modelLabel}
                   type="monotone"
-                  dataKey={bucket}
-                  stroke={BUCKET_COLORS[bucket] || DASH_COLORS.textMuted}
+                  dataKey={modelLabel}
+                  stroke={MODEL_COLORS[modelLabel] || DASH_COLORS.textMuted}
                   strokeWidth={2}
                   dot={{ r: 3 }}
                   connectNulls
@@ -295,7 +391,7 @@ export const TokenRatioTab: React.FC = () => {
         </div>
       )}
 
-      {/* Samples Table */}
+      {/* Samples Table - filtered to active period */}
       {recentSamples.length > 0 && (
         <div style={{
           background: DASH_COLORS.cardBg,
@@ -310,7 +406,7 @@ export const TokenRatioTab: React.FC = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${DASH_COLORS.border}` }}>
-                {['Date', 'Bucket', 'Usage%', 'Raw Delta', 'Weighted Delta', 'Delta Usage%', 'Weighted Tok/1%'].map((h) => (
+                {['Date', 'Model', 'Usage%', 'Raw Delta', 'Weighted Delta', 'Delta Usage%', 'Weighted Tok/1%'].map((h) => (
                   <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: DASH_COLORS.textMuted, fontWeight: 500 }}>
                     {h}
                   </th>
@@ -318,29 +414,32 @@ export const TokenRatioTab: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {recentSamples.map((s) => (
-                <tr key={s.id} style={{ borderBottom: `1px solid rgba(48,54,61,0.5)` }}>
-                  <td style={{ padding: '6px 10px', color: DASH_COLORS.textMuted }}>{formatDate(s.timestamp)}</td>
-                  <td style={{ padding: '6px 10px' }}>
-                    <span style={{ color: BUCKET_COLORS[s.bucket] || DASH_COLORS.text }}>
-                      {s.bucketLabel}
-                    </span>
-                  </td>
-                  <td style={{ padding: '6px 10px', color: DASH_COLORS.text }}>{s.usagePercent}%</td>
-                  <td style={{ padding: '6px 10px', color: DASH_COLORS.textMuted }}>{formatTokens(s.deltaTokens)}</td>
-                  <td style={{ padding: '6px 10px', color: DASH_COLORS.text }}>
-                    {formatTokens(Math.round(s.weightedDeltaTokens ?? s.deltaTokens))}
-                  </td>
-                  <td style={{ padding: '6px 10px', color: s.deltaUsagePercent < 0 ? DASH_COLORS.amber : DASH_COLORS.text }}>
-                    {s.deltaUsagePercent >= 0 ? '+' : ''}{s.deltaUsagePercent.toFixed(1)}%
-                  </td>
-                  <td style={{ padding: '6px 10px', fontWeight: 600, color: s.tokensPerPercent !== null ? DASH_COLORS.text : DASH_COLORS.textMuted }}>
-                    {s.tokensPerPercent !== null
-                      ? formatTokens(s.tokensPerPercent)
-                      : (s.deltaTokens > 0 ? 'Baseline' : 'N/A')}
-                  </td>
-                </tr>
-              ))}
+              {recentSamples.map((s) => {
+                const parsed = parseBucketKey(s.bucket);
+                const modelLabel = parsed?.modelLabel ?? s.bucket;
+                const rowColor = MODEL_COLORS[modelLabel] || DASH_COLORS.text;
+                return (
+                  <tr key={s.id} style={{ borderBottom: `1px solid rgba(48,54,61,0.5)` }}>
+                    <td style={{ padding: '6px 10px', color: DASH_COLORS.textMuted }}>{formatDate(s.timestamp)}</td>
+                    <td style={{ padding: '6px 10px' }}>
+                      <span style={{ color: rowColor }}>{modelLabel}</span>
+                    </td>
+                    <td style={{ padding: '6px 10px', color: DASH_COLORS.text }}>{s.usagePercent}%</td>
+                    <td style={{ padding: '6px 10px', color: DASH_COLORS.textMuted }}>{formatTokens(s.deltaTokens)}</td>
+                    <td style={{ padding: '6px 10px', color: DASH_COLORS.text }}>
+                      {formatTokens(Math.round(s.weightedDeltaTokens ?? s.deltaTokens))}
+                    </td>
+                    <td style={{ padding: '6px 10px', color: s.deltaUsagePercent < 0 ? DASH_COLORS.amber : DASH_COLORS.text }}>
+                      {s.deltaUsagePercent >= 0 ? '+' : ''}{s.deltaUsagePercent.toFixed(1)}%
+                    </td>
+                    <td style={{ padding: '6px 10px', fontWeight: 600, color: s.tokensPerPercent !== null ? DASH_COLORS.text : DASH_COLORS.textMuted }}>
+                      {s.tokensPerPercent !== null
+                        ? formatTokens(s.tokensPerPercent)
+                        : (s.deltaTokens > 0 ? 'Baseline' : 'N/A')}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
