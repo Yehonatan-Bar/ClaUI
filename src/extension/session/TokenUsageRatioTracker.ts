@@ -104,7 +104,9 @@ export class TokenUsageRatioTracker {
     const cumWeighted = this.history.cumulativeWeightedTokens;
 
     for (const stat of usageStats) {
-      const bucket = this.labelToBucketKey(stat.label);
+      // Use bucketKey (original API key like "seven_day_sonnet") when available;
+      // fall back to label→key mapping for older data that predates this field.
+      const bucket = stat.bucketKey ?? this.labelToBucketKey(stat.label);
       const lastForBucket = this.lastSampleForBucket(bucket);
 
       let deltaTokens = 0;
@@ -143,11 +145,16 @@ export class TokenUsageRatioTracker {
         // deltaUsagePercent stays 0 (unknown baseline), tokensPerPercent stays null
       }
 
+      // Build a clear bucket label: "7 Days: Sonnet" or just "All Models" if only label available
+      const bucketLabel = stat.period
+        ? `${stat.period}: ${stat.modelLabel ?? stat.label}`
+        : stat.label;
+
       const sample: TokenUsageRatioSample = {
         id: `${bucket}-${now}-${Math.random().toString(36).slice(2, 6)}`,
         timestamp: now,
         bucket,
-        bucketLabel: stat.label,
+        bucketLabel,
         usagePercent: stat.percentage,
         cumulativeTotalTokens: cumRaw,
         cumulativeWeightedTokens: cumWeighted,

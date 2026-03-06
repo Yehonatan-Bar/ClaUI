@@ -1229,7 +1229,10 @@ export interface ClaudeAuthStatusMessage {
 
 /** One usage stat entry from the claude /usage command output */
 export interface UsageStat {
-  label: string;       // e.g. "Current session", "Current week (all models)"
+  label: string;       // compact display label, e.g. "All Models", "Opus"
+  period: string;      // human-readable period, e.g. "7 Days", "5 Hours"
+  modelLabel: string;  // model name, e.g. "All Models", "Opus", "Sonnet"
+  bucketKey: string;   // original API key, e.g. "seven_day_sonnet"
   percentage: number;  // 0–100
   resetsAt: string;    // e.g. "1pm (Asia/Jerusalem)"
 }

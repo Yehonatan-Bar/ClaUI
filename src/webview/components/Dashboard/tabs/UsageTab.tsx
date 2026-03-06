@@ -4,6 +4,9 @@ import { postToExtension } from '../../../hooks/useClaudeStream';
 import { DASH_COLORS } from '../dashboardUtils';
 import type { UsageStat } from '../../../../extension/types/webview-messages';
 
+/** Preferred display order for time periods */
+const PERIOD_ORDER = ['5 Hours', '24 Hours', '7 Days', '14 Days', '30 Days', '2 Months'];
+
 function getColor(pct: number): string {
   if (pct > 75) return DASH_COLORS.red;
   if (pct > 50) return DASH_COLORS.amber;
@@ -39,7 +42,7 @@ const UsageCard: React.FC<UsageCardProps> = ({ stat }) => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, color: DASH_COLORS.text, marginBottom: 2 }}>
-            {stat.label}
+            {stat.modelLabel}
           </div>
           {stat.resetsAt && (
             <div style={{ fontSize: 12, color: DASH_COLORS.textMuted }}>
@@ -81,6 +84,7 @@ export const UsageTab: React.FC = () => {
   const usageFetchedAt = useAppStore((s) => s.usageFetchedAt);
   const usageError = useAppStore((s) => s.usageError);
   const [loading, setLoading] = React.useState(false);
+  const [selectedPeriod, setSelectedPeriod] = React.useState<string | null>(null);
 
   const prevFetchedAt = React.useRef(usageFetchedAt);
   React.useEffect(() => {
@@ -90,11 +94,40 @@ export const UsageTab: React.FC = () => {
     }
   }, [usageFetchedAt]);
 
+  // Group stats by period
+  const periodGroups = React.useMemo(() => {
+    const groups: Record<string, UsageStat[]> = {};
+    for (const stat of usageStats) {
+      const p = stat.period ?? 'Unknown';
+      if (!groups[p]) groups[p] = [];
+      groups[p].push(stat);
+    }
+    return groups;
+  }, [usageStats]);
+
+  // Periods available in API response, sorted by preferred order
+  const availablePeriods = React.useMemo(() => {
+    const known = PERIOD_ORDER.filter((p) => periodGroups[p]);
+    const unknown = Object.keys(periodGroups).filter((p) => !PERIOD_ORDER.includes(p));
+    return [...known, ...unknown];
+  }, [periodGroups]);
+
+  // Auto-select first available period when data arrives
+  React.useEffect(() => {
+    if (availablePeriods.length > 0) {
+      setSelectedPeriod((prev) =>
+        prev && periodGroups[prev] ? prev : availablePeriods[0]
+      );
+    }
+  }, [availablePeriods, periodGroups]);
+
   const handleRefresh = () => {
     setLoading(true);
     postToExtension({ type: 'requestUsage' });
   };
 
+  const activePeriod = selectedPeriod && periodGroups[selectedPeriod] ? selectedPeriod : availablePeriods[0] ?? null;
+  const activeStats = activePeriod ? (periodGroups[activePeriod] ?? []) : [];
   const hasData = usageStats.length > 0;
 
   return (
@@ -104,7 +137,7 @@ export const UsageTab: React.FC = () => {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 16,
       }}>
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: DASH_COLORS.text }}>
@@ -135,9 +168,42 @@ export const UsageTab: React.FC = () => {
         </button>
       </div>
 
+      {/* Period tabs */}
+      {hasData && availablePeriods.length > 0 && (
+        <div style={{
+          display: 'flex',
+          gap: 6,
+          marginBottom: 18,
+          flexWrap: 'wrap',
+        }}>
+          {availablePeriods.map((period) => {
+            const isActive = period === activePeriod;
+            return (
+              <button
+                key={period}
+                onClick={() => setSelectedPeriod(period)}
+                style={{
+                  background: isActive ? DASH_COLORS.blue : DASH_COLORS.cardBg,
+                  color: isActive ? '#fff' : DASH_COLORS.textMuted,
+                  border: `1px solid ${isActive ? DASH_COLORS.blue : DASH_COLORS.border}`,
+                  borderRadius: 6,
+                  padding: '5px 14px',
+                  fontSize: 12,
+                  fontWeight: isActive ? 700 : 400,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {period}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Content */}
       {hasData ? (
-        usageStats.map((stat, i) => <UsageCard key={i} stat={stat} />)
+        activeStats.map((stat, i) => <UsageCard key={i} stat={stat} />)
       ) : usageError ? (
         <div style={{
           background: DASH_COLORS.cardBg,
@@ -161,12 +227,9 @@ export const UsageTab: React.FC = () => {
           color: DASH_COLORS.textMuted,
           fontSize: 13,
         }}>
-          <div style={{ fontSize: 28, marginBottom: 10 }}>
-            {'\u{1F4CA}'}
-          </div>
           <div>Click <strong>Refresh</strong> to load your current usage data.</div>
           <div style={{ fontSize: 11, marginTop: 6, opacity: 0.7 }}>
-            Shows session and weekly usage limits from Claude Code.
+            Shows usage limits per time period and model from Claude Code.
           </div>
         </div>
       )}
