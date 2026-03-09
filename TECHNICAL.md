@@ -52,6 +52,7 @@ claude-code-mirror/
 |   |   |   +-- ClaUiSidebarViewProvider.ts #   Activity Bar sidebar launcher (WebviewViewProvider)
 |   |   +-- process/
 |   |   |   +-- ClaudeProcessManager.ts   #   Spawns and manages CLI process
+|   |   |   +-- CodexCliDetector.ts        #  Shared Codex CLI detection, probing & candidate scoring
 |   |   |   +-- CodexExecProcessManager.ts #  Spawns and manages Codex exec processes
 |   |   |   +-- envUtils.ts               #   Shared env sanitization & API key management
 |   |   |   +-- killTree.ts              #   Shared cross-platform process tree kill utility

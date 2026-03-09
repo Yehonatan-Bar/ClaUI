@@ -9,7 +9,9 @@ Recognizes these patterns on stderr to show proper install guidance instead of g
 - `spawn codex enoent` / `enoent codex` (Node.js spawn errors)
 - `the system cannot find the path/file specified` (Windows OS-level error, commonly emitted by extension-bundled binaries that fail on `exec` mode)
 
-**Auto-Detect Validation** (`CodexMessageHandler.findWorkingCodexCliCandidates()`):
+**Auto-Detect & Auto-Configure** (`CodexCliDetector.ts` - shared utility):
+Detection logic is extracted into `src/extension/process/CodexCliDetector.ts` and used by both `CodexSessionTab` (runtime recovery) and `CodexMessageHandler` (auto-setup / auto-detect UI flows).
+
 - All candidates are probed with `codex --version` to verify they are functional
 - Extension-bundled candidates (source: `official-extension-bundled`) also get a secondary `codex exec --help` probe, because bundled binaries may pass `--version` but fail on `exec` mode due to missing internal resources
 - If the exec probe returns OS-level path errors, the candidate is filtered out
@@ -20,6 +22,9 @@ Recognizes these patterns on stderr to show proper install guidance instead of g
 3. Extension-bundled binaries (`.vscode/extensions/openai.chatgpt-*/bin/*/codex.exe`)
 4. Common install locations (`%APPDATA%\npm\codex.cmd`, etc.)
 5. npm prefix fallback (when auto-setup is used)
+
+**Auto-Recovery on CLI Missing:**
+When a Codex turn fails because the CLI is not found (process exit/error or login precheck), `CodexSessionTab` now runs `findWorkingCodexCliCandidates()` before showing the install guidance error. If a working candidate is found, it is automatically saved to `claudeMirror.codex.cliPath` and the user is informed to retry. This handles the common case where the official Codex VS Code extension is installed (bundling the binary) but `codex` is not on PATH.
 
 ## 2026-02-25 - Codex image paste/send support
 

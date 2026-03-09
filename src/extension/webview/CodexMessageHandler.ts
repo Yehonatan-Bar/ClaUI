@@ -66,11 +66,14 @@ function formatCodexModelLabel(id: string): string {
     .join('-');
 }
 
-interface CodexCliCandidate {
-  path: string;
-  source: 'path' | 'official-extension-bundled' | 'npm-prefix' | 'common-location';
-  version?: string;
-}
+// CodexCliCandidate type and detection functions are in CodexCliDetector.ts
+import {
+  type CodexCliCandidate,
+  findWorkingCodexCliCandidates as detectWorkingCodexCli,
+  pickPreferredCodexCliCandidate as pickPreferredCandidate,
+  probeCodexCliVersion as probeVersion,
+  quoteForShell as quoteShell,
+} from '../process/CodexCliDetector';
 
 const CODEX_PROVIDER_CAPABILITIES: ProviderCapabilities = {
   supportsPlanApproval: false,
@@ -1259,7 +1262,7 @@ export class CodexMessageHandler {
   }
 
   private async handleAutoDetectCodexCliPath(): Promise<void> {
-    const candidates = await this.findWorkingCodexCliCandidates();
+    const candidates = await detectWorkingCodexCli();
     if (candidates.length === 0) {
       void vscode.window.showWarningMessage(
         'Could not find a working Codex CLI. Try Auto-setup (install + configure), or use Browse for codex executable.'
@@ -1267,7 +1270,7 @@ export class CodexMessageHandler {
       return;
     }
 
-    let selected = this.pickPreferredCodexCliCandidate(candidates);
+    let selected = pickPreferredCandidate(candidates);
     if (candidates.length > 1) {
       const picked = await vscode.window.showQuickPick(
         candidates.map((c) => ({
@@ -1310,7 +1313,7 @@ export class CodexMessageHandler {
         },
         async (progress) => {
           progress.report({ message: 'Looking for an existing Codex CLI...' });
-          let candidates = await this.findWorkingCodexCliCandidates();
+          let candidates = await detectWorkingCodexCli();
 
           if (candidates.length === 0) {
             progress.report({ message: 'No Codex CLI found. Checking npm...' });
@@ -1330,7 +1333,7 @@ export class CodexMessageHandler {
             }
 
             progress.report({ message: 'Detecting installed Codex CLI...' });
-            candidates = await this.findWorkingCodexCliCandidates({ includeNpmPrefixFallback: true });
+            candidates = await detectWorkingCodexCli({ includeNpmPrefixFallback: true });
           }
 
           if (candidates.length === 0) {
@@ -1339,7 +1342,7 @@ export class CodexMessageHandler {
             );
           }
 
-          const selected = this.pickPreferredCodexCliCandidate(candidates);
+          const selected = pickPreferredCandidate(candidates);
           await vscode.workspace.getConfiguration('claudeMirror').update('codex.cliPath', selected.path, true);
 
           // Clear the setup error banner on success.
@@ -1372,207 +1375,6 @@ export class CodexMessageHandler {
     }
   }
 
-  private async findWorkingCodexCliCandidates(
-    options?: { includeNpmPrefixFallback?: boolean }
-  ): Promise<CodexCliCandidate[]> {
-    const rawCandidates = await this.findCodexCliCandidates(options);
-    const verified: CodexCliCandidate[] = [];
-    for (const candidate of rawCandidates) {
-      const version = await this.probeCodexCliVersion(candidate.path);
-      if (!version) {
-        continue;
-      }
-      // Extension-bundled binaries may pass --version but fail on exec (e.g. missing
-      // internal resources). Run a quick exec-mode smoke test to filter them out.
-      if (candidate.source === 'official-extension-bundled') {
-        const execOk = await this.probeCodexCliExecCapability(candidate.path);
-        if (!execOk) {
-          continue;
-        }
-      }
-      verified.push({ ...candidate, version });
-    }
-    // De-dupe by path while preserving order.
-    return verified.filter((c, idx, arr) => arr.findIndex((x) => x.path.toLowerCase() === c.path.toLowerCase()) === idx);
-  }
-
-  private async findCodexCliCandidates(
-    options?: { includeNpmPrefixFallback?: boolean }
-  ): Promise<CodexCliCandidate[]> {
-    const candidates: CodexCliCandidate[] = [];
-    const seen = new Set<string>();
-    const add = (pathValue: string, source: CodexCliCandidate['source']) => {
-      const normalized = pathValue.trim();
-      if (!normalized) return;
-      const key = process.platform === 'win32' ? normalized.toLowerCase() : normalized;
-      if (seen.has(key)) return;
-      seen.add(key);
-      candidates.push({ path: normalized, source });
-    };
-
-    // Prefer PATH shorthand if available (keeps config simpler).
-    if (await this.probeCodexCliVersion('codex')) {
-      add('codex', 'path');
-    }
-
-    const pathCommand = process.platform === 'win32' ? 'where.exe codex' : 'command -v codex || which codex';
-    const pathResult = await this.execShellCommand(pathCommand, 5000);
-    if (pathResult.stdout) {
-      for (const line of pathResult.stdout.split(/\r?\n/)) {
-        add(line, 'path');
-      }
-    }
-
-    for (const bundled of this.findBundledEditorCodexCliCandidates()) {
-      add(bundled, 'official-extension-bundled');
-    }
-
-    for (const common of this.findCommonCodexCliLocations()) {
-      add(common, 'common-location');
-    }
-
-    if (options?.includeNpmPrefixFallback) {
-      for (const npmCandidate of await this.findNpmPrefixCodexCandidates()) {
-        add(npmCandidate, 'npm-prefix');
-      }
-    }
-
-    return candidates;
-  }
-
-  private findBundledEditorCodexCliCandidates(): string[] {
-    const home = os.homedir();
-    const roots = [
-      path.join(home, '.vscode', 'extensions'),
-      path.join(home, '.vscode-insiders', 'extensions'),
-      path.join(home, '.cursor', 'extensions'),
-      path.join(home, '.windsurf', 'extensions'),
-    ];
-    const matches: string[] = [];
-
-    for (const root of roots) {
-      if (!fs.existsSync(root)) continue;
-      let entries: fs.Dirent[] = [];
-      try {
-        entries = fs.readdirSync(root, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        const name = entry.name.toLowerCase();
-        if (!(name.startsWith('openai.chatgpt-') || name.startsWith('openai.codex-') || name.includes('openai'))) {
-          continue;
-        }
-        const base = path.join(root, entry.name, 'bin');
-        if (!fs.existsSync(base)) continue;
-        try {
-          const platformDirs = fs.readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory());
-          for (const pdir of platformDirs) {
-            const binDir = path.join(base, pdir.name);
-            const names = process.platform === 'win32' ? ['codex.exe', 'codex.cmd', 'codex'] : ['codex'];
-            for (const candidateName of names) {
-              const full = path.join(binDir, candidateName);
-              if (fs.existsSync(full)) {
-                matches.push(full);
-              }
-            }
-          }
-        } catch {
-          // ignore broken extension dir
-        }
-      }
-    }
-    return matches;
-  }
-
-  private findCommonCodexCliLocations(): string[] {
-    const locations: string[] = [];
-    if (process.platform === 'win32') {
-      const appData = process.env.APPDATA || '';
-      const userProfile = process.env.USERPROFILE || os.homedir();
-      const localApp = process.env.LOCALAPPDATA || '';
-      locations.push(
-        path.join(appData, 'npm', 'codex.cmd'),
-        path.join(appData, 'npm', 'codex'),
-        path.join(appData, 'npm', 'codex.exe'),
-        path.join(userProfile, '.npm-global', 'bin', 'codex.cmd'),
-        path.join(userProfile, '.npm-global', 'bin', 'codex.exe'),
-        path.join(localApp, 'Programs', 'Codex', 'codex.exe'),
-        path.join(localApp, 'Programs', 'OpenAI Codex', 'codex.exe')
-      );
-    } else {
-      locations.push('/usr/local/bin/codex', '/opt/homebrew/bin/codex', path.join(os.homedir(), '.local', 'bin', 'codex'));
-    }
-    return locations.filter((p) => !!p && fs.existsSync(p));
-  }
-
-  private async findNpmPrefixCodexCandidates(): Promise<string[]> {
-    const result = await this.execShellCommand('npm config get prefix', 10000);
-    const prefix = result.stdout?.split(/\r?\n/)[0]?.trim();
-    if (!result.ok || !prefix) {
-      return [];
-    }
-
-    const candidates =
-      process.platform === 'win32'
-        ? [path.join(prefix, 'codex.cmd'), path.join(prefix, 'codex.exe'), path.join(prefix, 'codex')]
-        : [path.join(prefix, 'bin', 'codex'), path.join(prefix, 'codex')];
-    return candidates.filter((p) => fs.existsSync(p));
-  }
-
-  private async probeCodexCliVersion(cliPath: string): Promise<string | null> {
-    const quoted = this.quoteForShell(cliPath);
-    const result = await this.execShellCommand(`${quoted} --version`, 10000);
-    if (!result.ok) {
-      return null;
-    }
-    const line = result.stdout.split(/\r?\n/).find((s) => s.trim())?.trim();
-    return line || 'codex-cli';
-  }
-
-  /**
-   * Quick smoke test: spawn `codex exec --help` (or a minimal exec invocation) and check
-   * that it doesn't immediately fail with "The system cannot find the path specified" or
-   * similar OS-level errors that indicate the binary can't actually run exec mode.
-   */
-  private async probeCodexCliExecCapability(cliPath: string): Promise<boolean> {
-    const quoted = this.quoteForShell(cliPath);
-    // `codex exec --help` is lightweight and should return quickly if exec mode is functional.
-    // If the binary lacks internal resources, it will fail with an OS-level path error.
-    const result = await this.execShellCommand(`${quoted} exec --help`, 10000);
-    if (result.ok) {
-      return true;
-    }
-    const combined = `${result.stderr} ${result.stdout}`.toLowerCase();
-    // These OS-level errors indicate the binary is fundamentally broken for exec mode.
-    const fatalPatterns = [
-      /the system cannot find the (path|file) specified/i,
-      /\bno such file or directory\b/i,
-    ];
-    if (fatalPatterns.some((p) => p.test(combined))) {
-      return false;
-    }
-    // Other failures (e.g. auth errors, usage errors) mean the binary CAN run exec.
-    return true;
-  }
-
-  private pickPreferredCodexCliCandidate(candidates: CodexCliCandidate[]): CodexCliCandidate {
-    const score = (c: CodexCliCandidate): number => {
-      const p = c.path.toLowerCase();
-      let s = 0;
-      if (p === 'codex') s += 200;
-      if (p.endsWith('codex.cmd')) s += 120;
-      if (p.includes('\\appdata\\roaming\\npm\\')) s += 100;
-      if (c.source === 'path') s += 50;
-      if (c.source === 'official-extension-bundled') s += 10;
-      // Prefer non-alpha versions when possible
-      if (c.version && !/alpha|beta|rc/i.test(c.version)) s += 20;
-      return s;
-    };
-    return [...candidates].sort((a, b) => score(b) - score(a))[0];
-  }
-
   private execShellCommand(command: string, timeoutMs = 5000): Promise<{ ok: boolean; code: number | null; stdout: string; stderr: string }> {
     return new Promise((resolve) => {
       exec(
@@ -1599,20 +1401,6 @@ export class CodexMessageHandler {
     const source = (result.stderr || result.stdout || '').trim();
     const firstLine = source.split(/\r?\n/).find((s) => s.trim())?.trim() || 'unknown error';
     return `exit=${result.code ?? 'unknown'} | ${firstLine}`;
-  }
-
-  private quoteForShell(value: string): string {
-    const trimmed = (value || '').trim();
-    if (!trimmed) {
-      return 'codex';
-    }
-    if (!/[\\/\s"]/u.test(trimmed)) {
-      return trimmed;
-    }
-    if (process.platform === 'win32') {
-      return `"${trimmed.replace(/"/g, '\\"')}"`;
-    }
-    return `'${trimmed.replace(/'/g, `'\\''`)}'`;
   }
 
   private getLikelyCodexCliDirectoryUri(): vscode.Uri | undefined {

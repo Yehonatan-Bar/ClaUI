@@ -4,6 +4,7 @@ import * as path from 'path';
 import { exec, execSync } from 'child_process';
 import { CodexExecProcessManager } from '../process/CodexExecProcessManager';
 import { CodexExecDemux } from '../process/CodexExecDemux';
+import { findWorkingCodexCliCandidates, pickPreferredCodexCliCandidate } from '../process/CodexCliDetector';
 import { CodexMessageHandler, type CodexSessionController } from '../webview/CodexMessageHandler';
 import { buildWebviewHtml } from '../webview/WebviewProvider';
 import { CodexConversationReader } from './CodexConversationReader';
@@ -846,13 +847,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
           this.turnCliMissingDetected = true;
         }
         if (this.turnCliMissingDetected) {
-          tabLog('Codex CLI missing/not found detected; showing install guidance');
-          void this.showCodexCliMissingGuidance();
-          this.postMessage({
-            type: 'error',
-            message:
-              'Codex CLI not found. ClaUi Codex mode wraps the Codex CLI (not the VS Code extension). Install Codex and/or set "claudeMirror.codex.cliPath", then run "codex login" and retry.',
-          });
+          tabLog('Codex CLI missing/not found detected; attempting auto-detection before showing guidance');
+          void this.handleCodexCliMissing(tabLog);
           this.resetTurnFailureCapture();
           return;
         }
@@ -890,12 +886,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       this.achievementService.onRuntimeError(this.id);
       this.postMessage({ type: 'processBusy', busy: false });
       if (this.turnCliMissingDetected) {
-        void this.showCodexCliMissingGuidance();
-        this.postMessage({
-          type: 'error',
-          message:
-            'Codex CLI not found. ClaUi Codex mode wraps the Codex CLI (not the VS Code extension). Install Codex and/or set "claudeMirror.codex.cliPath", then run "codex login" and retry.',
-        });
+        void this.handleCodexCliMissing(tabLog);
       } else if (this.turnAuthFailureDetected) {
         void this.launchCodexLoginFlow();
         this.postMessage({
@@ -1141,21 +1132,28 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     }
     this.codexLoginLaunchInProgress = true;
     try {
-      const cliPath = vscode.workspace.getConfiguration('claudeMirror').get<string>('codex.cliPath', 'codex') || 'codex';
+      let cliPath = vscode.workspace.getConfiguration('claudeMirror').get<string>('codex.cliPath', 'codex') || 'codex';
       if (options?.precheckCli) {
         const cliAvailable = await this.probeCodexCliAvailability(cliPath);
         if (!cliAvailable) {
-          const terminal = vscode.window.createTerminal({ name: 'Codex Setup' });
-          terminal.show();
-          this.sendTerminalInfoLine(terminal, 'Codex CLI was not found on PATH (or at the configured path).');
-          this.sendTerminalInfoLine(terminal, 'Note: Signing in to the official Codex VS Code extension does not expose the "codex" command to ClaUi.');
-          this.sendTerminalInfoLine(terminal, 'Install Codex CLI first: https://github.com/openai/codex');
-          this.sendTerminalInfoLine(terminal, 'Checking whether the command is visible on PATH...');
-          terminal.sendText(process.platform === 'win32' ? 'where.exe codex' : 'which codex', true);
-          this.sendTerminalInfoLine(terminal, 'If not found, set claudeMirror.codex.cliPath to the full path of codex.exe/codex.cmd.');
-          this.sendTerminalInfoLine(terminal, 'Then run: codex login');
-          void this.showCodexCliMissingGuidance();
-          return;
+          // Try auto-detection before giving up
+          const autoDetected = await this.tryAutoDetectCodexCli();
+          if (autoDetected) {
+            // Re-read the now-updated setting and proceed to login
+            cliPath = vscode.workspace.getConfiguration('claudeMirror').get<string>('codex.cliPath', 'codex') || 'codex';
+          } else {
+            const terminal = vscode.window.createTerminal({ name: 'Codex Setup' });
+            terminal.show();
+            this.sendTerminalInfoLine(terminal, 'Codex CLI was not found on PATH (or at the configured path).');
+            this.sendTerminalInfoLine(terminal, 'Note: Signing in to the official Codex VS Code extension does not expose the "codex" command to ClaUi.');
+            this.sendTerminalInfoLine(terminal, 'Install Codex CLI first: https://github.com/openai/codex');
+            this.sendTerminalInfoLine(terminal, 'Checking whether the command is visible on PATH...');
+            terminal.sendText(process.platform === 'win32' ? 'where.exe codex' : 'which codex', true);
+            this.sendTerminalInfoLine(terminal, 'If not found, set claudeMirror.codex.cliPath to the full path of codex.exe/codex.cmd.');
+            this.sendTerminalInfoLine(terminal, 'Then run: codex login');
+            void this.showCodexCliMissingGuidance();
+            return;
+          }
         }
       }
       const terminal = vscode.window.createTerminal({ name: 'Codex Login' });
@@ -1192,6 +1190,44 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         }
       );
     });
+  }
+
+  /**
+   * Try to auto-detect a working Codex CLI and save it to settings.
+   * Returns true if a candidate was found and configured.
+   */
+  private async tryAutoDetectCodexCli(): Promise<boolean> {
+    const candidates = await findWorkingCodexCliCandidates();
+    if (candidates.length === 0) {
+      return false;
+    }
+    const selected = pickPreferredCodexCliCandidate(candidates);
+    await vscode.workspace.getConfiguration('claudeMirror').update('codex.cliPath', selected.path, true);
+    void vscode.window.showInformationMessage(
+      `Codex CLI auto-detected at "${selected.path}" (${selected.version ?? 'unknown'}). Setting saved. Please retry your message.`,
+    );
+    return true;
+  }
+
+  /**
+   * Called when the Codex CLI is detected as missing during a turn.
+   * Tries auto-detection first; if that fails, shows install guidance.
+   */
+  private async handleCodexCliMissing(log: (msg: string) => void): Promise<void> {
+    const autoDetected = await this.tryAutoDetectCodexCli();
+    if (autoDetected) {
+      log('Codex CLI auto-detected and configured; clearing error');
+      this.postMessage({ type: 'error', message: '' });
+      this.postMessage({ type: 'processBusy', busy: false });
+      return;
+    }
+    log('Codex CLI auto-detection found nothing; showing install guidance');
+    this.postMessage({
+      type: 'error',
+      message:
+        'Codex CLI not found. ClaUi Codex mode wraps the Codex CLI (not the VS Code extension). Install Codex and/or set "claudeMirror.codex.cliPath", then run "codex login" and retry.',
+    });
+    void this.showCodexCliMissingGuidance();
   }
 
   private async showCodexCliMissingGuidance(): Promise<void> {
