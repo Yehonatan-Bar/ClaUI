@@ -36,6 +36,16 @@ The feature is split across extension-side (Node.js) and webview-side (React) co
 | `teamColors.ts` | Color constants for agent statuses, task states, and the agent color palette. |
 | `index.ts` | Barrel exports. |
 
+### Inline Chat Visualization (`src/webview/components/ChatView/`)
+
+| File | Purpose |
+|------|---------|
+| `AgentSpawnBlock.tsx` | Specialized card for `Agent`/`Task`/`dispatch_agent` tool_use blocks. Shows type badge (Explore=orange, Plan=blue, general-purpose=purple), pulsing status dot, description, background chip. Collapsible body with prompt text and result summary. Detects nested sub-agents in result text. |
+| `AgentHierarchyBlock.tsx` | Tree visualization of nested sub-agents. Vertical connector line (2px border-left) with horizontal branches. Child cards use same styling as parent but smaller. |
+| `TeamInlineWidget.tsx` | Compact inline card for `TeamCreate`/`TeamDelete` tool_use blocks. Shows team name, member count, task progress, member status dots, and "Open Team Panel" button. |
+
+**Integration**: `ToolUseBlock.tsx` detects agent/team tool names and delegates rendering to these components. `MessageBubble.tsx` pairs agent `tool_use` blocks with their matching `tool_result` (by `tool_use_id`) so the agent card can display the result inline. Paired `tool_result` blocks are suppressed from standalone rendering. `MessageHandler.ts` categorizes agent tools under the `research` turn category for timeline/intensity border coloring.
+
 ### Store (`src/webview/state/store.ts`)
 
 Team state fields: `teamActive`, `teamName`, `teamConfig`, `teamTasks`, `teamAgentStatuses`, `teamRecentMessages`, `teamPanelOpen`, `teamPanelActiveTab`.

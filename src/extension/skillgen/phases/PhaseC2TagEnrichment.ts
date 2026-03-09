@@ -88,17 +88,40 @@ export class PhaseC2TagEnrichment {
     const allCards: Record<string, any> = {};
     const cardsNeedingEnrichment: any[] = [];
 
+    // Build index of existing enriched cards for incremental processing
+    const existingEnriched: Record<string, any> = {};
+    if (fs.existsSync(enrichedCardsDir)) {
+      for (const file of fs.readdirSync(enrichedCardsDir).filter(f => f.endsWith('.json'))) {
+        try {
+          const enrichedCard = JSON.parse(fs.readFileSync(path.join(enrichedCardsDir, file), 'utf-8'));
+          if (enrichedCard.doc_id) {
+            existingEnriched[enrichedCard.doc_id] = enrichedCard;
+          }
+        } catch { /* skip corrupt files */ }
+      }
+    }
+
+    let alreadyEnrichedCount = 0;
+
     for (const file of cardFiles) {
       const card = JSON.parse(fs.readFileSync(path.join(docCardsDir, file), 'utf-8'));
       allCards[card.doc_id] = card;
       if (this.needsEnrichment(card)) {
-        cardsNeedingEnrichment.push(card);
+        // Check if already enriched in a previous run
+        const prev = existingEnriched[card.doc_id];
+        if (prev?._enrichment?.enriched) {
+          // Reuse previous enrichment - don't re-call AI
+          allCards[card.doc_id] = prev;
+          alreadyEnrichedCount++;
+        } else {
+          cardsNeedingEnrichment.push(card);
+        }
       }
     }
 
-    this.log(`[PhaseC2] Found ${cardFiles.length} cards, ${cardsNeedingEnrichment.length} need enrichment`);
+    this.log(`[PhaseC2] Found ${cardFiles.length} cards, ${alreadyEnrichedCount} already enriched (cached), ${cardsNeedingEnrichment.length} need enrichment now`);
 
-    const results = { total: cardFiles.length, enriched: 0, failed: 0, bucketChanges: 0 };
+    const results = { total: cardFiles.length, alreadyEnriched: alreadyEnrichedCount, enriched: 0, failed: 0, bucketChanges: 0 };
     const enrichedCards: Record<string, any> = {};
 
     // Process cards sequentially

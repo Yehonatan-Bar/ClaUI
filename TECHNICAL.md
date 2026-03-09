@@ -68,6 +68,7 @@ claude-code-mirror/
 |   |   |   +-- SessionNamer.ts           #   Auto-generates tab names via Haiku
 |   |   |   +-- CodexSessionNamer.ts      #   Auto-generates Codex tab names via one-shot codex exec
 |   |   |   +-- ActivitySummarizer.ts     #   Periodic tool activity summary via Haiku
+|   |   |   +-- VisualProgressProcessor.ts #  VPM card generator: tool events -> visual cards + Haiku AI descriptions
 |   |   |   +-- AdventureInterpreter.ts  #   Converts TurnRecords to AdventureBeats (dungeon crawler)
 |   |   |   +-- MessageTranslator.ts      #   Translates assistant messages to Hebrew via Sonnet CLI call
 |   |   |   +-- FileLogger.ts             #   Per-session file logging with rotation and rename
@@ -133,9 +134,16 @@ claude-code-mirror/
 |       |   |   +-- MessageList.tsx       #   Scrollable message list with scroll-to-bottom button
 |       |   |   +-- MessageBubble.tsx     #   Single message with content blocks
 |       |   |   +-- StreamingText.tsx     #   In-progress text with cursor
-|       |   |   +-- ToolUseBlock.tsx      #   Tool use display (collapsible, plan-aware, TodoWrite visual card)
+|       |   |   +-- ToolUseBlock.tsx      #   Tool use display (collapsible, plan-aware, TodoWrite visual card, agent/team delegation)
+|       |   |   +-- AgentSpawnBlock.tsx  #   Inline agent spawn card with type badge, status dot, collapsible prompt/result
+|       |   |   +-- AgentHierarchyBlock.tsx # Nested sub-agent tree visualization with connector lines
+|       |   |   +-- TeamInlineWidget.tsx #   Compact inline team card with member status dots
 |       |   |   +-- PlanApprovalBar.tsx  #   CLI-matching plan approval (4 options: clear+bypass, bypass, manual, feedback) or question UI (option buttons + custom answer)
 |       |   |   +-- PromptHistoryPanel.tsx #  3-tab prompt history overlay (session/project/global)
+|       |   |   +-- VisualProgress/
+|       |   |   |   +-- VisualProgressView.tsx  #  VPM container with auto-scroll card timeline
+|       |   |   |   +-- ProgressCard.tsx        #  Individual VPM card with character SVG, descriptions, meta
+|       |   |   |   +-- characters/             #  10 animated SVG character components + index.ts (colors, labels, maps)
 |       |   |   +-- CodeBlock.tsx         #   Syntax block with copy + HTML preview button
 |       |   |   +-- MarkdownContent.tsx  #   Markdown rendering with sanitization and link detection
 |       |   |   +-- filePathLinks.tsx   #   Clickable file path and URL detection and rendering
@@ -263,7 +271,7 @@ claude-code-mirror/
 **ClaudeProcessManager** - Spawns the Claude CLI child process with stream-json flags, handles stdin/stdout piping, process lifecycle, and crash detection. Uses the shared `killProcessTree()` utility on Windows to kill the entire process tree (required because `shell: true` creates a cmd.exe wrapper that SIGTERM alone cannot penetrate). Reads the user's API key from SecretStorage before each spawn and passes it via `buildClaudeCliEnv()`. Instantiated per-tab by SessionTab.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**Process Tree Kill (`killTree.ts`)** - Shared utility for cross-platform child process tree termination. On Windows, uses `taskkill /F /T /PID` to kill the cmd.exe wrapper AND all descendant processes. On Unix, uses standard `SIGTERM`. Used by all 12 CLI spawn points: `ClaudeProcessManager`, `CodexExecProcessManager`, `SessionNamer`, `CodexSessionNamer`, `ActivitySummarizer`, `MessageTranslator`, `TurnAnalyzer`, `PromptEnhancer`, `PromptTranslator`, `ClaudeCliCaller`, `AchievementInsightAnalyzer`, `PythonPhaseRunner`.
+**Process Tree Kill (`killTree.ts`)** - Shared utility for cross-platform child process tree termination. On Windows, uses `taskkill /F /T /PID` to kill the cmd.exe wrapper AND all descendant processes. On Unix, uses standard `SIGTERM`. Used by all 13 CLI spawn points: `ClaudeProcessManager`, `CodexExecProcessManager`, `SessionNamer`, `CodexSessionNamer`, `ActivitySummarizer`, `VisualProgressProcessor`, `MessageTranslator`, `TurnAnalyzer`, `PromptEnhancer`, `PromptTranslator`, `ClaudeCliCaller`, `AchievementInsightAnalyzer`, `PythonPhaseRunner`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/PROCESS_LIFECYCLE.md`
 
 **Orphan Cleanup (`orphanCleanup.ts`)** - Runs on extension activation. Scans for orphaned node.exe processes from previous ClaUi sessions (identified by `stream-json` CLI flag in command line) whose parent process is dead, and kills them. Prevents zombie process accumulation when VS Code crashes or extension host dies without running `deactivate()`.
@@ -326,7 +334,7 @@ claude-code-mirror/
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/GIT_PUSH_BUTTON.md`
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**Ultrathink Button & Glow** - Brain icon button in the input area that injects the "ultrathink" keyword to boost Claude's reasoning effort. On click, plays one of 4 random CSS animations (Rocket Launch, Brain on Fire, Wizard Staff, Turbo/NOS) for 1.2s, then prepends "ultrathink " to the input text. The word "ultrathink" also displays with an animated rainbow glow effect (cycling colors, sparkle particles) in both completed and streaming chat messages.
+**Ultrathink Button & Glow** - Brain icon button in the input area that injects the "ultrathink" keyword to boost Claude's reasoning effort. On click, plays one of 4 random CSS animations (Rocket Launch, Brain on Fire, Wizard Staff, Turbo/NOS) for 1.2s, then prepends "ultrathink " to the input text. Includes a lock toggle badge that, when active, auto-prepends "ultrathink" to every outgoing prompt. The word "ultrathink" also displays with an animated rainbow glow effect (cycling colors, sparkle particles) in both completed and streaming chat messages.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ULTRATHINK_BUTTON.md`
 
 **Clear Session** - Button in the input area that resets all UI state (messages, cost, streaming) and restarts the CLI process. Sends `clearSession` message to the extension, which stops the current process and spawns a new one.
@@ -375,6 +383,12 @@ claude-code-mirror/
 **Adventure Widget** - Pixel-art dungeon crawler that visualizes session activity as a thin-wall maze grid. Each CLI turn extends the maze and maps to an encounter: scrolls (Read), anvils (Edit), traps (errors), dragons (3+ errors), treasure (recovery). Canvas 2D engine with 4x4 mini sprites on a 40x40 cell maze, PICO-8 palette, BFS pathfinding, state machine (IDLE/WALKING/ENCOUNTER/RESOLUTION). Extension-side `AdventureInterpreter` converts `TurnRecord` to `AdventureBeat` via deterministic rules. Toggleable separately from main vitals.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ADVENTURE_WIDGET.md`
 
+**Summary Mode** - When enabled, splits the chat area 50/50: a full-height animated visualization panel on the left, and text-only messages on the right. Animation type is session-fixed (randomly chosen from 5 types: Building Blocks, Progress Path, Puzzle Assembly, Rocket Launch, Growing Tree). Each tool call visibly advances the animation (continuous progression, full at ~50 tools). Tool blocks are hidden from messages. Toggle in Vitals panel persists across sessions.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/SUMMARY_MODE.md`
+
+**Visual Progress Mode (VPM)** - Card-based visual progress display that shows what Claude is doing in real time. Each tool action generates an animated card with a category-specific SVG character illustration and a template description. Cards flow in a vertical timeline with connecting arrows in a 340px side panel alongside messages. Mutually exclusive with Summary Mode. Extension-side `VisualProgressProcessor` maps tool events to 10 categories (reading, writing, editing, searching, executing, delegating, planning, skill, deciding, researching), emits template cards at `toolUseStart`, enriches with full input details at `blockStop`, and optionally queues Haiku API calls for AI-generated natural language descriptions (max 2 concurrent, cached, 8s timeout). Webview uses upsert logic so cards update in-place. Toggle in Vitals panel, AI descriptions toggle separately.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/VISUAL_PROGRESS_MODE.md`
+
 **Achievements / Trophy** - Gamification system that awards badges for coding milestones. Features: 30 achievements across 7 categories (debugging, testing, refactor, collaboration, session, architecture, productivity), 4 rarities, XP-based leveling (15 tiers), per-session goals (7 templates), daily streaks, file/language tracking, frontend/backend classification, error cycle detection, toast notifications with optional sound, session recap card with AI insights, and full i18n (EN+HE). AI Session Insight: spawns Sonnet CLI once per day at session end for deeper analysis (quality, pattern, XP bonus). Includes a live recap snapshot request (`requestSessionRecapSnapshot`) used by an idle reminder nudge (1 hour idle, with Later=3h deferral / Dismiss) without ending the session. Edit-and-resend now abandons the current achievement session state and restarts cleanly without emitting a false session recap. **Community / GitHub Sync**: Publish achievements to a public GitHub Gist, discover and compare with other developers via friend lookup, generate shields.io dynamic badges and markdown profile cards for GitHub README. Backend: `AchievementEngine`, `AchievementCatalog`, `AchievementStore`, `AchievementService`, `AchievementInsightAnalyzer`, `GitHubSyncService`. Frontend: `AchievementPanel`, `CommunityPanel`, `ShareCard`, `AchievementToastStack`, `SessionRecapCard`, `achievementI18n.ts`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ACHIEVEMENTS.md`
 
@@ -411,7 +425,7 @@ claude-code-mirror/
 **Full Bug Report** - Comprehensive in-extension bug reporting. 4th option in the Feedback QuickPick. Opens an overlay panel with two modes: Quick Report (required text description + auto-collected diagnostics) and AI-Assisted Report (chat with Claude Sonnet for guided diagnosis, with script suggestion approve/reject). Auto-collects system info, VS Code environment, CLI versions, and recent logs. Packages everything into a ZIP via `adm-zip` and submits via `FormspreeService`. Privacy-first: nothing sent until explicit user approval. Backend: `BugReportService`, `DiagnosticsCollector`. Frontend: `BugReportPanel`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/BUG_REPORT_FEATURE.md`
 
-**Agent Teams** -- Visualization and flow control for Claude Code's experimental Agent Teams feature. Auto-detects team creation/deletion from CLI stream (`TeamCreate`/`TeamDelete` tool_use blocks). Watches `~/.claude/teams/{name}/` and `~/.claude/tasks/{name}/` directories for live state updates (config, tasks, inbox messages) via `TeamWatcher` (EventEmitter, 100ms debounce, 2s polling fallback). Full-screen overlay panel with 4 tabs: Topology (agent cards with status dots and pulse animation), Tasks (kanban board with inline add), Messages (chronological feed with inline send), Activity (per-agent status with shutdown). Draggable floating widget shows team name, agent counts, and task progress bar. User actions (send message, create/update task, shutdown agent) write directly to team files on disk via `TeamActions`. Backend: `TeamDetector`, `TeamWatcher`, `TeamActions`, `TeamTypes`. Frontend: `TeamPanel`, `TeamStatusWidget`, `TopologyTab`, `TasksTab`, `MessagesTab`, `ActivityTab`. Keybinding: `Ctrl+Alt+T`.
+**Agent Teams** -- Visualization and flow control for Claude Code's experimental Agent Teams feature. Auto-detects team creation/deletion from CLI stream (`TeamCreate`/`TeamDelete` tool_use blocks). Watches `~/.claude/teams/{name}/` and `~/.claude/tasks/{name}/` directories for live state updates (config, tasks, inbox messages) via `TeamWatcher` (EventEmitter, 100ms debounce, 2s polling fallback). Full-screen overlay panel with 4 tabs: Topology (agent cards with status dots and pulse animation), Tasks (kanban board with inline add), Messages (chronological feed with inline send), Activity (per-agent status with shutdown). Draggable floating widget shows team name, agent counts, and task progress bar. **Inline chat visualization**: `AgentSpawnBlock` renders specialized cards for `Agent`/`Task`/`dispatch_agent` tool_use blocks with type badge (Explore=orange, Plan=blue, general-purpose=purple), pulsing status dot, description, and collapsible prompt/result. `AgentHierarchyBlock` renders nested sub-agent trees with connector lines. `TeamInlineWidget` renders compact inline team cards with member status dots. `ToolUseBlock` delegates to these components when detecting agent/team tool names. `MessageBubble` pairs agent tool_use blocks with their tool_result for inline display. Backend: `TeamDetector`, `TeamWatcher`, `TeamActions`, `TeamTypes`. Frontend: `TeamPanel`, `TeamStatusWidget`, `TopologyTab`, `TasksTab`, `MessagesTab`, `ActivityTab`, `AgentSpawnBlock`, `AgentHierarchyBlock`, `TeamInlineWidget`. Keybinding: `Ctrl+Alt+T`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/AGENT_TEAMS.md`
 
 **Happy Provider (remote)** -- The internal provider id remains `'remote'`, but implementation now reuses the standard `SessionTab` + `ClaudeProcessManager` pipeline and only swaps the executable path to Happy CLI via `ProcessStartOptions.cliPathOverride`. `TabManager.createRemoteTab()` creates a regular `SessionTab` and sets `claudeMirror.happy.cliPath` (default `happy`). Both command-driven and webview-driven start/restart paths honor this override. Auth flow is handled by spawning `happy auth` via command `claudeMirror.authenticateHappy`, and `SessionTab` detects auth-required stderr patterns to show targeted guidance.
@@ -439,6 +453,9 @@ claude-code-mirror/
 | `claudeMirror.logDirectory` | `""` | Directory for log files (empty = extension's default storage) |
 | `claudeMirror.sessionVitals` | `false` | Show Session Vitals dashboard (timeline, weather, cost bar, turn borders) |
 | `claudeMirror.adventureWidget` | `false` | Show pixel-art dungeon crawler adventure widget |
+| `claudeMirror.summaryMode` | `false` | Summary Mode: hide tool details, show animated activity summaries |
+| `claudeMirror.visualProgressMode` | `false` | Visual Progress Mode: animated card-based progress display (mutually exclusive with Summary Mode) |
+| `claudeMirror.vpmAiDescriptions` | `true` | Use Haiku AI to generate natural language descriptions for VPM cards |
 | `claudeMirror.analysisModel` | `"claude-haiku-4-5-20251001"` | Model for background analysis (session naming, summaries, semantic turn analysis) |
 | `claudeMirror.turnAnalysis.enabled` | `false` | Enable background semantic analysis for dashboard insights |
 | `claudeMirror.turnAnalysis.maxPerSession` | `30` | Max semantic analysis calls per session tab |

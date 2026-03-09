@@ -329,6 +329,26 @@
           "default": false,
           "description": "Show Session Vitals dashboard (timeline minimap, weather widget, cost heat bar, turn intensity borders)"
         },
+        "claudeMirror.summaryMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Summary Mode: hide tool details, show animated activity summaries"
+        },
+        "claudeMirror.visualProgressMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Visual Progress Mode: replace text output with animated visual cards showing what Claude is doing"
+        },
+        "claudeMirror.vpmAiDescriptions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use AI (Haiku) to generate natural language descriptions for Visual Progress Mode cards"
+        },
+        "claudeMirror.detailedDiffView": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show inline file diffs (added/removed lines) for Write and Edit tool operations"
+        },
         "claudeMirror.adventureWidget": {
           "type": "boolean",
           "default": false,

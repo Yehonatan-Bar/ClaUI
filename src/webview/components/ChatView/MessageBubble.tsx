@@ -5,6 +5,9 @@ import type { TurnCategory } from '../../../extension/types/webview-messages';
 import type { ContentBlock } from '../../../extension/types/stream-json';
 import { CodeBlock } from './CodeBlock';
 import { ToolUseBlock } from './ToolUseBlock';
+import { AGENT_TOOLS } from './AgentSpawnBlock';
+import { TEAM_TOOLS } from './TeamInlineWidget';
+import { DiffViewer } from './DiffViewer';
 import { MarkdownContent } from './MarkdownContent';
 import { renderTextWithFileLinks } from './filePathLinks';
 import { postToExtension } from '../../hooks/useClaudeStream';
@@ -49,10 +52,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
 
   const babelFishEnabled = useAppStore((s) => s.babelFishEnabled);
   const userOriginalText = useAppStore((s) => s.userOriginalTexts[message.id]);
+  const translationError = useAppStore((s) => s.translationErrors[message.id]);
   const isTranslating = translatingMessageIds.has(message.id);
   const hasTranslation = message.id in translations;
   const isShowingTranslation = showingTranslation.has(message.id);
   const isRtlLanguage = translationLanguage === 'Hebrew' || translationLanguage === 'Arabic';
+
+  // Summary Mode: hide tool blocks in messages (animation lives in the persistent SummaryModeWidget)
+  const summaryModeEnabled = useAppStore((s) => s.summaryModeEnabled);
+  const messageToolCount = useMemo(() => contentBlocks.filter(b => b.type === 'tool_use').length, [contentBlocks]);
+  const shouldShowSummaryMode = summaryModeEnabled && !isUser && messageToolCount > 0;
 
   // Session Vitals: turn intensity border
   const vitalsEnabled = useAppStore((s) => s.vitalsEnabled);
@@ -113,6 +122,30 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
       language: translationLanguage,
     });
   }, [message.id, hasTranslation, contentBlocks, toggleTranslationView, translationLanguage]);
+
+  // Check if this assistant message has any collapsible blocks
+  const hasCollapsibles = useMemo(() => {
+    return !isUser && contentBlocks.some(b => b.type === 'tool_use' || b.type === 'tool_result');
+  }, [isUser, contentBlocks]);
+
+  const [allExpanded, setAllExpanded] = useState(false);
+
+  // Toggle ALL collapsible blocks across the entire chat interface
+  const handleToggleAll = useCallback(() => {
+    const chatContainer = document.querySelector('.message-list') || document.body;
+    const indicators = Array.from(chatContainer.querySelectorAll('.tool-collapse-indicator'));
+    if (indicators.length === 0) return;
+
+    const anyCollapsed = indicators.some(el => !el.classList.contains('expanded'));
+    indicators.forEach(el => {
+      const isExpanded = el.classList.contains('expanded');
+      const header = el.closest('.tool-use-header') as HTMLElement | null;
+      if (!header) return;
+      if (anyCollapsed && !isExpanded) header.click();
+      else if (!anyCollapsed && isExpanded) header.click();
+    });
+    setAllExpanded(anyCollapsed);
+  }, []);
 
   const [copied, setCopied] = useState(false);
 
@@ -200,6 +233,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
             {copied ? 'Copied!' : 'Copy'}
           </button>
         )}
+        {hasCollapsibles && !shouldShowSummaryMode && (
+          <button
+            className="toggle-all-btn"
+            onClick={handleToggleAll}
+            data-tooltip={allExpanded ? 'Collapse all blocks' : 'Expand all blocks'}
+          >
+            <span className={`toggle-all-arrows${allExpanded ? ' expanded' : ''}`} />
+          </button>
+        )}
         {canEdit && !isEditing && (
           <button
             className="edit-message-btn"
@@ -220,12 +262,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
         )}
         {!isUser && textContent && providerCapabilities.supportsTranslation && !babelFishEnabled && (
           <button
-            className={`translate-message-btn${isShowingTranslation ? ' showing-translation' : ''}${isTranslating ? ' translating' : ''}`}
+            className={`translate-message-btn${isShowingTranslation ? ' showing-translation' : ''}${isTranslating ? ' translating' : ''}${translationError ? ' translation-error' : ''}`}
             onClick={handleTranslate}
-            data-tooltip={isShowingTranslation ? 'Show original' : `Translate to ${translationLanguage}`}
+            data-tooltip={translationError ? `Translation failed - click to retry` : isShowingTranslation ? 'Show original' : `Translate to ${translationLanguage}`}
             disabled={isTranslating}
           >
-            {isTranslating ? 'Translating...' : isShowingTranslation ? 'Original' : translationLanguage}
+            {isTranslating ? 'Translating...' : translationError ? 'Retry' : isShowingTranslation ? 'Original' : translationLanguage}
           </button>
         )}
         {!isUser && babelFishEnabled && (hasTranslation || isTranslating) && (
@@ -279,19 +321,152 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
               <ContentBlockRenderer key={`orig-${index}`} block={block} />
             ))}
         </div>
-      ) : (
+      ) : shouldShowSummaryMode ? (
         <div dir="auto">
-          {contentBlocks.map((block, index) => (
-            <ContentBlockRenderer key={index} block={block} />
+          {contentBlocks.filter(b => b.type === 'text').map((block, i) => (
+            <ContentBlockRenderer key={`text-${i}`} block={block} />
           ))}
         </div>
+      ) : (
+        <ContentBlockList contentBlocks={contentBlocks} />
       )}
     </div>
   );
 };
 
+/**
+ * Renders content blocks with agent tool_use -> tool_result pairing.
+ * For agent/team tools, the tool_result is inlined into the agent card
+ * and suppressed from rendering as a standalone block.
+ */
+const ContentBlockList: React.FC<{ contentBlocks: ContentBlock[] }> = ({ contentBlocks }) => {
+  // Pre-compute: map agent tool_use ids -> their matching tool_result blocks
+  const { pairMap, pairedResultIds } = useMemo(() => {
+    const map = new Map<string, ContentBlock>();
+    const ids = new Set<string>();
+    for (const block of contentBlocks) {
+      if (block.type === 'tool_use' && block.id && RESULT_PAIRED_TOOLS.has(block.name || '')) {
+        const result = contentBlocks.find(
+          (b) => b.type === 'tool_result' && b.tool_use_id === block.id
+        );
+        if (result) {
+          map.set(block.id, result);
+          if (result.tool_use_id) ids.add(result.tool_use_id);
+        }
+      }
+    }
+    return { pairMap: map, pairedResultIds: ids };
+  }, [contentBlocks]);
+
+  return (
+    <div dir="auto">
+      {contentBlocks.map((block, index) => (
+        <ContentBlockRenderer
+          key={index}
+          block={block}
+          pairedResult={block.type === 'tool_use' && block.id ? pairMap.get(block.id) : undefined}
+          pairedResultIds={pairedResultIds}
+        />
+      ))}
+    </div>
+  );
+};
+
+/** Tools that write/modify files and can show diffs */
+const DIFF_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
+
+/** All special tool sets that need result pairing */
+const RESULT_PAIRED_TOOLS = new Set([...AGENT_TOOLS, ...TEAM_TOOLS]);
+
+/**
+ * Renders a tool_use block, adding an inline DiffViewer below it when
+ * detailed diff mode is enabled for Write/Edit/MultiEdit tools.
+ * For Agent/Team tools, pairs with the matching tool_result.
+ */
+const ToolUseWithDiff: React.FC<{ block: ContentBlock; pairedResult?: ContentBlock }> = ({ block, pairedResult }) => {
+  const detailedDiffEnabled = useAppStore((s) => s.detailedDiffEnabled);
+  const writeOldContentByToolId = useAppStore((s) => s.writeOldContentByToolId);
+
+  const toolName = block.name || 'unknown';
+  const input = block.input as Record<string, unknown> | undefined;
+
+  // For agent/team tools, build a toolResult prop from the paired result block
+  const agentToolResult = pairedResult && RESULT_PAIRED_TOOLS.has(toolName)
+    ? {
+        content: pairedResult.content as string | Array<{ type: string; text?: string }>,
+        isError: pairedResult.is_error === true,
+      }
+    : undefined;
+
+  const toolUseBlock = (
+    <ToolUseBlock
+      toolName={toolName}
+      input={block.input}
+      isStreaming={false}
+      toolResult={agentToolResult}
+    />
+  );
+
+  if (!detailedDiffEnabled || !DIFF_TOOLS.has(toolName) || !input) {
+    return toolUseBlock;
+  }
+
+  // Build diffs depending on tool type
+  const diffs: Array<{ filePath: string; oldContent: string; newContent: string }> = [];
+
+  if (toolName === 'Edit') {
+    const filePath = (input.file_path as string) || '';
+    const oldStr = (input.old_string as string) ?? '';
+    const newStr = (input.new_string as string) ?? '';
+    if (filePath) {
+      diffs.push({ filePath, oldContent: oldStr, newContent: newStr });
+    }
+  } else if (toolName === 'MultiEdit') {
+    const filePath = (input.file_path as string) || '';
+    const edits = Array.isArray(input.edits) ? input.edits as Array<{ old_string?: string; new_string?: string }> : [];
+    for (const edit of edits) {
+      diffs.push({
+        filePath,
+        oldContent: edit.old_string ?? '',
+        newContent: edit.new_string ?? '',
+      });
+    }
+  } else if (toolName === 'Write' || toolName === 'NotebookEdit') {
+    const filePath = (input.file_path as string) || (input.notebook_path as string) || '';
+    const newContent = (input.content as string) ?? '';
+    const toolId = (block as ContentBlock & { id?: string }).id ?? '';
+    const captured = toolId ? writeOldContentByToolId[toolId] : undefined;
+    const oldContent = captured?.oldContent ?? '';
+    if (filePath) {
+      diffs.push({ filePath, oldContent, newContent });
+    }
+  }
+
+  if (diffs.length === 0) {
+    return toolUseBlock;
+  }
+
+  return (
+    <>
+      {toolUseBlock}
+      {diffs.map((d, i) => (
+        <DiffViewer
+          key={i}
+          filePath={d.filePath}
+          oldContent={d.oldContent}
+          newContent={d.newContent}
+        />
+      ))}
+    </>
+  );
+};
+
 /** Renders a single content block based on its type */
-const ContentBlockRenderer: React.FC<{ block: ContentBlock }> = ({ block }) => {
+const ContentBlockRenderer: React.FC<{
+  block: ContentBlock;
+  pairedResult?: ContentBlock;
+  pairedResultIds?: Set<string>;
+}> = ({ block, pairedResult, pairedResultIds }) => {
   switch (block.type) {
     case 'text':
       return <TextBlockRenderer text={block.text || ''} />;
@@ -300,15 +475,11 @@ const ContentBlockRenderer: React.FC<{ block: ContentBlock }> = ({ block }) => {
       return <ImageBlockRenderer block={block} />;
 
     case 'tool_use':
-      return (
-        <ToolUseBlock
-          toolName={block.name || 'unknown'}
-          input={block.input}
-          isStreaming={false}
-        />
-      );
+      return <ToolUseWithDiff block={block} pairedResult={pairedResult} />;
 
     case 'tool_result':
+      // If this result is already paired with an agent tool_use, skip standalone rendering
+      if (pairedResultIds && block.tool_use_id && pairedResultIds.has(block.tool_use_id)) return null;
       return (
         <ToolResultRenderer
           content={block.content}

@@ -59,7 +59,9 @@ export class CodexExecProcessManager extends EventEmitter {
 
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const cliPath = config.get<string>('codex.cliPath', 'codex');
-    const selectedModel = options.model ?? config.get<string>('codex.model', '');
+    // Guard: skip display-only labels like "Codex (default)" that aren't real model IDs
+    const rawModel = options.model ?? config.get<string>('codex.model', '');
+    const selectedModel = rawModel && !rawModel.includes('(') ? rawModel : '';
     const selectedReasoningEffort = config.get<string>('codex.reasoningEffort', '').trim();
     const permissionMode =
       options.permissionMode ??

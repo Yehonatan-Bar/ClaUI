@@ -57,6 +57,7 @@ export function useClaudeStream(): void {
     addAchievementToast,
     setAchievementGoals,
     setSessionRecap,
+    setUltrathinkLocked,
     setVitalsEnabled,
     rebuildTurnHistoryFromMessages,
     setAdventureEnabled,
@@ -86,6 +87,11 @@ export function useClaudeStream(): void {
     setTeamActive,
     clearTeamState,
     setThinkingEffort,
+    setDetailedDiffEnabled,
+    addWriteOldContent,
+    setSummaryModeEnabled,
+    setMessageSummary,
+    incrementSessionToolCount,
   } = useAppStore();
 
   useEffect(() => {
@@ -347,6 +353,33 @@ export function useClaudeStream(): void {
 
         case 'toolActivity':
           setToolActivity(msg.detail || null);
+          incrementSessionToolCount();
+          break;
+
+        case 'summaryModeSetting':
+          setSummaryModeEnabled(msg.enabled);
+          break;
+
+        case 'vpmSetting':
+          useAppStore.getState().setVpmEnabled(msg.enabled);
+          break;
+
+        case 'visualProgressCard':
+          useAppStore.getState().addVisualProgressCard({
+            ...msg.card,
+            category: msg.card.category as import('../state/store').ToolCategory,
+          });
+          break;
+
+        case 'visualProgressCardUpdate':
+          useAppStore.getState().updateCardDescription(msg.cardId, msg.aiDescription);
+          break;
+
+        case 'messageSummary':
+          setMessageSummary(msg.messageId, {
+            shortLabel: msg.shortLabel,
+            fullSummary: msg.fullSummary,
+          });
           break;
 
         case 'activitySummary':
@@ -372,6 +405,12 @@ export function useClaudeStream(): void {
           setPendingApproval({ toolName: msg.toolName, planText });
           break;
         }
+
+        case 'planApprovalDismissed':
+          // Bug 16 fix: extension detected non-plan tool activity while ExitPlanMode
+          // bar was visible. Auto-dismiss the bar since the model has moved on.
+          setPendingApproval(null);
+          break;
 
         case 'gitPushResult':
           setGitPushRunning(false);
@@ -431,6 +470,11 @@ export function useClaudeStream(): void {
           setTranslating(msg.messageId, false);
           if (msg.success && msg.translatedText) {
             setTranslation(msg.messageId, msg.translatedText);
+          } else {
+            useAppStore.getState().setTranslationError(
+              msg.messageId,
+              msg.error || 'Translation failed'
+            );
           }
           break;
 
@@ -495,8 +539,20 @@ export function useClaudeStream(): void {
           addTurnRecord(msg.turn);
           break;
 
+        case 'ultrathinkLockedSetting':
+          setUltrathinkLocked(msg.locked);
+          break;
+
         case 'vitalsSetting':
           setVitalsEnabled(msg.enabled);
+          break;
+
+        case 'detailedDiffViewSetting':
+          setDetailedDiffEnabled(msg.enabled);
+          break;
+
+        case 'fileOldContent':
+          addWriteOldContent(msg.toolUseId, msg.filePath, msg.oldContent);
           break;
 
         case 'adventureWidgetSetting':
@@ -740,6 +796,7 @@ export function useClaudeStream(): void {
     addAchievementToast,
     setAchievementGoals,
     setSessionRecap,
+    setUltrathinkLocked,
     setVitalsEnabled,
     rebuildTurnHistoryFromMessages,
     setAdventureEnabled,
@@ -766,6 +823,8 @@ export function useClaudeStream(): void {
     setTeamActive,
     clearTeamState,
     setThinkingEffort,
+    setDetailedDiffEnabled,
+    addWriteOldContent,
   ]);
 }
 

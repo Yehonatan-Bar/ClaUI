@@ -234,6 +234,11 @@ export interface SetVitalsEnabledRequest {
   enabled: boolean;
 }
 
+export interface SetDetailedDiffViewEnabledRequest {
+  type: 'setDetailedDiffViewEnabled';
+  enabled: boolean;
+}
+
 export interface SetAdventureWidgetEnabledRequest {
   type: 'setAdventureWidgetEnabled';
   enabled: boolean;
@@ -556,6 +561,7 @@ export type WebviewToExtensionMessage =
   | SetAchievementsEnabledRequest
   | GetAchievementsSnapshotRequest
   | SetVitalsEnabledRequest
+  | SetDetailedDiffViewEnabledRequest
   | SetAdventureWidgetEnabledRequest
   | SetTranslationLanguageRequest
   | AdventureDebugLogMessage
@@ -612,7 +618,10 @@ export type WebviewToExtensionMessage =
   | TeamSendMessageRequest
   | TeamCreateTaskRequest
   | TeamUpdateTaskRequest
-  | TeamShutdownAgentRequest;
+  | TeamShutdownAgentRequest
+  | SetSummaryModeEnabledRequest
+  | SetVpmEnabledRequest
+  | SetUltrathinkLockedRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -766,6 +775,10 @@ export interface CodexModelOptionsMessage {
 export interface PlanApprovalRequiredMessage {
   type: 'planApprovalRequired';
   toolName: string;
+}
+
+export interface PlanApprovalDismissedMessage {
+  type: 'planApprovalDismissed';
 }
 
 export interface PromptHistoryResponseMessage {
@@ -983,9 +996,91 @@ export interface VitalsSettingMessage {
   enabled: boolean;
 }
 
+export interface DetailedDiffViewSettingMessage {
+  type: 'detailedDiffViewSetting';
+  enabled: boolean;
+}
+
+/** Carries the pre-write file content for a Write tool call so the webview can show a diff */
+export interface FileOldContentMessage {
+  type: 'fileOldContent';
+  toolUseId: string;
+  filePath: string;
+  oldContent: string;
+}
+
 export interface AdventureWidgetSettingMessage {
   type: 'adventureWidgetSetting';
   enabled: boolean;
+}
+
+// --- Summary Mode ---
+
+/** Webview -> Extension: toggle Visual Progress Mode */
+export interface SetVpmEnabledRequest {
+  type: 'setVpmEnabled';
+  enabled: boolean;
+}
+
+/** Webview -> Extension: toggle summary mode */
+export interface SetSummaryModeEnabledRequest {
+  type: 'setSummaryModeEnabled';
+  enabled: boolean;
+}
+
+/** Webview -> Extension: persist ultrathink lock at project level */
+export interface SetUltrathinkLockedRequest {
+  type: 'setUltrathinkLocked';
+  locked: boolean;
+}
+
+/** Extension -> Webview: send Visual Progress Mode setting */
+export interface VpmSettingMessage {
+  type: 'vpmSetting';
+  enabled: boolean;
+}
+
+/** Extension -> Webview: new VPM card */
+export interface VisualProgressCardMessage {
+  type: 'visualProgressCard';
+  card: {
+    id: string;
+    category: string;
+    toolName: string;
+    description: string;
+    filePath?: string;
+    command?: string;
+    pattern?: string;
+    timestamp: number;
+    isStreaming: boolean;
+  };
+}
+
+/** Extension -> Webview: update VPM card with AI description */
+export interface VisualProgressCardUpdateMessage {
+  type: 'visualProgressCardUpdate';
+  cardId: string;
+  aiDescription: string;
+}
+
+/** Extension -> Webview: send summary mode setting */
+export interface SummaryModeSettingMessage {
+  type: 'summaryModeSetting';
+  enabled: boolean;
+}
+
+/** Extension -> Webview: send ultrathink lock state (project-level) */
+export interface UltrathinkLockedSettingMessage {
+  type: 'ultrathinkLockedSetting';
+  locked: boolean;
+}
+
+/** Extension -> Webview: per-message summary text */
+export interface MessageSummaryMessage {
+  type: 'messageSummary';
+  messageId: string;
+  shortLabel: string;
+  fullSummary: string;
 }
 
 export interface TurnSemanticsMessage {
@@ -1424,6 +1519,7 @@ export type ExtensionToWebviewMessage =
   | CodexReasoningEffortSettingMessage
   | CodexModelOptionsMessage
   | PlanApprovalRequiredMessage
+  | PlanApprovalDismissedMessage
   | PromptHistoryResponseMessage
   | ActivitySummaryMessage
   | ToolActivityMessage
@@ -1442,6 +1538,8 @@ export type ExtensionToWebviewMessage =
   | SessionRecapMessage
   | TurnCompleteMessage
   | VitalsSettingMessage
+  | DetailedDiffViewSettingMessage
+  | FileOldContentMessage
   | AdventureWidgetSettingMessage
   | AdventureBeatMessage
   | TurnSemanticsMessage
@@ -1475,4 +1573,10 @@ export type ExtensionToWebviewMessage =
   | BugReportSubmitResultMessage
   | TeamStateUpdateMessage
   | TeamDetectedMessage
-  | TeamDismissedMessage;
+  | TeamDismissedMessage
+  | SummaryModeSettingMessage
+  | MessageSummaryMessage
+  | VpmSettingMessage
+  | VisualProgressCardMessage
+  | VisualProgressCardUpdateMessage
+  | UltrathinkLockedSettingMessage;

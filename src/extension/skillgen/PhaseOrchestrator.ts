@@ -118,7 +118,29 @@ export class PhaseOrchestrator {
 
     const skillsOutDir = path.join(workspaceDir, 'skills_out');
 
-    // Ensure workspace subdirectories
+    // Load resume progress BEFORE cleaning
+    const progressFile = path.join(workspaceDir, '.pipeline_progress.json');
+    let progress = this.loadProgress(progressFile);
+    const startFromIndex = this.findResumeIndex(progress);
+
+    // Clean workspace for fresh runs (startFromIndex === 0 means no valid resume point)
+    // This prevents accumulation of old data from previous pipeline runs
+    if (startFromIndex === 0) {
+      this.log(`[PhaseOrchestrator] Fresh run - cleaning workspace to prevent stale data accumulation`);
+      for (const sub of ['srptd_raw', 'extractions', 'clusters', 'skills_out']) {
+        const subDir = path.join(workspaceDir, sub);
+        if (fs.existsSync(subDir)) {
+          fs.rmSync(subDir, { recursive: true, force: true });
+        }
+      }
+      // Also clear progress file for fresh run
+      if (fs.existsSync(progressFile)) {
+        fs.unlinkSync(progressFile);
+      }
+      progress = {};
+    }
+
+    // Ensure workspace subdirectories exist
     for (const sub of ['srptd_raw', 'extractions', 'clusters', 'skills_out', 'logs']) {
       fs.mkdirSync(path.join(workspaceDir, sub), { recursive: true });
     }
@@ -145,11 +167,6 @@ export class PhaseOrchestrator {
       JSON.stringify({ docsDirectory, pendingDocPaths, timestamp: new Date().toISOString() }, null, 2),
       'utf-8'
     );
-
-    // Load resume progress
-    const progressFile = path.join(workspaceDir, '.pipeline_progress.json');
-    let progress = this.loadProgress(progressFile);
-    const startFromIndex = this.findResumeIndex(progress);
 
     if (startFromIndex > 0) {
       this.log(`[PhaseOrchestrator] Resuming from phase ${PHASE_ORDER[startFromIndex]}`);

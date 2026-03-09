@@ -55,6 +55,33 @@ interface AssistantSnapshot {
   model: string;
 }
 
+// --- Visual Progress Mode types ---
+
+export type ToolCategory =
+  | 'reading'
+  | 'writing'
+  | 'editing'
+  | 'searching'
+  | 'executing'
+  | 'delegating'
+  | 'planning'
+  | 'skill'
+  | 'deciding'
+  | 'researching';
+
+export interface VisualProgressCard {
+  id: string;
+  category: ToolCategory;
+  toolName: string;
+  description: string;
+  aiDescription?: string;
+  filePath?: string;
+  command?: string;
+  pattern?: string;
+  timestamp: number;
+  isStreaming: boolean;
+}
+
 // --- Store state ---
 
 export interface TextSettings {
@@ -147,10 +174,27 @@ export interface AppState {
   translations: Record<string, string>;
   translatingMessageIds: Set<string>;
   showingTranslation: Set<string>;
+  /** Maps message IDs to translation error messages (cleared on next attempt) */
+  translationErrors: Record<string, string>;
   /** Maps user message IDs to the original (pre-translation) text the user typed */
   userOriginalTexts: Record<string, string>;
   /** Holds the original text while waiting for the CLI to echo the translated message */
   pendingOriginalText: string | null;
+
+  // Summary Mode
+  summaryModeEnabled: boolean;
+  sessionAnimationIndex: number;
+  sessionToolCount: number;
+  summaryByMessageId: Record<string, { shortLabel: string; fullSummary: string }>;
+
+  // Visual Progress Mode
+  vpmEnabled: boolean;
+  visualProgressCards: VisualProgressCard[];
+
+  // Detailed Diff View
+  detailedDiffEnabled: boolean;
+  /** Maps toolUseId -> { filePath, oldContent } for pre-write file captures */
+  writeOldContentByToolId: Record<string, { filePath: string; oldContent: string }>;
 
   // Session Vitals
   vitalsEnabled: boolean;
@@ -160,6 +204,9 @@ export interface AppState {
 
   // Context usage widget
   contextWidgetVisible: boolean;
+
+  // Ultrathink lock (project-level, persisted via workspaceState)
+  ultrathinkLocked: boolean;
 
   // Usage widget
   usageWidgetEnabled: boolean;
@@ -409,9 +456,20 @@ export interface AppState {
   setTranslationLanguage: (language: string) => void;
   setTranslation: (messageId: string, translatedText: string) => void;
   setTranslating: (messageId: string, translating: boolean) => void;
+  setTranslationError: (messageId: string, error: string) => void;
   toggleTranslationView: (messageId: string) => void;
   setPendingOriginalText: (text: string | null) => void;
   setUserOriginalText: (messageId: string, text: string) => void;
+  setSummaryModeEnabled: (enabled: boolean) => void;
+  setMessageSummary: (messageId: string, summary: { shortLabel: string; fullSummary: string }) => void;
+  incrementSessionToolCount: () => void;
+  setVpmEnabled: (enabled: boolean) => void;
+  addVisualProgressCard: (card: VisualProgressCard) => void;
+  updateCardDescription: (cardId: string, description: string) => void;
+  clearVisualProgressCards: () => void;
+  setDetailedDiffEnabled: (enabled: boolean) => void;
+  addWriteOldContent: (toolUseId: string, filePath: string, oldContent: string) => void;
+  setUltrathinkLocked: (locked: boolean) => void;
   setVitalsEnabled: (enabled: boolean) => void;
   setContextWidgetVisible: (visible: boolean) => void;
   setUsageWidgetEnabled: (enabled: boolean) => void;
@@ -645,8 +703,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   translations: {},
   translatingMessageIds: new Set(),
   showingTranslation: new Set(),
+  translationErrors: {},
   userOriginalTexts: {},
   pendingOriginalText: null,
+  summaryModeEnabled: false,
+  sessionAnimationIndex: Math.floor(Math.random() * 5),
+  sessionToolCount: 0,
+  summaryByMessageId: {},
+  vpmEnabled: false,
+  visualProgressCards: [],
+  detailedDiffEnabled: false,
+  writeOldContentByToolId: {},
+  ultrathinkLocked: false,
   vitalsEnabled: false,
   turnHistory: [],
   turnByMessageId: {},
@@ -823,6 +891,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             sessionActivityElapsedMs: 0,
             sessionActivityRunningSinceMs: null,
             weather: { mood: 'clear' as WeatherMood, pulseRate: 'slow' as PulseRate },
+            visualProgressCards: [],
           }
           : {}),
       };
@@ -960,6 +1029,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Upsert: replace if same ID exists, otherwise append
       const existingIndex = state.messages.findIndex((m) => m.id === messageId);
       if (existingIndex >= 0) {
+        // Guard: with --include-partial-messages, the CLI sends incremental
+        // assistantMessage events (each containing only the most recently
+        // completed block). Once a message is finalized by the streaming
+        // pipeline (finalizeStreamingMessage), it has the complete, authoritative
+        // content. Any subsequent assistantMessage event is a partial snapshot
+        // that must not overwrite the finalized message.
+        //
+        // Rule: if the existing finalized message has any tool_use blocks,
+        // treat it as authoritative and skip ALL replacement attempts.
+        // The streaming pipeline (finalizeStreamingMessage) is the only
+        // correct source for messages containing tool_use blocks.
+        const existing = state.messages[existingIndex];
+        const existingContent = Array.isArray(existing.content) ? existing.content : [];
+        const existingHasToolUse = existingContent.some((b: ContentBlock) => b.type === 'tool_use');
+        if (existingHasToolUse) {
+          return {};
+        }
         const updatedMessages = [...state.messages];
         updatedMessages[existingIndex] = newMessage;
         return { messages: updatedMessages };
@@ -1281,6 +1367,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         translations: {},
         translatingMessageIds: new Set(),
         showingTranslation: new Set(),
+        translationErrors: {},
         userOriginalTexts: {},
         pendingOriginalText: null,
       };
@@ -1300,8 +1387,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       } else {
         newSet.delete(messageId);
       }
+      // Clear error when starting a new translation attempt
+      if (translating) {
+        const { [messageId]: _, ...rest } = state.translationErrors;
+        return { translatingMessageIds: newSet, translationErrors: rest };
+      }
       return { translatingMessageIds: newSet };
     }),
+
+  setTranslationError: (messageId, error) =>
+    set((state) => ({
+      translationErrors: { ...state.translationErrors, [messageId]: error },
+    })),
 
   toggleTranslationView: (messageId) =>
     set((state) => {
@@ -1320,6 +1417,45 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       userOriginalTexts: { ...state.userOriginalTexts, [messageId]: text },
     })),
+
+  setSummaryModeEnabled: (enabled) => set({ summaryModeEnabled: enabled }),
+  setVpmEnabled: (enabled) => set({ vpmEnabled: enabled }),
+  addVisualProgressCard: (card) =>
+    set((state) => {
+      // If card with same ID exists, update it (enrichment from blockStop)
+      const existing = state.visualProgressCards.findIndex((c) => c.id === card.id);
+      if (existing >= 0) {
+        const updated = [...state.visualProgressCards];
+        updated[existing] = { ...updated[existing], ...card };
+        return { visualProgressCards: updated };
+      }
+      return { visualProgressCards: [...state.visualProgressCards, card] };
+    }),
+  updateCardDescription: (cardId, description) =>
+    set((state) => ({
+      visualProgressCards: state.visualProgressCards.map((c) =>
+        c.id === cardId ? { ...c, aiDescription: description } : c
+      ),
+    })),
+  clearVisualProgressCards: () => set({ visualProgressCards: [] }),
+  setMessageSummary: (messageId, summary) =>
+    set((state) => ({
+      summaryByMessageId: { ...state.summaryByMessageId, [messageId]: summary },
+    })),
+  incrementSessionToolCount: () =>
+    set((state) => ({ sessionToolCount: state.sessionToolCount + 1 })),
+
+  setDetailedDiffEnabled: (enabled) => set({ detailedDiffEnabled: enabled }),
+
+  addWriteOldContent: (toolUseId, filePath, oldContent) =>
+    set((state) => ({
+      writeOldContentByToolId: {
+        ...state.writeOldContentByToolId,
+        [toolUseId]: { filePath, oldContent },
+      },
+    })),
+
+  setUltrathinkLocked: (locked) => set({ ultrathinkLocked: locked }),
 
   setVitalsEnabled: (enabled) =>
     set((state) => {
@@ -1562,8 +1698,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       translations: {},
       translatingMessageIds: new Set(),
       showingTranslation: new Set(),
+      translationErrors: {},
       userOriginalTexts: {},
       pendingOriginalText: null,
+      summaryModeEnabled: state.summaryModeEnabled,
+      sessionAnimationIndex: Math.floor(Math.random() * 5),
+      sessionToolCount: 0,
+      summaryByMessageId: {},
+      detailedDiffEnabled: state.detailedDiffEnabled,
+      writeOldContentByToolId: {},
+      ultrathinkLocked: state.ultrathinkLocked,
       vitalsEnabled: state.vitalsEnabled,
       adventureEnabled: state.adventureEnabled,
       adventureBeats: [],

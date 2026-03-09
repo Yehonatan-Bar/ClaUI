@@ -189,17 +189,18 @@ export class CodexMessageHandler {
   }
 
   /** Post a userMessage with dedup (same pattern as MessageHandler). */
-  private postUserMessage(content: ContentBlock[]): void {
+  private postUserMessage(content: ContentBlock[], isOptimistic = false): void {
     const text = content
       .filter((b) => b.type === 'text')
       .map((b) => (b as any).text || '')
       .join('');
-    const now = Date.now();
-    if (this.lastPostedUserMsg && this.lastPostedUserMsg.text === text && now - this.lastPostedUserMsg.time < 2000) {
-      this.log(`Suppressed duplicate userMessage: "${text.slice(0, 60)}..."`);
+    if (!isOptimistic && this.lastPostedUserMsg && this.lastPostedUserMsg.text === text) {
+      this.log(`Suppressed CLI echo duplicate: "${text.slice(0, 60)}..."`);
       return;
     }
-    this.lastPostedUserMsg = { text, time: now };
+    if (isOptimistic) {
+      this.lastPostedUserMsg = { text, time: Date.now() };
+    }
     this.postToWebview({ type: 'userMessage', content });
   }
 
@@ -311,7 +312,7 @@ export class CodexMessageHandler {
           }
           this.achievementService.onUserPrompt(this.tabId, msg.text);
           void this.promptHistoryStore.addPrompt(msg.text);
-          this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock]);
+          this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock], true);
           this.postToWebview({ type: 'processBusy', busy: true });
           {
             const deferred = this.buildDeferredHandoffPayload(msg.text);
@@ -357,7 +358,7 @@ export class CodexMessageHandler {
               },
             });
           }
-          this.postUserMessage(content);
+          this.postUserMessage(content, true);
           this.postToWebview({ type: 'processBusy', busy: true });
           {
             const deferred = this.buildDeferredHandoffPayload(msg.text, { imageCount: msg.images.length });
@@ -1690,7 +1691,7 @@ export class CodexMessageHandler {
   }
 
   private getConfiguredCodexModelLabel(): string {
-    return this.session.getCurrentModel() || 'codex';
+    return this.session.getCurrentModel() || 'Codex (default)';
   }
 
   private errMsg(err: unknown): string {

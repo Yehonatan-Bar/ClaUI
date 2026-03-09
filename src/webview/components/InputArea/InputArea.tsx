@@ -77,6 +77,8 @@ export const InputArea: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoMgr = useMemo(() => new UndoManager(), []);
   const [ultrathinkAnim, setUltrathinkAnim] = useState<string | null>(null);
+  const ultrathinkLocked = useAppStore((s) => s.ultrathinkLocked);
+  const setUltrathinkLocked = useAppStore((s) => s.setUltrathinkLocked);
   const {
     provider,
     selectedProvider,
@@ -316,8 +318,13 @@ export const InputArea: React.FC = () => {
    *  When a plan approval bar is active, the text is sent as plan feedback
    *  so the CLI interprets it in the approval context. */
   const sendMessage = useCallback(() => {
-    const trimmed = text.trim();
+    let trimmed = text.trim();
     if ((!trimmed && pendingImages.length === 0) || !isConnected || inputLockedByHandoff) return;
+
+    // Auto-prepend "ultrathink" when the lock is active
+    if (ultrathinkLocked && trimmed && !trimmed.toLowerCase().startsWith('ultrathink')) {
+      trimmed = 'ultrathink ' + trimmed;
+    }
 
     // Guard: block identical text sent within 500ms (key-repeat / double-fire).
     // setText('') is async so rapid keydown events re-enter with stale text.
@@ -438,7 +445,7 @@ export const InputArea: React.FC = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [text, pendingImages, isConnected, inputLockedByHandoff, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer, promptTranslateEnabled, autoTranslateEnabled, isTranslatingPrompt, setIsTranslatingPrompt, isCodexBusy, codexSteerArmed, logUiDebug]);
+  }, [text, pendingImages, isConnected, inputLockedByHandoff, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer, promptTranslateEnabled, autoTranslateEnabled, isTranslatingPrompt, setIsTranslatingPrompt, isCodexBusy, codexSteerArmed, logUiDebug, ultrathinkLocked]);
 
   /** Cancel the in-flight request */
   const cancelRequest = useCallback(() => {
@@ -1296,22 +1303,41 @@ export const InputArea: React.FC = () => {
             <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
           </svg>
         </button>
-        <button
-          className={`ultrathink-button${ultrathinkAnim ? ' animating' : ''}`}
-          onClick={handleUltrathink}
-          disabled={!isConnected || !!ultrathinkAnim || inputLockedByHandoff}
-          data-tooltip="Ultrathink - boost reasoning power"
-        >
-          <span className="ut-default-icon">&#x1F9E0;</span>
-          {ultrathinkAnim && (
-            <div className={`ultrathink-anim ultrathink-anim-${ultrathinkAnim}`}>
-              {ultrathinkAnim === 'rocket' && <span className="ut-emoji">&#x1F680;</span>}
-              {ultrathinkAnim === 'brain' && <span className="ut-emoji">&#x1F9E0;</span>}
-              {ultrathinkAnim === 'wizard' && <span className="ut-emoji">&#x1FA84;</span>}
-              {ultrathinkAnim === 'turbo' && <span className="ut-emoji">&#x26A1;</span>}
-            </div>
-          )}
-        </button>
+        <div className="ultrathink-wrapper">
+          <button
+            className={`ultrathink-button${ultrathinkAnim ? ' animating' : ''}${ultrathinkLocked ? ' locked' : ''}`}
+            onClick={handleUltrathink}
+            disabled={!isConnected || !!ultrathinkAnim || inputLockedByHandoff}
+            data-tooltip={ultrathinkLocked ? "Ultrathink LOCKED - auto-injected every prompt" : "Ultrathink - boost reasoning power"}
+          >
+            <span className="ut-default-icon">&#x1F9E0;</span>
+            {ultrathinkAnim && (
+              <div className={`ultrathink-anim ultrathink-anim-${ultrathinkAnim}`}>
+                {ultrathinkAnim === 'rocket' && <span className="ut-emoji">&#x1F680;</span>}
+                {ultrathinkAnim === 'brain' && <span className="ut-emoji">&#x1F9E0;</span>}
+                {ultrathinkAnim === 'wizard' && <span className="ut-emoji">&#x1FA84;</span>}
+                {ultrathinkAnim === 'turbo' && <span className="ut-emoji">&#x26A1;</span>}
+              </div>
+            )}
+          </button>
+          <button
+            className={`ut-lock-toggle${ultrathinkLocked ? ' active' : ''}`}
+            onClick={() => {
+              const next = !ultrathinkLocked;
+              setUltrathinkLocked(next);
+              postToExtension({ type: 'setUltrathinkLocked', locked: next } as any);
+            }}
+            data-tooltip={ultrathinkLocked ? "Unlock ultrathink" : "Lock ultrathink on every prompt"}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              {ultrathinkLocked ? (
+                <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>
+              ) : (
+                <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></>
+              )}
+            </svg>
+          </button>
+        </div>
         <div className={`textarea-container${isEnhancing ? ' enhancing' : ''}${isTranslatingPrompt ? ' translating' : ''}`}>
           <textarea
             ref={textareaRef}

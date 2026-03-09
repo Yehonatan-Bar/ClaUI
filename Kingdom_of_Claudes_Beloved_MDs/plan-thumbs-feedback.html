@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClaUi - Thumbs Feedback Feature Plan</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 2rem;
+      color: #38bdf8;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .subtitle {
+      text-align: center;
+      color: #94a3b8;
+      margin-bottom: 40px;
+      font-size: 1rem;
+    }
+    .card {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 24px;
+      backdrop-filter: blur(10px);
+    }
+    .card h2 {
+      color: #38bdf8;
+      font-size: 1.3rem;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 10px;
+    }
+    .card p, .card li {
+      line-height: 1.8;
+      color: #cbd5e1;
+      font-size: 0.95rem;
+    }
+    .card ul {
+      padding-right: 24px;
+      margin-top: 8px;
+    }
+    .card li {
+      margin-bottom: 8px;
+    }
+    .highlight {
+      color: #fbbf24;
+      font-weight: 600;
+    }
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 20px 0;
+      direction: ltr;
+    }
+    .flow-step {
+      background: #1e3a5f;
+      border: 1px solid #38bdf8;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+      text-align: center;
+      min-width: 120px;
+    }
+    .flow-arrow {
+      color: #38bdf8;
+      font-size: 1.4rem;
+      font-weight: bold;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 12px;
+    }
+    .info-item {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .info-item h3 {
+      color: #38bdf8;
+      font-size: 0.95rem;
+      margin-bottom: 6px;
+    }
+    .info-item p {
+      font-size: 0.85rem;
+    }
+    .badge {
+      display: inline-block;
+      background: #1e3a5f;
+      color: #38bdf8;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      margin-left: 4px;
+    }
+    .badge.reuse {
+      background: #1a3d2e;
+      color: #4ade80;
+    }
+    .badge.new {
+      background: #3b1f2b;
+      color: #fb7185;
+    }
+    .steps-list {
+      counter-reset: steps;
+      list-style: none;
+      padding: 0;
+    }
+    .steps-list li {
+      counter-increment: steps;
+      position: relative;
+      padding-right: 40px;
+      margin-bottom: 14px;
+    }
+    .steps-list li::before {
+      content: counter(steps);
+      position: absolute;
+      right: 0;
+      top: 2px;
+      width: 28px;
+      height: 28px;
+      background: #38bdf8;
+      color: #0f172a;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.85rem;
+    }
+    .thumbs-demo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      margin: 20px 0;
+      font-size: 2.5rem;
+    }
+    .thumb-up { cursor: pointer; transition: all 0.2s; color: #4ade80; }
+    .thumb-up:hover { transform: scale(1.2); filter: brightness(1.3); }
+    .thumb-down { cursor: pointer; transition: all 0.2s; color: #f87171; }
+    .thumb-down:hover { transform: scale(1.2); filter: brightness(1.3); }
+    footer {
+      text-align: center;
+      color: #475569;
+      margin-top: 40px;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>תוכנית: כפתורי משוב (אגודל למעלה / למטה)</h1>
+    <p class="subtitle">ClaUi - פיצ'ר חדש למשוב מהיר על תשובות הבינה המלאכותית</p>
+
+    <div class="thumbs-demo">
+      <span class="thumb-down" title="תשובה לא טובה">&#128078;</span>
+      <span class="thumb-up" title="תשובה טובה">&#128077;</span>
+    </div>
+
+    <div class="card">
+      <h2>מה הפיצ'ר הזה?</h2>
+      <p>
+        הוספת <span class="highlight">כפתורי אגודל למעלה ואגודל למטה</span> על כל תשובה של הבינה המלאכותית בצ'אט.
+        כשהמשתמש לוחץ על אחד הכפתורים, הוא יכול להוסיף הערה אופציונלית, ואז המערכת שולחת את המשוב
+        <span class="highlight">יחד עם כל הלוגים של הפיתוח</span> ישירות למפתח.
+      </p>
+      <p style="margin-top: 12px;">
+        זה נותן למפתח תמונה מלאה: מה המשתמש שאל, מה הבינה המלאכותית ענתה,
+        האם התשובה היתה טובה, ומה קרה ברקע (לוגים טכניים).
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>איך זה עובד?</h2>
+      <div class="flow-diagram">
+        <div class="flow-step">המשתמש לוחץ<br>על אגודל</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">תיבת הערה<br>(אופציונלי)</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">איסוף לוגים<br>מהסשן</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">שליחה<br>למפתח</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">אישור<br>למשתמש</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>מה נשלח למפתח?</h2>
+      <div class="info-grid">
+        <div class="info-item">
+          <h3>הדירוג</h3>
+          <p>אגודל למעלה (תשובה טובה) או אגודל למטה (תשובה לא טובה)</p>
+        </div>
+        <div class="info-item">
+          <h3>ההודעות</h3>
+          <p>השאלה של המשתמש + התשובה של הבינה המלאכותית</p>
+        </div>
+        <div class="info-item">
+          <h3>הערה אישית</h3>
+          <p>הערה אופציונלית מהמשתמש שמסביר למה הדירוג כזה</p>
+        </div>
+        <div class="info-item">
+          <h3>לוגים טכניים</h3>
+          <p>כל הלוגים מהסשן הנוכחי (עד 50KB) - מה שקרה ברקע</p>
+        </div>
+      </div>
+      <p style="margin-top: 16px;">בנוסף: שם המודל, ספק השירות, גרסת התוסף, מזהה הסשן.</p>
+    </div>
+
+    <div class="card">
+      <h2>תשתית קיימת שנשתמש בה</h2>
+      <ul>
+        <li><span class="badge reuse">קיים</span> <strong>שירות Formspree</strong> - כבר משמש לדיווחי באגים, אותה תשתית בדיוק</li>
+        <li><span class="badge reuse">קיים</span> <strong>מערכת לוגים</strong> - קבצי לוג נשמרים לכל סשן, רק צריך לקרוא אותם</li>
+        <li><span class="badge reuse">קיים</span> <strong>תבנית כפתורים</strong> - כבר יש כפתורי Copy, Edit, Fork, Translate על הודעות</li>
+        <li><span class="badge new">חדש</span> <strong>שירות משוב על הודעות</strong> - רכיב קל שמרכיב את המידע ושולח</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>חוויית המשתמש</h2>
+      <ol class="steps-list">
+        <li>המשתמש מעביר את העכבר מעל תשובה של הבינה המלאכותית - כפתורי האגודל מופיעים</li>
+        <li>המשתמש לוחץ על אגודל למעלה או למטה</li>
+        <li>נפתחת תיבת טקסט קטנה להערה אופציונלית</li>
+        <li>המשתמש לוחץ "שלח" (עם או בלי הערה)</li>
+        <li>הכפתור שנבחר נשאר מודגש - אישור ויזואלי שהמשוב נשלח</li>
+        <li>לא ניתן לדרג את אותה הודעה פעמיים</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>היקף העבודה</h2>
+      <ul>
+        <li><strong>7 קבצים לעדכון</strong> + <strong>1 קובץ חדש</strong></li>
+        <li>מבוסס ברובו על תשתית קיימת (Formspree, לוגים, תבנית כפתורים)</li>
+        <li>הרכיב החדש היחיד: שירות קל (~80 שורות) שמרכיב את המשוב ושולח</li>
+        <li>לא נדרש שינוי בהגדרות התוסף או בממשק ההגדרות</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>מקרי קצה שטופלו</h2>
+      <ul>
+        <li>מניעת משוב כפול - אחרי דירוג, שני הכפתורים מושבתים</li>
+        <li>רק תיבת הערה אחת פתוחה בכל רגע נתון</li>
+        <li>אם הלוגים גדולים מדי - חיתוך אוטומטי ל-50KB</li>
+        <li>אם שליחת המשוב נכשלת - תוצאה חוזרת למסך, לא קורס</li>
+        <li>כפתורים מופיעים רק על תשובות הבינה, לא על הודעות המשתמש</li>
+      </ul>
+    </div>
+
+    <footer>
+      ClaUi Extension - Thumbs Feedback Feature Plan | 2026-03-09
+    </footer>
+  </div>
+</body>
+</html>

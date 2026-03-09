@@ -157,8 +157,8 @@ Bidirectional bridge between the webview and the CLI process. Accepts a `Webview
 **Webview -> Extension direction:**
 | Webview Message | Action |
 |-----------------|--------|
-| `sendMessage` | Sends optimistic `userMessage` to webview, then calls `control.sendText()` |
-| `sendMessageWithImages` | Sends optimistic `userMessage` (with image blocks) to webview, then calls `control.sendWithImages()` |
+| `sendMessage` | Sends optimistic `userMessage` to webview (isOptimistic=true), then calls `control.sendText()`. CLI echo is deduplicated by `postUserMessage` matching against the last optimistic text. |
+| `sendMessageWithImages` | Sends optimistic `userMessage` with image blocks (isOptimistic=true), then calls `control.sendWithImages()` |
 | `cancelRequest` | Calls `control.cancel()` |
 | `compact` | Calls `control.compact()` |
 | `startSession` | Calls `processManager.start()` |
@@ -481,7 +481,7 @@ Users can edit a previously sent message and resend it, discarding everything af
 
 The edited message is sent **immediately** after process start, without waiting for `system/init`. The CLI in pipe mode only emits `system/init` after receiving its first stdin message, so waiting for init before sending would cause a deadlock.
 
-The edited message is added to the store locally (step 5) rather than waiting for the CLI echo, because the session restart can cause the echo to be delayed or lost. The `addUserMessage` function deduplicates within a 15-second window by scanning backwards through recent messages (not just the last one) to prevent a duplicate if the CLI does echo the same text back. The backwards scan handles cases where assistant events interleave between the optimistic display and the CLI echo.
+The edited message is added to the store locally (step 5) rather than waiting for the CLI echo, because the session restart can cause the echo to be delayed or lost. Deduplication happens at two levels: (1) extension-side `postUserMessage` uses an `isOptimistic` flag -- optimistic sends always go through and record the text, CLI echoes are suppressed if they match the last optimistic text regardless of timing; (2) webview-side `addUserMessage` scans backwards through recent messages within a 15-second window as a safety net.
 
 The `skipReplay` flag (`ProcessStartOptions.skipReplay`) omits `--replay-user-messages` from the CLI args so that the resumed session does not flood the webview with old messages that are already displayed (truncated history before the edit point).
 
@@ -498,7 +498,7 @@ The `skipReplay` flag (`ProcessStartOptions.skipReplay`) omits `--replay-user-me
 - Edit button hidden while assistant is busy (`isBusy` prop)
 - Only text-only user messages are editable (messages with images skip the edit button)
 - Editing the first message clears the entire conversation
-- Duplicate user messages with the same text within 15s are deduplicated (backwards scan through recent messages handles interleaved assistant events)
+- Duplicate user messages are deduplicated at the extension level (optimistic vs CLI echo matching, no time window) and at the webview level (15s backwards scan as safety net)
 - If session already ended (no sessionId), falls back to starting a fresh session
 - Session tab is not renamed on edit-and-resend (unlike new sessions)
 

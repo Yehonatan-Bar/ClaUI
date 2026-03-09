@@ -92,6 +92,7 @@ function isEnterPlanModeTool(name: string): boolean {
 const CODE_WRITE_TOOLS = ['Write', 'Edit', 'NotebookEdit', 'MultiEdit'];
 const RESEARCH_TOOLS = ['Read', 'Grep', 'Glob', 'WebSearch', 'WebFetch'];
 const COMMAND_TOOLS = ['Bash', 'Terminal'];
+const AGENT_TOOLS = ['Agent', 'Task', 'dispatch_agent'];
 
 const CLAUDE_PROVIDER_CAPABILITIES: ProviderCapabilities = {
   supportsPlanApproval: true,
@@ -113,6 +114,7 @@ function categorizeTurn(toolNames: string[], isError: boolean): TurnCategory {
   if (toolNames.length === 0) return 'discussion';
   const baseNames = toolNames.map(n => n.includes('__') ? n.split('__').pop()! : n);
   if (baseNames.some(n => n === 'Skill')) return 'skill';
+  if (baseNames.some(n => AGENT_TOOLS.includes(n))) return 'research';
   if (baseNames.some(n => CODE_WRITE_TOOLS.includes(n))) return 'code-write';
   if (baseNames.some(n => COMMAND_TOOLS.includes(n))) return 'command';
   if (baseNames.some(n => RESEARCH_TOOLS.includes(n))) return 'research';
@@ -187,12 +189,24 @@ export class MessageHandler {
   /** Separate timer for post-approve nudge, decoupled from approval cycle state so it
    *  won't be cancelled by result-handler cleanup or markApprovalCycleResumeObserved. */
   private postApproveNudgeTimer: ReturnType<typeof setTimeout> | null = null;
+  /** True while an ExitPlanMode approval bar is shown in the webview.
+   *  Unlike pendingApprovalTool (cleared by messageStart), this flag persists until:
+   *  (a) user responds via button click or typed text, or
+   *  (b) a non-plan tool starts (auto-dismiss).
+   *  Used to set exitPlanModeProcessed even when pendingApprovalTool was already cleared. */
+  private exitPlanModeBarActive = false;
 
   /** Activity summarizer: periodically summarizes tool activity via Haiku */
   private activitySummarizer: ActivitySummarizer | null = null;
+  /** Visual Progress Mode: generates animated cards for tool events */
+  private vpmProcessor: import('../session/VisualProgressProcessor').VisualProgressProcessor | null = null;
   private activitySummaryCallback: ((summary: ActivitySummary) => void) | null = null;
   /** Maps blockIndex -> toolName for tool_use blocks in the current message */
   private toolBlockNames: Map<number, string> = new Map();
+  /** Maps blockIndex -> toolId for tool_use blocks in the current message */
+  private toolBlockIds: Map<number, string> = new Map();
+  /** Maps toolUseId -> { filePath, oldContent } for Write tools; flushed before each assistantMessage */
+  private pendingWriteOldContent: Map<string, { filePath: string; oldContent: string }> = new Map();
   /** Maps blockIndex -> accumulated input_json_delta chunks (for enrichment context) */
   private toolBlockContexts: Map<number, string> = new Map();
   /** True once at least one tool blockStop was seen in the current message */
@@ -250,6 +264,8 @@ export class MessageHandler {
   private turnRecords: TurnRecord[] = [];
   /** Project analytics store (injected, may be null if not wired) */
   private projectAnalyticsStore: ProjectAnalyticsStore | null = null;
+  /** Workspace-scoped state for project-level persistence */
+  private workspaceState: vscode.Memento | null = null;
   private secrets: vscode.SecretStorage | null = null;
   private authManager: AuthManager | null = null;
   private bugReportService: BugReportService | null = null;
@@ -307,6 +323,13 @@ export class MessageHandler {
     this.activitySummarizer = summarizer;
   }
 
+  /** Attach a VisualProgressProcessor for VPM card generation */
+  setVpmProcessor(processor: import('../session/VisualProgressProcessor').VisualProgressProcessor): void {
+    this.vpmProcessor = processor;
+    processor.setLogger(this.log);
+    processor.setPostMessage((msg) => this.webview.postMessage(msg as any));
+  }
+
   /** Register a callback invoked when an activity summary is generated */
   onActivitySummaryGenerated(callback: (summary: ActivitySummary) => void): void {
     this.activitySummaryCallback = callback;
@@ -353,6 +376,11 @@ export class MessageHandler {
   /** Attach a ProjectAnalyticsStore for persisting session summaries */
   setProjectAnalyticsStore(store: ProjectAnalyticsStore): void {
     this.projectAnalyticsStore = store;
+  }
+
+  /** Attach workspaceState for project-level persistence (e.g. ultrathink lock) */
+  setWorkspaceState(ws: vscode.Memento): void {
+    this.workspaceState = ws;
   }
 
   /** Attach the global TokenUsageRatioTracker */
@@ -459,22 +487,27 @@ export class MessageHandler {
   }
 
   /**
-   * Post a userMessage to the webview, deduplicating identical text within 2 s.
-   * This is the single chokepoint for ALL user-message display: optimistic send,
-   * CLI echo, edit-and-resend, and plan-feedback -- so dedup here catches every
-   * duplicate source (key-repeat, CLI echo after optimistic, double postMessage, etc.).
+   * Post a userMessage to the webview, deduplicating CLI echoes against the
+   * last optimistic send.
+   *
+   * Optimistic sends (isOptimistic=true) always go through and record the text.
+   * CLI echoes (isOptimistic=false) are suppressed if they match the last
+   * optimistic text, regardless of how much time has passed.  This fixes the
+   * intermittent duplicate-prompt bug where the CLI echo arrives long after
+   * the 2-second dedup window that was previously used.
    */
-  private postUserMessage(content: ContentBlock[]): void {
+  private postUserMessage(content: ContentBlock[], isOptimistic = false): void {
     const text = content
       .filter((b) => b.type === 'text')
       .map((b) => (b as any).text || '')
       .join('');
-    const now = Date.now();
-    if (this.lastPostedUserMsg && this.lastPostedUserMsg.text === text && now - this.lastPostedUserMsg.time < 2000) {
-      this.log(`Suppressed duplicate userMessage: "${text.slice(0, 60)}..."`);
+    if (!isOptimistic && this.lastPostedUserMsg && this.lastPostedUserMsg.text === text) {
+      this.log(`Suppressed CLI echo duplicate: "${text.slice(0, 60)}..."`);
       return;
     }
-    this.lastPostedUserMsg = { text, time: now };
+    if (isOptimistic) {
+      this.lastPostedUserMsg = { text, time: Date.now() };
+    }
     this.webview.postMessage({ type: 'userMessage', content });
   }
 
@@ -530,12 +563,18 @@ export class MessageHandler {
           // typing text (instead of clicking an approve button) leaves
           // exitPlanModeProcessed=false, causing the approval bar to re-appear when
           // the model spuriously calls ExitPlanMode in its response to the user text.
+          // Bug 16 fix: also check exitPlanModeBarActive as a fallback. By the time the
+          // user types text, messageStart may have already cleared pendingApprovalTool,
+          // but exitPlanModeBarActive persists until explicit user action.
           if (this.pendingApprovalTool) {
             const pendingNorm = this.pendingApprovalTool.trim().toLowerCase();
             if (pendingNorm === 'exitplanmode' || pendingNorm.endsWith('.exitplanmode')) {
               this.markExitPlanModeProcessed('user sent text while ExitPlanMode approval bar was active');
             }
+          } else if (this.exitPlanModeBarActive) {
+            this.markExitPlanModeProcessed('user sent text while ExitPlanMode bar active (pendingApprovalTool already cleared)');
           }
+          this.exitPlanModeBarActive = false;
           this.cancelExitPlanApproveResumeFallback();
           this.cancelPostApproveNudge();
           this.clearApprovalTracking();
@@ -543,7 +582,7 @@ export class MessageHandler {
           this._codexConsultStartedAt = null;
           this.achievementService.onUserPrompt(this.tabId, msg.text);
           // Optimistic: show user message in UI immediately (before CLI echoes it back)
-          this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock]);
+          this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock], true);
           this.control.sendText(this.consumeDeferredHandoffContext(msg.text));
           this.webview.postMessage({ type: 'processBusy', busy: true });
           this.triggerSessionNaming(msg.text);
@@ -554,12 +593,16 @@ export class MessageHandler {
         case 'sendMessageWithImages': {
           this.log(`Sending message with ${msg.images.length} images`);
           // Same ExitPlanMode guard as sendMessage (user may paste images while bar is active)
+          // Bug 16 fix: also check exitPlanModeBarActive fallback (see sendMessage comment).
           if (this.pendingApprovalTool) {
             const pendingNorm2 = this.pendingApprovalTool.trim().toLowerCase();
             if (pendingNorm2 === 'exitplanmode' || pendingNorm2.endsWith('.exitplanmode')) {
               this.markExitPlanModeProcessed('user sent images while ExitPlanMode approval bar was active');
             }
+          } else if (this.exitPlanModeBarActive) {
+            this.markExitPlanModeProcessed('user sent images while ExitPlanMode bar active (pendingApprovalTool already cleared)');
           }
+          this.exitPlanModeBarActive = false;
           this.cancelExitPlanApproveResumeFallback();
           this.cancelPostApproveNudge();
           this.clearApprovalTracking();
@@ -581,7 +624,7 @@ export class MessageHandler {
               },
             } as ContentBlock);
           }
-          this.postUserMessage(imgContent);
+          this.postUserMessage(imgContent, true);
           this.control.sendWithImages(
             this.consumeDeferredHandoffContext(msg.text, { imageCount: msg.images.length }),
             msg.images,
@@ -598,6 +641,7 @@ export class MessageHandler {
           this.log('Cancel requested - killing process');
           // Immediate UI feedback so the user sees the cancel take effect
           this.webview.postMessage({ type: 'processBusy', busy: false });
+          this.exitPlanModeBarActive = false;
           this.clearApprovalTracking();
           this.clearCodexConsultTimeout();
           this._codexConsultStartedAt = null;
@@ -717,6 +761,10 @@ export class MessageHandler {
           this.webview.saveProjectAnalyticsNow?.();
           this.firstMessageSent = false;
           this.clearPendingHandoffPrompt();
+          this.exitPlanModeBarActive = false;
+          this.clearApprovalTracking();
+          this.resetExitPlanModeProcessed('clearSession');
+          this.exitPlanModeReopenCount = 0;
           this.activitySummarizer?.reset();
           this.adventureInterpreter?.reset();
           this.turnRecords = [];
@@ -814,9 +862,31 @@ export class MessageHandler {
           vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', msg.mode, true);
           break;
 
+        case 'setUltrathinkLocked':
+          this.log(`Setting ultrathink locked to: ${msg.locked}`);
+          if (this.workspaceState) {
+            void this.workspaceState.update('claui.ultrathinkLocked', msg.locked);
+          }
+          break;
+
         case 'setVitalsEnabled':
           this.log(`Setting session vitals to: ${msg.enabled}`);
           vscode.workspace.getConfiguration('claudeMirror').update('sessionVitals', msg.enabled, true);
+          break;
+
+        case 'setDetailedDiffViewEnabled':
+          this.log(`Setting detailed diff view to: ${msg.enabled}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('detailedDiffView', msg.enabled, true);
+          break;
+
+        case 'setSummaryModeEnabled':
+          this.log(`Setting summary mode to: ${msg.enabled}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('summaryMode', msg.enabled, true);
+          break;
+
+        case 'setVpmEnabled':
+          this.log(`Setting Visual Progress Mode to: ${msg.enabled}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('visualProgressMode', msg.enabled, true);
           break;
 
         case 'setAdventureWidgetEnabled':
@@ -1192,6 +1262,7 @@ export class MessageHandler {
           if (isExitPlanMode) {
             // Plan mode cycle complete
             this.markExitPlanModeProcessed(`planApprovalResponse:${msg.action}`);
+            this.exitPlanModeBarActive = false;
           }
 
           // ExitPlanMode: DO NOT send approve/reject text to the CLI.
@@ -1212,7 +1283,7 @@ export class MessageHandler {
               this.resetExitPlanModeProcessed('ExitPlanMode feedback requested plan revision');
               this.log(`ExitPlanMode feedback - sending user feedback to CLI`);
               // Optimistic: show user message in UI immediately
-              this.postUserMessage([{ type: 'text', text: msg.feedback.trim() } as ContentBlock]);
+              this.postUserMessage([{ type: 'text', text: msg.feedback.trim() } as ContentBlock], true);
               sendApprovalText(msg.feedback.trim(), 'ExitPlanMode feedback');
             } else {
               this.log(`ExitPlanMode ${msg.action} - closing bar without sending user message (CLI auto-approves)`);
@@ -1317,6 +1388,7 @@ export class MessageHandler {
           this.webview.saveProjectAnalyticsNow?.();
           this.clearApprovalTracking();
           this.planModeActive = false;
+          this.exitPlanModeBarActive = false;
           this.exitPlanModeReopenCount = 0;
           this.resetExitPlanModeProcessed('edit-and-resend restart');
           this.activitySummarizer?.reset();
@@ -1781,8 +1853,16 @@ export class MessageHandler {
           this.sendPermissionModeSetting();
           // Send git push settings
           this.sendGitPushSettings();
+          // Send ultrathink lock state (project-level)
+          this.sendUltrathinkLockedSetting();
           // Send session vitals setting
           this.sendVitalsSetting();
+          // Send summary mode setting
+          this.sendSummaryModeSetting();
+          // Send Visual Progress Mode setting
+          this.sendVpmSetting();
+          // Send detailed diff view setting
+          this.sendDetailedDiffViewSetting();
           // Send adventure widget setting
           this.sendAdventureWidgetSetting();
           // Send usage widget setting
@@ -2125,6 +2205,13 @@ export class MessageHandler {
     });
   }
 
+  /** Read ultrathink lock state from workspaceState and send to webview */
+  private sendUltrathinkLockedSetting(): void {
+    const locked = this.workspaceState?.get<boolean>('claui.ultrathinkLocked', false) ?? false;
+    this.log(`Sending ultrathink locked setting: locked=${locked}`);
+    this.webview.postMessage({ type: 'ultrathinkLockedSetting', locked });
+  }
+
   /** Read session vitals setting from VS Code config and send to webview */
   private sendVitalsSetting(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -2132,6 +2219,33 @@ export class MessageHandler {
     this.log(`Sending vitals setting: enabled=${enabled}`);
     this.webview.postMessage({
       type: 'vitalsSetting',
+      enabled,
+    });
+  }
+
+  /** Read summary mode setting from VS Code config and send to webview */
+  private sendSummaryModeSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const enabled = config.get<boolean>('summaryMode', false);
+    this.log(`Sending summaryMode setting: enabled=${enabled}`);
+    this.webview.postMessage({ type: 'summaryModeSetting', enabled });
+  }
+
+  /** Read Visual Progress Mode setting from VS Code config and send to webview */
+  private sendVpmSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const enabled = config.get<boolean>('visualProgressMode', false);
+    this.log(`Sending VPM setting: enabled=${enabled}`);
+    this.webview.postMessage({ type: 'vpmSetting', enabled });
+  }
+
+  /** Read detailed diff view setting from VS Code config and send to webview */
+  private sendDetailedDiffViewSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const enabled = config.get<boolean>('detailedDiffView', false);
+    this.log(`Sending detailedDiffView setting: enabled=${enabled}`);
+    this.webview.postMessage({
+      type: 'detailedDiffViewSetting',
       enabled,
     });
   }
@@ -2429,6 +2543,15 @@ export class MessageHandler {
       if (e.affectsConfiguration('claudeMirror.sessionVitals')) {
         this.sendVitalsSetting();
       }
+      if (e.affectsConfiguration('claudeMirror.summaryMode')) {
+        this.sendSummaryModeSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.visualProgressMode')) {
+        this.sendVpmSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.detailedDiffView')) {
+        this.sendDetailedDiffViewSetting();
+      }
       if (e.affectsConfiguration('claudeMirror.adventureWidget')) {
         this.sendAdventureWidgetSetting();
       }
@@ -2527,6 +2650,8 @@ export class MessageHandler {
           messageId: data.messageId,
           blockIndex: data.blockIndex,
         });
+        // VPM: keep last 200 chars of assistant text for context
+        this.vpmProcessor?.updateAssistantContext(data.text);
       }
     );
 
@@ -2545,13 +2670,29 @@ export class MessageHandler {
         if (isEnterPlanModeTool(data.toolName)) {
           this.planModeActive = true;
           this.exitPlanModeReopenCount = 0;
+          this.exitPlanModeBarActive = false;
           this.resetExitPlanModeProcessed('EnterPlanMode detected');
           this.log('Plan mode activated (EnterPlanMode detected, reopen counter reset)');
         } else {
           this.notePostExitPlanNonPlanActivity(data.toolName);
+          // Bug 16 fix: auto-dismiss stale ExitPlanMode approval bar when the model
+          // starts using non-plan tools (implementation has begun). Without this, the
+          // bar persists indefinitely because messageStart doesn't clear it (Bug 3/13).
+          // Also set exitPlanModeProcessed so any subsequent ExitPlanMode calls from
+          // the model are suppressed (prevents the bar from re-appearing).
+          if (this.exitPlanModeBarActive && !isApprovalToolName(data.toolName)) {
+            this.log(`[EPM_AUTODISMISS] Auto-dismissing ExitPlanMode bar - non-plan tool ${data.toolName} started`);
+            this.exitPlanModeBarActive = false;
+            if (!this.exitPlanModeProcessed) {
+              this.markExitPlanModeProcessed(`non-plan tool ${data.toolName} started while ExitPlanMode bar visible`);
+            }
+            // Tell webview to clear the approval bar
+            this.webview.postMessage({ type: 'planApprovalDismissed' });
+          }
         }
-        // Track for activity summarizer enrichment
+        // Track for activity summarizer enrichment and diff capture
         this.toolBlockNames.set(data.blockIndex, data.toolName);
+        this.toolBlockIds.set(data.blockIndex, data.toolId);
         this.webview.postMessage({
           type: 'toolUseStart',
           messageId: data.messageId,
@@ -2569,6 +2710,8 @@ export class MessageHandler {
         if (this.adventureInterpreter) {
           this.emitAdventureBeat(this.buildLiveToolBeat(data.toolName), 'toolUseStart');
         }
+        // VPM: emit a visual progress card for this tool use
+        this.vpmProcessor?.onToolUseStart(data.toolName, data.toolId, data.blockIndex);
       }
     );
 
@@ -2600,6 +2743,8 @@ export class MessageHandler {
             const enriched = this.enrichToolNameFromRaw(toolName, rawInput);
             this.activitySummarizer.recordToolUse(enriched);
           }
+          // VPM: enrich card with full accumulated input
+          this.vpmProcessor?.onBlockStop(data.blockIndex, rawInput);
           this.achievementService.onToolUse(this.tabId, toolName, rawInput);
           this.collectAdventureContext(toolName, rawInput);
           // Real-time tool activity: send enriched detail now that we have full input
@@ -2619,7 +2764,41 @@ export class MessageHandler {
               // ignore malformed JSON - rawInput may be partial
             }
           }
+          // Capture pre-write file content for detailed diff view
+          if (toolName === 'Write' || toolName === 'NotebookEdit') {
+            const toolId = this.toolBlockIds.get(data.blockIndex);
+            if (toolId) {
+              try {
+                const parsed = JSON.parse(rawInput);
+                const filePath: string = parsed.file_path || parsed.notebook_path || '';
+                if (filePath) {
+                  const config = vscode.workspace.getConfiguration('claudeMirror');
+                  const diffEnabled = config.get<boolean>('detailedDiffView', false);
+                  if (diffEnabled) {
+                    // Read the file before Write executes (blockStop fires before tool execution)
+                    const workspaceFolders = vscode.workspace.workspaceFolders;
+                    const rootPath = workspaceFolders?.[0]?.uri?.fsPath ?? '';
+                    const absolutePath = path.isAbsolute(filePath)
+                      ? filePath
+                      : path.join(rootPath, filePath);
+                    try {
+                      const raw = fs.readFileSync(absolutePath, 'utf8');
+                      // Cap at 500KB to avoid posting huge messages
+                      const capped = raw.length > 512000 ? raw.slice(0, 512000) : raw;
+                      this.pendingWriteOldContent.set(toolId, { filePath, oldContent: capped });
+                    } catch {
+                      // File does not exist yet — Write is creating a new file
+                      this.pendingWriteOldContent.set(toolId, { filePath, oldContent: '' });
+                    }
+                  }
+                }
+              } catch {
+                // ignore malformed JSON
+              }
+            }
+          }
         }
+        this.toolBlockIds.delete(data.blockIndex);
         this.toolBlockNames.delete(data.blockIndex);
         this.toolBlockContexts.delete(data.blockIndex);
       }
@@ -2705,6 +2884,18 @@ export class MessageHandler {
         }
         const effortForMessage = this.currentThinkingEffort || this.demux.getThinkingEffort() || undefined;
         this.log(`-> webview: assistantMessage id=${event.message.id} blocks=[${blockTypes}] usage=${JSON.stringify(event.message.usage)} thinkingEffort=${effortForMessage}`);
+        // Flush pre-write old content so webview can show diffs (must arrive before assistantMessage)
+        if (this.pendingWriteOldContent.size > 0) {
+          for (const [toolUseId, { filePath, oldContent }] of this.pendingWriteOldContent) {
+            this.webview.postMessage({
+              type: 'fileOldContent',
+              toolUseId,
+              filePath,
+              oldContent,
+            });
+          }
+          this.pendingWriteOldContent.clear();
+        }
         this.webview.postMessage({
           type: 'assistantMessage',
           messageId: event.message.id,
@@ -3090,6 +3281,7 @@ export class MessageHandler {
     this.log(
       `[APPROVAL_STATE] ${context} | ` +
       `pendingTool=${this.pendingApprovalTool ?? 'null'} ` +
+      `epmBarActive=${this.exitPlanModeBarActive} ` +
       `approvalRespProcessed=${this.approvalResponseProcessed} ` +
       `planModeActive=${this.planModeActive} ` +
       `exitPlanProcessed=${this.exitPlanModeProcessed} ` +
@@ -3364,6 +3556,9 @@ export class MessageHandler {
     this.log(`Plan approval required: tool=${toolName} cycle=${this.pendingApprovalCycleId}`);
     this.logApprovalState('showing-approval-bar');
     this.pendingApprovalTool = toolName;
+    if (isExitPlanMode) {
+      this.exitPlanModeBarActive = true;
+    }
     this.webview.postMessage({
       type: 'planApprovalRequired',
       toolName,
@@ -3383,6 +3578,15 @@ export class MessageHandler {
         shortLabel: summary.shortLabel,
         fullSummary: summary.fullSummary,
       });
+      // Forward per-message summary for Summary Mode
+      if (this.lastMessageId) {
+        this.webview.postMessage({
+          type: 'messageSummary',
+          messageId: this.lastMessageId,
+          shortLabel: summary.shortLabel,
+          fullSummary: summary.fullSummary,
+        });
+      }
       // Forward to SessionTab for tab title update
       this.activitySummaryCallback?.(summary);
     });

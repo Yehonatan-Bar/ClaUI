@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaUi - Thumbs Feedback Feature Plan</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  .header h1 {
+    font-size: 2.2rem;
+    color: #a78bfa;
+    margin-bottom: 8px;
+  }
+  .header p {
+    font-size: 1.1rem;
+    color: #94a3b8;
+  }
+  .card {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 24px;
+    backdrop-filter: blur(10px);
+  }
+  .card h2 {
+    font-size: 1.3rem;
+    color: #7dd3fc;
+    margin-bottom: 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 8px;
+  }
+  .card p, .card li {
+    font-size: 1rem;
+    line-height: 1.7;
+    color: #cbd5e1;
+  }
+  .card ul {
+    padding-right: 24px;
+    margin-top: 8px;
+  }
+  .card li { margin-bottom: 6px; }
+  .highlight {
+    color: #fbbf24;
+    font-weight: 600;
+  }
+  .flow-diagram {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin: 20px 0;
+  }
+  .flow-step {
+    background: rgba(124, 58, 237, 0.2);
+    border: 1px solid rgba(124, 58, 237, 0.4);
+    border-radius: 10px;
+    padding: 12px 24px;
+    text-align: center;
+    width: 80%;
+    max-width: 500px;
+    font-size: 0.95rem;
+  }
+  .flow-arrow {
+    color: #a78bfa;
+    font-size: 1.4rem;
+  }
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+  }
+  .data-table th, .data-table td {
+    padding: 10px 14px;
+    text-align: right;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .data-table th {
+    color: #a78bfa;
+    font-weight: 600;
+    background: rgba(124, 58, 237, 0.1);
+  }
+  .data-table td { color: #cbd5e1; }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .badge-new { background: rgba(52, 211, 153, 0.2); color: #34d399; }
+  .badge-edit { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+  .steps-list {
+    counter-reset: step-counter;
+    list-style: none;
+    padding: 0;
+  }
+  .steps-list li {
+    counter-increment: step-counter;
+    position: relative;
+    padding-right: 40px;
+    margin-bottom: 14px;
+  }
+  .steps-list li::before {
+    content: counter(step-counter);
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 28px;
+    height: 28px;
+    background: rgba(124, 58, 237, 0.3);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #a78bfa;
+    font-size: 0.85rem;
+  }
+  .summary-box {
+    background: rgba(52, 211, 153, 0.08);
+    border: 1px solid rgba(52, 211, 153, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 16px;
+    text-align: center;
+  }
+  .summary-box p {
+    font-size: 1.05rem;
+    color: #34d399;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>תוכנית: כפתורי פידבק - אגודל למעלה / למטה</h1>
+    <p>הוספת יכולת משוב מהיר על תשובות העוזר, כולל שליחה אוטומטית של לוגים למפתח</p>
+  </div>
+
+  <div class="card">
+    <h2>מה הפיצ'ר הזה עושה?</h2>
+    <p>
+      כל הודעת תשובה של העוזר (Assistant) תציג שני כפתורים קטנים:
+      <span class="highlight">אגודל למעלה</span> (תשובה טובה) ו-<span class="highlight">אגודל למטה</span> (תשובה לא טובה).
+    </p>
+    <ul>
+      <li>הכפתורים מופיעים בריחוף עכבר, כמו כפתור ה-Copy וה-Translate הקיימים</li>
+      <li>לחיצה על אגודל למעלה - שולח את הפידבק מיידית</li>
+      <li>לחיצה על אגודל למטה - מציג שדה תגובה קצר (אופציונלי, עד 200 תווים) לפני שליחה</li>
+      <li>אפשר לשנות את הבחירה (ללחוץ על האגודל ההפוך)</li>
+      <li>הפיצ'ר ניתן לכיבוי/הפעלה דרך הגדרות VS Code</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>מה נשלח למפתח?</h2>
+    <p>כל לחיצת פידבק שולחת למפתח (דרך Formspree - אותו כלי שכבר קיים לדיווחי באגים) את הנתונים הבאים:</p>
+    <table class="data-table">
+      <tr><th>נתון</th><th>תיאור</th></tr>
+      <tr><td>הצבעה</td><td>אגודל למעלה או אגודל למטה</td></tr>
+      <tr><td>תגובה (אופציונלי)</td><td>טקסט חופשי קצר שהמשתמש כתב</td></tr>
+      <tr><td>ההודעה שנבחרה</td><td>תוכן התשובה של העוזר שקיבלה את ההצבעה</td></tr>
+      <tr><td>היסטוריית שיחה</td><td>כל ההודעות מתחילת השיחה עד ההודעה שנבחרה</td></tr>
+      <tr><td>פרטי סשן</td><td>שם הסשן, מודל, ספק (Claude/Codex), גרסת התוסף</td></tr>
+      <tr><td>מידע מערכת</td><td>מערכת הפעלה, גרסת VS Code, גרסת Node</td></tr>
+      <tr><td>לוגים אחרונים</td><td>כל הלוגים מ-30 הדקות האחרונות (עד 50KB)</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>איך זה עובד - תהליך מלא</h2>
+    <div class="flow-diagram">
+      <div class="flow-step">המשתמש לוחץ על אגודל למעלה/למטה בהודעת העוזר</div>
+      <div class="flow-arrow">v</div>
+      <div class="flow-step">אם אגודל למטה - מופיע שדה תגובה אופציונלי</div>
+      <div class="flow-arrow">v</div>
+      <div class="flow-step">הממשק אוסף את השיחה עד ההודעה שנבחרה ושולח לתוסף</div>
+      <div class="flow-arrow">v</div>
+      <div class="flow-step">התוסף אוסף מידע מערכת + לוגים אחרונים (תשתית קיימת)</div>
+      <div class="flow-arrow">v</div>
+      <div class="flow-step">הכל נשלח ב-Formspree למייל המפתח (תשתית קיימת)</div>
+      <div class="flow-arrow">v</div>
+      <div class="flow-step">הכפתור מתמלא בצבע (ירוק/אדום) - אישור חזותי</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>שלבי פיתוח</h2>
+    <ol class="steps-list">
+      <li>הוספת הגדרה חדשה ב-package.json - הפעלה/כיבוי של הפיצ'ר</li>
+      <li>הגדרת סוגי הודעות חדשים לתקשורת בין הממשק לתוסף</li>
+      <li>הוספת ניהול מצב (State) בממשק - מעקב אחרי הצבעות ומצב שליחה</li>
+      <li>בניית הכפתורים בממשק המשתמש - אייקונים, אנימציות, שדה תגובה</li>
+      <li>יצירת שירות פידבק חדש - אוסף נתונים ושולח דרך Formspree</li>
+      <li>חיבור הטיפול בהודעות בצד התוסף - עבור Claude ו-Codex</li>
+      <li>הוספת עיצוב CSS לכפתורים ולשדה התגובה</li>
+      <li>בדיקות ואימות מקצה לקצה</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>קבצים שמשתנים</h2>
+    <table class="data-table">
+      <tr><th>קובץ</th><th>סוג שינוי</th><th>מה משתנה</th></tr>
+      <tr><td>package.json</td><td><span class="badge badge-edit">עריכה</span></td><td>הגדרה חדשה</td></tr>
+      <tr><td>webview-messages.ts</td><td><span class="badge badge-edit">עריכה</span></td><td>3 סוגי הודעות חדשים</td></tr>
+      <tr><td>store.ts</td><td><span class="badge badge-edit">עריכה</span></td><td>מצב פידבק</td></tr>
+      <tr><td>MessageBubble.tsx</td><td><span class="badge badge-edit">עריכה</span></td><td>כפתורים + שדה תגובה</td></tr>
+      <tr><td>MessageHandler.ts</td><td><span class="badge badge-edit">עריכה</span></td><td>טיפול בהודעת פידבק</td></tr>
+      <tr><td>CodexMessageHandler.ts</td><td><span class="badge badge-edit">עריכה</span></td><td>אותו טיפול (Codex)</td></tr>
+      <tr><td>useClaudeStream.ts</td><td><span class="badge badge-edit">עריכה</span></td><td>קבלת תוצאות + הגדרה</td></tr>
+      <tr><td>global.css</td><td><span class="badge badge-edit">עריכה</span></td><td>עיצוב כפתורים</td></tr>
+      <tr><td>MessageFeedbackService.ts</td><td><span class="badge badge-new">חדש</span></td><td>שירות שליחת פידבק</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>נקודות חשובות</h2>
+    <ul>
+      <li><span class="highlight">שימוש בתשתית קיימת</span> - לא מייצרים מנגנון שליחה חדש. הפידבק נשלח דרך Formspree שכבר עובד בדיווחי באגים</li>
+      <li><span class="highlight">איסוף לוגים אוטומטי</span> - מערכת האיסוף של DiagnosticsCollector כבר קיימת ובדוקה</li>
+      <li><span class="highlight">תמיכה בשני הספקים</span> - הפיצ'ר עובד גם עם Claude וגם עם Codex</li>
+      <li><span class="highlight">ניתן לכיבוי</span> - המשתמש יכול לכבות את הכפתורים דרך הגדרות VS Code</li>
+      <li><span class="highlight">חוויה חלקה</span> - הכפתורים מופיעים רק בריחוף, לא מפריעים לזרימת העבודה</li>
+      <li><span class="highlight">גודל חבילה</span> - השיחה נחתכת ל-30,000 תווים והלוגים ל-50,000 תווים כדי לא לחרוג ממגבלות Formspree</li>
+    </ul>
+  </div>
+
+  <div class="summary-box">
+    <p>קובץ חדש אחד + 8 קבצים קיימים לעריכה | מבוסס על תשתית קיימת ובדוקה | פיצ'ר קל ולא פולשני</p>
+  </div>
+
+</div>
+</body>
+</html>

@@ -605,6 +605,12 @@ html, body, #root {
 }
 
 /* ── Ultrathink Button ── */
+/* ── Ultrathink wrapper (brain + lock) ── */
+.ultrathink-wrapper {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
 .ultrathink-button {
   position: relative;
   display: flex;
@@ -622,6 +628,40 @@ html, body, #root {
   font-size: 18px;
   line-height: 1;
   overflow: visible;
+}
+/* Locked state: persistent glow */
+.ultrathink-button.locked {
+  border-color: #4fc3f7;
+  box-shadow: 0 0 6px rgba(79, 195, 247, 0.35);
+  background: rgba(79, 195, 247, 0.08);
+}
+/* Lock toggle badge */
+.ut-lock-toggle {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  background: var(--vscode-editor-background, #1e1e1e);
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.ut-lock-toggle:hover {
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-toolbar-hoverBackground);
+}
+.ut-lock-toggle.active {
+  border-color: #4fc3f7;
+  background: rgba(79, 195, 247, 0.2);
+  color: #4fc3f7;
 }
 .ultrathink-button:hover {
   background: var(--vscode-toolbar-hoverBackground);
@@ -3165,6 +3205,56 @@ html, body, #root {
   border-color: var(--vscode-focusBorder);
 }
 
+/* Toggle-all blocks button - appears on hover for assistant messages with 2+ collapsible blocks */
+.toggle-all-btn {
+  float: right;
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 3px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 2px 7px;
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  margin-right: 4px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.message:hover .toggle-all-btn {
+  opacity: 1;
+}
+
+.toggle-all-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+  border-color: var(--vscode-focusBorder);
+}
+
+/* Double-arrow indicator inside toggle-all button */
+.toggle-all-arrows {
+  display: inline-flex;
+  gap: 2px;
+  transition: transform 0.15s ease;
+}
+
+.toggle-all-arrows::before,
+.toggle-all-arrows::after {
+  content: '';
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 4px 0 4px 5px;
+  border-color: transparent transparent transparent currentColor;
+}
+
+.toggle-all-arrows.expanded {
+  transform: rotate(90deg);
+}
+
 /* Translate message button - appears on hover for assistant messages */
 .translate-message-btn {
   float: right;
@@ -3206,6 +3296,11 @@ html, body, #root {
 .translate-message-btn.translating {
   opacity: 1;
   animation: textFade 2s ease-in-out infinite;
+}
+
+.translate-message-btn.translation-error {
+  color: var(--vscode-errorForeground, #f44);
+  border-color: var(--vscode-errorForeground, #f44);
 }
 
 /* Edit message button and inline editing */
@@ -6375,6 +6470,553 @@ html, body, #root {
   50% { box-shadow: 0 0 8px 3px rgba(224, 64, 251, 0.8); }
 }
 
+/* ========================================================
+   Agent Spawn Inline Visualization
+   ======================================================== */
+
+/* Base agent card - prominent with thick left border */
+.tool-use-block.agent-tool {
+  border: 1px solid rgba(156, 39, 176, 0.4);
+  border-left: 4px solid #9c27b0;
+  background: linear-gradient(135deg, rgba(156, 39, 176, 0.10) 0%, rgba(156, 39, 176, 0.03) 40%, transparent 100%);
+  border-radius: 8px;
+}
+
+.tool-use-block.agent-tool .tool-use-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  min-height: 36px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* Agent type variants - left border accent + background tint */
+.tool-use-block.agent-tool.agent-explore {
+  border-color: rgba(255, 152, 0, 0.4);
+  border-left: 4px solid #ff9800;
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.10) 0%, rgba(255, 152, 0, 0.03) 40%, transparent 100%);
+}
+.tool-use-block.agent-tool.agent-plan {
+  border-color: rgba(33, 150, 243, 0.4);
+  border-left: 4px solid #2196f3;
+  background: linear-gradient(135deg, rgba(33, 150, 243, 0.10) 0%, rgba(33, 150, 243, 0.03) 40%, transparent 100%);
+}
+.tool-use-block.agent-tool.agent-general {
+  border-color: rgba(156, 39, 176, 0.4);
+  border-left: 4px solid #9c27b0;
+  background: linear-gradient(135deg, rgba(156, 39, 176, 0.10) 0%, rgba(156, 39, 176, 0.03) 40%, transparent 100%);
+}
+
+/* Agent type badge - prominent pill */
+.agent-type-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  letter-spacing: 0.5px;
+  text-transform: capitalize;
+  flex-shrink: 0;
+}
+.agent-type-badge.agent-explore {
+  background: rgba(255, 152, 0, 0.25);
+  color: #ffb74d;
+  border: 1px solid rgba(255, 152, 0, 0.5);
+}
+.agent-type-badge.agent-plan {
+  background: rgba(33, 150, 243, 0.25);
+  color: #64b5f6;
+  border: 1px solid rgba(33, 150, 243, 0.5);
+}
+.agent-type-badge.agent-general {
+  background: rgba(156, 39, 176, 0.25);
+  color: #ce93d8;
+  border: 1px solid rgba(156, 39, 176, 0.5);
+}
+
+/* Agent description text - prominent */
+.agent-description {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--vscode-foreground, #e0e0e0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Agent status dot - larger and more visible */
+.agent-status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.agent-status-dot.running {
+  background: #4caf50;
+  box-shadow: 0 0 6px 1px rgba(76, 175, 80, 0.5);
+  animation: agentPulse 1.5s ease-in-out infinite;
+}
+.agent-status-dot.completed {
+  background: #4caf50;
+  box-shadow: 0 0 4px 1px rgba(76, 175, 80, 0.3);
+}
+.agent-status-dot.error {
+  background: #f44336;
+  box-shadow: 0 0 4px 1px rgba(244, 67, 54, 0.3);
+}
+
+@keyframes agentPulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px 1px rgba(76, 175, 80, 0.3); }
+  50% { opacity: 0.6; box-shadow: 0 0 10px 3px rgba(76, 175, 80, 0.6); }
+}
+
+/* Status label in header */
+.agent-status-label {
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.agent-status-label.running {
+  color: #4caf50;
+}
+.agent-status-label.completed {
+  color: #8b949e;
+}
+.agent-status-label.error {
+  color: #f44336;
+}
+
+/* Background agent chip */
+.agent-background-chip {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(0, 188, 212, 0.20);
+  color: #4dd0e1;
+  border: 1px solid rgba(0, 188, 212, 0.45);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+/* Agent tool body */
+.agent-tool-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.agent-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground, #999);
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+}
+
+.agent-prompt-section,
+.agent-result-section {
+  padding: 6px 0;
+}
+
+.agent-prompt-text,
+.agent-result-text {
+  font-size: 12px;
+  color: var(--vscode-foreground, #ccc);
+  opacity: 0.9;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+.agent-result-section {
+  border-top: 1px solid var(--vscode-panel-border, #444);
+  padding-top: 10px;
+}
+
+/* ========================================================
+   Agent Hierarchy Tree
+   ======================================================== */
+
+.agent-hierarchy {
+  padding: 6px 0;
+}
+
+.agent-hierarchy-tree {
+  position: relative;
+  padding-left: 16px;
+  border-left: 2px solid rgba(255, 255, 255, 0.15);
+  margin-left: 6px;
+}
+
+.agent-hierarchy-branch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.agent-hierarchy-connector {
+  width: 20px;
+  height: 0;
+  border-top: 2px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.agent-hierarchy-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--vscode-panel-border, #444);
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-hierarchy-card.agent-explore {
+  border-left: 3px solid #ff9800;
+  background: linear-gradient(90deg, rgba(255, 152, 0, 0.08) 0%, rgba(0, 0, 0, 0.2) 100%);
+}
+.agent-hierarchy-card.agent-plan {
+  border-left: 3px solid #2196f3;
+  background: linear-gradient(90deg, rgba(33, 150, 243, 0.08) 0%, rgba(0, 0, 0, 0.2) 100%);
+}
+.agent-hierarchy-card.agent-general {
+  border-left: 3px solid #9c27b0;
+  background: linear-gradient(90deg, rgba(156, 39, 176, 0.08) 0%, rgba(0, 0, 0, 0.2) 100%);
+}
+
+.agent-hierarchy-card .agent-status-dot {
+  width: 7px;
+  height: 7px;
+}
+
+.agent-hierarchy-card .agent-type-badge {
+  font-size: 10px;
+  padding: 1px 7px;
+}
+
+.agent-hierarchy-card .agent-description {
+  font-size: 12px;
+}
+
+/* ======================================
+   Summary Mode — Full-height side panel
+   ====================================== */
+
+/* Split layout: animation panel + messages side by side */
+.chat-area-wrapper.sm-split-layout {
+  display: flex;
+  flex-direction: row;
+}
+
+.chat-area-wrapper.sm-split-layout .message-list {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Side panel — 50% width, stretches to full height via flex stretch */
+.sm-side-panel {
+  width: 50%;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.06) 100%);
+}
+
+/* Absolutely positioned to fill the side panel */
+.sm-animation-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.sm-animation-fill svg {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* --- Shared: glow pulse (used by all animations on completion) --- */
+
+.sm-glow-pulse {
+  animation: smGlowPulse 2s ease-in-out infinite;
+}
+
+@keyframes smGlowPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+
+/* --- Building Blocks --- */
+
+.sm-block-slide-in {
+  animation: smBlockSlideIn 0.35s ease-out both;
+}
+
+@keyframes smBlockSlideIn {
+  0% { transform: translateY(-20px); opacity: 0; }
+  70% { transform: translateY(2px); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* --- Progress Path --- */
+
+.sm-station-pulse {
+  animation: smStationPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes smStationPulse {
+  0%, 100% { r: 9; opacity: 0.9; }
+  50% { r: 12; opacity: 1; }
+}
+
+.sm-flag-wave {
+  animation: smFlagWave 1.5s ease-in-out infinite;
+  transform-origin: 240px 2px;
+}
+
+@keyframes smFlagWave {
+  0%, 100% { transform: scaleX(1); }
+  50% { transform: scaleX(0.85); }
+}
+
+/* --- Puzzle Assembly --- */
+
+.sm-puzzle-fly-in-0 {
+  animation: smPuzzleFlyIn0 0.4s ease-out both;
+}
+
+.sm-puzzle-fly-in-1 {
+  animation: smPuzzleFlyIn1 0.4s ease-out both;
+}
+
+.sm-puzzle-fly-in-2 {
+  animation: smPuzzleFlyIn2 0.4s ease-out both;
+}
+
+.sm-puzzle-fly-in-3 {
+  animation: smPuzzleFlyIn3 0.4s ease-out both;
+}
+
+@keyframes smPuzzleFlyIn0 {
+  0% { transform: translateX(-30px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 0.85; }
+}
+
+@keyframes smPuzzleFlyIn1 {
+  0% { transform: translateX(30px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 0.85; }
+}
+
+@keyframes smPuzzleFlyIn2 {
+  0% { transform: translateY(-30px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 0.85; }
+}
+
+@keyframes smPuzzleFlyIn3 {
+  0% { transform: translateY(30px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 0.85; }
+}
+
+/* --- Rocket Launch --- */
+
+.sm-rocket-flame {
+  animation: smRocketFlame 0.25s ease-in-out infinite alternate;
+}
+
+@keyframes smRocketFlame {
+  0% { transform: scaleY(1); }
+  100% { transform: scaleY(1.2); }
+}
+
+.sm-star-twinkle {
+  animation: smStarTwinkle 2.5s ease-in-out infinite;
+}
+
+@keyframes smStarTwinkle {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
+/* --- Growing Tree --- */
+
+.sm-tree-grow {
+  animation: smTreeGrowIn 0.6s ease-out both;
+}
+
+@keyframes smTreeGrowIn {
+  0% { opacity: 0; transform: scaleY(0); }
+  100% { opacity: 1; transform: scaleY(1); }
+}
+
+.sm-branch-grow {
+  animation: smBranchGrow 0.5s ease-out both;
+}
+
+@keyframes smBranchGrow {
+  0% { stroke-dashoffset: 80; opacity: 0; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+
+.sm-leaf-bud {
+  animation: smLeafBud 0.5s ease-out both;
+}
+
+@keyframes smLeafBud {
+  0% { r: 0; opacity: 0; }
+  100% { opacity: 0.7; }
+}
+
+.sm-leaf-sway {
+  animation: smLeafSway 3s ease-in-out infinite;
+}
+
+@keyframes smLeafSway {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(4px); }
+}
+
+.sm-bird-fly {
+  animation: smBirdFly 5s ease-in-out infinite;
+}
+
+@keyframes smBirdFly {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(15px, -8px); }
+  50% { transform: translate(30px, -3px); }
+  75% { transform: translate(15px, -12px); }
+  100% { transform: translate(0, 0); }
+}
+
+.agent-hierarchy-card .agent-type-badge {
+  font-size: 10px;
+  padding: 0 6px;
+}
+
+.agent-hierarchy-card .agent-description {
+  font-size: 11px;
+}
+
+/* ========================================================
+   Team Inline Widget
+   ======================================================== */
+
+.tool-use-block.team-inline-widget {
+  border-left: 3px solid #e040fb;
+  background: linear-gradient(90deg, rgba(224, 64, 251, 0.06) 0%, transparent 60%);
+}
+
+.team-inline-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.team-inline-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #e040fb;
+}
+
+.team-inline-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vscode-foreground, #ccc);
+}
+
+.team-inline-stats {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  margin-left: auto;
+}
+
+.team-inline-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.team-inline-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.team-member-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--vscode-sideBarSectionHeader-background, #252526);
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+.team-member-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.team-member-name {
+  color: var(--vscode-foreground, #ccc);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-open-panel-btn {
+  display: inline-block;
+  background: rgba(224, 64, 251, 0.12);
+  color: #e040fb;
+  border: 1px solid rgba(224, 64, 251, 0.3);
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  width: fit-content;
+  transition: background 0.15s;
+}
+.team-open-panel-btn:hover {
+  background: rgba(224, 64, 251, 0.22);
+}
+
 /* Provider handoff UX */
 .status-bar-handoff-banner {
   display: flex;
@@ -6423,4 +7065,334 @@ html, body, #root {
   border-radius: 6px;
   background: var(--vscode-editorWidget-background, rgba(30, 30, 30, 0.8));
   color: var(--vscode-descriptionForeground, #bdbdbd);
+}
+
+/* ============================================================
+   Diff Viewer — inline file diffs for Write/Edit tool results
+   ============================================================ */
+
+.diff-viewer {
+  margin: 4px 0 6px;
+  border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: var(--vscode-editor-font-family, 'Consolas', 'Courier New', monospace);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.diff-viewer--no-changes {
+  opacity: 0.6;
+}
+
+.diff-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  background: var(--vscode-editorGroupHeader-tabsBackground, rgba(30, 30, 30, 0.8));
+  border-bottom: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.12));
+  cursor: pointer;
+  user-select: none;
+}
+
+.diff-header:hover {
+  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.05));
+}
+
+.diff-collapse-icon {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #888);
+  flex-shrink: 0;
+}
+
+.diff-file-name {
+  font-weight: 600;
+  color: var(--vscode-foreground, #ccc);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-summary {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  white-space: nowrap;
+}
+
+.diff-summary--new {
+  color: #6db33f;
+}
+
+.diff-body {
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.diff-line {
+  display: flex;
+  align-items: stretch;
+  min-height: 20px;
+}
+
+.diff-line--add {
+  background: rgba(70, 155, 70, 0.18);
+}
+
+.diff-line--remove {
+  background: rgba(200, 60, 60, 0.18);
+}
+
+.diff-line--context {
+  background: transparent;
+}
+
+.diff-ln {
+  min-width: 38px;
+  padding: 1px 6px;
+  text-align: right;
+  color: var(--vscode-editorLineNumber-foreground, #555);
+  font-size: 11px;
+  user-select: none;
+  flex-shrink: 0;
+  border-right: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.08));
+}
+
+.diff-ln--old {
+  border-right: none;
+}
+
+.diff-sign {
+  min-width: 18px;
+  padding: 1px 3px 1px 4px;
+  text-align: center;
+  font-weight: 700;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.diff-line--add .diff-sign {
+  color: #6db33f;
+}
+
+.diff-line--remove .diff-sign {
+  color: #e06c6c;
+}
+
+.diff-line--context .diff-sign {
+  color: transparent;
+}
+
+.diff-content {
+  padding: 1px 8px;
+  white-space: pre;
+  color: var(--vscode-foreground, #ccc);
+  flex: 1;
+  overflow: hidden;
+}
+
+.diff-line--add .diff-content {
+  color: #a8e6a8;
+}
+
+.diff-line--remove .diff-content {
+  color: #f4a7a7;
+}
+
+.diff-fold {
+  display: flex;
+  align-items: center;
+  padding: 3px 10px;
+  background: var(--vscode-editorWidget-background, rgba(20, 20, 20, 0.6));
+  border-top: 1px dashed var(--vscode-input-border, rgba(255, 255, 255, 0.1));
+  border-bottom: 1px dashed var(--vscode-input-border, rgba(255, 255, 255, 0.1));
+}
+
+.diff-fold-label {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #666);
+  font-style: italic;
+}
+
+/* ======================================
+   Visual Progress Mode (VPM)
+   ====================================== */
+
+.vpm-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 20px;
+  scroll-behavior: smooth;
+}
+
+.vpm-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  opacity: 0.5;
+  gap: 8px;
+}
+
+.vpm-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.vpm-empty-subtitle {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.vpm-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* --- Card --- */
+
+@keyframes vpm-card-enter {
+  0% { transform: translateX(-30px); opacity: 0; }
+  60% { transform: translateX(5px); opacity: 1; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+.vpm-card {
+  background: var(--vscode-editorWidget-background, rgba(30, 30, 30, 0.8));
+  border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.08));
+  border-left: 4px solid #888;
+  border-radius: 8px;
+  padding: 12px 14px;
+  animation: vpm-card-enter 0.5s ease-out both;
+  transition: border-color 0.3s ease;
+}
+
+.vpm-card-inner {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.vpm-card-character {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vpm-card-character svg {
+  width: 72px;
+  height: 72px;
+}
+
+.vpm-card-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vpm-card-description {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--vscode-editor-foreground, #ccc);
+}
+
+.vpm-card-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.vpm-card-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 10px;
+}
+
+.vpm-card-file {
+  font-family: var(--vscode-editor-font-family, monospace);
+  opacity: 0.8;
+}
+
+.vpm-card-time {
+  margin-left: auto;
+}
+
+/* Streaming indicator dots */
+
+.vpm-card-streaming-indicator {
+  display: flex;
+  gap: 4px;
+  padding-top: 8px;
+  padding-left: 86px;
+}
+
+@keyframes vpm-dot-pulse {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+.vpm-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: vpm-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.vpm-dot:nth-child(2) { animation-delay: 0.15s; }
+.vpm-dot:nth-child(3) { animation-delay: 0.3s; }
+
+/* --- Connector arrows --- */
+
+.vpm-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 28px;
+  padding: 2px 0;
+}
+
+.vpm-connector-line {
+  width: 2px;
+  flex: 1;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.vpm-connector-arrow {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid rgba(255, 255, 255, 0.12);
+}
+
+/* --- VPM split layout (with messages) --- */
+
+.chat-area-wrapper.vpm-split-layout {
+  display: flex;
+  flex-direction: row;
+}
+
+.chat-area-wrapper.vpm-split-layout .vpm-container {
+  width: 340px;
+  min-width: 280px;
+  max-width: 400px;
+  border-right: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.08));
+}
+
+.chat-area-wrapper.vpm-split-layout .message-list {
+  flex: 1;
+  min-width: 0;
 }

@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { renderTextWithFileLinks } from './filePathLinks';
+import { AgentSpawnBlock, AGENT_TOOLS } from './AgentSpawnBlock';
+import type { AgentSpawnBlockProps } from './AgentSpawnBlock';
+import { TeamInlineWidget, TEAM_TOOLS, extractTeamInfo } from './TeamInlineWidget';
 
 /** Tool names that represent plan approval / question flows */
 const PLAN_TOOLS = ['ExitPlanMode', 'AskUserQuestion'];
@@ -33,6 +36,7 @@ interface ToolUseBlockProps {
   input?: Record<string, unknown>;
   partialInput?: string;
   isStreaming: boolean;
+  toolResult?: { content?: string | unknown[]; isError?: boolean };
 }
 
 /**
@@ -45,11 +49,15 @@ export const ToolUseBlock: React.FC<ToolUseBlockProps> = ({
   input,
   partialInput,
   isStreaming,
+  toolResult,
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(() => toolName !== TODO_TOOL);
+  const isAgentTool = AGENT_TOOLS.has(toolName);
+  const isTeamTool = TEAM_TOOLS.has(toolName);
   const isPlanTool = PLAN_TOOLS.includes(toolName);
   const isTodoTool = toolName === TODO_TOOL;
   const isSkillTool = toolName === SKILL_TOOL || toolName.endsWith('__Skill');
+
+  const [isCollapsed, setIsCollapsed] = useState(() => toolName !== TODO_TOOL);
   const todoItems = useMemo(
     () => (isTodoTool ? extractTodos(input, partialInput) : null),
     [isTodoTool, input, partialInput]
@@ -61,6 +69,31 @@ export const ToolUseBlock: React.FC<ToolUseBlockProps> = ({
     () => (isSkillTool ? extractSkillName(input, partialInput) : null),
     [isSkillTool, input, partialInput]
   );
+
+  // Agent tools: render specialized AgentSpawnBlock
+  if (isAgentTool) {
+    return (
+      <AgentSpawnBlock
+        toolName={toolName}
+        input={input}
+        partialInput={partialInput}
+        isStreaming={isStreaming}
+        toolResult={toolResult as AgentSpawnBlockProps['toolResult']}
+      />
+    );
+  }
+
+  // Team tools: render TeamInlineWidget
+  if (isTeamTool) {
+    const { teamName } = extractTeamInfo(input, partialInput);
+    return (
+      <TeamInlineWidget
+        teamName={teamName}
+        members={[]}
+        taskCount={{ total: 0, completed: 0 }}
+      />
+    );
+  }
 
   // For plan tools, try to extract readable plan text instead of raw JSON
   let displayContent: string;

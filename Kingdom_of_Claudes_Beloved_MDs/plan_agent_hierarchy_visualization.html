@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>תוכנית: המחשה ויזואלית של סוכנים</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    padding: 40px 20px;
+    line-height: 1.7;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 {
+    color: #58a6ff;
+    font-size: 28px;
+    margin-bottom: 8px;
+    border-bottom: 2px solid #21262d;
+    padding-bottom: 12px;
+  }
+  .subtitle {
+    color: #8b949e;
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+  h2 {
+    color: #f0883e;
+    font-size: 20px;
+    margin: 28px 0 12px;
+  }
+  h3 {
+    color: #d2a8ff;
+    font-size: 16px;
+    margin: 20px 0 8px;
+  }
+  p, li { font-size: 15px; color: #c9d1d9; }
+  ul { padding-right: 24px; margin-bottom: 16px; }
+  li { margin-bottom: 6px; }
+
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 16px 0;
+  }
+  .card.highlight {
+    border-color: #58a6ff;
+    background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+  }
+
+  .phase {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin: 12px 0;
+    padding: 14px 18px;
+    background: #161b22;
+    border-radius: 8px;
+    border-right: 4px solid #30363d;
+  }
+  .phase-num {
+    background: #58a6ff;
+    color: #0d1117;
+    font-weight: 700;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+  }
+  .phase:nth-child(1) { border-right-color: #58a6ff; }
+  .phase:nth-child(2) { border-right-color: #f0883e; }
+  .phase:nth-child(3) { border-right-color: #d2a8ff; }
+  .phase:nth-child(4) { border-right-color: #3fb950; }
+
+  .demo-box {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 12px 0;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    direction: ltr;
+    text-align: left;
+  }
+
+  .agent-card-demo {
+    border-right: 3px solid #ff9800;
+    background: linear-gradient(270deg, rgba(255,152,0,0.06) 0%, transparent 60%);
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin: 6px 0;
+  }
+  .agent-card-demo.plan-type {
+    border-right-color: #2196f3;
+    background: linear-gradient(270deg, rgba(33,150,243,0.06) 0%, transparent 60%);
+  }
+  .agent-card-demo.general-type {
+    border-right-color: #9c27b0;
+    background: linear-gradient(270deg, rgba(156,39,176,0.06) 0%, transparent 60%);
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge-explore { background: rgba(255,152,0,0.15); color: #ff9800; border: 1px solid rgba(255,152,0,0.3); }
+  .badge-plan { background: rgba(33,150,243,0.15); color: #2196f3; border: 1px solid rgba(33,150,243,0.3); }
+  .badge-general { background: rgba(156,39,176,0.15); color: #9c27b0; border: 1px solid rgba(156,39,176,0.3); }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-left: 6px;
+  }
+  .dot-running { background: #3fb950; animation: pulse 1.5s infinite; }
+  .dot-done { background: #3fb950; }
+  .dot-error { background: #f85149; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(63,185,80,0.4); }
+    50% { box-shadow: 0 0 0 5px rgba(63,185,80,0); }
+  }
+
+  .tree-line {
+    border-right: 2px solid #30363d;
+    padding-right: 20px;
+    margin-right: 16px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+  }
+
+  .team-demo {
+    background: linear-gradient(270deg, rgba(224,64,251,0.06) 0%, transparent 60%);
+    border-right: 3px solid #e040fb;
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin: 6px 0;
+  }
+
+  .color-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 8px 0;
+  }
+  .color-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: #161b22;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  .color-swatch {
+    width: 14px; height: 14px;
+    border-radius: 3px;
+  }
+
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+  }
+  .summary-table th, .summary-table td {
+    padding: 10px 14px;
+    border: 1px solid #30363d;
+    text-align: right;
+    font-size: 14px;
+  }
+  .summary-table th {
+    background: #161b22;
+    color: #58a6ff;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>תוכנית: המחשה ויזואלית של סוכנים בצ'אט</h1>
+<p class="subtitle">ClaUi - תוסף VS Code | תאריך: 2026-03-08</p>
+
+<div class="card highlight">
+  <h2>מה הבעיה?</h2>
+  <p>כשקלוד משתמש בסוכנים (Agent) לביצוע משימות - למשל סוכן חקירה שקורא קבצים, או סוכן תכנון שמתכנן ארכיטקטורה - זה מוצג כיום כטקסט JSON גולמי שקשה להבין ממנו מה קורה.</p>
+  <p style="margin-top: 8px;">אם סוכן מפעיל תת-סוכנים, או אם נוצר צוות שלם של סוכנים - אין שום אינדיקציה ויזואלית לזה.</p>
+</div>
+
+<h2>מה נבנה?</h2>
+
+<h3>1. כרטיס סוכן בודד</h3>
+<p>כל שימוש בסוכן יוצג ככרטיס צבעוני ברור, עם סוג הסוכן, תיאור המשימה, ומצב (פעיל/הושלם/שגיאה):</p>
+
+<div class="demo-box">
+  <div class="agent-card-demo">
+    <span class="status-dot dot-running"></span>
+    <span class="badge badge-explore">Explore</span>
+    &nbsp;&nbsp;"Explore planning logic deeply"
+    <span style="color: #8b949e; font-size: 11px; margin-right: 12px;">running...</span>
+  </div>
+  <div class="agent-card-demo plan-type" style="margin-top: 8px;">
+    <span class="status-dot dot-done"></span>
+    <span class="badge badge-plan">Plan</span>
+    &nbsp;&nbsp;"Design implementation approach"
+    <span style="color: #3fb950; font-size: 11px; margin-right: 12px;">completed</span>
+  </div>
+  <div class="agent-card-demo general-type" style="margin-top: 8px;">
+    <span class="status-dot dot-error"></span>
+    <span class="badge badge-general">General</span>
+    &nbsp;&nbsp;"Run test suite"
+    <span style="color: #f85149; font-size: 11px; margin-right: 12px;">error</span>
+  </div>
+</div>
+
+<h3>2. היררכיית סוכנים מקוננת</h3>
+<p>כשסוכן מפעיל תת-סוכנים, זה יוצג כעץ ויזואלי - סוכן ראשי עם ענפים לתת-סוכנים:</p>
+
+<div class="demo-box">
+  <div class="agent-card-demo general-type">
+    <span class="status-dot dot-done"></span>
+    <span class="badge badge-general">General</span>
+    &nbsp;&nbsp;"Research and plan feature"
+  </div>
+  <div class="tree-line">
+    <div class="agent-card-demo" style="font-size: 12px;">
+      <span class="status-dot dot-done"></span>
+      <span class="badge badge-explore" style="font-size: 10px;">Explore</span>
+      &nbsp;&nbsp;"Read codebase files"
+    </div>
+    <div class="agent-card-demo plan-type" style="font-size: 12px; margin-top: 6px;">
+      <span class="status-dot dot-done"></span>
+      <span class="badge badge-plan" style="font-size: 10px;">Plan</span>
+      &nbsp;&nbsp;"Design component architecture"
+    </div>
+  </div>
+</div>
+
+<h3>3. המחשת צוות סוכנים</h3>
+<p>כשנוצר צוות שלם של סוכנים (Team), יוצג כרטיס צוות קומפקטי בתוך הצ'אט עם שמות הסוכנים, מצבם, והתקדמות המשימות:</p>
+
+<div class="demo-box">
+  <div class="team-demo">
+    <div style="margin-bottom: 8px;">
+      <strong style="color: #e040fb;">TEAM:</strong> "research-team"
+      &nbsp;&nbsp;
+      <span style="color: #8b949e;">3 agents</span>
+      &nbsp;&nbsp;
+      <span style="color: #8b949e;">2/5 tasks</span>
+    </div>
+    <div style="display: flex; gap: 16px;">
+      <span><span class="status-dot dot-running"></span> explorer-1</span>
+      <span><span class="status-dot dot-done"></span> planner</span>
+      <span><span style="width:8px;height:8px;border-radius:50%;display:inline-block;background:#d29922;margin-left:6px;"></span> reviewer</span>
+    </div>
+    <div style="margin-top: 8px; font-size: 12px; color: #58a6ff; cursor: pointer;">
+      [Click to open Team Panel]
+    </div>
+  </div>
+</div>
+
+<h2>קוד צבעים</h2>
+<div class="color-row">
+  <div class="color-chip"><div class="color-swatch" style="background: #ff9800;"></div> Explore (כתום)</div>
+  <div class="color-chip"><div class="color-swatch" style="background: #2196f3;"></div> Plan (כחול)</div>
+  <div class="color-chip"><div class="color-swatch" style="background: #9c27b0;"></div> General (סגול)</div>
+  <div class="color-chip"><div class="color-swatch" style="background: #00bcd4;"></div> Background (טורקיז)</div>
+  <div class="color-chip"><div class="color-swatch" style="background: #e040fb;"></div> Team (מגנטה)</div>
+</div>
+
+<h2>שלבי ביצוע</h2>
+
+<div class="phase">
+  <div class="phase-num">1</div>
+  <div>
+    <strong>כרטיס סוכן בסיסי</strong>
+    <p>יצירת הרכיב הויזואלי שמציג כל שימוש בסוכן ככרטיס צבעוני עם סוג, תיאור ומצב. זיהוי אוטומטי של סוכנים בזרם ההודעות.</p>
+  </div>
+</div>
+
+<div class="phase">
+  <div class="phase-num">2</div>
+  <div>
+    <strong>חיבור תוצאות</strong>
+    <p>קישור בין הפעלת הסוכן לתוצאה שלו - כשהסוכן מסיים, הכרטיס מתעדכן ומציג סיכום של מה שהסוכן עשה.</p>
+  </div>
+</div>
+
+<div class="phase">
+  <div class="phase-num">3</div>
+  <div>
+    <strong>היררכיה מקוננת</strong>
+    <p>זיהוי של תת-סוכנים בתוך תוצאות סוכן, והצגת עץ ויזואלי עם קווי חיבור בין סוכן ראשי לתת-סוכנים.</p>
+  </div>
+</div>
+
+<div class="phase">
+  <div class="phase-num">4</div>
+  <div>
+    <strong>המחשת צוות</strong>
+    <p>כשנוצר צוות סוכנים - הצגת כרטיס צוות קומפקטי בצ'אט עם מצב כל סוכן, התקדמות משימות, וקישור ללוח הצוות המלא.</p>
+  </div>
+</div>
+
+<h2>סיכום השפעה</h2>
+
+<table class="summary-table">
+  <tr>
+    <th>היבט</th>
+    <th>מצב נוכחי</th>
+    <th>מצב חדש</th>
+  </tr>
+  <tr>
+    <td>הפעלת סוכן</td>
+    <td>JSON גולמי - לא ברור</td>
+    <td>כרטיס צבעוני עם סוג, תיאור ומצב</td>
+  </tr>
+  <tr>
+    <td>תת-סוכנים</td>
+    <td>לא מוצגים כלל</td>
+    <td>עץ היררכי ויזואלי</td>
+  </tr>
+  <tr>
+    <td>צוות סוכנים</td>
+    <td>רק בפאנל נפרד</td>
+    <td>כרטיס מובנה בצ'אט + קישור לפאנל</td>
+  </tr>
+  <tr>
+    <td>מצב סוכן</td>
+    <td>לא מוצג</td>
+    <td>נקודה פועמת (פעיל), ירוקה (הושלם), אדומה (שגיאה)</td>
+  </tr>
+</table>
+
+<div class="card" style="margin-top: 24px; border-color: #3fb950;">
+  <p><strong style="color: #3fb950;">קבצים חדשים:</strong> 3 רכיבים חדשים (כרטיס סוכן, היררכיה, צוות)</p>
+  <p><strong style="color: #f0883e;">קבצים מעודכנים:</strong> 4 קבצים קיימים (זיהוי כלים, הצגת הודעות, סטיילינג, קטגוריזציה)</p>
+  <p style="margin-top: 8px; color: #8b949e;">ללא שבירת תאימות אחורה - הפיצ'ר מוסיף המחשה ויזואלית מעל המערכת הקיימת.</p>
+</div>
+
+</div>
+</body>
+</html>

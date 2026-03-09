@@ -86,8 +86,10 @@ export class ClaudeProcessManager extends EventEmitter {
     }
 
     // Add model flag if specified (from config or explicit option)
-    const selectedModel = options?.model ||
+    // Guard: skip display-only labels like "Codex (default)" that aren't real model IDs
+    const rawModel = options?.model ||
       vscode.workspace.getConfiguration('claudeMirror').get<string>('model', '');
+    const selectedModel = rawModel && !rawModel.includes('(') ? rawModel : '';
     if (selectedModel) {
       args.push('--model', selectedModel);
     }

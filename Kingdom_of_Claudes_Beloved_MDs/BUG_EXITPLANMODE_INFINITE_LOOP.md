@@ -18,8 +18,9 @@ The plan approval bar (4 CLI-matching options) and AskUserQuestion interactive c
 **Date Thirteenth Fix**: 2026-03-04 (approval bar auto-dismissed by 5s timer before user can interact)
 **Date Fourteenth Fix**: 2026-03-05 (approve click no-op when CLI auto-resumed AND completed - resumeObserved masks idle state)
 **Date Fifteenth Fix**: 2026-03-05 (approve click no-op when one-shot delayed check fires during compact/busy turn)
+**Date Sixteenth Fix**: 2026-03-08 (stale bar persists + re-appears because exitPlanModeProcessed never set when user types text)
 **Severity**: Critical (blocks plan mode workflow)
-**Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`, `src/webview/components/ChatView/PlanApprovalBar.tsx`
+**Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`, `src/webview/components/ChatView/PlanApprovalBar.tsx`, `src/extension/types/webview-messages.ts`
 
 ---
 
@@ -269,6 +270,43 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 - If the CLI is truly idle/no-progress, the user gets a deterministic continuation instead of silent no-op.
 - The `exitPlanModeProcessed` guard still prevents infinite ExitPlanMode re-triggers.
 
+### Sixteenth Bug (2026-03-08): Stale Bar Persists + Re-Appears Because exitPlanModeProcessed Never Set
+
+**Cause**: Two related problems:
+
+1. **Case A (stale bar)**: After ExitPlanMode detection, the approval bar persists indefinitely while Claude implements. Bug 3 removed `messageStart` clearing, Bug 13 removed the 5-second auto-dismiss timer. Nothing clears the bar during execution.
+
+2. **Case B (re-appearing bar)**: When the user types text (e.g., "Continue with the implementation") while the bar is visible, InputArea sends a `sendMessage` (not `planApprovalResponse`). The extension's `sendMessage` handler checks `this.pendingApprovalTool` to set `exitPlanModeProcessed`, but `messageStart` already cleared `pendingApprovalTool` when the CLI auto-resumed (within ~50ms of ExitPlanMode). By the time the user types text (seconds later), `pendingApprovalTool` is null, so the guard fails. `exitPlanModeProcessed` stays `false`, and the model's next ExitPlanMode call shows the bar again.
+
+**Sequence (Case B)**:
+1. ExitPlanMode detected -> bar shown -> `pendingApprovalTool = 'ExitPlanMode'`
+2. CLI auto-approves -> new turn starts -> `messageStart` -> `pendingApprovalTool = null`
+3. Model works (Read, Glob, etc.) -> bar stays visible (by design)
+4. User types "Continue with the implementation" -> `sendMessage` handler
+5. Guard checks `this.pendingApprovalTool` -> **null** -> guard fails
+6. `exitPlanModeProcessed` stays `false`
+7. Text sent to CLI -> model processes -> calls ExitPlanMode again
+8. `notifyPlanApprovalRequired` -> `exitPlanModeProcessed` is `false` -> bar shows again
+9. Repeat indefinitely
+
+**Root cause**: The `sendMessage` handler's guard relied on `pendingApprovalTool`, which is cleared by `messageStart` (line 2818) long before the user responds. The Bug 8 fix only worked when the user responded before the CLI auto-resumed (sub-second), which is unrealistic.
+
+**Fix** (two parts):
+
+1. **Added `exitPlanModeBarActive` flag**: A new boolean that tracks whether an ExitPlanMode approval bar is currently shown in the webview. Unlike `pendingApprovalTool` (cleared by `messageStart`), this flag persists until the user responds (button click, typed text) or the model starts non-plan tools (auto-dismiss). Set `true` in `notifyPlanApprovalRequired` for ExitPlanMode bars. Cleared in `planApprovalResponse`, `sendMessage`, `sendMessageWithImages`, `cancelRequest`, `clearSession`, `editAndResend`, and the auto-dismiss path.
+
+2. **Auto-dismiss on non-plan tool use**: In the `toolUseStart` handler, when a non-plan tool starts while `exitPlanModeBarActive` is true, auto-dismiss the bar: set `exitPlanModeProcessed = true`, set `exitPlanModeBarActive = false`, and send `planApprovalDismissed` to the webview to clear `pendingApproval`. Added `PlanApprovalDismissedMessage` type to `webview-messages.ts` and handling in `useClaudeStream.ts`.
+
+3. **Fallback guard in sendMessage**: If `pendingApprovalTool` is already null but `exitPlanModeBarActive` is true, still set `exitPlanModeProcessed = true`. Same for `sendMessageWithImages`.
+
+**Why this doesn't cause the infinite loop**: The `exitPlanModeProcessed` flag is set in all paths that dismiss the bar (auto-dismiss, button click, typed text). Any subsequent ExitPlanMode calls from the model are suppressed. The auto-dismiss only fires on non-plan tools, so the bar remains visible for legitimate plan-mode interactions (e.g., EnterPlanMode resets everything).
+
+**Why this is safe**:
+- Auto-dismiss only fires for ExitPlanMode bars, NOT AskUserQuestion (where user input matters)
+- Only fires when a non-plan tool starts (clear signal that implementation has begun)
+- `exitPlanModeBarActive` is reset on all session lifecycle events (clear, cancel, edit-and-resend, EnterPlanMode)
+- The flag is included in `logApprovalState()` diagnostic dumps as `epmBarActive=`
+
 ---
 
 ## Current Defense Layers
@@ -293,8 +331,11 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 | `exitPlanModeReopenCount` limits Bug 10 re-opens to MAX_EXITPLANMODE_REOPENS | MessageHandler.ts `notifyPlanApprovalRequired` | Infinite reopen loop from unbounded Bug 10 logic (Bug 11 fix) |
 | `logApprovalState()` diagnostic dumps at every lifecycle point | MessageHandler.ts throughout | Comprehensive state visibility for debugging (Bug 11 enhancement) |
 | Persistent approval bar (no auto-dismiss) | useClaudeStream.ts `messageStart` handler | Bar stays until user interaction; reverts Bug 12's 5s timer (Bug 13 fix) |
+| `exitPlanModeBarActive` flag survives messageStart | MessageHandler.ts `notifyPlanApprovalRequired` + `sendMessage` | Tracks ExitPlanMode bar visibility independently of `pendingApprovalTool` (Bug 16 fix) |
+| Auto-dismiss on non-plan tool use | MessageHandler.ts `toolUseStart` + useClaudeStream.ts `planApprovalDismissed` | Clears stale bar when implementation starts, sets `exitPlanModeProcessed` (Bug 16 fix) |
+| `sendMessage` uses `exitPlanModeBarActive` fallback | MessageHandler.ts `sendMessage` / `sendMessageWithImages` | Sets `exitPlanModeProcessed` even when `pendingApprovalTool` was cleared by messageStart (Bug 16 fix) |
 
-The `messageStart` clearing was **removed** (Bug 3) and the auto-dismiss timer was **removed** (Bug 13). The bar now persists until user interaction.
+The `messageStart` clearing was **removed** (Bug 3) and the auto-dismiss timer was **removed** (Bug 13). The bar now auto-dismisses when non-plan tool activity starts (Bug 16) or persists until user interaction.
 
 ---
 
@@ -365,14 +406,18 @@ else if (pendingApproval) {
 
 ```typescript
 case 'sendMessage':
-  // If there was a pending ExitPlanMode approval, mark it as processed
-  // so subsequent ExitPlanMode calls from the model are suppressed.
+  // Bug 16 fix: also check exitPlanModeBarActive as a fallback.
+  // By the time the user types text, messageStart may have already
+  // cleared pendingApprovalTool, but exitPlanModeBarActive persists.
   if (this.pendingApprovalTool) {
     const pendingNorm = this.pendingApprovalTool.trim().toLowerCase();
     if (pendingNorm === 'exitplanmode' || pendingNorm.endsWith('.exitplanmode')) {
       this.markExitPlanModeProcessed('user sent text while ExitPlanMode approval bar was active');
     }
+  } else if (this.exitPlanModeBarActive) {
+    this.markExitPlanModeProcessed('user sent text while ExitPlanMode bar active (pendingApprovalTool already cleared)');
   }
+  this.exitPlanModeBarActive = false;
   this.cancelExitPlanApproveResumeFallback();
   this.clearApprovalTracking();
   // ... send text to CLI ...
@@ -438,7 +483,8 @@ The approval bar is cleared when:
 1. **User clicks a button** -> PlanApprovalBar calls `setPendingApproval(null)` directly. For non-ExitPlanMode, extension immediately sends text + `processBusy:true`. For ExitPlanMode approve, extension closes the bar and runs retry-based fallback checks (idle/progress/timeout) before nudging. For ExitPlanMode feedback, extension sends the feedback text to CLI + `processBusy:true`.
 2. **User sends a regular message** -> `sendMessage` -> `processBusy: true` -> bar cleared
 3. **New `planApprovalRequired` replaces it** (e.g., AskUserQuestion replaced by ExitPlanMode)
-4. **Session resets**
+4. **Non-plan tool starts** (Bug 16) -> extension sends `planApprovalDismissed` -> bar cleared. Only for ExitPlanMode bars; AskUserQuestion bars are unaffected.
+5. **Session resets**
 
 The bar is NOT cleared on:
 - `messageStart` (removed - caused bar to be invisible)

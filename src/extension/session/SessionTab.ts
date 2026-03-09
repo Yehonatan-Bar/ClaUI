@@ -8,6 +8,7 @@ import { ControlProtocol } from '../process/ControlProtocol';
 import { SessionNamer } from './SessionNamer';
 import { MessageTranslator } from './MessageTranslator';
 import { ActivitySummarizer } from './ActivitySummarizer';
+import { VisualProgressProcessor } from './VisualProgressProcessor';
 import { AdventureInterpreter } from './AdventureInterpreter';
 import { TurnAnalyzer } from './TurnAnalyzer';
 import { PromptEnhancer } from './PromptEnhancer';
@@ -138,6 +139,7 @@ export class SessionTab implements WebviewBridge {
       this.skillGenService
     );
     this.messageHandler.setSessionNameGetter(() => this.baseTitle);
+    this.messageHandler.setWorkspaceState(context.workspaceState);
     this.messageHandler.setProjectAnalyticsStore(this.projectAnalyticsStore);
     this.messageHandler.setSecrets(context.secrets);
     this.messageHandler.setAuthManager(new AuthManager());
@@ -198,6 +200,10 @@ export class SessionTab implements WebviewBridge {
     const activitySummarizer = new ActivitySummarizer({ threshold: summaryThreshold });
     activitySummarizer.setLogger(tabLog);
     this.messageHandler.setActivitySummarizer(activitySummarizer);
+    // Wire Visual Progress Mode processor
+    const vpmProcessor = new VisualProgressProcessor();
+    this.messageHandler.setVpmProcessor(vpmProcessor);
+
     this.messageHandler.onActivitySummaryGenerated((summary) => {
       tabLog(`[ActivitySummary] Callback: "${summary.shortLabel}"`);
       if (!this.disposed) {

@@ -1,5 +1,18 @@
 # ClaUi - Changelog
 
+## v0.1.86 - 2026-03-06
+
+**Bug Fix: Robust file-reference opening from chat links**
+
+- Fixed chat file links failing with `The editor could not be opened because the file was not found` for references like `:LocalModelServer.swift#L103`
+- Root cause: `openFile` parsed only `:line[:col]` suffixes and treated leading punctuation / `#L...` anchors as literal path text
+- Added `openFile` normalization in both Claude and Codex handlers:
+  - trims wrapper/punctuation noise around tokens
+  - supports GitHub-style anchors (`#L123`, `#L123C7`, range suffixes)
+  - keeps existing `:line[:col]` support
+  - adds fallback basename/suffix lookup when relative paths are incomplete
+  - adds parent-folder fallback for `.xcodeproj` / `.xcworkspace` workspace roots
+
 ## v0.1.84 - 2026-03-05
 
 **Feature: Mid-session provider handoff with context (Claude <-> Codex)**

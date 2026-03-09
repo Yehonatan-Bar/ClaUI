@@ -243,7 +243,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.postMessage({
       type: 'sessionStarted',
       sessionId: this.threadId || 'pending',
-      model: this.currentModel || 'codex',
+      model: this.currentModel || 'Codex (default)',
       isResume: !!options?.resume && !isFork,
       provider: 'codex',
     });
@@ -516,7 +516,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     void this.sessionStore.saveSession({
       sessionId: this.threadId,
       name: name || existing?.name || this.baseTitle || `Codex ${this.tabNumber}`,
-      model: this.currentModel || existing?.model || 'codex',
+      model: this.currentModel || existing?.model || 'Codex (default)',
       provider: 'codex',
       startedAt: existing?.startedAt || this.sessionStartedAt || new Date().toISOString(),
       lastActiveAt: new Date().toISOString(),
@@ -634,7 +634,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       sessionId,
       provider: 'codex',
       sessionName: this.baseTitle || `Codex ${this.tabNumber}`,
-      model: this.currentModel || this.getCurrentModel() || 'codex',
+      model: this.currentModel || this.getCurrentModel() || 'Codex (default)',
       startedAt: this.sessionStartedAt || now,
       endedAt: now,
       durationMs: totalDurationMs,
@@ -926,7 +926,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       lastActivityAt: now,
       promptLen: text.length,
       threadIdAtStart: this.threadId,
-      modelAtStart: this.currentModel || this.getCurrentModel() || 'codex',
+      modelAtStart: this.currentModel || this.getCurrentModel() || 'Codex (default)',
       cwdAtStart: this.sessionCwd,
       jsonEvents: 0,
       rawEvents: 0,

@@ -2,11 +2,20 @@
 
 Brain icon button in the input area that injects the `ultrathink` keyword to boost Claude's reasoning effort for the next turn. Plays a randomly-chosen CSS animation on each click for visual flair. The word "ultrathink" also appears with an animated rainbow glow effect wherever it appears in chat messages.
 
+Includes a **lock toggle** (small lock badge at bottom-right of the brain button). When locked, "ultrathink " is automatically prepended to every outgoing prompt without needing to click the brain button each time. The brain button shows a persistent cyan glow while locked.
+
+The lock state is **persisted at project level** via VS Code's `workspaceState`. When the user locks ultrathink in any session tab, it remains locked across all sessions in that project until explicitly unlocked. New tabs and reloads restore the lock state automatically.
+
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `src/webview/components/InputArea/InputArea.tsx` | Button state, handler, and JSX (lines ~769-793, ~1233-1248) |
+| `src/webview/components/InputArea/InputArea.tsx` | Button JSX, lock toggle handler, animation logic |
+| `src/webview/state/store.ts` | Zustand store: `ultrathinkLocked` state + `setUltrathinkLocked` setter |
+| `src/webview/hooks/useClaudeStream.ts` | Receives `ultrathinkLockedSetting` message from extension |
+| `src/extension/webview/MessageHandler.ts` | Persists lock in `workspaceState`, sends on `ready` |
+| `src/extension/session/SessionTab.ts` | Wires `workspaceState` to MessageHandler |
+| `src/extension/types/webview-messages.ts` | `SetUltrathinkLockedRequest` + `UltrathinkLockedSettingMessage` |
 | `src/webview/components/ChatView/MarkdownContent.tsx` | Transforms "ultrathink" in rendered messages into `<span class="ultrathink-glow">` |
 | `src/webview/components/ChatView/StreamingText.tsx` | Splits streaming text to render "ultrathink" with glow styling |
 | `src/webview/styles/global.css` | Button styles, 4 animation keyframes, and `.ultrathink-glow` rainbow effect |
@@ -21,12 +30,16 @@ Brain icon button in the input area that injects the `ultrathink` keyword to boo
 
 ## State
 
-```tsx
-const [ultrathinkAnim, setUltrathinkAnim] = useState<string | null>(null);
-```
+- `ultrathinkAnim`: Local React state in InputArea. `null` = idle (brain icon visible), `'rocket' | 'brain' | 'wizard' | 'turbo'` = animation playing
+- `ultrathinkLocked`: Zustand store state, persisted via `workspaceState` (project-level). `false` = manual mode, `true` = auto-inject on every send
 
-- `null` = idle (brain icon visible)
-- `'rocket' | 'brain' | 'wizard' | 'turbo'` = animation playing (default icon hidden, animation overlay shown)
+### Persistence Flow (Lock)
+
+1. User toggles lock -> `setUltrathinkLocked(next)` updates Zustand store
+2. Simultaneously sends `{ type: 'setUltrathinkLocked', locked }` to extension
+3. `MessageHandler` persists to `workspaceState` key `'claui.ultrathinkLocked'`
+4. On webview `ready`, `MessageHandler.sendUltrathinkLockedSetting()` reads from `workspaceState` and sends `{ type: 'ultrathinkLockedSetting', locked }` to webview
+5. `useClaudeStream` receives it and calls `setUltrathinkLocked` in Zustand store
 
 ## The 4 Animations
 
@@ -48,14 +61,18 @@ All animations are pure CSS using transforms, opacity, filter, box-shadow, and p
 | Disconnected / not connected | Button is disabled |
 | Double-click during animation | Guarded by `ultrathinkAnim` state check - second click is no-op |
 | Undo after injection | Works - new text is pushed to `UndoManager` |
+| Lock active + text already starts with "ultrathink" | No double-prepend (case-insensitive check) |
+| Lock active + empty text | Sends "ultrathink " (same as manual click on empty) |
 
 ## CSS Class Structure
 
 ```
+.ultrathink-wrapper             - Inline-flex container for brain button + lock badge
 .ultrathink-button              - Base button (32x32, matches browse-button pattern)
 .ultrathink-button:hover        - VS Code hover background + focus border
 .ultrathink-button:disabled     - Grayed out
 .ultrathink-button.animating    - Blue border glow, pointer-events: none
+.ultrathink-button.locked       - Persistent cyan glow (border + box-shadow + background tint)
   .ut-default-icon              - Brain emoji (hidden during animation via opacity: 0)
   .ultrathink-anim              - Absolute-positioned animation container (z-index: 50)
     .ultrathink-anim-rocket     - Rocket animation variant
@@ -63,22 +80,31 @@ All animations are pure CSS using transforms, opacity, filter, box-shadow, and p
     .ultrathink-anim-wizard     - Wizard animation variant
     .ultrathink-anim-turbo      - Turbo animation variant
       .ut-emoji                 - The animated emoji element (font-size: 20px)
+.ut-lock-toggle                 - Lock badge (16x16 circle, absolute bottom-right of wrapper)
+.ut-lock-toggle.active          - Cyan highlight when locked
 ```
 
 ## JSX Structure
 
 ```tsx
-<button className={`ultrathink-button${ultrathinkAnim ? ' animating' : ''}`}
-        onClick={handleUltrathink}
-        disabled={!isConnected || !!ultrathinkAnim}
-        data-tooltip="Ultrathink - boost reasoning power">
-  <span className="ut-default-icon">{brain emoji}</span>
-  {ultrathinkAnim && (
-    <div className={`ultrathink-anim ultrathink-anim-${ultrathinkAnim}`}>
-      {/* Conditionally render the animation-specific emoji */}
-    </div>
-  )}
-</button>
+<div className="ultrathink-wrapper">
+  <button className={`ultrathink-button${ultrathinkAnim ? ' animating' : ''}${ultrathinkLocked ? ' locked' : ''}`}
+          onClick={handleUltrathink}
+          disabled={!isConnected || !!ultrathinkAnim}
+          data-tooltip="...">
+    <span className="ut-default-icon">{brain emoji}</span>
+    {ultrathinkAnim && (
+      <div className={`ultrathink-anim ultrathink-anim-${ultrathinkAnim}`}>
+        {/* Conditionally render the animation-specific emoji */}
+      </div>
+    )}
+  </button>
+  <button className={`ut-lock-toggle${ultrathinkLocked ? ' active' : ''}`}
+          onClick={() => setUltrathinkLocked(prev => !prev)}
+          data-tooltip="...">
+    <svg>{/* locked/unlocked padlock icon */}</svg>
+  </button>
+</div>
 ```
 
 ## Glow Effect in Chat Messages

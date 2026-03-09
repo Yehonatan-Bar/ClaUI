@@ -22,6 +22,12 @@ interface VitalsInfoPanelProps {
 export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => {
   const vitalsEnabled = useAppStore((s) => s.vitalsEnabled);
   const setVitalsEnabled = useAppStore((s) => s.setVitalsEnabled);
+  const summaryModeEnabled = useAppStore((s) => s.summaryModeEnabled);
+  const setSummaryModeEnabled = useAppStore((s) => s.setSummaryModeEnabled);
+  const vpmEnabled = useAppStore((s) => s.vpmEnabled);
+  const setVpmEnabled = useAppStore((s) => s.setVpmEnabled);
+  const detailedDiffEnabled = useAppStore((s) => s.detailedDiffEnabled);
+  const setDetailedDiffEnabled = useAppStore((s) => s.setDetailedDiffEnabled);
   const adventureEnabled = useAppStore((s) => s.adventureEnabled);
   const setAdventureEnabled = useAppStore((s) => s.setAdventureEnabled);
   const translationLanguage = useAppStore((s) => s.translationLanguage);
@@ -44,6 +50,34 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
     const next = !vitalsEnabled;
     setVitalsEnabled(next);
     postToExtension({ type: 'setVitalsEnabled', enabled: next });
+  };
+
+  const handleSummaryModeToggle = () => {
+    const next = !summaryModeEnabled;
+    setSummaryModeEnabled(next);
+    postToExtension({ type: 'setSummaryModeEnabled', enabled: next });
+    // VPM and Summary Mode are mutually exclusive
+    if (next && vpmEnabled) {
+      setVpmEnabled(false);
+      postToExtension({ type: 'setVpmEnabled', enabled: false });
+    }
+  };
+
+  const handleVpmToggle = () => {
+    const next = !vpmEnabled;
+    setVpmEnabled(next);
+    postToExtension({ type: 'setVpmEnabled', enabled: next });
+    // VPM and Summary Mode are mutually exclusive
+    if (next && summaryModeEnabled) {
+      setSummaryModeEnabled(false);
+      postToExtension({ type: 'setSummaryModeEnabled', enabled: false });
+    }
+  };
+
+  const handleDetailedDiffToggle = () => {
+    const next = !detailedDiffEnabled;
+    setDetailedDiffEnabled(next);
+    postToExtension({ type: 'setDetailedDiffViewEnabled', enabled: next });
   };
 
   const handleAdventureToggle = () => {
@@ -368,6 +402,36 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
         <button
           className={`vitals-info-toggle-btn ${vitalsEnabled ? 'on' : 'off'}`}
           onClick={handleToggle}
+        >
+          <span className="vitals-toggle-knob" />
+        </button>
+      </div>
+
+      <div className="vitals-info-toggle-row">
+        <span data-tooltip="Summary Mode: hide tool details, show animated activity summaries. Animation is fixed per session and grows with tool usage.">Summary Mode</span>
+        <button
+          className={`vitals-info-toggle-btn ${summaryModeEnabled ? 'on' : 'off'}`}
+          onClick={handleSummaryModeToggle}
+        >
+          <span className="vitals-toggle-knob" />
+        </button>
+      </div>
+
+      <div className="vitals-info-toggle-row">
+        <span data-tooltip="Visual Progress Mode: replace text output with animated visual cards showing each action Claude performs. Mutually exclusive with Summary Mode.">Visual Progress</span>
+        <button
+          className={`vitals-info-toggle-btn ${vpmEnabled ? 'on' : 'off'}`}
+          onClick={handleVpmToggle}
+        >
+          <span className="vitals-toggle-knob" />
+        </button>
+      </div>
+
+      <div className="vitals-info-toggle-row">
+        <span data-tooltip="Show inline file diffs (added/removed lines) for Write and Edit operations.">Detailed Diff View</span>
+        <button
+          className={`vitals-info-toggle-btn ${detailedDiffEnabled ? 'on' : 'off'}`}
+          onClick={handleDetailedDiffToggle}
         >
           <span className="vitals-toggle-knob" />
         </button>

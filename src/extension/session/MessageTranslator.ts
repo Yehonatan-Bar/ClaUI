@@ -46,11 +46,13 @@ export class MessageTranslator {
       '---',
     ].join('\n');
 
-    const args = ['-p', '--model', 'claude-sonnet-4-6'];
+    const args = ['-p', '--model', 'claude-sonnet-4-6', '--max-tokens', '16000'];
 
     const env = buildClaudeCliEnv(apiKey);
 
-    this.log(`[MessageTranslator] Spawning CLI for translation to ${targetLang} (${textContent.length} chars)`);
+    // Scale timeout with text length: 45s base + 10s per 1000 chars, capped at 120s
+    const timeoutMs = Math.min(45_000 + Math.ceil(textContent.length / 1000) * 10_000, 120_000);
+    this.log(`[MessageTranslator] Spawning CLI for translation to ${targetLang} (${textContent.length} chars, timeout=${timeoutMs}ms)`);
 
     return new Promise<string | null>((resolve) => {
       let stdout = '';
@@ -78,12 +80,11 @@ export class MessageTranslator {
         return;
       }
 
-      // 30-second timeout (translations can be lengthy)
       const timer = setTimeout(() => {
-        this.log('[MessageTranslator] timeout (30s), killing process');
+        this.log(`[MessageTranslator] timeout (${timeoutMs}ms), killing process`);
         killProcessTree(child);
         finish(null);
-      }, 30_000);
+      }, timeoutMs);
 
       child.stdout?.on('data', (chunk: Buffer) => {
         stdout += chunk.toString('utf-8');

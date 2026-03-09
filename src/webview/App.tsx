@@ -12,6 +12,8 @@ import { CommunityPanel } from './components/Achievements/CommunityPanel';
 import { ShareCard } from './components/Achievements/ShareCard';
 import { VitalsContainer } from './components/Vitals/VitalsContainer';
 import { AdventureWidget } from './components/Vitals/AdventureWidget';
+import { SummaryModeWidget } from './components/ChatView/SummaryMode/SummaryModeWidget';
+import { VisualProgressView } from './components/ChatView/VisualProgress/VisualProgressView';
 import { UsageWidget } from './components/Usage/UsageWidget';
 // ContextUsageWidget floating strip removed - context bar now lives in InputArea
 import { SessionTimeline } from './components/Vitals/SessionTimeline';
@@ -53,6 +55,8 @@ export const App: React.FC = () => {
     vitalsEnabled,
     adventureEnabled,
     usageWidgetEnabled,
+    summaryModeEnabled,
+    vpmEnabled,
     contextWidgetVisible,
     turnHistory,
     dashboardOpen,
@@ -269,9 +273,11 @@ export const App: React.FC = () => {
 
       {/* Always show messages if they exist, regardless of connection state */}
       {hasMessages ? (
-        <div className="chat-area-wrapper">
+        <div className={`chat-area-wrapper ${summaryModeEnabled ? 'sm-split-layout' : ''} ${vpmEnabled ? 'vpm-split-layout' : ''}`}>
+          {summaryModeEnabled && <SummaryModeWidget />}
+          {vpmEnabled && <VisualProgressView />}
           <MessageList onScrollFractionChange={setScrollFraction} />
-          {vitalsEnabled && resolvedTurnHistory.length > 0 && (
+          {vitalsEnabled && !summaryModeEnabled && !vpmEnabled && resolvedTurnHistory.length > 0 && (
             <SessionTimeline
               turnHistory={resolvedTurnHistory}
               scrollFraction={scrollFraction}
@@ -279,7 +285,14 @@ export const App: React.FC = () => {
             />
           )}
         </div>
-      ) : isConnected ? <div className="chat-spacer" /> : null}
+      ) : isConnected ? (
+        vpmEnabled ? (
+          <div className="chat-area-wrapper vpm-split-layout">
+            <VisualProgressView />
+            <div className="chat-spacer" />
+          </div>
+        ) : <div className="chat-spacer" />
+      ) : null}
 
       {isConnected ? (
         <>
