@@ -1,6 +1,103 @@
 # ClaUi - Changelog
 
+## v0.1.87 - 2026-03-09
+
+**Feature: Visual Progress Mode**
+
+- New display mode that replaces raw tool output with animated visual cards showing what Claude is doing in real time
+- Each tool call generates a card with category classification (reading, writing, editing, searching, executing, delegating, planning, skill, deciding, researching) and template-based descriptions
+- AI-enriched descriptions via Haiku explain the "why" in first person (e.g., "I'm reading the config file to understand the data flow")
+- Bash commands are parsed into human-readable text (git, npm, python, node, file operations)
+- Max 2 concurrent Haiku calls with queue, 8-second timeout, and response caching
+- New setting: `claudeMirror.visualProgressMode` (default: off)
+- New setting: `claudeMirror.vpmAiDescriptions` (default: on) -- toggle AI descriptions
+
+**Feature: Summary Mode**
+
+- New display mode that hides tool details from messages and shows animated activity summaries instead
+- When enabled, the chat layout splits 50/50 with an animation panel and the message list
+- 5 animated SVG visualizations that progress with each tool call (reach 100% at 50 calls):
+  - Building Blocks -- brick wall assembling from bottom to top
+  - Progress Path -- winding mountain trail with checkpoints
+  - Puzzle Assembly -- jigsaw puzzle assembling from center outward
+  - Rocket Launch -- rocket ascending through atmosphere into space
+  - Growing Tree -- seed growing into a full tree with branches, leaves, and fruit
+- Each animation has a unique completion state (golden glow, birds, flags, etc.)
+- New setting: `claudeMirror.summaryMode` (default: off)
+
+**Feature: Detailed Diff View**
+
+- Inline file diffs for Write and Edit tool operations showing added/removed lines
+- For Edit/MultiEdit: shows old_string vs new_string as a colored diff
+- For Write: captures file content before the write, then diffs old vs new
+- LCS-based diff algorithm with context-line folding (3 lines around changes)
+- Collapsible diff blocks with +/- line counts in the header
+- New file creation shown as all-green additions; capped at 500KB per file
+- New setting: `claudeMirror.detailedDiffView` (default: off)
+
+**Feature: Agent/Task tool visualization**
+
+- Agent, Task, and dispatch_agent tool calls now render as specialized visual cards
+- Cards show agent type badge (Explore/Plan/general-purpose) with color coding
+- Status indicators (running/completed/error) with animated dots
+- Collapsible prompt and result sections; background agents show a "BG" chip
+- Nested sub-agent hierarchy tree visualization with connector lines
+- Partial JSON parsing during streaming for immediate display
+- Agent tool_result blocks are paired inline with their tool_use (not as standalone blocks)
+
+**Feature: Expand/Collapse All tool blocks**
+
+- New toggle button on assistant messages to expand or collapse ALL tool/result blocks at once across the entire message list
+
+**Feature: Ultrathink Lock (project-level)**
+
+- Ultrathink (extended thinking) toggle state now persists per-project using VS Code's `workspaceState`
+- Lock state survives across sessions within the same workspace
+
+**Bug Fix: Duplicate user message display (reworked)**
+
+- Rewrote the user message dedup logic to properly handle late CLI echo arrivals
+- Optimistic sends always go through; CLI echo sends are suppressed if they match the last optimistic text regardless of time elapsed
+- Applied to both Claude and Codex message handlers
+
+**Bug Fix: ExitPlanMode approval bar persistence (Bug 16)**
+
+- Added `exitPlanModeBarActive` flag that persists even after `pendingApprovalTool` is cleared by `messageStart`
+- When user sends text/images while the bar is active, the plan is correctly marked as processed
+- Auto-dismiss: when the model starts using non-plan tools (implementation begun), the approval bar is automatically dismissed
+- New `planApprovalDismissed` message type sent to webview to clear the bar
+- Bar properly cleared on cancel, clearSession, and edit-and-resend
+
+**Bug Fix: Model label passed as CLI argument**
+
+- Both ClaudeProcessManager and CodexExecProcessManager now skip display-only labels like "Codex (default)" that contain parentheses, preventing invalid `--model` CLI arguments
+
+**Bug Fix: Translation error display**
+
+- Translation failures now surface in the UI with error state styling, "Translation failed - click to retry" tooltip, and a Retry button
+
+**Bug Fix: Auto-dismiss transient command errors**
+
+- Non-fatal "command failed (exit N)" error banners now auto-dismiss after 10 seconds instead of persisting until manually cleared
+
+**Improvement: Translation timeout scaling**
+
+- Translation CLI calls now use `--max-tokens 16000` with dynamic timeout: 45s base + 10s per 1000 chars, capped at 120s (previously fixed 30s)
+
+**Improvement: SkillGen pipeline**
+
+- Fresh runs now clean workspace subdirectories to prevent stale data accumulation
+- Incremental enrichment: reuses cached card enrichments to avoid duplicate API calls
+
 ## v0.1.86 - 2026-03-06
+
+**Feature: Usage dashboard period selector**
+
+- Both the Usage tab and Token Ratio tab now have clickable period-selector tabs (5 Hours, 24 Hours, 7 Days, 14 Days, 30 Days, 2 Months) instead of a flat list of all buckets
+- Dynamic/future-proof usage parsing: any new API time windows or models are auto-detected without code changes
+- Cards display model name (Opus, Sonnet, Haiku) as the title; period context provided by the tab selector
+- Chart legend and colors are now consistent per model across all time periods
+- New time periods supported: 24 Hours, 14 Days, 30 Days, 2 Months; new model: Haiku
 
 **Bug Fix: Robust file-reference opening from chat links**
 
@@ -12,6 +109,17 @@
   - keeps existing `:line[:col]` support
   - adds fallback basename/suffix lookup when relative paths are incomplete
   - adds parent-folder fallback for `.xcodeproj` / `.xcworkspace` workspace roots
+
+## v0.1.85 - 2026-03-06
+
+**Improvement: Deferred handoff context injection**
+
+- Reworked provider handoff to use deferred prompt injection instead of immediate auto-send
+- Handoff context is now staged and injected into the first user message sent in the target tab, rather than being sent automatically as a standalone prompt
+- Removed `claudeMirror.handoff.autoSend` setting (no longer needed)
+- Handoff prompt is composed as prior conversation history/context (not a directive), giving the user control over when the handoff context is consumed
+- Staged context is cleared on session start/resume/clear/fork to prevent stale injection
+- Codex message ID collisions fixed: agent messages now use unique UI IDs instead of reusable Codex item IDs
 
 ## v0.1.84 - 2026-03-05
 
@@ -28,7 +136,6 @@
 - Added input lock during active handoff stages and a manual fallback (`Send capsule manually`) when handoff fails
 - Added new settings:
   - `claudeMirror.handoff.enabled`
-  - `claudeMirror.handoff.autoSend`
   - `claudeMirror.handoff.storeArtifacts`
 
 **Fixes included in v0.1.84 (Plan Approval reliability)**
