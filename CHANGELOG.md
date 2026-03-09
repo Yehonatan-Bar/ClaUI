@@ -76,6 +76,13 @@
 
 - Translation failures now surface in the UI with error state styling, "Translation failed - click to retry" tooltip, and a Retry button
 
+**Bug Fix: Codex CLI auto-recovery when not on PATH**
+
+- When Codex CLI is not found on PATH, ClaUi now automatically searches bundled VS Code extensions, common install locations, and npm prefix before showing the "not found" error
+- If a working Codex CLI is found (e.g., bundled inside the official Codex VS Code extension), it is auto-configured in `claudeMirror.codex.cliPath` and the user is informed to retry
+- Previously, the sophisticated detection logic only ran during the manual "Auto-setup" flow, not during runtime error recovery
+- Extracted CLI detection into shared utility `CodexCliDetector.ts` used by both `CodexSessionTab` and `CodexMessageHandler`
+
 **Bug Fix: Auto-dismiss transient command errors**
 
 - Non-fatal "command failed (exit N)" error banners now auto-dismiss after 10 seconds instead of persisting until manually cleared
