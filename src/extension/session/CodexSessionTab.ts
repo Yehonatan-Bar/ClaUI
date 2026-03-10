@@ -94,6 +94,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   } | null = null;
   /** Waiters that resolve on the next assistant reply (used by provider handoff orchestration). */
   private assistantReplyWaiters: Array<(ok: boolean) => void> = [];
+  /** Subscription for VS Code window state changes (focus/blur) */
+  private windowStateSubscription: vscode.Disposable | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -454,6 +456,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.endTurnDiagnostics('tab dispose()');
     this.stopThinkingAnimation();
     this.resolveAssistantReplyWaiters(false);
+    this.windowStateSubscription?.dispose();
+    this.windowStateSubscription = null;
     this.saveProjectAnalytics();
     this.processManager.stop();
     this.achievementService.onSessionEnd(this.id);
@@ -752,6 +756,16 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.panel.onDidChangeViewState((e) => {
       if (e.webviewPanel.active) {
         this.callbacks.onFocused(this.id);
+        this.postMessage({ type: 'focusInput' });
+      }
+    });
+
+    // When VS Code window regains OS focus, re-focus the input textarea.
+    // reveal() ensures the webview iframe gets focus before we ask it to focus the textarea.
+    this.windowStateSubscription = vscode.window.onDidChangeWindowState((e) => {
+      if (e.focused && this.panel?.active) {
+        this.panel.reveal(undefined, false);
+        setTimeout(() => this.postMessage({ type: 'focusInput' }), 100);
       }
     });
 
@@ -762,6 +776,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         this.endTurnDiagnostics('panel onDidDispose');
         this.stopThinkingAnimation();
         this.resolveAssistantReplyWaiters(false);
+        this.windowStateSubscription?.dispose();
+        this.windowStateSubscription = null;
         this.saveProjectAnalytics();
         this.processManager.stop();
         this.achievementService.onSessionEnd(this.id);

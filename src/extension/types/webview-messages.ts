@@ -1075,6 +1075,11 @@ export interface UltrathinkLockedSettingMessage {
   locked: boolean;
 }
 
+/** Extension -> Webview: tell the webview to focus the input textarea */
+export interface FocusInputMessage {
+  type: 'focusInput';
+}
+
 /** Extension -> Webview: per-message summary text */
 export interface MessageSummaryMessage {
   type: 'messageSummary';
@@ -1579,4 +1584,5 @@ export type ExtensionToWebviewMessage =
   | VpmSettingMessage
   | VisualProgressCardMessage
   | VisualProgressCardUpdateMessage
-  | UltrathinkLockedSettingMessage;
+  | UltrathinkLockedSettingMessage
+  | FocusInputMessage;

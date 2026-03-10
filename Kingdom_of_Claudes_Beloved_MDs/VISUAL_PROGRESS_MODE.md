@@ -85,7 +85,7 @@ Key methods:
 | `package.json` | Added `claudeMirror.visualProgressMode` and `claudeMirror.vpmAiDescriptions` settings |
 | `src/webview/state/store.ts` | Added `ToolCategory`, `VisualProgressCard` types, state fields, upsert/update/clear actions |
 | `src/extension/types/webview-messages.ts` | Added `SetVpmEnabledRequest`, `VpmSettingMessage`, `VisualProgressCardMessage`, `VisualProgressCardUpdateMessage` |
-| `src/webview/components/Vitals/VitalsInfoPanel.tsx` | Added VPM toggle with mutual exclusion vs Summary Mode |
+| `src/webview/components/Vitals/VitalsInfoPanel.tsx` | Display Mode slider (4-position: Normal, Summary, Visual, Diff) |
 | `src/extension/webview/MessageHandler.ts` | Wired VPM processor, config watcher, setting sync, demux hooks |
 | `src/extension/session/SessionTab.ts` | Instantiates VisualProgressProcessor, wires to MessageHandler |
 | `src/webview/hooks/useClaudeStream.ts` | Handles `vpmSetting`, `visualProgressCard`, `visualProgressCardUpdate` messages |
@@ -112,10 +112,10 @@ Uses the proven CLI-spawn pattern from SessionNamer:
 
 ## Mutual Exclusion
 
-VPM and Summary Mode are mutually exclusive:
-- Enabling VPM disables Summary Mode (and vice versa)
-- Enforced in `VitalsInfoPanel.tsx` toggle handlers
-- Both send `setVpmEnabled`/`setSummaryMode` messages to persist in VS Code config
+All display modes (Normal, Summary, Visual Progress, Detailed Diff) are mutually exclusive:
+- Selected via a 4-position slider in `VitalsInfoPanel.tsx`
+- The slider sets all 3 boolean flags atomically (only the selected mode is true, others false)
+- All 3 messages (`setVpmEnabled`, `setSummaryModeEnabled`, `setDetailedDiffViewEnabled`) are sent to persist in VS Code config
 
 ## Store State
 

@@ -102,6 +102,8 @@ export class SessionTab implements WebviewBridge {
   private teamHadWorkingAgent = false;
   /** Per-tab CLI override (used by Happy provider to spawn `happy` instead of `claude`) */
   private cliPathOverride: string | null = null;
+  /** Subscription for VS Code window state changes (focus/blur) */
+  private windowStateSubscription: vscode.Disposable | null = null;
   /** Waiters that resolve when the next assistant reply arrives (handoff orchestration). */
   private assistantReplyWaiters: Array<(ok: boolean) => void> = [];
 
@@ -551,6 +553,8 @@ export class SessionTab implements WebviewBridge {
     this.disposed = true;
     this.stopThinkingAnimation();
     this.resolveAssistantReplyWaiters(false);
+    this.windowStateSubscription?.dispose();
+    this.windowStateSubscription = null;
     // Clean up team watcher
     if (this.teamWatcher) {
       this.teamWatcher.dispose();
@@ -754,6 +758,16 @@ export class SessionTab implements WebviewBridge {
     this.panel.onDidChangeViewState((e) => {
       if (e.webviewPanel.active) {
         this.callbacks.onFocused(this.id);
+        this.postMessage({ type: 'focusInput' });
+      }
+    });
+
+    // When VS Code window regains OS focus, re-focus the input textarea.
+    // reveal() ensures the webview iframe gets focus before we ask it to focus the textarea.
+    this.windowStateSubscription = vscode.window.onDidChangeWindowState((e) => {
+      if (e.focused && this.panel?.active) {
+        this.panel.reveal(undefined, false);
+        setTimeout(() => this.postMessage({ type: 'focusInput' }), 100);
       }
     });
 
@@ -762,6 +776,8 @@ export class SessionTab implements WebviewBridge {
       try {
         this.stopThinkingAnimation();
         this.resolveAssistantReplyWaiters(false);
+        this.windowStateSubscription?.dispose();
+        this.windowStateSubscription = null;
         // Save analytics BEFORE stopping the process to ensure data is persisted
         this.saveProjectAnalytics();
         this.achievementService.onSessionEnd(this.id);

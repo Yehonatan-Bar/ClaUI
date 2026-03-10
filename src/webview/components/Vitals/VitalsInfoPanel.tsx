@@ -52,32 +52,21 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
     postToExtension({ type: 'setVitalsEnabled', enabled: next });
   };
 
-  const handleSummaryModeToggle = () => {
-    const next = !summaryModeEnabled;
-    setSummaryModeEnabled(next);
-    postToExtension({ type: 'setSummaryModeEnabled', enabled: next });
-    // VPM and Summary Mode are mutually exclusive
-    if (next && vpmEnabled) {
-      setVpmEnabled(false);
-      postToExtension({ type: 'setVpmEnabled', enabled: false });
-    }
-  };
+  // Derive current display mode position from the 3 boolean flags
+  const displayModePosition = summaryModeEnabled ? 1 : vpmEnabled ? 2 : detailedDiffEnabled ? 3 : 0;
 
-  const handleVpmToggle = () => {
-    const next = !vpmEnabled;
-    setVpmEnabled(next);
-    postToExtension({ type: 'setVpmEnabled', enabled: next });
-    // VPM and Summary Mode are mutually exclusive
-    if (next && summaryModeEnabled) {
-      setSummaryModeEnabled(false);
-      postToExtension({ type: 'setSummaryModeEnabled', enabled: false });
-    }
-  };
+  const handleDisplayModeChange = (position: number) => {
+    const summaryNext = position === 1;
+    const vpmNext = position === 2;
+    const diffNext = position === 3;
 
-  const handleDetailedDiffToggle = () => {
-    const next = !detailedDiffEnabled;
-    setDetailedDiffEnabled(next);
-    postToExtension({ type: 'setDetailedDiffViewEnabled', enabled: next });
+    setSummaryModeEnabled(summaryNext);
+    setVpmEnabled(vpmNext);
+    setDetailedDiffEnabled(diffNext);
+
+    postToExtension({ type: 'setSummaryModeEnabled', enabled: summaryNext });
+    postToExtension({ type: 'setVpmEnabled', enabled: vpmNext });
+    postToExtension({ type: 'setDetailedDiffViewEnabled', enabled: diffNext });
   };
 
   const handleAdventureToggle = () => {
@@ -407,34 +396,45 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
         </button>
       </div>
 
-      <div className="vitals-info-toggle-row">
-        <span data-tooltip="Summary Mode: hide tool details, show animated activity summaries. Animation is fixed per session and grows with tool usage.">Summary Mode</span>
-        <button
-          className={`vitals-info-toggle-btn ${summaryModeEnabled ? 'on' : 'off'}`}
-          onClick={handleSummaryModeToggle}
+      <div className="display-mode-slider">
+        <div className="display-mode-header">
+          <span data-tooltip="Choose how Claude's output is displayed. Normal: standard output. Summary: animated activity summaries. Visual: animated progress cards. Diff: inline file diffs.">
+            Display Mode
+          </span>
+        </div>
+        <div
+          className="display-mode-track-container"
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const fraction = (e.clientX - rect.left) / rect.width;
+            const position = Math.round(fraction * 3);
+            handleDisplayModeChange(Math.max(0, Math.min(3, position)));
+          }}
         >
-          <span className="vitals-toggle-knob" />
-        </button>
-      </div>
-
-      <div className="vitals-info-toggle-row">
-        <span data-tooltip="Visual Progress Mode: replace text output with animated visual cards showing each action Claude performs. Mutually exclusive with Summary Mode.">Visual Progress</span>
-        <button
-          className={`vitals-info-toggle-btn ${vpmEnabled ? 'on' : 'off'}`}
-          onClick={handleVpmToggle}
-        >
-          <span className="vitals-toggle-knob" />
-        </button>
-      </div>
-
-      <div className="vitals-info-toggle-row">
-        <span data-tooltip="Show inline file diffs (added/removed lines) for Write and Edit operations.">Detailed Diff View</span>
-        <button
-          className={`vitals-info-toggle-btn ${detailedDiffEnabled ? 'on' : 'off'}`}
-          onClick={handleDetailedDiffToggle}
-        >
-          <span className="vitals-toggle-knob" />
-        </button>
+          <div className="display-mode-track" />
+          {[0, 1, 2, 3].map((pos) => (
+            <div
+              key={pos}
+              className={`display-mode-tick ${displayModePosition === pos ? 'active' : ''}`}
+              style={{ left: `${(pos / 3) * 100}%` }}
+            />
+          ))}
+          <div
+            className="display-mode-thumb"
+            style={{ left: `${(displayModePosition / 3) * 100}%` }}
+          />
+        </div>
+        <div className="display-mode-labels">
+          {['Normal', 'Summary', 'Visual', 'Diff'].map((label, i) => (
+            <span
+              key={label}
+              className={`display-mode-label ${displayModePosition === i ? 'active' : ''}`}
+              onClick={() => handleDisplayModeChange(i)}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );

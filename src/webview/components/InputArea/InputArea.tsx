@@ -1103,6 +1103,25 @@ export const InputArea: React.FC = () => {
     textareaRef.current?.focus();
   }, []);
 
+  // Refocus textarea when the extension tells us the panel regained focus
+  // (browser focus/visibilitychange events don't fire reliably in VS Code webview iframes)
+  useEffect(() => {
+    const handleFocusInput = () => {
+      // Use requestAnimationFrame to ensure the webview iframe has settled focus
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (el && !el.disabled) {
+          el.focus();
+        }
+      });
+    };
+
+    window.addEventListener('claui-focus-input', handleFocusInput);
+    return () => {
+      window.removeEventListener('claui-focus-input', handleFocusInput);
+    };
+  }, []);
+
   return (
     <div className="input-area">
       {inputLockedByHandoff && (

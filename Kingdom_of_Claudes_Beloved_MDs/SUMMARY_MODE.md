@@ -7,7 +7,7 @@ Third display mode for assistant messages. When enabled, the chat area splits in
 - **Full-height side panel**: Animation occupies 50% of chat width and full height (not a small widget)
 - **Session-fixed animation**: Animation type (0-4) randomly chosen once per session, persists until reset
 - **Continuous progression**: Each tool call visibly advances the animation (1 tool = 1 visual element). Full progress reached at ~50 tool calls
-- **Toggle persists**: `summaryModeEnabled` survives session reset (like `detailedDiffEnabled`)
+- **Persists across sessions**: `summaryModeEnabled` survives session reset (like `detailedDiffEnabled`)
 - **Text blocks preserved**: Only tool_use/tool_result blocks are hidden; text blocks render normally in the messages column
 
 ## Architecture
@@ -47,7 +47,7 @@ chat-area-wrapper.sm-split-layout (flex row)
 | `src/extension/webview/MessageHandler.ts` | `sendSummaryModeSetting()`, ready handler, toggle, config watcher |
 | `src/webview/App.tsx` | Split layout when summary mode enabled; widget inside chat-area-wrapper |
 | `src/webview/components/ChatView/MessageBubble.tsx` | Summary mode branch hides tool blocks, shows text only |
-| `src/webview/components/Vitals/VitalsInfoPanel.tsx` | Summary Mode toggle row |
+| `src/webview/components/Vitals/VitalsInfoPanel.tsx` | Display Mode slider (4-position: Normal, Summary, Visual, Diff) |
 | `src/webview/styles/global.css` | Split layout CSS, animation keyframes |
 
 ## 5 Animation Types

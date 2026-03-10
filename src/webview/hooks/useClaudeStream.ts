@@ -741,6 +741,10 @@ export function useClaudeStream(): void {
         case 'thinkingEffortUpdate':
           setThinkingEffort(msg.effort);
           break;
+
+        case 'focusInput':
+          window.dispatchEvent(new Event('claui-focus-input'));
+          break;
       }
     }
 
