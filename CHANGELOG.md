@@ -1,5 +1,40 @@
 # ClaUi - Changelog
 
+## Unreleased - 2026-03-11
+
+**Improvement: BTW side-conversation reliability and UX polish**
+
+- Reworked `BackgroundSession` to a single-phase fork flow (fork + immediate first message), avoiding the previous stuck behavior in pipe mode
+- Fixed BTW event mapping in `SessionTab` to read nested `.message` payloads correctly, so assistant content renders instead of empty bubbles
+- Added optimistic BTW user-message rendering (no wait for CLI echo), idempotent `initBtwSession`, and skipped echoed duplicates
+- Added richer BTW diagnostics/log lines and small overlay behavior refinements in `MessageList`/`BtwPopup`
+
+**Improvement: Token Ratio chart axis readability**
+
+- `TokenRatioTab` now uses period-aware X-axis formatting:
+  - `5 Hours` / `24 Hours`: shows time labels
+  - `7 Days` and longer: shows date labels
+- Tooltip label formatting was aligned with timestamp-based axis data
+
+**Documentation updates**
+
+- Added `Kingdom_of_Claudes_Beloved_MDs/btw_bug.md` with BTW bug-fix investigation history and architecture notes
+- Added `Kingdom_of_Claudes_Beloved_MDs/USAGE_LIMIT_DEFERRED_SEND_PLAN.md` (planned usage-limit deferred-send flow)
+- Updated `TECHNICAL.md` and analytics/token-ratio details to reflect the new docs and chart behavior
+
+## v0.1.91 - 2026-03-11
+
+**Release: version bump**
+
+- Updated extension version from `0.1.90` to `0.1.91` in `package.json` and `package-lock.json`
+
+**Fix: BTW side-conversation infinite/stuck flow**
+
+- Introduced a new headless `BackgroundSession` to run BTW conversations separately from the main tab session
+- Added full BTW message contract between webview and extension (`start/send/close` requests and streaming lifecycle events)
+- Added BTW chat overlay mode with follow-up messaging, independent state, and busy/streaming handling
+- Improved right-click context menu (selection-aware actions + BTW entry) and BTW popup flow (Send vs New Tab paths)
+
 ## v0.1.89 - 2026-03-11
 
 **Feature: Image Lightbox (Double-Click to Enlarge)**
