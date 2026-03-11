@@ -7502,3 +7502,171 @@ html, body, #root {
 .pending-image-thumb img {
   cursor: zoom-in;
 }
+
+/* ============================================
+   BTW Context Menu
+   ============================================ */
+
+.btw-context-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+}
+
+.btw-context-menu {
+  position: fixed;
+  z-index: 10001;
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+  padding: 4px 0;
+  min-width: 100px;
+}
+
+.btw-context-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 20px;
+  background: none;
+  border: none;
+  color: var(--vscode-foreground);
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btw-context-menu-item:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.btw-context-menu-item:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+/* ============================================
+   BTW Popup (Modal Overlay)
+   ============================================ */
+
+.btw-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.btw-popup {
+  max-width: 500px;
+  width: 90%;
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-widget-border, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btw-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btw-popup-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
+
+.btw-popup-close {
+  background: none;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btw-popup-close:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+
+.btw-popup-context-info {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.btw-popup-textarea {
+  width: 100%;
+  min-height: 100px;
+  max-height: 300px;
+  resize: vertical;
+  padding: 8px;
+  border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.1));
+  border-radius: 4px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.5;
+}
+
+.btw-popup-textarea:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.btw-popup-textarea::placeholder {
+  color: var(--vscode-input-placeholderForeground, rgba(255, 255, 255, 0.4));
+}
+
+.btw-popup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btw-popup-btn {
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+}
+
+.btw-popup-btn-cancel {
+  background: transparent;
+  color: var(--vscode-foreground);
+  border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.15));
+}
+
+.btw-popup-btn-cancel:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.btw-popup-btn-submit {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.btw-popup-btn-submit:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.btw-popup-btn-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

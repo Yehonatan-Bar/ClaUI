@@ -169,6 +169,9 @@ export interface AppState {
   // Fork state (set when a forked tab receives forkInit from extension)
   forkInit: { promptText: string } | null;
 
+  // BTW side-thought popup state
+  btwPopup: { contextMessageId: string | null } | null;
+
   // Translation state
   translationLanguage: string;
   translations: Record<string, string>;
@@ -457,6 +460,7 @@ export interface AppState {
   setGitPushConfigPanelOpen: (open: boolean) => void;
   setGitPushRunning: (running: boolean) => void;
   setForkInit: (init: { promptText: string } | null) => void;
+  setBtwPopup: (popup: { contextMessageId: string | null } | null) => void;
   setTranslationLanguage: (language: string) => void;
   setTranslation: (messageId: string, translatedText: string) => void;
   setTranslating: (messageId: string, translating: boolean) => void;
@@ -703,6 +707,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   gitPushConfigPanelOpen: false,
   gitPushRunning: false,
   forkInit: null,
+  btwPopup: null,
   translationLanguage: 'Hebrew',
   translations: {},
   translatingMessageIds: new Set(),
@@ -1364,6 +1369,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setGitPushConfigPanelOpen: (open) => set({ gitPushConfigPanelOpen: open }),
   setGitPushRunning: (running) => set({ gitPushRunning: running }),
   setForkInit: (init) => set({ forkInit: init }),
+  setBtwPopup: (popup) => set({ btwPopup: popup }),
 
   setTranslationLanguage: (language) =>
     set((state) => {
@@ -1703,6 +1709,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       gitPushConfigPanelOpen: false,
       gitPushRunning: false,
       forkInit: null,
+      btwPopup: null,
       translations: {},
       translatingMessageIds: new Set(),
       showingTranslation: new Set(),

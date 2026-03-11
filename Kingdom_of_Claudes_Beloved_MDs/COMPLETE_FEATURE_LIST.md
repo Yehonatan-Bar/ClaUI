@@ -23,6 +23,7 @@ A comprehensive catalog of every feature and capability in the ClaUi VS Code ext
 - **Resume sessions** - Continue any past session with full conversation restored in the UI. Claude picks up right where you left off
 - **Conversation reader** - Reads JSONL files directly from Claude's local session storage (`~/.claude/projects/<hash>/<session>.jsonl`) for instant history display, bypassing the CLI replay delay
 - **Fork from message** - Click "Fork" on any user message to create a new tab branching from that point. Claude tabs use CLI resume/fork semantics; Codex tabs use UI-level fork with prefilled input and copied history
+- **BTW (Side Thought)** - Right-click anywhere in the message list to open a "btw..." context menu. Type a side question in the popup and open it in a new tab with conversation context up to the right-clicked message. Reuses fork infrastructure without disrupting the main conversation
 - **Editable prompts** - Hover over a sent user message and click "Edit" to modify it inline. On send, all subsequent messages are removed, the CLI session restarts, and the edited prompt is sent as the first message. Only text-only messages are editable (not images). Hidden while the assistant is busy
 
 ---

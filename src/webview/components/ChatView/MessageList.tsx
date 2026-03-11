@@ -4,6 +4,8 @@ import { postToExtension } from '../../hooks/useClaudeStream';
 import { MessageBubble } from './MessageBubble';
 import { StreamingText } from './StreamingText';
 import { ToolUseBlock } from './ToolUseBlock';
+import { BtwContextMenu } from './BtwContextMenu';
+import { BtwPopup } from './BtwPopup';
 
 /**
  * Scrollable list of chat messages with auto-scroll behavior.
@@ -14,11 +16,12 @@ interface MessageListProps {
 }
 
 export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange }) => {
-  const { messages, streamingMessageId, streamingBlocks, isBusy, truncateFromMessage, addUserMessage, markSessionPromptSent, currentThinkingEffort } = useAppStore();
+  const { messages, streamingMessageId, streamingBlocks, isBusy, truncateFromMessage, addUserMessage, markSessionPromptSent, currentThinkingEffort, btwPopup, setBtwPopup } = useAppStore();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const userScrolledUp = useRef(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; messageId: string | null } | null>(null);
 
   // Auto-scroll to bottom on new content, unless user has scrolled up
   useEffect(() => {
@@ -81,6 +84,53 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
     });
   }, []);
 
+  /** Right-click handler: show the BTW context menu at click coordinates */
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    const state = useAppStore.getState();
+    if (state.messages.length === 0) return; // no context to BTW about
+    e.preventDefault();
+    const messageEl = (e.target as HTMLElement).closest('[data-message-id]');
+    const messageId = messageEl?.getAttribute('data-message-id') ?? null;
+    setContextMenu({ x: e.clientX, y: e.clientY, messageId });
+  }, []);
+
+  /** Context menu "btw" click: open the popup */
+  const handleBtwClick = useCallback(() => {
+    if (!contextMenu) return;
+    setBtwPopup({ contextMessageId: contextMenu.messageId });
+    setContextMenu(null);
+  }, [contextMenu, setBtwPopup]);
+
+  /** BTW submit: reuse fork infrastructure to open a new tab with context */
+  const handleBtwSubmit = useCallback((btwText: string) => {
+    const state = useAppStore.getState();
+    const sessionId = state.sessionId;
+    if (!sessionId) return;
+
+    const allMessages = state.messages;
+    const popup = state.btwPopup;
+    let messagesForContext: typeof allMessages;
+    let forkIndex: number;
+
+    if (popup?.contextMessageId) {
+      const idx = allMessages.findIndex((m) => m.id === popup.contextMessageId);
+      messagesForContext = idx >= 0 ? allMessages.slice(0, idx + 1) : [...allMessages];
+      forkIndex = idx >= 0 ? idx + 1 : allMessages.length;
+    } else {
+      messagesForContext = [...allMessages];
+      forkIndex = allMessages.length;
+    }
+
+    postToExtension({
+      type: 'forkFromMessage',
+      sessionId,
+      forkMessageIndex: forkIndex,
+      promptText: btwText,
+      messages: messagesForContext,
+    });
+    setBtwPopup(null);
+  }, [setBtwPopup]);
+
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     userScrolledUp.current = false;
@@ -92,6 +142,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
       className="message-list"
       ref={containerRef}
       onScroll={handleScroll}
+      onContextMenu={handleContextMenu}
     >
       {messages.map((msg) => (
         <MessageBubble
@@ -145,6 +196,23 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
             <path d="M8 11.5L2.5 6l1-1L8 9.5 12.5 5l1 1z" />
           </svg>
         </button>
+      )}
+
+      {contextMenu && (
+        <BtwContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onBtwClick={handleBtwClick}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {btwPopup && (
+        <BtwPopup
+          contextMessageId={btwPopup.contextMessageId}
+          onSubmit={handleBtwSubmit}
+          onClose={() => setBtwPopup(null)}
+        />
       )}
     </div>
   );
