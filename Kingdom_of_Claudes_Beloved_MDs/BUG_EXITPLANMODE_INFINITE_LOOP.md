@@ -19,6 +19,7 @@ The plan approval bar (4 CLI-matching options) and AskUserQuestion interactive c
 **Date Fourteenth Fix**: 2026-03-05 (approve click no-op when CLI auto-resumed AND completed - resumeObserved masks idle state)
 **Date Fifteenth Fix**: 2026-03-05 (approve click no-op when one-shot delayed check fires during compact/busy turn)
 **Date Sixteenth Fix**: 2026-03-08 (stale bar persists + re-appears because exitPlanModeProcessed never set when user types text)
+**Date Seventeenth Fix**: 2026-03-11 (model re-enters ExitPlanMode loop after vague nudge text + nudge visible in UI)
 **Severity**: Critical (blocks plan mode workflow)
 **Files Modified**: `src/extension/webview/MessageHandler.ts`, `src/webview/hooks/useClaudeStream.ts`, `src/webview/components/ChatView/PlanApprovalBar.tsx`, `src/extension/types/webview-messages.ts`
 
@@ -307,6 +308,39 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 - `exitPlanModeBarActive` is reset on all session lifecycle events (clear, cancel, edit-and-resend, EnterPlanMode)
 - The flag is included in `logApprovalState()` diagnostic dumps as `epmBarActive=`
 
+### Seventeenth Bug (2026-03-11): Model Re-Enters ExitPlanMode Loop After Vague Nudge + Nudge Visible in UI
+
+**Cause**: Two related problems:
+
+1. **Vague nudge text**: After the user approved ExitPlanMode (option 2), the extension correctly detected CLI idle and sent the nudge `"Continue with the implementation."`. The model received it, started implementing (ToolSearch, TodoWrite, Read), but mid-implementation decided "The plan mode is still active. Let me exit it properly first." and called ExitPlanMode **again**. The nudge text was too vague -- it didn't explicitly tell the model that plan mode was already exited, so the model saw EnterPlanMode in its conversation history and concluded it was still in plan mode.
+
+2. **Nudge visible in UI**: The nudge was sent via `this.control.sendText()` without suppressing the CLI echo. When the CLI echoed the user message back, `postUserMessage()` displayed it as a user message bubble in the chat, which was confusing and visible to the user.
+
+**Sequence**:
+1. ExitPlanMode detected -> approval bar shown (cycle 1)
+2. User clicks option 2 (approve) -> `exitPlanModeProcessed = true`, bar dismissed
+3. CLI idle -> immediate nudge: `"Continue with the implementation."` (shown as user message in UI)
+4. Model starts: ToolSearch(TodoWrite), TodoWrite, text + Read -> `postActivity = true`
+5. Model says "The plan mode is still active. Let me exit it properly first."
+6. Model calls ExitPlanMode again
+7. Bug 10 re-open fires (reopen 1/2): `postActivity = true` -> bar shown (cycle 2)
+8. CLI auto-approves, model outputs "I need user confirmation to exit plan mode. Please confirm to proceed with implementation."
+9. CLI idle. Bar showing again. Stuck in loop.
+
+**Root cause**: The nudge `"Continue with the implementation."` didn't convey that ExitPlanMode was already approved. The model has EnterPlanMode in its conversation history and no clear signal that plan mode ended, so it re-enters ExitPlanMode on every opportunity. Additionally, the nudge appearing as a visible user message bubble was a UI/UX issue.
+
+**Fix** (two parts):
+
+1. **Explicit nudge text**: Changed from `"Continue with the implementation."` to `"Plan mode has been exited successfully. ExitPlanMode was already approved. Do not call ExitPlanMode again. Proceed directly with writing code and making changes."` in both nudge paths:
+   - Immediate nudge when CLI idle (`scheduleExitPlanApproveResumeFallback`, line ~3438)
+   - Timeout force nudge (`scheduleExitPlanApproveResumeFallback`, line ~3471)
+
+2. **Nudge hidden from UI**: Before each `control.sendText(nudgeText)`, set `this.lastPostedUserMsg = { text: nudgeText, time: Date.now() }`. This registers the nudge in the dedup mechanism of `postUserMessage()`, so when the CLI echoes it back as a user message, the echo is suppressed and never shown in the webview.
+
+**Why this should prevent the loop**: The model now receives an unambiguous instruction that ExitPlanMode was already processed. The explicit "Do not call ExitPlanMode again" directive targets the exact behavior observed -- the model re-entering plan mode because it didn't realize ExitPlanMode was already approved.
+
+**Why hiding is safe**: The nudge is an internal mechanism between the extension and the CLI, not something the user typed. Showing it as a user message was misleading. The `lastPostedUserMsg` dedup mechanism is the same one used for optimistic user messages -- reliable and well-tested.
+
 ---
 
 ## Current Defense Layers
@@ -323,7 +357,8 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 | `inAssistantTurn` + retry loop for approve nudge | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Approve click no-op when one-shot busy check misses idle transition (Bug 15 fix) |
 | `EXIT_PLANMODE_APPROVE_MAX_WAIT_MS` forced nudge | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Stuck/no-progress sessions where CLI stays busy or misses idle signal (Bug 15 fix) |
 | `postApproveNudgeTimer` (re-check scheduler) | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Repeated busy-state rechecks until idle/progress/timeout (Bug 15 fix) |
-| Neutral nudge text | MessageHandler.ts all fallback paths | Prevents model from associating nudge with plan approval |
+| Explicit anti-loop nudge text | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Tells model ExitPlanMode was already approved, do not call again (Bug 17 fix) |
+| Nudge hidden from UI via `lastPostedUserMsg` dedup | MessageHandler.ts `scheduleExitPlanApproveResumeFallback` | Prevents nudge from appearing as user message bubble in webview (Bug 17 fix) |
 | Approve-path try/catch with error postMessage | MessageHandler.ts `planApprovalResponse` + fallback nudge | Silent failures when send/compact throws |
 | PlanApprovalBar click telemetry | PlanApprovalBar.tsx (`uiDebugLog`) | Distinguishes "click never reached extension" vs "extension handled but stalled" |
 | `compactPending` -> reset `exitPlanModeProcessed` on messageStart | MessageHandler.ts `messageStart` handler | Stuck plan mode after context compaction (Bug 9 fix) |
@@ -458,8 +493,12 @@ if (!isExitPlanMode || isExitPlanFeedback) {
 
 ```typescript
 // Bug 15 fix: retry until idle/progress/timeout (not one-shot).
+// Bug 17 fix: explicit nudge text + hidden from UI via lastPostedUserMsg dedup.
+const nudgeText = 'Plan mode has been exited successfully. ExitPlanMode was already approved. Do not call ExitPlanMode again. Proceed directly with writing code and making changes.';
+
 if (!this.inAssistantTurn && !this.postExitPlanNonPlanActivityObserved) {
-  sendProceedNudgeNow();
+  this.lastPostedUserMsg = { text: nudgeText, time: Date.now() };
+  this.control.sendText(nudgeText);
   return;
 }
 if (this.postExitPlanNonPlanActivityObserved) {
@@ -468,7 +507,8 @@ if (this.postExitPlanNonPlanActivityObserved) {
 }
 if (elapsedMs >= EXIT_PLANMODE_APPROVE_MAX_WAIT_MS) {
   // Stuck/no-progress failsafe.
-  sendProceedNudgeNow();
+  this.lastPostedUserMsg = { text: nudgeText, time: Date.now() };
+  this.control.sendText(nudgeText);
   return;
 }
 // Busy + no progress -> schedule another re-check.

@@ -383,6 +383,10 @@ export interface AppState {
   tokenRatioCumulativeWeightedTokens: number | null;
   setTokenRatioData: (samples: TokenUsageRatioSample[], summaries: TokenRatioBucketSummary[], globalTurnCount: number, cumulativeTokens: { input: number; output: number; cacheCreation: number; cacheRead: number }, cumulativeWeightedTokens: number) => void;
 
+  // Image Lightbox
+  lightboxImageSrc: string | null;
+  setLightboxImageSrc: (src: string | null) => void;
+
   // Actions
   setSession: (sessionId: string, model: string) => void;
   endSession: (reason: string) => void;
@@ -865,6 +869,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   tokenRatioCumulativeWeightedTokens: null,
   setTokenRatioData: (samples, summaries, globalTurnCount, cumulativeTokens, cumulativeWeightedTokens) =>
     set({ tokenRatioSamples: samples, tokenRatioSummaries: summaries, tokenRatioGlobalTurnCount: globalTurnCount, tokenRatioCumulativeTokens: cumulativeTokens, tokenRatioCumulativeWeightedTokens: cumulativeWeightedTokens }),
+
+  // Image Lightbox
+  lightboxImageSrc: null,
+  setLightboxImageSrc: (src) => set({ lightboxImageSrc: src }),
 
   // Actions
   setSession: (sessionId, model) =>

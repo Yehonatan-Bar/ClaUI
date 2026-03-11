@@ -323,6 +323,9 @@ claude-code-mirror/
 **Global Tooltip System** - Unified, VS Code-themed tooltip rendered via a single `GlobalTooltip` React component mounted at the App root. Uses document-level event delegation to detect `mouseover` on any element with a `data-tooltip` attribute, then renders a positioned tooltip via `createPortal`. 400ms hover delay, auto-flips above/below trigger, shifts horizontally to stay within viewport, hides on scroll. Accessible (`role="tooltip"`, dynamic `aria-describedby`). Touch-device guard. All ~25 component files use `data-tooltip="..."` instead of native `title` attributes.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/GLOBAL_TOOLTIP_SYSTEM.md`
 
+**Image Lightbox** - Full-screen overlay for viewing images at natural size. Double-clicking any image (pending input thumbnails or message bubble images) opens a dark overlay with the image centered at up to 90vw/90vh. Closes on backdrop click or Escape key. Portal-based component (`ImageLightbox`) mounted at App root, driven by `lightboxImageSrc` Zustand state field. CSS class `.image-lightbox-overlay` at z-index 9999.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/IMAGE_LIGHTBOX.md`
+
 **TextSettingsBar** - In-webview UI for adjusting chat text font size, font family, and typing personality theme. Supports Hebrew-friendly font presets and four rendering themes: Terminal Hacker, Retro, Zen, and Neo Zen. Settings are stored in Zustand and synced from VS Code configuration on startup and on change.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClaUi - Image Lightbox Feature Plan</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 40px 20px;
+      line-height: 1.8;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    h1 {
+      font-size: 28px;
+      color: #60a5fa;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #334155;
+      padding-bottom: 12px;
+    }
+    .subtitle {
+      color: #94a3b8;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    h2 {
+      font-size: 20px;
+      color: #38bdf8;
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+    p {
+      color: #cbd5e1;
+      margin-bottom: 12px;
+    }
+    .highlight-box {
+      background: #1a3a5c;
+      border-right: 4px solid #60a5fa;
+      padding: 16px 20px;
+      border-radius: 0 8px 8px 0;
+      margin: 16px 0;
+    }
+    .highlight-box p {
+      margin: 0;
+      color: #93c5fd;
+    }
+    .steps {
+      list-style: none;
+      counter-reset: step;
+      padding: 0;
+    }
+    .steps li {
+      counter-increment: step;
+      padding: 12px 16px 12px 0;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .steps li:last-child { border-bottom: none; }
+    .steps li::before {
+      content: counter(step);
+      background: #3b82f6;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-right: 6px;
+    }
+    .badge-new { background: #065f46; color: #6ee7b7; }
+    .badge-edit { background: #78350f; color: #fcd34d; }
+    .scope-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+    }
+    .scope-table th {
+      text-align: right;
+      padding: 10px 12px;
+      background: #334155;
+      color: #93c5fd;
+      font-weight: 600;
+    }
+    .scope-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #334155;
+      color: #cbd5e1;
+    }
+    .scope-table tr:last-child td { border-bottom: none; }
+    .check-list {
+      list-style: none;
+      padding: 0;
+    }
+    .check-list li {
+      padding: 8px 0;
+      color: #a7f3d0;
+    }
+    .check-list li::before {
+      content: "\2713  ";
+      color: #34d399;
+      font-weight: bold;
+    }
+    .footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid #334155;
+      color: #64748b;
+      font-size: 13px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>תכנית פיתוח: הגדלת תמונה בלחיצה כפולה</h1>
+    <div class="subtitle">ClaUi - VS Code Extension | תאריך: 2026-03-10</div>
+
+    <h2>הבעיה</h2>
+    <p>
+      כשמשתמש מדביק תמונה בצ'אט, היא מוצגת כתמונה ממוזערת קטנה מאוד (64x64 פיקסלים).
+      אין דרך נוחה לוודא מה הודבק לפני השליחה. גם תמונות שכבר נשלחו מוצגות בגודל מוגבל (עד 400 פיקסלים) ללא אפשרות להגדלה.
+    </p>
+
+    <div class="highlight-box">
+      <p><strong>הפתרון:</strong> לחיצה כפולה על כל תמונה (לפני או אחרי שליחה) תפתח תצוגה מוגדלת על מסך מלא, שנסגרת בלחיצה על הרקע או במקש Escape.</p>
+    </div>
+
+    <h2>היקף השינוי</h2>
+    <table class="scope-table">
+      <tr>
+        <th>פרמטר</th>
+        <th>ערך</th>
+      </tr>
+      <tr>
+        <td>קבצים חדשים</td>
+        <td>2 (רכיב התצוגה המוגדלת + קובץ ייצוא)</td>
+      </tr>
+      <tr>
+        <td>קבצים מעודכנים</td>
+        <td>5 (מצב, ממשק ראשי, אזור הקלט, בועת הודעה, עיצוב)</td>
+      </tr>
+      <tr>
+        <td>רמת סיכון</td>
+        <td>נמוכה - אין שינוי בלוגיקה קיימת, רק הוספת אינטראקציה</td>
+      </tr>
+      <tr>
+        <td>זמן משוער</td>
+        <td>שינוי קטן</td>
+      </tr>
+    </table>
+
+    <h2>שלבי הביצוע</h2>
+    <ol class="steps">
+      <li>
+        הוספת שדה מצב חדש למערכת - כאשר השדה מכיל כתובת תמונה, התצוגה המוגדלת נפתחת. כאשר הוא ריק, היא סגורה.
+      </li>
+      <li>
+        יצירת רכיב "תצוגה מוגדלת" - שכבת-על כהה שמכסה את כל המסך, עם התמונה במרכז בגודל מלא. לחיצה על הרקע או Escape סוגרת אותה.
+      </li>
+      <li>
+        שילוב הרכיב בממשק הראשי של האפליקציה - נטען פעם אחת ומוכן לשימוש מכל מקום.
+      </li>
+      <li>
+        הוספת לחיצה כפולה לתמונות ממוזערות באזור ההקלדה - כך שהמשתמש יכול לוודא מה הדביק לפני השליחה.
+      </li>
+      <li>
+        הוספת לחיצה כפולה לתמונות בהודעות שנשלחו - כך שניתן להגדיל כל תמונה בצ'אט.
+      </li>
+      <li>
+        עדכון עיצוב - הוספת סמן "זכוכית מגדלת" כשעוברים עם העכבר מעל תמונות, כדי לרמוז למשתמש שניתן להגדיל.
+      </li>
+    </ol>
+
+    <h2>חוויית משתמש</h2>
+    <ul class="check-list">
+      <li>לחיצה כפולה על תמונה ממוזערת = תצוגה מוגדלת</li>
+      <li>לחיצה על הרקע הכהה = סגירת התצוגה</li>
+      <li>מקש Escape = סגירת התצוגה</li>
+      <li>סמן העכבר משתנה לזכוכית מגדלת מעל תמונות</li>
+      <li>כפתור ה-X להסרת תמונה ממשיך לעבוד כרגיל</li>
+    </ul>
+
+    <h2>בדיקות</h2>
+    <ul class="check-list">
+      <li>הדבקת תמונה ולחיצה כפולה על התמונה הממוזערת</li>
+      <li>שליחת הודעה עם תמונה ולחיצה כפולה על התמונה בהודעה</li>
+      <li>סגירה עם Escape ועם לחיצה על הרקע</li>
+      <li>ווידוא שכפתור ההסרה (X) עדיין עובד בלחיצה רגילה</li>
+      <li>ווידוא שאין שגיאות אבטחה בקונסול</li>
+    </ul>
+
+    <div class="footer">
+      תכנית זו הוכנה על ידי Gandalf | ClaUi Development
+    </div>
+  </div>
+</body>
+</html>

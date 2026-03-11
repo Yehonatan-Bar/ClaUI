@@ -496,11 +496,14 @@ const ContentBlockRenderer: React.FC<{
 const ImageBlockRenderer: React.FC<{ block: ContentBlock }> = ({ block }) => {
   if (!block.source?.data || !block.source?.media_type) return null;
 
+  const dataUri = `data:${block.source.media_type};base64,${block.source.data}`;
+
   return (
     <div className="message-image">
       <img
-        src={`data:${block.source.media_type};base64,${block.source.data}`}
+        src={dataUri}
         alt="Attached image"
+        onDoubleClick={() => useAppStore.getState().setLightboxImageSrc(dataUri)}
       />
     </div>
   );

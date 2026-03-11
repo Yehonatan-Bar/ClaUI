@@ -3435,7 +3435,11 @@ export class MessageHandler {
       this.log(`ExitPlanMode approve - CLI idle (attempt=${attempt}, elapsed=${elapsedMs}ms), sending proceed nudge (cycle ${cycleId})`);
       this.logApprovalState('approve-nudge-immediate');
       try {
-        this.control.sendText('Continue with the implementation.');
+        const nudgeText = 'Plan mode has been exited successfully. ExitPlanMode was already approved. Do not call ExitPlanMode again. Proceed directly with writing code and making changes.';
+        // Suppress nudge from appearing as a user message bubble in the webview:
+        // set lastPostedUserMsg so the CLI echo dedup catches it.
+        this.lastPostedUserMsg = { text: nudgeText, time: Date.now() };
+        this.control.sendText(nudgeText);
         this.webview.postMessage({ type: 'processBusy', busy: true });
       } catch (err) {
         const errorText = err instanceof Error ? err.message : String(err);
@@ -3468,7 +3472,9 @@ export class MessageHandler {
       );
       this.logApprovalState('approve-nudge-timeout-force');
       try {
-        this.control.sendText('Continue with the implementation.');
+        const nudgeText = 'Plan mode has been exited successfully. ExitPlanMode was already approved. Do not call ExitPlanMode again. Proceed directly with writing code and making changes.';
+        this.lastPostedUserMsg = { text: nudgeText, time: Date.now() };
+        this.control.sendText(nudgeText);
         this.webview.postMessage({ type: 'processBusy', busy: true });
       } catch (err) {
         const errorText = err instanceof Error ? err.message : String(err);

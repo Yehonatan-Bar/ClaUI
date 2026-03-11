@@ -1,5 +1,33 @@
 # ClaUi - Changelog
 
+## v0.1.89 - 2026-03-11
+
+**Feature: Image Lightbox (Double-Click to Enlarge)**
+
+- Double-clicking any image (pending input thumbnails or message bubble images) opens a full-screen lightbox overlay
+- Image displayed at natural size (up to 90vw/90vh) centered on a dark semi-transparent backdrop
+- Close by clicking the backdrop or pressing Escape
+- Zoom-in cursor on all clickable images; zoom-out cursor on the overlay backdrop
+- Portal-based component (`ImageLightbox`) mounted at App root, driven by `lightboxImageSrc` Zustand state field
+
+**Feature: Display Mode Slider**
+
+- Replaced the three separate toggles (Summary Mode, Visual Progress, Detailed Diff) in the Vitals gear panel with a unified 4-position slider
+- Positions: Normal (0), Summary (1), Visual (2), Diff (3) -- mutually exclusive, only one active at a time
+- Clicking the track or labels switches modes; smooth animated thumb transition
+
+**Improvement: Auto-focus input on panel/window focus**
+
+- Textarea in the input area now automatically regains focus when the webview panel becomes active (tab switch) or when the VS Code window regains OS focus
+- Uses a custom `claui-focus-input` event dispatched from the extension via `focusInput` message, with `requestAnimationFrame` to ensure the iframe has settled
+- Applied to both Claude and Codex session tabs
+
+**Improvement: Codex CLI auto-detection on missing CLI**
+
+- When Codex CLI is not found at runtime, the extension now attempts auto-detection (bundled VS Code extensions, npm prefix, common install locations) before showing the "not found" guidance
+- Extracted shared CLI detection logic into `CodexCliDetector.ts`, used by both `CodexSessionTab` and `CodexMessageHandler`
+- If a working CLI is found, it is auto-configured and the user is informed to retry
+
 ## v0.1.87 - 2026-03-09
 
 **Feature: Visual Progress Mode**

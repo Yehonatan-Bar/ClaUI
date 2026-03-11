@@ -27,6 +27,7 @@ import { postToExtension } from './hooks/useClaudeStream';
 import { detectRtl } from './hooks/useRtlDetection';
 import { deriveTurnHistoryFromMessages } from './utils/turnVitals';
 import { GlobalTooltip } from './components/Tooltip/GlobalTooltip';
+import { ImageLightbox } from './components/ImageLightbox';
 
 const SESSION_SUMMARY_IDLE_MS = 60 * 60 * 1000;
 const SESSION_SUMMARY_DEFER_MS = 3 * 60 * 60 * 1000;
@@ -350,6 +351,7 @@ export const App: React.FC = () => {
       )}
       {achievementsEnabled && <AchievementToastStack />}
       <GlobalTooltip delay={400} />
+      <ImageLightbox />
     </div>
   );
 };
