@@ -621,7 +621,10 @@ export type WebviewToExtensionMessage =
   | TeamShutdownAgentRequest
   | SetSummaryModeEnabledRequest
   | SetVpmEnabledRequest
-  | SetUltrathinkLockedRequest;
+  | SetUltrathinkLockedRequest
+  | StartBtwSessionRequest
+  | SendBtwMessageRequest
+  | CloseBtwSessionRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -1489,6 +1492,64 @@ export interface BugReportSubmitResultMessage {
   error?: string;
 }
 
+// --- BTW Background Session (Webview -> Extension) ---
+
+export interface StartBtwSessionRequest {
+  type: 'startBtwSession';
+  promptText: string;
+}
+
+export interface SendBtwMessageRequest {
+  type: 'sendBtwMessage';
+  text: string;
+}
+
+export interface CloseBtwSessionRequest {
+  type: 'closeBtwSession';
+}
+
+// --- BTW Background Session (Extension -> Webview) ---
+
+export interface BtwSessionStartedMessage {
+  type: 'btwSessionStarted';
+}
+
+export interface BtwUserMessageMessage {
+  type: 'btwUserMessage';
+  content: ContentBlock[];
+}
+
+export interface BtwMessageStartMessage {
+  type: 'btwMessageStart';
+  messageId: string;
+}
+
+export interface BtwStreamingTextMessage {
+  type: 'btwStreamingText';
+  blockIndex: number;
+  text: string;
+}
+
+export interface BtwAssistantMessageMessage {
+  type: 'btwAssistantMessage';
+  messageId: string;
+  content: ContentBlock[];
+  model?: string;
+}
+
+export interface BtwMessageStopMessage {
+  type: 'btwMessageStop';
+}
+
+export interface BtwResultMessage {
+  type: 'btwResult';
+}
+
+export interface BtwSessionEndedMessage {
+  type: 'btwSessionEnded';
+  error?: string;
+}
+
 /** Serializable chat message for passing between webview instances (e.g. fork) */
 export interface SerializedChatMessage {
   id: string;
@@ -1585,4 +1646,12 @@ export type ExtensionToWebviewMessage =
   | VisualProgressCardMessage
   | VisualProgressCardUpdateMessage
   | UltrathinkLockedSettingMessage
-  | FocusInputMessage;
+  | FocusInputMessage
+  | BtwSessionStartedMessage
+  | BtwUserMessageMessage
+  | BtwMessageStartMessage
+  | BtwStreamingTextMessage
+  | BtwAssistantMessageMessage
+  | BtwMessageStopMessage
+  | BtwResultMessage
+  | BtwSessionEndedMessage;

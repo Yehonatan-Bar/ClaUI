@@ -59,6 +59,12 @@ export interface WebviewBridge {
   getCliPathOverride?(): string | null;
   /** Provider currently routed by this tab */
   getProvider?(): ProviderId;
+  /** Start a btw background session (fork from current, send first message) */
+  startBtwSession?(promptText: string): void;
+  /** Send a follow-up message in the active btw session */
+  sendBtwMessage?(text: string): void;
+  /** Close the active btw session */
+  closeBtwSession?(): void;
 }
 
 /**
@@ -1380,6 +1386,21 @@ export class MessageHandler {
             msg.promptText,
             msg.messages || []
           );
+          break;
+
+        case 'startBtwSession':
+          this.log(`Starting btw session with prompt: ${msg.promptText.slice(0, 60)}...`);
+          this.webview.startBtwSession?.(msg.promptText);
+          break;
+
+        case 'sendBtwMessage':
+          this.log(`Sending btw message: ${msg.text.slice(0, 60)}...`);
+          this.webview.sendBtwMessage?.(msg.text);
+          break;
+
+        case 'closeBtwSession':
+          this.log('Closing btw session.');
+          this.webview.closeBtwSession?.();
           break;
 
         case 'editAndResend':

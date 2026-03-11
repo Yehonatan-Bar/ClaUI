@@ -230,6 +230,11 @@ export class ClaudeProcessManager extends EventEmitter {
     this.killTree();
   }
 
+  /** Close stdin without killing the process (e.g. signal fork phase 1 to finish). */
+  endStdin(): void {
+    try { this.process?.stdin?.end(); } catch { /* already closed */ }
+  }
+
   /** Gracefully stop the process */
   stop(): void {
     if (this.process) {

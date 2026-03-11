@@ -16,12 +16,12 @@ interface MessageListProps {
 }
 
 export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange }) => {
-  const { messages, streamingMessageId, streamingBlocks, isBusy, truncateFromMessage, addUserMessage, markSessionPromptSent, currentThinkingEffort, btwPopup, setBtwPopup } = useAppStore();
+  const { messages, streamingMessageId, streamingBlocks, isBusy, truncateFromMessage, addUserMessage, markSessionPromptSent, currentThinkingEffort, btwPopup, setBtwPopup, clearBtwSession } = useAppStore();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const userScrolledUp = useRef(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; messageId: string | null } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; messageId: string | null; hasSelection: boolean } | null>(null);
 
   // Auto-scroll to bottom on new content, unless user has scrolled up
   useEffect(() => {
@@ -88,18 +88,37 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     const state = useAppStore.getState();
     if (state.messages.length === 0) return; // no context to BTW about
+
     e.preventDefault();
     const messageEl = (e.target as HTMLElement).closest('[data-message-id]');
     const messageId = messageEl?.getAttribute('data-message-id') ?? null;
-    setContextMenu({ x: e.clientX, y: e.clientY, messageId });
+    const selection = window.getSelection();
+    const hasSelection = !!selection && selection.toString().trim().length > 0;
+    setContextMenu({ x: e.clientX, y: e.clientY, messageId, hasSelection });
   }, []);
 
   /** Context menu "btw" click: open the popup */
   const handleBtwClick = useCallback(() => {
     if (!contextMenu) return;
-    setBtwPopup({ contextMessageId: contextMenu.messageId });
+    setBtwPopup({ contextMessageId: contextMenu.messageId, mode: 'compose' });
     setContextMenu(null);
   }, [contextMenu, setBtwPopup]);
+
+  /** BTW start background session: fork from current session and send first message */
+  const handleStartBtwSession = useCallback((btwText: string) => {
+    postToExtension({ type: 'startBtwSession', promptText: btwText });
+    // Switch popup to chat mode - the overlay reads from btwSession state
+    setBtwPopup({
+      contextMessageId: useAppStore.getState().btwPopup?.contextMessageId ?? null,
+      mode: 'chat',
+    });
+  }, [setBtwPopup]);
+
+  /** BTW close: dispose the background session and clear btw state */
+  const handleBtwClose = useCallback(() => {
+    postToExtension({ type: 'closeBtwSession' });
+    clearBtwSession();
+  }, [clearBtwSession]);
 
   /** BTW submit: reuse fork infrastructure to open a new tab with context */
   const handleBtwSubmit = useCallback((btwText: string) => {
@@ -202,6 +221,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
         <BtwContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
+          hasSelection={contextMenu.hasSelection}
           onBtwClick={handleBtwClick}
           onClose={() => setContextMenu(null)}
         />
@@ -210,8 +230,10 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
       {btwPopup && (
         <BtwPopup
           contextMessageId={btwPopup.contextMessageId}
-          onSubmit={handleBtwSubmit}
-          onClose={() => setBtwPopup(null)}
+          mode={btwPopup.mode}
+          onSubmitNewTab={handleBtwSubmit}
+          onStartBtwSession={handleStartBtwSession}
+          onClose={handleBtwClose}
         />
       )}
     </div>

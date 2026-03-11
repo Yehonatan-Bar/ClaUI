@@ -92,6 +92,14 @@ export function useClaudeStream(): void {
     setSummaryModeEnabled,
     setMessageSummary,
     incrementSessionToolCount,
+    initBtwSession,
+    addBtwUserMessage,
+    handleBtwMessageStart,
+    handleBtwStreamingText,
+    addBtwAssistantMessage,
+    handleBtwMessageStop,
+    handleBtwResult,
+    clearBtwSession,
   } = useAppStore();
 
   useEffect(() => {
@@ -745,6 +753,41 @@ export function useClaudeStream(): void {
         case 'focusInput':
           window.dispatchEvent(new Event('claui-focus-input'));
           break;
+
+        // --- BTW Background Session events ---
+        case 'btwSessionStarted':
+          initBtwSession();
+          break;
+
+        case 'btwUserMessage':
+          addBtwUserMessage(msg.content);
+          break;
+
+        case 'btwMessageStart':
+          handleBtwMessageStart(msg.messageId);
+          break;
+
+        case 'btwStreamingText':
+          handleBtwStreamingText(msg.blockIndex, msg.text);
+          break;
+
+        case 'btwAssistantMessage':
+          addBtwAssistantMessage(msg.messageId, msg.content, msg.model);
+          break;
+
+        case 'btwMessageStop':
+          handleBtwMessageStop();
+          break;
+
+        case 'btwResult':
+          handleBtwResult();
+          break;
+
+        case 'btwSessionEnded':
+          // Don't clear session state immediately - user may want to read the conversation
+          // Just mark it as not busy
+          handleBtwResult();
+          break;
       }
     }
 
@@ -829,6 +872,14 @@ export function useClaudeStream(): void {
     setThinkingEffort,
     setDetailedDiffEnabled,
     addWriteOldContent,
+    initBtwSession,
+    addBtwUserMessage,
+    handleBtwMessageStart,
+    handleBtwStreamingText,
+    addBtwAssistantMessage,
+    handleBtwMessageStop,
+    handleBtwResult,
+    clearBtwSession,
   ]);
 }
 

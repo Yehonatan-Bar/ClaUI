@@ -170,7 +170,15 @@ export interface AppState {
   forkInit: { promptText: string } | null;
 
   // BTW side-thought popup state
-  btwPopup: { contextMessageId: string | null } | null;
+  btwPopup: { contextMessageId: string | null; mode: 'compose' | 'chat' } | null;
+
+  // BTW background session state (separate from main session)
+  btwSession: {
+    messages: ChatMessage[];
+    streamingMessageId: string | null;
+    streamingBlocks: StreamingBlock[];
+    isBusy: boolean;
+  } | null;
 
   // Translation state
   translationLanguage: string;
@@ -460,7 +468,16 @@ export interface AppState {
   setGitPushConfigPanelOpen: (open: boolean) => void;
   setGitPushRunning: (running: boolean) => void;
   setForkInit: (init: { promptText: string } | null) => void;
-  setBtwPopup: (popup: { contextMessageId: string | null } | null) => void;
+  setBtwPopup: (popup: { contextMessageId: string | null; mode: 'compose' | 'chat' } | null) => void;
+  // BTW background session actions
+  initBtwSession: () => void;
+  addBtwUserMessage: (content: ContentBlock[]) => void;
+  handleBtwMessageStart: (messageId: string) => void;
+  handleBtwStreamingText: (blockIndex: number, text: string) => void;
+  addBtwAssistantMessage: (messageId: string, content: ContentBlock[], model?: string) => void;
+  handleBtwMessageStop: () => void;
+  handleBtwResult: () => void;
+  clearBtwSession: () => void;
   setTranslationLanguage: (language: string) => void;
   setTranslation: (messageId: string, translatedText: string) => void;
   setTranslating: (messageId: string, translating: boolean) => void;
@@ -708,6 +725,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   gitPushRunning: false,
   forkInit: null,
   btwPopup: null,
+  btwSession: null,
   translationLanguage: 'Hebrew',
   translations: {},
   translatingMessageIds: new Set(),
@@ -1371,6 +1389,97 @@ export const useAppStore = create<AppState>((set, get) => ({
   setForkInit: (init) => set({ forkInit: init }),
   setBtwPopup: (popup) => set({ btwPopup: popup }),
 
+  // BTW background session actions
+  initBtwSession: () => set({
+    btwSession: {
+      messages: [],
+      streamingMessageId: null,
+      streamingBlocks: [],
+      isBusy: true,
+    },
+  }),
+
+  addBtwUserMessage: (content) => set((state) => {
+    if (!state.btwSession) { return {}; }
+    const normalizedContent: ContentBlock[] = typeof content === 'string'
+      ? [{ type: 'text', text: content as string }]
+      : content;
+    const newMsg: ChatMessage = {
+      id: `btw-user-${Date.now()}`,
+      role: 'user',
+      content: normalizedContent,
+      timestamp: Date.now(),
+    };
+    return {
+      btwSession: {
+        ...state.btwSession,
+        messages: [...state.btwSession.messages, newMsg],
+        isBusy: true,
+      },
+    };
+  }),
+
+  handleBtwMessageStart: (messageId) => set((state) => {
+    if (!state.btwSession) { return {}; }
+    return {
+      btwSession: {
+        ...state.btwSession,
+        streamingMessageId: messageId,
+        streamingBlocks: [],
+        isBusy: true,
+      },
+    };
+  }),
+
+  handleBtwStreamingText: (blockIndex, text) => set((state) => {
+    if (!state.btwSession) { return {}; }
+    const blocks = [...state.btwSession.streamingBlocks];
+    const existing = blocks.find((b) => b.blockIndex === blockIndex);
+    if (existing) {
+      existing.text += text;
+    } else {
+      blocks.push({ blockIndex, type: 'text', text, toolName: undefined, partialJson: undefined });
+    }
+    return {
+      btwSession: { ...state.btwSession, streamingBlocks: blocks },
+    };
+  }),
+
+  addBtwAssistantMessage: (messageId, content, model) => set((state) => {
+    if (!state.btwSession) { return {}; }
+    const newMsg: ChatMessage = {
+      id: messageId,
+      role: 'assistant',
+      content,
+      model,
+      timestamp: Date.now(),
+    };
+    return {
+      btwSession: {
+        ...state.btwSession,
+        messages: [...state.btwSession.messages, newMsg],
+        streamingMessageId: null,
+        streamingBlocks: [],
+      },
+    };
+  }),
+
+  handleBtwMessageStop: () => set((state) => {
+    if (!state.btwSession) { return {}; }
+    return {
+      btwSession: { ...state.btwSession },
+    };
+  }),
+
+  handleBtwResult: () => set((state) => {
+    if (!state.btwSession) { return {}; }
+    return {
+      btwSession: { ...state.btwSession, isBusy: false },
+    };
+  }),
+
+  clearBtwSession: () => set({ btwSession: null, btwPopup: null }),
+
   setTranslationLanguage: (language) =>
     set((state) => {
       if (state.translationLanguage === language) {
@@ -1710,6 +1819,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       gitPushRunning: false,
       forkInit: null,
       btwPopup: null,
+      btwSession: null,
       translations: {},
       translatingMessageIds: new Set(),
       showingTranslation: new Set(),

@@ -38,6 +38,7 @@ import type {
   TurnRecord,
 } from '../types/webview-messages';
 import type { HandoffProvider, HandoffSourceSnapshot } from './handoff/HandoffTypes';
+import { BackgroundSession } from './BackgroundSession';
 
 export interface SessionTabCallbacks {
   onClosed: (tabId: string) => void;
@@ -106,6 +107,8 @@ export class SessionTab implements WebviewBridge {
   private windowStateSubscription: vscode.Disposable | null = null;
   /** Waiters that resolve when the next assistant reply arrives (handoff orchestration). */
   private assistantReplyWaiters: Array<(ok: boolean) => void> = [];
+  /** Background session for the "btw" side-conversation overlay */
+  private btwSession: BackgroundSession | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -565,9 +568,107 @@ export class SessionTab implements WebviewBridge {
     this.achievementService.onSessionEnd(this.id);
     this.achievementService.unregisterTab(this.id);
     this.skillGenService?.unregisterTab(this.id);
+    this.closeBtwSession();
     this.processManager.stop();
     this.fileLogger?.dispose();
     this.panel.dispose();
+  }
+
+  // --- BTW Background Session ---
+
+  /** Create a background session for the btw overlay, forked from the current session. */
+  startBtwSession(promptText: string): void {
+    const sessionId = this.processManager.currentSessionId;
+    if (!sessionId) {
+      this.log(`[Tab ${this.tabNumber}] Cannot start btw session: no active session.`);
+      this.postMessage({ type: 'btwSessionEnded', error: 'No active session.' });
+      return;
+    }
+
+    // Close any existing btw session first
+    this.closeBtwSession();
+
+    this.log(`[Tab ${this.tabNumber}] Starting btw background session from ${sessionId}`);
+    this.btwSession = new BackgroundSession(
+      this.context,
+      (msg) => this.log(`[Tab ${this.tabNumber}] ${msg}`),
+    );
+    this.wireBtwSessionEvents();
+    this.postMessage({ type: 'btwSessionStarted' });
+
+    this.btwSession.startFork(sessionId, promptText).catch((err: unknown) => {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      this.log(`[Tab ${this.tabNumber}] btw session fork failed: ${errMsg}`);
+      this.postMessage({ type: 'btwSessionEnded', error: errMsg });
+      this.closeBtwSession();
+    });
+  }
+
+  /** Wire demux events from the btw background session to the webview. */
+  private wireBtwSessionEvents(): void {
+    if (!this.btwSession) { return; }
+    const btw = this.btwSession;
+
+    btw.on('userMessage', (data: { content: unknown }) => {
+      const content = Array.isArray(data.content)
+        ? data.content
+        : typeof data.content === 'string'
+          ? [{ type: 'text' as const, text: data.content }]
+          : [];
+      this.postMessage({ type: 'btwUserMessage', content });
+    });
+
+    btw.on('messageStart', (data: { messageId: string }) => {
+      this.postMessage({ type: 'btwMessageStart', messageId: data.messageId });
+    });
+
+    btw.on('textDelta', (data: { blockIndex: number; text: string }) => {
+      this.postMessage({
+        type: 'btwStreamingText',
+        blockIndex: data.blockIndex,
+        text: data.text,
+      });
+    });
+
+    btw.on('assistantMessage', (data: { id: string; content: unknown[]; model?: string }) => {
+      this.postMessage({
+        type: 'btwAssistantMessage',
+        messageId: data.id,
+        content: Array.isArray(data.content) ? data.content as any : [],
+        model: data.model,
+      });
+    });
+
+    btw.on('messageStop', () => {
+      this.postMessage({ type: 'btwMessageStop' });
+    });
+
+    btw.on('result', () => {
+      this.postMessage({ type: 'btwResult' });
+    });
+
+    btw.on('ended', (data?: { error?: string; code?: number }) => {
+      this.postMessage({ type: 'btwSessionEnded', error: data?.error });
+      this.btwSession = null;
+    });
+  }
+
+  /** Send a follow-up message in the btw background session. */
+  sendBtwMessage(text: string): void {
+    if (!this.btwSession) {
+      this.log(`[Tab ${this.tabNumber}] Cannot send btw message: no active btw session.`);
+      return;
+    }
+    this.btwSession.sendMessage(text);
+  }
+
+  /** Close and dispose the btw background session. */
+  closeBtwSession(): void {
+    if (this.btwSession) {
+      this.log(`[Tab ${this.tabNumber}] Closing btw session.`);
+      this.btwSession.dispose();
+      this.btwSession = null;
+    }
   }
 
   private resolveAssistantReplyWaiters(ok: boolean): void {
