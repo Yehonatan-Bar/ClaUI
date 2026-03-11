@@ -82,6 +82,7 @@ User mode displays global user-level analytics shared across all workspaces (sto
 - Summary cards: one per billing bucket showing latest weighted tokensPerPercent, trend arrow, sample count
 - Global stats bar: total turns tracked, raw tokens, weighted tokens, per-type breakdown with cost multiplier labels
 - Trend line chart (Recharts LineChart): weighted tokensPerPercent over time, one colored line per bucket
+- Trend line X-axis is period-aware: `5 Hours`/`24 Hours` show time (`HH:MM`), while `7 Days`+ periods show date labels
 - Samples table: last 50 samples (Date, Bucket, Usage%, Raw Delta, Weighted Delta, Delta Usage%, Weighted Tok/1%)
 - Clear Data button to reset all stored samples
 - Quick-start: first baseline sample created after just 2 turns (subsequent samples every 5 turns)

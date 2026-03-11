@@ -594,6 +594,7 @@ export class SessionTab implements WebviewBridge {
       (msg) => this.log(`[Tab ${this.tabNumber}] ${msg}`),
     );
     this.wireBtwSessionEvents();
+    this.log(`[Tab ${this.tabNumber}] [BTW->WV] btwSessionStarted`);
     this.postMessage({ type: 'btwSessionStarted' });
 
     this.btwSession.startFork(sessionId, promptText).catch((err: unknown) => {
@@ -609,16 +610,21 @@ export class SessionTab implements WebviewBridge {
     if (!this.btwSession) { return; }
     const btw = this.btwSession;
 
-    btw.on('userMessage', (data: { content: unknown }) => {
-      const content = Array.isArray(data.content)
-        ? data.content
-        : typeof data.content === 'string'
-          ? [{ type: 'text' as const, text: data.content }]
+    const tabLog = (msg: string) => this.log(`[Tab ${this.tabNumber}] [BTW->WV] ${msg}`);
+
+    btw.on('userMessage', (data: { message: { content: unknown } }) => {
+      const rawContent = data.message?.content;
+      const content = Array.isArray(rawContent)
+        ? rawContent
+        : typeof rawContent === 'string'
+          ? [{ type: 'text' as const, text: rawContent }]
           : [];
+      tabLog('btwUserMessage');
       this.postMessage({ type: 'btwUserMessage', content });
     });
 
     btw.on('messageStart', (data: { messageId: string }) => {
+      tabLog(`btwMessageStart msgId=${data.messageId}`);
       this.postMessage({ type: 'btwMessageStart', messageId: data.messageId });
     });
 
@@ -630,24 +636,30 @@ export class SessionTab implements WebviewBridge {
       });
     });
 
-    btw.on('assistantMessage', (data: { id: string; content: unknown[]; model?: string }) => {
+    btw.on('assistantMessage', (data: { message: { id: string; content: unknown[]; model?: string } }) => {
+      const msg = data.message;
+      const contentLen = Array.isArray(msg?.content) ? msg.content.length : 0;
+      tabLog(`btwAssistantMessage msgId=${msg?.id} contentBlocks=${contentLen}`);
       this.postMessage({
         type: 'btwAssistantMessage',
-        messageId: data.id,
-        content: Array.isArray(data.content) ? data.content as any : [],
-        model: data.model,
+        messageId: msg?.id,
+        content: Array.isArray(msg?.content) ? msg.content as any : [],
+        model: msg?.model,
       });
     });
 
     btw.on('messageStop', () => {
+      tabLog('btwMessageStop');
       this.postMessage({ type: 'btwMessageStop' });
     });
 
     btw.on('result', () => {
+      tabLog('btwResult');
       this.postMessage({ type: 'btwResult' });
     });
 
     btw.on('ended', (data?: { error?: string; code?: number }) => {
+      tabLog(`btwSessionEnded error=${data?.error} code=${data?.code}`);
       this.postMessage({ type: 'btwSessionEnded', error: data?.error });
       this.btwSession = null;
     });

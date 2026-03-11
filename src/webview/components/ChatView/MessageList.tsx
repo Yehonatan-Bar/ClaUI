@@ -16,7 +16,7 @@ interface MessageListProps {
 }
 
 export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange }) => {
-  const { messages, streamingMessageId, streamingBlocks, isBusy, truncateFromMessage, addUserMessage, markSessionPromptSent, currentThinkingEffort, btwPopup, setBtwPopup, clearBtwSession } = useAppStore();
+  const { messages, streamingMessageId, streamingBlocks, isBusy, truncateFromMessage, addUserMessage, markSessionPromptSent, currentThinkingEffort, btwPopup, setBtwPopup, clearBtwSession, initBtwSession, addBtwUserMessage } = useAppStore();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const userScrolledUp = useRef(false);
@@ -106,13 +106,16 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
 
   /** BTW start background session: fork from current session and send first message */
   const handleStartBtwSession = useCallback((btwText: string) => {
+    // Optimistic: initialize btw session and show user message immediately
+    initBtwSession();
+    addBtwUserMessage([{ type: 'text', text: btwText }]);
     postToExtension({ type: 'startBtwSession', promptText: btwText });
     // Switch popup to chat mode - the overlay reads from btwSession state
     setBtwPopup({
       contextMessageId: useAppStore.getState().btwPopup?.contextMessageId ?? null,
       mode: 'chat',
     });
-  }, [setBtwPopup]);
+  }, [setBtwPopup, initBtwSession, addBtwUserMessage]);
 
   /** BTW close: dispose the background session and clear btw state */
   const handleBtwClose = useCallback(() => {

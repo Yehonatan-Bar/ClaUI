@@ -1390,13 +1390,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   setBtwPopup: (popup) => set({ btwPopup: popup }),
 
   // BTW background session actions
-  initBtwSession: () => set({
-    btwSession: {
-      messages: [],
-      streamingMessageId: null,
-      streamingBlocks: [],
-      isBusy: true,
-    },
+  // Idempotent: skip if already initialized (preserves optimistic user messages)
+  initBtwSession: () => set((state) => {
+    if (state.btwSession) { return {}; }
+    return {
+      btwSession: {
+        messages: [],
+        streamingMessageId: null,
+        streamingBlocks: [],
+        isBusy: true,
+      },
+    };
   }),
 
   addBtwUserMessage: (content) => set((state) => {

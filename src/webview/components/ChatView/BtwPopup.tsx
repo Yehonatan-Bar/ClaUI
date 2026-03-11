@@ -82,18 +82,23 @@ export const BtwPopup: React.FC<BtwPopupProps> = ({
     [text, sessionId, onStartBtwSession]
   );
 
+  const addBtwUserMessage = useAppStore((s) => s.addBtwUserMessage);
+
   // Enter to send in chat mode (Shift+Enter for newline)
   const handleChatKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         if (text.trim() && !btwSession?.isBusy) {
-          postToExtension({ type: 'sendBtwMessage', text: text.trim() });
+          const trimmed = text.trim();
+          // Optimistic: show user message immediately before CLI echo
+          addBtwUserMessage([{ type: 'text', text: trimmed }]);
+          postToExtension({ type: 'sendBtwMessage', text: trimmed });
           setText('');
         }
       }
     },
-    [text, btwSession?.isBusy]
+    [text, btwSession?.isBusy, addBtwUserMessage]
   );
 
   const handleNewTabSubmit = useCallback(() => {
@@ -111,10 +116,13 @@ export const BtwPopup: React.FC<BtwPopupProps> = ({
 
   const handleChatSend = useCallback(() => {
     if (text.trim() && !btwSession?.isBusy) {
-      postToExtension({ type: 'sendBtwMessage', text: text.trim() });
+      const trimmed = text.trim();
+      // Optimistic: show user message immediately before CLI echo
+      addBtwUserMessage([{ type: 'text', text: trimmed }]);
+      postToExtension({ type: 'sendBtwMessage', text: trimmed });
       setText('');
     }
-  }, [text, btwSession?.isBusy]);
+  }, [text, btwSession?.isBusy, addBtwUserMessage]);
 
   const canSubmit = text.trim().length > 0 && !!sessionId;
   const isBtwBusy = btwSession?.isBusy ?? false;

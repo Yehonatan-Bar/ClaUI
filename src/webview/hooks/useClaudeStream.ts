@@ -760,7 +760,7 @@ export function useClaudeStream(): void {
           break;
 
         case 'btwUserMessage':
-          addBtwUserMessage(msg.content);
+          // Skip CLI echo - user messages are added optimistically in BtwPopup/MessageList
           break;
 
         case 'btwMessageStart':

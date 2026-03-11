@@ -71,6 +71,13 @@ function formatShortTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatAxisTick(ts: number, periodLabel?: string | null): string {
+  if (periodLabel === '5 Hours' || periodLabel === '24 Hours') {
+    return formatShortTime(ts);
+  }
+  return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
 // --- Summary Card ---
 const SummaryCard: React.FC<{ summary: TokenRatioBucketSummary }> = ({ summary }) => {
   const parsed = parseBucketKey(summary.bucket);
@@ -122,7 +129,7 @@ function buildChartData(
     if (s.tokensPerPercent === null) continue;
     const parsed = parseBucketKey(s.bucket);
     const modelKey = parsed?.modelLabel ?? s.bucket;
-    const entry = byTime.get(s.timestamp) || { timestamp: s.timestamp, time: formatShortTime(s.timestamp) };
+    const entry = byTime.get(s.timestamp) || { timestamp: s.timestamp };
     entry[modelKey] = s.tokensPerPercent;
     byTime.set(s.timestamp, entry);
   }
@@ -362,7 +369,13 @@ export const TokenRatioTab: React.FC = () => {
           </div>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={chartData}>
-              <XAxis dataKey="time" tick={{ fontSize: 11, fill: DASH_COLORS.textMuted }} />
+              <XAxis
+                dataKey="timestamp"
+                type="number"
+                domain={['dataMin', 'dataMax']}
+                tick={{ fontSize: 11, fill: DASH_COLORS.textMuted }}
+                tickFormatter={(value: number) => formatAxisTick(value, activePeriodEntry?.label)}
+              />
               <YAxis tick={{ fontSize: 11, fill: DASH_COLORS.textMuted }} tickFormatter={(v: number) => formatTokens(v)} />
               <Tooltip
                 contentStyle={{
@@ -371,6 +384,11 @@ export const TokenRatioTab: React.FC = () => {
                   borderRadius: 6,
                   fontSize: 12,
                   color: DASH_COLORS.text,
+                }}
+                labelFormatter={(label: React.ReactNode) => {
+                  if (typeof label === 'number') return formatDate(label);
+                  if (typeof label === 'string') return formatDate(Number(label));
+                  return '';
                 }}
                 formatter={(value: number | undefined) => [formatTokens(value ?? 0), '']}
               />

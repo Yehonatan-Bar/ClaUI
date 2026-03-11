@@ -13,17 +13,20 @@ import type { CliOutputEvent } from '../types/stream-json';
  *
  * Lifecycle:
  *   1. construct(context)
- *   2. startFork(sessionId, promptText)  -- two-phase fork, sends first message
+ *   2. startFork(sessionId, promptText)  -- forks and sends first message
  *   3. sendMessage(text)                 -- follow-up messages
  *   4. dispose()                         -- kill process and clean up
+ *
+ * Key insight: In pipe mode (-p) with --fork-session, the CLI does NOT exit
+ * after forking. It stays alive on the forked session, waiting for stdin input.
+ * So we use a SINGLE phase: start with --fork-session, then immediately send
+ * the first message. No two-phase approach needed.
  */
 export class BackgroundSession extends EventEmitter {
   private processManager: ClaudeProcessManager;
   private demux: StreamDemux;
   private control: ControlProtocol;
-  private pendingFirstMessage: string | null = null;
   private disposed = false;
-  private forkInProgress = false;
   private log: (msg: string) => void;
 
   constructor(
@@ -39,16 +42,13 @@ export class BackgroundSession extends EventEmitter {
     this.wireEvents();
   }
 
-  /** Wire processManager events — handles both fork phase 1 exit and phase 2 session. */
+  /** Wire processManager and demux events. */
   private wireEvents(): void {
-    // Log ALL CLI stdout events for diagnostics
+    // CLI stdout events -> demux
     this.processManager.on('event', (event: CliOutputEvent) => {
       const subtype = 'subtype' in event ? String((event as unknown as { subtype: string }).subtype) : 'N/A';
       this.log(`[BtwSession] event: type=${event.type} subtype=${subtype}`);
-      // During fork phase 1, don't feed events to demux (they're hook events, not conversation)
-      if (!this.forkInProgress) {
-        this.demux.handleEvent(event);
-      }
+      this.demux.handleEvent(event);
     });
 
     // Log raw non-JSON lines
@@ -65,33 +65,14 @@ export class BackgroundSession extends EventEmitter {
       this.emit('error', err);
     });
 
-    // Exit handler — serves double duty for fork phase 1 and phase 2
+    // Process exit = btw session ended
     this.processManager.on('exit', (info: { code: number | null; signal: string | null }) => {
       if (this.disposed) { return; }
-
-      // Fork phase 1 complete: --fork-session created the new session and exited.
-      // Phase 2: resume the forked session as a normal interactive session.
-      if (this.forkInProgress) {
-        this.forkInProgress = false;
-        const forkedSessionId = this.processManager.currentSessionId;
-        this.log(`[BtwSession] Fork phase 1 exited (code=${info.code}). Captured session_id=${forkedSessionId}`);
-
-        if (forkedSessionId) {
-          this.log(`[BtwSession] Starting phase 2 with forked session: ${forkedSessionId}`);
-          this.startPhase2(forkedSessionId);
-        } else {
-          this.log('[BtwSession] Fork failed: no session ID captured from init event');
-          this.emit('ended', { error: 'Fork failed: no session ID captured.' });
-        }
-        return;
-      }
-
-      // Phase 2 exit = btw session ended
-      this.log(`[BtwSession] Phase 2 process exited (code=${info.code}, signal=${info.signal})`);
+      this.log(`[BtwSession] Process exited (code=${info.code}, signal=${info.signal})`);
       this.emit('ended', { code: info.code });
     });
 
-    // Forward demux events with the same names used by SessionTab/MessageHandler
+    // Forward demux events
     const forwardEvents = [
       'init', 'userMessage', 'assistantMessage',
       'textDelta', 'toolUseStart', 'toolUseDelta', 'blockStop',
@@ -110,42 +91,20 @@ export class BackgroundSession extends EventEmitter {
   /**
    * Fork from a parent session and send the first btw message.
    *
-   * Uses processManager.start() with fork: true — same approach as SessionTab.
-   * The processManager spawns `claude -p --resume <id> --fork-session ...`.
-   * The CLI creates a forked session, emits system/init with the new ID, and exits.
-   * The exit handler then starts phase 2 (interactive session on the forked ID).
+   * In pipe mode with --fork-session, the CLI forks the session and then
+   * stays alive waiting for stdin input (it does NOT exit after forking).
+   * So we immediately send the first message after the process spawns.
+   * The CLI will emit system/init and then process the message.
    */
   async startFork(sessionId: string, promptText: string): Promise<void> {
-    this.pendingFirstMessage = promptText;
-    this.forkInProgress = true;
     this.log(`[BtwSession] Starting fork from session ${sessionId}`);
     await this.processManager.start({ resume: sessionId, fork: true });
-    this.log(`[BtwSession] processManager.start() resolved (fork phase 1 spawned)`);
-  }
+    this.log(`[BtwSession] Fork process spawned, sending first message immediately...`);
+    this.emit('ready');
 
-  /** Phase 2: Start interactive session on the forked session. */
-  private startPhase2(forkedSessionId: string): void {
-    this.processManager
-      .start({
-        resume: forkedSessionId,
-        skipReplay: true,
-      })
-      .then(() => {
-        this.log(`[BtwSession] Phase 2 process spawned. isRunning=${this.processManager.isRunning}`);
-        this.emit('ready');
-        if (this.pendingFirstMessage) {
-          const msg = this.pendingFirstMessage;
-          this.pendingFirstMessage = null;
-          this.log(`[BtwSession] Sending first message (${msg.length} chars)...`);
-          this.control.sendText(msg);
-          this.log('[BtwSession] First message sent via control.sendText()');
-        }
-      })
-      .catch((err: unknown) => {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        this.log(`[BtwSession] Phase 2 start failed: ${errMsg}`);
-        this.emit('ended', { error: errMsg });
-      });
+    // Send the first message right away - the CLI will buffer it until ready
+    this.control.sendText(promptText);
+    this.log(`[BtwSession] First message sent (${promptText.length} chars)`);
   }
 
   /** Send a follow-up user message in the btw conversation. */
