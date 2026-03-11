@@ -30,6 +30,7 @@ export const BtwPopup: React.FC<BtwPopupProps> = ({
   const chatMessagesRef = useRef<HTMLDivElement>(null);
   const messages = useAppStore((s) => s.messages);
   const sessionId = useAppStore((s) => s.sessionId);
+  const activeProvider = useAppStore((s) => s.provider ?? s.selectedProvider);
 
   // BTW background session state
   const btwSession = useAppStore((s) => s.btwSession);
@@ -126,6 +127,7 @@ export const BtwPopup: React.FC<BtwPopupProps> = ({
 
   const canSubmit = text.trim().length > 0 && !!sessionId;
   const isBtwBusy = btwSession?.isBusy ?? false;
+  const assistantName = activeProvider === 'codex' ? 'Codex' : 'Claude';
 
   // Extract text from content blocks
   const getTextFromContent = (content: ContentBlock[]) => {
@@ -161,13 +163,13 @@ export const BtwPopup: React.FC<BtwPopupProps> = ({
             )}
             {btwMessages.map((msg) => (
               <div key={msg.id} className={`btw-chat-msg btw-chat-msg-${msg.role}`}>
-                <div className="btw-chat-msg-role">{msg.role === 'user' ? 'You' : 'Claude'}</div>
+                <div className="btw-chat-msg-role">{msg.role === 'user' ? 'You' : assistantName}</div>
                 <div className="btw-chat-msg-text">{getTextFromContent(msg.content)}</div>
               </div>
             ))}
             {isStreaming && (
               <div className="btw-chat-msg btw-chat-msg-assistant">
-                <div className="btw-chat-msg-role">Claude</div>
+                <div className="btw-chat-msg-role">{assistantName}</div>
                 <div className="btw-chat-msg-text">
                   {streamingBlocks
                     .filter((b) => b.type === 'text')

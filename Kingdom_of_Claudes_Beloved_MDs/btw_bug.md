@@ -13,7 +13,9 @@ The "btw..." feature allows users to have a **separate side-conversation** that 
 ## Architecture
 
 - **BackgroundSession** (`src/extension/session/BackgroundSession.ts`): Headless CLI session that forks from the parent session. Owns its own `ClaudeProcessManager`, `StreamDemux`, and `ControlProtocol`. Uses single-phase approach: fork + immediate message send.
-- **SessionTab** manages the btw lifecycle: `startBtwSession()`, `wireBtwSessionEvents()`, `sendBtwMessage()`, `closeBtwSession()`.
+- **CodexBackgroundSession** (`src/extension/session/CodexBackgroundSession.ts`): Headless Codex side-session for BTW. Uses per-turn `codex exec --json`, retains `threadId`, and emits BTW-compatible events (`messageStart`, `textDelta`, `assistantMessage`, `messageStop`, `result`).
+- **SessionTab / CodexSessionTab** manage the BTW lifecycle: `startBtwSession()`, event wiring, `sendBtwMessage()`, `closeBtwSession()`.
+- **MessageHandler / CodexMessageHandler** route `startBtwSession`, `sendBtwMessage`, `closeBtwSession` from webview to the active provider runtime.
 - **Webview** has separate Zustand store state (`btwSession`) with its own messages/streaming/busy arrays.
 - **Message routing**: Extension sends btw-prefixed messages (`btwSessionStarted`, `btwStreamingText`, etc.) to webview. Webview sends `startBtwSession`, `sendBtwMessage`, `closeBtwSession` to extension.
 
@@ -157,6 +159,22 @@ btw.on('assistantMessage', (data: { message: { id, content, model } }) => {
 
 ---
 
+### 2026-03-11: Codex BTW Parity
+
+**Problem**: BTW overlay requests were only implemented in the Claude path. In Codex tabs, webview sent `startBtwSession/sendBtwMessage/closeBtwSession` but `CodexMessageHandler` ignored them, so users could not actually run BTW chat with Codex.
+
+**Fix**:
+
+1. Added `CodexBackgroundSession` to run independent Codex side-chat turns without polluting the main tab stream.
+2. Added full BTW lifecycle in `CodexSessionTab`: start, send, close, event forwarding to `btw*` webview messages.
+3. Added Codex-side message routing in `CodexMessageHandler` for BTW requests.
+4. Added bootstrap prompt in Codex BTW start that includes clipped recent context from the current Codex session snapshot.
+5. Updated `BtwPopup.tsx` assistant role label to follow active provider (`Claude` vs `Codex`).
+
+**Result**: In Codex sessions, BTW overlay now talks to Codex (not Claude), while preserving separate BTW state in the webview.
+
+---
+
 ## Key Technical Lessons
 
 1. **CLI pipe mode behavior**: The Claude CLI with `-p` does NOT emit `system/init` until it receives stdin input. With `--fork-session`, it does NOT exit - it stays alive on the forked session. Solution: send the first message immediately after spawning.
@@ -174,11 +192,14 @@ btw.on('assistantMessage', (data: { message: { id, content, model } }) => {
 | File | Changes |
 |---|---|
 | `src/extension/session/BackgroundSession.ts` | Complete rewrite - single-phase fork approach |
+| `src/extension/session/CodexBackgroundSession.ts` | New Codex BTW runtime (headless side-session) |
 | `src/extension/session/SessionTab.ts` | btw lifecycle + fixed `.message` nesting in wireBtwSessionEvents |
+| `src/extension/session/CodexSessionTab.ts` | Added Codex BTW lifecycle + context bootstrap |
 | `src/extension/webview/MessageHandler.ts` | WebviewBridge interface + message handlers |
+| `src/extension/webview/CodexMessageHandler.ts` | Added BTW request routing for Codex tabs |
 | `src/extension/types/webview-messages.ts` | 11 new btw message types |
 | `src/webview/state/store.ts` | Separate `btwSession` state + 8 actions |
 | `src/webview/hooks/useClaudeStream.ts` | 8 btw event handlers |
-| `src/webview/components/ChatView/BtwPopup.tsx` | Overlay UI with compose/chat modes |
+| `src/webview/components/ChatView/BtwPopup.tsx` | Overlay UI + provider-aware assistant label (`Claude`/`Codex`) |
 | `src/webview/components/ChatView/MessageList.tsx` | btw session start/close handlers |
 | `src/webview/styles/global.css` | Floating overlay panel CSS |

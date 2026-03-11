@@ -2,6 +2,14 @@
 
 ## Unreleased - 2026-03-11
 
+**Feature: BTW now works natively in Codex sessions**
+
+- Added a dedicated headless `CodexBackgroundSession` for BTW side-conversations, with isolated per-turn `codex exec --json` flow and persistent BTW thread context
+- Added full BTW lifecycle support in `CodexSessionTab` (`startBtwSession`, `sendBtwMessage`, `closeBtwSession`) and mapped Codex events to existing `btw*` webview messages
+- Added BTW request routing in `CodexMessageHandler` so BTW actions from the webview are handled in Codex tabs (instead of being ignored)
+- Seeded Codex BTW start with clipped recent context from the current tab to preserve conversational continuity in the side-thread
+- Updated `BtwPopup` role label to be provider-aware (`Claude` / `Codex`) during BTW chat
+
 **Improvement: BTW side-conversation reliability and UX polish**
 
 - Reworked `BackgroundSession` to a single-phase fork flow (fork + immediate first message), avoiding the previous stuck behavior in pipe mode
@@ -21,6 +29,7 @@
 - Added `Kingdom_of_Claudes_Beloved_MDs/btw_bug.md` with BTW bug-fix investigation history and architecture notes
 - Added `Kingdom_of_Claudes_Beloved_MDs/USAGE_LIMIT_DEFERRED_SEND_PLAN.md` (planned usage-limit deferred-send flow)
 - Updated `TECHNICAL.md` and analytics/token-ratio details to reflect the new docs and chart behavior
+- Updated `Kingdom_of_Claudes_Beloved_MDs/btw_bug.md` and `TECHNICAL.md` with Codex BTW architecture and runtime flow
 
 ## v0.1.91 - 2026-03-11
 

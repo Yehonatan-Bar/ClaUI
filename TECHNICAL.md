@@ -197,6 +197,7 @@ claude-code-mirror/
 |       |   |   |   +-- CommandsTab.tsx   #     Session: Bash command timeline + filters
 |       |   |   |   +-- ContextTab.tsx    #     Session: Metadata + conversation inspector
 |       |   |   |   +-- ProjectOverviewTab.tsx  #  Project: Aggregated metrics + charts across sessions
+|       |   |   |   +-- Project30DaysTab.tsx   #  Project: Last-30-days filtered analytics view
 |       |   |   |   +-- ProjectSessionsTab.tsx  #  Project: Sortable/filterable session table
 |       |   |   |   +-- ProjectTokensTab.tsx    #  Project: Aggregated token breakdown
 |       |   |   |   +-- ProjectToolsTab.tsx     #  Project: Aggregated tool/category/task type
@@ -245,6 +246,7 @@ claude-code-mirror/
     +-- GIT_PUSH_BUTTON.md               #   Git push button and configuration
     +-- MARKDOWN_RENDERING.md            #   Markdown rendering pipeline (marked + DOMPurify)
     +-- MESSAGE_TRANSLATION.md           #   Hebrew translation via Sonnet CLI
+    +-- PROJECT_30_DAYS_TAB.md          #   Project dashboard 30-day filtered tab behavior
     +-- SESSION_NAMER.md                  #   Auto-naming feature (data flow, gotchas, debugging)
     +-- SESSION_VITALS.md                 #   Session health dashboard (timeline, weather, cost bar)
     +-- SKILL_VISUAL_INDICATOR.md        #   Skill tool invocation visual indicators (badge, pill, category)
@@ -379,7 +381,7 @@ claude-code-mirror/
 **Editable Prompts** - Users can edit previously sent messages by hovering over a user message and clicking "Edit". The message content switches to an inline textarea. On send, all messages from the edit point onward are removed from the UI, the current CLI session is stopped, then **resumed** with `--resume <sessionId>` (without `--replay-user-messages` to avoid re-emitting old messages). The edited prompt is sent into the resumed session so Claude retains full prior conversation context. Only text-only user messages are editable (not images). The edit button is hidden while the assistant is busy.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**Fork Conversation** - Users can fork the conversation from any user message by hovering and clicking "Fork". The webview sends a truncated message history (everything before the selected user message) plus the selected message text. `claudeMirror.forkFromMessage` creates a new tab using the same provider as the source session. Claude tabs use a **two-phase fork**: Phase 1 spawns `claude --resume <id> --fork-session` (without `--replay-user-messages`) which creates the fork and exits; the exit handler detects `forkInProgress`, captures the new session ID, then Phase 2 resumes the forked session interactively with `--resume <new-id> --skipReplay`. Codex tabs use a simple UI-level fork (new Codex session, copied history snapshot in the webview, and the forked message prefilled in the input box, without resuming the original thread). **BTW (Side Thought)**: Right-click anywhere in the message list to open a "btw..." context menu. Clicking it opens a modal popup where users type a side question. Submitting opens a new tab with conversation context up to the right-clicked message, using the same fork infrastructure. Unlike Fork (which replaces a specific user message), BTW injects a new question with context up to any point. Key files: `BtwContextMenu.tsx`, `BtwPopup.tsx`, `MessageBubble.tsx` (Fork button), `MessageList.tsx` (handlers for both fork and BTW), `MessageHandler.ts` / `CodexMessageHandler.ts` (`forkFromMessage` routing), `commands.ts` (`claudeMirror.forkFromMessage`), `SessionTab.ts` / `CodexSessionTab.ts` (`setForkInit` + two-phase fork startup), `App.tsx` (fork completion logic), `InputArea.tsx` (`fork-set-input` listener).
+**Fork Conversation** - Users can fork the conversation from any user message by hovering and clicking "Fork". The webview sends a truncated message history (everything before the selected user message) plus the selected message text. `claudeMirror.forkFromMessage` creates a new tab using the same provider as the source session. Claude tabs use a **two-phase fork**: Phase 1 spawns `claude --resume <id> --fork-session` (without `--replay-user-messages`) which creates the fork and exits; the exit handler detects `forkInProgress`, captures the new session ID, then Phase 2 resumes the forked session interactively with `--resume <new-id> --skipReplay`. Codex tabs use a simple UI-level fork (new Codex session, copied history snapshot in the webview, and the forked message prefilled in the input box, without resuming the original thread). **BTW (Side Thought)**: Right-click anywhere in the message list to open a "btw..." context menu. In compose mode, users can either open a new tab (same fork flow as above) or click **Send** to start an in-place floating side chat. Claude tabs route BTW chat through `BackgroundSession` (forked Claude side process). Codex tabs route BTW chat through `CodexBackgroundSession` (dedicated Codex side thread, seeded with clipped recent context from the current tab). This keeps BTW chat isolated from the main message stream while using the active provider. Key files: `BtwContextMenu.tsx`, `BtwPopup.tsx`, `MessageBubble.tsx` (Fork button), `MessageList.tsx` (handlers for both fork and BTW), `MessageHandler.ts` / `CodexMessageHandler.ts` (BTW + fork routing), `BackgroundSession.ts` / `CodexBackgroundSession.ts`, `SessionTab.ts` / `CodexSessionTab.ts`, `commands.ts` (`claudeMirror.forkFromMessage`), `App.tsx` (fork completion logic), `InputArea.tsx` (`fork-set-input` listener).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Session Vitals** - Visual session health dashboard with 5 components: Session Timeline (vertical color-coded minimap alongside messages, click-to-jump), Weather Widget (animated mood icon reflecting error/success patterns), Cost Heat Bar (gradient strip showing cost accumulation), Turn Intensity Borders (colored left border on assistant messages based on tool activity), and a Vitals toggle button in the StatusBar. The Vitals gear dropdown (`VitalsInfoPanel`) also hosts quick settings utilities including API key management and Claude CLI account Login/Logout/Refresh controls (status shown as email + subscription type when available). Data pipeline: `MessageHandler` builds `TurnRecord` on each CLI result event, sends to webview via `turnComplete` postMessage, stored in Zustand (`turnHistory[]`, `turnByMessageId{}`). Weather mood recalculated on each turn via sliding window algorithm. All components hidden when vitals disabled.
@@ -402,8 +404,11 @@ claude-code-mirror/
 **Achievements / Trophy** - Gamification system that awards badges for coding milestones. Features: 30 achievements across 7 categories (debugging, testing, refactor, collaboration, session, architecture, productivity), 4 rarities, XP-based leveling (15 tiers), per-session goals (7 templates), daily streaks, file/language tracking, frontend/backend classification, error cycle detection, toast notifications with optional sound, session recap card with AI insights, and full i18n (EN+HE). AI Session Insight: spawns Sonnet CLI once per day at session end for deeper analysis (quality, pattern, XP bonus). Includes a live recap snapshot request (`requestSessionRecapSnapshot`) used by an idle reminder nudge (1 hour idle, with Later=3h deferral / Dismiss) without ending the session. Edit-and-resend now abandons the current achievement session state and restarts cleanly without emitting a false session recap. **Community / GitHub Sync**: Publish achievements to a public GitHub Gist, discover and compare with other developers via friend lookup, generate shields.io dynamic badges and markdown profile cards for GitHub README. Backend: `AchievementEngine`, `AchievementCatalog`, `AchievementStore`, `AchievementService`, `AchievementInsightAnalyzer`, `GitHubSyncService`. Frontend: `AchievementPanel`, `CommunityPanel`, `ShareCard`, `AchievementToastStack`, `SessionRecapCard`, `achievementI18n.ts`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ACHIEVEMENTS.md`
 
-**Analytics Dashboard** - Full-screen overlay with three modes: **Session** (7 tabs: Overview, Tokens, Tools, Timeline, Commands, Context, Usage), **Project** (4 tabs: Overview, Sessions, Tokens, Tools), and **User** (Token Ratio). A pill toggle in the header switches modes (blue=Session, purple=Project, amber=User). Session mode shows current-session analytics from Zustand `turnHistory`. Project mode aggregates `SessionSummary` records across all past sessions in the workspace, persisted in `ProjectAnalyticsStore` (VS Code `workspaceState`, survives restarts). User mode shows global user-level analytics from VS Code `globalState` (shared across all workspaces). Session summaries are auto-saved from ALL exit paths (normal exit, crash, tab close, VS Code close, session clear, edit-and-resend) via `flushTurnRecords()` + `analyticsSaved` guard to prevent data loss and double-save. Project data is loaded on demand.
+**Analytics Dashboard** - Full-screen overlay with three modes: **Session** (7 tabs: Overview, Tokens, Tools, Timeline, Commands, Context, Usage), **Project** (5 tabs: Overview, 30 Days, Sessions, Tokens, Tools), and **User** (Token Ratio). A pill toggle in the header switches modes (blue=Session, purple=Project, amber=User). Session mode shows current-session analytics from Zustand `turnHistory`. Project mode aggregates `SessionSummary` records across all past sessions in the workspace, persisted in `ProjectAnalyticsStore` (VS Code `workspaceState`, survives restarts). User mode shows global user-level analytics from VS Code `globalState` (shared across all workspaces). Session summaries are auto-saved from ALL exit paths (normal exit, crash, tab close, VS Code close, session clear, edit-and-resend) via `flushTurnRecords()` + `analyticsSaved` guard to prevent data loss and double-save. Project data is loaded on demand.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ANALYTICS_DASHBOARD.md`
+
+**Project 30 Days Tab** - Additional Project-mode analytics tab that filters `projectSessions` to the last 30 days (`startedAt >= now - 30d`) and reuses `ProjectOverviewTab` charts/metrics on the filtered subset. Displays contextual count + cutoff date banner and an empty-state message when no recent sessions exist.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/PROJECT_30_DAYS_TAB.md`
 
 **TurnAnalyzer** - Background semantic analysis engine (enabled by default). After each turn completes, spawns a one-shot Claude CLI process (using `claudeMirror.analysisModel`) to classify user mood, task type, outcome, and bug repetition. Results arrive asynchronously and merge into `turnHistory` via `turnSemantics` postMessage. Includes queue (max 20), per-session cap, timeout, and enable flag for cost control.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ANALYTICS_DASHBOARD.md`
@@ -831,3 +836,47 @@ Added settings:
 ### Detail Doc
 
 - `Kingdom_of_Claudes_Beloved_MDs/PROVIDER_HANDOFF.md`
+
+---
+
+## 2026-03-11 - BTW Codex Parity
+
+### New Components (Component Index Additions)
+
+- `src/extension/session/CodexBackgroundSession.ts`
+  - Headless Codex BTW runtime for side-conversation overlay.
+  - Emits BTW-compatible event stream (`messageStart`, `textDelta`, `assistantMessage`, `messageStop`, `result`) from `codex exec --json` demux events.
+  - Persists BTW `threadId` across turns while keeping the main tab session untouched.
+
+### Updated Components
+
+- `src/extension/session/CodexSessionTab.ts`
+  - Added full BTW lifecycle: `startBtwSession()`, `sendBtwMessage()`, `closeBtwSession()`.
+  - Added Codex BTW event forwarding (`btwMessageStart`, `btwStreamingText`, `btwAssistantMessage`, `btwResult`, `btwSessionEnded`).
+  - Added bootstrap prompt builder that seeds Codex BTW with clipped recent context from `collectHandoffSnapshot()`.
+- `src/extension/webview/CodexMessageHandler.ts`
+  - Added routing for webview BTW requests: `startBtwSession`, `sendBtwMessage`, `closeBtwSession`.
+- `src/webview/components/ChatView/BtwPopup.tsx`
+  - Assistant role label in BTW overlay is now provider-aware (`Claude` vs `Codex`).
+
+### Directory Structure Delta
+
+Under `src/extension/session/`:
+
+- Added file:
+  - `CodexBackgroundSession.ts`
+
+### Manifest/Settings Delta
+
+- None.
+
+### Runtime Notes
+
+- BTW chat now follows the active provider:
+  - Claude tab -> Claude background BTW session.
+  - Codex tab -> Codex background BTW session.
+- UI store/state contract is unchanged (`btw*` messages), so existing BTW overlay logic in webview remains shared.
+
+### Detail Doc
+
+- `Kingdom_of_Claudes_Beloved_MDs/btw_bug.md`

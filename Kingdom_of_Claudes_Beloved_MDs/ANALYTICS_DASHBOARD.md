@@ -2,7 +2,7 @@
 
 ## Overview
 
-A full-screen overlay dashboard inside the chat webview with three modes: **Session** (current session analytics), **Project** (aggregated analytics across all past sessions in the workspace), and **User** (global user-level analytics shared across all workspaces). Opens from the StatusBar "Dashboard" button. A pill toggle in the header switches between modes (blue=Session, purple=Project, amber=User).
+A full-screen overlay dashboard inside the chat webview with three modes: **Session** (current session analytics), **Project** (aggregated analytics across all past sessions in the workspace), and **User** (global user-level analytics shared across all workspaces). Project mode has 5 tabs: Overview, 30 Days, Sessions, Tokens, Tools. Opens from the StatusBar "Dashboard" button. A pill toggle in the header switches between modes (blue=Session, purple=Project, amber=User).
 
 ## Architecture
 
@@ -29,7 +29,8 @@ A full-screen overlay dashboard inside the chat webview with three modes: **Sess
 - `src/webview/components/Dashboard/dashboardUtils.ts` - Colors, helpers, command categorization
 - `src/webview/components/Dashboard/charts/RechartsWrappers.tsx` - 6 Recharts components
 - `src/webview/components/Dashboard/charts/SemanticWidgets.tsx` - MoodTimeline, FrustrationAlert, BugRepeatTracker
-- `src/webview/components/Dashboard/tabs/` - Session tabs (7) + Project tabs (4) + User tabs (1)
+- `src/webview/components/Dashboard/tabs/` - Session tabs (7) + Project tabs (5) + User tabs (1)
+- `src/webview/components/Dashboard/tabs/Project30DaysTab.tsx` - Project mode 30-day filtered view wrapper (reuses ProjectOverviewTab)
 
 ## Session Mode (7 Tabs)
 
@@ -91,7 +92,7 @@ User mode displays global user-level analytics shared across all workspaces (sto
 - "Resample Now" button: triggers immediate usage fetch and ratio computation without waiting for the automatic sampling interval
 - Shows "Waiting for data..." only when fewer than 2 turns have been tracked
 
-## Project Mode (4 Tabs)
+## Project Mode (5 Tabs)
 
 ### Project Overview
 - 6 aggregated metric cards (total sessions, total turns, total tool uses, overall error rate, most used model, avg session duration)
@@ -99,6 +100,11 @@ User mode displays global user-level analytics shared across all workspaces (sto
 - Aggregated tool frequency horizontal bar (top 15, all sessions combined)
 - Aggregated category distribution donut (all sessions combined)
 - Model usage horizontal bar chart
+
+### Project 30 Days
+- Filters `projectSessions[]` to sessions with `startedAt >= now - 30 days`
+- Shows a contextual header with session count and cutoff date
+- Reuses `ProjectOverviewTab` rendering on the filtered dataset
 
 ### Project Sessions
 - Text search filter on session name

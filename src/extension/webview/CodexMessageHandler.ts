@@ -41,6 +41,9 @@ export interface CodexSessionController {
   getCurrentModel(): string;
   isTurnRunning(): boolean;
   isBusyState(): boolean;
+  startBtwSession?(promptText: string): void;
+  sendBtwMessage?(text: string): void;
+  closeBtwSession?(): void;
 }
 
 function codexTurnCategory(hasCommands: boolean): TurnCategory {
@@ -577,6 +580,21 @@ export class CodexMessageHandler {
             msg.promptText,
             msg.messages || []
           );
+          break;
+
+        case 'startBtwSession':
+          this.log(`Starting Codex btw session with prompt: ${msg.promptText.slice(0, 60)}...`);
+          this.session.startBtwSession?.(msg.promptText);
+          break;
+
+        case 'sendBtwMessage':
+          this.log(`Sending Codex btw message: ${msg.text.slice(0, 60)}...`);
+          this.session.sendBtwMessage?.(msg.text);
+          break;
+
+        case 'closeBtwSession':
+          this.log('Closing Codex btw session.');
+          this.session.closeBtwSession?.();
           break;
 
         case 'compact':

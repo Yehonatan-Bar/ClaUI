@@ -8,6 +8,7 @@ import { TimelineTab } from './tabs/TimelineTab';
 import { CommandsTab } from './tabs/CommandsTab';
 import { ContextTab } from './tabs/ContextTab';
 import { ProjectOverviewTab } from './tabs/ProjectOverviewTab';
+import { Project30DaysTab } from './tabs/Project30DaysTab';
 import { ProjectSessionsTab } from './tabs/ProjectSessionsTab';
 import { ProjectTokensTab } from './tabs/ProjectTokensTab';
 import { ProjectToolsTab } from './tabs/ProjectToolsTab';
@@ -16,7 +17,7 @@ import { TokenRatioTab } from './tabs/TokenRatioTab';
 import { DASH_COLORS } from './dashboardUtils';
 
 type SessionTab = 'overview' | 'tokens' | 'tools' | 'timeline' | 'commands' | 'context' | 'usage';
-type ProjectTab = 'p-overview' | 'p-sessions' | 'p-tokens' | 'p-tools';
+type ProjectTab = 'p-overview' | 'p-30-days' | 'p-sessions' | 'p-tokens' | 'p-tools';
 type UserTab = 'u-ratio';
 type DashboardTab = SessionTab | ProjectTab | UserTab;
 
@@ -32,6 +33,7 @@ const SESSION_TABS: { key: SessionTab; label: string }[] = [
 
 const PROJECT_TABS: { key: ProjectTab; label: string }[] = [
   { key: 'p-overview', label: 'Overview' },
+  { key: 'p-30-days', label: '30 Days' },
   { key: 'p-sessions', label: 'Sessions' },
   { key: 'p-tokens', label: 'Tokens' },
   { key: 'p-tools', label: 'Tools' },
@@ -251,6 +253,7 @@ export const DashboardPanel: React.FC = () => {
         {mode === 'session' && activeTab === 'usage' && <UsageTab />}
         {/* Project tabs */}
         {mode === 'project' && activeTab === 'p-overview' && <ProjectOverviewTab sessions={projectSessions} />}
+        {mode === 'project' && activeTab === 'p-30-days' && <Project30DaysTab sessions={projectSessions} />}
         {mode === 'project' && activeTab === 'p-sessions' && <ProjectSessionsTab sessions={projectSessions} />}
         {mode === 'project' && activeTab === 'p-tokens' && <ProjectTokensTab sessions={projectSessions} />}
         {mode === 'project' && activeTab === 'p-tools' && <ProjectToolsTab sessions={projectSessions} />}

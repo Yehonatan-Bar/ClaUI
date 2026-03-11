@@ -8,6 +8,7 @@ import { findWorkingCodexCliCandidates, pickPreferredCodexCliCandidate } from '.
 import { CodexMessageHandler, type CodexSessionController } from '../webview/CodexMessageHandler';
 import { buildWebviewHtml } from '../webview/WebviewProvider';
 import { CodexConversationReader } from './CodexConversationReader';
+import { CodexBackgroundSession } from './CodexBackgroundSession';
 import { CodexSessionNamer } from './CodexSessionNamer';
 import { MessageTranslator } from './MessageTranslator';
 import { FileLogger } from './FileLogger';
@@ -27,6 +28,7 @@ import type {
 } from '../types/webview-messages';
 import type { CodexExecJsonEvent } from '../types/codex-exec-json';
 import type { HandoffProvider, HandoffSourceSnapshot } from './handoff/HandoffTypes';
+import type { ContentBlock } from '../types/stream-json';
 
 /**
  * Codex runtime tab (Stage 2 MVP): logical session per tab, one `codex exec` process per turn.
@@ -73,6 +75,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private deferredAutoSessionName: string | null = null;
   /** Fork initialization data (history snapshot + prompt text) for new forked tabs */
   private forkInitData: { promptText: string; messages: SerializedChatMessage[] } | null = null;
+  /** Background session for the "btw" side-conversation overlay */
+  private btwSession: CodexBackgroundSession | null = null;
   private turnDiagSeq = 0;
   private turnDiagHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private activeTurnDiag: {
@@ -292,6 +296,176 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.postMessage({ type: 'sessionEnded', reason: 'stopped' });
   }
 
+  // --- BTW Background Session ---
+
+  /** Start a Codex-backed BTW side conversation. */
+  startBtwSession(promptText: string): void {
+    this.closeBtwSession();
+
+    const cwd = this.sessionCwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const model = this.currentModel || this.getCurrentModel() || undefined;
+
+    this.log(`[Codex Tab ${this.tabNumber}] Starting btw Codex background session`);
+    this.btwSession = new CodexBackgroundSession(
+      this.context,
+      (msg) => this.log(`[Codex Tab ${this.tabNumber}] ${msg}`),
+    );
+    const activeBtw = this.btwSession;
+    this.wireBtwSessionEvents(activeBtw);
+    this.postMessage({ type: 'btwSessionStarted' });
+
+    void this.buildBtwBootstrapPrompt(promptText)
+      .then((bootstrapPrompt) => {
+        if (this.btwSession !== activeBtw || !activeBtw) {
+          return;
+        }
+        return activeBtw.start(bootstrapPrompt, { cwd, model });
+      })
+      .catch((err: unknown) => {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.log(`[Codex Tab ${this.tabNumber}] btw session start failed: ${errMsg}`);
+        this.postMessage({ type: 'btwSessionEnded', error: errMsg });
+        this.closeBtwSession();
+      });
+  }
+
+  /** Send a follow-up message in the active Codex BTW session. */
+  sendBtwMessage(text: string): void {
+    if (!this.btwSession) {
+      this.log(`[Codex Tab ${this.tabNumber}] Cannot send btw message: no active btw session.`);
+      return;
+    }
+    const cwd = this.sessionCwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const model = this.currentModel || this.getCurrentModel() || undefined;
+    void this.btwSession.sendMessage(text, { cwd, model }).catch((err: unknown) => {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      this.log(`[Codex Tab ${this.tabNumber}] btw send failed: ${errMsg}`);
+      this.postMessage({ type: 'error', message: `BTW (Codex) failed: ${errMsg}` });
+      this.postMessage({ type: 'btwResult' });
+    });
+  }
+
+  /** Close and dispose the active Codex BTW session. */
+  closeBtwSession(): void {
+    if (!this.btwSession) {
+      return;
+    }
+    this.log(`[Codex Tab ${this.tabNumber}] Closing btw session.`);
+    this.btwSession.dispose();
+    this.btwSession = null;
+  }
+
+  /** Wire Codex BTW session events and relay them to the webview. */
+  private wireBtwSessionEvents(btw: CodexBackgroundSession): void {
+    const tabLog = (msg: string) => this.log(`[Codex Tab ${this.tabNumber}] [BTW->WV] ${msg}`);
+
+    btw.on('messageStart', (data: { messageId: string }) => {
+      tabLog(`btwMessageStart msgId=${data.messageId}`);
+      this.postMessage({ type: 'btwMessageStart', messageId: data.messageId });
+    });
+
+    btw.on('textDelta', (data: { blockIndex: number; text: string }) => {
+      this.postMessage({
+        type: 'btwStreamingText',
+        blockIndex: data.blockIndex,
+        text: data.text,
+      });
+    });
+
+    btw.on('assistantMessage', (data: { message: { id: string; content: unknown[]; model?: string } }) => {
+      const msg = data.message;
+      const content = Array.isArray(msg?.content) ? (msg.content as ContentBlock[]) : [];
+      tabLog(`btwAssistantMessage msgId=${msg?.id} contentBlocks=${content.length}`);
+      this.postMessage({
+        type: 'btwAssistantMessage',
+        messageId: msg?.id,
+        content,
+        model: msg?.model,
+      });
+    });
+
+    btw.on('messageStop', () => {
+      this.postMessage({ type: 'btwMessageStop' });
+    });
+
+    btw.on('result', () => {
+      tabLog('btwResult');
+      this.postMessage({ type: 'btwResult' });
+    });
+
+    btw.on('error', (err: Error) => {
+      tabLog(`btwError message=${err.message}`);
+      this.postMessage({ type: 'error', message: `BTW (Codex) error: ${err.message}` });
+    });
+
+    btw.on('ended', () => {
+      tabLog('btwSessionEnded');
+      this.postMessage({ type: 'btwSessionEnded' });
+      if (this.btwSession === btw) {
+        this.btwSession = null;
+      }
+    });
+  }
+
+  /** Build a bootstrap prompt so Codex BTW starts with recent context from this tab. */
+  private async buildBtwBootstrapPrompt(promptText: string): Promise<string> {
+    let snapshot: HandoffSourceSnapshot | null = null;
+    try {
+      snapshot = await this.collectHandoffSnapshot();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`[Codex Tab ${this.tabNumber}] BTW context snapshot failed: ${message}`);
+    }
+
+    const recent = snapshot?.messages?.slice(-10) ?? [];
+    const lines = recent
+      .map((msg, idx) => {
+        const role = msg.role === 'assistant' ? 'Assistant' : 'User';
+        const text = this.extractTextFromSerializedContent(msg.content);
+        if (!text) {
+          return '';
+        }
+        const clipped = text.length > 1200 ? `${text.slice(0, 1180)}\n...[truncated]` : text;
+        return `${idx + 1}. ${role}:\n${clipped}`;
+      })
+      .filter((line) => line.trim().length > 0);
+
+    if (lines.length === 0) {
+      return promptText;
+    }
+
+    return [
+      'Context from the current Codex session. Treat it as prior conversation history for this side thread.',
+      'Recent conversation:',
+      lines.join('\n\n'),
+      'New BTW user message:',
+      promptText,
+    ].join('\n\n');
+  }
+
+  private extractTextFromSerializedContent(content: SerializedChatMessage['content']): string {
+    if (!Array.isArray(content)) {
+      return '';
+    }
+
+    const parts: string[] = [];
+    for (const block of content) {
+      if (block?.type === 'text' && typeof block.text === 'string') {
+        parts.push(block.text);
+        continue;
+      }
+      if (block?.type === 'tool_use') {
+        const name = typeof block.name === 'string' ? block.name : 'tool';
+        parts.push(`[tool_use:${name}]`);
+        continue;
+      }
+      if (block?.type === 'tool_result') {
+        parts.push('[tool_result]');
+      }
+    }
+    return parts.join('\n').trim();
+  }
+
   async sendText(text: string, options?: { steer?: boolean }): Promise<void> {
     await this.sendTurn(text, undefined, options);
   }
@@ -459,6 +633,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.windowStateSubscription?.dispose();
     this.windowStateSubscription = null;
     this.saveProjectAnalytics();
+    this.closeBtwSession();
     this.processManager.stop();
     this.achievementService.onSessionEnd(this.id);
     this.achievementService.unregisterTab(this.id);
@@ -779,6 +954,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         this.windowStateSubscription?.dispose();
         this.windowStateSubscription = null;
         this.saveProjectAnalytics();
+        this.closeBtwSession();
         this.processManager.stop();
         this.achievementService.onSessionEnd(this.id);
         this.achievementService.unregisterTab(this.id);
