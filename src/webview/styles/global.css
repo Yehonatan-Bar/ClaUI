@@ -548,6 +548,31 @@ html, body, #root {
   position: relative;
 }
 
+.usage-limit-helper {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--vscode-inputValidation-warningBorder, #cca700);
+  border-radius: 6px;
+  background: var(--vscode-inputValidation-warningBackground, rgba(204, 167, 0, 0.12));
+  color: var(--vscode-editor-foreground);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.usage-limit-queued-chip {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--vscode-focusBorder, #007acc);
+  background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.06));
+  color: var(--vscode-button-secondaryForeground, inherit);
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .clear-session-button {
   display: flex;
   align-items: center;
@@ -4607,6 +4632,47 @@ html, body, #root {
 /* ══════════════════════════════════════════════
    Send Button Group & Prompt Translation
    ══════════════════════════════════════════════ */
+
+/* --- Prompt Navigation Arrows --- */
+
+.send-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.prompt-nav-buttons {
+  display: flex;
+  gap: 1px;
+}
+
+.prompt-nav-btn {
+  width: 32px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--vscode-button-secondaryForeground, #ccc);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.prompt-nav-btn:hover {
+  opacity: 1;
+  background: var(--vscode-button-secondaryHoverBackground, #45494e);
+}
+
+.prompt-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
 
 .send-button-group {
   display: flex;

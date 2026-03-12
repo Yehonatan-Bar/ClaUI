@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useCallback } from 'react';
+import { useOutsideClick } from '../../hooks/useOutsideClick';
 
 interface StatusBarGroupButtonProps {
   label: string;
@@ -21,17 +22,8 @@ export const StatusBarGroupButton: React.FC<StatusBarGroupButtonProps> = ({
     if (isOpen) onToggle();
   }, [isOpen, onToggle]);
 
-  // Click-outside to close
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        handleClose();
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [isOpen, handleClose]);
+  // Centralized outside-click handler (uses 'click', not 'mousedown')
+  useOutsideClick(`sbg-${label}`, wrapperRef, isOpen, handleClose);
 
   // Escape to close
   useEffect(() => {

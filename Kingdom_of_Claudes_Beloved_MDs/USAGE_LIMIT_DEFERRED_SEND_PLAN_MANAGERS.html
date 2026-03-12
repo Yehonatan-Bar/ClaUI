@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>תוכנית מנהלים - שליחה מושהית בזמן מגבלת שימוש</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #4b5563;
+      --line: #e5e7eb;
+      --accent: #0f766e;
+      --accent-soft: #ecfdf5;
+      --warn: #b45309;
+      --warn-soft: #fffbeb;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: linear-gradient(180deg, #f8fafc 0%, #f3f4f6 100%);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    .wrap {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 28px 18px 64px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+      color: #ffffff;
+      border-radius: 14px;
+      padding: 24px 22px;
+      margin-bottom: 18px;
+      box-shadow: 0 10px 28px rgba(15, 118, 110, 0.2);
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      line-height: 1.3;
+    }
+
+    .hero p {
+      margin: 0;
+      font-size: 15px;
+      opacity: 0.95;
+    }
+
+    .badge {
+      display: inline-block;
+      margin-top: 12px;
+      background: rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 999px;
+      padding: 5px 11px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 20px;
+      color: #111827;
+    }
+
+    p {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    ul, ol {
+      margin: 8px 0 0;
+      padding-right: 18px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    li { margin-bottom: 7px; }
+
+    .flow {
+      background: var(--accent-soft);
+      border: 1px solid #bbf7d0;
+      border-radius: 10px;
+      padding: 12px;
+      margin-top: 8px;
+    }
+
+    .flow-step {
+      padding: 8px 10px;
+      background: #ffffff;
+      border: 1px solid #d1fae5;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .flow-step:last-child { margin-bottom: 0; }
+
+    .kpi {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .kpi-item {
+      background: #f9fafb;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 14px;
+      color: #374151;
+    }
+
+    .note {
+      background: var(--warn-soft);
+      border: 1px solid #fde68a;
+      color: #78350f;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 14px;
+    }
+
+    @media (max-width: 640px) {
+      .hero h1 { font-size: 22px; }
+      .kpi { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>תוכנית מנהלים: שליחה מושהית בזמן מגבלת שימוש</h1>
+      <p>מטרת היוזמה: לאפשר למשתמשים להמשיך לעבוד גם כאשר מגיעים למגבלת שימוש זמנית, בלי לאבד מומנטום ובלי לנסות לשלוח שוב ידנית.</p>
+      <div class="badge">סטטוס נוכחי: יושם ומופעל (עדכון: 11 במרץ 2026)</div>
+    </section>
+
+    <section class="card">
+      <h2>הבעיה העסקית</h2>
+      <p>כאשר המערכת מודיעה על מגבלת שימוש זמנית, המשתמש נתקע: הוא לא בטוח מתי לנסות שוב, נדרש לזכור לשלוח מחדש, ולעיתים מאבד רצף עבודה.</p>
+      <p>התוצאה היא חוויית שימוש מתסכלת ופגיעה בפרודוקטיביות.</p>
+    </section>
+
+    <section class="card">
+      <h2>הפתרון שיושם</h2>
+      <ul>
+        <li>בזמן מגבלה, כפתור השליחה ישתנה ל־<strong>Send When Available</strong>.</li>
+        <li>המשתמש יוכל לשלוח כרגיל, והבקשה תיכנס לתור אוטומטי.</li>
+        <li>המערכת תשלח את ההודעה אוטומטית דקה אחרי זמן האיפוס.</li>
+        <li>אם המשתמש שולח שוב לפני הזמן, ההודעה האחרונה היא זו שתישלח.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>איך זה ירגיש למשתמש</h2>
+      <div class="flow">
+        <div class="flow-step"><strong>שלב 1:</strong> המשתמש מקבל הודעת מגבלה.</div>
+        <div class="flow-step"><strong>שלב 2:</strong> ממשק הקלט מסביר שאפשר לשלוח עכשיו והמערכת תשלח אוטומטית כשיתאפשר.</div>
+        <div class="flow-step"><strong>שלב 3:</strong> המשתמש לוחץ שליחה ורואה אישור עם זמן מתוכנן.</div>
+        <div class="flow-step"><strong>שלב 4:</strong> ההודעה נשלחת אוטומטית בזמן הנכון, ללא פעולה נוספת.</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>היקף גרסה ראשונה</h2>
+      <ul>
+        <li>רלוונטי ל־Claude בלבד.</li>
+        <li>הודעה אחת בתור לכל חלון שיחה (העדכנית ביותר נשמרת).</li>
+        <li>תמיכה גם בטקסט וגם בתמונות.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>מה זה נותן לעסק</h2>
+      <ul>
+        <li>מוריד חיכוך בדיוק בנקודת כאב מוכרת למשתמשים כבדים.</li>
+        <li>משפר תחושת אמינות: המוצר "שומר מקום" למשתמש.</li>
+        <li>מפחית ניסיונות שליחה חוזרים ובלבול סביב זמני איפוס.</li>
+        <li>תומך בשימור משתמשים בתקופות עומס.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>מדדי הצלחה מוצעים</h2>
+      <div class="kpi">
+        <div class="kpi-item">שיעור הודעות שנכנסו לתור ונשלחו בהצלחה אוטומטית.</div>
+        <div class="kpi-item">ירידה בניסיונות שליחה ידניים חוזרים בזמן מגבלה.</div>
+        <div class="kpi-item">ירידה בפניות תמיכה בנושא "למה ההודעה לא נשלחה".</div>
+        <div class="kpi-item">שיפור שביעות רצון משתמשים סביב אירועי מגבלת שימוש.</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>סיכונים וניהול סיכונים</h2>
+      <ul>
+        <li><strong>סיכון:</strong> זמן איפוס לא ברור. <strong>ניהול:</strong> הצגת זמן מתוכנן ברור למשתמש.</li>
+        <li><strong>סיכון:</strong> עומס רגעי בזמן השליחה. <strong>ניהול:</strong> ניסיון חוזר אוטומטי במרווחים.</li>
+        <li><strong>סיכון:</strong> המשתמש מחליף הקשר עבודה. <strong>ניהול:</strong> ניקוי תור במעבר רלוונטי.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>מה בוצע בפועל</h2>
+      <ol>
+        <li>זיהוי אוטומטי של אירוע מגבלת שימוש במענה מהמערכת.</li>
+        <li>מעבר מיידי לכפתור <strong>Send When Available</strong> עם הסבר למשתמש.</li>
+        <li>שמירת ההודעה האחרונה בתור ושליחה אוטומטית דקה אחרי זמן האיפוס.</li>
+      </ol>
+    </section>
+
+    <section class="note">
+      מסמך זה מיועד למנהלים ולבעלי עניין עסקיים, ולכן הוא בכוונה לא כולל פירוט טכני.
+    </section>
+  </div>
+</body>
+</html>

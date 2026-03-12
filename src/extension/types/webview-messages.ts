@@ -53,6 +53,12 @@ export interface SendMessageWithImages {
   steer?: boolean;
 }
 
+export interface QueuePromptUntilUsageResetRequest {
+  type: 'queuePromptUntilUsageReset';
+  text: string;
+  images?: WebviewImageData[];
+}
+
 export interface CancelRequest {
   type: 'cancelRequest';
 }
@@ -526,6 +532,7 @@ export interface BugReportCloseRequest {
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
+  | QueuePromptUntilUsageResetRequest
   | CancelRequest
   | CompactRequest
   | StartSessionRequest
@@ -704,6 +711,21 @@ export interface ErrorMessage {
 export interface ProcessBusyMessage {
   type: 'processBusy';
   busy: boolean;
+}
+
+export interface UsageLimitDetectedMessage {
+  type: 'usageLimitDetected';
+  active: boolean;
+  resetAtMs?: number;
+  resetDisplay: string;
+  rawMessage: string;
+}
+
+export interface UsageQueuedPromptStateMessage {
+  type: 'usageQueuedPromptState';
+  queued: boolean;
+  scheduledSendAtMs?: number;
+  summary?: string;
 }
 
 export interface MessageStartMessage {
@@ -1572,6 +1594,8 @@ export type ExtensionToWebviewMessage =
   | CostUpdateMessage
   | ErrorMessage
   | ProcessBusyMessage
+  | UsageLimitDetectedMessage
+  | UsageQueuedPromptStateMessage
   | MessageStartMessage
   | MessageStopMessage
   | ThinkingEffortUpdateMessage

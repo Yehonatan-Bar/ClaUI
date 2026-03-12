@@ -57,6 +57,7 @@ claude-code-mirror/
 |   |   |   +-- envUtils.ts               #   Shared env sanitization & API key management
 |   |   |   +-- killTree.ts              #   Shared cross-platform process tree kill utility
 |   |   |   +-- orphanCleanup.ts         #   Startup cleanup of orphaned ClaUi processes
+|   |   |   +-- usageLimitParser.ts      #   Parses usage-limit errors into reset timestamps
 |   |   |   +-- StreamDemux.ts            #   Parses JSON lines, routes events
 |   |   |   +-- ControlProtocol.ts        #   Higher-level command API
 |   |   +-- webview/
@@ -130,6 +131,7 @@ claude-code-mirror/
 |       |   +-- useRtlDetection.ts        #   detectRtl() helper for InputArea (messages use dir="auto")
 |       |   +-- useFileMention.ts         #   @ file mention trigger detection, debounced search, popup state
 |       |   +-- useStatusBarCollapse.ts  #   4-stage responsive layout hook (hysteresis + overflow guard)
+|       |   +-- useOutsideClick.ts      #   Centralized outside-click manager for all dropdowns/popovers
 |       +-- components/
 |       |   +-- ChatView/
 |       |   |   +-- MessageList.tsx       #   Scrollable message list with scroll-to-bottom button
@@ -149,7 +151,7 @@ claude-code-mirror/
 |       |   |   +-- MarkdownContent.tsx  #   Markdown rendering with sanitization and link detection
 |       |   |   +-- filePathLinks.tsx   #   Clickable file path and URL detection and rendering
 |       |   +-- InputArea/
-|       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt/steer, image paste, @ file mentions, ultrathink button
+|       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt/steer, usage-limit queue mode, image paste, @ file mentions, ultrathink button, prompt navigation arrows
 |       |   |   +-- FileMentionPopup.tsx  #   Autocomplete popup for @ file mentions
 |       |   |   +-- GitPushPanel.tsx      #   Config panel for git push (status, ask Claude to configure)
 |       |   |   +-- CodexConsultPanel.tsx #   Input panel for Codex GPT expert consultation
@@ -219,7 +221,7 @@ claude-code-mirror/
 |       |   |   +-- ContextUsageWidget.tsx  #   Thin draggable context strip (blue-first gradient + hover tooltip hit-zone)
 |       |   +-- StatusBar/
 |       |   |   +-- StatusBar.tsx            #   Bottom status bar with responsive collapse
-|       |   |   +-- StatusBarGroupButton.tsx #   Reusable dropdown group button for responsive status-bar modes
+|       |   |   +-- StatusBarGroupButton.tsx #   Reusable dropdown group button (uses useOutsideClick for outside-click handling)
 |       |   +-- TextSettingsBar/
 |       |       +-- TextSettingsBar.tsx   #   Font size/family/theme controls
 |       +-- styles/
@@ -252,7 +254,8 @@ claude-code-mirror/
     +-- SKILL_VISUAL_INDICATOR.md        #   Skill tool invocation visual indicators (badge, pill, category)
     +-- STREAM_JSON_PROTOCOL.md           #   CLI protocol reference
     +-- PROMPT_ENHANCER.md               #   AI prompt enhancement feature
-    +-- USAGE_LIMIT_DEFERRED_SEND_PLAN.md #  Execution plan: queue prompt and auto-send after usage reset
+    +-- USAGE_LIMIT_DEFERRED_SEND.md      #   Implemented usage-limit queue and deferred auto-send flow
+    +-- USAGE_LIMIT_DEFERRED_SEND_PLAN.md #   Archived execution plan
     +-- SKILL_GENERATION.md             #   Auto skill generation from SR-PTD docs
 ```
 
@@ -320,8 +323,8 @@ claude-code-mirror/
 **React Chat UI** - React 18 components for message display, streaming text, tool use blocks, code blocks, image display, and RTL-aware input. The input area supports sending prompts while busy (interrupt/steer). In Codex tabs, when a turn is active the controls switch to `Stop` + `Steer`; pressing `Steer` asks for approval and then interrupts the running turn before sending the new prompt. Ctrl+V pastes images from clipboard as base64 attachments (shown as thumbnails above the input, removable before sending) when the active provider capability `supportsImages` is enabled (Claude + Codex). In Codex tabs, image attachments are converted to temporary files and passed to `codex exec` / `codex exec resume` via repeatable `--image` flags. Clipboard shortcut/paste diagnostics from `InputArea` can be forwarded to the extension log as `[UiDebug][InputArea] ...` entries for troubleshooting paste/image issues in the webview. Both Send/Steer and Cancel/Stop buttons are visible during processing; Escape cancels/stops the current response.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**Usage-Limit Deferred Send (Planned)** - Planned UX/flow for Claude usage-limit handling: when the CLI returns `Claude usage limit reached...`, InputArea switches to `Send When Available`, allows immediate queueing, and auto-sends queued prompt one minute after reset. Plan defines parser, queue scheduler, message-contract updates, and QA matrix.
-> Detail: `Kingdom_of_Claudes_Beloved_MDs/USAGE_LIMIT_DEFERRED_SEND_PLAN.md`
+**Usage-Limit Deferred Send** - Claude-only deferred-send mode for temporary usage-limit errors. When the CLI returns a usage-limit reset message, the extension parses reset time, flips InputArea into `Send When Available`, and allows immediate queueing. The queue is tab-local (latest prompt wins), supports text and image payloads, schedules auto-send at `resetAt + 60s`, and retries every 15 seconds if the process is still busy at fire time. State and timers are cleared on session lifecycle transitions, provider switch away from Claude, and after a successful result.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/USAGE_LIMIT_DEFERRED_SEND.md`
 
 **StatusBar (Responsive)** - Bottom status bar extracted into its own component (`StatusBar/StatusBar.tsx`). Uses a `ResizeObserver` hook (`useStatusBarCollapse`) with 4 layout stages and hysteresis thresholds (`~1350`, `~860`, `~480`). Layout transitions are driven purely by width thresholds with hysteresis gaps (~40px each) to prevent flicker. No `scrollWidth` overflow detection. Stage 1 (`full`): existing full-width layout. Stage 2 (`medium`): inline `Clock`, `History`, `Prompts`, `Feedback`, `Plans`, Babel Fish icon, Vitals gear, `Aa`, and token counters; a **More** dropdown contains provider selectors, model/permission selectors, Git, Dashboard, Teams, Consult, SkillDocs, Achievements, Usage, and Vitals toggle. Stage 3 (`collapsed`): two dropdowns (**More** + **Tools**) plus always-visible Active Clock, Vitals gear, Aa, and token counters. Stage 4 (`minimal`): a single **Menu** dropdown plus Vitals gear only. Provider-specific gating is applied in the webview: in Codex UI mode, the `SkillDocs` button, adjacent `!` info button, and Anthropic `Usage` button are hidden (across responsive stages where they appear). If a provider does not support Git Push, the Git controls remain visible but are disabled with tooltips (instead of disappearing). Dropdowns open upward with click-outside dismiss, mutual exclusivity, and Escape key support. The Usage popover also toggles the context strip (`ContextUsageWidget`) and now labels it as a strip (not a widget) for copy consistency.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
@@ -346,6 +349,8 @@ claude-code-mirror/
 
 **Ultrathink Button & Glow** - Brain icon button in the input area that injects the "ultrathink" keyword to boost Claude's reasoning effort. On click, plays one of 4 random CSS animations (Rocket Launch, Brain on Fire, Wizard Staff, Turbo/NOS) for 1.2s, then prepends "ultrathink " to the input text. Includes a lock toggle badge that, when active, auto-prepends "ultrathink" to every outgoing prompt. The word "ultrathink" also displays with an animated rainbow glow effect (cycling colors, sparkle particles) in both completed and streaming chat messages.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ULTRATHINK_BUTTON.md`
+
+**Prompt Navigation Arrows** - Up/down arrow buttons above the Send button that scroll the chat view to the previous/next user prompt. Filters messages by `role === 'user'`, tracks an index ref, and uses `data-message-id` DOM queries with `scrollIntoView({ behavior: 'smooth', block: 'center' })`. Navigation index resets when new messages arrive.
 
 **Clear Session** - Button in the input area that resets all UI state (messages, cost, streaming) and restarts the CLI process. Sends `clearSession` message to the extension, which stops the current process and spawns a new one.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`

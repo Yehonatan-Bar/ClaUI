@@ -20,7 +20,8 @@ Happy CLI is treated as a Claude-compatible executable. ClaUi just swaps the spa
 3. `TabManager` reads `claudeMirror.happy.cliPath` (default `happy`) and calls `tab.setCliPathOverride(...)`.
 4. `SessionTab.startSession()` passes the override to `ClaudeProcessManager.start(...)`.
 5. `MessageHandler` also reads the per-tab override from `WebviewBridge.getCliPathOverride()` for webview-driven starts/restarts (`startSession`, `clearSession`, `resumeSession`, `forkSession`, edit-and-resend resume).
-6. `ClaudeProcessManager` spawns the overridden CLI path with the same stream-json flags used for Claude.
+6. Before starting a new session, `MessageHandler.syncProviderOverrideForNewSession()` checks whether the provider dropdown setting differs from the tab's current provider and updates the CLI path override accordingly. This allows seamless Claude <-> Happy switching within the same tab.
+7. `ClaudeProcessManager` spawns the overridden CLI path with the same stream-json flags used for Claude.
 7. Standard `StreamDemux`, `MessageHandler`, control protocol, analytics, forking, and history all work unchanged.
 
 ---
@@ -69,6 +70,8 @@ Removed settings:
 - `src/extension/webview/MessageHandler.ts`
   - Uses `WebviewBridge.getCliPathOverride()` for webview-triggered process starts/restarts
   - Uses `WebviewBridge.getProvider()` so provider in `sessionStarted` reflects the actual tab runtime
+  - `syncProviderOverrideForNewSession()` syncs CLI path override with provider dropdown before `startSession` / `clearSession`, enabling in-tab Claude <-> Happy switching
+  - `WebviewBridge.setCliPathOverride()` allows updating the tab's CLI override at runtime
 - `src/extension/session/TabManager.ts`
   - `createRemoteTab()` now returns `SessionTab` (not a custom tab type)
   - Applies `happy.cliPath` override

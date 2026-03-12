@@ -414,8 +414,8 @@ export class SessionTab implements WebviewBridge {
     this.messageHandler.setPendingHandoffPrompt(prompt);
   }
 
-  setCliPathOverride(path: string): void {
-    this.cliPathOverride = path;
+  setCliPathOverride(pathOrNull: string | null): void {
+    this.cliPathOverride = pathOrNull;
   }
 
   /** Start a new CLI session in this tab (Claude by default, Happy when overridden) */

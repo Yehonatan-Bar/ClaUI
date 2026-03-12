@@ -82,6 +82,8 @@ export function useClaudeStream(): void {
     setClaudeAuthStatus,
     setUsageWidgetEnabled,
     setUsageData,
+    setUsageLimitState,
+    setUsageQueuedPromptState,
     setTokenRatioData,
     setTeamState,
     setTeamActive,
@@ -686,6 +688,23 @@ export function useClaudeStream(): void {
           setUsageData(msg.stats, msg.fetchedAt, msg.error);
           break;
 
+        case 'usageLimitDetected':
+          setUsageLimitState({
+            active: msg.active,
+            resetAtMs: msg.resetAtMs ?? null,
+            resetDisplay: msg.resetDisplay,
+            rawMessage: msg.rawMessage || null,
+          });
+          break;
+
+        case 'usageQueuedPromptState':
+          setUsageQueuedPromptState({
+            queued: msg.queued,
+            scheduledSendAtMs: msg.scheduledSendAtMs ?? null,
+            summary: msg.summary ?? null,
+          });
+          break;
+
         case 'tokenRatioData':
           setTokenRatioData(msg.samples, msg.summaries, msg.globalTurnCount, msg.cumulativeTokens, msg.cumulativeWeightedTokens);
           break;
@@ -865,6 +884,8 @@ export function useClaudeStream(): void {
     setClaudeAuthStatus,
     setUsageWidgetEnabled,
     setUsageData,
+    setUsageLimitState,
+    setUsageQueuedPromptState,
     setTokenRatioData,
     setTeamState,
     setTeamActive,

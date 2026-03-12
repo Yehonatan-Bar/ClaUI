@@ -5,17 +5,26 @@ import { ProgressCard } from './ProgressCard';
 export const VisualProgressView: React.FC = () => {
   const cards = useAppStore((s) => s.visualProgressCards);
   const containerRef = useRef<HTMLDivElement>(null);
+  const prevLengthRef = useRef(0);
 
-  // Auto-scroll to bottom when new cards arrive
+  // Auto-scroll to bottom when cards change (new cards or updates)
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
-    // Only auto-scroll if already near the bottom (within 150px)
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
-    if (isNearBottom) {
+    if (!el || cards.length === 0) return;
+
+    const isNewCard = cards.length > prevLengthRef.current;
+    prevLengthRef.current = cards.length;
+
+    // Always scroll for new cards; for updates, only if near bottom
+    if (isNewCard) {
       el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    } else {
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200;
+      if (isNearBottom) {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      }
     }
-  }, [cards.length]);
+  }, [cards]);
 
   if (cards.length === 0) {
     return (

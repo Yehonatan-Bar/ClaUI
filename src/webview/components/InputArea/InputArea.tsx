@@ -7,6 +7,7 @@ import { FileMentionPopup } from './FileMentionPopup';
 import { useFileMention } from '../../hooks/useFileMention';
 import type { WebviewImageData } from '../../../extension/types/webview-messages';
 import { getModelMaxContext } from '../../utils/modelContextLimits';
+import { useOutsideClick } from '../../hooks/useOutsideClick';
 
 /**
  * Manages an undo/redo stack for a textarea controlled by React state.
@@ -115,6 +116,8 @@ export const InputArea: React.FC = () => {
     setAutoTranslateEnabled,
     setSendSettingsPopoverOpen,
     contextWidgetVisible,
+    usageLimit,
+    usageQueuedPrompt,
     sessionSkills,
     handoffStage,
     handoffTargetProvider,
@@ -159,6 +162,8 @@ export const InputArea: React.FC = () => {
   const autoSendAfterTranslateRef = useRef(false);
   // Ref: client-side safety timeout to reset isTranslatingPrompt if result never arrives
   const translateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const enhanceGroupRef = useRef<HTMLDivElement>(null);
+  const sendGroupRef = useRef<HTMLDivElement>(null);
 
   // Seed prompt history from existing user messages on mount (covers messages
   // sent before this feature was deployed or before a reload)
@@ -180,9 +185,53 @@ export const InputArea: React.FC = () => {
     }
   }, [messages.length]);
 
+  // --- Prompt navigation (scroll chat to prev/next user message) ---
+  const promptNavIndexRef = useRef<number | null>(null);
+  const userMessages = useMemo(
+    () => messages.filter((m) => m.role === 'user'),
+    [messages]
+  );
+
+  const scrollToUserPrompt = useCallback((index: number) => {
+    const msg = userMessages[index];
+    if (!msg) return;
+    const el = document.querySelector(`[data-message-id="${msg.id}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [userMessages]);
+
+  const navigatePromptUp = useCallback(() => {
+    if (userMessages.length === 0) return;
+    if (promptNavIndexRef.current === null) {
+      // Start from the last user message
+      promptNavIndexRef.current = userMessages.length - 1;
+    } else if (promptNavIndexRef.current > 0) {
+      promptNavIndexRef.current -= 1;
+    } else {
+      return; // Already at the top
+    }
+    scrollToUserPrompt(promptNavIndexRef.current);
+  }, [userMessages, scrollToUserPrompt]);
+
+  const navigatePromptDown = useCallback(() => {
+    if (userMessages.length === 0) return;
+    if (promptNavIndexRef.current === null) return; // No nav started yet
+    if (promptNavIndexRef.current < userMessages.length - 1) {
+      promptNavIndexRef.current += 1;
+      scrollToUserPrompt(promptNavIndexRef.current);
+    }
+  }, [userMessages, scrollToUserPrompt]);
+
+  // Reset nav index when messages change (new message sent)
+  useEffect(() => {
+    promptNavIndexRef.current = null;
+  }, [userMessages.length]);
+
   // Auto-detect RTL for the input text
   const direction = text ? (detectRtl(text) ? 'rtl' : 'ltr') : 'auto';
   const effectiveProvider = provider ?? selectedProvider;
+  const isUsageLimitMode = usageLimit.active && effectiveProvider === 'claude';
   const isCodexBusy = effectiveProvider === 'codex' && isBusy;
   const inputLockedByHandoff =
     handoffStage !== 'idle' &&
@@ -334,6 +383,29 @@ export const InputArea: React.FC = () => {
     }
     lastSentRef.current = { text: trimmed, time: now };
 
+    // Usage-limit queue mode (Claude only): queue now, send automatically later.
+    if (isUsageLimitMode) {
+      if (trimmed) {
+        addToPromptHistory(trimmed);
+      }
+      historyIndexRef.current = -1;
+      draftRef.current = '';
+      markSessionPromptSent();
+      postToExtension({
+        type: 'queuePromptUntilUsageReset',
+        text: trimmed,
+        ...(pendingImages.length > 0 ? { images: pendingImages } : {}),
+      } as any);
+      setText('');
+      setPendingImages([]);
+      setCodexSteerArmed(false);
+      undoMgr.reset();
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+      return;
+    }
+
     // Auto-enhance: intercept send, enhance first, then auto-send
     if (
       providerCapabilities.supportsPromptEnhancer &&
@@ -445,7 +517,7 @@ export const InputArea: React.FC = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [text, pendingImages, isConnected, inputLockedByHandoff, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer, promptTranslateEnabled, autoTranslateEnabled, isTranslatingPrompt, setIsTranslatingPrompt, isCodexBusy, codexSteerArmed, logUiDebug, ultrathinkLocked]);
+  }, [text, pendingImages, isConnected, inputLockedByHandoff, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer, promptTranslateEnabled, autoTranslateEnabled, isTranslatingPrompt, setIsTranslatingPrompt, isCodexBusy, codexSteerArmed, logUiDebug, ultrathinkLocked, isUsageLimitMode]);
 
   /** Cancel the in-flight request */
   const cancelRequest = useCallback(() => {
@@ -995,18 +1067,8 @@ export const InputArea: React.FC = () => {
     return () => window.removeEventListener('prompt-enhance-failed', handler);
   }, [sendMessage]);
 
-  // Close enhancer popover on outside click
-  useEffect(() => {
-    if (!enhancerPopoverOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.enhance-button-group')) {
-        setEnhancerPopoverOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [enhancerPopoverOpen, setEnhancerPopoverOpen]);
+  // Centralized outside-click for enhancer popover
+  useOutsideClick('input-enhancer', enhanceGroupRef, enhancerPopoverOpen, () => setEnhancerPopoverOpen(false));
 
   // Listen for prompt translation results
   useEffect(() => {
@@ -1072,18 +1134,8 @@ export const InputArea: React.FC = () => {
     return () => window.removeEventListener('prompt-translate-failed', handler);
   }, [sendMessage]);
 
-  // Close send settings popover on outside click
-  useEffect(() => {
-    if (!sendSettingsPopoverOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.send-button-group')) {
-        setSendSettingsPopoverOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [sendSettingsPopoverOpen, setSendSettingsPopoverOpen]);
+  // Centralized outside-click for send settings popover
+  useOutsideClick('input-send-settings', sendGroupRef, sendSettingsPopoverOpen, () => setSendSettingsPopoverOpen(false));
 
   // Auto-dismiss git push result toast after 5 seconds
   useEffect(() => {
@@ -1290,6 +1342,23 @@ export const InputArea: React.FC = () => {
         </div>
       )}
 
+      {isUsageLimitMode && (
+        <div className="usage-limit-helper">
+          <div>
+            Usage limit reached. You can send now; your prompt will be queued and sent automatically one minute after your limit resets.
+          </div>
+          {usageQueuedPrompt.queued && (
+            <div className="usage-limit-queued-chip">
+              {usageQueuedPrompt.summary || (
+                usageQueuedPrompt.scheduledSendAtMs
+                  ? `Prompt queued for ${new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(usageQueuedPrompt.scheduledSendAtMs))}.`
+                  : 'Prompt queued.'
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="input-wrapper">
         {fileMention.isOpen && (
           <FileMentionPopup
@@ -1375,6 +1444,8 @@ export const InputArea: React.FC = () => {
                 ? (pendingApproval.toolName === 'AskUserQuestion'
                   ? 'Type your answer... (Ctrl+Enter to send)'
                   : 'Type feedback or approve/reject above... (Ctrl+Enter to send)')
+                : isUsageLimitMode
+                  ? 'Usage limit reached - queue your prompt now (Ctrl+Enter)'
                 : isBusy
                   ? (isCodexBusy
                       ? (codexSteerArmed ? 'Press Ctrl+Enter again to confirm steer...' : 'Type to steer Codex... (Ctrl+Enter to confirm)')
@@ -1403,7 +1474,7 @@ export const InputArea: React.FC = () => {
         </div>
         <div className="input-buttons">
           {providerCapabilities.supportsPromptEnhancer && (
-            <div className="enhance-button-group">
+            <div className="enhance-button-group" ref={enhanceGroupRef}>
               <button
                 className={`enhance-button${isEnhancing ? ' enhancing' : ''}${autoEnhanceEnabled ? ' auto-active' : ''}`}
                 onClick={handleEnhancePrompt}
@@ -1457,7 +1528,26 @@ export const InputArea: React.FC = () => {
               {isCodexBusy ? 'Stop' : 'Cancel'}
             </button>
           )}
-          <div className="send-button-group">
+          <div className="send-column">
+          <div className="prompt-nav-buttons">
+            <button
+              className="prompt-nav-btn"
+              onClick={navigatePromptUp}
+              disabled={userMessages.length === 0}
+              data-tooltip="Previous user prompt"
+            >
+              {'\u25B2'}
+            </button>
+            <button
+              className="prompt-nav-btn"
+              onClick={navigatePromptDown}
+              disabled={userMessages.length === 0}
+              data-tooltip="Next user prompt"
+            >
+              {'\u25BC'}
+            </button>
+          </div>
+          <div className="send-button-group" ref={sendGroupRef}>
             <button
               className="send-button"
               onClick={sendMessage}
@@ -1467,11 +1557,15 @@ export const InputArea: React.FC = () => {
                   ? (codexSteerArmed
                       ? 'Confirm Steer: stop current turn and send this prompt (Ctrl+Enter)'
                       : 'Steer Codex: click once to arm, click again to confirm (Ctrl+Enter)')
+                  : isUsageLimitMode
+                    ? 'Queue prompt for auto-send one minute after usage reset (Ctrl+Enter)'
                   : (promptTranslateEnabled && !autoTranslateEnabled ? 'Translate to English (Ctrl+Enter)' : 'Send message (Ctrl+Enter)')
               }
             >
               {isCodexBusy
                 ? (codexSteerArmed ? 'Confirm Steer' : 'Steer')
+                : isUsageLimitMode
+                  ? 'Send When Available'
                 : (promptTranslateEnabled && !autoTranslateEnabled ? 'Translate' : 'Send')}
             </button>
             <button
@@ -1507,6 +1601,7 @@ export const InputArea: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
           </div>
         </div>
       </div>

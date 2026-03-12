@@ -1,4 +1,7 @@
-# Usage Limit Deferred Send - Execution Plan
+# Usage Limit Deferred Send - Execution Plan (Archived)
+
+> Implemented on **March 11, 2026**.  
+> Current state snapshot: `Kingdom_of_Claudes_Beloved_MDs/USAGE_LIMIT_DEFERRED_SEND.md`
 
 ## Goal
 

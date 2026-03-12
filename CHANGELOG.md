@@ -1,6 +1,48 @@
 # ClaUi - Changelog
 
-## Unreleased - 2026-03-11
+## Unreleased - 2026-03-12
+
+**Feature: Usage-limit deferred send (Claude only)**
+
+- When Claude returns a usage-limit error, the extension now detects it automatically and enters "deferred send" mode
+- Users can queue their next prompt immediately; it will be auto-sent one minute after the limit resets
+- New `usageLimitParser.ts` parses reset times from Claude error messages (absolute time, relative duration, time-only formats) with future-normalization
+- Full state machine in `MessageHandler`: detects usage-limit errors on `result.error`, tracks reset time, schedules dispatch with retry on busy, clears on session lifecycle events (start/stop/resume/fork/clear/editAndResend/provider switch)
+- Webview receives `usageLimitDetected` and `usageQueuedPromptState` messages to drive UI state
+- Input area shows a warning banner with reset info and a queued-prompt chip when a prompt is staged
+- Send button label changes to "Send When Available" and placeholder text updates during usage-limit mode
+- New `queuePromptUntilUsageReset` message type for explicit queue requests from the webview
+- Usage-limit state is cleared automatically on successful result, provider switch away from Claude, or any session lifecycle reset
+
+**Feature: Prompt navigation arrows**
+
+- Added up/down arrow buttons above the send button to scroll through previous user prompts in the chat
+- Clicking the up arrow scrolls to the previous user message; down arrow scrolls to the next
+- Navigation index resets when new messages are sent
+- Messages scroll into view smoothly, centered in the viewport
+
+**Feature: Project 30 Days dashboard tab**
+
+- Added a "30 Days" tab under the Dashboard's Project mode
+- Filters project session summaries to the last 30 calendar days and renders the existing project overview analytics on the filtered subset
+- Shows session count and cutoff date in an info header; displays "No sessions in the last 30 days" when empty
+
+**Improvement: Centralized outside-click handling**
+
+- Created `useOutsideClick` hook that uses a single shared document `click` listener with a module-level registry instead of per-dropdown `mousedown` listeners
+- Fixes the "first click does nothing" bug where `mousedown` fired before the target button's `click`, causing React to batch state updates that swallowed the click
+- Migrated all outside-click logic: StatusBar (vitals, Babel Fish, usage popovers), StatusBarGroupButton, InputArea (enhancer popover, send settings popover)
+
+**Improvement: Provider switching within the same Claude tab**
+
+- `MessageHandler` now syncs the CLI path override with the provider dropdown selection before starting a new session
+- Allows Claude and Happy switching within the same `SessionTab` without needing to open a new tab
+- `SessionTab.setCliPathOverride` now accepts `null` to clear the override (switching back to Claude)
+
+**Improvement: Visual Progress auto-scroll reliability**
+
+- `VisualProgressView` now always scrolls to bottom for newly added cards (not just when near bottom)
+- For card updates (content changes on existing cards), still only auto-scrolls if already near the bottom (within 200px)
 
 **Feature: BTW now works natively in Codex sessions**
 
@@ -28,6 +70,7 @@
 
 - Added `Kingdom_of_Claudes_Beloved_MDs/btw_bug.md` with BTW bug-fix investigation history and architecture notes
 - Added `Kingdom_of_Claudes_Beloved_MDs/USAGE_LIMIT_DEFERRED_SEND_PLAN.md` (planned usage-limit deferred-send flow)
+- Added `Kingdom_of_Claudes_Beloved_MDs/PROJECT_30_DAYS_TAB.md` with Project 30 Days tab documentation
 - Updated `TECHNICAL.md` and analytics/token-ratio details to reflect the new docs and chart behavior
 - Updated `Kingdom_of_Claudes_Beloved_MDs/btw_bug.md` and `TECHNICAL.md` with Codex BTW architecture and runtime flow
 

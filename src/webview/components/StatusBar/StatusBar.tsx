@@ -13,6 +13,7 @@ import { t as tAch } from '../Achievements/achievementI18n';
 import { getModelMaxContext, getContextColor } from '../../utils/modelContextLimits';
 import { useStatusBarCollapse } from '../../hooks/useStatusBarCollapse';
 import { StatusBarGroupButton } from './StatusBarGroupButton';
+import { useOutsideClick } from '../../hooks/useOutsideClick';
 
 function formatDuration(durationMs: number): string {
   const totalSec = Math.max(0, Math.floor(durationMs / 1000));
@@ -94,41 +95,10 @@ export const StatusBar: React.FC<{
     return () => clearInterval(id);
   }, []);
 
-  // Close vitals info panel on outside click
-  useEffect(() => {
-    if (!vitalsInfoOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (vitalsInfoRef.current && !vitalsInfoRef.current.contains(e.target as Node)) {
-        setVitalsInfoOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [vitalsInfoOpen]);
-
-  // Close Babel Fish panel on outside click
-  useEffect(() => {
-    if (!babelFishOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (babelFishRef.current && !babelFishRef.current.contains(e.target as Node)) {
-        setBabelFishOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [babelFishOpen]);
-
-  // Close usage popover on outside click
-  useEffect(() => {
-    if (!usagePopoverOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (usageRef.current && !usageRef.current.contains(e.target as Node)) {
-        setUsagePopoverOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [usagePopoverOpen]);
+  // Centralized outside-click handlers (use 'click', not 'mousedown')
+  useOutsideClick('statusbar-vitals', vitalsInfoRef, vitalsInfoOpen, () => setVitalsInfoOpen(false));
+  useOutsideClick('statusbar-babelfish', babelFishRef, babelFishOpen, () => setBabelFishOpen(false));
+  useOutsideClick('statusbar-usage', usageRef, usagePopoverOpen, () => setUsagePopoverOpen(false));
 
   // Close dropdowns when leaving their layout modes
   useEffect(() => {

@@ -224,6 +224,17 @@ export interface AppState {
   usageStats: UsageStat[];
   usageFetchedAt: number | null;
   usageError: string | undefined;
+  usageLimit: {
+    active: boolean;
+    resetAtMs: number | null;
+    resetDisplay: string;
+    rawMessage: string | null;
+  };
+  usageQueuedPrompt: {
+    queued: boolean;
+    scheduledSendAtMs: number | null;
+    summary: string | null;
+  };
 
   // Achievements
   achievementsEnabled: boolean;
@@ -499,6 +510,8 @@ export interface AppState {
   setContextWidgetVisible: (visible: boolean) => void;
   setUsageWidgetEnabled: (enabled: boolean) => void;
   setUsageData: (stats: UsageStat[], fetchedAt: number, error?: string) => void;
+  setUsageLimitState: (state: { active: boolean; resetAtMs: number | null; resetDisplay: string; rawMessage: string | null }) => void;
+  setUsageQueuedPromptState: (state: { queued: boolean; scheduledSendAtMs: number | null; summary: string | null }) => void;
   rebuildTurnHistoryFromMessages: (messages?: ChatMessage[]) => void;
   addTurnRecord: (turn: TurnRecord) => void;
   setAchievementLanguage: (lang: AchievementLang) => void;
@@ -751,6 +764,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   usageStats: [],
   usageFetchedAt: null,
   usageError: undefined,
+  usageLimit: { active: false, resetAtMs: null, resetDisplay: '', rawMessage: null },
+  usageQueuedPrompt: { queued: false, scheduledSendAtMs: null, summary: null },
   achievementsEnabled: true,
   achievementsSound: false,
   achievementLanguage: (() => {
@@ -954,6 +969,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         handoffError: null,
         handoffArtifactPath: null,
         handoffManualPrompt: null,
+        usageLimit: { active: false, resetAtMs: null, resetDisplay: '', rawMessage: null },
+        usageQueuedPrompt: { queued: false, scheduledSendAtMs: null, summary: null },
         // Clear team state when the session ends - teammates die with the session
         teamActive: false,
         teamName: null,
@@ -1330,7 +1347,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setTypingTheme: (theme) => set({ typingTheme: theme }),
 
-  setProvider: (provider) => set({ provider }),
+  setProvider: (provider) => set((state) => ({
+    provider,
+    ...(provider !== 'claude'
+      ? {
+        usageLimit: { active: false, resetAtMs: null, resetDisplay: '', rawMessage: null },
+        usageQueuedPrompt: { queued: false, scheduledSendAtMs: null, summary: null },
+      }
+      : {}),
+  })),
 
   setSelectedProvider: (provider) => set({ selectedProvider: provider }),
 
@@ -1604,6 +1629,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   setUsageData: (stats, fetchedAt, error) =>
     set({ usageStats: stats, usageFetchedAt: fetchedAt, usageError: error }),
 
+  setUsageLimitState: (usageLimit) =>
+    set({ usageLimit }),
+
+  setUsageQueuedPromptState: (usageQueuedPrompt) =>
+    set({ usageQueuedPrompt }),
+
   rebuildTurnHistoryFromMessages: (messages) =>
     set((state) => {
       const rebuilt = deriveTurnHistoryFromMessages(messages ?? state.messages);
@@ -1797,6 +1828,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       handoffError: null,
       handoffArtifactPath: null,
       handoffManualPrompt: null,
+      usageLimit: { active: false, resetAtMs: null, resetDisplay: '', rawMessage: null },
+      usageQueuedPrompt: { queued: false, scheduledSendAtMs: null, summary: null },
       messages: [],
       streamingMessageId: null,
       streamingBlocks: [],

@@ -17,6 +17,7 @@ import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import { getStoredApiKey, setStoredApiKey, maskApiKey } from '../process/envUtils';
 import type { TokenUsageRatioTracker } from '../session/TokenUsageRatioTracker';
+import { parseUsageLimitError } from '../process/usageLimitParser';
 import { AuthManager } from '../auth/AuthManager';
 import { BugReportService } from '../feedback/BugReportService';
 import { openHtmlPreviewPanel } from './HtmlPreviewPanel';
@@ -29,6 +30,7 @@ import type {
   TypingTheme,
   TurnCategory,
   TurnRecord,
+  WebviewImageData,
   WebviewToExtensionMessage,
 } from '../types/webview-messages';
 import type {
@@ -57,6 +59,8 @@ export interface WebviewBridge {
   saveProjectAnalyticsNow?(): void;
   /** Optional per-tab CLI override (e.g. Happy provider uses `happy` instead of `claude`) */
   getCliPathOverride?(): string | null;
+  /** Update per-tab CLI override (used when switching between Claude and Happy within the same tab) */
+  setCliPathOverride?(pathOrNull: string | null): void;
   /** Provider currently routed by this tab */
   getProvider?(): ProviderId;
   /** Start a btw background session (fork from current, send first message) */
@@ -251,6 +255,15 @@ export class MessageHandler {
   private lastPostedUserMsg: { text: string; time: number } | null = null;
   /** One-time handoff context staged by provider switch. Appended only to the first user turn. */
   private pendingHandoffPrompt: string | null = null;
+
+  /** Usage-limit deferred-send mode (Claude-only) */
+  private usageLimitActive = false;
+  private usageLimitResetAtMs: number | null = null;
+  private usageLimitResetDisplay = '';
+  private usageLimitRawMessage = '';
+  private queuedUsagePrompt: { text: string; images?: WebviewImageData[] } | null = null;
+  private queuedUsageScheduledSendAtMs: number | null = null;
+  private queuedUsageTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Turn counter for Session Vitals (reset on session clear) */
   private turnIndex = 0;
@@ -454,6 +467,37 @@ export class MessageHandler {
     return this.webview.getCliPathOverride?.() ?? undefined;
   }
 
+  /**
+   * Sync the tab's CLI path override with the currently configured provider setting.
+   * This allows Claude <-> Happy switching within the same SessionTab when the user
+   * changes the provider dropdown and then starts a new session.
+   * Only relevant when the process is NOT running (about to start a new session).
+   */
+  private syncProviderOverrideForNewSession(): void {
+    const configuredProvider = vscode.workspace
+      .getConfiguration('claudeMirror')
+      .get<ProviderId>('provider', 'claude');
+    const currentProvider = this.getActiveProvider();
+
+    if (configuredProvider === currentProvider) {
+      return;
+    }
+
+    // Claude <-> Happy can be handled within the same SessionTab
+    if (configuredProvider === 'remote') {
+      const happyCliPath = vscode.workspace
+        .getConfiguration('claudeMirror')
+        .get<string>('happy.cliPath', 'happy');
+      this.webview.setCliPathOverride?.(happyCliPath);
+      this.log(`Provider override synced to Happy: ${happyCliPath}`);
+    } else if (configuredProvider === 'claude' && currentProvider === 'remote') {
+      this.webview.setCliPathOverride?.(null);
+      this.log('Provider override cleared (switched back to Claude)');
+    }
+    // Note: switching to/from 'codex' requires a different tab type (CodexSessionTab),
+    // so we don't handle it here - the user must open a new Codex tab.
+  }
+
   private async sendClaudeAuthStatus(): Promise<void> {
     const fallback = { loggedIn: false, email: '', subscriptionType: '' };
     if (!this.authManager) {
@@ -547,6 +591,205 @@ export class MessageHandler {
     ].join('\n\n');
   }
 
+  private isUsageDeferredSendBlocked(): boolean {
+    return this.inAssistantTurn || !!this.pendingApprovalTool || this.exitPlanModeBarActive;
+  }
+
+  private formatUsageScheduledTime(ms: number): string {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(new Date(ms));
+  }
+
+  private postUsageLimitState(): void {
+    this.webview.postMessage({
+      type: 'usageLimitDetected',
+      active: this.usageLimitActive,
+      resetAtMs: this.usageLimitResetAtMs ?? undefined,
+      resetDisplay: this.usageLimitResetDisplay,
+      rawMessage: this.usageLimitRawMessage,
+    });
+  }
+
+  private postUsageQueuedPromptState(summary?: string): void {
+    this.webview.postMessage({
+      type: 'usageQueuedPromptState',
+      queued: !!this.queuedUsagePrompt,
+      scheduledSendAtMs: this.queuedUsageScheduledSendAtMs ?? undefined,
+      summary,
+    });
+  }
+
+  private clearQueuedUsageTimer(): void {
+    if (this.queuedUsageTimer) {
+      clearTimeout(this.queuedUsageTimer);
+      this.queuedUsageTimer = null;
+    }
+  }
+
+  private clearQueuedUsagePromptState(notifyWebview: boolean): void {
+    this.clearQueuedUsageTimer();
+    this.queuedUsagePrompt = null;
+    this.queuedUsageScheduledSendAtMs = null;
+    if (notifyWebview) {
+      this.postUsageQueuedPromptState();
+    }
+  }
+
+  private clearUsageLimitState(reason: string, options?: { notifyWebview?: boolean; clearQueuedPrompt?: boolean }): void {
+    const notifyWebview = options?.notifyWebview ?? true;
+    const clearQueuedPrompt = options?.clearQueuedPrompt ?? true;
+    this.log(`[UsageLimitQueue] Clearing usage-limit state (${reason})`);
+    this.usageLimitActive = false;
+    this.usageLimitResetAtMs = null;
+    this.usageLimitResetDisplay = '';
+    this.usageLimitRawMessage = '';
+    if (clearQueuedPrompt) {
+      this.clearQueuedUsagePromptState(false);
+    }
+    if (notifyWebview) {
+      this.postUsageLimitState();
+      if (clearQueuedPrompt) {
+        this.postUsageQueuedPromptState();
+      }
+    }
+  }
+
+  private scheduleQueuedUsageDispatch(delayMs?: number): void {
+    if (!this.queuedUsagePrompt || this.queuedUsageScheduledSendAtMs == null) {
+      return;
+    }
+    this.clearQueuedUsageTimer();
+    const computedDelay = delayMs != null
+      ? Math.max(0, delayMs)
+      : Math.max(0, this.queuedUsageScheduledSendAtMs - Date.now());
+    this.queuedUsageTimer = setTimeout(() => {
+      this.queuedUsageTimer = null;
+      this.tryDispatchQueuedUsagePrompt();
+    }, computedDelay);
+  }
+
+  private tryDispatchQueuedUsagePrompt(): void {
+    if (!this.queuedUsagePrompt || this.queuedUsageScheduledSendAtMs == null) {
+      return;
+    }
+    if (this.getActiveProvider() !== 'claude') {
+      this.log('[UsageLimitQueue] Skipping queued dispatch: provider is not Claude');
+      this.clearUsageLimitState('provider is not Claude during queued dispatch', { notifyWebview: true, clearQueuedPrompt: true });
+      return;
+    }
+    if (!this.processManager.isRunning) {
+      this.log('[UsageLimitQueue] Process not running at fire time; clearing queued prompt');
+      this.clearUsageLimitState('process not running at queued dispatch time', {
+        notifyWebview: true,
+        clearQueuedPrompt: true,
+      });
+      return;
+    }
+    if (this.isUsageDeferredSendBlocked()) {
+      this.log('[UsageLimitQueue] Process busy at fire time; retrying queued dispatch in 15s');
+      this.scheduleQueuedUsageDispatch(15_000);
+      return;
+    }
+
+    const queued = this.queuedUsagePrompt;
+    const queuedImages = queued.images ?? [];
+    const queuedText = queued.text;
+    try {
+      if (queuedText.trim()) {
+        this.achievementService.onUserPrompt(this.tabId, queuedText);
+      }
+      const content: ContentBlock[] = [];
+      if (queuedText) {
+        content.push({ type: 'text', text: queuedText });
+      }
+      for (const img of queuedImages) {
+        content.push({
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: img.mediaType,
+            data: img.base64,
+          },
+        } as ContentBlock);
+      }
+      this.postUserMessage(content, true);
+      if (queuedImages.length > 0) {
+        this.control.sendWithImages(
+          this.consumeDeferredHandoffContext(queuedText, { imageCount: queuedImages.length }),
+          queuedImages
+        );
+      } else {
+        this.control.sendText(this.consumeDeferredHandoffContext(queuedText));
+      }
+      this.webview.postMessage({ type: 'processBusy', busy: true });
+      this.triggerSessionNaming(queuedText);
+      if (queuedText.trim()) {
+        void this.promptHistoryStore.addPrompt(queuedText);
+      }
+      this.clearQueuedUsagePromptState(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`[UsageLimitQueue] Queued prompt dispatch failed: ${message}`);
+      this.webview.postMessage({
+        type: 'error',
+        message: `Failed to auto-send queued prompt: ${message}`,
+      });
+      this.scheduleQueuedUsageDispatch(15_000);
+    }
+  }
+
+  private queuePromptUntilUsageReset(text: string, images?: WebviewImageData[]): void {
+    if (this.getActiveProvider() !== 'claude') {
+      this.log('[UsageLimitQueue] Ignoring queue request on non-Claude provider');
+      return;
+    }
+    if (!this.usageLimitActive || this.usageLimitResetAtMs == null) {
+      this.webview.postMessage({
+        type: 'error',
+        message: 'Usage-limit queue is not active. Send normally.',
+      });
+      return;
+    }
+    const normalizedImages = (images && images.length > 0) ? images : undefined;
+    const hasPayload = text.trim().length > 0 || !!normalizedImages;
+    if (!hasPayload) {
+      return;
+    }
+
+    const wasQueued = !!this.queuedUsagePrompt;
+    this.queuedUsagePrompt = { text, images: normalizedImages };
+    this.queuedUsageScheduledSendAtMs = this.usageLimitResetAtMs + 60_000;
+    this.scheduleQueuedUsageDispatch();
+
+    const scheduledLabel = this.formatUsageScheduledTime(this.queuedUsageScheduledSendAtMs);
+    const summary = wasQueued
+      ? `Queued prompt updated. The latest prompt will be sent at ${scheduledLabel}.`
+      : `Prompt queued for ${scheduledLabel}.`;
+    this.postUsageQueuedPromptState(summary);
+    this.log(`[UsageLimitQueue] Prompt queued for ${scheduledLabel} (updated=${wasQueued})`);
+  }
+
+  private handleUsageLimitDetected(rawError: string): void {
+    if (this.getActiveProvider() !== 'claude') {
+      return;
+    }
+    const parsed = parseUsageLimitError(rawError);
+    if (!parsed) {
+      return;
+    }
+    this.usageLimitActive = true;
+    this.usageLimitResetAtMs = parsed.resetAtMs;
+    this.usageLimitResetDisplay = parsed.resetDisplay;
+    this.usageLimitRawMessage = rawError;
+    this.postUsageLimitState();
+    this.log(
+      `[UsageLimitQueue] Usage limit detected; resetAt=${new Date(parsed.resetAtMs).toISOString()} ` +
+      `display="${parsed.resetDisplay}"`
+    );
+  }
+
   /** Wire up all event listeners */
   initialize(): void {
     this.bindWebviewMessages();
@@ -562,6 +805,10 @@ export class MessageHandler {
 
       switch (msg.type) {
         case 'sendMessage':
+          if (this.usageLimitActive && this.getActiveProvider() === 'claude') {
+            this.queuePromptUntilUsageReset(msg.text);
+            break;
+          }
           this.log(`Sending user message: "${msg.text.slice(0, 80)}..."`);
           this.logApprovalState('sendMessage-entry');
           // If there was a pending ExitPlanMode approval, mark it as processed so
@@ -597,6 +844,10 @@ export class MessageHandler {
           break;
 
         case 'sendMessageWithImages': {
+          if (this.usageLimitActive && this.getActiveProvider() === 'claude') {
+            this.queuePromptUntilUsageReset(msg.text, msg.images);
+            break;
+          }
           this.log(`Sending message with ${msg.images.length} images`);
           // Same ExitPlanMode guard as sendMessage (user may paste images while bar is active)
           // Bug 16 fix: also check exitPlanModeBarActive fallback (see sendMessage comment).
@@ -659,12 +910,17 @@ export class MessageHandler {
           }
           break;
 
+        case 'queuePromptUntilUsageReset':
+          this.queuePromptUntilUsageReset(msg.text, msg.images);
+          break;
+
         case 'compact':
           this.compactPending = true;
           this.control.compact(msg.instructions);
           break;
 
         case 'startSession':
+          this.clearUsageLimitState('startSession', { notifyWebview: true, clearQueuedPrompt: true });
           this.firstMessageSent = false;
           this.clearPendingHandoffPrompt();
           this.activitySummarizer?.reset();
@@ -680,6 +936,8 @@ export class MessageHandler {
             });
             break;
           }
+          // Sync CLI override with provider dropdown before starting
+          this.syncProviderOverrideForNewSession();
           this.processManager
             .start({
               cwd: msg.workspacePath,
@@ -704,6 +962,7 @@ export class MessageHandler {
           break;
 
         case 'stopSession':
+          this.clearUsageLimitState('stopSession', { notifyWebview: true, clearQueuedPrompt: true });
           this.clearPendingHandoffPrompt();
           this.processManager.stop();
           this.achievementService.onSessionEnd(this.tabId);
@@ -714,6 +973,7 @@ export class MessageHandler {
           break;
 
         case 'resumeSession':
+          this.clearUsageLimitState('resumeSession', { notifyWebview: true, clearQueuedPrompt: true });
           this.firstMessageSent = false;
           this.clearPendingHandoffPrompt();
           this.achievementService.onSessionEnd(this.tabId);
@@ -734,6 +994,7 @@ export class MessageHandler {
           break;
 
         case 'forkSession':
+          this.clearUsageLimitState('forkSession', { notifyWebview: true, clearQueuedPrompt: true });
           this.firstMessageSent = false;
           this.clearPendingHandoffPrompt();
           this.achievementService.onSessionEnd(this.tabId);
@@ -765,6 +1026,7 @@ export class MessageHandler {
         case 'clearSession':
           // Save analytics for the current session BEFORE clearing records
           this.webview.saveProjectAnalyticsNow?.();
+          this.clearUsageLimitState('clearSession', { notifyWebview: true, clearQueuedPrompt: true });
           this.firstMessageSent = false;
           this.clearPendingHandoffPrompt();
           this.exitPlanModeBarActive = false;
@@ -777,6 +1039,8 @@ export class MessageHandler {
           this.log('clearSession - stopping current process and starting fresh');
           this.achievementService.onSessionEnd(this.tabId);
           this.processManager.stop();
+          // Sync CLI override with provider dropdown before restarting
+          this.syncProviderOverrideForNewSession();
           this.processManager
             .start({
               cwd: msg.workspacePath,
@@ -807,6 +1071,9 @@ export class MessageHandler {
 
         case 'setProvider':
           this.log(`Setting provider to: "${msg.provider}"`);
+          if (msg.provider !== 'claude') {
+            this.clearUsageLimitState('provider switched away from Claude', { notifyWebview: true, clearQueuedPrompt: true });
+          }
           void vscode.workspace.getConfiguration('claudeMirror').update('provider', msg.provider, true)
             .then(() => {
               const saved = vscode.workspace.getConfiguration('claudeMirror').get<ProviderId>('provider', 'claude');
@@ -1405,6 +1672,7 @@ export class MessageHandler {
 
         case 'editAndResend':
           this.log(`Edit-and-resend: resuming session with edited prompt`);
+          this.clearUsageLimitState('editAndResend', { notifyWebview: true, clearQueuedPrompt: true });
           // Save analytics for the current session BEFORE clearing records
           this.webview.saveProjectAnalyticsNow?.();
           this.clearApprovalTracking();
@@ -1888,6 +2156,9 @@ export class MessageHandler {
           this.sendAdventureWidgetSetting();
           // Send usage widget setting
           this.sendUsageWidgetSetting();
+          // Send usage-limit deferred queue state
+          this.postUsageLimitState();
+          this.postUsageQueuedPromptState();
           // Send translation language setting
           this.sendTranslationLanguageSetting();
           // Send turn analysis settings
@@ -3058,6 +3329,12 @@ export class MessageHandler {
         }
         if (event.subtype === 'success') {
           this.achievementService.onResult(this.tabId, true);
+          if (this.usageLimitActive) {
+            this.clearUsageLimitState('successful result after usage-limit mode', {
+              notifyWebview: true,
+              clearQueuedPrompt: true,
+            });
+          }
           const success = event as ResultSuccess;
           // result.usage is CUMULATIVE across all API calls in the turn.
           // For context-window display we need the LAST API call's input
@@ -3133,6 +3410,7 @@ export class MessageHandler {
         } else {
           this.achievementService.onResult(this.tabId, false);
           const error = event as ResultError;
+          this.handleUsageLimitDetected(error.error);
           this.webview.postMessage({
             type: 'error',
             message: error.error,
