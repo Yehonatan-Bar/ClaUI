@@ -383,7 +383,7 @@ export class SessionTab implements WebviewBridge {
 
     this.log(`[Tab ${this.tabNumber}] Switching model to "${model}" (session ${sessionToResume})`);
     this.suppressNextExit = true;
-    this.postMessage({ type: 'processBusy', busy: false });
+    this.postMessage({ type: 'processBusy', busy: true });
     this.processManager.stop();
 
     try {
@@ -393,7 +393,6 @@ export class SessionTab implements WebviewBridge {
         cliPathOverride: this.cliPathOverride ?? undefined,
       });
       this.log(`[Tab ${this.tabNumber}] Session resumed with model "${model}"`);
-      await vscode.workspace.getConfiguration('claudeMirror').update('model', model, true);
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       this.log(`[Tab ${this.tabNumber}] Failed to switch model: ${errMsg}`);

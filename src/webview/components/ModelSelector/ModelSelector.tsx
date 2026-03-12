@@ -13,7 +13,7 @@ const MODEL_OPTIONS = [
 
 /**
  * Model selector dropdown for choosing which Claude model to use.
- * Changes take effect on the next session start.
+ * Changing the model live-switches the current session (stop + resume with new model).
  */
 export const ModelSelector: React.FC = () => {
   const { selectedModel, model, isConnected, setSelectedModel } = useAppStore();
@@ -37,8 +37,8 @@ export const ModelSelector: React.FC = () => {
         value={selectedModel}
         onChange={handleChange}
         data-tooltip={isConnected && activeModelLabel
-          ? `Active: ${activeModelLabel} (change takes effect on next session)`
-          : 'Select model for next session'}
+          ? `Active: ${activeModelLabel}`
+          : 'Select model'}
       >
         {MODEL_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>

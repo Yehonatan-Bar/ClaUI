@@ -337,10 +337,9 @@
 - להשתמש ב־`CodexConversationReader`
 
 7. `switchModel(model)`:
-- לא `resume` של process מתמשך
-- רק update setting + session הבא / turn הבא
-- אם רוצים "החלפה מיידית": turn הבא ב־resume עם model חדש
-- לא לעצור "session process" כי אין כזה
+- Claude path: live switch -- stops current session and resumes with new model immediately
+- Codex path: update setting, applies on next turn
+- לא לעצור "session process" כי אין כזה (Codex)
 
 **מה נשאר כמעט זהה**
 - webview panel setup

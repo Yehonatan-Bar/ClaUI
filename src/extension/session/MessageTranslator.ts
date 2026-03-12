@@ -46,7 +46,7 @@ export class MessageTranslator {
       '---',
     ].join('\n');
 
-    const args = ['-p', '--model', 'claude-sonnet-4-6', '--max-tokens', '16000'];
+    const args = ['-p', '--model', 'claude-sonnet-4-6'];
 
     const env = buildClaudeCliEnv(apiKey);
 

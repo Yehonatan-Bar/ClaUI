@@ -1066,7 +1066,15 @@ export class MessageHandler {
 
         case 'setModel':
           this.log(`Setting model to: "${msg.model}"`);
+          // Always save the setting (used if no active session, or as fallback if switch fails)
           vscode.workspace.getConfiguration('claudeMirror').update('model', msg.model, true);
+          // Live-switch: restart current session with new model (preserves conversation)
+          if (this.webview.switchModel) {
+            this.webview.switchModel(msg.model).catch((err: unknown) => {
+              const message = err instanceof Error ? err.message : String(err);
+              this.log(`Model switch failed (setting saved for next session): ${message}`);
+            });
+          }
           break;
 
         case 'setProvider':

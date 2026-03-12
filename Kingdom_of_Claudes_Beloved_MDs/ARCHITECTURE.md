@@ -512,12 +512,14 @@ Controls whether Claude has full tool access or is restricted to read-only tools
 - **Full Access** (default) - CLI runs with `-p --permission-mode bypassPermissions`, all tools run without approval prompts.
 - **Supervised** - CLI runs with `-p --allowedTools Read,Grep,Glob,LS,Task,WebFetch,WebSearch,TodoRead,TodoWrite,AskUserQuestion,ExitPlanMode` restricting to read-only tools. Write tools (Bash, Edit, Write) are denied by the CLI.
 
-**Data flow (same pattern as ModelSelector):**
+**Data flow:**
 1. User selects mode in `PermissionModeSelector` dropdown (status bar)
 2. `setPermissionMode` updates Zustand store + sends `setPermissionMode` message to extension
 3. Extension persists to VS Code config (`claudeMirror.permissionMode`)
 4. On next session start, `ClaudeProcessManager.start()` reads the config and adds the appropriate CLI flag (`--permission-mode bypassPermissions` for full-access, `--allowedTools` for supervised)
 5. On webview ready, extension sends `permissionModeSetting` message to sync the dropdown
+
+Note: Unlike the ModelSelector (which applies immediately by stopping and resuming the session), permission mode changes take effect on the next session start.
 
 **Key files:**
 - `ClaudeProcessManager.ts` - `--permission-mode bypassPermissions` for full-access, `--allowedTools` for supervised in `start()`

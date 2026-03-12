@@ -55,7 +55,7 @@ A comprehensive catalog of every feature and capability in the ClaUi VS Code ext
 
 ## 5. Model & Provider Selection
 
-- **Model selector** - Dropdown in the status bar for choosing: Sonnet 4.6, Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default. Persisted to VS Code settings and synced on startup
+- **Model selector** - Dropdown in the status bar for choosing: Sonnet 4.6, Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default. Persisted to VS Code settings and synced on startup. Changing the model takes effect immediately -- the current session is stopped and resumed with the new model (live switch)
 - **Dual provider support** - Switch between Claude and Codex (OpenAI GPT) providers
 - **Provider selector** - "Codex" quick-switch button and "Provider" dropdown (Claude / Codex) in the status bar. Selection is persisted
 - **Codex integration** - Full runtime support via `codex exec --json`:
