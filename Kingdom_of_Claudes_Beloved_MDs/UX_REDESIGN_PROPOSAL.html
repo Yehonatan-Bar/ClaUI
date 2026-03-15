@@ -1,0 +1,1872 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaUi - UX Redesign Proposal</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', -apple-system, sans-serif;
+    background: #0a0a0f;
+    color: #e0e0e0;
+    line-height: 1.6;
+    direction: ltr;
+  }
+
+  .hero {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #1a1025 100%);
+    padding: 60px 40px;
+    text-align: center;
+    border-bottom: 1px solid #30363d;
+  }
+
+  .hero h1 {
+    font-size: 42px;
+    font-weight: 300;
+    color: #fff;
+    margin-bottom: 8px;
+    letter-spacing: -1px;
+  }
+
+  .hero h1 span {
+    font-weight: 700;
+    background: linear-gradient(135deg, #58a6ff, #bc8cff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero .subtitle {
+    font-size: 18px;
+    color: #8b949e;
+    margin-bottom: 30px;
+  }
+
+  .hero .stats {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+  }
+
+  .hero .stat {
+    text-align: center;
+  }
+
+  .hero .stat-number {
+    font-size: 48px;
+    font-weight: 700;
+    color: #ff6b6b;
+  }
+
+  .hero .stat-number.green { color: #7ee787; }
+
+  .hero .stat-label {
+    font-size: 13px;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 60px 40px;
+  }
+
+  h2 {
+    font-size: 28px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #30363d;
+  }
+
+  h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #c9d1d9;
+    margin: 24px 0 12px;
+  }
+
+  p {
+    color: #8b949e;
+    margin-bottom: 16px;
+    font-size: 15px;
+  }
+
+  /* Problem Section */
+  .problem-visual {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 24px 0;
+    overflow-x: auto;
+  }
+
+  .current-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    background: #1c2128;
+    border-radius: 6px;
+    white-space: nowrap;
+    min-width: 1400px;
+  }
+
+  .current-bar .btn {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .current-bar .btn.active {
+    background: #1f6feb;
+    border-color: #388bfd;
+    color: #fff;
+  }
+
+  .current-bar .sep {
+    width: 1px;
+    height: 16px;
+    background: #30363d;
+    flex-shrink: 0;
+  }
+
+  /* Annotation */
+  .annotation {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #1c1028;
+    border: 1px solid #6e40c9;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+  }
+
+  .annotation .icon {
+    font-size: 24px;
+    flex-shrink: 0;
+  }
+
+  .annotation .text {
+    color: #d2a8ff;
+    font-size: 14px;
+  }
+
+  /* Principles */
+  .principles-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .principle-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+
+  .principle-card:hover {
+    border-color: #58a6ff;
+  }
+
+  .principle-card .num {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+    text-align: center;
+    background: #1f6feb;
+    color: #fff;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+
+  .principle-card h4 {
+    color: #f0f6fc;
+    font-size: 15px;
+    margin-bottom: 8px;
+  }
+
+  .principle-card p {
+    font-size: 13px;
+    margin-bottom: 0;
+  }
+
+  /* Grouping Table */
+  .grouping-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+  }
+
+  .grouping-table th {
+    background: #161b22;
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #8b949e;
+    border-bottom: 2px solid #30363d;
+  }
+
+  .grouping-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid #21262d;
+    font-size: 14px;
+  }
+
+  .grouping-table tr:hover td {
+    background: #161b22;
+  }
+
+  .freq-high { color: #7ee787; font-weight: 600; }
+  .freq-med { color: #d29922; }
+  .freq-low { color: #8b949e; }
+
+  .group-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .group-badge.ai { background: #1f3d5c; color: #58a6ff; }
+  .group-badge.session { background: #1a3a1a; color: #7ee787; }
+  .group-badge.tools { background: #3d2c1a; color: #d29922; }
+  .group-badge.view { background: #2d1a3d; color: #bc8cff; }
+  .group-badge.input { background: #3d1a1a; color: #ff7b72; }
+  .group-badge.status { background: #1a2d3d; color: #79c0ff; }
+
+  /* MOCKUP SECTION */
+  .mockup-container {
+    background: #1c2128;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 24px 0;
+    position: relative;
+  }
+
+  .mockup-label {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: #1f6feb;
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    z-index: 10;
+  }
+
+  .mockup-label.before { background: #da3633; }
+  .mockup-label.after { background: #238636; }
+
+  /* Chat area mock */
+  .mock-chat {
+    padding: 20px;
+    min-height: 120px;
+    background: #0d1117;
+  }
+
+  .mock-chat .msg {
+    background: #161b22;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #8b949e;
+    max-width: 70%;
+  }
+
+  .mock-chat .msg.user {
+    background: #1a3a5c;
+    color: #79c0ff;
+    margin-left: auto;
+  }
+
+  /* ============================================ */
+  /* REDESIGNED INPUT AREA */
+  /* ============================================ */
+  .new-input-area {
+    padding: 10px 12px;
+    background: #161b22;
+    border-top: 1px solid #30363d;
+  }
+
+  .new-input-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+  }
+
+  .new-input-left {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+
+  .icon-btn:hover {
+    background: #30363d;
+    color: #c9d1d9;
+  }
+
+  .icon-btn.active {
+    background: #1f3d5c;
+    border-color: #388bfd;
+    color: #58a6ff;
+  }
+
+  .icon-btn.danger {
+    color: #ff7b72;
+  }
+
+  .icon-btn.danger:hover {
+    background: #3d1a1a;
+  }
+
+  .new-textarea {
+    flex: 1;
+    min-height: 36px;
+    max-height: 120px;
+    padding: 8px 12px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    color: #c9d1d9;
+    font-size: 13px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+  }
+
+  .new-textarea:focus {
+    border-color: #388bfd;
+  }
+
+  .new-textarea::placeholder {
+    color: #484f58;
+  }
+
+  .new-input-right {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .send-btn {
+    height: 36px;
+    padding: 0 16px;
+    background: #238636;
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .send-btn:hover {
+    background: #2ea043;
+  }
+
+  /* ============================================ */
+  /* REDESIGNED STATUS BAR */
+  /* ============================================ */
+  .new-status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    height: 32px;
+    background: #0d1117;
+    border-top: 1px solid #21262d;
+    font-size: 12px;
+  }
+
+  .status-left {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .status-center {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .status-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #484f58;
+    font-size: 11px;
+  }
+
+  /* AI Chip (Provider + Model + Permissions combined) */
+  .ai-chip {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    cursor: pointer;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #30363d;
+    transition: border-color 0.15s;
+    height: 24px;
+  }
+
+  .ai-chip:hover {
+    border-color: #58a6ff;
+  }
+
+  .ai-chip .provider {
+    padding: 0 8px;
+    background: #1f6feb;
+    color: #fff;
+    font-weight: 600;
+    font-size: 11px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+  }
+
+  .ai-chip .model {
+    padding: 0 8px;
+    background: #21262d;
+    color: #c9d1d9;
+    font-size: 11px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .ai-chip .perm {
+    padding: 0 6px;
+    background: #1a3a1a;
+    color: #7ee787;
+    font-size: 10px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+  }
+
+  .ai-chip .arrow {
+    padding: 0 4px;
+    background: #21262d;
+    color: #484f58;
+    font-size: 9px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Group Buttons */
+  .group-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+    height: 24px;
+    border-radius: 6px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: #8b949e;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .group-btn:hover {
+    background: #21262d;
+    color: #c9d1d9;
+    border-color: #30363d;
+  }
+
+  .group-btn.open {
+    background: #21262d;
+    color: #c9d1d9;
+    border-color: #30363d;
+  }
+
+  .group-btn .badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #d29922;
+  }
+
+  /* Status metrics */
+  .metric {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #484f58;
+    font-size: 11px;
+  }
+
+  .metric .value { color: #8b949e; }
+
+  .metric .bar {
+    width: 40px;
+    height: 4px;
+    background: #21262d;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .metric .bar-fill {
+    height: 100%;
+    background: #238636;
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+
+  .metric .bar-fill.warn { background: #d29922; }
+  .metric .bar-fill.danger { background: #da3633; }
+
+  /* ============================================ */
+  /* DROPDOWN PANELS */
+  /* ============================================ */
+  .dropdown-panel {
+    position: absolute;
+    bottom: 34px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 8px;
+    min-width: 220px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    display: none;
+    z-index: 100;
+  }
+
+  .dropdown-panel.show {
+    display: block;
+  }
+
+  .dropdown-panel h5 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #484f58;
+    padding: 6px 8px 4px;
+    margin-top: 4px;
+  }
+
+  .dropdown-panel h5:first-child {
+    margin-top: 0;
+  }
+
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    color: #c9d1d9;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .dropdown-item:hover {
+    background: #21262d;
+  }
+
+  .dropdown-item .di-icon {
+    width: 20px;
+    text-align: center;
+    font-size: 13px;
+    color: #8b949e;
+  }
+
+  .dropdown-item .di-label { flex: 1; }
+
+  .dropdown-item .di-shortcut {
+    font-size: 10px;
+    color: #484f58;
+    background: #21262d;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .dropdown-item .di-badge {
+    font-size: 10px;
+    color: #d29922;
+    background: #3d2c1a;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+
+  .dropdown-sep {
+    height: 1px;
+    background: #21262d;
+    margin: 4px 0;
+  }
+
+  /* Provider selector in dropdown */
+  .provider-row {
+    display: flex;
+    gap: 4px;
+    padding: 4px 8px;
+  }
+
+  .provider-pill {
+    flex: 1;
+    padding: 5px 0;
+    text-align: center;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #21262d;
+    color: #8b949e;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .provider-pill:hover {
+    border-color: #30363d;
+    color: #c9d1d9;
+  }
+
+  .provider-pill.active {
+    background: #1f6feb;
+    color: #fff;
+    border-color: #388bfd;
+  }
+
+  /* Select in dropdown */
+  .dd-select {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+  }
+
+  .dd-select label {
+    font-size: 11px;
+    color: #8b949e;
+    min-width: 60px;
+  }
+
+  .dd-select select {
+    flex: 1;
+    padding: 4px 8px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    color: #c9d1d9;
+    font-size: 11px;
+  }
+
+  /* ============================================ */
+  /* COMPARISON SECTION */
+  /* ============================================ */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin: 32px 0;
+  }
+
+  .comparison > div {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #30363d;
+  }
+
+  .comparison .label {
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .comparison .before .label {
+    background: #3d1a1a;
+    color: #ff7b72;
+  }
+
+  .comparison .after .label {
+    background: #1a3a1a;
+    color: #7ee787;
+  }
+
+  /* ============================================ */
+  /* BENEFITS SECTION */
+  /* ============================================ */
+  .benefits-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .benefit-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 20px;
+  }
+
+  .benefit-card .metric-big {
+    font-size: 36px;
+    font-weight: 700;
+    color: #7ee787;
+    margin-bottom: 4px;
+  }
+
+  .benefit-card h4 {
+    font-size: 15px;
+    color: #f0f6fc;
+    margin-bottom: 8px;
+  }
+
+  .benefit-card p {
+    font-size: 13px;
+    margin-bottom: 0;
+  }
+
+  /* ============================================ */
+  /* RESPONSIVE BEHAVIOR SECTION */
+  /* ============================================ */
+  .responsive-demo {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .responsive-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .responsive-card h4 {
+    color: #f0f6fc;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+
+  .responsive-card .width {
+    color: #8b949e;
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+
+  .mini-bar {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 6px;
+    background: #0d1117;
+    border-radius: 6px;
+    font-size: 9px;
+    flex-wrap: wrap;
+  }
+
+  .mini-bar .mb {
+    padding: 2px 5px;
+    background: #21262d;
+    border-radius: 3px;
+    color: #8b949e;
+    white-space: nowrap;
+  }
+
+  .mini-bar .mb.blue { background: #1f3d5c; color: #58a6ff; }
+  .mini-bar .mb.green { background: #1a3a1a; color: #7ee787; }
+  .mini-bar .mb.purple { background: #2d1a3d; color: #bc8cff; }
+  .mini-bar .mb.orange { background: #3d2c1a; color: #d29922; }
+
+  /* Tab highlight effect */
+  .tab-indicator {
+    width: 2px;
+    height: 12px;
+    background: #58a6ff;
+    border-radius: 1px;
+    margin-right: 4px;
+  }
+
+  /* Tooltip-style descriptions under mockups */
+  .mockup-desc {
+    padding: 16px 20px;
+    background: #0d1117;
+    font-size: 13px;
+    color: #8b949e;
+    border-top: 1px solid #21262d;
+  }
+
+  .mockup-desc strong { color: #c9d1d9; }
+
+  /* Callout boxes */
+  .callout {
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+
+  .callout.info {
+    background: #0d2347;
+    border: 1px solid #1f6feb;
+    color: #79c0ff;
+  }
+
+  .callout.success {
+    background: #0d2d0d;
+    border: 1px solid #238636;
+    color: #7ee787;
+  }
+
+  .callout.warning {
+    background: #2d1f0d;
+    border: 1px solid #d29922;
+    color: #e3b341;
+  }
+
+  /* Wrapper for the interactive mockup */
+  .interactive-wrapper {
+    position: relative;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 40px;
+    color: #484f58;
+    font-size: 13px;
+    border-top: 1px solid #21262d;
+  }
+
+  /* Mapping diagram */
+  .mapping {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0;
+    margin: 24px 0;
+    align-items: start;
+  }
+
+  .mapping-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .mapping-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #30363d;
+    font-size: 24px;
+    padding: 0 16px;
+    padding-top: 60px;
+  }
+
+  .mapping-item {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .mapping-col.from .mapping-item {
+    background: #21262d;
+    color: #8b949e;
+    border: 1px solid #30363d;
+  }
+
+  .mapping-col.to .mapping-item {
+    border: 1px solid;
+  }
+
+  .mapping-col.to .mapping-item.blue {
+    background: #0d2347;
+    border-color: #1f6feb;
+    color: #58a6ff;
+  }
+  .mapping-col.to .mapping-item.green {
+    background: #0d2d0d;
+    border-color: #238636;
+    color: #7ee787;
+  }
+  .mapping-col.to .mapping-item.orange {
+    background: #2d1f0d;
+    border-color: #d29922;
+    color: #e3b341;
+  }
+  .mapping-col.to .mapping-item.purple {
+    background: #1a0d2d;
+    border-color: #8957e5;
+    color: #bc8cff;
+  }
+  .mapping-col.to .mapping-item.gray {
+    background: #161b22;
+    border-color: #30363d;
+    color: #8b949e;
+  }
+  .mapping-col.to .mapping-item.red {
+    background: #2d0d0d;
+    border-color: #da3633;
+    color: #ff7b72;
+  }
+
+  .mapping-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #484f58;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+
+  /* Flow arrows from group to items */
+  .flow-section {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .flow-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .flow-card-header {
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .flow-card-header.blue { background: #0d2347; color: #58a6ff; border-bottom: 2px solid #1f6feb; }
+  .flow-card-header.green { background: #0d2d0d; color: #7ee787; border-bottom: 2px solid #238636; }
+  .flow-card-header.orange { background: #2d1f0d; color: #e3b341; border-bottom: 2px solid #d29922; }
+  .flow-card-header.purple { background: #1a0d2d; color: #bc8cff; border-bottom: 2px solid #8957e5; }
+
+  .flow-card-body {
+    padding: 8px;
+  }
+
+  .flow-item {
+    padding: 5px 10px;
+    font-size: 12px;
+    color: #c9d1d9;
+    border-radius: 4px;
+  }
+
+  .flow-item:hover {
+    background: #21262d;
+  }
+
+  .flow-item .fi-icon {
+    display: inline-block;
+    width: 18px;
+    font-size: 12px;
+    color: #8b949e;
+  }
+
+  .flow-item .fi-hot {
+    float: right;
+    font-size: 9px;
+    color: #d29922;
+    background: #3d2c1a;
+    padding: 0 5px;
+    border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================ -->
+<!-- HERO -->
+<!-- ============================================ -->
+<div class="hero">
+  <h1>ClaUi <span>UX Redesign</span></h1>
+  <p class="subtitle">From 25+ scattered buttons to an organized, discoverable interface</p>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-number">25+</div>
+      <div class="stat-label">Buttons now</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number green">7</div>
+      <div class="stat-label">Visible after</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number green">0</div>
+      <div class="stat-label">Features lost</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- PROBLEM ANALYSIS -->
+<!-- ============================================ -->
+<section>
+  <h2>1. The Problem</h2>
+  <p>The current StatusBar packs every feature into a single horizontal row. At full width (~1500px), this is what users see:</p>
+
+  <div class="problem-visual">
+    <div class="current-bar">
+      <span class="btn">Active: 00:00:00</span>
+      <span class="btn">37 Trophy</span>
+      <span class="btn">History</span>
+      <span class="btn">Prompts</span>
+      <span class="btn">Plans</span>
+      <span class="btn">Feedback</span>
+      <span class="btn">Consult</span>
+      <span class="btn">Git *</span>
+      <span class="sep"></span>
+      <span class="btn active">Claude</span>
+      <span class="btn">Codex</span>
+      <span class="btn">Happy</span>
+      <span class="btn">Carry</span>
+      <span class="sep"></span>
+      <span class="btn">Model</span>
+      <span class="btn">Opus 4.6</span>
+      <span class="btn">Permissions</span>
+      <span class="btn">Full Access</span>
+      <span class="sep"></span>
+      <span class="btn">Aa</span>
+      <span class="btn">Dashboard</span>
+      <span class="btn">SkillDocs 4/50</span>
+      <span class="btn">!</span>
+      <span class="btn">Usage</span>
+      <span class="btn">-></span>
+      <span class="btn">Vitals</span>
+      <span class="btn">Settings</span>
+      <span class="btn">In: 0</span>
+      <span class="btn">Out: 0</span>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <div class="icon">!</div>
+    <div class="text">
+      <strong>Core UX problems:</strong><br>
+      <strong>No hierarchy</strong> &mdash; Rarely-used "Font" sits next to critical "Model" selector. Everything competes for equal attention.<br>
+      <strong>No grouping</strong> &mdash; Buttons are adjacent but have no visual boundary. "Claude/Codex/Happy/Carry" and "Model/Permissions" serve the same purpose (AI config) but look disconnected.<br>
+      <strong>Cognitive overload</strong> &mdash; A new user must scan 25+ items to find anything. Power users must remember positions.<br>
+      <strong>No progressive disclosure</strong> &mdash; Features you use once a week take the same space as features you use every minute.
+    </div>
+  </div>
+
+  <h3>Feature Usage Frequency</h3>
+  <table class="grouping-table">
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th>Usage Frequency</th>
+        <th>Proposed Group</th>
+        <th>Why This Group</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Send / Cancel</td>
+        <td class="freq-high">Every message</td>
+        <td><span class="group-badge input">Input Bar</span></td>
+        <td>Primary action, always visible</td>
+      </tr>
+      <tr>
+        <td>Ultrathink (Brain)</td>
+        <td class="freq-high">Most messages</td>
+        <td><span class="group-badge input">Input Bar</span></td>
+        <td>Pre-send modifier, belongs near input</td>
+      </tr>
+      <tr>
+        <td>File Attach</td>
+        <td class="freq-high">Frequent</td>
+        <td><span class="group-badge input">Input Bar</span></td>
+        <td>Input enrichment</td>
+      </tr>
+      <tr>
+        <td>Provider / Model / Permissions</td>
+        <td class="freq-med">Once per session</td>
+        <td><span class="group-badge ai">AI Chip</span></td>
+        <td>All configure "who am I talking to" &mdash; one compound control</td>
+      </tr>
+      <tr>
+        <td>Session History</td>
+        <td class="freq-high">Frequent</td>
+        <td><span class="group-badge session">Session</span></td>
+        <td>Session management</td>
+      </tr>
+      <tr>
+        <td>Plans (view before execute)</td>
+        <td class="freq-high">Frequent</td>
+        <td><span class="group-badge session">Session</span></td>
+        <td>Session workflow tool</td>
+      </tr>
+      <tr>
+        <td>Prompt History</td>
+        <td class="freq-med">Sometimes</td>
+        <td><span class="group-badge session">Session</span></td>
+        <td>Session context</td>
+      </tr>
+      <tr>
+        <td>Dashboard</td>
+        <td class="freq-med">Sometimes</td>
+        <td><span class="group-badge session">Session</span></td>
+        <td>Session analytics</td>
+      </tr>
+      <tr>
+        <td>Git Push</td>
+        <td class="freq-med">A few times per session</td>
+        <td><span class="group-badge tools">Tools</span></td>
+        <td>Dev tool action</td>
+      </tr>
+      <tr>
+        <td>Consult (Codex)</td>
+        <td class="freq-med">Sometimes</td>
+        <td><span class="group-badge tools">Tools</span></td>
+        <td>Dev tool action</td>
+      </tr>
+      <tr>
+        <td>Babel Fish</td>
+        <td class="freq-med">Sometimes</td>
+        <td><span class="group-badge tools">Tools</span></td>
+        <td>Translation tool</td>
+      </tr>
+      <tr>
+        <td>SkillDocs</td>
+        <td class="freq-low">Rarely</td>
+        <td><span class="group-badge tools">Tools</span></td>
+        <td>Dev tool</td>
+      </tr>
+      <tr>
+        <td>Feedback / Bug Report</td>
+        <td class="freq-low">Rarely</td>
+        <td><span class="group-badge tools">Tools</span></td>
+        <td>Support tool</td>
+      </tr>
+      <tr>
+        <td>Session Timer</td>
+        <td class="freq-high">Passive (always visible)</td>
+        <td><span class="group-badge status">Status Strip</span></td>
+        <td>Always-visible metric</td>
+      </tr>
+      <tr>
+        <td>Usage % Bar</td>
+        <td class="freq-high">Passive (always visible)</td>
+        <td><span class="group-badge status">Status Strip</span></td>
+        <td>Always-visible metric</td>
+      </tr>
+      <tr>
+        <td>Token In/Out</td>
+        <td class="freq-low">Passive (always visible)</td>
+        <td><span class="group-badge status">Status Strip</span></td>
+        <td>Always-visible metric</td>
+      </tr>
+      <tr>
+        <td>Achievements / Trophies</td>
+        <td class="freq-low">Rarely</td>
+        <td><span class="group-badge session">Session</span></td>
+        <td>Gamification, session context</td>
+      </tr>
+      <tr>
+        <td>Font Settings</td>
+        <td class="freq-low">Once ever</td>
+        <td><span class="group-badge purple">View</span></td>
+        <td>Visual preference</td>
+      </tr>
+      <tr>
+        <td>Vitals Display</td>
+        <td class="freq-low">Rarely</td>
+        <td><span class="group-badge purple">View</span></td>
+        <td>Visual preference</td>
+      </tr>
+      <tr>
+        <td>Widget Settings</td>
+        <td class="freq-low">Once ever</td>
+        <td><span class="group-badge purple">View</span></td>
+        <td>Visual preference</td>
+      </tr>
+      <tr>
+        <td>Display Verbosity</td>
+        <td class="freq-low">Rarely</td>
+        <td><span class="group-badge purple">View</span></td>
+        <td>Visual preference</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================ -->
+<!-- DESIGN PRINCIPLES -->
+<!-- ============================================ -->
+<section>
+  <h2>2. Design Principles</h2>
+
+  <div class="principles-grid">
+    <div class="principle-card">
+      <div class="num">1</div>
+      <h4>Progressive Disclosure</h4>
+      <p>Show only what users need right now. Everything else is one click away, organized logically.</p>
+    </div>
+    <div class="principle-card">
+      <div class="num">2</div>
+      <h4>Visual Hierarchy</h4>
+      <p>Frequently used features are prominent and always visible. Rarely used ones are tucked into menus.</p>
+    </div>
+    <div class="principle-card">
+      <div class="num">3</div>
+      <h4>Semantic Grouping</h4>
+      <p>Controls that answer the same question belong together. "What AI?" = one control. "Session tools?" = one menu.</p>
+    </div>
+    <div class="principle-card">
+      <div class="num">4</div>
+      <h4>Compound Controls</h4>
+      <p>Merge related items into single multi-segment chips. Provider + Model + Permissions = one clickable element.</p>
+    </div>
+    <div class="principle-card">
+      <div class="num">5</div>
+      <h4>Information at a Glance</h4>
+      <p>Passive metrics (time, usage, tokens) are always visible but compact. They inform without demanding attention.</p>
+    </div>
+    <div class="principle-card">
+      <div class="num">6</div>
+      <h4>Graceful Degradation</h4>
+      <p>At narrow widths, groups collapse into fewer menus. At minimal width, one "Menu" button contains everything.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- FEATURE GROUPING -->
+<!-- ============================================ -->
+<section>
+  <h2>3. The New Structure: 4 Groups + Status</h2>
+  <p>Every feature maps to one of 4 dropdown groups, or stays permanently visible in the status strip or input bar.</p>
+
+  <div class="flow-section">
+    <div class="flow-card">
+      <div class="flow-card-header blue">
+        <span>AI</span>
+        <span style="font-weight: 400; font-size: 11px; opacity: 0.7">&mdash; Compound Chip</span>
+      </div>
+      <div class="flow-card-body">
+        <div class="flow-item"><span class="fi-icon">*</span> Provider switch (Claude/Codex/Happy/Carry)</div>
+        <div class="flow-item"><span class="fi-icon">*</span> Model selector</div>
+        <div class="flow-item"><span class="fi-icon">*</span> Permissions level</div>
+        <div class="flow-item"><span class="fi-icon">*</span> Carry (transfer conversation)</div>
+      </div>
+    </div>
+
+    <div class="flow-card">
+      <div class="flow-card-header green">
+        <span>Session</span>
+      </div>
+      <div class="flow-card-body">
+        <div class="flow-item"><span class="fi-icon">*</span> History (restore) <span class="fi-hot">HOT</span></div>
+        <div class="flow-item"><span class="fi-icon">*</span> Plans (review) <span class="fi-hot">HOT</span></div>
+        <div class="flow-item"><span class="fi-icon">*</span> Prompt History</div>
+        <div class="flow-item"><span class="fi-icon">*</span> Dashboard</div>
+        <div class="flow-item"><span class="fi-icon">*</span> Achievements</div>
+      </div>
+    </div>
+
+    <div class="flow-card">
+      <div class="flow-card-header orange">
+        <span>Tools</span>
+      </div>
+      <div class="flow-card-body">
+        <div class="flow-item"><span class="fi-icon">*</span> Git Push</div>
+        <div class="flow-item"><span class="fi-icon">*</span> Consult (Codex)</div>
+        <div class="flow-item"><span class="fi-icon">*</span> Babel Fish</div>
+        <div class="flow-item"><span class="fi-icon">*</span> SkillDocs</div>
+        <div class="flow-item"><span class="fi-icon">*</span> Feedback / Bugs</div>
+      </div>
+    </div>
+
+    <div class="flow-card">
+      <div class="flow-card-header purple">
+        <span>View</span>
+      </div>
+      <div class="flow-card-body">
+        <div class="flow-item"><span class="fi-icon">*</span> Font Size & Type</div>
+        <div class="flow-item"><span class="fi-icon">*</span> Vitals Display</div>
+        <div class="flow-item"><span class="fi-icon">*</span> Session Detail Level</div>
+        <div class="flow-item"><span class="fi-icon">*</span> Maze Widget</div>
+        <div class="flow-item"><span class="fi-icon">*</span> Other Settings</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <strong>Key insight:</strong> The "AI Chip" is not a dropdown button &mdash; it's a <strong>compound control</strong> that shows the current AI config at a glance (provider + model + permissions) and opens a config panel when clicked. This replaces 7 separate buttons (4 providers + model dropdown + "Permissions" label + permissions dropdown) with <strong>one elegant element</strong>.
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- THE MOCKUP -->
+<!-- ============================================ -->
+<section>
+  <h2>4. The Redesign</h2>
+
+  <!-- BEFORE -->
+  <h3>Before: Current layout (full width)</h3>
+  <div class="mockup-container">
+    <div class="mockup-label before">CURRENT</div>
+    <div class="mock-chat">
+      <div class="msg user">Add a loading spinner to the dashboard</div>
+      <div class="msg">I'll add a loading spinner to the DashboardPanel component...</div>
+    </div>
+    <div style="padding: 10px 12px; background: #161b22; border-top: 1px solid #30363d;">
+      <div style="display: flex; align-items: flex-end; gap: 6px;">
+        <button class="icon-btn danger" title="Clear">X</button>
+        <button class="icon-btn" title="Attach">P</button>
+        <button class="icon-btn active" title="Ultrathink">B</button>
+        <input type="text" class="new-textarea" placeholder="Type a message..." style="height: 36px;">
+        <button class="icon-btn" title="Enhance">E</button>
+        <button class="icon-btn" title="Settings">S</button>
+        <button class="send-btn">Send</button>
+      </div>
+    </div>
+    <div style="overflow-x: auto; background: #0d1117; border-top: 1px solid #21262d;">
+      <div class="current-bar">
+        <span class="btn">Active: 00:00:00</span>
+        <span class="btn">37 Trophy</span>
+        <span class="btn">History</span>
+        <span class="btn">Prompts</span>
+        <span class="btn">Plans</span>
+        <span class="btn">Feedback</span>
+        <span class="btn">Consult</span>
+        <span class="btn">Git *</span>
+        <span class="sep"></span>
+        <span class="btn active">Claude</span>
+        <span class="btn">Codex</span>
+        <span class="btn">Happy</span>
+        <span class="btn">Carry</span>
+        <span class="sep"></span>
+        <span class="btn">Model</span>
+        <span class="btn">Opus 4.6</span>
+        <span class="btn">Permissions</span>
+        <span class="btn">Full Access</span>
+        <span class="sep"></span>
+        <span class="btn">Aa</span>
+        <span class="btn">Dashboard</span>
+        <span class="btn">SkillDocs 4/50</span>
+        <span class="btn">!</span>
+        <span class="btn">Usage</span>
+        <span class="btn">-></span>
+        <span class="btn">Vitals</span>
+        <span class="btn">Settings</span>
+        <span class="btn">In: 0</span>
+        <span class="btn">Out: 0</span>
+      </div>
+    </div>
+    <div class="mockup-desc">
+      25+ controls in a single row. Requires ~1500px width. No grouping, no hierarchy. All buttons look identical.
+    </div>
+  </div>
+
+  <!-- AFTER -->
+  <h3>After: Redesigned layout</h3>
+  <div class="mockup-container interactive-wrapper" id="mockup">
+    <div class="mockup-label after">PROPOSED</div>
+    <div class="mock-chat">
+      <div class="msg user">Add a loading spinner to the dashboard</div>
+      <div class="msg">I'll add a loading spinner to the DashboardPanel component...</div>
+    </div>
+
+    <!-- Input Area (mostly unchanged) -->
+    <div class="new-input-area">
+      <div class="new-input-row">
+        <div class="new-input-left">
+          <button class="icon-btn danger" title="Clear Session">X</button>
+          <button class="icon-btn" title="Attach File">P</button>
+          <button class="icon-btn active" title="Ultrathink">B</button>
+        </div>
+        <textarea class="new-textarea" placeholder="Type a message..." rows="1"></textarea>
+        <div class="new-input-right">
+          <button class="icon-btn" title="Enhance Prompt">E</button>
+          <button class="icon-btn" title="Send Settings">S</button>
+          <button class="send-btn">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NEW STATUS BAR -->
+    <div class="new-status-bar">
+      <div class="status-left">
+        <!-- AI Chip: compound control -->
+        <div class="ai-chip" onclick="togglePanel('ai-panel')" title="Click to configure AI">
+          <div class="provider">Claude</div>
+          <div class="model">Opus 4.6</div>
+          <div class="perm">Full</div>
+          <div class="arrow">v</div>
+        </div>
+
+        <!-- Spacer -->
+        <div style="width: 8px"></div>
+
+        <!-- Group buttons -->
+        <button class="group-btn" onclick="togglePanel('session-panel')" id="session-btn">
+          Session v
+        </button>
+        <button class="group-btn" onclick="togglePanel('tools-panel')" id="tools-btn">
+          Tools v
+        </button>
+        <button class="group-btn" onclick="togglePanel('view-panel')" id="view-btn">
+          View v
+        </button>
+      </div>
+
+      <div class="status-right">
+        <div class="metric">
+          <span style="color: #58a6ff;">T</span>
+          <span class="value">12:34</span>
+        </div>
+        <div class="metric">
+          <div class="bar"><div class="bar-fill warn" style="width: 72%"></div></div>
+          <span class="value">72%</span>
+        </div>
+        <div class="metric">
+          <span>In:</span>
+          <span class="value">1.2k</span>
+          <span>Out:</span>
+          <span class="value">3.4k</span>
+        </div>
+      </div>
+
+      <!-- DROPDOWN: AI Config -->
+      <div class="dropdown-panel" id="ai-panel" style="left: 12px;">
+        <h5>Provider</h5>
+        <div class="provider-row">
+          <div class="provider-pill active">Claude</div>
+          <div class="provider-pill">Codex</div>
+          <div class="provider-pill">Happy</div>
+          <div class="provider-pill">Carry</div>
+        </div>
+        <div class="dropdown-sep"></div>
+        <div class="dd-select">
+          <label>Model</label>
+          <select>
+            <option>Opus 4.6</option>
+            <option>Sonnet 4.6</option>
+            <option>Haiku 4.5</option>
+          </select>
+        </div>
+        <div class="dd-select">
+          <label>Permissions</label>
+          <select>
+            <option>Full Access</option>
+            <option>Accept Edits</option>
+            <option>Plan Mode</option>
+          </select>
+        </div>
+        <div class="dropdown-sep"></div>
+        <div class="dropdown-item" style="color: #d29922;">
+          <span class="di-icon">C</span>
+          <span class="di-label">Carry conversation to...</span>
+        </div>
+      </div>
+
+      <!-- DROPDOWN: Session -->
+      <div class="dropdown-panel" id="session-panel" style="left: 140px;">
+        <h5>Navigate</h5>
+        <div class="dropdown-item">
+          <span class="di-icon">H</span>
+          <span class="di-label">Session History</span>
+          <span class="di-shortcut">Ctrl+H</span>
+        </div>
+        <div class="dropdown-item">
+          <span class="di-icon">P</span>
+          <span class="di-label">Plans</span>
+          <span class="di-shortcut">Ctrl+P</span>
+        </div>
+        <div class="dropdown-item">
+          <span class="di-icon">></span>
+          <span class="di-label">Prompt History</span>
+        </div>
+        <div class="dropdown-sep"></div>
+        <h5>Analytics</h5>
+        <div class="dropdown-item">
+          <span class="di-icon">D</span>
+          <span class="di-label">Dashboard</span>
+        </div>
+        <div class="dropdown-item">
+          <span class="di-icon">T</span>
+          <span class="di-label">Achievements</span>
+          <span class="di-badge">37</span>
+        </div>
+      </div>
+
+      <!-- DROPDOWN: Tools -->
+      <div class="dropdown-panel" id="tools-panel" style="left: 220px;">
+        <div class="dropdown-item">
+          <span class="di-icon">G</span>
+          <span class="di-label">Git Push</span>
+          <span class="di-shortcut">Ctrl+G</span>
+        </div>
+        <div class="dropdown-item">
+          <span class="di-icon">?</span>
+          <span class="di-label">Consult (Codex)</span>
+        </div>
+        <div class="dropdown-item">
+          <span class="di-icon">F</span>
+          <span class="di-label">Babel Fish</span>
+        </div>
+        <div class="dropdown-sep"></div>
+        <div class="dropdown-item">
+          <span class="di-icon">S</span>
+          <span class="di-label">SkillDocs</span>
+          <span class="di-badge">4/50</span>
+        </div>
+        <div class="dropdown-item">
+          <span class="di-icon">!</span>
+          <span class="di-label">Feedback & Bugs</span>
+        </div>
+      </div>
+
+      <!-- DROPDOWN: View -->
+      <div class="dropdown-panel" id="view-panel" style="left: 290px;">
+        <div class="dropdown-item">
+          <span class="di-icon">A</span>
+          <span class="di-label">Font Size & Type</span>
+        </div>
+        <div class="dropdown-item">
+          <span class="di-icon">V</span>
+          <span class="di-label">Vitals Display</span>
+        </div>
+        <div class="dropdown-sep"></div>
+        <h5>Session Display</h5>
+        <div class="dropdown-item">
+          <span class="di-icon">=</span>
+          <span class="di-label">Detail Level</span>
+        </div>
+        <div class="dropdown-item">
+          <span class="di-icon">M</span>
+          <span class="di-label">Maze Widget</span>
+        </div>
+        <div class="dropdown-item">
+          <span class="di-icon">*</span>
+          <span class="di-label">More Settings...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="mockup-desc">
+      <strong>Click the AI chip or any group button to see the dropdowns.</strong>
+      7 visible elements replace 25+ buttons. Every feature is exactly 1 click away. The AI Chip shows your current config at a glance.
+      Status metrics (time, usage %, tokens) stay passively visible on the right.
+    </div>
+  </div>
+
+  <div class="callout success">
+    <strong>The input bar stays the same.</strong> It already works well &mdash; Clear, Attach, Brain on the left; Enhance, Settings, Send on the right. No changes needed there.
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- DETAILED BREAKDOWN -->
+<!-- ============================================ -->
+<section>
+  <h2>5. Component Details</h2>
+
+  <h3>5a. The AI Chip (Compound Control)</h3>
+  <p>This is the biggest single improvement. It replaces <strong>7 separate controls</strong> (4 provider buttons + model dropdown + "Permissions" label + permissions dropdown) with <strong>one element</strong> that shows your current AI config at a glance.</p>
+
+  <div style="display: flex; gap: 24px; align-items: flex-start; margin: 24px 0;">
+    <div style="flex: 1;">
+      <div style="margin-bottom: 12px; font-size: 12px; color: #484f58; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Always visible (collapsed)</div>
+      <div style="background: #0d1117; padding: 16px; border-radius: 8px; display: flex; justify-content: center;">
+        <div class="ai-chip" style="cursor: default; height: 28px;">
+          <div class="provider" style="font-size: 12px;">Claude</div>
+          <div class="model" style="font-size: 12px;">Opus 4.6</div>
+          <div class="perm" style="font-size: 11px;">Full</div>
+          <div class="arrow" style="font-size: 10px;">v</div>
+        </div>
+      </div>
+      <p style="text-align: center; font-size: 12px; margin-top: 8px;">One compact element. Provider is color-coded (blue=Claude, green=Codex, etc.)</p>
+    </div>
+    <div style="flex: 1;">
+      <div style="margin-bottom: 12px; font-size: 12px; color: #484f58; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Expanded on click</div>
+      <div style="background: #0d1117; padding: 16px; border-radius: 8px;">
+        <div style="background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 8px; width: 240px; margin: 0 auto;">
+          <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #484f58; padding: 6px 8px 4px;">Provider</div>
+          <div class="provider-row">
+            <div class="provider-pill active">Claude</div>
+            <div class="provider-pill">Codex</div>
+            <div class="provider-pill">Happy</div>
+            <div class="provider-pill">Carry</div>
+          </div>
+          <div class="dropdown-sep"></div>
+          <div class="dd-select">
+            <label>Model</label>
+            <select><option>Opus 4.6</option></select>
+          </div>
+          <div class="dd-select">
+            <label>Perms</label>
+            <select><option>Full Access</option></select>
+          </div>
+        </div>
+      </div>
+      <p style="text-align: center; font-size: 12px; margin-top: 8px;">Provider pills + model/permissions selectors. All in one panel.</p>
+    </div>
+  </div>
+
+  <h3>5b. Group Buttons (Session / Tools / View)</h3>
+  <p>Three lightweight text buttons that open categorized dropdown panels. Similar to how VS Code's status bar items open quick-pick menus.</p>
+
+  <div class="callout info">
+    <strong>Keyboard shortcuts preserved:</strong> History (Ctrl+H), Plans (Ctrl+P), Git (Ctrl+G) still work directly &mdash; the dropdown is just an alternative discovery path. Power users never need to open the menus.
+  </div>
+
+  <h3>5c. Status Metrics (Right side)</h3>
+  <p>Three passive indicators that stay visible without demanding attention:</p>
+  <div style="background: #0d1117; padding: 20px; border-radius: 8px; margin: 16px 0; display: flex; justify-content: center; gap: 32px;">
+    <div class="metric" style="font-size: 13px;">
+      <span style="color: #58a6ff;">T</span>
+      <span class="value" style="font-size: 13px;">12:34</span>
+      <span style="color: #484f58; font-size: 11px;">&mdash; session time</span>
+    </div>
+    <div class="metric" style="font-size: 13px;">
+      <div class="bar" style="width: 60px; height: 6px;"><div class="bar-fill warn" style="width: 72%"></div></div>
+      <span class="value" style="font-size: 13px;">72%</span>
+      <span style="color: #484f58; font-size: 11px;">&mdash; usage limit</span>
+    </div>
+    <div class="metric" style="font-size: 13px;">
+      <span style="color: #484f58;">In:</span>
+      <span class="value" style="font-size: 13px;">1.2k</span>
+      <span style="color: #484f58;">Out:</span>
+      <span class="value" style="font-size: 13px;">3.4k</span>
+      <span style="color: #484f58; font-size: 11px;">&mdash; tokens</span>
+    </div>
+  </div>
+  <p>The usage bar changes color: <span style="color: #7ee787;">green</span> (&lt;60%), <span style="color: #d29922;">yellow</span> (60-85%), <span style="color: #ff7b72;">red</span> (&gt;85%).</p>
+</section>
+
+<!-- ============================================ -->
+<!-- RESPONSIVE BEHAVIOR -->
+<!-- ============================================ -->
+<section>
+  <h2>6. Responsive Behavior</h2>
+  <p>The new design degrades gracefully at narrower widths, similar to the current collapse logic but with better grouping:</p>
+
+  <div class="responsive-demo">
+    <div class="responsive-card">
+      <h4>Wide (> 800px)</h4>
+      <div class="width">Full layout</div>
+      <div class="mini-bar">
+        <span class="mb blue">Claude Opus 4.6 Full v</span>
+        <span class="mb green">Session v</span>
+        <span class="mb orange">Tools v</span>
+        <span class="mb purple">View v</span>
+        <span style="flex: 1;"></span>
+        <span class="mb">12:34</span>
+        <span class="mb">72%</span>
+        <span class="mb">In:1.2k Out:3.4k</span>
+      </div>
+      <p style="font-size: 11px; margin-top: 8px;">All groups visible. AI Chip shows full info. Metrics on right.</p>
+    </div>
+    <div class="responsive-card">
+      <h4>Medium (500-800px)</h4>
+      <div class="width">Compact layout</div>
+      <div class="mini-bar">
+        <span class="mb blue">Claude Opus v</span>
+        <span class="mb green">Session v</span>
+        <span class="mb">More v</span>
+        <span style="flex: 1;"></span>
+        <span class="mb">12:34</span>
+        <span class="mb">72%</span>
+      </div>
+      <p style="font-size: 11px; margin-top: 8px;">Tools + View merge into "More". Tokens hidden. AI Chip shorter.</p>
+    </div>
+    <div class="responsive-card">
+      <h4>Narrow (< 500px)</h4>
+      <div class="width">Minimal layout</div>
+      <div class="mini-bar">
+        <span class="mb blue">Claude v</span>
+        <span class="mb">Menu v</span>
+        <span style="flex: 1;"></span>
+        <span class="mb">72%</span>
+      </div>
+      <p style="font-size: 11px; margin-top: 8px;">Single "Menu" for everything. AI Chip shows provider only. Just usage %.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- BENEFITS -->
+<!-- ============================================ -->
+<section>
+  <h2>7. Impact Summary</h2>
+
+  <div class="benefits-grid">
+    <div class="benefit-card">
+      <div class="metric-big">-72%</div>
+      <h4>Visual Clutter</h4>
+      <p>From 25+ visible controls to 7. The interface breathes. New users aren't overwhelmed.</p>
+    </div>
+    <div class="benefit-card">
+      <div class="metric-big">1 click</div>
+      <h4>Max Depth</h4>
+      <p>Every feature is at most 1 click away. No features are hidden deeper than a single dropdown.</p>
+    </div>
+    <div class="benefit-card">
+      <div class="metric-big">4 groups</div>
+      <h4>Mental Model</h4>
+      <p>Users learn 4 categories (AI, Session, Tools, View) instead of memorizing 25 button positions.</p>
+    </div>
+    <div class="benefit-card">
+      <div class="metric-big">0</div>
+      <h4>Features Removed</h4>
+      <p>Every single feature is preserved. Nothing is lost &mdash; just better organized.</p>
+    </div>
+  </div>
+
+  <div class="callout warning">
+    <strong>Migration strategy:</strong> Add tooltips during the first few sessions after the redesign. Each tooltip says "X moved here" pointing to the new group. This helps existing users find relocated features quickly. Consider a one-time "What's new" overlay on first launch.
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- IMPLEMENTATION NOTES -->
+<!-- ============================================ -->
+<section>
+  <h2>8. Implementation Notes</h2>
+
+  <h3>Reuse Existing Infrastructure</h3>
+  <p>The current codebase already has <code>StatusBarGroupButton.tsx</code> with dropdown logic, <code>useStatusBarCollapse.ts</code> with responsive breakpoints, and the dropdown styling infrastructure. The redesign builds on these patterns &mdash; it's reorganizing, not rewriting.</p>
+
+  <h3>Key Changes</h3>
+  <table class="grouping-table">
+    <thead>
+      <tr><th>Component</th><th>Change</th><th>Effort</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>StatusBar.tsx</code></td>
+        <td>Restructure layout into AI Chip + 3 groups + metrics. Reuse StatusBarGroupButton.</td>
+        <td>Medium</td>
+      </tr>
+      <tr>
+        <td><code>AIChip.tsx</code> (new)</td>
+        <td>Compound control combining provider buttons, model selector, and permissions selector.</td>
+        <td>Medium</td>
+      </tr>
+      <tr>
+        <td><code>useStatusBarCollapse.ts</code></td>
+        <td>Update breakpoints for new layout (fewer items = lower thresholds).</td>
+        <td>Small</td>
+      </tr>
+      <tr>
+        <td><code>StatusBar.css</code></td>
+        <td>Add AI Chip styles, update group button styles, add metric styles.</td>
+        <td>Small</td>
+      </tr>
+      <tr>
+        <td>All existing features</td>
+        <td>No change to logic. Only their "container" moves from inline to dropdown.</td>
+        <td>None</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>What NOT to Change</h3>
+  <ul style="color: #8b949e; font-size: 14px; padding-left: 20px;">
+    <li style="margin-bottom: 8px;">The <strong>InputArea</strong> &mdash; it works well as-is</li>
+    <li style="margin-bottom: 8px;">Feature <strong>logic and state</strong> &mdash; only the visual container changes</li>
+    <li style="margin-bottom: 8px;"><strong>Keyboard shortcuts</strong> &mdash; they bypass the UI entirely</li>
+    <li style="margin-bottom: 8px;">The <strong>overlay panels</strong> (Dashboard, History, Plans) &mdash; they open the same way</li>
+  </ul>
+</section>
+
+<div class="footer">
+  ClaUi UX Redesign Proposal &mdash; Created for Yoni Bar
+</div>
+
+<script>
+  // Interactive dropdown toggle
+  let openPanel = null;
+
+  function togglePanel(panelId) {
+    const panel = document.getElementById(panelId);
+
+    // Close any open panel
+    if (openPanel && openPanel !== panel) {
+      openPanel.classList.remove('show');
+    }
+
+    // Toggle clicked panel
+    if (panel.classList.contains('show')) {
+      panel.classList.remove('show');
+      openPanel = null;
+    } else {
+      panel.classList.add('show');
+      openPanel = panel;
+    }
+  }
+
+  // Close panels when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.ai-chip') &&
+        !e.target.closest('.group-btn') &&
+        !e.target.closest('.dropdown-panel')) {
+      if (openPanel) {
+        openPanel.classList.remove('show');
+        openPanel = null;
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -166,21 +166,23 @@ export const TokenRatioTab: React.FC = () => {
       arr.push(s.bucket);
       periodMap.set(parsed.period, arr);
     }
-    const known = PERIOD_ORDER.filter(p => periodMap.has(p));
     const unknown = [...periodMap.keys()].filter(p => !PERIOD_ORDER.includes(p));
-    return [...known, ...unknown].map(p => ({ label: p, buckets: periodMap.get(p) ?? [] }));
+    return [...PERIOD_ORDER, ...unknown].map(p => ({ label: p, buckets: periodMap.get(p) ?? [] }));
   }, [summaries]);
 
-  // Auto-select first available period
+  // Auto-select a period with data when possible.
   useEffect(() => {
     if (periods.length > 0) {
       setSelectedPeriod(prev =>
-        prev && periods.some(p => p.label === prev) ? prev : periods[0].label
+        prev && periods.some(p => p.label === prev)
+          ? prev
+          : (periods.find((p) => p.buckets.length > 0)?.label ?? periods[0].label)
       );
     }
   }, [periods]);
 
   const activePeriodEntry = periods.find(p => p.label === selectedPeriod) ?? periods[0] ?? null;
+  const activePeriodHasData = (activePeriodEntry?.buckets.length ?? 0) > 0;
   const activeBuckets = new Set(activePeriodEntry?.buckets ?? []);
   const activeSummaries = summaries.filter(s => activeBuckets.has(s.bucket));
   const chartData = buildChartData(samples, activeBuckets);
@@ -189,9 +191,9 @@ export const TokenRatioTab: React.FC = () => {
     .map(s => parseBucketKey(s.bucket)?.modelLabel ?? s.bucket)
     .filter((v, i, a) => a.indexOf(v) === i);
   // Filter samples table to active period
-  const recentSamples = samples
-    .filter(s => activeBuckets.size === 0 || activeBuckets.has(s.bucket))
-    .slice(-50).reverse();
+  const recentSamples = activePeriodHasData
+    ? samples.filter(s => activeBuckets.has(s.bucket)).slice(-50).reverse()
+    : [];
 
   if (samples.length === 0 && globalTurnCount < 2) {
     return (
@@ -275,6 +277,7 @@ export const TokenRatioTab: React.FC = () => {
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {periods.map(({ label }) => {
             const isActive = label === activePeriodEntry?.label;
+            const hasPeriodData = (periods.find((p) => p.label === label)?.buckets.length ?? 0) > 0;
             return (
               <button
                 key={label}
@@ -288,6 +291,7 @@ export const TokenRatioTab: React.FC = () => {
                   fontSize: 12,
                   fontWeight: isActive ? 700 : 400,
                   cursor: 'pointer',
+                  opacity: !hasPeriodData && !isActive ? 0.65 : 1,
                   transition: 'all 0.15s ease',
                 }}
               >
@@ -295,6 +299,20 @@ export const TokenRatioTab: React.FC = () => {
               </button>
             );
           })}
+        </div>
+      )}
+
+      {/* Empty-state for selected period */}
+      {activePeriodEntry && !activePeriodHasData && (
+        <div style={{
+          background: DASH_COLORS.cardBg,
+          border: `1px solid ${DASH_COLORS.border}`,
+          borderRadius: 8,
+          padding: '14px 16px',
+          fontSize: 12,
+          color: DASH_COLORS.textMuted,
+        }}>
+          No token-ratio samples yet for <strong>{activePeriodEntry.label}</strong>.
         </div>
       )}
 

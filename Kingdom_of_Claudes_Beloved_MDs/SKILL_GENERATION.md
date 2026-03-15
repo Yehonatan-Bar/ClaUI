@@ -20,6 +20,7 @@ Automatically generates Claude skills from accumulated SR-PTD (post-task documen
 | `src/extension/skillgen/phases/PhaseDSkillSynthesis.ts` | AI skill synthesis via Claude CLI (parallelized, max 3 concurrent) |
 | `src/extension/skillgen/DeduplicationEngine.ts` | 3-tier deduplication engine |
 | `src/extension/skillgen/SkillInstaller.ts` | Atomic skill installation with backup/rollback |
+| `src/extension/skillgen/SkillUsageTracker.ts` | Tracks skill invocations in `~/.claude/skills/_usage.json` |
 | `src/extension/skillgen/SrPtdBootstrap.ts` | Auto-install SR-PTD skill + inject CLAUDE.md instructions |
 
 ### Bundled Skill Files
@@ -137,10 +138,12 @@ SkillGenService is a singleton created in `extension.ts`. It uses a `registerTab
 ### Wiring
 
 1. `extension.ts` creates `SkillGenService` with `globalState`, runs initial scan
-2. `TabManager` passes `skillGenService` to each `SessionTab`
-3. `SessionTab` calls `skillGenService.registerTab()` after panel creation
-4. `SessionTab` calls `skillGenService.unregisterTab()` on dispose
-5. `MessageHandler` receives webview messages and delegates to `skillGenService`
+2. `extension.ts` creates `SkillUsageTracker` with `~/.claude/skills` path, attaches to `SkillGenService`
+3. `TabManager` passes `skillGenService` and `skillUsageTracker` to each `SessionTab`
+4. `SessionTab` calls `skillGenService.registerTab()` after panel creation, wires `skillUsageTracker` to `MessageHandler`
+5. `SessionTab` calls `skillGenService.unregisterTab()` on dispose
+6. `MessageHandler` receives `skillUsageReport` messages from webview and calls `skillUsageTracker.recordUsage()`
+7. Webview detects skill invocations in streaming output (`useClaudeStream.ts`) and posts `skillUsageReport`
 
 ---
 
@@ -198,8 +201,10 @@ AI tag enrichment for doc cards with missing domain/pattern tags.
 Incremental within-bucket clustering.
 
 - Reads buckets from `buckets_enriched/`, doc cards from `doc_cards_enriched/`
+- Filters buckets below `minDocsPerBucket` threshold (default 3) to prevent thin clusters
 - For each bucket, processes docs sequentially (order matters -- clusters build incrementally)
 - Two prompt variants: first-doc-in-bucket (create initial cluster) vs subsequent-doc (assign or create new)
+- No singleton fallback on error (prevents junk clusters)
 - Writes per-bucket cluster files to `clusters_incremental/`
 - Writes `_incremental_clustering_summary.json`
 
@@ -207,9 +212,11 @@ Incremental within-bucket clustering.
 
 Cross-bucket merging using domain rollups.
 
+- Filters clusters below `minDocsPerSkill` threshold (default 3)
 - Groups clusters by domain rollup (hardcoded mapping: pdf-processing, data-analysis, frontend, etc.)
 - One CLI call per rollup group (far fewer calls than C.2/C.3)
-- AI decides: merge_all (one skill) or split (2-3 sub-skills)
+- AI decides: merge_all (one skill) or split -- hard cap at `maxSkillsPerRollup` (default 2)
+- Forces merge_all when total docs < 10 or AI splits beyond max
 - Writes to `clusters_final/`, `doc_to_cluster_map_final.json`, `_merge_summary.json`
 
 ### PhaseDSkillSynthesis
@@ -220,6 +227,8 @@ Skill synthesis from cluster representatives.
 - 300s timeout per call
 - Parallelized with concurrency limiter (max 3 concurrent CLI processes)
 - Each cluster is independent -- no sequential dependency
+- Enforces description max 120 chars with trigger-first format (prevents truncation in system-reminder)
+- Patches SKILL.md frontmatter description to match enforced length
 - Parses large JSON response, creates skill directory structure (SKILL.md, references/, scripts/, assets/, traceability.json)
 - Writes `_phase_d_synthesis_summary.json`
 
@@ -244,6 +253,8 @@ Central orchestrator. Coordinates the full pipeline: scan -> preflight -> lock -
 - Cross-process locking via lock files (stale detection after 2 hours)
 - Auto-run mode: triggers pipeline automatically when threshold reached
 - Records run history with status, duration, skills generated count
+- Post-install auto-archiving: enforces `maxSkills` cap (default 50) by moving least-used skills to `_archived/`
+- 30-day grace period protects newly created skills from archiving
 
 ### DeduplicationEngine
 
@@ -251,7 +262,7 @@ Central orchestrator. Coordinates the full pipeline: scan -> preflight -> lock -
 
 **Tier 1 - Traceability:** Reads `traceability.json` from each existing skill directory, compares source document fingerprints and overlap ratio.
 
-**Tier 2 - Metadata:** Compares skill names, descriptions, and keywords using trigram-based string similarity (Jaccard coefficient). Flags skills with >0.7 similarity as potential upgrades.
+**Tier 2 - Metadata:** Compares skill names, descriptions, and keywords using trigram-based string similarity (Jaccard coefficient). Configurable upgrade threshold (default 0.45, previously 0.6) favors updating existing skills over creating new ones.
 
 **Tier 3 - AI (placeholder):** Reserved for Claude Sonnet-based semantic comparison. Currently returns `null` (no verdict).
 
@@ -268,6 +279,17 @@ Atomic installation with safety guarantees.
    - Copies new skill files to target directory
 3. On any failure: rolls back all installed skills from backups
 4. Returns count of installed and skipped skills
+
+### SkillUsageTracker
+
+Tracks skill invocations for usage-based archiving decisions.
+
+- Maintains `~/.claude/skills/_usage.json` with per-skill use counts and timestamps
+- `recordUsage(skillName)`: increments count, updates `last_used` timestamp
+- `getLeastUsed(count, protectedSkills)`: returns N least-used skill names, excluding protected skills and `_`-prefixed directories
+- Builds records for ALL installed skills (including 0-usage ones) to catch never-used skills
+- Wired through: `extension.ts` -> `TabManager` -> `SessionTab` -> `MessageHandler` (via `setSkillUsageTracker`)
+- Webview reports usage via `skillUsageReport` message when a skill invocation is detected in streaming output
 
 ---
 
@@ -292,6 +314,8 @@ Atomic installation with safety guarantees.
 | `[SkillGen:Dedup]` | DeduplicationEngine | Dedup verdict summary | INFO |
 | `[SkillGen:Install]` | SkillInstaller | Install plan/result, rollback | INFO |
 | `[SkillGen:Store]` | SkillGenStore | Ledger persistence, history | DEBUG |
+| `[SkillGen:Archive]` | SkillGenService | Auto-archiving decisions and operations | INFO |
+| `[SkillUsage]` | SkillUsageTracker / MessageHandler | Skill invocation recording | INFO |
 | `[SkillGen:WebviewTx]` | SkillGenService | Tab register/unregister, broadcast | DEBUG |
 
 ### Log Format
@@ -351,6 +375,7 @@ Full overlay panel:
 | `getSkillGenStatus` | Request current status snapshot |
 | `skillGenUiLog` | UI interaction log (bridged to extension output channel) |
 | `openSkillGenGuide` | Open the skills pipeline HTML guide in the browser |
+| `skillUsageReport` | Report a skill invocation detected in streaming output |
 
 ### Extension -> Webview
 
@@ -381,6 +406,11 @@ All settings under `claudeMirror.skillGen.*` in `package.json`:
 | `autoRun` | `true` | Auto-trigger on threshold |
 | `timeoutMs` | `300000` | Pipeline timeout (5 min) |
 | `aiDeduplication` | `false` | Enable AI dedup (Tier 3) |
+| `maxSkills` | `50` | Maximum active skills; excess archived by usage |
+| `minDocsPerBucket` | `3` | Min docs in bucket to qualify for clustering (C3) |
+| `minDocsPerSkill` | `3` | Min docs for a cluster to become a skill (C4) |
+| `maxSkillsPerRollup` | `2` | Max skills per domain rollup group (C4) |
+| `dedupUpgradeThreshold` | `0.45` | Similarity threshold for upgrading vs creating new |
 
 **Additional setting:**
 

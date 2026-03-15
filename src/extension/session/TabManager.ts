@@ -9,6 +9,7 @@ import type { ExtensionToWebviewMessage, ProviderId } from '../types/webview-mes
 import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import type { TokenUsageRatioTracker } from './TokenUsageRatioTracker';
+import type { SkillUsageTracker } from '../skillgen/SkillUsageTracker';
 import { HandoffContextBuilder } from './handoff/HandoffContextBuilder';
 import { HandoffPromptComposer } from './handoff/HandoffPromptComposer';
 import { HandoffArtifactStore } from './handoff/HandoffArtifactStore';
@@ -54,7 +55,8 @@ export class TabManager {
     private readonly achievementService: AchievementService,
     private readonly logDir: string | null,
     private readonly skillGenService?: SkillGenService,
-    private readonly tokenRatioTracker?: TokenUsageRatioTracker
+    private readonly tokenRatioTracker?: TokenUsageRatioTracker,
+    private readonly skillUsageTracker?: SkillUsageTracker
   ) {
     // Single shared status bar item across all tabs
     this.statusBarItem = vscode.window.createStatusBarItem(
@@ -115,7 +117,8 @@ export class TabManager {
       this.achievementService,
       this.logDir,
       this.skillGenService,
-      this.tokenRatioTracker
+      this.tokenRatioTracker,
+      this.skillUsageTracker
     );
 
     this.tabs.set(tab.id, tab);

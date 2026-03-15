@@ -52,6 +52,7 @@ export class PhaseC3IncrementalClustering {
     workspaceDir: string,
     model: string = 'claude-sonnet-4-6',
     onProgress?: (pct: number, label: string) => void,
+    minDocsPerBucket: number = 3,
   ): Promise<PhaseResult> {
     const startTime = Date.now();
     this.cancelled = false;
@@ -77,12 +78,16 @@ export class PhaseC3IncrementalClustering {
 
     for (const file of bucketFiles) {
       const bucket = JSON.parse(fs.readFileSync(path.join(enrichedBucketsDir, file), 'utf-8'));
-      if ((bucket.doc_ids?.length ?? 0) >= 1) {
+      if ((bucket.doc_ids?.length ?? 0) >= minDocsPerBucket) {
         bucketsToProcess.push({ file, bucket });
       }
     }
 
-    this.log(`[PhaseC3] Processing ${bucketsToProcess.length} buckets`);
+    const skippedBuckets = bucketFiles.length - bucketsToProcess.length;
+    if (skippedBuckets > 0) {
+      this.log(`[PhaseC3] Skipped ${skippedBuckets} buckets below minDocsPerBucket=${minDocsPerBucket}`);
+    }
+    this.log(`[PhaseC3] Processing ${bucketsToProcess.length} buckets (minDocsPerBucket=${minDocsPerBucket})`);
 
     const results = { totalBuckets: bucketFiles.length, processed: 0, totalClusters: 0, totalDocs: 0 };
 
@@ -221,19 +226,7 @@ export class PhaseC3IncrementalClustering {
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        this.log(`[PhaseC3]   ERROR processing ${docId}: ${msg}`);
-
-        // Fallback: create singleton cluster
-        clusters.push({
-          cluster_name: `singleton-${docId.slice(0, 20)}`,
-          cluster_description: 'Auto-created singleton cluster',
-          member_doc_ids: [docId],
-          member_count: 1,
-          top_tags: card.tags || {},
-          trigger_phrases: [],
-          typical_outputs: [],
-          singleton: true,
-        });
+        this.log(`[PhaseC3]   ERROR processing ${docId}: ${msg} - skipping (no singleton fallback)`);
       }
     }
 

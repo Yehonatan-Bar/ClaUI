@@ -573,6 +573,74 @@ html, body, #root {
   font-weight: 600;
 }
 
+/* Scheduled message banner */
+.scheduled-message-banner {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--vscode-textLink-foreground, #3794ff);
+  border-radius: 6px;
+  background: rgba(55, 148, 255, 0.08);
+  color: var(--vscode-editor-foreground);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.scheduled-message-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--vscode-textLink-foreground, #3794ff);
+  background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.06));
+  color: var(--vscode-button-secondaryForeground, inherit);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.scheduled-message-cancel-btn {
+  background: none;
+  border: 1px solid var(--vscode-inputValidation-errorBorder, #f44);
+  color: var(--vscode-inputValidation-errorBorder, #f44);
+  border-radius: 4px;
+  font-size: 10px;
+  padding: 1px 6px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.15s;
+}
+
+.scheduled-message-cancel-btn:hover {
+  opacity: 1;
+}
+
+/* Schedule date/time inputs in the send settings popover */
+.schedule-datetime-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 4px;
+}
+
+.schedule-date-input,
+.schedule-time-input {
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-family: inherit;
+}
+
+.schedule-date-input {
+  flex: 1;
+}
+
+.schedule-time-input {
+  width: 80px;
+}
+
 .clear-session-button {
   display: flex;
   align-items: center;
@@ -1687,6 +1755,269 @@ html, body, #root {
   font-size: 11px;
   color: var(--vscode-descriptionForeground);
   gap: 12px;
+}
+
+/* ============================================ */
+/* Grouped StatusBar Layout (UX Redesign)       */
+/* ============================================ */
+
+.status-bar.status-bar-grouped {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 8px;
+  gap: 4px;
+}
+
+.status-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.status-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Section labels inside dropdowns */
+.status-bar-group-dropdown-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--vscode-descriptionForeground);
+  padding: 6px 10px 2px;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+/* --- AI Chip: compound control --- */
+.ai-chip-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ai-chip {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 5px;
+  overflow: hidden;
+  cursor: pointer;
+  height: 22px;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.ai-chip:hover {
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.ai-chip.open {
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.ai-chip-provider {
+  padding: 0 8px;
+  color: var(--vscode-button-foreground, #fff);
+  font-weight: 600;
+  font-size: 11px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.ai-chip-model {
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 80%, var(--vscode-panel-border, #333));
+  color: var(--vscode-editor-foreground);
+  font-size: 11px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  line-height: 1;
+  border-left: 1px solid var(--vscode-panel-border, #333);
+}
+
+.ai-chip-perm {
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--vscode-charts-green, #89d185) 12%, transparent);
+  color: var(--vscode-charts-green, #89d185);
+  font-size: 10px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  line-height: 1;
+  border-left: 1px solid var(--vscode-panel-border, #333);
+  font-weight: 600;
+}
+
+.ai-chip-arrow {
+  padding: 0 4px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 80%, var(--vscode-panel-border, #333));
+  color: var(--vscode-descriptionForeground);
+  font-size: 8px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  line-height: 1;
+  border-left: 1px solid var(--vscode-panel-border, #333);
+}
+
+/* AI Chip dropdown panel */
+.ai-chip-dropdown {
+  position: absolute;
+  bottom: 28px;
+  left: 0;
+  min-width: 240px;
+  max-width: 320px;
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 8px;
+  padding: 8px;
+  z-index: 9999;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.35);
+  animation: vitalsPopIn 0.15s ease-out;
+}
+
+.ai-chip-dropdown-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--vscode-descriptionForeground);
+  padding: 4px 8px 2px;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+.ai-chip-provider-row {
+  display: flex;
+  gap: 4px;
+  padding: 4px 4px 6px;
+}
+
+.ai-chip-provider-pill {
+  flex: 1;
+  padding: 4px 0;
+  text-align: center;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--vscode-editor-background) 70%, var(--vscode-panel-border, #333));
+  color: var(--vscode-descriptionForeground);
+  border: 1px solid transparent;
+  transition: all 0.12s;
+}
+
+.ai-chip-provider-pill:hover:not(:disabled) {
+  border-color: var(--vscode-panel-border, #555);
+  color: var(--vscode-editor-foreground);
+}
+
+.ai-chip-provider-pill.active {
+  color: var(--vscode-button-foreground, #fff);
+  border-color: transparent;
+}
+
+.ai-chip-provider-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ai-chip-dropdown-sep {
+  height: 1px;
+  background: var(--vscode-panel-border, #333);
+  margin: 4px 0;
+}
+
+.ai-chip-dropdown-control {
+  padding: 2px 4px;
+}
+
+.ai-chip-dropdown-control .model-selector,
+.ai-chip-dropdown-control .codex-model-selector,
+.ai-chip-dropdown-control .codex-reasoning-effort-selector,
+.ai-chip-dropdown-control .permission-mode-selector {
+  width: 100%;
+}
+
+.ai-chip-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: none;
+  background: none;
+  color: var(--vscode-editor-foreground);
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  text-align: left;
+  width: 100%;
+}
+
+.ai-chip-dropdown-item:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.ai-chip-dropdown-item.carry-btn {
+  color: var(--vscode-charts-yellow, #cca700);
+}
+
+/* --- Usage metric (compact inline bar + percentage) --- */
+.status-bar-usage-metric-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 3px;
+  padding: 1px 6px;
+  cursor: pointer;
+  height: 20px;
+  min-width: 55px;
+  position: relative;
+  transition: border-color 0.15s;
+}
+
+.status-bar-usage-metric-btn:hover {
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.status-bar-usage-metric-btn.active {
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.status-bar-usage-bar-inline {
+  width: 28px;
+  height: 4px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 50%, var(--vscode-panel-border, #333));
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.status-bar-usage-bar-inline-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease, background 0.5s ease;
+}
+
+.status-bar-usage-metric-label {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
 }
 
 /* RTL support */

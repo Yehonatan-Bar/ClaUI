@@ -17,11 +17,41 @@ const COST_WEIGHTS = {
   cacheRead: 0.1,
 };
 
+/** Known model categories for per-model token tracking */
+const MODEL_CATEGORIES = ['opus', 'sonnet', 'haiku'] as const;
+
+/** Known period prefixes in API bucket keys */
+const PERIOD_PREFIXES = ['sixty_day', 'thirty_day', 'fourteen_day', 'seven_day', 'one_day', 'five_hour'];
+
+/** Extract model category from a full model ID string like "claude-sonnet-4-20250514" */
+function normalizeModelCategory(model: string): string | null {
+  const lower = model.toLowerCase();
+  for (const cat of MODEL_CATEGORIES) {
+    if (lower.includes(cat)) return cat;
+  }
+  return null;
+}
+
+/** Extract model suffix from bucket key, e.g. "seven_day_sonnet" -> "sonnet", "seven_day" -> null */
+function extractBucketModelSuffix(bucket: string): string | null {
+  for (const prefix of PERIOD_PREFIXES) {
+    if (bucket === prefix) return null; // aggregate bucket (all models)
+    if (bucket.startsWith(prefix + '_')) {
+      return bucket.slice(prefix.length + 1);
+    }
+  }
+  return null;
+}
+
 /** Persisted data shape for globalState */
 interface TokenUsageRatioHistory {
   samples: TokenUsageRatioSample[];
   cumulativeTokens: { input: number; output: number; cacheCreation: number; cacheRead: number };
   cumulativeWeightedTokens: number;
+  /** Per-model cumulative weighted tokens (keyed by model category: "opus", "sonnet", "haiku") */
+  cumulativeWeightedTokensByModel: Record<string, number>;
+  /** Per-model cumulative raw token count */
+  cumulativeRawTokensByModel: Record<string, number>;
   globalTurnCount: number;
   lastSampledAtTurnCount: number;
 }
@@ -32,6 +62,8 @@ export interface TurnTokens {
   outputTokens: number;
   cacheCreationTokens: number;
   cacheReadTokens: number;
+  /** Model ID from messageStart, e.g. "claude-sonnet-4-20250514" */
+  model?: string;
 }
 
 const STORAGE_KEY = 'claudeMirror.tokenUsageRatio';
@@ -69,10 +101,25 @@ export class TokenUsageRatioTracker {
     this.history.cumulativeTokens.cacheCreation += tokens.cacheCreationTokens;
     this.history.cumulativeTokens.cacheRead += tokens.cacheReadTokens;
 
-    this.history.cumulativeWeightedTokens += weightedSum(
+    const turnWeighted = weightedSum(
       tokens.inputTokens, tokens.outputTokens,
       tokens.cacheCreationTokens, tokens.cacheReadTokens
     );
+    const turnRaw = tokens.inputTokens + tokens.outputTokens
+      + tokens.cacheCreationTokens + tokens.cacheReadTokens;
+
+    this.history.cumulativeWeightedTokens += turnWeighted;
+
+    // Per-model accumulation so per-model buckets get accurate deltas
+    if (tokens.model) {
+      const cat = normalizeModelCategory(tokens.model);
+      if (cat) {
+        this.history.cumulativeWeightedTokensByModel[cat] =
+          (this.history.cumulativeWeightedTokensByModel[cat] ?? 0) + turnWeighted;
+        this.history.cumulativeRawTokensByModel[cat] =
+          (this.history.cumulativeRawTokensByModel[cat] ?? 0) + turnRaw;
+      }
+    }
 
     this.history.globalTurnCount++;
     this.enqueueWrite();
@@ -100,14 +147,27 @@ export class TokenUsageRatioTracker {
    */
   createSamples(usageStats: UsageStat[]): void {
     const now = Date.now();
-    const cumRaw = this.totalCumulativeTokens();
-    const cumWeighted = this.history.cumulativeWeightedTokens;
+    const globalCumRaw = this.totalCumulativeTokens();
+    const globalCumWeighted = this.history.cumulativeWeightedTokens;
 
     for (const stat of usageStats) {
       // Use bucketKey (original API key like "seven_day_sonnet") when available;
-      // fall back to label→key mapping for older data that predates this field.
+      // fall back to label->key mapping for older data that predates this field.
       const bucket = stat.bucketKey ?? this.labelToBucketKey(stat.label);
       const lastForBucket = this.lastSampleForBucket(bucket);
+
+      // Per-model buckets use per-model cumulative values so the delta
+      // reflects only tokens from that model (not all models combined).
+      // Aggregate buckets (e.g. "seven_day") use global cumulative values.
+      const modelSuffix = extractBucketModelSuffix(bucket);
+      const isTrackedModel = modelSuffix !== null
+        && (MODEL_CATEGORIES as readonly string[]).includes(modelSuffix);
+      const cumWeighted = isTrackedModel
+        ? (this.history.cumulativeWeightedTokensByModel[modelSuffix!] ?? 0)
+        : globalCumWeighted;
+      const cumRaw = isTrackedModel
+        ? (this.history.cumulativeRawTokensByModel[modelSuffix!] ?? 0)
+        : globalCumRaw;
 
       let deltaTokens = 0;
       let weightedDeltaTokens = 0;
@@ -135,7 +195,8 @@ export class TokenUsageRatioTracker {
           }
           weightedDeltaTokens = deltaTokens; // approximate for display
         }
-        // Negative deltaUsagePercent = reset, null is appropriate
+        // Negative deltaUsagePercent (reset) or negative delta (upgrade from
+        // global->per-model tracking): tokensPerPercent stays null = baseline
       } else {
         // First sample for this bucket: delta is entire cumulative (from zero).
         // We can't compute tokensPerPercent (no baseline usage% to diff),
@@ -156,8 +217,8 @@ export class TokenUsageRatioTracker {
         bucket,
         bucketLabel,
         usagePercent: stat.percentage,
-        cumulativeTotalTokens: cumRaw,
-        cumulativeWeightedTokens: cumWeighted,
+        cumulativeTotalTokens: cumRaw,      // per-model for per-model buckets, global for aggregate
+        cumulativeWeightedTokens: cumWeighted, // per-model for per-model buckets, global for aggregate
         deltaTokens,
         weightedDeltaTokens,
         deltaUsagePercent,
@@ -280,6 +341,13 @@ export class TokenUsageRatioTracker {
       if (typeof stored.cumulativeWeightedTokens !== 'number') {
         stored.cumulativeWeightedTokens = 0;
       }
+      // Backward compat: old history may not have per-model tracking
+      if (!stored.cumulativeWeightedTokensByModel || typeof stored.cumulativeWeightedTokensByModel !== 'object') {
+        stored.cumulativeWeightedTokensByModel = {};
+      }
+      if (!stored.cumulativeRawTokensByModel || typeof stored.cumulativeRawTokensByModel !== 'object') {
+        stored.cumulativeRawTokensByModel = {};
+      }
       return stored;
     }
     return this.emptyHistory();
@@ -290,6 +358,8 @@ export class TokenUsageRatioTracker {
       samples: [],
       cumulativeTokens: { input: 0, output: 0, cacheCreation: 0, cacheRead: 0 },
       cumulativeWeightedTokens: 0,
+      cumulativeWeightedTokensByModel: {},
+      cumulativeRawTokensByModel: {},
       globalTurnCount: 0,
       lastSampledAtTurnCount: 0,
     };

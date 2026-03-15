@@ -165,6 +165,8 @@ export class MessageHandler {
   private approvalResponseProcessed = false;
   /** Last known input_tokens from AssistantMessage (always present, unlike ResultSuccess.usage) */
   private lastAssistantInputTokens = 0;
+  /** Model ID from the most recent messageStart (e.g. "claude-sonnet-4-20250514") */
+  private currentTurnModel = '';
   /** Tracks whether EnterPlanMode was called in this session */
   private planModeActive = false;
   /** Tracks whether an ExitPlanMode approval cycle completed in this session.
@@ -241,6 +243,8 @@ export class MessageHandler {
   private babelFishTranslatedIds = new Set<string>();
   /** Skill generation service (global, shared across tabs) */
   private skillGenService: SkillGenService | null = null;
+  /** Skill usage tracker (global, shared across tabs) */
+  private skillUsageTracker: import('../skillgen/SkillUsageTracker').SkillUsageTracker | null = null;
   /** Global token-usage ratio tracker (shared across all tabs) */
   private tokenRatioTracker: TokenUsageRatioTracker | null = null;
 
@@ -264,6 +268,11 @@ export class MessageHandler {
   private queuedUsagePrompt: { text: string; images?: WebviewImageData[] } | null = null;
   private queuedUsageScheduledSendAtMs: number | null = null;
   private queuedUsageTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** User-scheduled message (independent from usage-limit queue) */
+  private scheduledPrompt: { text: string; images?: WebviewImageData[] } | null = null;
+  private scheduledPromptAtMs: number | null = null;
+  private scheduledPromptTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Turn counter for Session Vitals (reset on session clear) */
   private turnIndex = 0;
@@ -382,6 +391,11 @@ export class MessageHandler {
   /** Attach the global SkillGenService */
   setSkillGenService(service: SkillGenService): void {
     this.skillGenService = service;
+  }
+
+  /** Attach the global SkillUsageTracker */
+  setSkillUsageTracker(tracker: import('../skillgen/SkillUsageTracker').SkillUsageTracker): void {
+    this.skillUsageTracker = tracker;
   }
 
   /** Attach a TurnAnalyzer for semantic analysis (dashboard insights) */
@@ -790,6 +804,134 @@ export class MessageHandler {
     );
   }
 
+  // ---------- Scheduled Message Methods ----------
+
+  private postScheduledMessageState(summary?: string): void {
+    this.webview.postMessage({
+      type: 'scheduledMessageState',
+      scheduled: !!this.scheduledPrompt,
+      text: this.scheduledPrompt?.text?.slice(0, 80),
+      scheduledAtMs: this.scheduledPromptAtMs ?? undefined,
+      summary,
+    } as any);
+  }
+
+  private clearScheduledPromptTimer(): void {
+    if (this.scheduledPromptTimer) {
+      clearTimeout(this.scheduledPromptTimer);
+      this.scheduledPromptTimer = null;
+    }
+  }
+
+  private clearScheduledPromptState(notifyWebview: boolean): void {
+    this.clearScheduledPromptTimer();
+    this.scheduledPrompt = null;
+    this.scheduledPromptAtMs = null;
+    if (notifyWebview) {
+      this.postScheduledMessageState();
+    }
+  }
+
+  private schedulePromptDispatch(delayMs?: number): void {
+    if (!this.scheduledPrompt || this.scheduledPromptAtMs == null) {
+      return;
+    }
+    this.clearScheduledPromptTimer();
+    const computedDelay = delayMs != null
+      ? Math.max(0, delayMs)
+      : Math.max(0, this.scheduledPromptAtMs - Date.now());
+    this.scheduledPromptTimer = setTimeout(() => {
+      this.scheduledPromptTimer = null;
+      this.tryDispatchScheduledPrompt();
+    }, computedDelay);
+  }
+
+  private tryDispatchScheduledPrompt(): void {
+    if (!this.scheduledPrompt || this.scheduledPromptAtMs == null) {
+      return;
+    }
+    if (!this.processManager.isRunning) {
+      this.log('[ScheduledMessage] Process not running at fire time; clearing scheduled prompt');
+      this.clearScheduledPromptState(true);
+      this.webview.postMessage({
+        type: 'error',
+        message: 'Scheduled message cancelled: session is not running.',
+      } as any);
+      return;
+    }
+    if (this.isUsageDeferredSendBlocked()) {
+      this.log('[ScheduledMessage] Process busy at fire time; retrying in 15s');
+      this.schedulePromptDispatch(15_000);
+      return;
+    }
+
+    const queued = this.scheduledPrompt;
+    const queuedImages = queued.images ?? [];
+    const queuedText = queued.text;
+    try {
+      if (queuedText.trim()) {
+        this.achievementService.onUserPrompt(this.tabId, queuedText);
+      }
+      const content: ContentBlock[] = [];
+      if (queuedText) {
+        content.push({ type: 'text', text: queuedText });
+      }
+      for (const img of queuedImages) {
+        content.push({
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: img.mediaType,
+            data: img.base64,
+          },
+        } as ContentBlock);
+      }
+      this.postUserMessage(content, true);
+      if (queuedImages.length > 0) {
+        this.control.sendWithImages(
+          this.consumeDeferredHandoffContext(queuedText, { imageCount: queuedImages.length }),
+          queuedImages
+        );
+      } else {
+        this.control.sendText(this.consumeDeferredHandoffContext(queuedText));
+      }
+      this.webview.postMessage({ type: 'processBusy', busy: true });
+      this.triggerSessionNaming(queuedText);
+      if (queuedText.trim()) {
+        void this.promptHistoryStore.addPrompt(queuedText);
+      }
+      this.clearScheduledPromptState(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`[ScheduledMessage] Scheduled prompt dispatch failed: ${message}`);
+      this.webview.postMessage({
+        type: 'error',
+        message: `Failed to send scheduled message: ${message}`,
+      } as any);
+      this.schedulePromptDispatch(15_000);
+    }
+  }
+
+  private scheduleMessage(text: string, scheduledAtMs: number, images?: WebviewImageData[]): void {
+    const normalizedImages = (images && images.length > 0) ? images : undefined;
+    const hasPayload = text.trim().length > 0 || !!normalizedImages;
+    if (!hasPayload) {
+      return;
+    }
+
+    const wasScheduled = !!this.scheduledPrompt;
+    this.scheduledPrompt = { text, images: normalizedImages };
+    this.scheduledPromptAtMs = scheduledAtMs;
+    this.schedulePromptDispatch();
+
+    const scheduledLabel = this.formatUsageScheduledTime(scheduledAtMs);
+    const summary = wasScheduled
+      ? `Scheduled message updated. Will send at ${scheduledLabel}.`
+      : `Message scheduled for ${scheduledLabel}.`;
+    this.postScheduledMessageState(summary);
+    this.log(`[ScheduledMessage] Prompt scheduled for ${scheduledLabel} (updated=${wasScheduled})`);
+  }
+
   /** Wire up all event listeners */
   initialize(): void {
     this.bindWebviewMessages();
@@ -914,6 +1056,21 @@ export class MessageHandler {
           this.queuePromptUntilUsageReset(msg.text, msg.images);
           break;
 
+        case 'scheduleMessage':
+          this.scheduleMessage((msg as any).text, (msg as any).scheduledAtMs, (msg as any).images);
+          break;
+
+        case 'cancelScheduledMessage':
+          this.log('[ScheduledMessage] User cancelled scheduled message');
+          this.clearScheduledPromptState(true);
+          break;
+
+        // DEBUG: Simulate usage limit for testing. Remove before release.
+        case 'simulateUsageLimit' as any:
+          this.log('DEBUG: Simulating usage limit detection');
+          this.handleUsageLimitDetected('Usage limit reached. Your limit will reset in 2 minutes.');
+          break;
+
         case 'compact':
           this.compactPending = true;
           this.control.compact(msg.instructions);
@@ -921,6 +1078,7 @@ export class MessageHandler {
 
         case 'startSession':
           this.clearUsageLimitState('startSession', { notifyWebview: true, clearQueuedPrompt: true });
+          this.clearScheduledPromptState(true);
           this.firstMessageSent = false;
           this.clearPendingHandoffPrompt();
           this.activitySummarizer?.reset();
@@ -963,6 +1121,7 @@ export class MessageHandler {
 
         case 'stopSession':
           this.clearUsageLimitState('stopSession', { notifyWebview: true, clearQueuedPrompt: true });
+          this.clearScheduledPromptState(true);
           this.clearPendingHandoffPrompt();
           this.processManager.stop();
           this.achievementService.onSessionEnd(this.tabId);
@@ -974,6 +1133,7 @@ export class MessageHandler {
 
         case 'resumeSession':
           this.clearUsageLimitState('resumeSession', { notifyWebview: true, clearQueuedPrompt: true });
+          this.clearScheduledPromptState(true);
           this.firstMessageSent = false;
           this.clearPendingHandoffPrompt();
           this.achievementService.onSessionEnd(this.tabId);
@@ -995,6 +1155,7 @@ export class MessageHandler {
 
         case 'forkSession':
           this.clearUsageLimitState('forkSession', { notifyWebview: true, clearQueuedPrompt: true });
+          this.clearScheduledPromptState(true);
           this.firstMessageSent = false;
           this.clearPendingHandoffPrompt();
           this.achievementService.onSessionEnd(this.tabId);
@@ -1027,6 +1188,7 @@ export class MessageHandler {
           // Save analytics for the current session BEFORE clearing records
           this.webview.saveProjectAnalyticsNow?.();
           this.clearUsageLimitState('clearSession', { notifyWebview: true, clearQueuedPrompt: true });
+          this.clearScheduledPromptState(true);
           this.firstMessageSent = false;
           this.clearPendingHandoffPrompt();
           this.exitPlanModeBarActive = false;
@@ -1081,6 +1243,7 @@ export class MessageHandler {
           this.log(`Setting provider to: "${msg.provider}"`);
           if (msg.provider !== 'claude') {
             this.clearUsageLimitState('provider switched away from Claude', { notifyWebview: true, clearQueuedPrompt: true });
+            this.clearScheduledPromptState(true);
           }
           void vscode.workspace.getConfiguration('claudeMirror').update('provider', msg.provider, true)
             .then(() => {
@@ -1368,6 +1531,13 @@ export class MessageHandler {
           this.log(`[SkillGen:UI][${msg.level}] ${msg.event}${dataStr}`);
           break;
         }
+
+        case 'skillUsageReport':
+          this.log(`[SkillUsage][INFO] Skill invoked | skill=${msg.skillName}`);
+          if (this.skillUsageTracker) {
+            this.skillUsageTracker.recordUsage(msg.skillName);
+          }
+          break;
 
         case 'openSkillGenGuide': {
           const guidePath = path.join(__dirname, '..', 'sr-ptd-skill', 'assets', 'skills-pipeline-guide.html');
@@ -1681,6 +1851,7 @@ export class MessageHandler {
         case 'editAndResend':
           this.log(`Edit-and-resend: resuming session with edited prompt`);
           this.clearUsageLimitState('editAndResend', { notifyWebview: true, clearQueuedPrompt: true });
+          this.clearScheduledPromptState(true);
           // Save analytics for the current session BEFORE clearing records
           this.webview.saveProjectAnalyticsNow?.();
           this.clearApprovalTracking();
@@ -2167,6 +2338,8 @@ export class MessageHandler {
           // Send usage-limit deferred queue state
           this.postUsageLimitState();
           this.postUsageQueuedPromptState();
+          // Send scheduled message state
+          this.postScheduledMessageState();
           // Send translation language setting
           this.sendTranslationLanguageSetting();
           // Send turn analysis settings
@@ -3225,6 +3398,7 @@ export class MessageHandler {
       (data: { messageId: string; model: string; inputTokens?: number }) => {
         this.log(`-> webview: messageStart id=${data.messageId} inputTokens=${data.inputTokens}`);
         this.inAssistantTurn = true;
+        this.currentTurnModel = data.model ?? '';
         // Reset per-message thinking effort (will be set if thinking blocks arrive)
         this.currentThinkingEffort = null;
         // Track input tokens from message_start (reliable during live streaming)
@@ -3392,6 +3566,7 @@ export class MessageHandler {
               outputTokens: successTurn.outputTokens ?? 0,
               cacheCreationTokens: successTurn.cacheCreationTokens ?? 0,
               cacheReadTokens: successTurn.cacheReadTokens ?? 0,
+              model: this.currentTurnModel,
             });
             if (shouldSample) {
               void this.sampleTokenUsageRatio();
@@ -3447,6 +3622,7 @@ export class MessageHandler {
           if (this.tokenRatioTracker) {
             const shouldSample = this.tokenRatioTracker.recordTurn({
               inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0,
+              model: this.currentTurnModel,
             });
             if (shouldSample) {
               void this.sampleTokenUsageRatio();

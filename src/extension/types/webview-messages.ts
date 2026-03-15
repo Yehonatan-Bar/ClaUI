@@ -59,6 +59,17 @@ export interface QueuePromptUntilUsageResetRequest {
   images?: WebviewImageData[];
 }
 
+export interface ScheduleMessageRequest {
+  type: 'scheduleMessage';
+  text: string;
+  images?: WebviewImageData[];
+  scheduledAtMs: number;
+}
+
+export interface CancelScheduledMessageRequest {
+  type: 'cancelScheduledMessage';
+}
+
 export interface CancelRequest {
   type: 'cancelRequest';
 }
@@ -408,6 +419,11 @@ export interface SkillGenUiLogMessage {
   data?: Record<string, unknown>;
 }
 
+export interface SkillUsageReportMessage {
+  type: 'skillUsageReport';
+  skillName: string;
+}
+
 export interface OpenSkillGenGuideRequest {
   type: 'openSkillGenGuide';
 }
@@ -533,6 +549,8 @@ export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
   | QueuePromptUntilUsageResetRequest
+  | ScheduleMessageRequest
+  | CancelScheduledMessageRequest
   | CancelRequest
   | CompactRequest
   | StartSessionRequest
@@ -600,6 +618,7 @@ export type WebviewToExtensionMessage =
   | SkillGenCancelRequest
   | GetSkillGenStatusRequest
   | SkillGenUiLogMessage
+  | SkillUsageReportMessage
   | OpenSkillGenGuideRequest
   | SetGitHubSyncEnabledRequest
   | GitHubSyncRequest
@@ -725,6 +744,14 @@ export interface UsageQueuedPromptStateMessage {
   type: 'usageQueuedPromptState';
   queued: boolean;
   scheduledSendAtMs?: number;
+  summary?: string;
+}
+
+export interface ScheduledMessageStateMessage {
+  type: 'scheduledMessageState';
+  scheduled: boolean;
+  text?: string;
+  scheduledAtMs?: number;
   summary?: string;
 }
 
@@ -1596,6 +1623,7 @@ export type ExtensionToWebviewMessage =
   | ProcessBusyMessage
   | UsageLimitDetectedMessage
   | UsageQueuedPromptStateMessage
+  | ScheduledMessageStateMessage
   | MessageStartMessage
   | MessageStopMessage
   | ThinkingEffortUpdateMessage

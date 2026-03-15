@@ -77,6 +77,8 @@ export class PhaseC4CrossBucketMerge {
     workspaceDir: string,
     model: string = 'claude-sonnet-4-6',
     onProgress?: (pct: number, label: string) => void,
+    minDocsPerSkill: number = 3,
+    maxSkillsPerRollup: number = 2,
   ): Promise<PhaseResult> {
     const startTime = Date.now();
     this.cancelled = false;
@@ -94,9 +96,14 @@ export class PhaseC4CrossBucketMerge {
       return { success: false, error: `clusters_incremental directory not found: ${incrementalDir}`, durationMs: Date.now() - startTime };
     }
 
-    // Load all incremental clusters
-    const allClusters = this.loadAllIncrementalClusters(incrementalDir);
-    this.log(`[PhaseC4] Loaded ${allClusters.length} incremental clusters`);
+    // Load all incremental clusters and filter by minimum doc count
+    const rawClusters = this.loadAllIncrementalClusters(incrementalDir);
+    const allClusters = rawClusters.filter(c => (c.member_doc_ids?.length ?? 0) >= minDocsPerSkill);
+    const filteredOut = rawClusters.length - allClusters.length;
+    if (filteredOut > 0) {
+      this.log(`[PhaseC4] Filtered out ${filteredOut} clusters below minDocsPerSkill=${minDocsPerSkill}`);
+    }
+    this.log(`[PhaseC4] Loaded ${allClusters.length} clusters (from ${rawClusters.length} total)`);
 
     // Compute signatures
     const signatures = allClusters.map(c => this.computeSignature(c));
@@ -135,10 +142,24 @@ export class PhaseC4CrossBucketMerge {
           timeoutMs: 60_000,
         });
 
-        const recommendation = aiResult.recommendation || 'merge_all';
+        let recommendation = aiResult.recommendation || 'merge_all';
         const skills = aiResult.skills || [];
 
-        this.log(`[PhaseC4]   AI recommends: ${recommendation}`);
+        this.log(`[PhaseC4]   AI recommends: ${recommendation} (${skills.length} skills)`);
+
+        // Hard cap enforcement: if AI splits into more than maxSkillsPerRollup, force merge
+        if (recommendation === 'split' && skills.length > maxSkillsPerRollup) {
+          this.log(`[PhaseC4]   OVERRIDE: AI split into ${skills.length} > max ${maxSkillsPerRollup}, forcing merge_all`);
+          recommendation = 'merge_all';
+          // Keep first skill definition but assign all cluster names to it
+          const merged = skills[0];
+          merged.skill_description = skills.map(s => s.skill_description).join(' ');
+          merged.activation_triggers = skills.flatMap(s => s.activation_triggers || []).slice(0, 10);
+          merged.cluster_names = group.cluster_names;
+          merged.estimated_doc_count = group.total_docs;
+          skills.length = 0;
+          skills.push(merged);
+        }
 
         // If merge_all with 1 skill, use all cluster names
         if (recommendation === 'merge_all' && skills.length === 1) {
@@ -339,10 +360,12 @@ AGGREGATE INFO:
 
 TASK: Create a unified Skill definition for this domain.
 
-Consider:
-1. Should this be ONE skill or split into 2-3 sub-skills?
-2. Only split if there are CLEARLY distinct use cases
-3. When in doubt, keep as ONE skill (fewer = better)
+RULES (strict):
+1. DEFAULT to merge_all. Fewer skills = better.
+2. Only split if use cases are FUNDAMENTALLY different (different trigger types AND different outputs).
+3. Maximum 2 skills per rollup (NEVER 3).
+4. If total_docs < 10, you MUST use merge_all.
+5. Similar workflows with minor variations = merge_all.
 
 RESPOND WITH ONLY JSON:
 {

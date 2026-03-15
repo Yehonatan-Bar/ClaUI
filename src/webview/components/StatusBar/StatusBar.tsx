@@ -1,11 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../../state/store';
 import { TextSettingsBar } from '../TextSettingsBar/TextSettingsBar';
-import { ModelSelector } from '../ModelSelector/ModelSelector';
-import { CodexModelSelector } from '../ModelSelector/CodexModelSelector';
-import { CodexReasoningEffortSelector } from '../ModelSelector/CodexReasoningEffortSelector';
-import { PermissionModeSelector } from '../PermissionModeSelector/PermissionModeSelector';
-import type { ProviderId } from '../../../extension/types/webview-messages';
 import { VitalsInfoPanel } from '../Vitals/VitalsInfoPanel';
 import { BabelFishPanel } from '../BabelFish/BabelFishPanel';
 import { postToExtension } from '../../hooks/useClaudeStream';
@@ -13,6 +8,7 @@ import { t as tAch } from '../Achievements/achievementI18n';
 import { getModelMaxContext, getContextColor } from '../../utils/modelContextLimits';
 import { useStatusBarCollapse } from '../../hooks/useStatusBarCollapse';
 import { StatusBarGroupButton } from './StatusBarGroupButton';
+import { AIChip } from './AIChip';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 
 function formatDuration(durationMs: number): string {
@@ -64,9 +60,7 @@ export const StatusBar: React.FC<{
     isConnected,
     isBusy,
     provider,
-    selectedProvider,
     providerCapabilities,
-    setSelectedProvider,
     setCodexConsultPanelOpen,
     setPromptHistoryPanelOpen,
     usageStats,
@@ -85,40 +79,86 @@ export const StatusBar: React.FC<{
   } = useAppStore();
 
   const { barRef, layoutMode } = useStatusBarCollapse();
-  const [navOpen, setNavOpen] = useState(false);
+
+  // Dropdown states for the new grouped layout
+  const [aiChipOpen, setAiChipOpen] = useState(false);
+  const [sessionOpen, setSessionOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
-  const [minimalOpen, setMinimalOpen] = useState(false);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setTickMs(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  // Centralized outside-click handlers (use 'click', not 'mousedown')
+  // Centralized outside-click handlers
   useOutsideClick('statusbar-vitals', vitalsInfoRef, vitalsInfoOpen, () => setVitalsInfoOpen(false));
   useOutsideClick('statusbar-babelfish', babelFishRef, babelFishOpen, () => setBabelFishOpen(false));
   useOutsideClick('statusbar-usage', usageRef, usagePopoverOpen, () => setUsagePopoverOpen(false));
 
-  // Close dropdowns when leaving their layout modes
+  // Close all group dropdowns when layout mode changes
   useEffect(() => {
-    if (layoutMode !== 'collapsed' && layoutMode !== 'medium') {
-      setNavOpen(false);
-    }
-    if (layoutMode !== 'collapsed') {
-      setToolsOpen(false);
-    }
-    if (layoutMode !== 'minimal') {
-      setMinimalOpen(false);
-    }
-    if (layoutMode !== 'full' && layoutMode !== 'medium') {
-      setFeedbackOpen(false);
-    }
+    setAiChipOpen(false);
+    setSessionOpen(false);
+    setToolsOpen(false);
+    setViewOpen(false);
+    setMoreOpen(false);
+    setMenuOpen(false);
   }, [layoutMode]);
 
   const activityMs = sessionActivityElapsedMs + (
     sessionActivityRunningSinceMs ? Math.max(0, tickMs - sessionActivityRunningSinceMs) : 0
   );
+
+  // --- Shared handlers ---
+
+  const closeAllGroups = () => {
+    setAiChipOpen(false);
+    setSessionOpen(false);
+    setToolsOpen(false);
+    setViewOpen(false);
+    setMoreOpen(false);
+    setMenuOpen(false);
+    setVitalsInfoOpen(false);
+  };
+
+  const handleAiChipToggle = () => {
+    const next = !aiChipOpen;
+    closeAllGroups();
+    setAiChipOpen(next);
+  };
+
+  const handleSessionToggle = () => {
+    const next = !sessionOpen;
+    closeAllGroups();
+    setSessionOpen(next);
+  };
+
+  const handleToolsToggle = () => {
+    const next = !toolsOpen;
+    closeAllGroups();
+    setToolsOpen(next);
+  };
+
+  const handleViewToggle = () => {
+    const next = !viewOpen;
+    closeAllGroups();
+    setViewOpen(next);
+  };
+
+  const handleMoreToggle = () => {
+    const next = !moreOpen;
+    closeAllGroups();
+    setMoreOpen(next);
+  };
+
+  const handleMenuToggle = () => {
+    const next = !menuOpen;
+    closeAllGroups();
+    setMenuOpen(next);
+  };
 
   const handleHistory = () => {
     postToExtension({ type: 'showHistory' });
@@ -132,16 +172,7 @@ export const StatusBar: React.FC<{
     postToExtension({ type: 'openPlanDocs' });
   };
 
-  const handleFeedbackToggle = () => {
-    setFeedbackOpen((p) => !p);
-    setNavOpen(false);
-    setToolsOpen(false);
-    setMinimalOpen(false);
-    setVitalsInfoOpen(false);
-  };
-
   const handleFeedbackAction = (action: 'bug' | 'feature' | 'email' | 'fullBugReport') => {
-    setFeedbackOpen(false);
     postToExtension({ type: 'feedbackAction', action });
   };
 
@@ -182,7 +213,6 @@ export const StatusBar: React.FC<{
     postToExtension({ type: 'requestUsage' });
   };
 
-  // Clear loading indicator when new data arrives
   const prevUsageFetchedAt = React.useRef(usageFetchedAt);
   useEffect(() => {
     if (usageFetchedAt !== prevUsageFetchedAt.current) {
@@ -191,39 +221,27 @@ export const StatusBar: React.FC<{
     }
   }, [usageFetchedAt]);
 
-  const handleNavToggle = () => {
-    setNavOpen((p) => !p);
-    setToolsOpen(false);
-    setMinimalOpen(false);
-    setVitalsInfoOpen(false);
-  };
-
-  const handleToolsToggle = () => {
-    setToolsOpen((p) => !p);
-    setNavOpen(false);
-    setMinimalOpen(false);
-    setFeedbackOpen(false);
-    setVitalsInfoOpen(false);
-  };
-
-  const handleMinimalToggle = () => {
-    setMinimalOpen((p) => !p);
-    setNavOpen(false);
-    setToolsOpen(false);
-    setVitalsInfoOpen(false);
-  };
-
   const handleVitalsSettingsToggle = () => {
     setVitalsInfoOpen((prev) => !prev);
-    setNavOpen(false);
-    setToolsOpen(false);
   };
 
-  const providerLabel = (p: ProviderId): string => p === 'codex' ? 'Codex' : p === 'remote' ? 'Happy' : 'Claude';
+  const handleCopyManualCapsule = () => {
+    if (!handoffManualPrompt) return;
+    postToExtension({ type: 'copyToClipboard', text: handoffManualPrompt });
+  };
+
+  const handleContextWidgetToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setContextWidgetVisible(!contextWidgetVisible);
+  };
+
+  const providerLabel = (p: string): string => p === 'codex' ? 'Codex' : p === 'remote' ? 'Happy' : 'Claude';
+
   const isHandoffRunning =
     handoffStage !== 'idle' &&
     handoffStage !== 'completed' &&
     handoffStage !== 'failed';
+
   const handoffStageLabel: Record<string, string> = {
     idle: 'Idle',
     collecting_context: 'Collecting context',
@@ -234,80 +252,30 @@ export const StatusBar: React.FC<{
     failed: 'Handoff failed',
   };
 
-  const handleOpenProviderTab = (targetProvider: ProviderId) => {
-    const targetLabel = providerLabel(targetProvider);
+  const isCodexUi = provider === 'codex' || !providerCapabilities.supportsPermissionModeSelector;
+  const gitPushSupported = providerCapabilities.supportsGitPush;
+  const showCodexConsult = providerCapabilities.supportsCodexConsult;
 
-    if (provider === targetProvider || isBusy || isHandoffRunning) {
-      const reason = provider === targetProvider ? `current-tab-is-${targetProvider}` : isBusy ? 'busy' : 'handoff-running';
-      console.log(`[StatusBar] ${targetLabel} button ignored`, {
-        reason,
-        targetProvider,
-        selectedProvider,
-        provider,
-        isBusy,
-      });
-      postToExtension({
-        type: 'diag',
-        phase: `statusbar.${targetProvider}.click.ignored`,
-      detail: `reason=${reason} target=${targetProvider} selected=${selectedProvider} current=${provider ?? 'none'} busy=${isBusy}`,
-    } as any);
-      return;
-    }
-    console.log(`[StatusBar] ${targetLabel} button clicked -> open new ${targetLabel} tab`, {
-      targetProvider,
-      selectedProviderBefore: selectedProvider,
-      currentTabProvider: provider,
-      isBusy,
-    });
-    postToExtension({
-      type: 'diag',
-      phase: `statusbar.${targetProvider}.click`,
-      detail: `target=${targetProvider} selectedBefore=${selectedProvider} current=${provider ?? 'none'} busy=${isBusy}`,
-    } as any);
-    if (selectedProvider !== targetProvider) {
-      setSelectedProvider(targetProvider);
-    }
-    postToExtension({ type: 'openProviderTab', provider: targetProvider });
-  };
+  // Usage stats
+  const maxUsagePct = usageStats.length > 0
+    ? Math.max(...usageStats.map((s) => s.percentage))
+    : null;
 
-  const handleSwitchProviderWithContext = (targetProvider: ProviderId) => {
-    if (targetProvider !== 'claude' && targetProvider !== 'codex') {
-      return;
-    }
-    if (provider === targetProvider || isBusy || isHandoffRunning) {
-      return;
-    }
-    postToExtension({
-      type: 'switchProviderWithContext',
-      targetProvider,
-      keepSourceOpen: true,
-    });
-  };
+  // Context usage computation
+  const ctxMax = getModelMaxContext(model ?? '');
+  const ctxTokens = cost?.inputTokens ?? 0;
+  const ctxPct = ctxMax > 0 ? Math.min((ctxTokens / ctxMax) * 100, 100) : 0;
+  const ctxColor = getContextColor(ctxPct);
+  const ctxHasData = ctxTokens > 0;
 
-  const fallbackTarget: ProviderId = provider === 'claude' ? 'codex' : 'claude';
-  const carryTarget: ProviderId = selectedProvider === provider ? fallbackTarget : selectedProvider;
-  const handleCarryContextToSelected = () => {
-    handleSwitchProviderWithContext(carryTarget);
-  };
+  // --- Layout mode helpers ---
+  const isFull = layoutMode === 'full' || layoutMode === 'medium';
+  const isCompact = layoutMode === 'collapsed';
+  const isMinimal = layoutMode === 'minimal';
 
-  const handleCopyManualCapsule = () => {
-    if (!handoffManualPrompt) {
-      return;
-    }
-    postToExtension({ type: 'copyToClipboard', text: handoffManualPrompt });
-  };
+  const chipDisplayMode = isMinimal ? 'minimal' : isCompact ? 'compact' : 'full';
 
-  const handleSetClaudeProvider = () => handleOpenProviderTab('claude');
-  const handleSetCodexProvider = () => handleOpenProviderTab('codex');
-  const handleSetHappyProvider = () => handleOpenProviderTab('remote');
-
-  const providerButtonTitle = (p: ProviderId): string => {
-    const label = providerLabel(p);
-    if (provider === p) { return `${label} is the current provider`; }
-    if (selectedProvider === p) { return `Open a new ${label} tab`; }
-    return `Switch default provider to ${label} and open a new ${label} tab`;
-  };
-
+  // --- Handoff banner (shared across all modes) ---
   const handoffBanner = handoffStage !== 'idle' ? (
     <div className={`status-bar-handoff-banner ${handoffStage === 'failed' ? 'is-error' : handoffStage === 'completed' ? 'is-success' : ''}`}>
       <span className="status-bar-handoff-banner-text">
@@ -327,37 +295,35 @@ export const StatusBar: React.FC<{
       )}
     </div>
   ) : null;
-  const canCarryContext =
-    !!isConnected &&
-    !isBusy &&
-    !isHandoffRunning &&
-    (provider === 'claude' || provider === 'codex') &&
-    (carryTarget === 'claude' || carryTarget === 'codex') &&
-    carryTarget !== provider;
 
-  const claudeButtonTitle = providerButtonTitle('claude');
-  const codexButtonTitle = providerButtonTitle('codex');
-  const happyButtonTitle = providerButtonTitle('remote');
+  // --- Reusable dropdown item groups ---
 
-  const isCodexUi = provider === 'codex' || !providerCapabilities.supportsPermissionModeSelector;
-  const modelSelectorElement = isCodexUi ? <CodexModelSelector /> : <ModelSelector />;
-  const codexReasoningSelectorElement = isCodexUi ? <CodexReasoningEffortSelector /> : null;
-  const permissionSelectorElement = providerCapabilities.supportsPermissionModeSelector
-    ? <PermissionModeSelector />
-    : null;
-  const gitPushSupported = providerCapabilities.supportsGitPush;
-  const showGitPush = true;
-  const showCodexConsult = providerCapabilities.supportsCodexConsult;
-
-  // --- Shared elements ---
-
-  const clockElement = (
-    <div
-      className={`status-bar-session-clock ${sessionActivityRunningSinceMs ? 'running' : ''}`}
-      data-tooltip="Claude active processing time (starts after first prompt)"
-    >
-      Active: {sessionActivityStarted ? formatDuration(activityMs) : '00:00:00'}
-    </div>
+  const sessionItems = (
+    <>
+      <button className="status-bar-group-dropdown-item" onClick={handleHistory} data-tooltip="Conversation History (Ctrl+Shift+H)">
+        History
+      </button>
+      <button className="status-bar-group-dropdown-item" onClick={handleOpenPlans} data-tooltip="Open plan document in browser">
+        Plans
+      </button>
+      <button className="status-bar-group-dropdown-item" onClick={handlePromptHistory} disabled={!isConnected} data-tooltip="Prompt History">
+        Prompts
+      </button>
+      <div className="status-bar-group-dropdown-separator" />
+      <button className="status-bar-group-dropdown-item" onClick={toggleDashboard} data-tooltip="Analytics Dashboard">
+        Dashboard
+      </button>
+      {teamActive && (
+        <button className="status-bar-group-dropdown-item" onClick={() => useAppStore.getState().setTeamPanelOpen(true)} data-tooltip="Agent Teams Panel">
+          Teams
+        </button>
+      )}
+      {achievementsEnabled && (
+        <button className="status-bar-group-dropdown-item" onClick={handleAchievements}>
+          {tAch(achievementLanguage).trophy} {achievementProfile.totalAchievements}
+        </button>
+      )}
+    </>
   );
 
   const gitGroup = (
@@ -387,31 +353,105 @@ export const StatusBar: React.FC<{
     </div>
   );
 
-  const tokensElement = (
-    <div className="cost-display">
-      <span>In: {(cost?.inputTokens ?? 0).toLocaleString()}</span>
-      <span>Out: {(cost?.outputTokens ?? 0).toLocaleString()}</span>
-    </div>
+  const toolsItems = (
+    <>
+      <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+        {gitGroup}
+      </div>
+      {isConnected && showCodexConsult && (
+        <button className="status-bar-group-dropdown-item" onClick={() => setCodexConsultPanelOpen(true)} data-tooltip="Consult Codex GPT expert">
+          Consult Codex
+        </button>
+      )}
+      <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={babelFishRef}>
+        <button
+          className={`status-bar-babelfish-icon-btn ${babelFishEnabled ? 'active' : ''}`}
+          onClick={() => setBabelFishOpen((prev) => !prev)}
+          data-tooltip="Babel Fish translation settings"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15 3Q23 3 23 12Q23 21 15 21" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
+            <path d="M16 7Q20 7 20 12Q20 17 16 17" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+            <path d="M15 12Q11 8.5 6 12Q11 15.5 15 12Z" fill="currentColor"/>
+            <path d="M6 12L3 9.5M6 12L3 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            <circle cx="12.5" cy="11.2" r="0.7" fill="var(--vscode-editor-background, #1e1e1e)"/>
+          </svg>
+          <span style={{ marginLeft: 4 }}>Babel Fish</span>
+        </button>
+        {babelFishOpen && <BabelFishPanel onClose={() => setBabelFishOpen(false)} />}
+      </div>
+      <div className="status-bar-group-dropdown-separator" />
+      {skillGenEnabled && !isCodexUi && (
+        <div className="status-bar-group-dropdown-item-row">
+          <button
+            className={`status-bar-group-dropdown-item ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''}`}
+            onClick={() => {
+              postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'panelOpened', data: { source: 'statusbar-grouped', pendingDocs: skillGenPendingDocs, threshold: skillGenThreshold } });
+              postToExtension({ type: 'getSkillGenStatus' });
+              setSkillGenPanelOpen(true);
+            }}
+          >
+            SkillDocs {skillGenPendingDocs}/{skillGenThreshold}
+          </button>
+          <button
+            className="skillgen-info-btn"
+            data-tooltip="How Skills work"
+            onClick={() => {
+              postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'infoOpened', data: { source: 'statusbar-grouped' } });
+              postToExtension({ type: 'getSkillGenStatus' });
+              setSkillGenShowInfo(true);
+              setSkillGenPanelOpen(true);
+            }}
+          >
+            !
+          </button>
+        </div>
+      )}
+      <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('bug')} data-tooltip="Open bug report">
+        Report Bug
+      </button>
+      <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('feature')} data-tooltip="Request a new feature">
+        Feature Request
+      </button>
+      <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('email')} data-tooltip="Send email feedback">
+        Email Feedback
+      </button>
+      <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('fullBugReport')} data-tooltip="Collect diagnostics and send full report">
+        Full Bug Report
+      </button>
+    </>
   );
 
-  // The highest single usage percentage (for button label hint)
-  const maxUsagePct = usageStats.length > 0
-    ? Math.max(...usageStats.map((s) => s.percentage))
-    : null;
+  const viewItems = (
+    <>
+      <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+        <TextSettingsBar />
+      </div>
+      <div className="status-bar-group-dropdown-separator" />
+      <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={vitalsInfoRef}>
+        <div className="status-bar-vitals-controls">
+          <button
+            className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
+            onClick={handleToggleVitals}
+            data-tooltip={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
+          >
+            Vitals
+          </button>
+          <button
+            className="status-bar-vitals-settings-btn"
+            onClick={handleVitalsSettingsToggle}
+            data-tooltip="Vitals settings"
+            aria-label="Vitals settings"
+          >
+            {'\u2699'}
+          </button>
+        </div>
+        {vitalsInfoOpen && <VitalsInfoPanel onClose={() => setVitalsInfoOpen(false)} />}
+      </div>
+    </>
+  );
 
-  // Context usage computation
-  const ctxMax = getModelMaxContext(model ?? '');
-  const ctxTokens = cost?.inputTokens ?? 0;
-  const ctxPct = ctxMax > 0 ? Math.min((ctxTokens / ctxMax) * 100, 100) : 0;
-  const ctxColor = getContextColor(ctxPct);
-  const ctxHasData = ctxTokens > 0;
-
-  const handleContextWidgetToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setContextWidgetVisible(!contextWidgetVisible);
-  };
-
-  // Inline popover for the Usage button
+  // --- Usage popover (rendered inline in the metrics area) ---
   const usagePopover = usagePopoverOpen ? (
     <div className="status-bar-usage-popover">
       <div className="status-bar-usage-popover-header">
@@ -451,14 +491,13 @@ export const StatusBar: React.FC<{
           </div>
         ))
       ) : (
-        <div className="status-bar-usage-popover-empty">No data — click {'\u21BB'} to load</div>
+        <div className="status-bar-usage-popover-empty">No data -- click {'\u21BB'} to load</div>
       )}
-      {/* Context usage section */}
       <div className="status-bar-usage-context-section">
         <div className="status-bar-usage-stat-header">
           <span className="status-bar-usage-stat-label">Context window</span>
           <span className="status-bar-usage-stat-pct" style={{ color: ctxHasData ? ctxColor : 'var(--vscode-descriptionForeground)' }}>
-            {ctxHasData ? `${ctxPct.toFixed(1)}%` : '—'}
+            {ctxHasData ? `${ctxPct.toFixed(1)}%` : '\u2014'}
           </span>
         </div>
         <div className="status-bar-usage-bar-bg" style={{ marginBottom: 6 }}>
@@ -478,773 +517,113 @@ export const StatusBar: React.FC<{
     </div>
   ) : null;
 
-  // --- MINIMAL mode (Stage 4) ---
-  if (layoutMode === 'minimal') {
-    return (
-      <div className="status-bar status-bar-collapsed" ref={barRef}>
-        {handoffBanner}
-        <StatusBarGroupButton label="Menu" isOpen={minimalOpen} onToggle={handleMinimalToggle}>
-          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('bug')} data-tooltip="Open bug report">
-            Report Bug
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('feature')} data-tooltip="Request a new feature">
-            Feature Request
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('email')} data-tooltip="Send email feedback">
-            Email Feedback
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('fullBugReport')} data-tooltip="Collect diagnostics and send full report">
-            Full Bug Report
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={handleOpenPlans} data-tooltip="Open plan document in browser">
-            Plans
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={handleHistory} data-tooltip="Conversation History (Ctrl+Shift+H)">
-            History
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={handlePromptHistory} disabled={!isConnected} data-tooltip="Prompt History">
-            Prompts
-          </button>
-          <div className="status-bar-group-dropdown-separator" />
-          <button
-            className="status-bar-group-dropdown-item"
-            onClick={handleCarryContextToSelected}
-            disabled={!canCarryContext}
-            data-tooltip="Switch current tab to selected provider with context"
-          >
-            Switch (Carry Context)
-          </button>
-          <button
-            className={`status-bar-group-dropdown-item ${selectedProvider === 'claude' ? 'active' : ''}`}
-            onClick={handleSetClaudeProvider}
-            disabled={isBusy || isHandoffRunning}
-            data-tooltip={claudeButtonTitle}
-          >
-            Claude
-          </button>
-          <button
-            className={`status-bar-group-dropdown-item ${selectedProvider === 'codex' ? 'active' : ''}`}
-            onClick={handleSetCodexProvider}
-            disabled={isBusy || isHandoffRunning}
-            data-tooltip={codexButtonTitle}
-          >
-            Codex
-          </button>
-          <button
-            className={`status-bar-group-dropdown-item ${selectedProvider === 'remote' ? 'active' : ''}`}
-            onClick={handleSetHappyProvider}
-            disabled={isBusy || isHandoffRunning}
-            data-tooltip={happyButtonTitle}
-          >
-            Happy
-          </button>
-          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-            {modelSelectorElement}
-          </div>
-          {codexReasoningSelectorElement && (
-            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-              {codexReasoningSelectorElement}
-            </div>
-          )}
-          {permissionSelectorElement && (
-            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-              {permissionSelectorElement}
-            </div>
-          )}
-          <div className="status-bar-group-dropdown-separator" />
-          <button className="status-bar-group-dropdown-item" onClick={toggleDashboard} data-tooltip="Analytics Dashboard">
-            Dashboard
-          </button>
-          {teamActive && (
-            <button className="status-bar-group-dropdown-item" onClick={() => useAppStore.getState().setTeamPanelOpen(true)} data-tooltip="Agent Teams Panel">
-              Teams
-            </button>
-          )}
-          {isConnected && showCodexConsult && (
-            <button className="status-bar-group-dropdown-item" onClick={() => setCodexConsultPanelOpen(true)} data-tooltip="Consult Codex GPT expert">
-              Consult Codex
-            </button>
-          )}
-          <div className="status-bar-group-dropdown-separator" />
-          {showGitPush && (
-            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-              {gitGroup}
-            </div>
-          )}
-          {skillGenEnabled && !isCodexUi && (
-            <div className="status-bar-group-dropdown-item-row">
-              <button
-                className={`status-bar-group-dropdown-item ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''}`}
-                onClick={() => {
-                  postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'panelOpened', data: { source: 'statusbar-minimal', pendingDocs: skillGenPendingDocs, threshold: skillGenThreshold } });
-                  postToExtension({ type: 'getSkillGenStatus' });
-                  setSkillGenPanelOpen(true);
-                }}
-              >
-                SkillDocs {skillGenPendingDocs}/{skillGenThreshold}
-              </button>
-              <button
-                className="skillgen-info-btn"
-                data-tooltip="How Skills work"
-                onClick={() => {
-                  postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'infoOpened', data: { source: 'statusbar-minimal' } });
-                  postToExtension({ type: 'getSkillGenStatus' });
-                  setSkillGenShowInfo(true);
-                  setSkillGenPanelOpen(true);
-                }}
-              >
-                !
-              </button>
-            </div>
-          )}
-          {achievementsEnabled && (
-            <button className="status-bar-group-dropdown-item" onClick={handleAchievements}>
-              {tAch(achievementLanguage).trophy} {achievementProfile.totalAchievements}
-            </button>
-          )}
-          {!isCodexUi && (
-            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={usageRef}>
-              <button
-                className={`status-bar-vitals-btn ${usagePopoverOpen ? 'active' : ''}`}
-                onClick={handleUsageClick}
-                data-tooltip="Usage Data"
-              >
-                <span className="usage-btn-label">{maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}</span>
-                {ctxHasData && (
-                  <span
-                    className="usage-btn-context-strip"
-                    style={{ background: ctxColor, width: `${ctxPct}%` }}
-                  />
-                )}
-              </button>
-              {usagePopover}
-            </div>
-          )}
-          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={babelFishRef}>
-            <button
-              className={`status-bar-babelfish-icon-btn ${babelFishEnabled ? 'active' : ''}`}
-              onClick={() => setBabelFishOpen((prev) => !prev)}
-              data-tooltip="Babel Fish translation settings"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M15 3Q23 3 23 12Q23 21 15 21" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                <path d="M16 7Q20 7 20 12Q20 17 16 17" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-                <path d="M15 12Q11 8.5 6 12Q11 15.5 15 12Z" fill="currentColor"/>
-                <path d="M6 12L3 9.5M6 12L3 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <circle cx="12.5" cy="11.2" r="0.7" fill="var(--vscode-editor-background, #1e1e1e)"/>
-              </svg>
-            </button>
-            {babelFishOpen && <BabelFishPanel onClose={() => setBabelFishOpen(false)} />}
-          </div>
-          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-            <button
-              className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
-              onClick={handleToggleVitals}
-              data-tooltip={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
-            >
-              Vitals
-            </button>
-          </div>
-        </StatusBarGroupButton>
+  // --- Clock element ---
+  const clockElement = (
+    <div
+      className={`status-bar-session-clock ${sessionActivityRunningSinceMs ? 'running' : ''}`}
+      data-tooltip="Claude active processing time (starts after first prompt)"
+    >
+      {sessionActivityStarted ? formatDuration(activityMs) : '00:00:00'}
+    </div>
+  );
 
-        <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
-          <button
-            className="status-bar-vitals-settings-btn"
-            onClick={handleVitalsSettingsToggle}
-            data-tooltip="Vitals settings"
-            aria-label="Vitals settings"
-          >
-            {'\u2699'}
-          </button>
-          {vitalsInfoOpen && <VitalsInfoPanel onClose={() => setVitalsInfoOpen(false)} />}
-        </div>
-      </div>
-    );
-  }
+  // --- Token counts ---
+  const tokensElement = (
+    <div className="cost-display">
+      <span>In: {(cost?.inputTokens ?? 0).toLocaleString()}</span>
+      <span>Out: {(cost?.outputTokens ?? 0).toLocaleString()}</span>
+    </div>
+  );
 
-  // --- MEDIUM mode (Stage 2) ---
-  if (layoutMode === 'medium') {
-    return (
-      <div className="status-bar status-bar-collapsed" ref={barRef}>
-        {handoffBanner}
-        {clockElement}
-        <button className="status-bar-history-btn" onClick={handleHistory} data-tooltip="Conversation History (Ctrl+Shift+H)">
-          History
-        </button>
-        <button className="status-bar-prompt-history-btn" onClick={handlePromptHistory} data-tooltip="Prompt History" disabled={!isConnected}>
-          Prompts
-        </button>
-        <StatusBarGroupButton label="Feedback" isOpen={feedbackOpen} onToggle={handleFeedbackToggle}>
-          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('bug')} data-tooltip="Open bug report">
-            Report Bug
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('feature')} data-tooltip="Request a new feature">
-            Feature Request
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('email')} data-tooltip="Send email feedback">
-            Email Feedback
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('fullBugReport')} data-tooltip="Collect diagnostics and send full report">
-            Full Bug Report
-          </button>
-        </StatusBarGroupButton>
-        <button className="status-bar-plans-btn" onClick={handleOpenPlans} data-tooltip="Open plan document in browser">
-          Plans
-        </button>
+  // --- Usage metric with inline bar ---
+  const usageMetric = !isCodexUi ? (
+    <div className="status-bar-usage-wrapper" ref={usageRef}>
+      <button
+        className={`status-bar-usage-metric-btn ${usagePopoverOpen ? 'active' : ''}`}
+        onClick={handleUsageClick}
+        data-tooltip="Usage Data"
+      >
+        <span className="status-bar-usage-bar-inline">
+          <span
+            className="status-bar-usage-bar-inline-fill"
+            style={{
+              width: maxUsagePct !== null ? `${Math.min(maxUsagePct, 100)}%` : '0%',
+              background: maxUsagePct !== null ? usageBarColor(maxUsagePct) : 'transparent',
+            }}
+          />
+        </span>
+        <span className="status-bar-usage-metric-label">
+          {maxUsagePct !== null ? `${maxUsagePct}%` : 'Usage'}
+        </span>
+      </button>
+      {usagePopover}
+    </div>
+  ) : null;
 
-        <StatusBarGroupButton label="More" isOpen={navOpen} onToggle={handleNavToggle}>
-          <button
-            className="status-bar-group-dropdown-item"
-            onClick={handleCarryContextToSelected}
-            disabled={!canCarryContext}
-            data-tooltip="Switch current tab to selected provider with context"
-          >
-            Switch (Carry Context)
-          </button>
-          <button
-            className={`status-bar-group-dropdown-item ${selectedProvider === 'claude' ? 'active' : ''}`}
-            onClick={handleSetClaudeProvider}
-            disabled={isBusy || isHandoffRunning}
-            data-tooltip={claudeButtonTitle}
-          >
-            Claude
-          </button>
-          <button
-            className={`status-bar-group-dropdown-item ${selectedProvider === 'codex' ? 'active' : ''}`}
-            onClick={handleSetCodexProvider}
-            disabled={isBusy || isHandoffRunning}
-            data-tooltip={codexButtonTitle}
-          >
-            Codex
-          </button>
-          <button
-            className={`status-bar-group-dropdown-item ${selectedProvider === 'remote' ? 'active' : ''}`}
-            onClick={handleSetHappyProvider}
-            disabled={isBusy || isHandoffRunning}
-            data-tooltip={happyButtonTitle}
-          >
-            Happy
-          </button>
-          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-            {modelSelectorElement}
-          </div>
-          {codexReasoningSelectorElement && (
-            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-              {codexReasoningSelectorElement}
-            </div>
-          )}
-          {permissionSelectorElement && (
-            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-              {permissionSelectorElement}
-            </div>
-          )}
-          <div className="status-bar-group-dropdown-separator" />
-          {isConnected && showCodexConsult && (
-            <button className="status-bar-group-dropdown-item" onClick={() => setCodexConsultPanelOpen(true)} data-tooltip="Consult Codex GPT expert">
-              Consult Codex
-            </button>
-          )}
-          {showGitPush && (
-            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-              {gitGroup}
-            </div>
-          )}
-          <button className="status-bar-group-dropdown-item" onClick={toggleDashboard} data-tooltip="Analytics Dashboard">
-            Dashboard
-          </button>
-          {teamActive && (
-            <button className="status-bar-group-dropdown-item" onClick={() => useAppStore.getState().setTeamPanelOpen(true)} data-tooltip="Agent Teams Panel">
-              Teams
-            </button>
-          )}
-          {skillGenEnabled && !isCodexUi && (
-            <div className="status-bar-group-dropdown-item-row">
-              <button
-                className={`status-bar-group-dropdown-item ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''}`}
-                onClick={() => {
-                  postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'panelOpened', data: { source: 'statusbar-medium', pendingDocs: skillGenPendingDocs, threshold: skillGenThreshold } });
-                  postToExtension({ type: 'getSkillGenStatus' });
-                  setSkillGenPanelOpen(true);
-                }}
-              >
-                SkillDocs {skillGenPendingDocs}/{skillGenThreshold}
-              </button>
-              <button
-                className="skillgen-info-btn"
-                data-tooltip="How Skills work"
-                onClick={() => {
-                  postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'infoOpened', data: { source: 'statusbar-medium' } });
-                  postToExtension({ type: 'getSkillGenStatus' });
-                  setSkillGenShowInfo(true);
-                  setSkillGenPanelOpen(true);
-                }}
-              >
-                !
-              </button>
-            </div>
-          )}
-          {achievementsEnabled && (
-            <button className="status-bar-group-dropdown-item" onClick={handleAchievements}>
-              {tAch(achievementLanguage).trophy} {achievementProfile.totalAchievements}
-            </button>
-          )}
-          {!isCodexUi && (
-            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={usageRef}>
-              <button
-                className={`status-bar-vitals-btn ${usagePopoverOpen ? 'active' : ''}`}
-                onClick={handleUsageClick}
-                data-tooltip="Usage Data"
-              >
-                <span className="usage-btn-label">{maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}</span>
-                {ctxHasData && (
-                  <span
-                    className="usage-btn-context-strip"
-                    style={{ background: ctxColor, width: `${ctxPct}%` }}
-                  />
-                )}
-              </button>
-              {usagePopover}
-            </div>
-          )}
-          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-            <button
-              className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
-              onClick={handleToggleVitals}
-              data-tooltip={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
-            >
-              Vitals
-            </button>
-          </div>
-        </StatusBarGroupButton>
-
-        <div className="status-bar-babelfish-wrapper" ref={babelFishRef}>
-          <button
-            className={`status-bar-babelfish-icon-btn ${babelFishEnabled ? 'active' : ''}`}
-            onClick={() => setBabelFishOpen((prev) => !prev)}
-            data-tooltip="Babel Fish translation settings"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 3Q23 3 23 12Q23 21 15 21" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
-              <path d="M16 7Q20 7 20 12Q20 17 16 17" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-              <path d="M15 12Q11 8.5 6 12Q11 15.5 15 12Z" fill="currentColor"/>
-              <path d="M6 12L3 9.5M6 12L3 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <circle cx="12.5" cy="11.2" r="0.7" fill="var(--vscode-editor-background, #1e1e1e)"/>
-            </svg>
-          </button>
-          {babelFishOpen && <BabelFishPanel onClose={() => setBabelFishOpen(false)} />}
-        </div>
-        <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
-          <button
-            className="status-bar-vitals-settings-btn"
-            onClick={handleVitalsSettingsToggle}
-            data-tooltip="Vitals settings"
-            aria-label="Vitals settings"
-          >
-            {'\u2699'}
-          </button>
-          {vitalsInfoOpen && <VitalsInfoPanel onClose={() => setVitalsInfoOpen(false)} />}
-        </div>
-        <TextSettingsBar />
-        {tokensElement}
-      </div>
-    );
-  }
-
-  // --- COLLAPSED mode (Stage 3) ---
-  if (layoutMode === 'collapsed') {
-    return (
-      <div className="status-bar status-bar-collapsed" ref={barRef}>
-        {handoffBanner}
-        {clockElement}
-
-        <StatusBarGroupButton label="More" isOpen={navOpen} onToggle={handleNavToggle}>
-          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('bug')} data-tooltip="Open bug report">
-            Report Bug
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('feature')} data-tooltip="Request a new feature">
-            Feature Request
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('email')} data-tooltip="Send email feedback">
-            Email Feedback
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('fullBugReport')} data-tooltip="Collect diagnostics and send full report">
-            Full Bug Report
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={handleOpenPlans} data-tooltip="Open plan document in browser">
-            Plans
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={handleHistory} data-tooltip="Conversation History (Ctrl+Shift+H)">
-            History
-          </button>
-          <button className="status-bar-group-dropdown-item" onClick={handlePromptHistory} disabled={!isConnected} data-tooltip="Prompt History">
-            Prompts
-          </button>
-          <div className="status-bar-group-dropdown-separator" />
-          <button
-            className="status-bar-group-dropdown-item"
-            onClick={handleCarryContextToSelected}
-            disabled={!canCarryContext}
-            data-tooltip="Switch current tab to selected provider with context"
-          >
-            Switch (Carry Context)
-          </button>
-          <button
-            className={`status-bar-group-dropdown-item ${selectedProvider === 'claude' ? 'active' : ''}`}
-            onClick={handleSetClaudeProvider}
-            disabled={isBusy || isHandoffRunning}
-            data-tooltip={claudeButtonTitle}
-          >
-            Claude
-          </button>
-          <button
-            className={`status-bar-group-dropdown-item ${selectedProvider === 'codex' ? 'active' : ''}`}
-            onClick={handleSetCodexProvider}
-            disabled={isBusy || isHandoffRunning}
-            data-tooltip={codexButtonTitle}
-          >
-            Codex
-          </button>
-          <button
-            className={`status-bar-group-dropdown-item ${selectedProvider === 'remote' ? 'active' : ''}`}
-            onClick={handleSetHappyProvider}
-            disabled={isBusy || isHandoffRunning}
-            data-tooltip={happyButtonTitle}
-          >
-            Happy
-          </button>
-          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-            {modelSelectorElement}
-          </div>
-          {codexReasoningSelectorElement && (
-            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-              {codexReasoningSelectorElement}
-            </div>
-          )}
-          {permissionSelectorElement && (
-            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-              {permissionSelectorElement}
-            </div>
-          )}
-          <div className="status-bar-group-dropdown-separator" />
-          <button className="status-bar-group-dropdown-item" onClick={toggleDashboard} data-tooltip="Analytics Dashboard">
-            Dashboard
-          </button>
-          {teamActive && (
-            <button className="status-bar-group-dropdown-item" onClick={() => useAppStore.getState().setTeamPanelOpen(true)} data-tooltip="Agent Teams Panel">
-              Teams
-            </button>
-          )}
-          {isConnected && showCodexConsult && (
-            <button className="status-bar-group-dropdown-item" onClick={() => setCodexConsultPanelOpen(true)} data-tooltip="Consult Codex GPT expert">
-              Consult Codex
-            </button>
-          )}
-        </StatusBarGroupButton>
-
-        <StatusBarGroupButton label="Tools" isOpen={toolsOpen} onToggle={handleToolsToggle} alignRight>
-          {showGitPush && (
-            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-              {gitGroup}
-            </div>
-          )}
-          {skillGenEnabled && !isCodexUi && (
-            <div className="status-bar-group-dropdown-item-row">
-              <button
-                className={`status-bar-group-dropdown-item ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''}`}
-                onClick={() => {
-                  postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'panelOpened', data: { source: 'statusbar-collapsed', pendingDocs: skillGenPendingDocs, threshold: skillGenThreshold } });
-                  postToExtension({ type: 'getSkillGenStatus' });
-                  setSkillGenPanelOpen(true);
-                }}
-              >
-                SkillDocs {skillGenPendingDocs}/{skillGenThreshold}
-              </button>
-              <button
-                className="skillgen-info-btn"
-                data-tooltip="How Skills work"
-                onClick={() => {
-                  postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'infoOpened', data: { source: 'statusbar-collapsed' } });
-                  postToExtension({ type: 'getSkillGenStatus' });
-                  setSkillGenShowInfo(true);
-                  setSkillGenPanelOpen(true);
-                }}
-              >
-                !
-              </button>
-            </div>
-          )}
-          {achievementsEnabled && (
-            <button className="status-bar-group-dropdown-item" onClick={handleAchievements}>
-              {tAch(achievementLanguage).trophy} {achievementProfile.totalAchievements}
-            </button>
-          )}
-          {!isCodexUi && (
-            <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={usageRef}>
-              <button
-                className={`status-bar-vitals-btn ${usagePopoverOpen ? 'active' : ''}`}
-                onClick={handleUsageClick}
-                data-tooltip="Usage Data"
-              >
-                <span className="usage-btn-label">{maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}</span>
-                {ctxHasData && (
-                  <span
-                    className="usage-btn-context-strip"
-                    style={{ background: ctxColor, width: `${ctxPct}%` }}
-                  />
-                )}
-              </button>
-              {usagePopover}
-            </div>
-          )}
-          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={babelFishRef}>
-            <button
-              className={`status-bar-babelfish-icon-btn ${babelFishEnabled ? 'active' : ''}`}
-              onClick={() => setBabelFishOpen((prev) => !prev)}
-              data-tooltip="Babel Fish translation settings"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {/* Ear - outer helix arc */}
-                <path d="M15 3Q23 3 23 12Q23 21 15 21" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                {/* Ear - inner fold */}
-                <path d="M16 7Q20 7 20 12Q20 17 16 17" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-                {/* Fish body swimming right into ear */}
-                <path d="M15 12Q11 8.5 6 12Q11 15.5 15 12Z" fill="currentColor"/>
-                {/* Fish tail - forked */}
-                <path d="M6 12L3 9.5M6 12L3 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                {/* Fish eye */}
-                <circle cx="12.5" cy="11.2" r="0.7" fill="var(--vscode-editor-background, #1e1e1e)"/>
-              </svg>
-            </button>
-            {babelFishOpen && <BabelFishPanel onClose={() => setBabelFishOpen(false)} />}
-          </div>
-          <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
-            <button
-              className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
-              onClick={handleToggleVitals}
-              data-tooltip={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
-            >
-              Vitals
-            </button>
-          </div>
-        </StatusBarGroupButton>
-
-        <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
-          <button
-            className="status-bar-vitals-settings-btn"
-            onClick={handleVitalsSettingsToggle}
-            data-tooltip="Vitals settings"
-            aria-label="Vitals settings"
-          >
-            {'\u2699'}
-          </button>
-          {vitalsInfoOpen && <VitalsInfoPanel onClose={() => setVitalsInfoOpen(false)} />}
-        </div>
-        <TextSettingsBar />
-        {tokensElement}
-      </div>
-    );
-  }
-
-  // --- FULL mode (Stage 1) ---
+  // --- Single unified render ---
   return (
-    <div className="status-bar" ref={barRef}>
+    <div className="status-bar status-bar-grouped" ref={barRef}>
       {handoffBanner}
-      {clockElement}
-      {achievementsEnabled && (
-        <button
-          className="status-bar-achievements-btn"
-          onClick={handleAchievements}
-          data-tooltip={tAch(achievementLanguage).achievements}
-        >
-          {tAch(achievementLanguage).trophy} {achievementProfile.totalAchievements}
-        </button>
-      )}
-      <button className="status-bar-history-btn" onClick={handleHistory} data-tooltip="Conversation History (Ctrl+Shift+H)">
-        History
-      </button>
-      <button className="status-bar-prompt-history-btn" onClick={handlePromptHistory} data-tooltip="Prompt History" disabled={!isConnected}>
-        Prompts
-      </button>
-      <button className="status-bar-plans-btn" onClick={handleOpenPlans} data-tooltip="Open plan document in browser">
-        Plans
-      </button>
-      <StatusBarGroupButton label="Feedback" isOpen={feedbackOpen} onToggle={handleFeedbackToggle}>
-        <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('bug')} data-tooltip="Open bug report">
-          Report Bug
-        </button>
-        <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('feature')} data-tooltip="Request a new feature">
-          Feature Request
-        </button>
-        <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('email')} data-tooltip="Send email feedback">
-          Email Feedback
-        </button>
-        <button className="status-bar-group-dropdown-item" onClick={() => handleFeedbackAction('fullBugReport')} data-tooltip="Collect diagnostics and send full report">
-          Full Bug Report
-        </button>
-      </StatusBarGroupButton>
-      {isConnected && showCodexConsult && (
-        <button
-          className="status-bar-consult-btn"
-          onClick={() => setCodexConsultPanelOpen(true)}
-          data-tooltip="Consult Codex GPT expert"
-        >
-          Consult
-        </button>
-      )}
-      {showGitPush && gitGroup}
-      <button
-        className={`status-bar-provider-quick-btn ${selectedProvider === 'claude' ? 'active' : ''}`}
-        onClick={handleSetClaudeProvider}
-        disabled={isBusy || isHandoffRunning}
-        data-tooltip={claudeButtonTitle}
-      >
-        Claude
-      </button>
-      <button
-        className={`status-bar-provider-quick-btn ${selectedProvider === 'codex' ? 'active' : ''}`}
-        onClick={handleSetCodexProvider}
-        disabled={isBusy || isHandoffRunning}
-        data-tooltip={codexButtonTitle}
-      >
-        Codex
-      </button>
-      <button
-        className={`status-bar-provider-quick-btn ${selectedProvider === 'remote' ? 'active' : ''}`}
-        onClick={handleSetHappyProvider}
-        disabled={isBusy || isHandoffRunning}
-        data-tooltip={happyButtonTitle}
-      >
-        Happy
-      </button>
-      <button
-        className="status-bar-provider-quick-btn"
-        onClick={handleCarryContextToSelected}
-        disabled={!canCarryContext}
-        data-tooltip="Switch current tab to selected provider and carry context"
-      >
-        Carry
-      </button>
-      {modelSelectorElement}
-      {codexReasoningSelectorElement}
-      {permissionSelectorElement}
-      <TextSettingsBar />
-      <button
-        className="status-bar-dashboard-btn"
-        data-tooltip="Analytics Dashboard"
-        aria-label="Open analytics dashboard"
-        onClick={toggleDashboard}
-        style={{
-          background: 'none',
-          border: '1px solid rgba(255,255,255,0.15)',
-          color: '#e6edf3',
-          cursor: 'pointer',
-          padding: '2px 8px',
-          borderRadius: '4px',
-          fontSize: '12px',
-        }}
-      >
-        Dashboard
-      </button>
-      {teamActive && (
-        <button
-          className="status-bar-team-btn"
-          data-tooltip="Agent Teams Panel"
-          aria-label="Open Agent Teams panel"
-          onClick={() => useAppStore.getState().setTeamPanelOpen(true)}
-          style={{
-            background: 'none',
-            border: '1px solid rgba(88, 166, 255, 0.3)',
-            color: '#58a6ff',
-            cursor: 'pointer',
-            padding: '2px 8px',
-            borderRadius: '4px',
-            fontSize: '12px',
-          }}
-        >
-          Teams
-        </button>
-      )}
-      {skillGenEnabled && !isCodexUi && (
-        <>
-          <button
-            className={`status-bar-skillgen-btn ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''} ${skillGenRunStatus !== 'idle' && skillGenRunStatus !== 'succeeded' && skillGenRunStatus !== 'failed' ? 'running' : ''}`}
-            data-tooltip={`SkillDocs: ${skillGenPendingDocs}/${skillGenThreshold} pending${skillGenRunStatus !== 'idle' ? ` (${skillGenRunStatus})` : ''}`}
-            onClick={() => {
-              postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'panelOpened', data: { source: 'statusbar-expanded', pendingDocs: skillGenPendingDocs, threshold: skillGenThreshold, runStatus: skillGenRunStatus } });
-              postToExtension({ type: 'getSkillGenStatus' });
-              setSkillGenPanelOpen(true);
-            }}
-          >
-            SkillDocs {skillGenPendingDocs}/{skillGenThreshold}
-          </button>
-          <button
-            className="skillgen-info-btn"
-            data-tooltip="How Skills work"
-            onClick={() => {
-              postToExtension({ type: 'skillGenUiLog', level: 'INFO', event: 'infoOpened', data: { source: 'statusbar-expanded' } });
-              postToExtension({ type: 'getSkillGenStatus' });
-              setSkillGenShowInfo(true);
-              setSkillGenPanelOpen(true);
-            }}
-          >
-            !
-          </button>
-        </>
-      )}
-      {!isCodexUi && (
-        <div className="status-bar-usage-wrapper" ref={usageRef}>
-          <button
-            className={`status-bar-vitals-btn ${usagePopoverOpen ? 'active' : ''}`}
-            onClick={handleUsageClick}
-            data-tooltip="Usage Data"
-          >
-            {maxUsagePct !== null ? `Usage ${maxUsagePct}%` : 'Usage'}
-          </button>
-          {usagePopover}
-        </div>
-      )}
-      <div className="status-bar-babelfish-wrapper" ref={babelFishRef}>
-        <button
-          className={`status-bar-babelfish-icon-btn ${babelFishEnabled ? 'active' : ''}`}
-          onClick={() => setBabelFishOpen((prev) => !prev)}
-          data-tooltip="Babel Fish translation settings"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            {/* Ear - outer helix arc */}
-            <path d="M15 3Q23 3 23 12Q23 21 15 21" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
-            {/* Ear - inner fold */}
-            <path d="M16 7Q20 7 20 12Q20 17 16 17" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-            {/* Fish body swimming right into ear */}
-            <path d="M15 12Q11 8.5 6 12Q11 15.5 15 12Z" fill="currentColor"/>
-            {/* Fish tail - forked */}
-            <path d="M6 12L3 9.5M6 12L3 14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            {/* Fish eye */}
-            <circle cx="12.5" cy="11.2" r="0.7" fill="var(--vscode-editor-background, #1e1e1e)"/>
-          </svg>
-        </button>
-        {babelFishOpen && <BabelFishPanel onClose={() => setBabelFishOpen(false)} />}
+
+      <div className="status-bar-left">
+        {/* AI Chip: Provider + Model + Permissions compound control */}
+        <AIChip
+          isOpen={aiChipOpen}
+          onToggle={handleAiChipToggle}
+          displayMode={chipDisplayMode}
+        />
+
+        {/* Full: 3 separate group buttons */}
+        {isFull && (
+          <>
+            <StatusBarGroupButton label="Session" isOpen={sessionOpen} onToggle={handleSessionToggle}>
+              {sessionItems}
+            </StatusBarGroupButton>
+            <StatusBarGroupButton label="Tools" isOpen={toolsOpen} onToggle={handleToolsToggle}>
+              {toolsItems}
+            </StatusBarGroupButton>
+            <StatusBarGroupButton label="View" isOpen={viewOpen} onToggle={handleViewToggle}>
+              {viewItems}
+            </StatusBarGroupButton>
+          </>
+        )}
+
+        {/* Compact: Session + More (Tools+View merged) */}
+        {isCompact && (
+          <>
+            <StatusBarGroupButton label="Session" isOpen={sessionOpen} onToggle={handleSessionToggle}>
+              {sessionItems}
+            </StatusBarGroupButton>
+            <StatusBarGroupButton label="More" isOpen={moreOpen} onToggle={handleMoreToggle}>
+              <div className="status-bar-group-dropdown-section-label">Tools</div>
+              {toolsItems}
+              <div className="status-bar-group-dropdown-separator" />
+              <div className="status-bar-group-dropdown-section-label">View</div>
+              {viewItems}
+            </StatusBarGroupButton>
+          </>
+        )}
+
+        {/* Minimal: single Menu button */}
+        {isMinimal && (
+          <StatusBarGroupButton label="Menu" isOpen={menuOpen} onToggle={handleMenuToggle}>
+            <div className="status-bar-group-dropdown-section-label">Session</div>
+            {sessionItems}
+            <div className="status-bar-group-dropdown-separator" />
+            <div className="status-bar-group-dropdown-section-label">Tools</div>
+            {toolsItems}
+            <div className="status-bar-group-dropdown-separator" />
+            <div className="status-bar-group-dropdown-section-label">View</div>
+            {viewItems}
+          </StatusBarGroupButton>
+        )}
       </div>
-      <div className="status-bar-vitals-wrapper" ref={vitalsInfoRef}>
-        <div className="status-bar-vitals-controls">
-          <button
-            className={`status-bar-vitals-btn ${vitalsEnabled ? 'active' : ''}`}
-            onClick={handleToggleVitals}
-            data-tooltip={vitalsEnabled ? 'Hide Session Vitals' : 'Show Session Vitals'}
-          >
-            Vitals
-          </button>
-          <button
-            className="status-bar-vitals-settings-btn"
-            onClick={handleVitalsSettingsToggle}
-            data-tooltip="Vitals settings"
-            aria-label="Vitals settings"
-          >
-            {'\u2699'}
-          </button>
-        </div>
-        {vitalsInfoOpen && <VitalsInfoPanel onClose={() => setVitalsInfoOpen(false)} />}
+
+      <div className="status-bar-right">
+        {clockElement}
+        {usageMetric}
+        {!isMinimal && tokensElement}
       </div>
-      {tokensElement}
     </div>
   );
 };

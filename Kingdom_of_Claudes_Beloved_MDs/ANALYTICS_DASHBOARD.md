@@ -72,6 +72,8 @@ A full-screen overlay dashboard inside the chat webview with three modes: **Sess
 - Fetches live Anthropic API usage data via `UsageFetcher` (OAuth token from `~/.claude/.credentials.json`)
 - Displays billing buckets with usage percentage, daily spend, monthly limit, and reset dates
 - Auto-refresh toggle with configurable interval
+- Period tabs are fixed (`5 Hours`, `24 Hours`, `7 Days`, `14 Days`, `30 Days`, `2 Months`) and remain visible even when the API omits some buckets
+- Selecting a period with no returned bucket shows an explicit empty-state message instead of hiding the tab
 
 ## User Mode (1 Tab)
 
@@ -84,6 +86,8 @@ User mode displays global user-level analytics shared across all workspaces (sto
 - Global stats bar: total turns tracked, raw tokens, weighted tokens, per-type breakdown with cost multiplier labels
 - Trend line chart (Recharts LineChart): weighted tokensPerPercent over time, one colored line per bucket
 - Trend line X-axis is period-aware: `5 Hours`/`24 Hours` show time (`HH:MM`), while `7 Days`+ periods show date labels
+- Period tabs are fixed (`5 Hours`, `24 Hours`, `7 Days`, `14 Days`, `30 Days`, `2 Months`) so the 30-day tab is always visible
+- If the selected period has no samples yet, the tab shows a period-specific empty-state message
 - Samples table: last 50 samples (Date, Bucket, Usage%, Raw Delta, Weighted Delta, Delta Usage%, Weighted Tok/1%)
 - Clear Data button to reset all stored samples
 - Quick-start: first baseline sample created after just 2 turns (subsequent samples every 5 turns)
@@ -255,22 +259,24 @@ Formula: `weightedTokens = input*1.0 + output*5.0 + cacheCreation*1.25 + cacheRe
 
 **Global singleton** -- instantiated once in `extension.ts` with `context.globalState`, injected through TabManager -> SessionTab -> MessageHandler via optional constructor parameters and a setter method.
 
+**Per-model token tracking:** Token counts are accumulated both globally and per-model category (opus, sonnet, haiku). The model is identified from the `messageStart` event's model ID (e.g. "claude-sonnet-4-20250514" -> "sonnet"). When computing `tokensPerPercent` for per-model buckets (e.g. `seven_day_sonnet`), only that model's token delta is used, preventing cross-model contamination. Aggregate buckets (e.g. `seven_day`) continue to use the global token delta.
+
 **Key API:**
-- `recordTurn(tokens)` - Increments global turn counter, raw cumulative tokens, and cost-weighted cumulative total. Returns `true` every 5 turns (sample is due).
-- `createSamples(usageStats)` - Called when sample is due. Fetches current usage %, computes weighted delta tokens and delta usage % since last sample, calculates `tokensPerPercent = weightedDeltaTokens / deltaUsagePercent`. Handles edge cases: usage reset (negative delta -> null ratio), no change (zero delta -> null), first sample (baseline only, no ratio). Falls back to raw delta for old samples without weighted data.
+- `recordTurn(tokens)` - Increments global turn counter, raw cumulative tokens (global + per-model), and cost-weighted cumulative totals (global + per-model). Accepts optional `model` field for per-model attribution. Returns `true` every 5 turns (sample is due).
+- `createSamples(usageStats)` - Called when sample is due. Parses each bucket key to determine if it's a per-model bucket (e.g. `seven_day_sonnet`) or aggregate (`seven_day`). Uses the appropriate cumulative values (per-model or global) for delta computation. Calculates `tokensPerPercent = weightedDeltaTokens / deltaUsagePercent`. Handles edge cases: usage reset (negative delta -> null ratio), no change (zero delta -> null), first sample (baseline only), upgrade from global-only tracking (negative delta from cumulative mismatch -> null = new baseline).
 - `getHistory()` - Returns all stored samples (up to 500, FIFO eviction).
 - `computeSummaries()` - Groups samples by billing bucket, computes per-bucket: avgTokensPerPercent, latestTokensPerPercent, trend (increasing/decreasing/stable/insufficient-data).
 - `clearAll()` - Resets all stored data.
 
-**Persistence:** Samples stored in VS Code `globalState` under key `claudeMirror.tokenUsageRatio`. Uses `enqueueWrite()` to serialize all writes, preventing race conditions when multiple tabs record turns simultaneously. Backward compatible: old history without `cumulativeWeightedTokens` gets it initialized to 0 on load.
+**Persistence:** Samples stored in VS Code `globalState` under key `claudeMirror.tokenUsageRatio`. Uses `enqueueWrite()` to serialize all writes, preventing race conditions when multiple tabs record turns simultaneously. Backward compatible: old history without `cumulativeWeightedTokens` or `cumulativeWeightedTokensByModel` gets them initialized to 0/{} on load.
 
 ### Data Flow
 
 ```
 CLI result event completes (success or error):
-  MessageHandler extracts token counts
-    -> tracker.recordTurn({ input, output, cacheCreation, cacheRead })
-    -> Accumulates raw + weighted cumulative tokens
+  MessageHandler extracts token counts + model from messageStart
+    -> tracker.recordTurn({ input, output, cacheCreation, cacheRead, model })
+    -> Accumulates raw + weighted cumulative tokens (global AND per-model)
     -> Returns true every 5 turns
 
 When sample is due:
@@ -278,6 +284,7 @@ When sample is due:
     -> Creates UsageFetcher (dynamic import)
     -> Fetches usage stats from api.anthropic.com/api/oauth/usage
     -> tracker.createSamples(usageStats)
+      -> For each bucket: parses model suffix, uses per-model or global cumulative
     -> sendTokenRatioData() pushes tokenRatioData message to webview
 
 Dashboard TokenRatioTab mounts:

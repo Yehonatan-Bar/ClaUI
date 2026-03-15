@@ -118,6 +118,11 @@ export const InputArea: React.FC = () => {
     contextWidgetVisible,
     usageLimit,
     usageQueuedPrompt,
+    scheduledMessage,
+    scheduleMessageEnabled,
+    scheduleMessageAtMs,
+    setScheduleMessageEnabled,
+    setScheduleMessageAtMs,
     sessionSkills,
     handoffStage,
     handoffTargetProvider,
@@ -363,6 +368,38 @@ export const InputArea: React.FC = () => {
     postToExtension({ type: 'setAutoTranslate', enabled: newVal } as any);
   }, [autoTranslateEnabled, setAutoTranslateEnabled]);
 
+  /** Compute default scheduled time: 1 hour from now, rounded up to next 5 minutes */
+  const getDefaultScheduleTime = useCallback(() => {
+    const d = new Date(Date.now() + 60 * 60 * 1000);
+    d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5, 0, 0);
+    return d.getTime();
+  }, []);
+
+  /** Toggle schedule message mode */
+  const handleScheduleToggle = useCallback(() => {
+    const newVal = !scheduleMessageEnabled;
+    setScheduleMessageEnabled(newVal);
+    if (newVal && !scheduleMessageAtMs) {
+      setScheduleMessageAtMs(getDefaultScheduleTime());
+    }
+  }, [scheduleMessageEnabled, scheduleMessageAtMs, setScheduleMessageEnabled, setScheduleMessageAtMs, getDefaultScheduleTime]);
+
+  /** Handle schedule date input change */
+  const handleScheduleDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const current = scheduleMessageAtMs ? new Date(scheduleMessageAtMs) : new Date();
+    const [year, month, day] = e.target.value.split('-').map(Number);
+    current.setFullYear(year, month - 1, day);
+    setScheduleMessageAtMs(current.getTime());
+  }, [scheduleMessageAtMs, setScheduleMessageAtMs]);
+
+  /** Handle schedule time input change */
+  const handleScheduleTimeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const current = scheduleMessageAtMs ? new Date(scheduleMessageAtMs) : new Date();
+    const [hours, minutes] = e.target.value.split(':').map(Number);
+    current.setHours(hours, minutes, 0, 0);
+    setScheduleMessageAtMs(current.getTime());
+  }, [scheduleMessageAtMs, setScheduleMessageAtMs]);
+
   /** Send the current message to Claude/Codex (allowed even while busy, to interrupt).
    *  When a plan approval bar is active, the text is sent as plan feedback
    *  so the CLI interprets it in the approval context. */
@@ -382,6 +419,39 @@ export const InputArea: React.FC = () => {
       return;
     }
     lastSentRef.current = { text: trimmed, time: now };
+
+    // Scheduled message mode: store on extension side for timed dispatch
+    if (scheduleMessageEnabled && scheduleMessageAtMs) {
+      const schedNow = Date.now();
+      if (scheduleMessageAtMs <= schedNow) {
+        // Time is in the past -- disable toggle and fall through to normal send
+        setScheduleMessageEnabled(false);
+        setScheduleMessageAtMs(null);
+      } else {
+        if (trimmed) {
+          addToPromptHistory(trimmed);
+        }
+        historyIndexRef.current = -1;
+        draftRef.current = '';
+        markSessionPromptSent();
+        postToExtension({
+          type: 'scheduleMessage',
+          text: trimmed,
+          scheduledAtMs: scheduleMessageAtMs,
+          ...(pendingImages.length > 0 ? { images: pendingImages } : {}),
+        } as any);
+        setText('');
+        setPendingImages([]);
+        setCodexSteerArmed(false);
+        setScheduleMessageEnabled(false);
+        setScheduleMessageAtMs(null);
+        undoMgr.reset();
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+        }
+        return;
+      }
+    }
 
     // Usage-limit queue mode (Claude only): queue now, send automatically later.
     if (isUsageLimitMode) {
@@ -1359,6 +1429,25 @@ export const InputArea: React.FC = () => {
         </div>
       )}
 
+      {scheduledMessage.scheduled && (
+        <div className="scheduled-message-banner">
+          <div className="scheduled-message-chip">
+            {scheduledMessage.summary || (
+              scheduledMessage.scheduledAtMs
+                ? `Message scheduled for ${new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(scheduledMessage.scheduledAtMs))}.`
+                : 'Message scheduled.'
+            )}
+            <button
+              className="scheduled-message-cancel-btn"
+              onClick={() => postToExtension({ type: 'cancelScheduledMessage' } as any)}
+              data-tooltip="Cancel scheduled message"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="input-wrapper">
         {fileMention.isOpen && (
           <FileMentionPopup
@@ -1553,20 +1642,24 @@ export const InputArea: React.FC = () => {
               onClick={sendMessage}
               disabled={(!text.trim() && pendingImages.length === 0) || !isConnected || isEnhancing || isTranslatingPrompt || !!enhanceComparisonData || inputLockedByHandoff}
               data-tooltip={
-                isCodexBusy
-                  ? (codexSteerArmed
-                      ? 'Confirm Steer: stop current turn and send this prompt (Ctrl+Enter)'
-                      : 'Steer Codex: click once to arm, click again to confirm (Ctrl+Enter)')
-                  : isUsageLimitMode
-                    ? 'Queue prompt for auto-send one minute after usage reset (Ctrl+Enter)'
-                  : (promptTranslateEnabled && !autoTranslateEnabled ? 'Translate to English (Ctrl+Enter)' : 'Send message (Ctrl+Enter)')
+                scheduleMessageEnabled
+                  ? 'Schedule message for later sending (Ctrl+Enter)'
+                  : isCodexBusy
+                    ? (codexSteerArmed
+                        ? 'Confirm Steer: stop current turn and send this prompt (Ctrl+Enter)'
+                        : 'Steer Codex: click once to arm, click again to confirm (Ctrl+Enter)')
+                    : isUsageLimitMode
+                      ? 'Queue prompt for auto-send one minute after usage reset (Ctrl+Enter)'
+                    : (promptTranslateEnabled && !autoTranslateEnabled ? 'Translate to English (Ctrl+Enter)' : 'Send message (Ctrl+Enter)')
               }
             >
-              {isCodexBusy
-                ? (codexSteerArmed ? 'Confirm Steer' : 'Steer')
-                : isUsageLimitMode
-                  ? 'Send When Available'
-                : (promptTranslateEnabled && !autoTranslateEnabled ? 'Translate' : 'Send')}
+              {scheduleMessageEnabled
+                ? 'Schedule'
+                : isCodexBusy
+                  ? (codexSteerArmed ? 'Confirm Steer' : 'Steer')
+                  : isUsageLimitMode
+                    ? 'Send When Available'
+                  : (promptTranslateEnabled && !autoTranslateEnabled ? 'Translate' : 'Send')}
             </button>
             <button
               className="send-gear-button"
@@ -1599,6 +1692,33 @@ export const InputArea: React.FC = () => {
                     <span className="enhance-toggle-knob" />
                   </button>
                 </div>
+                <div className="enhance-popover-row">
+                  <span className="enhance-popover-label">Schedule message</span>
+                  <button
+                    className={`enhance-toggle-btn ${scheduleMessageEnabled ? 'on' : 'off'}`}
+                    onClick={handleScheduleToggle}
+                    data-tooltip={scheduleMessageEnabled ? 'Disable scheduling' : 'Enable scheduling'}
+                  >
+                    <span className="enhance-toggle-knob" />
+                  </button>
+                </div>
+                {scheduleMessageEnabled && (
+                  <div className="schedule-datetime-row">
+                    <input
+                      type="date"
+                      className="schedule-date-input"
+                      value={scheduleMessageAtMs ? new Date(scheduleMessageAtMs).toISOString().slice(0, 10) : ''}
+                      onChange={handleScheduleDateChange}
+                      min={new Date().toISOString().slice(0, 10)}
+                    />
+                    <input
+                      type="time"
+                      className="schedule-time-input"
+                      value={scheduleMessageAtMs ? `${String(new Date(scheduleMessageAtMs).getHours()).padStart(2, '0')}:${String(new Date(scheduleMessageAtMs).getMinutes()).padStart(2, '0')}` : ''}
+                      onChange={handleScheduleTimeChange}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>

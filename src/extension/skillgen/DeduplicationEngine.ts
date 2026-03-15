@@ -40,6 +40,13 @@ interface SkillMetadata {
  */
 export class DeduplicationEngine {
   private log: (msg: string) => void = () => {};
+  private skipThreshold = 0.85;
+  private upgradeThreshold = 0.45;
+
+  /** Configure the upgrade threshold (similarity score above which an existing skill is upgraded instead of creating new) */
+  setUpgradeThreshold(threshold: number): void {
+    this.upgradeThreshold = threshold;
+  }
 
   setLogger(logger: (msg: string) => void): void {
     this.log = logger;
@@ -191,7 +198,7 @@ export class DeduplicationEngine {
 
     if (!bestMatch) return null;
 
-    if (bestMatch.score > 0.85) {
+    if (bestMatch.score > this.skipThreshold) {
       return {
         skillName,
         verdict: 'skip',
@@ -201,7 +208,7 @@ export class DeduplicationEngine {
       };
     }
 
-    if (bestMatch.score > 0.6) {
+    if (bestMatch.score > this.upgradeThreshold) {
       return {
         skillName,
         verdict: 'upgrade',

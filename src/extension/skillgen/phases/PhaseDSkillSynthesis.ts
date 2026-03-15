@@ -202,7 +202,7 @@ Return a single JSON object:
 
 {
   "skill_name": "kebab-case-name",
-  "description": "One-line description for skill activation",
+  "description": "Max 120 chars. Start with action context, list trigger conditions first. Example: 'INVOKE WHEN deploying FastAPI to IIS, configuring wfastcgi, or debugging deployment errors'",
   "skill_md": "Full markdown content for SKILL.md",
   "references_files": [
     {"path": "references/filename.md", "contents": "file contents"}
@@ -227,7 +227,7 @@ Return a single JSON object:
 
 ---
 name: skill-name
-description: Brief description for matching
+description: Max 120 chars. Trigger-focused, start with action context
 version: 1.0.0
 ---
 
@@ -274,6 +274,7 @@ Code and explanation.
 3. Match specificity to risk
 4. Keep SKILL.md lean - push deep content to references/scripts/assets
 5. No emojis
+6. description MUST be under 120 characters. Start with trigger conditions, not a generic "A comprehensive skill for..."
 
 Return ONLY the JSON object, no markdown code fences around it.`;
   }
@@ -283,8 +284,27 @@ Return ONLY the JSON object, no markdown code fences around it.`;
     const skillDir = path.join(outputDir, skillName);
     fs.mkdirSync(skillDir, { recursive: true });
 
+    // Enforce description length (max 120 chars)
+    const MAX_DESC_LENGTH = 120;
+    if (skillResult.description && skillResult.description.length > MAX_DESC_LENGTH) {
+      this.log(`[PhaseD] Truncating description for ${skillName}: ${skillResult.description.length} -> ${MAX_DESC_LENGTH} chars`);
+      // Truncate at word boundary
+      const truncated = skillResult.description.slice(0, MAX_DESC_LENGTH - 3);
+      const lastSpace = truncated.lastIndexOf(' ');
+      skillResult.description = (lastSpace > MAX_DESC_LENGTH / 2 ? truncated.slice(0, lastSpace) : truncated) + '...';
+    }
+
+    // Patch SKILL.md frontmatter description to match enforced length
+    let skillMd = skillResult.skill_md || '';
+    if (skillResult.description && skillMd) {
+      skillMd = skillMd.replace(
+        /^(---\s*\n[\s\S]*?description:\s*).+/m,
+        `$1${skillResult.description}`
+      );
+    }
+
     // Write SKILL.md
-    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), skillResult.skill_md || '', 'utf-8');
+    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), skillMd, 'utf-8');
 
     // Write references
     for (const ref of skillResult.references_files || []) {

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as os from 'os';
 import { TabManager } from './session/TabManager';
 import { SessionStore } from './session/SessionStore';
 import { ProjectAnalyticsStore } from './session/ProjectAnalyticsStore';
@@ -11,6 +12,7 @@ import { GitHubSyncService } from './achievements/GitHubSyncService';
 import { SkillGenService } from './skillgen/SkillGenService';
 import { installSkillFiles, injectClaudeMdInstructions } from './skillgen/SrPtdBootstrap';
 import { TokenUsageRatioTracker } from './session/TokenUsageRatioTracker';
+import { SkillUsageTracker } from './skillgen/SkillUsageTracker';
 import { registerCommands } from './commands';
 import { registerDiscoverCommand } from './session/SessionDiscovery';
 import { ClaUiSidebarViewProvider } from './sidebar/ClaUiSidebarViewProvider';
@@ -96,6 +98,12 @@ export function activate(context: vscode.ExtensionContext): void {
   // Create global token-usage ratio tracker (shared across all tabs)
   const tokenRatioTracker = new TokenUsageRatioTracker(context.globalState);
 
+  // Create global skill usage tracker (shared across all tabs)
+  const skillsDir = path.join(os.homedir(), '.claude', 'skills');
+  const skillUsageTracker = new SkillUsageTracker(skillsDir);
+  skillUsageTracker.setLogger(log);
+  skillGenService.setSkillUsageTracker(skillUsageTracker);
+
   // Create the tab manager that owns all session tabs
   tabManager = new TabManager(
     context,
@@ -106,7 +114,8 @@ export function activate(context: vscode.ExtensionContext): void {
     achievementService,
     enableFileLogging ? logDir : null,
     skillGenService,
-    tokenRatioTracker
+    tokenRatioTracker,
+    skillUsageTracker
   );
 
   // Register commands routed through the tab manager

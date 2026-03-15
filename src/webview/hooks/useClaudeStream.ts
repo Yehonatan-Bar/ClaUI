@@ -258,6 +258,7 @@ export function useClaudeStream(): void {
             const extracted = extractSkillNameFromPartial(accumulated);
             if (extracted) {
               addSessionSkill(extracted);
+              postToExtension({ type: 'skillUsageReport', skillName: extracted });
               pendingSkillExtraction = false;
             }
           }
@@ -701,6 +702,15 @@ export function useClaudeStream(): void {
           setUsageQueuedPromptState({
             queued: msg.queued,
             scheduledSendAtMs: msg.scheduledSendAtMs ?? null,
+            summary: msg.summary ?? null,
+          });
+          break;
+
+        case 'scheduledMessageState':
+          useAppStore.getState().setScheduledMessageState({
+            scheduled: msg.scheduled,
+            text: msg.text ?? null,
+            scheduledAtMs: msg.scheduledAtMs ?? null,
             summary: msg.summary ?? null,
           });
           break;

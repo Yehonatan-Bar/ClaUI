@@ -527,6 +527,31 @@
           "default": true,
           "description": "Use AI (Claude Sonnet) for ambiguous skill deduplication decisions"
         },
+        "claudeMirror.skillGen.maxSkills": {
+          "type": "number",
+          "default": 50,
+          "description": "Maximum number of active skills. Excess skills are auto-archived by usage"
+        },
+        "claudeMirror.skillGen.minDocsPerBucket": {
+          "type": "number",
+          "default": 3,
+          "description": "Minimum documents in a bucket to qualify for clustering (Phase C3)"
+        },
+        "claudeMirror.skillGen.minDocsPerSkill": {
+          "type": "number",
+          "default": 3,
+          "description": "Minimum documents required for a cluster to become a skill (Phase C4)"
+        },
+        "claudeMirror.skillGen.maxSkillsPerRollup": {
+          "type": "number",
+          "default": 2,
+          "description": "Maximum skills per domain rollup group during cross-bucket merging (Phase C4)"
+        },
+        "claudeMirror.skillGen.dedupUpgradeThreshold": {
+          "type": "number",
+          "default": 0.45,
+          "description": "Similarity threshold (0-1) above which an existing skill is upgraded instead of creating a new one"
+        },
         "claudeMirror.teams.enabled": {
           "type": "boolean",
           "default": true,

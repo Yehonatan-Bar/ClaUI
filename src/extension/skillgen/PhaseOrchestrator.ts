@@ -54,11 +54,20 @@ const AI_PHASES = new Set<PhaseId>([PhaseId.C2, PhaseId.C3, PhaseId.C4, PhaseId.
  *
  * Supports resume via .pipeline_progress.json (same format as Python).
  */
+/** Configurable pipeline parameters passed from SkillGenService */
+export interface PipelineConfig {
+  minDocsPerBucket?: number;
+  minDocsPerSkill?: number;
+  maxSkillsPerRollup?: number;
+  dedupUpgradeThreshold?: number;
+}
+
 export class PhaseOrchestrator {
   private log: (msg: string) => void = () => {};
   private onProgress: ((update: PipelineProgressUpdate) => void) | null = null;
   private _isRunning = false;
   private _cancelled = false;
+  private pipelineConfig: PipelineConfig = {};
 
   private readonly cliCaller: ClaudeCliCaller;
   private readonly pythonRunner: PythonPhaseRunner;
@@ -93,6 +102,11 @@ export class PhaseOrchestrator {
 
   setProgressHandler(handler: (update: PipelineProgressUpdate) => void): void {
     this.onProgress = handler;
+  }
+
+  /** Set pipeline-wide configuration (thresholds, limits) */
+  setPipelineConfig(config: PipelineConfig): void {
+    this.pipelineConfig = config;
   }
 
   get isRunning(): boolean {
@@ -248,13 +262,14 @@ export class PhaseOrchestrator {
       this.emitProgress('running', mappedProgress, label);
     };
 
+    const cfg = this.pipelineConfig;
     switch (phaseId) {
       case PhaseId.C2:
         return this.phaseC2.run(workspaceDir, 'claude-sonnet-4-6', onProgress);
       case PhaseId.C3:
-        return this.phaseC3.run(workspaceDir, 'claude-sonnet-4-6', onProgress);
+        return this.phaseC3.run(workspaceDir, 'claude-sonnet-4-6', onProgress, cfg.minDocsPerBucket ?? 3);
       case PhaseId.C4:
-        return this.phaseC4.run(workspaceDir, 'claude-sonnet-4-6', onProgress);
+        return this.phaseC4.run(workspaceDir, 'claude-sonnet-4-6', onProgress, cfg.minDocsPerSkill ?? 3, cfg.maxSkillsPerRollup ?? 2);
       case PhaseId.D:
         return this.phaseD.run(workspaceDir, 'claude-opus-4-6', 3, onProgress);
       default:

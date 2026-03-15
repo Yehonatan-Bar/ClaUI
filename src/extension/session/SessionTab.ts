@@ -124,7 +124,8 @@ export class SessionTab implements WebviewBridge {
     private readonly achievementService: AchievementService,
     logDir: string | null,
     private readonly skillGenService?: SkillGenService,
-    private readonly tokenRatioTracker?: TokenUsageRatioTracker
+    private readonly tokenRatioTracker?: TokenUsageRatioTracker,
+    private readonly skillUsageTracker?: import('../skillgen/SkillUsageTracker').SkillUsageTracker
   ) {
     this.tabNumber = tabNumber;
     this.id = `tab-${tabNumber}`;
@@ -156,6 +157,9 @@ export class SessionTab implements WebviewBridge {
     }
     if (this.tokenRatioTracker) {
       this.messageHandler.setTokenRatioTracker(this.tokenRatioTracker);
+    }
+    if (this.skillUsageTracker) {
+      this.messageHandler.setSkillUsageTracker(this.skillUsageTracker);
     }
 
     // Create per-tab file logger if file logging is enabled

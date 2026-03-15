@@ -105,18 +105,19 @@ export const UsageTab: React.FC = () => {
     return groups;
   }, [usageStats]);
 
-  // Periods available in API response, sorted by preferred order
+  // Always show the standard periods, even if API didn't return data for some of them.
   const availablePeriods = React.useMemo(() => {
-    const known = PERIOD_ORDER.filter((p) => periodGroups[p]);
     const unknown = Object.keys(periodGroups).filter((p) => !PERIOD_ORDER.includes(p));
-    return [...known, ...unknown];
+    return [...PERIOD_ORDER, ...unknown];
   }, [periodGroups]);
 
-  // Auto-select first available period when data arrives
+  // Auto-select a period with data when possible, otherwise keep/show first tab.
   React.useEffect(() => {
     if (availablePeriods.length > 0) {
       setSelectedPeriod((prev) =>
-        prev && periodGroups[prev] ? prev : availablePeriods[0]
+        prev && availablePeriods.includes(prev)
+          ? prev
+          : (availablePeriods.find((p) => (periodGroups[p]?.length ?? 0) > 0) ?? availablePeriods[0])
       );
     }
   }, [availablePeriods, periodGroups]);
@@ -126,8 +127,9 @@ export const UsageTab: React.FC = () => {
     postToExtension({ type: 'requestUsage' });
   };
 
-  const activePeriod = selectedPeriod && periodGroups[selectedPeriod] ? selectedPeriod : availablePeriods[0] ?? null;
+  const activePeriod = selectedPeriod && availablePeriods.includes(selectedPeriod) ? selectedPeriod : availablePeriods[0] ?? null;
   const activeStats = activePeriod ? (periodGroups[activePeriod] ?? []) : [];
+  const activePeriodHasData = activeStats.length > 0;
   const hasData = usageStats.length > 0;
 
   return (
@@ -178,6 +180,7 @@ export const UsageTab: React.FC = () => {
         }}>
           {availablePeriods.map((period) => {
             const isActive = period === activePeriod;
+            const periodHasData = (periodGroups[period]?.length ?? 0) > 0;
             return (
               <button
                 key={period}
@@ -191,6 +194,7 @@ export const UsageTab: React.FC = () => {
                   fontSize: 12,
                   fontWeight: isActive ? 700 : 400,
                   cursor: 'pointer',
+                  opacity: !periodHasData && !isActive ? 0.65 : 1,
                   transition: 'all 0.15s ease',
                 }}
               >
@@ -203,7 +207,21 @@ export const UsageTab: React.FC = () => {
 
       {/* Content */}
       {hasData ? (
-        activeStats.map((stat, i) => <UsageCard key={i} stat={stat} />)
+        activePeriodHasData ? (
+          activeStats.map((stat, i) => <UsageCard key={i} stat={stat} />)
+        ) : (
+          <div style={{
+            background: DASH_COLORS.cardBg,
+            border: `1px solid ${DASH_COLORS.border}`,
+            borderRadius: 8,
+            padding: '20px',
+            color: DASH_COLORS.textMuted,
+            fontSize: 13,
+            lineHeight: 1.5,
+          }}>
+            No usage data returned for <strong>{activePeriod}</strong> in the current API response.
+          </div>
+        )
       ) : usageError ? (
         <div style={{
           background: DASH_COLORS.cardBg,

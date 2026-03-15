@@ -8,6 +8,7 @@ import { PhaseOrchestrator } from './PhaseOrchestrator';
 import { DeduplicationEngine } from './DeduplicationEngine';
 import { SkillInstaller } from './SkillInstaller';
 import { getStoredApiKey } from '../process/envUtils';
+import { SkillUsageTracker } from './SkillUsageTracker';
 import type {
   SkillGenRunStatus,
   SkillGenRunHistoryEntry,
@@ -47,6 +48,7 @@ export class SkillGenService {
   /** Multi-tab broadcast: maps tabId -> webview sender */
   private readonly tabSenders = new Map<string, WebviewSender>();
   private secrets: vscode.SecretStorage | null = null;
+  private skillUsageTracker: SkillUsageTracker | null = null;
 
   readonly store: SkillGenStore;
   private readonly runner: PhaseOrchestrator;
@@ -56,6 +58,11 @@ export class SkillGenService {
   /** Provide SecretStorage so pipeline AI phases can use the user's API key */
   setSecrets(secrets: vscode.SecretStorage): void {
     this.secrets = secrets;
+  }
+
+  /** Attach the global SkillUsageTracker for post-install archiving */
+  setSkillUsageTracker(tracker: SkillUsageTracker): void {
+    this.skillUsageTracker = tracker;
   }
 
   constructor(memento: vscode.Memento) {
@@ -112,6 +119,11 @@ export class SkillGenService {
       autoRun: config.get<boolean>('skillGen.autoRun', false),
       timeoutMs: config.get<number>('skillGen.timeoutMs', 600000),
       aiDeduplication: config.get<boolean>('skillGen.aiDeduplication', true),
+      maxSkills: config.get<number>('skillGen.maxSkills', 50),
+      minDocsPerBucket: config.get<number>('skillGen.minDocsPerBucket', 3),
+      minDocsPerSkill: config.get<number>('skillGen.minDocsPerSkill', 3),
+      maxSkillsPerRollup: config.get<number>('skillGen.maxSkillsPerRollup', 2),
+      dedupUpgradeThreshold: config.get<number>('skillGen.dedupUpgradeThreshold', 0.45),
     };
   }
 
@@ -288,6 +300,14 @@ export class SkillGenService {
         this.runner.setApiKey(apiKey);
       }
 
+      // Pass configurable thresholds to the pipeline
+      this.runner.setPipelineConfig({
+        minDocsPerBucket: config.minDocsPerBucket,
+        minDocsPerSkill: config.minDocsPerSkill,
+        maxSkillsPerRollup: config.maxSkillsPerRollup,
+        dedupUpgradeThreshold: config.dedupUpgradeThreshold,
+      });
+
       const pipelineResult = await this.runner.run(
         config.docsDirectory,
         pendingPaths,
@@ -314,7 +334,8 @@ export class SkillGenService {
       this.progressLabel = 'Checking for duplicate skills...';
       this.sendProgress();
 
-      this.log(`[SkillGen:Dedup][INFO] Deduplication started | runId=${runId} aiEnabled=${config.aiDeduplication}`);
+      this.dedup.setUpgradeThreshold(config.dedupUpgradeThreshold);
+      this.log(`[SkillGen:Dedup][INFO] Deduplication started | runId=${runId} aiEnabled=${config.aiDeduplication} upgradeThreshold=${config.dedupUpgradeThreshold}`);
       const dedupResults = await this.dedup.checkAll(
         pipelineResult.skillsOutputDir,
         config.skillsDirectory,
@@ -372,6 +393,9 @@ export class SkillGenService {
       if (failedCount > 0) {
         this.log(`[SkillGen:Install][WARNING] Partial failures | runId=${runId} failedSkills=${installResult.failed.map(f => f.skillName).join(', ')}`);
       }
+
+      // ─── Auto-archive if over skill cap ─────────────────
+      await this.enforceSkillCap(config.skillsDirectory, config.maxSkills, runId);
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
@@ -560,6 +584,81 @@ export class SkillGenService {
     });
     // Also send updated status (with new history)
     this.sendStatus();
+  }
+
+  // ─── Auto-archiving ──────────────────────────────────────────
+
+  /**
+   * If the number of installed skills exceeds maxSkills, archive the
+   * least-used ones. Skills created in the last 30 days are protected.
+   */
+  private async enforceSkillCap(skillsDir: string, maxSkills: number, runId: string): Promise<void> {
+    if (!this.skillUsageTracker) {
+      this.log(`[SkillGen:Archive][DEBUG] No usage tracker, skipping cap enforcement | runId=${runId}`);
+      return;
+    }
+
+    try {
+      const installed = fs.readdirSync(skillsDir, { withFileTypes: true })
+        .filter(d => d.isDirectory() && !d.name.startsWith('_'))
+        .map(d => d.name);
+
+      if (installed.length <= maxSkills) {
+        this.log(`[SkillGen:Archive][DEBUG] Within cap | runId=${runId} installed=${installed.length} max=${maxSkills}`);
+        return;
+      }
+
+      const excess = installed.length - maxSkills;
+      this.log(`[SkillGen:Archive][INFO] Over skill cap | runId=${runId} installed=${installed.length} max=${maxSkills} excess=${excess}`);
+
+      // Identify skills protected by 30-day grace period
+      const gracePeriodMs = 30 * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      const protectedSkills = ['sr-ptd-skill'];
+
+      for (const name of installed) {
+        const skillMdPath = path.join(skillsDir, name, 'SKILL.md');
+        if (fs.existsSync(skillMdPath)) {
+          const stat = fs.statSync(skillMdPath);
+          if (now - stat.mtimeMs < gracePeriodMs) {
+            protectedSkills.push(name);
+          }
+        }
+      }
+
+      // Get least-used candidates (request more than excess in case some are protected)
+      const candidates = this.skillUsageTracker.getLeastUsed(excess + protectedSkills.length, protectedSkills);
+      const toArchive = candidates.slice(0, excess);
+
+      if (!toArchive.length) {
+        this.log(`[SkillGen:Archive][INFO] No archivable candidates found | runId=${runId} protectedCount=${protectedSkills.length}`);
+        return;
+      }
+
+      // Create archive directory
+      const archiveDir = path.join(skillsDir, '_archived');
+      fs.mkdirSync(archiveDir, { recursive: true });
+
+      let archived = 0;
+      for (const skillName of toArchive) {
+        const srcDir = path.join(skillsDir, skillName);
+        const destDir = path.join(archiveDir, skillName);
+        try {
+          if (fs.existsSync(destDir)) {
+            fs.rmSync(destDir, { recursive: true });
+          }
+          fs.renameSync(srcDir, destDir);
+          archived++;
+          this.log(`[SkillGen:Archive][INFO] Archived skill | runId=${runId} skill=${skillName}`);
+        } catch (err) {
+          this.log(`[SkillGen:Archive][WARNING] Failed to archive | runId=${runId} skill=${skillName} error=${err}`);
+        }
+      }
+
+      this.log(`[SkillGen:Archive][INFO] Archiving complete | runId=${runId} archived=${archived}/${toArchive.length}`);
+    } catch (err) {
+      this.log(`[SkillGen:Archive][ERROR] Cap enforcement failed | runId=${runId} error=${err}`);
+    }
   }
 
   // ─── Helpers ───────────────────────────────────────────────
