@@ -63,6 +63,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   const messageToolCount = useMemo(() => contentBlocks.filter(b => b.type === 'tool_use').length, [contentBlocks]);
   const shouldShowSummaryMode = summaryModeEnabled && !isUser && messageToolCount > 0;
 
+  // Chat Search: highlight matching messages
+  const isSearchActive = useAppStore((s) => s.chatSearchOpen && s.chatSearchScope === 'session');
+  const isSearchMatch = useAppStore((s) => s.chatSearchOpen && s.chatSearchMatchIds.includes(message.id));
+  const isCurrentSearchMatch = useAppStore((s) =>
+    s.chatSearchOpen && s.chatSearchMatchIds[s.chatSearchCurrentIndex] === message.id
+  );
+
   // Session Vitals: turn intensity border
   const vitalsEnabled = useAppStore((s) => s.vitalsEnabled);
   const turnData = useAppStore((s) => s.turnByMessageId[message.id]);
@@ -200,7 +207,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   };
 
   return (
-    <div className={`message ${isUser ? 'message-user' : 'message-assistant'}`} data-message-id={message.id} style={vitalsBorderStyle}>
+    <div className={`message ${isUser ? 'message-user' : 'message-assistant'}${isSearchMatch ? ' search-match' : ''}${isCurrentSearchMatch ? ' search-current-match' : ''}`} data-message-id={message.id} style={vitalsBorderStyle}>
       {vitalsBorderStyle && (
         <div
           className="intensity-border-zone"

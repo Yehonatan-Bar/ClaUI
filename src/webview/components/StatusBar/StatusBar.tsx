@@ -79,6 +79,15 @@ export const StatusBar: React.FC<{
   } = useAppStore();
 
   const { barRef, layoutMode } = useStatusBarCollapse();
+  const logUiDebug = React.useCallback((event: string, payload?: Record<string, unknown>) => {
+    postToExtension({
+      type: 'uiDebugLog',
+      source: 'StatusBar',
+      event,
+      payload,
+      ts: Date.now(),
+    });
+  }, []);
 
   // Dropdown states for the new grouped layout
   const [aiChipOpen, setAiChipOpen] = useState(false);
@@ -160,15 +169,41 @@ export const StatusBar: React.FC<{
     setMenuOpen(next);
   };
 
-  const handleHistory = () => {
+  const handleHistory = (clickDetail?: number) => {
+    logUiDebug('historyClick', {
+      clickDetail: clickDetail ?? null,
+      layoutMode,
+      sessionOpen,
+      toolsOpen,
+      viewOpen,
+      moreOpen,
+      menuOpen,
+    });
+    closeAllGroups();
     postToExtension({ type: 'showHistory' });
   };
 
-  const handlePromptHistory = () => {
+  const handlePromptHistory = (clickDetail?: number) => {
+    logUiDebug('promptHistoryClick', {
+      clickDetail: clickDetail ?? null,
+      isConnected,
+      layoutMode,
+    });
+    closeAllGroups();
     setPromptHistoryPanelOpen(true);
   };
 
-  const handleOpenPlans = () => {
+  const handleOpenPlans = (clickDetail?: number) => {
+    logUiDebug('openPlansClick', {
+      clickDetail: clickDetail ?? null,
+      layoutMode,
+      sessionOpen,
+      toolsOpen,
+      viewOpen,
+      moreOpen,
+      menuOpen,
+    });
+    closeAllGroups();
     postToExtension({ type: 'openPlanDocs' });
   };
 
@@ -300,14 +335,17 @@ export const StatusBar: React.FC<{
 
   const sessionItems = (
     <>
-      <button className="status-bar-group-dropdown-item" onClick={handleHistory} data-tooltip="Conversation History (Ctrl+Shift+H)">
+      <button className="status-bar-group-dropdown-item" onClick={(e) => handleHistory(e.detail)} data-tooltip="Conversation History (Ctrl+Shift+H)">
         History
       </button>
-      <button className="status-bar-group-dropdown-item" onClick={handleOpenPlans} data-tooltip="Open plan document in browser">
+      <button className="status-bar-group-dropdown-item" onClick={(e) => handleOpenPlans(e.detail)} data-tooltip="Open plan document in browser">
         Plans
       </button>
-      <button className="status-bar-group-dropdown-item" onClick={handlePromptHistory} disabled={!isConnected} data-tooltip="Prompt History">
+      <button className="status-bar-group-dropdown-item" onClick={(e) => handlePromptHistory(e.detail)} disabled={!isConnected} data-tooltip="Prompt History">
         Prompts
+      </button>
+      <button className="status-bar-group-dropdown-item" onClick={() => { useAppStore.getState().setChatSearchOpen(true); closeAllGroups(); }} data-tooltip="Search chat messages (Ctrl+Shift+F)">
+        Search
       </button>
       <div className="status-bar-group-dropdown-separator" />
       <button className="status-bar-group-dropdown-item" onClick={toggleDashboard} data-tooltip="Analytics Dashboard">

@@ -77,3 +77,17 @@ VS Code extension host
 ```
 
 `child.kill('SIGTERM')` only kills `cmd.exe`, leaving `node.exe` as an orphan. `taskkill /F /T /PID` kills the entire tree including descendants.
+
+## Webview Focus Diagnostics (2026-03)
+
+To diagnose intermittent reports of tab/button clicks requiring a second click, both session tab runtimes now emit explicit focus/view-state logs:
+
+- `SessionTab`:
+  - `ViewState changed: active=... visible=...`
+  - `Posting focusInput (view-state active)`
+  - `Window focus changed: focused=... panelActive=...`
+  - `Re-focusing panel and scheduling focusInput (window focus)`
+  - `Posting focusInput (window focus timer)`
+- `CodexSessionTab`: same diagnostics with `Codex Tab` prefix.
+
+These logs make it possible to correlate user click timing with VS Code focus transitions and the extension's automatic input-refocus behavior.

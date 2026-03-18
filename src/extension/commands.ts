@@ -158,6 +158,10 @@ export function registerCommands(
     vscode.workspace.getConfiguration('claudeMirror').get<ProviderId>('provider', 'claude');
   const providerLabel = (provider: ProviderId): string =>
     provider === 'codex' ? 'Codex' : provider === 'remote' ? 'Happy' : 'Claude';
+  let showHistoryInFlight = false;
+  let showHistorySeq = 0;
+  let openPlanDocsInFlight = false;
+  let openPlanDocsSeq = 0;
 
   context.subscriptions.push(
     // Start a NEW session in a new tab
@@ -326,74 +330,99 @@ export function registerCommands(
 
     // Show conversation history in a QuickPick
     vscode.commands.registerCommand('claudeMirror.showHistory', async () => {
-      // Step 1: Ask which history source
-      const sourceItems: vscode.QuickPickItem[] = [
-        {
-          label: '$(window) Extension Sessions',
-          description: 'Conversations opened inside ClaUi',
-        },
-        {
-          label: '$(search) All Sessions',
-          description: 'Discover all Claude sessions from disk (including CLI)',
-        },
-      ];
-
-      const source = await vscode.window.showQuickPick(sourceItems, {
-        placeHolder: 'Browse conversation history from...',
-        ignoreFocusOut: false,
-      });
-
-      if (!source) { return; }
-
-      if (source.label.includes('All Sessions')) {
-        await vscode.commands.executeCommand('claudeMirror.discoverSessions');
+      const runId = ++showHistorySeq;
+      const startedAt = Date.now();
+      if (showHistoryInFlight) {
+        log(`[showHistory#${runId}] ignored: another history picker is already active`);
         return;
       }
+      showHistoryInFlight = true;
+      log(`[showHistory#${runId}] start`);
 
-      // Step 2: Show ClaUi extension sessions
-      const allSessions = sessionStore.getSessions();
-      log(`[showHistory] Found ${allSessions.length} sessions in store`);
+      try {
+        // Step 1: Ask which history source
+        const sourceItems: vscode.QuickPickItem[] = [
+          {
+            label: '$(window) Extension Sessions',
+            description: 'Conversations opened inside ClaUi',
+          },
+          {
+            label: '$(search) All Sessions',
+            description: 'Discover all Claude sessions from disk (including CLI)',
+          },
+        ];
 
-      // Filter to sessions from the current workspace, if one is open
-      const currentWorkspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      const normalizePath = (p: string) => p.replace(/[\\/]+/g, '/').replace(/\/+$/, '').toLowerCase();
-      const sessions = currentWorkspace
-        ? allSessions.filter(s => {
-            // Exclude sessions without workspacePath — they belong to unknown projects
-            if (!s.workspacePath) {
-              return false;
-            }
-            // Normalize separators and case for Windows path comparison
-            return normalizePath(s.workspacePath) === normalizePath(currentWorkspace);
-          })
-        : allSessions;
+        const source = await vscode.window.showQuickPick(sourceItems, {
+          placeHolder: 'Browse conversation history from...',
+          ignoreFocusOut: false,
+        });
 
-      log(`[showHistory] Showing ${sessions.length} sessions for workspace: ${currentWorkspace || '(none)'}`);
+        if (!source) {
+          log(`[showHistory#${runId}] source pick canceled after ${Date.now() - startedAt}ms`);
+          return;
+        }
 
-      if (sessions.length === 0) {
-        const msg = currentWorkspace
-          ? 'No ClaUi conversation history for this project yet. Use "All Sessions" to discover CLI sessions.'
-          : 'No ClaUi conversation history yet. Use "All Sessions" to discover CLI sessions.';
-        vscode.window.showInformationMessage(msg);
-        return;
-      }
+        const sourceKey = source.label.includes('All Sessions') ? 'all' : 'extension';
+        log(`[showHistory#${runId}] source selected=${sourceKey}`);
 
-      const items = sessions.map(s => ({
-        label: s.name || `Session ${s.sessionId.slice(0, 8)}`,
-        description: `${s.provider === 'codex' ? 'Codex' : s.provider === 'remote' ? 'Happy' : 'Claude'} | ${s.model || 'unknown'}  ${formatRelativeTime(s.lastActiveAt)}`,
-        detail: s.firstPrompt || undefined,
-        sessionId: s.sessionId,
-        provider: s.provider,
-      }));
+        if (source.label.includes('All Sessions')) {
+          log(`[showHistory#${runId}] forwarding to claudeMirror.discoverSessions`);
+          await vscode.commands.executeCommand('claudeMirror.discoverSessions');
+          return;
+        }
 
-      const picked = await vscode.window.showQuickPick(items, {
-        placeHolder: 'Select a conversation to resume',
-        matchOnDescription: true,
-        matchOnDetail: true,
-        ignoreFocusOut: false,
-      });
+        // Step 2: Show ClaUi extension sessions
+        const allSessions = sessionStore.getSessions();
+        log(`[showHistory] Found ${allSessions.length} sessions in store`);
 
-      if (picked) {
+        // Filter to sessions from the current workspace, if one is open
+        const currentWorkspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const normalizePath = (p: string) => p.replace(/[\\/]+/g, '/').replace(/\/+$/, '').toLowerCase();
+        const sessions = currentWorkspace
+          ? allSessions.filter(s => {
+              // Exclude sessions without workspacePath - they belong to unknown projects
+              if (!s.workspacePath) {
+                return false;
+              }
+              // Normalize separators and case for Windows path comparison
+              return normalizePath(s.workspacePath) === normalizePath(currentWorkspace);
+            })
+          : allSessions;
+
+        log(`[showHistory] Showing ${sessions.length} sessions for workspace: ${currentWorkspace || '(none)'}`);
+        log(`[showHistory#${runId}] session list prepared count=${sessions.length} workspace=${currentWorkspace || '(none)'}`);
+
+        if (sessions.length === 0) {
+          const msg = currentWorkspace
+            ? 'No ClaUi conversation history for this project yet. Use "All Sessions" to discover CLI sessions.'
+            : 'No ClaUi conversation history yet. Use "All Sessions" to discover CLI sessions.';
+          vscode.window.showInformationMessage(msg);
+          log(`[showHistory#${runId}] no sessions to show`);
+          return;
+        }
+
+        const items = sessions.map(s => ({
+          label: s.name || `Session ${s.sessionId.slice(0, 8)}`,
+          description: `${s.provider === 'codex' ? 'Codex' : s.provider === 'remote' ? 'Happy' : 'Claude'} | ${s.model || 'unknown'}  ${formatRelativeTime(s.lastActiveAt)}`,
+          detail: s.firstPrompt || undefined,
+          sessionId: s.sessionId,
+          provider: s.provider,
+        }));
+
+        const sessionPickStartedAt = Date.now();
+        const picked = await vscode.window.showQuickPick(items, {
+          placeHolder: 'Select a conversation to resume',
+          matchOnDescription: true,
+          matchOnDetail: true,
+          ignoreFocusOut: false,
+        });
+
+        if (!picked) {
+          log(`[showHistory#${runId}] session pick canceled after ${Date.now() - sessionPickStartedAt}ms`);
+          return;
+        }
+
+        log(`[showHistory#${runId}] session selected id=${picked.sessionId} provider=${picked.provider} after ${Date.now() - sessionPickStartedAt}ms`);
         log(`Resuming ${picked.provider} session from history: ${picked.sessionId}`);
         const tab = tabManager.createTabForProvider(picked.provider);
         try {
@@ -404,110 +433,136 @@ export function registerCommands(
             `Failed to resume ${picked.provider === 'codex' ? 'Codex' : picked.provider === 'remote' ? 'Happy' : 'Claude'} session: ${errorMessage}`
           );
         }
+      } finally {
+        showHistoryInFlight = false;
+        log(`[showHistory#${runId}] end durationMs=${Date.now() - startedAt}`);
       }
     }),
 
     // Open HTML plan documents from multiple locations in the default browser
     vscode.commands.registerCommand('claudeMirror.openPlanDocs', async () => {
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (!workspaceFolders || workspaceFolders.length === 0) {
-        vscode.window.showWarningMessage('No workspace folder open.');
+      const runId = ++openPlanDocsSeq;
+      const startedAt = Date.now();
+      if (openPlanDocsInFlight) {
+        log(`[openPlanDocs#${runId}] ignored: another plan picker is already active`);
         return;
       }
+      openPlanDocsInFlight = true;
+      log(`[openPlanDocs#${runId}] start`);
 
-      const workspaceRoot = workspaceFolders[0].uri.fsPath;
-      const kingdomDir = path.join(workspaceRoot, 'Kingdom_of_Claudes_Beloved_MDs');
-      const claudePlansDir = path.join(os.homedir(), '.claude', 'plans');
-
-      // Collect HTML plan files from all known plan directories (deduplicated by path)
-      const planFiles: Array<{ label: string; description: string; filePath: string; mtimeMs: number }> = [];
-      const seenPaths = new Set<string>();
-
-      const collectHtmlFiles = (dir: string, locationTag: string, maxDepth = 1, currentDepth = 0) => {
-        if (currentDepth >= maxDepth || !fs.existsSync(dir)) return;
-        try {
-          const entries = fs.readdirSync(dir, { withFileTypes: true });
-          for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
-            if (entry.isFile() && entry.name.endsWith('.html')) {
-              const normalized = fullPath.replace(/\\/g, '/').toLowerCase();
-              if (seenPaths.has(normalized)) continue;
-              seenPaths.add(normalized);
-              const stat = fs.statSync(fullPath);
-              planFiles.push({
-                label: entry.name,
-                description: `${locationTag} - ${formatRelativeTime(stat.mtime.toISOString())}`,
-                filePath: fullPath,
-                mtimeMs: stat.mtimeMs,
-              });
-            } else if (entry.isDirectory() && currentDepth + 1 < maxDepth) {
-              collectHtmlFiles(fullPath, locationTag, maxDepth, currentDepth + 1);
-            }
-          }
-        } catch {
-          // Skip directories that can't be read
+      try {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+          vscode.window.showWarningMessage('No workspace folder open.');
+          log(`[openPlanDocs#${runId}] canceled: no workspace folder`);
+          return;
         }
-      };
 
-      // Find all directories named "plans" within the workspace (up to 3 levels deep)
-      const skipDirs = new Set(['node_modules', '.git', 'dist', '.vscode', 'Kingdom_of_Claudes_Beloved_MDs']);
-      const findPlansDirs = (dir: string, depth: number): string[] => {
-        if (depth <= 0) return [];
-        const results: string[] = [];
-        try {
-          const entries = fs.readdirSync(dir, { withFileTypes: true });
-          for (const entry of entries) {
-            if (!entry.isDirectory() || skipDirs.has(entry.name)) continue;
-            const fullPath = path.join(dir, entry.name);
-            if (entry.name === 'plans') {
-              results.push(fullPath);
+        const workspaceRoot = workspaceFolders[0].uri.fsPath;
+        const kingdomDir = path.join(workspaceRoot, 'Kingdom_of_Claudes_Beloved_MDs');
+        const claudePlansDir = path.join(os.homedir(), '.claude', 'plans');
+
+        // Collect HTML plan files from all known plan directories (deduplicated by path)
+        const planFiles: Array<{ label: string; description: string; filePath: string; mtimeMs: number }> = [];
+        const seenPaths = new Set<string>();
+
+        const collectHtmlFiles = (dir: string, locationTag: string, maxDepth = 1, currentDepth = 0) => {
+          if (currentDepth >= maxDepth || !fs.existsSync(dir)) return;
+          try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+              const fullPath = path.join(dir, entry.name);
+              if (entry.isFile() && entry.name.endsWith('.html')) {
+                const normalized = fullPath.replace(/\\/g, '/').toLowerCase();
+                if (seenPaths.has(normalized)) continue;
+                seenPaths.add(normalized);
+                const stat = fs.statSync(fullPath);
+                planFiles.push({
+                  label: entry.name,
+                  description: `${locationTag} - ${formatRelativeTime(stat.mtime.toISOString())}`,
+                  filePath: fullPath,
+                  mtimeMs: stat.mtimeMs,
+                });
+              } else if (entry.isDirectory() && currentDepth + 1 < maxDepth) {
+                collectHtmlFiles(fullPath, locationTag, maxDepth, currentDepth + 1);
+              }
             }
-            results.push(...findPlansDirs(fullPath, depth - 1));
+          } catch {
+            // Skip directories that can't be read
           }
-        } catch {
-          // Skip unreadable directories
+        };
+
+        // Find all directories named "plans" within the workspace (up to 3 levels deep)
+        const skipDirs = new Set(['node_modules', '.git', 'dist', '.vscode', 'Kingdom_of_Claudes_Beloved_MDs']);
+        const findPlansDirs = (dir: string, depth: number): string[] => {
+          if (depth <= 0) return [];
+          const results: string[] = [];
+          try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+              if (!entry.isDirectory() || skipDirs.has(entry.name)) continue;
+              const fullPath = path.join(dir, entry.name);
+              if (entry.name === 'plans') {
+                results.push(fullPath);
+              }
+              results.push(...findPlansDirs(fullPath, depth - 1));
+            }
+          } catch {
+            // Skip unreadable directories
+          }
+          return results;
+        };
+
+        const scanStartedAt = Date.now();
+        const projectPlansDirs = findPlansDirs(workspaceRoot, 3);
+
+        collectHtmlFiles(kingdomDir, 'Kingdom', 3);
+        collectHtmlFiles(workspaceRoot, 'Root', 3);
+        for (const pd of projectPlansDirs) {
+          const relative = path.relative(workspaceRoot, pd).replace(/\\/g, '/');
+          collectHtmlFiles(pd, relative, 3);
         }
-        return results;
-      };
+        collectHtmlFiles(claudePlansDir, '~/.claude/plans', 3);
 
-      const projectPlansDirs = findPlansDirs(workspaceRoot, 3);
+        // Sort all collected files by modification time (newest first)
+        planFiles.sort((a, b) => b.mtimeMs - a.mtimeMs);
+        log(`[openPlanDocs#${runId}] scan done in ${Date.now() - scanStartedAt}ms | workspacePlansDirs=${projectPlansDirs.length} uniqueHtml=${planFiles.length}`);
 
-      collectHtmlFiles(kingdomDir, 'Kingdom', 3);
-      collectHtmlFiles(workspaceRoot, 'Root', 3);
-      for (const pd of projectPlansDirs) {
-        const relative = path.relative(workspaceRoot, pd).replace(/\\/g, '/');
-        collectHtmlFiles(pd, relative, 3);
-      }
-      collectHtmlFiles(claudePlansDir, '~/.claude/plans', 3);
+        // No plan documents found - offer to activate the Plans feature
+        if (planFiles.length === 0) {
+          log(`[openPlanDocs#${runId}] no plan docs found`);
+          await promptPlanFeatureActivation(workspaceRoot, log);
+          return;
+        }
 
-      // Sort all collected files by modification time (newest first)
-      planFiles.sort((a, b) => b.mtimeMs - a.mtimeMs);
+        // Single file: open directly in preview panel
+        if (planFiles.length === 1) {
+          log(`[openPlanDocs#${runId}] single plan doc auto-open: ${planFiles[0].filePath}`);
+          const html = fs.readFileSync(planFiles[0].filePath, 'utf-8');
+          openHtmlPreviewPanel(html, planFiles[0].label);
+          return;
+        }
 
-      // No plan documents found - offer to activate the Plans feature
-      if (planFiles.length === 0) {
-        await promptPlanFeatureActivation(workspaceRoot, log);
-        return;
-      }
+        // Multiple files: show QuickPick sorted by modification time
+        const pickerStartedAt = Date.now();
+        const picked = await vscode.window.showQuickPick(planFiles, {
+          placeHolder: 'Select a plan document to open in browser',
+          matchOnDescription: true,
+          ignoreFocusOut: false,
+        });
 
-      // Single file: open directly in preview panel
-      if (planFiles.length === 1) {
-        log(`Opening single plan doc: ${planFiles[0].filePath}`);
-        const html = fs.readFileSync(planFiles[0].filePath, 'utf-8');
-        openHtmlPreviewPanel(html, planFiles[0].label);
-        return;
-      }
+        if (!picked) {
+          log(`[openPlanDocs#${runId}] picker canceled after ${Date.now() - pickerStartedAt}ms`);
+          return;
+        }
 
-      // Multiple files: show QuickPick sorted by modification time
-      const picked = await vscode.window.showQuickPick(planFiles, {
-        placeHolder: 'Select a plan document to open in browser',
-        matchOnDescription: true,
-        ignoreFocusOut: false,
-      });
-
-      if (picked) {
+        log(`[openPlanDocs#${runId}] selected ${picked.filePath} after ${Date.now() - pickerStartedAt}ms`);
         log(`Opening plan doc: ${picked.filePath}`);
         const html = fs.readFileSync(picked.filePath, 'utf-8');
         openHtmlPreviewPanel(html, picked.label);
+      } finally {
+        openPlanDocsInFlight = false;
+        log(`[openPlanDocs#${runId}] end durationMs=${Date.now() - startedAt}`);
       }
     }),
 

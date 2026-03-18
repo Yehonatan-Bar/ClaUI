@@ -58,3 +58,20 @@ On selection: creates a new Claude tab via `tabManager.createTabForProvider('cla
 - Uses `TabManager.createTabForProvider()` to create new session tabs
 - Uses `SessionTab.startSession({ resume })` to resume discovered sessions
 - Complements `SessionStore` (globalState-based history) and `ConversationReader` (JSONL parsing for conversation display)
+
+## Diagnostics (2026-03)
+
+To investigate intermittent "first click did nothing" reports around history/plans actions, command-level diagnostics were added:
+
+- `claudeMirror.showHistory` now logs scoped traces like:
+  - `[showHistory#12] start`
+  - `[showHistory#12] source selected=extension|all`
+  - `[showHistory#12] session pick canceled ...`
+  - `[showHistory#12] end durationMs=...`
+- `claudeMirror.openPlanDocs` now logs scoped traces like:
+  - `[openPlanDocs#7] start`
+  - `[openPlanDocs#7] scan done in ... | workspacePlansDirs=... uniqueHtml=...`
+  - `[openPlanDocs#7] picker canceled ...`
+  - `[openPlanDocs#7] selected ...`
+  - `[openPlanDocs#7] end durationMs=...`
+- Both commands now include an in-flight guard to avoid overlapping pickers. Repeated clicks during an active run are logged as `ignored`.

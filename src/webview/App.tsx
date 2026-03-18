@@ -28,6 +28,7 @@ import { detectRtl } from './hooks/useRtlDetection';
 import { deriveTurnHistoryFromMessages } from './utils/turnVitals';
 import { GlobalTooltip } from './components/Tooltip/GlobalTooltip';
 import { ImageLightbox } from './components/ImageLightbox';
+import { ChatSearchBar } from './components/ChatView/ChatSearchBar';
 
 const SESSION_SUMMARY_IDLE_MS = 60 * 60 * 1000;
 const SESSION_SUMMARY_DEFER_MS = 3 * 60 * 60 * 1000;
@@ -69,6 +70,7 @@ export const App: React.FC = () => {
     teamActive,
     teamPanelOpen,
     currentThinkingEffort,
+    chatSearchOpen,
   } = useAppStore();
   const forkInit = useAppStore((s) => s.forkInit);
   const hasMessages = messages.length > 0 || streamingMessageId !== null;
@@ -92,6 +94,19 @@ export const App: React.FC = () => {
   const handleTimelineTurnClick = React.useCallback((messageId: string) => {
     const el = document.querySelector(`[data-message-id="${messageId}"]`);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
+
+  // Keyboard shortcut: Ctrl+Shift+F to toggle search bar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        const store = useAppStore.getState();
+        store.setChatSearchOpen(!store.chatSearchOpen);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // Fork completion: messages are already loaded into the store by
@@ -275,6 +290,7 @@ export const App: React.FC = () => {
       {/* Always show messages if they exist, regardless of connection state */}
       {hasMessages ? (
         <div className={`chat-area-wrapper ${summaryModeEnabled ? 'sm-split-layout' : ''} ${vpmEnabled ? 'vpm-split-layout' : ''}`}>
+          {chatSearchOpen && <ChatSearchBar />}
           {summaryModeEnabled && <SummaryModeWidget />}
           {vpmEnabled && <VisualProgressView />}
           <MessageList onScrollFractionChange={setScrollFraction} />

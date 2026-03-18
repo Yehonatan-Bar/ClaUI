@@ -817,6 +817,10 @@ export function useClaudeStream(): void {
           // Just mark it as not busy
           handleBtwResult();
           break;
+
+        case 'chatSearchProjectResults':
+          useAppStore.getState().setChatSearchProjectResults(msg.results, msg.requestId);
+          break;
       }
     }
 

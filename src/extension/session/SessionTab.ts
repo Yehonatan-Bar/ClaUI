@@ -872,8 +872,12 @@ export class SessionTab implements WebviewBridge {
     });
 
     this.panel.onDidChangeViewState((e) => {
+      this.log(
+        `[Tab ${this.tabNumber}] ViewState changed: active=${e.webviewPanel.active} visible=${e.webviewPanel.visible}`,
+      );
       if (e.webviewPanel.active) {
         this.callbacks.onFocused(this.id);
+        this.log(`[Tab ${this.tabNumber}] Posting focusInput (view-state active)`);
         this.postMessage({ type: 'focusInput' });
       }
     });
@@ -881,9 +885,16 @@ export class SessionTab implements WebviewBridge {
     // When VS Code window regains OS focus, re-focus the input textarea.
     // reveal() ensures the webview iframe gets focus before we ask it to focus the textarea.
     this.windowStateSubscription = vscode.window.onDidChangeWindowState((e) => {
+      this.log(
+        `[Tab ${this.tabNumber}] Window focus changed: focused=${e.focused} panelActive=${this.panel?.active ?? false}`,
+      );
       if (e.focused && this.panel?.active) {
+        this.log(`[Tab ${this.tabNumber}] Re-focusing panel and scheduling focusInput (window focus)`);
         this.panel.reveal(undefined, false);
-        setTimeout(() => this.postMessage({ type: 'focusInput' }), 100);
+        setTimeout(() => {
+          this.log(`[Tab ${this.tabNumber}] Posting focusInput (window focus timer)`);
+          this.postMessage({ type: 'focusInput' });
+        }, 100);
       }
     });
 

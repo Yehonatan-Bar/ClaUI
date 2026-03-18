@@ -241,6 +241,27 @@ export interface FileSearchRequest {
   requestId: number;
 }
 
+// --- Chat Search ---
+
+export interface ChatSearchProjectRequest {
+  type: 'chatSearchProject';
+  query: string;
+  requestId: number;
+}
+
+export interface ChatSearchResumeSessionRequest {
+  type: 'chatSearchResumeSession';
+  sessionId: string;
+}
+
+export interface ChatSearchProjectResult {
+  sessionId: string;
+  sessionLabel: string;
+  mtime: number;
+  matchSnippet: string;
+  matchRole: 'user' | 'assistant';
+}
+
 export interface SetAchievementsEnabledRequest {
   type: 'setAchievementsEnabled';
   enabled: boolean;
@@ -650,7 +671,9 @@ export type WebviewToExtensionMessage =
   | SetUltrathinkLockedRequest
   | StartBtwSessionRequest
   | SendBtwMessageRequest
-  | CloseBtwSessionRequest;
+  | CloseBtwSessionRequest
+  | ChatSearchProjectRequest
+  | ChatSearchResumeSessionRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -881,6 +904,13 @@ export interface FileSearchResultMessage {
   type: 'fileSearchResults';
   results: Array<{ relativePath: string; fileName: string }>;
   requestId: number;
+}
+
+export interface ChatSearchProjectResultMessage {
+  type: 'chatSearchProjectResults';
+  requestId: number;
+  results: ChatSearchProjectResult[];
+  totalMatches: number;
 }
 
 export interface TranslationResultMessage {
@@ -1706,4 +1736,5 @@ export type ExtensionToWebviewMessage =
   | BtwAssistantMessageMessage
   | BtwMessageStopMessage
   | BtwResultMessage
-  | BtwSessionEndedMessage;
+  | BtwSessionEndedMessage
+  | ChatSearchProjectResultMessage;

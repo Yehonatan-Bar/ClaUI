@@ -415,6 +415,16 @@ export interface AppState {
   tokenRatioCumulativeWeightedTokens: number | null;
   setTokenRatioData: (samples: TokenUsageRatioSample[], summaries: TokenRatioBucketSummary[], globalTurnCount: number, cumulativeTokens: { input: number; output: number; cacheCreation: number; cacheRead: number }, cumulativeWeightedTokens: number) => void;
 
+  // Chat Search
+  chatSearchOpen: boolean;
+  chatSearchQuery: string;
+  chatSearchScope: 'session' | 'project';
+  chatSearchMatchIds: string[];
+  chatSearchCurrentIndex: number;
+  chatSearchProjectResults: import('../../extension/types/webview-messages').ChatSearchProjectResult[];
+  chatSearchProjectLoading: boolean;
+  chatSearchProjectRequestId: number;
+
   // Image Lightbox
   lightboxImageSrc: string | null;
   setLightboxImageSrc: (src: string | null) => void;
@@ -566,6 +576,16 @@ export interface AppState {
   setSkillGenProgress: (update: { runStatus: SkillGenRunStatus; progress: number; progressLabel: string }) => void;
   setSkillGenPanelOpen: (open: boolean) => void;
   setSkillGenShowInfo: (show: boolean) => void;
+
+  // Chat Search actions
+  setChatSearchOpen: (open: boolean) => void;
+  setChatSearchQuery: (query: string) => void;
+  setChatSearchScope: (scope: 'session' | 'project') => void;
+  setChatSearchCurrentIndex: (index: number) => void;
+  setChatSearchProjectResults: (results: import('../../extension/types/webview-messages').ChatSearchProjectResult[], requestId: number) => void;
+  setChatSearchProjectLoading: (loading: boolean) => void;
+  clearChatSearch: () => void;
+
   reset: () => void;
 }
 
@@ -923,6 +943,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   tokenRatioCumulativeWeightedTokens: null,
   setTokenRatioData: (samples, summaries, globalTurnCount, cumulativeTokens, cumulativeWeightedTokens) =>
     set({ tokenRatioSamples: samples, tokenRatioSummaries: summaries, tokenRatioGlobalTurnCount: globalTurnCount, tokenRatioCumulativeTokens: cumulativeTokens, tokenRatioCumulativeWeightedTokens: cumulativeWeightedTokens }),
+
+  // Chat Search
+  chatSearchOpen: false,
+  chatSearchQuery: '',
+  chatSearchScope: 'session' as 'session' | 'project',
+  chatSearchMatchIds: [],
+  chatSearchCurrentIndex: -1,
+  chatSearchProjectResults: [],
+  chatSearchProjectLoading: false,
+  chatSearchProjectRequestId: 0,
 
   // Image Lightbox
   lightboxImageSrc: null,
@@ -1846,6 +1876,116 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSkillGenShowInfo: (show) =>
     set({ skillGenShowInfo: show }),
 
+  // Chat Search actions
+  setChatSearchOpen: (open) =>
+    set((state) => {
+      if (!open) {
+        // Closing search: clear all search state
+        return {
+          chatSearchOpen: false,
+          chatSearchQuery: '',
+          chatSearchMatchIds: [],
+          chatSearchCurrentIndex: -1,
+          chatSearchProjectResults: [],
+          chatSearchProjectLoading: false,
+        };
+      }
+      return { chatSearchOpen: true };
+    }),
+
+  setChatSearchQuery: (query) =>
+    set((state) => {
+      if (state.chatSearchScope === 'session') {
+        // Client-side search: filter messages immediately
+        const queryLower = query.toLowerCase();
+        const matchIds: string[] = [];
+        if (queryLower.length > 0) {
+          for (const msg of state.messages) {
+            const blocks = Array.isArray(msg.content) ? msg.content : [];
+            const hasMatch = blocks.some((b) => {
+              if (b.type === 'text' && b.text) {
+                return b.text.toLowerCase().includes(queryLower);
+              }
+              return false;
+            });
+            if (hasMatch) matchIds.push(msg.id);
+          }
+        }
+        return {
+          chatSearchQuery: query,
+          chatSearchMatchIds: matchIds,
+          chatSearchCurrentIndex: matchIds.length > 0 ? 0 : -1,
+          chatSearchProjectResults: [],
+        };
+      }
+      // Project scope: just update query (caller handles debounce + extension call)
+      return {
+        chatSearchQuery: query,
+        chatSearchMatchIds: [],
+        chatSearchCurrentIndex: -1,
+      };
+    }),
+
+  setChatSearchScope: (scope) =>
+    set((state) => {
+      if (scope === 'session') {
+        // Switching to session: run client-side search with current query
+        const queryLower = state.chatSearchQuery.toLowerCase();
+        const matchIds: string[] = [];
+        if (queryLower.length > 0) {
+          for (const msg of state.messages) {
+            const blocks = Array.isArray(msg.content) ? msg.content : [];
+            const hasMatch = blocks.some((b) => {
+              if (b.type === 'text' && b.text) {
+                return b.text.toLowerCase().includes(queryLower);
+              }
+              return false;
+            });
+            if (hasMatch) matchIds.push(msg.id);
+          }
+        }
+        return {
+          chatSearchScope: scope,
+          chatSearchMatchIds: matchIds,
+          chatSearchCurrentIndex: matchIds.length > 0 ? 0 : -1,
+          chatSearchProjectResults: [],
+          chatSearchProjectLoading: false,
+        };
+      }
+      // Switching to project: clear session matches
+      return {
+        chatSearchScope: scope,
+        chatSearchMatchIds: [],
+        chatSearchCurrentIndex: -1,
+      };
+    }),
+
+  setChatSearchCurrentIndex: (index) => set({ chatSearchCurrentIndex: index }),
+
+  setChatSearchProjectResults: (results, requestId) =>
+    set((state) => {
+      // Only apply results if requestId matches (discard stale responses)
+      if (requestId !== state.chatSearchProjectRequestId) return {};
+      return {
+        chatSearchProjectResults: results,
+        chatSearchProjectLoading: false,
+      };
+    }),
+
+  setChatSearchProjectLoading: (loading) => set({ chatSearchProjectLoading: loading }),
+
+  clearChatSearch: () =>
+    set({
+      chatSearchOpen: false,
+      chatSearchQuery: '',
+      chatSearchScope: 'session' as 'session' | 'project',
+      chatSearchMatchIds: [],
+      chatSearchCurrentIndex: -1,
+      chatSearchProjectResults: [],
+      chatSearchProjectLoading: false,
+      chatSearchProjectRequestId: 0,
+    }),
+
   reset: () =>
     set((state) => ({
       sessionId: null,
@@ -1961,5 +2101,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       claudeAuthLoggedIn: false,
       claudeAuthEmail: '',
       claudeAuthSubscriptionType: '',
+      // Chat Search: reset on session clear
+      chatSearchOpen: false,
+      chatSearchQuery: '',
+      chatSearchScope: 'session' as 'session' | 'project',
+      chatSearchMatchIds: [],
+      chatSearchCurrentIndex: -1,
+      chatSearchProjectResults: [],
+      chatSearchProjectLoading: false,
+      chatSearchProjectRequestId: 0,
     })),
 }));

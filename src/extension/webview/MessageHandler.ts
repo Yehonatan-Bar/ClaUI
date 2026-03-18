@@ -300,6 +300,9 @@ export class MessageHandler {
   private logDir = '';
   private extensionVersion = '0.0.0';
 
+  /** Chat search service for cross-session content search */
+  private chatSearchService: import('../session/ChatSearchService').ChatSearchService | null = null;
+
   constructor(
     private readonly tabId: string,
     private readonly webview: WebviewBridge,
@@ -1848,6 +1851,14 @@ export class MessageHandler {
           this.webview.closeBtwSession?.();
           break;
 
+        case 'chatSearchProject':
+          this.handleChatSearchProject(msg.query, msg.requestId);
+          break;
+
+        case 'chatSearchResumeSession':
+          this.handleChatSearchResumeSession(msg.sessionId);
+          break;
+
         case 'editAndResend':
           this.log(`Edit-and-resend: resuming session with edited prompt`);
           this.clearUsageLimitState('editAndResend', { notifyWebview: true, clearQueuedPrompt: true });
@@ -2437,6 +2448,42 @@ export class MessageHandler {
         requestId,
       });
     }
+  }
+
+  private async handleChatSearchProject(query: string, requestId: number): Promise<void> {
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspacePath) {
+      this.webview.postMessage({
+        type: 'chatSearchProjectResults',
+        requestId,
+        results: [],
+        totalMatches: 0,
+      });
+      return;
+    }
+
+    // Lazy-init the search service
+    if (!this.chatSearchService) {
+      const { ChatSearchService } = require('../session/ChatSearchService');
+      this.chatSearchService = new ChatSearchService(this.log);
+    }
+
+    const result = await this.chatSearchService!.searchProject(query, requestId, workspacePath);
+    if (result) {
+      this.webview.postMessage({
+        type: 'chatSearchProjectResults',
+        requestId,
+        results: result.results,
+        totalMatches: result.totalMatches,
+      });
+    }
+    // null result means cancelled - don't send anything
+  }
+
+  private handleChatSearchResumeSession(sessionId: string): void {
+    this.log(`[ChatSearch] Resuming session: ${sessionId}`);
+    // Use the VS Code command to resume in a new tab
+    vscode.commands.executeCommand('claudeMirror.resumeSession', sessionId);
   }
 
   private parseOpenFileTarget(rawPath: string): { filePath: string; line?: number; col?: number } | null {
