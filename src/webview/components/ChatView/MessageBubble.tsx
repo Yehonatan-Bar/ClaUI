@@ -12,6 +12,7 @@ import { MarkdownContent } from './MarkdownContent';
 import { renderTextWithFileLinks } from './filePathLinks';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { deriveTurnFromAssistantMessage } from '../../utils/turnVitals';
+import { detectRtl } from '../../hooks/useRtlDetection';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -329,7 +330,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
             ))}
         </div>
       ) : shouldShowSummaryMode ? (
-        <div dir="auto">
+        <div dir={detectRtl(textContent) ? 'rtl' : 'auto'}>
           {contentBlocks.filter(b => b.type === 'text').map((block, i) => (
             <ContentBlockRenderer key={`text-${i}`} block={block} />
           ))}
@@ -365,8 +366,13 @@ const ContentBlockList: React.FC<{ contentBlocks: ContentBlock[] }> = ({ content
     return { pairMap: map, pairedResultIds: ids };
   }, [contentBlocks]);
 
+  const blockText = useMemo(
+    () => contentBlocks.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join(' '),
+    [contentBlocks]
+  );
+
   return (
-    <div dir="auto">
+    <div dir={detectRtl(blockText) ? 'rtl' : 'auto'}>
       {contentBlocks.map((block, index) => (
         <ContentBlockRenderer
           key={index}

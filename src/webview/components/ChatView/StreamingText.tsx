@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '../../state/store';
+import { detectRtl } from '../../hooks/useRtlDetection';
 
 interface StreamingTextProps {
   text: string;
@@ -56,7 +57,7 @@ export const StreamingText: React.FC<StreamingTextProps> = ({ text }) => {
   return (
     <div
       className={`text-content streaming-text streaming-text-${typingTheme}`}
-      dir="auto"
+      dir={detectRtl(text) ? 'rtl' : 'auto'}
       style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
     >
       {renderedContent}

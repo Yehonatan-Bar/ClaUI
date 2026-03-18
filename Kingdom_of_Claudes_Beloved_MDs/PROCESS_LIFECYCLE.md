@@ -78,16 +78,21 @@ VS Code extension host
 
 `child.kill('SIGTERM')` only kills `cmd.exe`, leaving `node.exe` as an orphan. `taskkill /F /T /PID` kills the entire tree including descendants.
 
-## Webview Focus Diagnostics (2026-03)
+## Webview Focus Diagnostics and Guardrails (2026-03)
 
-To diagnose intermittent reports of tab/button clicks requiring a second click, both session tab runtimes now emit explicit focus/view-state logs:
+To diagnose and stabilize intermittent "double-click required" behavior, focus handling now has explicit guardrails on both extension and webview sides:
 
-- `SessionTab`:
-  - `ViewState changed: active=... visible=...`
-  - `Posting focusInput (view-state active)`
-  - `Window focus changed: focused=... panelActive=...`
-  - `Re-focusing panel and scheduling focusInput (window focus)`
-  - `Posting focusInput (window focus timer)`
-- `CodexSessionTab`: same diagnostics with `Codex Tab` prefix.
+- Extension (`SessionTab` / `CodexSessionTab`)
+  - Logs `ViewState changed: active=... visible=...`
+  - On active view-state: `Posting focusInput (view-state active)`
+  - On window focus: `Scheduling focusInput (window focus delay=180ms)`
+  - Throttle log: `Suppressing focusInput (...) due to throttle (...)`
+  - Important change: **no `panel.reveal()` is executed from window-focus events**
+- Webview (`InputArea`)
+  - Receives `focusInput` and emits `[UiDebug][InputArea]` events:
+    - `focusInputApplied`
+    - `focusInputSuppressed` with reasons:
+      - `recentPointer` (pointer/click happened in the last 280ms)
+      - `interactiveActiveElement` (focus currently on button/tab/link/input/etc.)
 
-These logs make it possible to correlate user click timing with VS Code focus transitions and the extension's automatic input-refocus behavior.
+This combination preserves auto-focus usability for typing while reducing cases where programmatic focus steals the user's first click.

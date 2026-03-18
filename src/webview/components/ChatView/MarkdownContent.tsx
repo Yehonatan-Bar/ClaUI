@@ -3,6 +3,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { FILE_PATH_REGEX, URL_REGEX } from './filePathLinks';
+import { detectRtl } from '../../hooks/useRtlDetection';
 
 // Configure marked options
 marked.setOptions({
@@ -188,9 +189,10 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ text }) => {
     // Linkify bare file paths and URLs in text nodes
     linkifyTextNodes(container);
 
-    // Per-paragraph bidi: let the browser detect direction for each block element
+    // Per-paragraph bidi: detect RTL if any Hebrew/Arabic characters are present
     container.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6, td, th').forEach((el) => {
-      el.setAttribute('dir', 'auto');
+      const text = el.textContent || '';
+      el.setAttribute('dir', detectRtl(text) ? 'rtl' : 'auto');
     });
 
     // Event delegation for clickable elements

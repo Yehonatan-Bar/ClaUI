@@ -1,5 +1,16 @@
 # ClaUi - Changelog
 
+## Unreleased - 2026-03-18
+
+**Fix: RTL alignment for mixed Hebrew/English chat messages**
+
+- Chat messages containing Hebrew/Arabic text now right-align even when the first character is English
+- Previously, `dir="auto"` relied on the browser's first-strong-character heuristic, causing messages like "Hello world shalom" to stay left-aligned despite containing Hebrew
+- Updated `MarkdownContent.tsx`, `StreamingText.tsx`, and `MessageBubble.tsx` to use `detectRtl()` which checks for any Hebrew/Arabic character in the text
+- This matches the existing input area behavior where any Hebrew triggers RTL
+
+---
+
 ## Unreleased - 2026-03-12
 
 **Feature: Codex GPT-5.4 model support**

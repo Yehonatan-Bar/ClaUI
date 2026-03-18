@@ -1,0 +1,379 @@
+להלן מדריך מעשי למפתח על MCP בתוך Claude Code, מבוסס על התיעוד הרשמי של Anthropic ושל MCP. ([Claude API Docs][1])
+
+# מדריך למפתח: MCP בClaude Code
+
+## מה זה MCP בכלל
+
+MCP, או Model Context Protocol, הוא תקן פתוח שמחבר אפליקציות AI למקורות נתונים, כלים וזרימות עבודה חיצוניות. בתוך Claude Code זה אומר שאפשר לחבר את קלוד למסדי נתונים, APIs, שירותי ענן, מערכות ניטור, issue trackers, מסמכים, וכל כלי פנימי שאתם בונים בעצמכם. Anthropic מתארים את זה כמו “USB-C לAI”: פרוטוקול אחיד שמאפשר ללקוח אחד להתחבר להרבה שרתים שונים בלי לבנות אינטגרציה נפרדת לכל מערכת. ([Claude API Docs][2])
+
+בClaude Code, שרתי MCP נותנים לקלוד גישה ליכולות חיצוניות כמו קריאת דאטה, הפעלת פעולות, גישה למשאבים, והרצת prompts מובנים. בפועל, זה מה שהופך את Claude Code מ”עוזר קוד” ל”סוכן פיתוח” שמסוגל לעבוד מול האקוסיסטם האמיתי של הארגון. ([Claude API Docs][1])
+
+## המודל המנטלי הנכון
+
+כדי להבין MCP טוב, כדאי להפריד בין כמה שכבות:
+
+* **Claude Code הוא הלקוח**
+  הוא זה שמתחבר לשרתי MCP, מגלה אילו יכולות הם מציעים, ואז מחליט מתי להשתמש בהן. ([Claude API Docs][1])
+
+* **MCP server הוא המתאם**
+  הוא עוטף מערכת מסוימת, כמו GitHub, Sentry, Postgres, Slack, או כלי פנימי שלכם, ומציג אותה לקלוד בפורמט סטנדרטי. ([Claude API Docs][1])
+
+* **Tools**
+  פעולות שהמודל יכול להפעיל אוטומטית, למשל “חפש PR”, “בצע שאילתה”, “צור draft”, “הרץ workflow”. הspec מתאר tools כיכולות model-controlled, כלומר המודל יכול לגלות ולהפעיל אותן לפי ההקשר. ([modelcontextprotocol.io][3])
+
+* **Resources**
+  מקורות מידע שהמשתמש או קלוד יכולים להפנות אליהם, כמו issue, schema, קובץ לוגי, אובייקט עסקי, או כל URI ייעודי ששרת MCP חושף. בClaude Code אפשר להפנות אליהם עם `@`. ([Claude API Docs][1])
+
+* **Prompts**
+  תבניות מוכנות ששרת MCP מספק, ובClaude Code הן נחשפות כפקודות slash. ([Claude API Docs][1])
+
+* **Elicitation**
+  מנגנון שבו השרת מבקש מהמשתמש מידע נוסף באמצע משימה, דרך dialog אינטראקטיבי. ([Claude API Docs][1])
+
+זו נקודה חשובה: MCP הוא לא רק “tool calling”. הוא שכבת אינטגרציה רחבה יותר שמכילה גם כלים, גם משאבים, גם prompts, וגם דיאלוגים אינטראקטיביים. ([modelcontextprotocol.io][4])
+
+## מה MCP מאפשר בתוך Claude Code
+
+לפי התיעוד של Anthropic, אחרי שמחברים שרתי MCP, אפשר לבקש מClaude Code לבצע משימות כמו:
+
+* לממש feature מתוך Jira ולפתוח PR בGitHub
+* לבדוק נתוני Sentry או Statsig
+* לשלוף משתמשים ממסד נתונים
+* לעדכן תבניות או קוד לפי עיצובים ומידע מכלים אחרים
+* לאוטומט תהליכי עבודה שחוצים מערכות שונות ([Claude API Docs][1])
+
+במילים פשוטות: MCP הוא הדרך לחבר את Claude Code לעולם החיצוני של הפרויקט שלכם.
+
+## סוגי חיבור נתמכים בClaude Code
+
+Claude Code תומך בכמה transports עבור שרתי MCP:
+
+* **HTTP**
+  זה הנתיב המומלץ לשרתים מרוחקים, והוא מתואר בתיעוד כtransport המומלץ והנפוץ ביותר לשירותי ענן. ([Claude API Docs][1])
+
+* **SSE**
+  עדיין נתמך, אבל Anthropic מציינים במפורש שהוא deprecated, וממליצים לעבור לHTTP כשאפשר. ([Claude API Docs][1])
+
+* **stdio**
+  שרת מקומי שרץ כprocess במכונה שלך. זה מתאים לכלים פנימיים, סקריפטים, אוטומציות, או כל שרת שצריך גישה ישירה למכונה המקומית. ([Claude API Docs][1])
+
+## איך מוסיפים שרת MCP
+
+### שרת HTTP מרוחק
+
+```bash
+claude mcp add --transport http notion https://mcp.notion.com/mcp
+```
+
+אפשר גם להעביר headers, למשל Bearer token:
+
+```bash
+claude mcp add --transport http secure-api https://api.example.com/mcp \
+  --header "Authorization: Bearer your-token"
+```
+
+Anthropic ממליצים על HTTP כברירת מחדל לשרתים מרוחקים. ([Claude API Docs][1])
+
+### שרת SSE
+
+```bash
+claude mcp add --transport sse asana https://mcp.asana.com/sse
+```
+
+הוא עדיין נתמך, אבל עדיף לא לבנות עליו משהו חדש אם יש חלופת HTTP. ([Claude API Docs][1])
+
+### שרת stdio מקומי
+
+```bash
+claude mcp add --transport stdio --env AIRTABLE_API_KEY=YOUR_KEY airtable \
+  -- npx -y airtable-mcp-server
+```
+
+הנקודה הכי חשובה כאן היא סדר הפרמטרים: כל הoptions באים לפני שם השרת, ו`--` מפריד בין הקונפיגורציה של Claude Code לבין הפקודה שתפעיל את השרת. ([Claude API Docs][1])
+
+בWindows יש הערה חשובה מאוד: אם שרת stdio משתמש ב`npx` על Windows רגיל, צריך לעטוף אותו ב`cmd /c`, אחרת עלולות להופיע שגיאות כמו “Connection closed”. ([Claude API Docs][1])
+
+דוגמה לWindows:
+
+```bash
+claude mcp add --transport stdio my-server -- cmd /c npx -y @some/package
+```
+
+## Scopes: איפה הקונפיגורציה נשמרת ולמי היא שייכת
+
+Claude Code תומך בכמה scopes להגדרת שרתי MCP:
+
+* **Local scope**
+  טוב לניסויים, שרתים אישיים, או credentials רגישים שקשורים רק לפרויקט אחד. ([Claude API Docs][1])
+
+* **Project scope**
+  טוב לכלים שהצוות כולו צריך. ההגדרות נשמרות בקובץ `.mcp.json` בשורש הפרויקט, ומיועדות להיכנס לversion control. ([Claude API Docs][1])
+
+* **User scope**
+  טוב לכלים אישיים שמשמשים אותך בכמה פרויקטים. נשמר ב`~/.claude.json`. ([Claude API Docs][1])
+
+* **Managed scope**
+  מיועד לארגונים וIT, דרך `managed-mcp.json` ברמת מערכת. ([Claude API Docs][1])
+
+דוגמה לproject scope:
+
+```bash
+claude mcp add --transport http paypal --scope project https://mcp.paypal.com/mcp
+```
+
+## מבנה הקובץ `.mcp.json`
+
+כשמוסיפים שרת בproject scope, Claude Code יוצר או מעדכן `.mcp.json` בשורש הפרויקט. הפורמט הבסיסי נראה כך:
+
+```json
+{
+  "mcpServers": {
+    "shared-server": {
+      "command": "/path/to/server",
+      "args": [],
+      "env": {}
+    }
+  }
+}
+```
+
+Claude Code גם דורש אישור לפני שימוש בשרתי project-scope שמגיעים מ`.mcp.json`, וניתן לאפס את בחירות האישור עם `claude mcp reset-project-choices`. ([Claude API Docs][1])
+
+### Environment variable expansion
+
+אפשר להשתמש בvariables כמו `${VAR}` או `${VAR:-default}` בתוך `.mcp.json`, וזה עובד ב:
+
+* `command`
+* `args`
+* `env`
+* `url`
+* `headers` ([Claude API Docs][1])
+
+זה חשוב מאוד לצוותים, כי אפשר לשתף קובץ קונפיגורציה אחד בלי hardcode של נתיבים מקומיים או סודות.
+
+## אימות לשרתים מרוחקים
+
+הרבה שרתי MCP בענן דורשים OAuth 2.0. הדרך הסטנדרטית בClaude Code היא:
+
+* להוסיף את השרת
+* להיכנס בתוך Claude Code לפקודה `/mcp`
+* להשלים login בדפדפן ([Claude API Docs][1])
+
+דוגמה:
+
+```bash
+claude mcp add --transport http sentry https://mcp.sentry.dev/mcp
+```
+
+ואז בתוך הסשן:
+
+```text
+/mcp
+```
+
+התיעוד גם מזכיר אפשרויות מתקדמות כמו שימוש בOAuth callback port קבוע, credentials מוגדרים מראש, וoverride לmetadata discovery אם שרת הOAuth לא עומד בדיוק בendpoint הסטנדרטי. ([Claude API Docs][1])
+
+## עבודה מתוך VS Code
+
+אם אתה עובד עם Claude Code מתוך VS Code, גם שם מוסיפים MCP דרך הterminal:
+
+```bash
+claude mcp add --transport http github https://api.githubcopilot.com/mcp/
+```
+
+אחרי זה אפשר להשתמש ב`/mcp` מתוך חלון הצ'אט של Claude Code בתוך VS Code כדי להפעיל, לכבות, להתחבר מחדש, ולנהל OAuth. ([Claude API Docs][5])
+
+## Resources: אחת היכולות הכי חזקות
+
+אם שרת MCP חושף resources, אפשר להזכיר אותם בתוך הפרומפט עם `@`, ממש כמו קבצים. לדוגמה:
+
+```text
+Can you analyze @github:issue://123 and suggest a fix?
+```
+
+Claude Code מציג resources יחד עם קבצים בautocomplete, שולף אותם אוטומטית כשהם מוזכרים, ומוסיף כלים לlist/read כשהשרת תומך בזה. ([Claude API Docs][1])
+
+מבחינת ארכיטקטורה, זה מאוד חזק כי זה מפריד בין “הפעלת פעולה” לבין “הבאת הקשר”. כלי אמור לבצע משהו. Resource אמור לתת תוכן או הקשר.
+
+## MCP prompts כפקודות slash
+
+שרת MCP יכול לחשוף prompts שהופכים לפקודות slash בתוך Claude Code. הפורמט הוא:
+
+```text
+/mcp__servername__promptname
+```
+
+דוגמאות:
+
+```text
+/mcp__github__list_prs
+/mcp__github__pr_review 456
+```
+
+כלומר אם אתה בונה MCP server, אתה יכול לא רק לחשוף tools אלא גם “ממשק פקודות” מוכן למשתמש. ([Claude API Docs][1])
+
+## Elicitation: כשהשרת צריך מידע נוסף
+
+שרת MCP יכול לעצור באמצע פעולה ולבקש קלט מובנה מהמשתמש. Claude Code יציג dialog אינטראקטיבי ויעביר את התשובה בחזרה לשרת. אין צורך להגדיר משהו מיוחד בצד המשתמש; זה מופיע אוטומטית אם השרת מבקש זאת. ([Claude API Docs][1])
+
+מבחינת מפתח שרת, זה מאפשר workflows הרבה יותר טובים. במקום להיכשל כי חסר פרמטר, השרת יכול לבקש אותו בזמן אמת.
+
+## Tool Search: מה קורה כשיש הרבה שרתי MCP
+
+אם מוגדרים הרבה כלים, עצם תיאורי הtools יכולים לתפוס חלק גדול מחלון הקונטקסט. Claude Code מתמודד עם זה דרך MCP Tool Search: הוא עובר לטעינה דינמית של כלים רק כשצריך, במקום preload מלא. Anthropic מציינים שזה נכנס אוטומטית לפעולה כשהתיאורים של הכלים עוברים 10% מחלון הקונטקסט. ([Claude API Docs][1])
+
+אפשר גם לכבות את זה:
+
+```bash
+ENABLE_TOOL_SEARCH=false claude
+```
+
+או לחסום ספציפית את `MCPSearch` דרך permissions. ([Claude API Docs][1])
+
+למפתח זה אומר משהו חשוב: אל תבנה שרתים עם descriptions מנופחים סתם. תיאורים מדויקים וקצרים משפרים גם גילוי כלים וגם חסכון בקונטקסט.
+
+## מגבלות פלט וtoken budgeting
+
+Claude Code מזהיר כשהפלט של כלי MCP עובר 10,000 tokens. ברירת המחדל למקסימום היא 25,000 tokens, וניתן לשנות דרך `MAX_MCP_OUTPUT_TOKENS`. ([Claude API Docs][1])
+
+לדוגמה:
+
+```bash
+export MAX_MCP_OUTPUT_TOKENS=50000
+claude
+```
+
+מסקנה מעשית למפתח שרת: אל תחזיר dump עצום אם אפשר להחזיר תקציר, pagination, או אפשרות filtering. שרת MCP טוב מחזיר מידע שמיש, לא סתם הרבה מידע.
+
+## Claude Code גם יכול להיות MCP server
+
+זו יכולת מעניינת מאוד: אפשר להפעיל את Claude Code עצמו כשרת MCP:
+
+```bash
+claude mcp serve
+```
+
+ואז לקוח אחר, למשל Claude Desktop, יכול להתחבר אליו. התיעוד מציג גם דוגמת קונפיגורציה ל`claude_desktop_config.json`. ([Claude API Docs][1])
+
+זה שימושי אם אתה רוצה לשלב את Claude Code בתוך stack גדול יותר של לקוחות MCP.
+
+## שרתים שמגיעים מClaude Desktop או Claude.ai
+
+Claude Code יודע גם:
+
+* לייבא שרתי MCP שהוגדרו בClaude Desktop עם `claude mcp add-from-claude-desktop` ([Claude API Docs][1])
+* להציג אוטומטית שרתי MCP שהוגדרו בClaude.ai, אם נכנסת עם חשבון Claude.ai. אפשר גם לכבות זאת עם `ENABLE_CLAUDEAI_MCP_SERVERS=false`. ([Claude API Docs][1])
+
+## Managed MCP לארגונים
+
+לארגונים יש `managed-mcp.json` ברמת מערכת, עם נתיבים שונים לפי מערכת הפעלה. בWindows המיקום הוא:
+
+```text
+C:\Program Files\ClaudeCode\managed-mcp.json
+```
+
+הקובץ משתמש באותו פורמט כמו `.mcp.json`, אבל מיועד לניהול מרכזי בידי IT/Admins. ([Claude API Docs][1])
+
+אם אתה בונה פתרון ארגוני, זה הערוץ הנכון להפצת שרתי MCP מאושרים לכל המפתחים.
+
+## אבטחה: איפה רוב האנשים טועים
+
+כאן צריך להיות חד: MCP הוא כוח, ולכן גם שטח תקיפה.
+
+Anthropic מזהירים במפורש ששימוש בשרתי MCP צד שלישי הוא על אחריותך, ושיש להיזהר במיוחד משרתים שיכולים להביא תוכן לא מהימן, כי זה חושף לסיכוני prompt injection. ([Claude API Docs][1])
+
+מבחינה מעשית, הנה העקרונות החשובים:
+
+* חשוף רק tools שבאמת צריך
+* תן לtools שמות ברורים ולא דו-משמעיים
+* שמור schemas מדויקים וקפדניים
+* אל תחזיר payloads עצומים בלי סינון
+* הפרד בין tools שמבצעים פעולות לבין resources שמספקים הקשר
+* תעדיף HTTP מאובטח או stdio מקומי על פני פתרונות מאולתרים
+* אל תשמור סודות בתוך `.mcp.json` אם אפשר להשתמש בenv vars
+* אם זה ארגוני, השתמש בmanaged policy ולא בכל מפתח לעצמו
+
+## איך הייתי מתכנן MCP server טוב
+
+אם הייתי בונה שרת MCP פנימי לצוות פיתוח, הייתי עובד כך:
+
+### שכבה ראשונה: לבחור use case חד
+
+למשל:
+
+* חיפוש tickets
+* קריאת runbooks
+* בדיקת logs
+* הרצת query בטוחה
+* יצירת drafts או actions במערכת אחת מוגדרת
+
+אל תבנה “שרת כל-יכול” בהתחלה. MCP עובד הכי טוב כשהשרתים ממוקדים. הarchitecture הרשמית גם מציגה שרתים כיחידות עם אחריות ממוקדת. ([modelcontextprotocol.io][4])
+
+### שכבה שנייה: להחליט מה הוא resource ומה הוא tool
+
+דוגמה:
+
+* `ticket://ENG-1234` כresource
+* `get_ticket_comments` כtool
+* `create_bugfix_branch` כtool
+* `/mcp__jira__triage_issue` כprompt
+
+זו חלוקה טובה יותר מאשר להפוך כל דבר לtool אחד ענק.
+
+### שכבה שלישית: schemas חזקים
+
+כל tool צריך:
+
+* שם ברור
+* תיאור קצר
+* קלט מובנה ומדויק
+* פלט ממוקד
+
+כל דבר עמום פוגע ביכולת של המודל לבחור נכון.
+
+### שכבה רביעית: פלטים קטנים וחכמים
+
+במקום להחזיר 500 שורות לוג, החזר:
+
+* summary
+* top errors
+* optional cursor
+* filters להמשך חקירה
+
+זה קריטי גם בגלל מגבלות token וגם בגלל usability. ([Claude API Docs][1])
+
+### שכבה חמישית: elicitation במקום failure
+
+אם חסר project id, environment, date range, או סוג פעולה, עדיף לבקש השלמה דרך elicitation מאשר להיכשל או לנחש. ([Claude API Docs][1])
+
+## דוגמת תהליך עבודה מומלץ למפתח
+
+נניח שאתה רוצה לחבר Claude Code למערכת פנימית של bugs:
+
+* מתחיל בstdio server מקומי לצורך פיתוח
+* חושף resource של bug לפי URI
+* חושף 2–4 tools בלבד
+* בודק שהDescriptions קצרים
+* בודק שהפלטים לא מנופחים
+* מוסיף prompt שימושי אחד כפקודת slash
+* רק אחרי זה מעביר לHTTP מרוחק אם יש צורך
+
+זו דרך יותר נכונה מאשר להתחיל ישר משרת ענק עם 30 כלים.
+
+## מה חשוב במיוחד אם אתה מפתח על Windows
+
+כיוון שאתה על Windows, יש שתי נקודות רלוונטיות במיוחד:
+
+* לשרתי stdio עם `npx`, עטוף ב`cmd /c` ([Claude API Docs][1])
+* אם הארגון שלך ירצה להפיץ managed MCP centrally, הנתיב בWindows הוא `C:\Program Files\ClaudeCode\managed-mcp.json` ([Claude API Docs][1])
+
+## מסקנה מקצועית
+
+אם לנסח את זה בצורה חדה:
+MCP בתוך Claude Code הוא לא “עוד פיצ'ר של כלים”, אלא שכבת האינטגרציה המרכזית שמאפשרת להפוך את Claude Code לסוכן שעובד מול מערכות אמיתיות. הערך הגדול שלו הוא בסטנדרטיזציה: פעם אחת בונים server טוב, ואז Claude Code יודע לצרוך אותו דרך כלים, משאבים, prompts וזרימות אינטראקטיביות בצורה אחידה. ([Claude API Docs][1])
+
+[1]: https://docs.anthropic.com/en/docs/claude-code/mcp "Connect Claude Code to tools via MCP - Claude Code Docs"
+[2]: https://docs.anthropic.com/en/docs/mcp "What is the Model Context Protocol (MCP)? - Model Context Protocol"
+[3]: https://modelcontextprotocol.io/specification/draft/server/tools?utm_source=chatgpt.com "Tools"
+[4]: https://modelcontextprotocol.io/specification/2025-06-18/architecture?utm_source=chatgpt.com "Architecture"
+[5]: https://docs.anthropic.com/en/docs/claude-code/ide-integrations "Use Claude Code in VS Code - Claude Code Docs"

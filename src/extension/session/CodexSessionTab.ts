@@ -100,6 +100,12 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private assistantReplyWaiters: Array<(ok: boolean) => void> = [];
   /** Subscription for VS Code window state changes (focus/blur) */
   private windowStateSubscription: vscode.Disposable | null = null;
+  /** Debounced timer for delayed focusInput after window-focus events */
+  private focusInputTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Timestamp of last posted focusInput message (dedupe/throttle) */
+  private lastFocusInputPostAt = 0;
+  private static readonly FOCUS_INPUT_THROTTLE_MS = 250;
+  private static readonly WINDOW_FOCUS_INPUT_DELAY_MS = 180;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -630,6 +636,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.endTurnDiagnostics('tab dispose()');
     this.stopThinkingAnimation();
     this.resolveAssistantReplyWaiters(false);
+    this.clearFocusInputTimer();
     this.windowStateSubscription?.dispose();
     this.windowStateSubscription = null;
     this.saveProjectAnalytics();
@@ -934,24 +941,18 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       );
       if (e.webviewPanel.active) {
         this.callbacks.onFocused(this.id);
-        this.log(`[Codex Tab ${this.tabNumber}] Posting focusInput (view-state active)`);
-        this.postMessage({ type: 'focusInput' });
+        this.postFocusInput('view-state active');
       }
     });
 
-    // When VS Code window regains OS focus, re-focus the input textarea.
-    // reveal() ensures the webview iframe gets focus before we ask it to focus the textarea.
+    // When VS Code window regains OS focus, schedule a delayed focusInput without
+    // panel.reveal(); reveal() here can steal the first click in UI controls.
     this.windowStateSubscription = vscode.window.onDidChangeWindowState((e) => {
       this.log(
         `[Codex Tab ${this.tabNumber}] Window focus changed: focused=${e.focused} panelActive=${this.panel?.active ?? false}`,
       );
       if (e.focused && this.panel?.active) {
-        this.log(`[Codex Tab ${this.tabNumber}] Re-focusing panel and scheduling focusInput (window focus)`);
-        this.panel.reveal(undefined, false);
-        setTimeout(() => {
-          this.log(`[Codex Tab ${this.tabNumber}] Posting focusInput (window focus timer)`);
-          this.postMessage({ type: 'focusInput' });
-        }, 100);
+        this.scheduleWindowFocusInput();
       }
     });
 
@@ -962,6 +963,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         this.endTurnDiagnostics('panel onDidDispose');
         this.stopThinkingAnimation();
         this.resolveAssistantReplyWaiters(false);
+        this.clearFocusInputTimer();
         this.windowStateSubscription?.dispose();
         this.windowStateSubscription = null;
         this.saveProjectAnalytics();
@@ -1658,6 +1660,41 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       this.deferredAutoSessionName = null;
       this.persistSessionMetadata(newName);
     }
+  }
+
+  private clearFocusInputTimer(): void {
+    if (this.focusInputTimer) {
+      clearTimeout(this.focusInputTimer);
+      this.focusInputTimer = null;
+    }
+  }
+
+  private postFocusInput(reason: string): void {
+    if (this.disposed || !this.panel?.active) {
+      return;
+    }
+    const now = Date.now();
+    const sinceLast = now - this.lastFocusInputPostAt;
+    if (sinceLast < CodexSessionTab.FOCUS_INPUT_THROTTLE_MS) {
+      this.log(
+        `[Codex Tab ${this.tabNumber}] Suppressing focusInput (${reason}) due to throttle (${sinceLast}ms < ${CodexSessionTab.FOCUS_INPUT_THROTTLE_MS}ms)`,
+      );
+      return;
+    }
+    this.lastFocusInputPostAt = now;
+    this.log(`[Codex Tab ${this.tabNumber}] Posting focusInput (${reason})`);
+    this.postMessage({ type: 'focusInput' });
+  }
+
+  private scheduleWindowFocusInput(): void {
+    this.clearFocusInputTimer();
+    this.log(
+      `[Codex Tab ${this.tabNumber}] Scheduling focusInput (window focus delay=${CodexSessionTab.WINDOW_FOCUS_INPUT_DELAY_MS}ms)`,
+    );
+    this.focusInputTimer = setTimeout(() => {
+      this.focusInputTimer = null;
+      this.postFocusInput('window focus timer');
+    }, CodexSessionTab.WINDOW_FOCUS_INPUT_DELAY_MS);
   }
 
   private flushPendingMessages(): void {

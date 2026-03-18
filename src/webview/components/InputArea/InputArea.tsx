@@ -9,6 +9,8 @@ import type { WebviewImageData } from '../../../extension/types/webview-messages
 import { getModelMaxContext } from '../../utils/modelContextLimits';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 
+const FOCUS_INPUT_POINTER_GUARD_MS = 280;
+
 /**
  * Manages an undo/redo stack for a textarea controlled by React state.
  * React controlled components break the browser's native undo because React
@@ -169,6 +171,8 @@ export const InputArea: React.FC = () => {
   const translateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const enhanceGroupRef = useRef<HTMLDivElement>(null);
   const sendGroupRef = useRef<HTMLDivElement>(null);
+  const lastPointerDownAtRef = useRef(0);
+  const lastClickAtRef = useRef(0);
 
   // Seed prompt history from existing user messages on mount (covers messages
   // sent before this feature was deployed or before a reload)
@@ -1225,6 +1229,24 @@ export const InputArea: React.FC = () => {
     textareaRef.current?.focus();
   }, []);
 
+  // Track recent pointer interactions so extension-driven focus can avoid stealing a click.
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (!event.isTrusted) return;
+      lastPointerDownAtRef.current = Date.now();
+    };
+    const onClick = (event: MouseEvent) => {
+      if (!event.isTrusted) return;
+      lastClickAtRef.current = Date.now();
+    };
+    window.addEventListener('pointerdown', onPointerDown, true);
+    window.addEventListener('click', onClick, true);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, true);
+      window.removeEventListener('click', onClick, true);
+    };
+  }, []);
+
   // Refocus textarea when the extension tells us the panel regained focus
   // (browser focus/visibilitychange events don't fire reliably in VS Code webview iframes)
   useEffect(() => {
@@ -1232,9 +1254,43 @@ export const InputArea: React.FC = () => {
       // Use requestAnimationFrame to ensure the webview iframe has settled focus
       requestAnimationFrame(() => {
         const el = textareaRef.current;
-        if (el && !el.disabled) {
-          el.focus();
+        if (!el || el.disabled) return;
+
+        const now = Date.now();
+        const lastPointerAt = Math.max(lastPointerDownAtRef.current, lastClickAtRef.current);
+        const pointerAgeMs = lastPointerAt > 0 ? now - lastPointerAt : Number.POSITIVE_INFINITY;
+
+        if (pointerAgeMs >= 0 && pointerAgeMs < FOCUS_INPUT_POINTER_GUARD_MS) {
+          logUiDebug('focusInputSuppressed', {
+            reason: 'recentPointer',
+            pointerAgeMs,
+            guardMs: FOCUS_INPUT_POINTER_GUARD_MS,
+          });
+          return;
         }
+
+        const activeEl = document.activeElement as HTMLElement | null;
+        if (activeEl && activeEl !== el) {
+          const isInteractive =
+            activeEl.isContentEditable ||
+            activeEl.matches(
+              'button, a[href], input, select, textarea, summary, [role="button"], [role="tab"], [role="menuitem"], [contenteditable="true"]',
+            );
+          if (isInteractive) {
+            logUiDebug('focusInputSuppressed', {
+              reason: 'interactiveActiveElement',
+              activeTag: activeEl.tagName.toLowerCase(),
+              activeRole: activeEl.getAttribute('role') || '',
+            });
+            return;
+          }
+        }
+
+        el.focus();
+        logUiDebug('focusInputApplied', {
+          reason: 'extensionSignal',
+          pointerAgeMs: Number.isFinite(pointerAgeMs) ? pointerAgeMs : null,
+        });
       });
     };
 
@@ -1242,7 +1298,7 @@ export const InputArea: React.FC = () => {
     return () => {
       window.removeEventListener('claui-focus-input', handleFocusInput);
     };
-  }, []);
+  }, [logUiDebug]);
 
   return (
     <div className="input-area">
