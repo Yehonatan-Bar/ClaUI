@@ -2,7 +2,7 @@
 
 Brain icon button in the input area that injects the `ultrathink` keyword to boost Claude's reasoning effort for the next turn. Plays a randomly-chosen CSS animation on each click for visual flair. The word "ultrathink" also appears with an animated rainbow glow effect wherever it appears in chat messages.
 
-Includes a **lock toggle** (small lock badge at bottom-right of the brain button). When locked, "ultrathink " is automatically prepended to every outgoing prompt without needing to click the brain button each time. The brain button shows a persistent cyan glow while locked.
+Includes a **lock toggle** (small lock button above the brain button inside the browse stack). When locked, "ultrathink " is automatically prepended to every outgoing prompt without needing to click the brain button each time. The brain button shows a persistent cyan glow while locked.
 
 The lock state is **persisted at project level** via VS Code's `workspaceState`. When the user locks ultrathink in any session tab, it remains locked across all sessions in that project until explicitly unlocked. New tabs and reloads restore the lock state automatically.
 
@@ -22,7 +22,7 @@ The lock state is **persisted at project level** via VS Code's `workspaceState`.
 
 ## How It Works
 
-1. User clicks the brain button (between browse/paperclip and textarea)
+1. User clicks the brain button (top item in the vertical browse stack, above browse/paperclip)
 2. `handleUltrathink` picks a random animation from `['rocket', 'brain', 'wizard', 'turbo']`
 3. Sets `ultrathinkAnim` state to the chosen animation name
 4. CSS animation plays for 1.2 seconds via conditional class `ultrathink-anim-{name}`
@@ -67,8 +67,10 @@ All animations are pure CSS using transforms, opacity, filter, box-shadow, and p
 ## CSS Class Structure
 
 ```
-.ultrathink-wrapper             - Inline-flex container for brain button + lock badge
-.ultrathink-button              - Base button (32x32, matches browse-button pattern)
+.browse-stack                   - Vertical stack container (ultrathink on top, browse below)
+.browse-stack .ultrathink-wrapper - Inline-flex wrapper scoped for stacked layout
+.ultrathink-wrapper             - Inline-flex column for lock (top) + brain button (bottom)
+.ultrathink-button              - Base button (global default 32x32; compact in browse stack)
 .ultrathink-button:hover        - VS Code hover background + focus border
 .ultrathink-button:disabled     - Grayed out
 .ultrathink-button.animating    - Blue border glow, pointer-events: none
@@ -80,7 +82,7 @@ All animations are pure CSS using transforms, opacity, filter, box-shadow, and p
     .ultrathink-anim-wizard     - Wizard animation variant
     .ultrathink-anim-turbo      - Turbo animation variant
       .ut-emoji                 - The animated emoji element (font-size: 20px)
-.ut-lock-toggle                 - Lock badge (16x16 circle, absolute bottom-right of wrapper)
+.ut-lock-toggle                 - Lock button (global default absolute badge; compact static top button in browse stack)
 .ut-lock-toggle.active          - Cyan highlight when locked
 ```
 
@@ -88,6 +90,11 @@ All animations are pure CSS using transforms, opacity, filter, box-shadow, and p
 
 ```tsx
 <div className="ultrathink-wrapper">
+  <button className={`ut-lock-toggle${ultrathinkLocked ? ' active' : ''}`}
+          onClick={() => setUltrathinkLocked(prev => !prev)}
+          data-tooltip="...">
+    <svg>{/* locked/unlocked padlock icon */}</svg>
+  </button>
   <button className={`ultrathink-button${ultrathinkAnim ? ' animating' : ''}${ultrathinkLocked ? ' locked' : ''}`}
           onClick={handleUltrathink}
           disabled={!isConnected || !!ultrathinkAnim}
@@ -98,11 +105,6 @@ All animations are pure CSS using transforms, opacity, filter, box-shadow, and p
         {/* Conditionally render the animation-specific emoji */}
       </div>
     )}
-  </button>
-  <button className={`ut-lock-toggle${ultrathinkLocked ? ' active' : ''}`}
-          onClick={() => setUltrathinkLocked(prev => !prev)}
-          data-tooltip="...">
-    <svg>{/* locked/unlocked padlock icon */}</svg>
   </button>
 </div>
 ```
@@ -133,7 +135,7 @@ Keyframes:
 
 ## Related Components
 
-- **Browse Button** - Adjacent button to the left (file picker)
+- **Browse Button** - Sits directly below Ultrathink in the same `browse-stack` (file picker)
 - **Textarea** - Adjacent element to the right (receives the injected text)
 - **UndoManager** - Text change is pushed to undo stack for Ctrl+Z support
 - **MarkdownContent** - Renders glow in completed messages

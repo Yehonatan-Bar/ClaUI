@@ -2,6 +2,31 @@
 
 ## Unreleased - 2026-03-12
 
+**Feature: Codex GPT-5.4 model support**
+
+- Added `gpt-5.4` as a first-class Codex model option in the fallback model selector list
+- Kept dynamic Codex model discovery from `~/.codex/models_cache.json` as the primary source; fallback list is used when cache data is unavailable
+- Aligned model naming with official OpenAI docs (`gpt-5.4`, not `gpt-5.4-codex`)
+
+**Improvement: Codex reasoning effort parity (`none`)**
+
+- Added `none` to the `CodexReasoningEffort` message-contract type
+- Added `None` option to the Codex reasoning selector in the webview
+- Updated extension setting manifest (`claudeMirror.codex.reasoningEffort`) to include `none` in enum + descriptions
+
+**Improvement: GPT-5 context window heuristics**
+
+- Updated webview context-limit mapping for GPT-5 family:
+  - `gpt-5.4` / `gpt-5.4-pro` -> `1,050,000`
+  - other `gpt-5*` models -> `400,000`
+- Improves context usage percentage accuracy in the input context bar for Codex GPT-5 sessions
+
+**Documentation updates**
+
+- Updated README Codex reasoning-effort docs to include `none`
+- Updated `Kingdom_of_Claudes_Beloved_MDs/CODEX_INTEGRATION_PROGRESS.md` with a dedicated 2026-03-18 GPT-5.4 alignment note
+- Updated `TECHNICAL.md` with the Codex GPT-5.4 support update entry and manifest/runtime notes
+
 **Feature: Usage-limit deferred send (Claude only)**
 
 - When Claude returns a usage-limit error, the extension now detects it automatically and enters "deferred send" mode
@@ -65,6 +90,21 @@
   - `5 Hours` / `24 Hours`: shows time labels
   - `7 Days` and longer: shows date labels
 - Tooltip label formatting was aligned with timestamp-based axis data
+
+**Feature: Chat Search (session + cross-project)**
+
+- Added a search bar for finding messages within the current session or across all project sessions
+- **Session search** (client-side): instant case-insensitive text matching against all loaded messages, with match counter and prev/next navigation that scrolls to highlighted message bubbles
+- **Project search** (extension-side): scans JSONL session files on disk using raw string matching (no full JSON parse) for 10-100x better performance; returns up to 50 results with snippet context
+- Results dropdown shows session label, relative timestamp, role badge (user/assistant), and highlighted match snippet
+- Clicking a project result resumes/opens that session via `claudeMirror.resumeSession`
+- requestId-based cancellation discards stale responses when query changes mid-flight
+- 300ms debounce on project search to avoid excessive filesystem scans; session search is immediate
+- Keyboard shortcuts: `Ctrl+Shift+F` to open, `Escape` to close, `Enter`/`Shift+Enter` for next/prev match
+- Matched messages highlighted with CSS outline using VS Code theme `findMatchHighlightBackground` colors; current match uses `findMatchBackground`
+- New "Search" button in StatusBar session dropdown
+- New files: `ChatSearchService.ts` (extension), `ChatSearchBar.tsx` (webview)
+- New message types: `chatSearchProject`, `chatSearchResumeSession`, `chatSearchProjectResults`
 
 **Documentation updates**
 

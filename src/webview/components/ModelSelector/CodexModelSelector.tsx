@@ -4,6 +4,7 @@ import { postToExtension } from '../../hooks/useClaudeStream';
 
 const CODEX_MODEL_OPTIONS_FALLBACK = [
   { label: 'Default', value: '' },
+  { label: 'GPT-5.4', value: 'gpt-5.4' },
   { label: 'GPT-5.3-Codex', value: 'gpt-5.3-codex' },
   { label: 'GPT-5.2-Codex', value: 'gpt-5.2-codex' },
   { label: 'GPT-5.1-Codex-Max', value: 'gpt-5.1-codex-max' },

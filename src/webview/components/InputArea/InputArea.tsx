@@ -1463,56 +1463,73 @@ export const InputArea: React.FC = () => {
             isLoading={fileMention.isLoading}
           />
         )}
-        <button
-          className="clear-session-button"
-          onClick={handleClearSession}
-          disabled={!isConnected || inputLockedByHandoff}
-          data-tooltip="Clear session and start fresh"
-        >
-          Clear
-        </button>
-        <button
-          className="browse-button"
-          onClick={handleBrowseFiles}
-          disabled={!isConnected || inputLockedByHandoff}
-          data-tooltip="Browse files to paste their paths"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-          </svg>
-        </button>
-        <div className="ultrathink-wrapper">
+        <div className="clear-stack">
           <button
-            className={`ultrathink-button${ultrathinkAnim ? ' animating' : ''}${ultrathinkLocked ? ' locked' : ''}`}
-            onClick={handleUltrathink}
-            disabled={!isConnected || !!ultrathinkAnim || inputLockedByHandoff}
-            data-tooltip={ultrathinkLocked ? "Ultrathink LOCKED - auto-injected every prompt" : "Ultrathink - boost reasoning power"}
+            className="search-chat-button"
+            onClick={() => {
+              const store = useAppStore.getState();
+              store.setChatSearchOpen(!store.chatSearchOpen);
+            }}
+            data-tooltip="Search chat (Ctrl+Shift+F)"
           >
-            <span className="ut-default-icon">&#x1F9E0;</span>
-            {ultrathinkAnim && (
-              <div className={`ultrathink-anim ultrathink-anim-${ultrathinkAnim}`}>
-                {ultrathinkAnim === 'rocket' && <span className="ut-emoji">&#x1F680;</span>}
-                {ultrathinkAnim === 'brain' && <span className="ut-emoji">&#x1F9E0;</span>}
-                {ultrathinkAnim === 'wizard' && <span className="ut-emoji">&#x1FA84;</span>}
-                {ultrathinkAnim === 'turbo' && <span className="ut-emoji">&#x26A1;</span>}
-              </div>
-            )}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
           </button>
           <button
-            className={`ut-lock-toggle${ultrathinkLocked ? ' active' : ''}`}
-            onClick={() => {
-              const next = !ultrathinkLocked;
-              setUltrathinkLocked(next);
-              postToExtension({ type: 'setUltrathinkLocked', locked: next } as any);
-            }}
-            data-tooltip={ultrathinkLocked ? "Unlock ultrathink" : "Lock ultrathink on every prompt"}
+            className="clear-session-button"
+            onClick={handleClearSession}
+            disabled={!isConnected || inputLockedByHandoff}
+            data-tooltip="Clear session and start fresh"
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              {ultrathinkLocked ? (
-                <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>
-              ) : (
-                <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></>
+            Clear
+          </button>
+        </div>
+        <div className="browse-stack">
+          <div className="ultrathink-wrapper">
+            <button
+              className={`ut-lock-toggle${ultrathinkLocked ? ' active' : ''}`}
+              onClick={() => {
+                const next = !ultrathinkLocked;
+                setUltrathinkLocked(next);
+                postToExtension({ type: 'setUltrathinkLocked', locked: next } as any);
+              }}
+              data-tooltip={ultrathinkLocked ? "Unlock ultrathink" : "Lock ultrathink on every prompt"}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                {ultrathinkLocked ? (
+                  <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>
+                ) : (
+                  <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></>
+                )}
+              </svg>
+            </button>
+            <button
+              className={`ultrathink-button${ultrathinkAnim ? ' animating' : ''}${ultrathinkLocked ? ' locked' : ''}`}
+              onClick={handleUltrathink}
+              disabled={!isConnected || !!ultrathinkAnim || inputLockedByHandoff}
+              data-tooltip={ultrathinkLocked ? "Ultrathink LOCKED - auto-injected every prompt" : "Ultrathink - boost reasoning power"}
+            >
+              <span className="ut-default-icon">&#x1F9E0;</span>
+              {ultrathinkAnim && (
+                <div className={`ultrathink-anim ultrathink-anim-${ultrathinkAnim}`}>
+                  {ultrathinkAnim === 'rocket' && <span className="ut-emoji">&#x1F680;</span>}
+                  {ultrathinkAnim === 'brain' && <span className="ut-emoji">&#x1F9E0;</span>}
+                  {ultrathinkAnim === 'wizard' && <span className="ut-emoji">&#x1FA84;</span>}
+                  {ultrathinkAnim === 'turbo' && <span className="ut-emoji">&#x26A1;</span>}
+                </div>
               )}
+            </button>
+          </div>
+          <button
+            className="browse-button"
+            onClick={handleBrowseFiles}
+            disabled={!isConnected || inputLockedByHandoff}
+            data-tooltip="Browse files to paste their paths"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
             </svg>
           </button>
         </div>

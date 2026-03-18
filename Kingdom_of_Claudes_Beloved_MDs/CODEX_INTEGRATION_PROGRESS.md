@@ -26,6 +26,25 @@ Detection logic is extracted into `src/extension/process/CodexCliDetector.ts` an
 **Auto-Recovery on CLI Missing:**
 When a Codex turn fails because the CLI is not found (process exit/error or login precheck), `CodexSessionTab` now runs `findWorkingCodexCliCandidates()` before showing the install guidance error. If a working candidate is found, it is automatically saved to `claudeMirror.codex.cliPath` and the user is informed to retry. This handles the common case where the official Codex VS Code extension is installed (bundling the binary) but `codex` is not on PATH.
 
+## 2026-03-18 - GPT-5.4 Codex support alignment
+
+Updated Codex model/reasoning UX to align with current OpenAI model docs:
+
+- Added `gpt-5.4` to the Codex model selector fallback options (`CodexModelSelector`).
+  - Dynamic model loading from `~/.codex/models_cache.json` remains the primary source.
+  - Fallback list now includes GPT-5.4 for cases where cache is missing/unreadable.
+- Added explicit `none` reasoning effort support end-to-end:
+  - `CodexReasoningEffort` type now includes `'none'`
+  - Codex Reasoning selector now includes `None`
+  - `claudeMirror.codex.reasoningEffort` enum in `package.json` now includes `none`
+- Updated GPT context-window heuristics used by the webview context bar:
+  - `gpt-5.4` / `gpt-5.4-pro` -> `1,050,000`
+  - other `gpt-5*` -> `400,000`
+
+Reference basis (official OpenAI docs):
+- GPT-5.4 supports Codex/Codex CLI and includes `reasoning.effort=none`
+- GPT-5.4 / GPT-5.4-pro use 1.05M context, GPT-5.3-codex uses 400K context
+
 ## 2026-02-25 - Codex image paste/send support
 
 - Enabled image capability in `CodexMessageHandler` (`supportsImages: true`) so Codex tabs accept pasted image attachments in `InputArea`.
@@ -333,9 +352,9 @@ Codex runtime hardening (observed during manual testing):
 
 Codex reasoning effort support (new user-facing capability):
 
-- Added Codex reasoning effort setting + UI selector (`Low` / `Medium` / `High` / `Extra High`, plus `Default`)
+- Added Codex reasoning effort setting + UI selector (`None` / `Low` / `Medium` / `High` / `Extra High`, plus `Default`)
 - New VS Code setting:
-  - `claudeMirror.codex.reasoningEffort` (`'' | low | medium | high | xhigh`)
+  - `claudeMirror.codex.reasoningEffort` (`'' | none | low | medium | high | xhigh`)
 - Codex webview handler now syncs this setting to/from the webview (`setCodexReasoningEffort` / `codexReasoningEffortSetting`)
 - `CodexExecProcessManager` now forwards reasoning effort to the Codex CLI using:
   - `-c model_reasoning_effort=<value>`

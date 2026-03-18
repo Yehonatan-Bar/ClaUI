@@ -14,7 +14,7 @@ export type HandoffStage =
   | 'arming_first_user_prompt'
   | 'completed'
   | 'failed';
-export type CodexReasoningEffort = '' | 'low' | 'medium' | 'high' | 'xhigh';
+export type CodexReasoningEffort = '' | 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 export interface CodexModelOption {
   label: string;
   value: string;

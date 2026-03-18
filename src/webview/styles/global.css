@@ -641,11 +641,44 @@ html, body, #root {
   width: 80px;
 }
 
+.clear-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.search-chat-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 18px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+}
+
+.search-chat-button svg {
+  width: 11px;
+  height: 11px;
+}
+
+.search-chat-button:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+  border-color: var(--vscode-focusBorder);
+}
+
 .clear-session-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 32px;
+  height: 24px;
   flex-shrink: 0;
   padding: 0 10px;
   background: none;
@@ -669,12 +702,53 @@ html, body, #root {
   cursor: not-allowed;
 }
 
+.browse-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.browse-stack .ultrathink-wrapper {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+}
+
+.browse-stack .ultrathink-button {
+  width: auto;
+  height: 18px;
+  font-size: 12px;
+  border-radius: 4px;
+  padding: 0 2px;
+}
+
+.browse-stack .ut-default-icon {
+  font-size: 12px;
+}
+
+.browse-stack .ut-lock-toggle {
+  position: static;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.browse-stack .ut-lock-toggle svg {
+  width: 8px;
+  height: 8px;
+}
+
 .browse-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 100%;
+  height: 24px;
   flex-shrink: 0;
   padding: 0;
   background: none;

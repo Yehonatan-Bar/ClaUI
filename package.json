@@ -180,6 +180,7 @@
           "default": "",
           "enum": [
             "",
+            "none",
             "low",
             "medium",
             "high",
@@ -187,6 +188,7 @@
           ],
           "enumDescriptions": [
             "Use Codex CLI/config default reasoning effort",
+            "No reasoning effort (fastest, for direct answers)",
             "Low reasoning effort (faster, lighter reasoning)",
             "Medium reasoning effort (balanced)",
             "High reasoning effort (deeper reasoning)",

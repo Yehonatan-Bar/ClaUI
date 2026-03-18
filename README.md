@@ -51,7 +51,7 @@ Run multiple Claude conversations in parallel, each isolated in its own VS Code 
 
 - **Dual provider** -- switch between Claude and Codex per session; each has its own model and settings
 - **Model selection** -- choose Claude Sonnet, Opus, or Haiku (or Codex models) from the status bar
-- **Codex reasoning effort** -- set reasoning depth (low / medium / high / xhigh) per Codex session
+- **Codex reasoning effort** -- set reasoning depth (none / low / medium / high / xhigh) per Codex session
 - **Semantic turn analysis** -- background AI classification of user mood, task type, outcome, and bug patterns per turn
 - **Activity summarizer** -- AI-powered live summaries of what Claude is doing, shown in the tab title
 - **Message translation** -- translate any assistant message to Hebrew, Arabic, Russian, Spanish, French, German, Portuguese, Chinese, Japanese, or Korean with one click; code blocks preserved
@@ -185,7 +185,7 @@ All settings are under `claudeMirror.*` in VS Code Settings (`Ctrl+,`).
 | `provider` | `"claude"` | Default provider: `claude` or `codex` |
 | `model` | `""` | Claude model for new sessions (empty = CLI default) |
 | `codex.model` | `""` | Codex model for new sessions |
-| `codex.reasoningEffort` | `""` | Codex reasoning depth: `low`, `medium`, `high`, `xhigh` |
+| `codex.reasoningEffort` | `""` | Codex reasoning depth: `none`, `low`, `medium`, `high`, `xhigh` |
 | `permissionMode` | `"full-access"` | `full-access` or `supervised` (read-only) |
 | `useCtrlEnterToSend` | `true` | Ctrl+Enter sends, Enter adds newline |
 | `autoRestart` | `true` | Auto-restart CLI process on crash |

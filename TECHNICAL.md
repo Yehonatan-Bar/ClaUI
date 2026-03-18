@@ -351,7 +351,7 @@ claude-code-mirror/
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/GIT_PUSH_BUTTON.md`
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**Ultrathink Button & Glow** - Brain icon button in the input area that injects the "ultrathink" keyword to boost Claude's reasoning effort. On click, plays one of 4 random CSS animations (Rocket Launch, Brain on Fire, Wizard Staff, Turbo/NOS) for 1.2s, then prepends "ultrathink " to the input text. Includes a lock toggle badge that, when active, auto-prepends "ultrathink" to every outgoing prompt. The word "ultrathink" also displays with an animated rainbow glow effect (cycling colors, sparkle particles) in both completed and streaming chat messages.
+**Ultrathink Button & Glow** - Brain icon button in the input area that injects the "ultrathink" keyword to boost Claude's reasoning effort. The ultrathink controls sit above the browse/paperclip button in a vertical `browse-stack`, with the lock button above the brain button. On click, plays one of 4 random CSS animations (Rocket Launch, Brain on Fire, Wizard Staff, Turbo/NOS) for 1.2s, then prepends "ultrathink " to the input text. Includes a lock toggle that, when active, auto-prepends "ultrathink" to every outgoing prompt. The word "ultrathink" also displays with an animated rainbow glow effect (cycling colors, sparkle particles) in both completed and streaming chat messages.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ULTRATHINK_BUTTON.md`
 
 **Prompt Navigation Arrows** - Up/down arrow buttons above the Send button that scroll the chat view to the previous/next user prompt. Filters messages by `role === 'user'`, tracks an index ref, and uses `data-message-id` DOM queries with `scrollIntoView({ behavior: 'smooth', block: 'center' })`. Navigation index resets when new messages arrive.
@@ -892,3 +892,43 @@ Under `src/extension/session/`:
 ### Detail Doc
 
 - `Kingdom_of_Claudes_Beloved_MDs/btw_bug.md`
+
+---
+
+## 2026-03-18 - Codex GPT-5.4 Support Update
+
+### Updated Components
+
+- `src/webview/components/ModelSelector/CodexModelSelector.tsx`
+  - Added `gpt-5.4` to fallback Codex model options (used when `~/.codex/models_cache.json` is unavailable).
+- `src/extension/types/webview-messages.ts`
+  - Extended `CodexReasoningEffort` union with `'none'`.
+- `src/webview/components/ModelSelector/CodexReasoningEffortSelector.tsx`
+  - Added `None` option for Codex reasoning effort.
+- `src/webview/utils/modelContextLimits.ts`
+  - Updated GPT context heuristics:
+    - `gpt-5.4` / `gpt-5.4-pro` -> `1,050,000`
+    - other `gpt-5*` -> `400,000`
+- `README.md`
+  - Updated Codex reasoning effort docs to include `none`.
+
+### Directory Structure Delta
+
+- None.
+
+### Manifest/Settings Delta
+
+Updated setting in `package.json`:
+
+- `claudeMirror.codex.reasoningEffort`
+  - Added enum value: `none`
+  - Added enum description: no-reasoning mode
+
+### Runtime Notes
+
+- Codex model options are still loaded dynamically from `~/.codex/models_cache.json` when available; fallback list is only a resilience path.
+- `model_reasoning_effort=none` is now fully selectable via UI and represented in message-contract types.
+
+### Detail Doc
+
+- `Kingdom_of_Claudes_Beloved_MDs/CODEX_INTEGRATION_PROGRESS.md`

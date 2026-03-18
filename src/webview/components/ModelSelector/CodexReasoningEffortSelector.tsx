@@ -5,6 +5,7 @@ import type { CodexReasoningEffort } from '../../../extension/types/webview-mess
 
 const CODEX_REASONING_EFFORT_OPTIONS: Array<{ label: string; value: CodexReasoningEffort }> = [
   { label: 'Default', value: '' },
+  { label: 'None', value: 'none' },
   { label: 'Low', value: 'low' },
   { label: 'Medium', value: 'medium' },
   { label: 'High', value: 'high' },

@@ -10,6 +10,14 @@ export function getModelMaxContext(model: string): number {
   if (lower.includes('gemini')) {
     return 1_000_000;
   }
+  // GPT-5.4 and GPT-5.4-pro expose a larger 1.05M context window.
+  if (lower.includes('gpt-5.4') && !lower.includes('mini')) {
+    return 1_050_000;
+  }
+  // GPT-5 and Codex GPT-5.x models use a 400K context window.
+  if (lower.includes('gpt-5')) {
+    return 400_000;
+  }
   if (lower.includes('gpt-4o') || lower.includes('gpt-4-turbo')) {
     return 128_000;
   }
