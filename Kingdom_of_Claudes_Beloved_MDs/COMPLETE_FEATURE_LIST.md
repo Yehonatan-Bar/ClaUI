@@ -438,7 +438,7 @@ A visual session health dashboard with 5 components:
 
 - **"More" dropdown** - Feedback, Plans, History, Prompts, Provider/Model/Permissions, Dashboard, Teams/Consult
 - **"Tools" dropdown** - Git, SkillDocs, Trophy, Usage, Babel Fish, Vitals toggle
-- Always visible: Active Session Timer, Vitals gear, Aa, Token counters
+- Always visible: Active Session Timer, Vitals gear, Aa
 
 ### 25.4 Stage 4 - Minimal
 

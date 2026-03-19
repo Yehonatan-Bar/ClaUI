@@ -36,6 +36,126 @@ export interface ProviderCapabilities {
   supportsCostUsd: boolean;
 }
 
+export type McpScope = 'local' | 'project' | 'user' | 'managed' | 'unknown';
+export type McpSource = 'runtime' | 'config' | 'both';
+export type McpTransport = 'stdio' | 'sse' | 'http';
+export type McpRuntimeStatus =
+  | 'connected'
+  | 'needs-auth'
+  | 'needs-approval'
+  | 'error'
+  | 'disconnected'
+  | 'unknown';
+export type McpEffectiveStatus =
+  | 'active'
+  | 'configured'
+  | 'pending_restart'
+  | 'needs_auth'
+  | 'needs_approval'
+  | 'broken'
+  | 'unknown';
+export type McpMutationKind = 'added' | 'removed' | 'updated' | 'imported';
+export type McpNextAction =
+  | 'restart-session'
+  | 'reconnect'
+  | 'sign-in'
+  | 'approve-project'
+  | 'open-config'
+  | 'none';
+
+export interface McpServerConfig {
+  transport?: McpTransport;
+  command?: string;
+  args?: string[];
+  url?: string;
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+  scope?: McpScope;
+  /**
+   * Raw secret values keyed by environment variable name.
+   * The config payload should reference these via `${VAR_NAME}` placeholders.
+   * This field must never be echoed back to the webview.
+   */
+  secretValues?: Record<string, string>;
+  raw?: Record<string, unknown>;
+}
+
+export interface McpServerInfo {
+  name: string;
+  scope: McpScope;
+  source: McpSource;
+  transport?: McpTransport;
+  runtimeStatus: McpRuntimeStatus;
+  effectiveStatus: McpEffectiveStatus;
+  command?: string;
+  args?: string[];
+  url?: string;
+  envKeys?: string[];
+  headerKeys?: string[];
+  tools: string[];
+  resources?: string[];
+  prompts?: string[];
+  pendingMutation?: McpMutationKind;
+  restartRequired?: boolean;
+  lastError?: string;
+  nextAction?: McpNextAction;
+}
+
+export interface McpMutationRecord {
+  name: string;
+  scope: McpScope;
+  kind: McpMutationKind;
+  timestamp: number;
+  restartRequired: boolean;
+}
+
+export interface McpConfigPaths {
+  workspaceConfigPath?: string;
+  userConfigPath?: string;
+  managedConfigPath?: string;
+  localConfigPath?: string;
+}
+
+export type McpTemplateFieldTarget = 'env' | 'header';
+
+export interface McpTemplateField {
+  id: string;
+  label: string;
+  target: McpTemplateFieldTarget;
+  key: string;
+  envVar?: string;
+  placeholder?: string;
+  required?: boolean;
+  secret?: boolean;
+  defaultValue?: string;
+  description?: string;
+}
+
+export interface McpTemplateDefinition {
+  id: string;
+  title: string;
+  description: string;
+  transport: McpTransport;
+  defaultName: string;
+  defaultScope: McpScope;
+  command?: string;
+  args?: string[];
+  url?: string;
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+  fields: McpTemplateField[];
+  notes?: string[];
+}
+
+export interface McpConfigDiffPreview {
+  name: string;
+  scope: McpScope;
+  exists: boolean;
+  before: string;
+  after: string;
+  diff: string;
+}
+
 // --- Webview -> Extension ---
 
 export interface SendTextMessage {
@@ -130,6 +250,51 @@ export interface SwitchProviderWithContextRequest {
   type: 'switchProviderWithContext';
   targetProvider: 'claude' | 'codex';
   keepSourceOpen?: boolean;
+}
+
+export interface McpRefreshRequest {
+  type: 'mcpRefresh';
+}
+
+export interface McpOpenConfigRequest {
+  type: 'mcpOpenConfig';
+  scope?: McpScope;
+}
+
+export interface McpOpenLogsRequest {
+  type: 'mcpOpenLogs';
+}
+
+export interface McpAddServerRequest {
+  type: 'mcpAddServer';
+  name: string;
+  config: McpServerConfig;
+  scope: McpScope;
+}
+
+export interface McpPreviewAddServerRequest {
+  type: 'mcpPreviewAddServer';
+  name: string;
+  config: McpServerConfig;
+  scope: McpScope;
+}
+
+export interface McpRemoveServerRequest {
+  type: 'mcpRemoveServer';
+  name: string;
+  scope: McpScope;
+}
+
+export interface McpResetProjectChoicesRequest {
+  type: 'mcpResetProjectChoices';
+}
+
+export interface McpImportDesktopRequest {
+  type: 'mcpImportDesktop';
+}
+
+export interface McpRestartSessionRequest {
+  type: 'mcpRestartSession';
 }
 
 export interface SetCodexReasoningEffortRequest {
@@ -539,6 +704,7 @@ export interface TeamShutdownAgentRequest {
 
 export interface BugReportInitRequest {
   type: 'bugReportInit';
+  context?: BugReportContext;
 }
 
 export interface BugReportChatRequest {
@@ -566,6 +732,14 @@ export interface BugReportCloseRequest {
   type: 'bugReportClose';
 }
 
+export interface BugReportContext {
+  source?: 'mcp';
+  title?: string;
+  quickDescription?: string;
+  aiPrompt?: string;
+  metadataText?: string;
+}
+
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
@@ -585,6 +759,15 @@ export type WebviewToExtensionMessage =
   | SetProviderRequest
   | OpenProviderTabRequest
   | SwitchProviderWithContextRequest
+  | McpRefreshRequest
+  | McpOpenConfigRequest
+  | McpOpenLogsRequest
+  | McpAddServerRequest
+  | McpPreviewAddServerRequest
+  | McpRemoveServerRequest
+  | McpResetProjectChoicesRequest
+  | McpImportDesktopRequest
+  | McpRestartSessionRequest
   | SetCodexReasoningEffortRequest
   | SetTypingThemeRequest
   | ShowHistoryRequest
@@ -681,6 +864,40 @@ export interface WebviewImageData {
 }
 
 // --- Extension -> Webview ---
+
+export interface McpInventoryMessage {
+  type: 'mcpInventory';
+  servers: McpServerInfo[];
+  pendingRestartCount: number;
+  configPaths?: McpConfigPaths;
+  lastError?: string;
+}
+
+export interface McpCatalogMessage {
+  type: 'mcpCatalog';
+  templates: McpTemplateDefinition[];
+}
+
+export interface McpDiffPreviewMessage {
+  type: 'mcpDiffPreview';
+  preview: McpConfigDiffPreview;
+}
+
+export interface McpOperationResultMessage {
+  type: 'mcpOperationResult';
+  success: boolean;
+  operation: string;
+  name?: string;
+  error?: string;
+  restartNeeded?: boolean;
+  nextAction?: McpNextAction;
+}
+
+export interface ToggleMcpPanelMessage {
+  type: 'toggleMcpPanel';
+  open?: boolean;
+  tab?: 'session' | 'workspace' | 'add' | 'debug';
+}
 
 export interface SessionStartedMessage {
   type: 'sessionStarted';
@@ -1187,7 +1404,7 @@ export interface SessionMetadataMessage {
   tools: string[];
   model: string;
   cwd: string;
-  mcpServers: string[];
+  mcpServers: McpServerInfo[];
 }
 
 export interface AdventureBeatMessage {
@@ -1640,6 +1857,11 @@ export interface SerializedChatMessage {
 }
 
 export type ExtensionToWebviewMessage =
+  | McpInventoryMessage
+  | McpCatalogMessage
+  | McpDiffPreviewMessage
+  | McpOperationResultMessage
+  | ToggleMcpPanelMessage
   | SessionStartedMessage
   | SessionEndedMessage
   | StreamingTextMessage

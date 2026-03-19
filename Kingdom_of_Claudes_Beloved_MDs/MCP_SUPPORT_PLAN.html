@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>תוכנית תמיכת MCP - ClaUI</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      line-height: 1.7;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #58a6ff;
+      font-size: 28px;
+      border-bottom: 2px solid #21262d;
+      padding-bottom: 16px;
+      margin-bottom: 32px;
+    }
+    h2 {
+      color: #79c0ff;
+      font-size: 22px;
+      margin-top: 36px;
+      margin-bottom: 16px;
+      padding-right: 12px;
+      border-right: 4px solid #58a6ff;
+    }
+    h3 {
+      color: #d2a8ff;
+      font-size: 18px;
+      margin-top: 24px;
+      margin-bottom: 10px;
+    }
+    p {
+      margin-bottom: 14px;
+      font-size: 15px;
+    }
+    .highlight-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .highlight-box.blue { border-right: 4px solid #58a6ff; }
+    .highlight-box.green { border-right: 4px solid #3fb950; }
+    .highlight-box.purple { border-right: 4px solid #d2a8ff; }
+    .highlight-box.orange { border-right: 4px solid #d29922; }
+    ul {
+      padding-right: 24px;
+      margin-bottom: 14px;
+    }
+    li {
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+    .phase-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .phase-badge {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: bold;
+      color: #fff;
+    }
+    .phase-1 { background: #3fb950; }
+    .phase-2 { background: #d29922; }
+    .phase-3 { background: #d2a8ff; color: #0d1117; }
+    .status-demo {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin: 12px 0;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 16px;
+      font-size: 13px;
+      background: #21262d;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .dot.green { background: #3fb950; }
+    .dot.yellow { background: #d29922; }
+    .dot.red { background: #f85149; }
+    .dot.gray { background: #484f58; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    th {
+      background: #161b22;
+      color: #79c0ff;
+      text-align: right;
+      padding: 10px 14px;
+      border-bottom: 2px solid #30363d;
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #21262d;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 20px 0;
+    }
+    .feature-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .feature-card h4 {
+      color: #58a6ff;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+    .feature-card p {
+      font-size: 13px;
+      color: #8b949e;
+      margin-bottom: 0;
+    }
+    .summary-box {
+      background: linear-gradient(135deg, #161b22, #1c2333);
+      border: 1px solid #58a6ff;
+      border-radius: 12px;
+      padding: 24px;
+      margin-top: 32px;
+    }
+    .summary-box h3 {
+      color: #58a6ff;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 600px) {
+      .feature-grid { grid-template-columns: 1fr; }
+      .status-demo { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>תוכנית תמיכת MCP בתוסף ClaUI</h1>
+
+    <div class="highlight-box blue">
+      <h3>מה זה MCP?</h3>
+      <p>
+        <strong>Model Context Protocol</strong> הוא תקן פתוח שמחבר את Claude לכלים חיצוניים -- GitHub, Sentry, מסדי נתונים, Slack, ועוד.
+        זה מה שהופך את Claude מ"עוזר קוד" ל"סוכן פיתוח" שמסוגל לעבוד מול מערכות אמיתיות.
+      </p>
+      <p>
+        כיום ClaUI מציג רק את <strong>שמות</strong> השרתים המחוברים, בלי סטטוס, בלי ניהול, ובלי שום אפשרות הגדרה מתוך הממשק.
+      </p>
+    </div>
+
+    <h2>מה אנחנו בונים</h2>
+    <p>
+      פאנל ניהול MCP מלא שמאפשר למשתמש לראות, להוסיף, להסיר ולנטר שרתי MCP ישירות מתוך ClaUI -- בלי צורך בשורת פקודה.
+    </p>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h4>לוח מצב חי</h4>
+        <p>סטטוס חיבור בזמן אמת לכל שרת -- מחובר, צריך אימות, שגיאה, או מנותק.</p>
+      </div>
+      <div class="feature-card">
+        <h4>מיפוי כלים לשרתים</h4>
+        <p>תצוגה ברורה של איזה כלים שייכים לאיזה שרת MCP, מקובצים ומסוננים.</p>
+      </div>
+      <div class="feature-card">
+        <h4>הוספה והסרה קלה</h4>
+        <p>טופס נוח להוספת שרתים חדשים, עם תמיכה בכל סוגי התחבורה (stdio, HTTP, SSE).</p>
+      </div>
+      <div class="feature-card">
+        <h4>שרתים פופולריים בלחיצה</h4>
+        <p>גלריית שרתים מוכרים (GitHub, Playwright, Sentry ועוד) -- לחיצה אחת למילוי אוטומטי של ההגדרות.</p>
+      </div>
+    </div>
+
+    <h2>איך זה ייראה</h2>
+
+    <h3>אינדיקטור בשורת המצב</h3>
+    <p>כפתור קטן בשורת המצב התחתונה שמראה כמה שרתים מחוברים מתוך הסך הכולל. לחיצה פותחת את הפאנל המלא.</p>
+
+    <h3>סטטוס שרתים</h3>
+    <div class="status-demo">
+      <span class="status-pill"><span class="dot green"></span> GitHub -- מחובר</span>
+      <span class="status-pill"><span class="dot green"></span> Codex -- מחובר</span>
+      <span class="status-pill"><span class="dot yellow"></span> Gmail -- צריך אימות</span>
+      <span class="status-pill"><span class="dot red"></span> Sentry -- שגיאה</span>
+      <span class="status-pill"><span class="dot gray"></span> Slack -- מנותק</span>
+    </div>
+
+    <h3>כרטיס שרת</h3>
+    <div class="highlight-box">
+      <p>כל שרת מוצג ככרטיס עם: שם, סטטוס חיבור (עיגול צבעוני), סוג חיבור (stdio/HTTP/SSE), היקף (משתמש/פרויקט/מקומי), ומספר הכלים הזמינים.</p>
+      <p>לחיצה על כרטיס מרחיבה את רשימת הכלים הספציפיים של אותו שרת.</p>
+    </div>
+
+    <h2>שלבי פיתוח</h2>
+
+    <!-- Phase 1 -->
+    <div class="highlight-box green">
+      <div class="phase-header">
+        <span class="phase-badge phase-1">שלב 1 -- גרסה ראשונה</span>
+      </div>
+      <p><strong>המטרה:</strong> תצוגת סטטוס עשירה + ניהול בסיסי של שרתים</p>
+      <ul>
+        <li>העשרת נתוני ההתחלה -- שמירת סטטוס חיבור, רשימת כלים לכל שרת, סוג תחבורה</li>
+        <li>פאנל MCP מלא עם שלושה טאבים: שרתים, כלים, הוספת שרת</li>
+        <li>כרטיסי שרת עם סטטוס חיבור צבעוני ופרטים</li>
+        <li>מיפוי כלים-לשרתים -- תצוגה מקובצת לפי שרת</li>
+        <li>טופס הוספת שרת עם תמיכה בכל סוגי התחבורה</li>
+        <li>גלריית שרתים פופולריים להוספה מהירה</li>
+        <li>הסרת שרת עם אישור</li>
+        <li>אינדיקטור MCP בשורת המצב</li>
+        <li>עדכון תצוגת הדשבורד הקיימת עם צבעי סטטוס</li>
+      </ul>
+    </div>
+
+    <!-- Phase 2 -->
+    <div class="highlight-box orange">
+      <div class="phase-header">
+        <span class="phase-badge phase-2">שלב 2 -- ניטור מתקדם</span>
+      </div>
+      <p><strong>המטרה:</strong> מעקב בריאות שרתים והתראות</p>
+      <ul>
+        <li>מעקב פעילות כלים בזמן אמת -- זמן אחרון של שימוש בכל שרת</li>
+        <li>מעקב אחר שינויים בקבצי הגדרות -- רענון אוטומטי של הממשק</li>
+        <li>פרטי שגיאה מורחבים עם כפתור "אמת מחדש" לשרתים שצריכים אימות</li>
+        <li>לוג חיבורים לכל שרת</li>
+      </ul>
+    </div>
+
+    <!-- Phase 3 -->
+    <div class="highlight-box purple">
+      <div class="phase-header">
+        <span class="phase-badge phase-3">שלב 3 -- יכולות מתקדמות</span>
+      </div>
+      <p><strong>המטרה:</strong> עריכה, בדיקה, ושיתוף הגדרות</p>
+      <ul>
+        <li>עריכת הגדרות שרת ישירות מהממשק (פקודה, כתובת, משתני סביבה)</li>
+        <li>כפתור "בדוק חיבור" -- בדיקת תקינות לכל שרת</li>
+        <li>אשף יצירת קובץ הגדרות פרויקטי (.mcp.json)</li>
+        <li>ייצוא וייבוא הגדרות MCP לשיתוף בין מפתחים</li>
+        <li>טאב MCP בדשבורד עם סטטיסטיקות פעילות</li>
+      </ul>
+    </div>
+
+    <h2>החלטות טכניות עיקריות</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>נושא</th>
+          <th>החלטה</th>
+          <th>סיבה</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>ניהול הגדרות</td>
+          <td>שימוש בפקודות CLI של Claude</td>
+          <td>בטוח יותר, שומר על תאימות, מונע קונפליקטים</td>
+        </tr>
+        <tr>
+          <td>תצוגת נתונים</td>
+          <td>קריאת קובץ ההגדרות ישירות</td>
+          <td>נתונים מובנים, מהיר, אמין</td>
+        </tr>
+        <tr>
+          <td>סוג ממשק</td>
+          <td>פאנל מסך מלא (כמו Dashboard/Teams)</td>
+          <td>עקביות עם דפוסי עיצוב קיימים בתוסף</td>
+        </tr>
+        <tr>
+          <td>מקור סטטוס</td>
+          <td>אירוע התחלה + מעקב כלים</td>
+          <td>ללא צורך בתשאול מתמשך, חסכוני</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>סיכונים ומענה</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>סיכון</th>
+          <th>מענה</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>פקודות CLI איטיות (עד 10 שניות לשרתי HTTP)</td>
+          <td>טעינה א-סינכרונית עם אנימציה, timeout של 15 שניות</td>
+        </tr>
+        <tr>
+          <td>שינוי בפורמט קובץ ההגדרות</td>
+          <td>קריאה דפנסיבית עם ברירות מחדל</td>
+        </tr>
+        <tr>
+          <td>בעיות ב-Windows עם npx</td>
+          <td>תבניות שרתים פופולריים כוללות עטיפת cmd /c</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="summary-box">
+      <h3>סיכום</h3>
+      <p>
+        התוכנית הזו מביאה תמיכת MCP מלאה ל-ClaUI בגישה מדורגת.
+        <strong>שלב 1</strong> נותן למשתמשים שליטה מלאה על שרתי MCP ישירות מהממשק --
+        ללא צורך בשורת פקודה. שלבים 2 ו-3 מוסיפים ניטור מתקדם ויכולות ניהול עשירות.
+      </p>
+      <p>
+        הפיתוח מבוסס על דפוסים מוכחים שכבר קיימים בתוסף (כמו פאנל Teams ו-Dashboard),
+        ומשתמש ב-CLI של Claude לכל הפעולות -- מה שמבטיח תאימות ובטיחות.
+      </p>
+    </div>
+  </div>
+</body>
+</html>

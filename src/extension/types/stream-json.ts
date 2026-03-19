@@ -12,8 +12,24 @@ export interface SystemInitEvent {
   tools: string[];
   model: string;
   cwd: string;
-  mcp_servers: Record<string, unknown>[];
+  mcp_servers: McpServerInit[];
   thinking_effort?: string;
+}
+
+export interface McpServerInit {
+  name: string;
+  id?: string;
+  status?: string;
+  transport?: string;
+  command?: string;
+  args?: string[];
+  url?: string;
+  env?: Record<string, string>;
+  headers?: Record<string, string>;
+  tools?: string[];
+  resources?: string[];
+  prompts?: string[];
+  [key: string]: unknown;
 }
 
 export interface ContentBlockStart {

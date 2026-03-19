@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ChildProcess, spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import type { CliOutputEvent, CliInputMessage } from '../types/stream-json';
+import { McpSecretsService } from '../mcp/McpSecretsService';
 import { buildClaudeCliEnv, getStoredApiKey } from './envUtils';
 import { killProcessTree } from './killTree';
 
@@ -113,8 +114,9 @@ export class ClaudeProcessManager extends EventEmitter {
 
     // Build sanitized env; inject user's API key from SecretStorage if configured
     const apiKey = await getStoredApiKey(this.context.secrets);
-    const env = buildClaudeCliEnv(apiKey);
-    this.log(`Env: hasAnthropicKey=${!!apiKey}`);
+    const mcpSecretEnv = await new McpSecretsService(this.context.secrets).getInjectedEnv();
+    const env = { ...buildClaudeCliEnv(apiKey), ...mcpSecretEnv };
+    this.log(`Env: hasAnthropicKey=${!!apiKey} mcpSecretVars=${Object.keys(mcpSecretEnv).length}`);
 
     const child = spawn(cliPath, args, {
       cwd,

@@ -88,9 +88,15 @@ claude-code-mirror/
 |   |   +-- terminal/                     #   Phase 2 stubs
 |   |   +-- feedback/
 |   |   |   +-- FormspreeService.ts      #   Formspree.io feedback submission (text + file attachments)
-|   |   |   +-- BugReportService.ts      #   Bug report lifecycle: auto-collect, AI chat, ZIP packaging, submission
+|   |   |   +-- BugReportService.ts      #   Bug report lifecycle: auto-collect, AI chat, feature-context snapshots, ZIP packaging, submission
 |   |   |   +-- DiagnosticsCollector.ts  #   Collects system/environment info + recent logs
 |   |   |   +-- BugReportTypes.ts        #   Shared WebviewBridge interface (avoids circular imports)
+|   |   +-- mcp/
+|   |   |   +-- McpCliService.ts         #   One-shot `claude mcp` wrapper using execFile + arg arrays only
+|   |   |   +-- McpConfigService.ts      #   Reads file-backed MCP config and CLI fallback discovery
+|   |   |   +-- McpRegistryService.ts    #   Merges runtime truth, config truth, and restart drift into UI inventory
+|   |   |   +-- McpTemplateCatalog.ts    #   Curated MCP templates with Windows-safe defaults
+|   |   |   +-- McpSecretsService.ts     #   SecretStorage registry for MCP placeholders + process env injection
 |   |   +-- auth/
 |   |   |   +-- AuthManager.ts           #   Claude CLI auth status/login/logout helpers
 |   |   +-- skillgen/
@@ -184,7 +190,7 @@ claude-code-mirror/
 |       |   |   +-- SkillGenPanel.tsx     #   Full overlay panel (toggle, progress, history, actions)
 |       |   |   +-- index.ts             #   Barrel export
 |       |   +-- BugReport/
-|       |   |   +-- BugReportPanel.tsx    #   Full-screen overlay (Quick/AI mode tabs, chat, script approve/reject)
+|       |   |   +-- BugReportPanel.tsx    #   Full-screen overlay (Quick/AI mode tabs, chat, script approve/reject, feature-specific prefill)
 |       |   |   +-- index.ts             #   Barrel export
 |       |   +-- Dashboard/
 |       |   |   +-- DashboardPanel.tsx    #   Root overlay (tab nav, close, Esc, Session/Project toggle)
@@ -224,6 +230,18 @@ claude-code-mirror/
 |       |   |   +-- StatusBar.tsx            #   Grouped status bar: AI Chip + Session/Tools/View dropdowns + metrics
 |       |   |   +-- AIChip.tsx               #   Compound control: Provider + Model + Permissions in one chip
 |       |   |   +-- StatusBarGroupButton.tsx #   Reusable dropdown group button (uses useOutsideClick for outside-click handling)
+|       |   +-- McpPanel/
+|       |   |   +-- McpPanel.tsx         #   Full-screen MCP inventory overlay (Session/Workspace/Add/Debug)
+|       |   |   +-- McpServerCard.tsx    #   Shared MCP card layout with status/action badges
+|       |   |   +-- McpToolsMap.tsx      #   Preserves `server -> tool` identity in runtime views
+|       |   |   +-- McpSessionTab.tsx    #   Active-session runtime truth and drift banner
+|       |   |   +-- McpWorkspaceTab.tsx  #   Config truth grouped by scope
+|       |   |   +-- McpAddTab.tsx        #   Add tab entry point for guided MCP management
+|       |   |   +-- McpAddWizard.tsx     #   Template/custom/import wizard with preview + apply flow
+|       |   |   +-- McpAddForm.tsx       #   Transport-aware MCP form editor
+|       |   |   +-- McpQuickAdd.tsx      #   Recommended templates + custom transport launchers
+|       |   |   +-- McpDebugTab.tsx      #   Paths, diagnostics, and copyable MCP commands
+|       |   |   +-- index.ts             #   Barrel export
 |       |   +-- TextSettingsBar/
 |       |       +-- TextSettingsBar.tsx   #   Font size/family/theme controls
 |       +-- styles/
@@ -250,6 +268,8 @@ claude-code-mirror/
     +-- FILE_MENTION.md                   #   @ file mention autocomplete feature
     +-- GIT_PUSH_BUTTON.md               #   Git push button and configuration
     +-- MARKDOWN_RENDERING.md            #   Markdown rendering pipeline (marked + DOMPurify)
+    +-- MCP_SUPPORT.md                  #   Implemented MCP visibility + management model
+    +-- MCP_SUPPORT_PLAN.md             #   MCP product, UX, and architecture roadmap for ClaUi
     +-- MESSAGE_TRANSLATION.md           #   Hebrew translation via Sonnet CLI
     +-- PROJECT_30_DAYS_TAB.md          #   Project dashboard 30-day filtered tab behavior
     +-- SESSION_NAMER.md                  #   Auto-naming feature (data flow, gotchas, debugging)
@@ -331,7 +351,7 @@ claude-code-mirror/
 
 **Scheduled Messages** - Users can schedule a message to be sent at a specific future time via a toggle in the send settings gear popover. A date/time picker sets the target time (default: 1 hour from now); the extension-side timer dispatches the message when the time arrives. A blue banner shows the scheduled message status with a cancel option. Only one scheduled message at a time (latest wins). State lives on the extension side (survives webview reloads) and is cleared on session lifecycle events. Mirrors the usage-limit deferred send architecture.
 
-**StatusBar (Grouped Layout)** - Bottom status bar reorganized with a UX-first grouped design. Uses **AI Chip** compound control (`AIChip.tsx`) showing Provider+Model+Permissions in one segmented button that opens a config panel with provider pills, model/permissions selectors, and carry-context. Features organized into **3 semantic group dropdowns**: **Session** (History, Plans, Prompts, Dashboard, Teams, Achievements), **Tools** (Git, Consult, Babel Fish, SkillDocs, Feedback/Bugs), **View** (TextSettings/Font, Vitals toggle+settings). Right side shows **passive metrics**: session clock, usage bar with inline progress indicator, and token In/Out counts. Uses `useStatusBarCollapse` with 3 responsive stages (`full` >=650px: all groups visible; `collapsed` 380-650px: Session + merged "More"; `minimal` <380px: single "Menu"). Reduces ~25 inline buttons to ~7 visible elements while keeping every feature exactly 1 click away. Dropdowns open upward with click-outside dismiss, mutual exclusivity, and Escape key support. StatusBar action clicks for History/Plans/Prompts now emit `[UiDebug][StatusBar]` logs with click detail + layout/dropdown state.
+**StatusBar (Grouped Layout)** - Bottom status bar reorganized with a UX-first grouped design. Uses **AI Chip** compound control (`AIChip.tsx`) showing Provider+Model+Permissions in one segmented button that opens a config panel with provider pills, model/permissions selectors, and carry-context. Features organized into **3 semantic group dropdowns**: **Session** (History, Plans, Prompts, Dashboard, Teams, Achievements), **Tools** (Git, Consult, Babel Fish, SkillDocs, Feedback/Bugs), **View** (TextSettings/Font, Vitals toggle+settings). Right side shows **passive metrics**: session clock, MCP status, and the usage bar with inline progress indicator. Uses `useStatusBarCollapse` with 3 responsive stages (`full` >=650px: all groups visible; `collapsed` 380-650px: Session + merged "More"; `minimal` <380px: single "Menu"). Reduces ~25 inline buttons to ~7 visible elements while keeping every feature exactly 1 click away. Dropdowns open upward with click-outside dismiss, mutual exclusivity, and Escape key support. StatusBar action clicks for History/Plans/Prompts now emit `[UiDebug][StatusBar]` logs with click detail + layout/dropdown state.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Global Tooltip System** - Unified, VS Code-themed tooltip rendered via a single `GlobalTooltip` React component mounted at the App root. Uses document-level event delegation to detect `mouseover` on any element with a `data-tooltip` attribute, then renders a positioned tooltip via `createPortal`. 400ms hover delay, auto-flips above/below trigger, shifts horizontally to stay within viewport, hides on scroll. Accessible (`role="tooltip"`, dynamic `aria-describedby`). Touch-device guard. All ~25 component files use `data-tooltip="..."` instead of native `title` attributes.
@@ -849,6 +869,130 @@ Added settings:
 ### Detail Doc
 
 - `Kingdom_of_Claudes_Beloved_MDs/PROVIDER_HANDOFF.md`
+
+---
+
+## 2026-03-18 - MCP Management Phase 1A + 1B
+
+### New Components (Component Index Additions)
+
+- `src/extension/mcp/McpCliService.ts`
+  - Wraps `claude mcp` list/get/add/remove/import/reset with `execFile` and argument arrays only.
+  - Uses `add-json` as the normalized write path so env/header/project flows share one CLI-safe mutation path.
+- `src/extension/mcp/McpConfigService.ts`
+  - Reads `.mcp.json`, `~/.claude.json`, local project entries under `projects[...]`, and managed config candidates defensively.
+  - Builds projected config diffs for add flows before project-scope writes.
+- `src/extension/mcp/McpRegistryService.ts`
+  - Converts `system/init.mcp_servers` into runtime MCP objects and merges runtime/config/mutation truth into a single inventory.
+- `src/extension/mcp/McpTemplateCatalog.ts`
+  - Ships curated MCP templates (GitHub, Playwright, Brave Search, Sentry, Slack, Postgres, Context7, Codex) with Windows-safe defaults.
+- `src/extension/mcp/McpSecretsService.ts`
+  - Stores MCP secret values in SecretStorage, tracks a secret index, and injects those env vars into ClaUi-launched Claude sessions.
+- `src/webview/components/McpPanel/McpPanel.tsx`
+  - Full overlay MCP inventory panel with `Session`, `Workspace`, `Add`, and `Debug` tabs.
+  - Shows restart/reconnect-aware banners and CTA buttons after MCP mutations.
+  - Adds a prominent MCP-specific bug-report action that opens the shared bug report overlay with an attached MCP snapshot.
+- `src/webview/components/McpPanel/McpServerCard.tsx`
+  - Shared server card used across runtime/config views with multi-action button support.
+- `src/webview/components/McpPanel/McpToolsMap.tsx`
+  - Preserves `server -> tool` mapping instead of flattening MCP tool names.
+- `src/webview/components/McpPanel/McpSessionTab.tsx`
+  - Runtime truth view for active-session MCP connectivity and tool ownership.
+- `src/webview/components/McpPanel/McpWorkspaceTab.tsx`
+  - Config truth grouped by scope (`project`, `local`, `user`, `managed`) with scoped remove actions.
+- `src/webview/components/McpPanel/McpAddTab.tsx`
+  - Entry point for the MCP add/import wizard.
+- `src/webview/components/McpPanel/McpAddWizard.tsx`
+  - Coordinates recommended templates, custom transports, project diff preview, and apply flow.
+- `src/webview/components/McpPanel/McpAddForm.tsx`
+  - Transport-aware editor for command/url/env/header/secret inputs.
+- `src/webview/components/McpPanel/McpQuickAdd.tsx`
+  - Recommended template gallery plus custom transport and import entry points.
+- `src/webview/components/McpPanel/McpDebugTab.tsx`
+  - Config paths, runtime-vs-config comparison, last error/operation, copyable CLI commands, and project-approval reset.
+
+### Updated Components
+
+- `src/extension/types/stream-json.ts`
+  - Added `McpServerInit` and typed `system/init.mcp_servers`.
+- `src/extension/types/webview-messages.ts`
+  - Added `McpServerInfo`, `McpMutationRecord`, MCP template contracts, preview diff contracts, mutation requests, `toggleMcpPanel`, and feature-specific bug-report context.
+- `src/extension/webview/MessageHandler.ts`
+  - Preserves MCP runtime objects on `system/init`, refreshes config snapshots, merges inventory, and handles the full Phase 1B action set:
+    - `mcpRefresh`
+    - `mcpOpenConfig`
+    - `mcpOpenLogs`
+    - `mcpPreviewAddServer`
+    - `mcpAddServer`
+    - `mcpRemoveServer`
+    - `mcpImportDesktop`
+    - `mcpResetProjectChoices`
+    - `mcpRestartSession`
+- `src/webview/state/store.ts`
+  - Split runtime session metadata (`sessionMetadata.mcpServers`) from merged MCP inventory state.
+  - Added template catalog and project diff preview state for the guided add flow.
+- `src/webview/hooks/useClaudeStream.ts`
+  - Handles `mcpInventory`, `mcpCatalog`, `mcpDiffPreview`, `mcpOperationResult`, and `toggleMcpPanel`.
+- `src/webview/App.tsx`
+  - Mounts the MCP overlay.
+- `src/webview/components/StatusBar/StatusBar.tsx`
+  - Added MCP chip with restart/login/error/read-only summaries.
+- `src/webview/components/Dashboard/tabs/ContextTab.tsx`
+  - MCP pills are now typed, status-colored, and open the MCP panel.
+- `src/extension/commands.ts`
+  - Added `claudeMirror.toggleMcpPanel`.
+- `src/extension/process/ClaudeProcessManager.ts`
+  - Injects SecretStorage-backed MCP env vars into Claude CLI processes so `${VAR}` placeholders work in ClaUi-launched sessions.
+
+### Directory Structure Delta
+
+Under `src/extension/`:
+
+- Added folder: `mcp/`
+- Added files:
+  - `McpCliService.ts`
+  - `McpConfigService.ts`
+  - `McpRegistryService.ts`
+  - `McpTemplateCatalog.ts`
+  - `McpSecretsService.ts`
+
+Under `src/webview/components/`:
+
+- Added folder: `McpPanel/`
+- Added files:
+  - `McpPanel.tsx`
+  - `McpServerCard.tsx`
+  - `McpToolsMap.tsx`
+  - `McpSessionTab.tsx`
+  - `McpWorkspaceTab.tsx`
+  - `McpAddTab.tsx`
+  - `McpAddWizard.tsx`
+  - `McpAddForm.tsx`
+  - `McpQuickAdd.tsx`
+  - `McpDebugTab.tsx`
+  - `index.ts`
+
+### Manifest/Settings Delta
+
+Added command in `package.json`:
+
+- `claudeMirror.toggleMcpPanel` (`ClaUi: MCP Servers`)
+
+### Runtime Notes
+
+- `sessionMetadata.mcpServers` is now runtime-only (`system/init` truth), not the merged config inventory.
+- Project-scope add flows now require a projected `.mcp.json` diff preview before save.
+- Secret values are never written to `.mcp.json`; only `${VAR}` placeholders are written, while raw values live in SecretStorage.
+- ClaUi injects stored MCP secret env vars only into Claude sessions it launches itself; external terminal sessions still need their own env setup.
+- Claude tabs get full Phase 1A/1B MCP visibility and management; Codex/Happy tabs stay explicit read-only/disabled instead of pretending to share Claude session parity.
+- Codex/Happy tabs still allow safe MCP discovery actions (`refresh`, `open config`, `open logs`) while management actions stay disabled.
+- Restart drift is derived from runtime truth vs config truth, not from config alone.
+- MCP-specific bug reports reuse the global bug report flow but include an MCP inventory snapshot in preview, AI diagnosis context, ZIP contents, and final Formspree payloads.
+
+### Detail Doc
+
+- `Kingdom_of_Claudes_Beloved_MDs/MCP_SUPPORT.md`
+- `Kingdom_of_Claudes_Beloved_MDs/SR-PTD_2026-03-18_mcp-support-management-phase1b.md`
 
 ---
 

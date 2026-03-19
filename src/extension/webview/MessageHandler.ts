@@ -20,10 +20,18 @@ import type { TokenUsageRatioTracker } from '../session/TokenUsageRatioTracker';
 import { parseUsageLimitError } from '../process/usageLimitParser';
 import { AuthManager } from '../auth/AuthManager';
 import { BugReportService } from '../feedback/BugReportService';
+import { McpCliService } from '../mcp/McpCliService';
+import { McpConfigService } from '../mcp/McpConfigService';
+import { McpRegistryService } from '../mcp/McpRegistryService';
+import { McpSecretsService } from '../mcp/McpSecretsService';
+import { McpTemplateCatalog } from '../mcp/McpTemplateCatalog';
 import { openHtmlPreviewPanel } from './HtmlPreviewPanel';
 import type {
   AdventureBeatMessage,
   ExtensionToWebviewMessage,
+  McpConfigPaths,
+  McpMutationRecord,
+  McpServerInfo,
   ProviderCapabilities,
   ProviderId,
   TurnSemantics,
@@ -299,6 +307,15 @@ export class MessageHandler {
   private bugReportService: BugReportService | null = null;
   private logDir = '';
   private extensionVersion = '0.0.0';
+  private currentRuntimeMcpServers: McpServerInfo[] = [];
+  private pendingMcpMutations: McpMutationRecord[] = [];
+  private mcpConfigPaths: McpConfigPaths | null = null;
+  private mcpLastError: string | null = null;
+  private readonly mcpCliService: McpCliService;
+  private readonly mcpConfigService: McpConfigService;
+  private readonly mcpRegistryService: McpRegistryService;
+  private readonly mcpTemplateCatalog = new McpTemplateCatalog();
+  private mcpSecretsService: McpSecretsService | null = null;
 
   /** Chat search service for cross-session content search */
   private chatSearchService: import('../session/ChatSearchService').ChatSearchService | null = null;
@@ -313,6 +330,9 @@ export class MessageHandler {
     private readonly achievementService: AchievementService,
     skillGenServiceParam?: SkillGenService
   ) {
+    this.mcpCliService = new McpCliService(() => this.getClaudeCliPath(), (msg) => this.log(`[MCP CLI] ${msg}`));
+    this.mcpConfigService = new McpConfigService(this.mcpCliService, (msg) => this.log(`[MCP Config] ${msg}`));
+    this.mcpRegistryService = new McpRegistryService((msg) => this.log(`[MCP Registry] ${msg}`));
     if (skillGenServiceParam) {
       this.skillGenService = skillGenServiceParam;
     }
@@ -437,6 +457,7 @@ export class MessageHandler {
   /** Provide SecretStorage for API key management */
   setSecrets(secrets: vscode.SecretStorage): void {
     this.secrets = secrets;
+    this.mcpSecretsService = new McpSecretsService(secrets);
   }
 
   /** Provide Claude auth manager for login/logout/status actions */
@@ -482,6 +503,275 @@ export class MessageHandler {
 
   private getCliPathOverride(): string | undefined {
     return this.webview.getCliPathOverride?.() ?? undefined;
+  }
+
+  private getWorkspacePath(): string | undefined {
+    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  }
+
+  private sendMcpCatalog(): void {
+    this.webview.postMessage({
+      type: 'mcpCatalog',
+      templates: this.mcpTemplateCatalog.listTemplates(),
+    });
+  }
+
+  private async refreshMcpInventory(runtimeServers = this.currentRuntimeMcpServers): Promise<void> {
+    const workspacePath = this.getWorkspacePath();
+    try {
+      const configSnapshot = await this.mcpConfigService.readSnapshot(workspacePath);
+      this.mcpConfigPaths = configSnapshot.configPaths;
+      this.mcpLastError = configSnapshot.lastError ?? null;
+
+      const inventory = this.mcpRegistryService.mergeInventory(
+        runtimeServers,
+        configSnapshot.servers,
+        this.pendingMcpMutations,
+        { hasRuntimeSession: this.processManager.isRunning && !!this.processManager.currentSessionId }
+      );
+      this.pendingMcpMutations = this.mcpRegistryService.pruneSatisfiedMutations(
+        inventory.servers,
+        this.pendingMcpMutations
+      );
+
+      this.webview.postMessage({
+        type: 'mcpInventory',
+        servers: inventory.servers,
+        pendingRestartCount: inventory.pendingRestartCount,
+        configPaths: configSnapshot.configPaths,
+        lastError: configSnapshot.lastError,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.mcpLastError = message;
+      this.webview.postMessage({
+        type: 'mcpInventory',
+        servers: runtimeServers,
+        pendingRestartCount: 0,
+        configPaths: this.mcpConfigPaths ?? this.mcpConfigService.getConfigPaths(workspacePath),
+        lastError: message,
+      });
+      this.webview.postMessage({
+        type: 'mcpOperationResult',
+        success: false,
+        operation: 'refresh',
+        error: message,
+      });
+    }
+  }
+
+  private isClaudeMcpManageable(): boolean {
+    return this.getActiveProvider() === 'claude';
+  }
+
+  private postMcpOperationResult(result: {
+    success: boolean;
+    operation: string;
+    name?: string;
+    error?: string;
+    restartNeeded?: boolean;
+    nextAction?: 'restart-session' | 'reconnect' | 'sign-in' | 'approve-project' | 'open-config' | 'none';
+  }): void {
+    this.webview.postMessage({
+      type: 'mcpOperationResult',
+      success: result.success,
+      operation: result.operation,
+      name: result.name,
+      error: result.error,
+      restartNeeded: result.restartNeeded,
+      nextAction: result.nextAction,
+    });
+  }
+
+  private async previewMcpAddServer(
+    name: string,
+    config: import('../types/webview-messages').McpServerConfig,
+    scope: import('../types/webview-messages').McpScope
+  ): Promise<void> {
+    if (!this.isClaudeMcpManageable()) {
+      throw new Error('MCP preview is available only in Claude tabs.');
+    }
+    const preview = this.mcpConfigService.buildAddServerPreview(name, this.withoutSecrets(config), scope, this.getWorkspacePath());
+    this.webview.postMessage({ type: 'mcpDiffPreview', preview });
+  }
+
+  private withoutSecrets(config: import('../types/webview-messages').McpServerConfig): import('../types/webview-messages').McpServerConfig {
+    const { secretValues: _secretValues, ...rest } = config;
+    return rest;
+  }
+
+  private recordMcpMutation(name: string, scope: import('../types/webview-messages').McpScope, kind: McpMutationRecord['kind'], restartRequired: boolean): void {
+    this.pendingMcpMutations = this.pendingMcpMutations.filter(
+      (mutation) => !(mutation.name === name && mutation.scope === scope)
+    );
+    this.pendingMcpMutations.push({
+      name,
+      scope,
+      kind,
+      timestamp: Date.now(),
+      restartRequired,
+    });
+  }
+
+  private async handleMcpAddServer(
+    name: string,
+    config: import('../types/webview-messages').McpServerConfig,
+    scope: import('../types/webview-messages').McpScope
+  ): Promise<void> {
+    if (!this.isClaudeMcpManageable()) {
+      this.postMcpOperationResult({
+        success: false,
+        operation: 'add',
+        name,
+        error: 'MCP mutations are disabled outside Claude tabs.',
+      });
+      return;
+    }
+
+    await this.mcpCliService.addServer(name, this.withoutSecrets(config), scope);
+    await this.mcpSecretsService?.storeSecretValues(name, scope, config.secretValues ?? {});
+    this.recordMcpMutation(name, scope, 'added', true);
+    await this.refreshMcpInventory();
+    this.postMcpOperationResult({
+      success: true,
+      operation: 'add',
+      name,
+      restartNeeded: true,
+      nextAction: 'restart-session',
+    });
+  }
+
+  private async handleMcpRemoveServer(
+    name: string,
+    scope: import('../types/webview-messages').McpScope
+  ): Promise<void> {
+    if (!this.isClaudeMcpManageable()) {
+      this.postMcpOperationResult({
+        success: false,
+        operation: 'remove',
+        name,
+        error: 'MCP mutations are disabled outside Claude tabs.',
+      });
+      return;
+    }
+
+    await this.mcpCliService.removeServer(name, scope);
+    await this.mcpSecretsService?.deleteServerSecrets(name, scope);
+    this.recordMcpMutation(name, scope, 'removed', true);
+    await this.refreshMcpInventory();
+    this.postMcpOperationResult({
+      success: true,
+      operation: 'remove',
+      name,
+      restartNeeded: true,
+      nextAction: 'restart-session',
+    });
+  }
+
+  private async handleMcpImportDesktop(): Promise<void> {
+    if (!this.isClaudeMcpManageable()) {
+      this.postMcpOperationResult({
+        success: false,
+        operation: 'importDesktop',
+        error: 'MCP mutations are disabled outside Claude tabs.',
+      });
+      return;
+    }
+
+    const workspacePath = this.getWorkspacePath();
+    const beforeSnapshot = await this.mcpConfigService.readSnapshot(workspacePath);
+    await this.mcpCliService.importFromDesktop();
+    const afterSnapshot = await this.mcpConfigService.readSnapshot(workspacePath);
+    const beforeKeys = new Set(beforeSnapshot.servers.map((server) => `${server.name}::${server.scope}`));
+    const importedServers = afterSnapshot.servers.filter(
+      (server) => !beforeKeys.has(`${server.name}::${server.scope}`)
+    );
+
+    for (const server of importedServers) {
+      this.recordMcpMutation(server.name, server.scope, 'imported', true);
+    }
+
+    await this.refreshMcpInventory();
+    this.postMcpOperationResult({
+      success: true,
+      operation: 'importDesktop',
+      restartNeeded: importedServers.length > 0,
+      nextAction: importedServers.length > 0 ? 'restart-session' : 'none',
+    });
+  }
+
+  private async handleMcpResetProjectChoices(): Promise<void> {
+    if (!this.isClaudeMcpManageable()) {
+      this.postMcpOperationResult({
+        success: false,
+        operation: 'resetProjectChoices',
+        error: 'MCP mutations are disabled outside Claude tabs.',
+      });
+      return;
+    }
+
+    await this.mcpCliService.resetProjectChoices();
+    await this.refreshMcpInventory();
+    this.postMcpOperationResult({
+      success: true,
+      operation: 'resetProjectChoices',
+      nextAction: 'none',
+    });
+  }
+
+  private async handleMcpRestartSession(): Promise<void> {
+    if (!this.isClaudeMcpManageable()) {
+      this.postMcpOperationResult({
+        success: false,
+        operation: 'restartSession',
+        error: 'Session restart is only available in Claude tabs.',
+      });
+      return;
+    }
+
+    const sessionId = this.processManager.currentSessionId;
+    if (!sessionId) {
+      this.postMcpOperationResult({
+        success: false,
+        operation: 'restartSession',
+        error: 'No running Claude session is available to restart.',
+      });
+      return;
+    }
+
+    this.webview.setSuppressNextExit?.(true);
+    this.webview.postMessage({ type: 'processBusy', busy: true });
+    this.processManager.stop();
+    await this.processManager.start({
+      resume: sessionId,
+      cliPathOverride: this.getCliPathOverride(),
+    });
+    this.pendingMcpMutations = [];
+    this.currentRuntimeMcpServers = [];
+    this.postMcpOperationResult({
+      success: true,
+      operation: 'restartSession',
+      nextAction: 'none',
+    });
+  }
+
+  private async openMcpConfig(scope?: McpServerInfo['scope']): Promise<void> {
+    const targetPath = this.mcpConfigService.getConfigPathForScope(scope ?? 'project', this.getWorkspacePath());
+    if (!targetPath) {
+      void vscode.window.showInformationMessage('No MCP config file is available for that scope yet.');
+      return;
+    }
+    if (!fs.existsSync(targetPath)) {
+      void vscode.window.showInformationMessage(`MCP config file does not exist yet: ${targetPath}`);
+      return;
+    }
+
+    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(targetPath));
+    await vscode.window.showTextDocument(doc, { preview: false });
+  }
+
+  private openMcpLogs(): void {
+    void vscode.commands.executeCommand('claudeMirror.openLogDirectory');
   }
 
   /**
@@ -1298,6 +1588,87 @@ export class MessageHandler {
           );
           break;
 
+        case 'mcpRefresh':
+          void this.refreshMcpInventory();
+          break;
+
+        case 'mcpOpenConfig':
+          void this.openMcpConfig(msg.scope);
+          break;
+
+        case 'mcpOpenLogs':
+          this.openMcpLogs();
+          break;
+
+        case 'mcpPreviewAddServer':
+          void this.previewMcpAddServer(msg.name, msg.config, msg.scope).catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error);
+            this.postMcpOperationResult({
+              success: false,
+              operation: 'previewAdd',
+              name: msg.name,
+              error: message,
+            });
+          });
+          break;
+
+        case 'mcpAddServer':
+          void this.handleMcpAddServer(msg.name, msg.config, msg.scope).catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error);
+            this.postMcpOperationResult({
+              success: false,
+              operation: 'add',
+              name: msg.name,
+              error: message,
+            });
+          });
+          break;
+
+        case 'mcpRemoveServer':
+          void this.handleMcpRemoveServer(msg.name, msg.scope).catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error);
+            this.postMcpOperationResult({
+              success: false,
+              operation: 'remove',
+              name: msg.name,
+              error: message,
+            });
+          });
+          break;
+
+        case 'mcpImportDesktop':
+          void this.handleMcpImportDesktop().catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error);
+            this.postMcpOperationResult({
+              success: false,
+              operation: 'importDesktop',
+              error: message,
+            });
+          });
+          break;
+
+        case 'mcpResetProjectChoices':
+          void this.handleMcpResetProjectChoices().catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error);
+            this.postMcpOperationResult({
+              success: false,
+              operation: 'resetProjectChoices',
+              error: message,
+            });
+          });
+          break;
+
+        case 'mcpRestartSession':
+          void this.handleMcpRestartSession().catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error);
+            this.postMcpOperationResult({
+              success: false,
+              operation: 'restartSession',
+              error: message,
+            });
+          });
+          break;
+
         case 'setTypingTheme':
           this.log(`Setting typing theme to: "${msg.theme}"`);
           vscode.workspace.getConfiguration('claudeMirror').update('typingTheme', msg.theme, true);
@@ -1613,7 +1984,7 @@ export class MessageHandler {
               this.logDir,
               apiKey,
             );
-            this.bugReportService.startAutoCollection();
+            this.bugReportService.startAutoCollection(msg.context);
           })();
           break;
         }
@@ -2371,6 +2742,10 @@ export class MessageHandler {
           void this.sendApiKeySetting();
           // Send Claude auth status
           void this.sendClaudeAuthStatus();
+          // Send MCP template catalog for guided add flows
+          this.sendMcpCatalog();
+          // Send MCP inventory snapshot (config truth even before a session starts)
+          void this.refreshMcpInventory();
           // Refresh API key for scheduler-based spawners
           void this.refreshSchedulerApiKeys();
           // Send GitHub sync status
@@ -3145,17 +3520,17 @@ export class MessageHandler {
           model: event.model,
           provider: this.getActiveProvider(),
         });
-        // Send session metadata for Context Inspector tab
-        const mcpNames = Array.isArray(event.mcp_servers)
-          ? event.mcp_servers.map((s: any) => String(s.name || s.id || JSON.stringify(s))).filter(Boolean)
-          : [];
+        const runtimeMcpServers = this.mcpRegistryService.buildRuntimeServers(event);
+        this.currentRuntimeMcpServers = runtimeMcpServers;
+        // Send runtime-only metadata for Context Inspector tab
         this.webview.postMessage({
           type: 'sessionMetadata',
           tools: event.tools ?? [],
           model: event.model ?? '',
           cwd: event.cwd ?? '',
-          mcpServers: mcpNames,
+          mcpServers: runtimeMcpServers,
         });
+        void this.refreshMcpInventory(runtimeMcpServers);
       }
     );
 

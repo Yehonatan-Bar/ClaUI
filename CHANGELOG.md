@@ -1,6 +1,30 @@
 # ClaUi - Changelog
 
-## Unreleased - 2026-03-18
+## v0.2.00 - 2026-03-19
+
+**Feature: MCP management and visibility (Phase 1A + 1B)**
+
+- Added full MCP inventory support for Claude tabs, combining runtime session truth, config truth, and pending mutation truth into one merged model
+- Added a dedicated MCP overlay with `Session`, `Workspace`, `Add`, and `Debug` tabs
+- Added MCP status surfaces across the UI:
+  - Status bar MCP chip with restart/login/error/read-only states
+  - Context tab MCP pills that open the MCP panel
+- Added guided MCP management flows for Claude tabs:
+  - add server
+  - remove server
+  - import from Claude Desktop
+  - reset project approval choices
+  - restart/reconnect CTA flow
+- Added project-scope `.mcp.json` diff preview before save
+- Added curated MCP templates plus custom `stdio`, `http`, and `sse` configuration flows
+- Added SecretStorage-backed MCP secret handling with `${VAR}` placeholders so secrets are never written directly to `.mcp.json`
+- Added provider-aware MCP gating:
+  - Claude tabs get full management
+  - Codex/Happy tabs stay explicit read-only, with safe discovery/debug actions only
+- Added MCP-specific diagnostics/reporting entry point:
+  - prominent `Report MCP issue` button in the MCP panel
+  - reuses the full bug-report flow with MCP-focused prefill
+  - automatically attaches the current MCP inventory snapshot to preview, AI diagnosis context, ZIP contents, and final submission
 
 **Fix: RTL alignment for mixed Hebrew/English chat messages**
 
@@ -8,10 +32,6 @@
 - Previously, `dir="auto"` relied on the browser's first-strong-character heuristic, causing messages like "Hello world shalom" to stay left-aligned despite containing Hebrew
 - Updated `MarkdownContent.tsx`, `StreamingText.tsx`, and `MessageBubble.tsx` to use `detectRtl()` which checks for any Hebrew/Arabic character in the text
 - This matches the existing input area behavior where any Hebrew triggers RTL
-
----
-
-## Unreleased - 2026-03-12
 
 **Feature: Codex GPT-5.4 model support**
 

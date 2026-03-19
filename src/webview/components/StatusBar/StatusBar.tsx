@@ -76,6 +76,11 @@ export const StatusBar: React.FC<{
     handoffError,
     handoffArtifactPath,
     handoffManualPrompt,
+    mcpInventory,
+    mcpPendingRestartCount,
+    mcpLastError,
+    setMcpPanelOpen,
+    setMcpSelectedTab,
   } = useAppStore();
 
   const { barRef, layoutMode } = useStatusBarCollapse();
@@ -565,14 +570,6 @@ export const StatusBar: React.FC<{
     </div>
   );
 
-  // --- Token counts ---
-  const tokensElement = (
-    <div className="cost-display">
-      <span>In: {(cost?.inputTokens ?? 0).toLocaleString()}</span>
-      <span>Out: {(cost?.outputTokens ?? 0).toLocaleString()}</span>
-    </div>
-  );
-
   // --- Usage metric with inline bar ---
   const usageMetric = !isCodexUi ? (
     <div className="status-bar-usage-wrapper" ref={usageRef}>
@@ -597,6 +594,48 @@ export const StatusBar: React.FC<{
       {usagePopover}
     </div>
   ) : null;
+
+  const needsAuthCount = mcpInventory.filter((server) => server.effectiveStatus === 'needs_auth').length;
+  const mcpChipLabel = provider !== 'claude'
+    ? 'MCP read-only'
+    : mcpLastError
+      ? 'MCP error'
+      : needsAuthCount > 0
+        ? `MCP ${mcpInventory.length} | ${needsAuthCount} needs login`
+        : mcpPendingRestartCount > 0
+          ? `MCP ${mcpInventory.length} | restart needed`
+          : `MCP ${mcpInventory.length}`;
+
+  const mcpChip = (
+    <button
+      onClick={() => {
+        setMcpSelectedTab(provider === 'claude' ? 'session' : 'debug');
+        setMcpPanelOpen(true);
+      }}
+      data-tooltip="Open MCP inventory"
+      style={{
+        padding: '5px 10px',
+        borderRadius: 999,
+        border: mcpLastError
+          ? '1px solid rgba(248, 81, 73, 0.35)'
+          : mcpPendingRestartCount > 0
+            ? '1px solid rgba(210, 153, 34, 0.35)'
+            : '1px solid rgba(88, 166, 255, 0.26)',
+        background: mcpLastError
+          ? 'rgba(248, 81, 73, 0.12)'
+          : mcpPendingRestartCount > 0
+            ? 'rgba(210, 153, 34, 0.12)'
+            : 'rgba(88, 166, 255, 0.12)',
+        color: mcpLastError ? '#ffaba8' : mcpPendingRestartCount > 0 ? '#f2cc60' : '#9ecbff',
+        cursor: 'pointer',
+        fontSize: 11,
+        fontWeight: 700,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {mcpChipLabel}
+    </button>
+  );
 
   // --- Single unified render ---
   return (
@@ -659,8 +698,8 @@ export const StatusBar: React.FC<{
 
       <div className="status-bar-right">
         {clockElement}
+        {mcpChip}
         {usageMetric}
-        {!isMinimal && tokensElement}
       </div>
     </div>
   );

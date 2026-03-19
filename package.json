@@ -119,6 +119,10 @@
         "title": "ClaUi: Toggle Agent Teams Panel"
       },
       {
+        "command": "claudeMirror.toggleMcpPanel",
+        "title": "ClaUi: MCP Servers"
+      },
+      {
         "command": "claudeMirror.authenticateHappy",
         "title": "ClaUi: Authenticate Happy Coder"
       },
@@ -670,6 +674,9 @@
         },
         {
           "command": "claudeMirror.sendFeedback"
+        },
+        {
+          "command": "claudeMirror.toggleMcpPanel"
         },
         {
           "command": "claudeMirror.switchProviderWithContext"

@@ -11,6 +11,7 @@ import { collectDiagnostics, DiagnosticsResult } from './DiagnosticsCollector';
 import { FormspreeService } from './FormspreeService';
 import { ClaudeCliCaller } from '../skillgen/ClaudeCliCaller';
 import type { WebviewBridge } from './BugReportTypes';
+import type { BugReportContext } from '../types/webview-messages';
 
 const FORMSPREE_FORM_ID = 'mreajleg';
 const AI_MODEL = 'claude-sonnet-4-6';
@@ -86,6 +87,7 @@ export class BugReportService {
   private scriptOutputs: Array<{ command: string; output: string; exitCode: number }> = [];
   private cliCaller: ClaudeCliCaller;
   private disposed = false;
+  private context: BugReportContext | null = null;
 
   constructor(
     bridge: WebviewBridge,
@@ -108,7 +110,8 @@ export class BugReportService {
   // Auto-collection
   // -----------------------------------------------------------------------
 
-  async startAutoCollection(): Promise<void> {
+  async startAutoCollection(context?: BugReportContext): Promise<void> {
+    this.context = context ?? null;
     this.log('[BugReport] Starting auto-collection');
     this.postStatus('collecting');
 
@@ -142,8 +145,11 @@ export class BugReportService {
     const historyText = this.conversationHistory
       .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
       .join('\n\n');
+    const featureContext = this.context?.metadataText
+      ? `\n\nFeature-specific context snapshot:\n${truncateHead(this.context.metadataText, 6_000, 'feature context')}\nUse it as current state unless the user corrects it.`
+      : '';
 
-    const prompt = `${buildSystemPrompt()}\n\nConversation so far:\n${historyText}\n\nRespond as the Assistant:`;
+    const prompt = `${buildSystemPrompt()}${featureContext}\n\nConversation so far:\n${historyText}\n\nRespond as the Assistant:`;
 
     try {
       const response = await this.cliCaller.call({
@@ -264,6 +270,14 @@ export class BugReportService {
       });
     }
 
+    if (this.context?.metadataText) {
+      files.push({
+        name: this.context.source === 'mcp' ? 'MCP context snapshot' : 'Feature context snapshot',
+        sizeBytes: Buffer.byteLength(this.context.metadataText, 'utf-8'),
+        preview: truncateHead(this.context.metadataText, 500, 'feature context'),
+      });
+    }
+
     for (let i = 0; i < this.scriptOutputs.length; i++) {
       const s = this.scriptOutputs[i];
       files.push({
@@ -287,9 +301,10 @@ export class BugReportService {
     try {
       // ----- Build named sections (full content, no truncation) -----
       const sections: Array<{ name: string; content: string }> = [];
+      const reportLabel = this.context?.source === 'mcp' ? 'ClaUi MCP Bug Report' : 'ClaUi Bug Report';
 
       const header = [
-        `=== ClaUi Bug Report (${mode} mode) ===`,
+        `=== ${reportLabel} (${mode} mode) ===`,
         `Extension: v${this.extensionVersion}`,
         `Timestamp: ${new Date().toISOString()}`,
         '',
@@ -299,6 +314,13 @@ export class BugReportService {
         sections.push({
           name: 'diagnostics',
           content: `--- System Diagnostics ---\n${this.diagnostics.systemInfo}\n`,
+        });
+      }
+
+      if (this.context?.metadataText) {
+        sections.push({
+          name: 'feature_context',
+          content: `--- ${this.context.source === 'mcp' ? 'MCP' : 'Feature'} Context Snapshot ---\n${this.context.metadataText}\n`,
         });
       }
 
@@ -341,6 +363,12 @@ export class BugReportService {
         zip.addFile('diagnostics.txt', Buffer.from(this.diagnostics.systemInfo, 'utf-8'));
         zip.addFile('logs.txt', Buffer.from(this.diagnostics.recentLogs, 'utf-8'));
       }
+      if (this.context?.metadataText) {
+        zip.addFile(
+          this.context.source === 'mcp' ? 'mcp-context.txt' : 'feature-context.txt',
+          Buffer.from(this.context.metadataText, 'utf-8'),
+        );
+      }
       if (mode === 'quick' && description) {
         zip.addFile('description.txt', Buffer.from(description, 'utf-8'));
       }
@@ -362,7 +390,7 @@ export class BugReportService {
       const formspree = new FormspreeService(FORMSPREE_FORM_ID);
       formspree.setLogger(this.log);
 
-      this.sendInBackground(formspree, mode, header, sections, zipBuffer);
+      this.sendInBackground(formspree, mode, reportLabel, header, sections, zipBuffer);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.log(`[BugReport] Submit error: ${msg}`);
@@ -378,6 +406,7 @@ export class BugReportService {
   private sendInBackground(
     formspree: FormspreeService,
     mode: string,
+    reportLabel: string,
     header: string,
     sections: Array<{ name: string; content: string }>,
     zipBuffer: Buffer,
@@ -390,7 +419,7 @@ export class BugReportService {
         const fullMessage = header + sections.map(s => s.content).join('\n');
         const result = await formspree.submit({
           message: fullMessage,
-          subject: `ClaUi Bug Report (${mode})`,
+          subject: `${reportLabel} (${mode})`,
           category: 'bug',
           extensionVersion: this.extensionVersion,
           attachments: [{ filename: 'bug-report.zip', content: zipBuffer, contentType: 'application/zip' }],
@@ -406,7 +435,7 @@ export class BugReportService {
 
         const payloads = chunks.map((chunk, i) => ({
           message: `${header}[Part ${i + 1} of ${chunks.length}]\n\n${chunk}`,
-          subject: `ClaUi Bug Report (${mode}) - Part ${i + 1}/${chunks.length}`,
+          subject: `${reportLabel} (${mode}) - Part ${i + 1}/${chunks.length}`,
           category: 'bug',
           extensionVersion: this.extensionVersion,
           ...(i === 0
@@ -495,5 +524,6 @@ export class BugReportService {
     this.diagnostics = null;
     this.conversationHistory = [];
     this.scriptOutputs = [];
+    this.context = null;
   }
 }

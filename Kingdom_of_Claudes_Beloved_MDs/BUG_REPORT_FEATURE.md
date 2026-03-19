@@ -4,6 +4,8 @@
 
 Comprehensive in-extension bug reporting. Users can submit detailed bug reports with auto-collected diagnostics, optional AI-assisted diagnosis, and script execution. Report data is sent as readable text via Formspree (with ZIP file attachment on paid plans). On free Formspree plans, falls back to text-only submission containing all report sections inline.
 
+The same reporting flow now also supports feature-specific entry points. The MCP panel opens the existing bug report overlay with MCP-focused prefill text and an attached MCP state snapshot.
+
 ## Key Files
 
 | File | Purpose |
@@ -28,23 +30,35 @@ User clicks Feedback -> "Full Bug Report" ->
                 FormspreeService submits to developer's email
 ```
 
+MCP-specific entry:
+
+```
+User clicks "Report MCP issue" inside McpPanel ->
+  McpPanel seeds bugReportContext in Zustand ->
+    BugReportPanel opens with MCP-focused title/prefill ->
+      bugReportInit carries BugReportContext ->
+        BugReportService attaches MCP snapshot to preview, AI diagnosis, ZIP, and final Formspree payload
+```
+
 ## Two Modes
 
 ### Quick Report
 - Required text description in a textarea
 - Auto-collected diagnostics included automatically
 - No AI interaction needed
+- Feature-specific entry points can prefill the textarea with a targeted template
 
 ### AI-Assisted Report
 - Chat interface with Claude Sonnet 4.6 (via `ClaudeCliCaller` one-shot calls)
 - AI asks structured diagnostic questions
 - AI can suggest diagnostic scripts (fenced code blocks) -- user must approve
 - Full conversation history saved in `conversation.json`
+- Feature-specific context is injected into the AI prompt before the conversation history
 
 ## Message Types
 
 ### Webview -> Extension (6 types)
-- `bugReportInit` -- start diagnostics collection, create service
+- `bugReportInit` -- start diagnostics collection, create service, optional feature-specific context
 - `bugReportChat` -- send user message to AI
 - `bugReportApproveScript` -- approve a suggested script for execution
 - `bugReportSubmit` -- package and send the report
@@ -81,6 +95,7 @@ User clicks Feedback -> "Full Bug Report" ->
 | `description.txt` | Quick | User's bug description |
 | `conversation.json` | AI | Full AI conversation history |
 | `script_output_N.txt` | AI | Output from approved scripts |
+| `mcp-context.txt` / `feature-context.txt` | Both when present | Feature-specific snapshot supplied by the launching UI |
 
 ## AI System Prompt
 
@@ -142,6 +157,7 @@ Chat messages, quick-mode textarea, and chat input detect Hebrew/Arabic via `det
 - "What info will be sent to the developer?" expandable section shows file list with full paths + sizes
 - Scripts require explicit approval before execution
 - Large red "SEND BUG REPORT" button is the only way to submit
+- MCP-launched reports explicitly tell the user that the current MCP inventory snapshot will be attached only after they click Send
 
 ## Dependencies
 

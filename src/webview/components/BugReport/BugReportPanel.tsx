@@ -16,24 +16,27 @@ export const BugReportPanel: React.FC = () => {
     bugReportChatLoading,
     bugReportPreviewFiles,
     bugReportError,
+    bugReportContext,
     setBugReportPanelOpen,
     setBugReportMode,
     bugReportReset,
   } = useAppStore();
 
-  const [description, setDescription] = useState('');
-  const [chatInput, setChatInput] = useState('');
+  const [description, setDescription] = useState(() => bugReportContext?.quickDescription ?? '');
+  const [chatInput, setChatInput] = useState(() => bugReportContext?.aiPrompt ?? '');
   const [previewOpen, setPreviewOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
+  const isMcpReport = bugReportContext?.source === 'mcp';
+  const panelTitle = bugReportContext?.title ?? 'Bug Report';
 
   // Init: tell extension to start collecting diagnostics
   useEffect(() => {
-    postToExtension({ type: 'bugReportInit' });
+    postToExtension({ type: 'bugReportInit', context: bugReportContext ?? undefined });
     return () => {
       postToExtension({ type: 'bugReportClose' });
     };
-  }, []);
+  }, [bugReportContext]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -101,12 +104,17 @@ export const BugReportPanel: React.FC = () => {
       <div className="bugreport-panel" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="bugreport-header">
-          <span className="bugreport-title">Bug Report</span>
+          <span className="bugreport-title">{panelTitle}</span>
           <button className="bugreport-close-btn" onClick={handleClose} title="Close">X</button>
         </div>
         <div className="bugreport-privacy-notice">
           Nothing will be sent until you click Send.
         </div>
+        {isMcpReport && (
+          <div className="bugreport-privacy-notice" style={{ color: 'var(--vscode-terminal-ansiYellow)' }}>
+            Current MCP inventory, logs, and system details will be attached automatically when you send this report.
+          </div>
+        )}
 
         {/* Mode Tabs */}
         <div className="bugreport-tabs">
@@ -149,12 +157,12 @@ export const BugReportPanel: React.FC = () => {
             /* Quick Mode */
             <div className="bugreport-quick-mode">
               <label className="bugreport-label" htmlFor="bugreport-description">
-                Describe the bug <span style={{ color: 'var(--vscode-errorForeground)' }}>*</span>
+                {isMcpReport ? 'Describe the MCP issue' : 'Describe the bug'} <span style={{ color: 'var(--vscode-errorForeground)' }}>*</span>
               </label>
               <textarea
                 id="bugreport-description"
                 className="bugreport-textarea"
-                placeholder="What happened? What did you expect? Steps to reproduce..."
+                placeholder={isMcpReport ? 'What MCP action failed? Which server was affected? What did you expect?' : 'What happened? What did you expect? Steps to reproduce...'}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 dir={detectRtl(description) ? 'rtl' : 'ltr'}
@@ -168,7 +176,9 @@ export const BugReportPanel: React.FC = () => {
               <div className="bugreport-chat-area">
                 {bugReportChatMessages.length === 0 && !bugReportChatLoading && (
                   <div className="bugreport-chat-empty">
-                    Describe the bug you encountered. The AI will help diagnose the issue and guide you through a structured report.
+                    {isMcpReport
+                      ? 'Describe the MCP issue you encountered. The AI will use the attached MCP snapshot to help diagnose the problem and guide you through a structured report.'
+                      : 'Describe the bug you encountered. The AI will help diagnose the issue and guide you through a structured report.'}
                   </div>
                 )}
                 {bugReportChatMessages.map((msg, i) => {
@@ -196,7 +206,7 @@ export const BugReportPanel: React.FC = () => {
                 <textarea
                   ref={chatInputRef}
                   className="bugreport-chat-input"
-                  placeholder="Describe the bug or answer the AI's question..."
+                  placeholder={isMcpReport ? 'Describe the MCP issue or answer the AI\'s question...' : 'Describe the bug or answer the AI\'s question...'}
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   dir={detectRtl(chatInput) ? 'rtl' : 'ltr'}

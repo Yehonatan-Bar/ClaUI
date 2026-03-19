@@ -714,7 +714,7 @@ export class CodexMessageHandler {
               this.logDir,
               apiKey,
             );
-            this.bugReportService.startAutoCollection();
+            this.bugReportService.startAutoCollection(msg.context);
           })();
           break;
         }

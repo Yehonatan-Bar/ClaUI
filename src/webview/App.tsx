@@ -21,6 +21,7 @@ import { StatusBar } from './components/StatusBar/StatusBar';
 import { DashboardPanel } from './components/Dashboard';
 import { SkillGenPanel } from './components/SkillGen';
 import { BugReportPanel } from './components/BugReport';
+import { McpPanel } from './components/McpPanel';
 import { CodexConsultPanel } from './components/InputArea/CodexConsultPanel';
 import { TeamPanel, TeamStatusWidget } from './components/Teams';
 import { postToExtension } from './hooks/useClaudeStream';
@@ -62,6 +63,7 @@ export const App: React.FC = () => {
     contextWidgetVisible,
     turnHistory,
     dashboardOpen,
+    mcpPanelOpen,
     skillGenPanelOpen,
     communityPanelOpen,
     codexConsultPanelOpen,
@@ -157,6 +159,7 @@ export const App: React.FC = () => {
       {achievementsEnabled && communityPanelOpen && <CommunityPanel />}
       {achievementsEnabled && <ShareCard />}
       {dashboardOpen && <DashboardPanel />}
+      {mcpPanelOpen && <McpPanel />}
       {skillGenPanelOpen && <SkillGenPanel />}
       {bugReportPanelOpen && <BugReportPanel />}
       {teamPanelOpen && <TeamPanel />}

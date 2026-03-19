@@ -66,6 +66,15 @@ export function useClaudeStream(): void {
     applyTurnSemantics,
     setTurnAnalysisSettings,
     setSessionMetadata,
+    setMcpPanelOpen,
+    setMcpSelectedTab,
+    setMcpInventory,
+    setMcpPendingRestartCount,
+    setMcpLoading,
+    setMcpLastError,
+    setMcpLastOperation,
+    setMcpTemplates,
+    setMcpDiffPreview,
     setProjectSessions,
     setIsEnhancing,
     setPromptEnhancerSettings,
@@ -156,6 +165,43 @@ export function useClaudeStream(): void {
         case 'sessionEnded':
           endSession(msg.reason);
           logState('after sessionEnded');
+          break;
+
+        case 'toggleMcpPanel':
+          setMcpPanelOpen(msg.open ?? !useAppStore.getState().mcpPanelOpen);
+          if (msg.tab) {
+            setMcpSelectedTab(msg.tab);
+          }
+          break;
+
+        case 'mcpInventory':
+          setMcpInventory(msg.servers, msg.configPaths ?? null);
+          setMcpPendingRestartCount(msg.pendingRestartCount);
+          setMcpLoading(false);
+          setMcpLastError(msg.lastError ?? null);
+          break;
+
+        case 'mcpCatalog':
+          setMcpTemplates(msg.templates);
+          break;
+
+        case 'mcpDiffPreview':
+          setMcpLoading(false);
+          setMcpDiffPreview(msg.preview);
+          break;
+
+        case 'mcpOperationResult':
+          setMcpLoading(false);
+          setMcpLastOperation({
+            op: msg.operation,
+            name: msg.name,
+            success: msg.success,
+            restartNeeded: msg.restartNeeded,
+            nextAction: msg.nextAction,
+          });
+          if (!msg.success) {
+            setMcpLastError(msg.error || 'MCP operation failed');
+          }
           break;
 
         case 'messageStart': {
@@ -738,6 +784,7 @@ export function useClaudeStream(): void {
 
         // ----- Bug Report -----
         case 'bugReportOpen':
+          useAppStore.getState().setBugReportContext(null);
           useAppStore.getState().setBugReportPanelOpen(true);
           break;
         case 'bugReportStatus':
@@ -885,6 +932,15 @@ export function useClaudeStream(): void {
     applyTurnSemantics,
     setTurnAnalysisSettings,
     setSessionMetadata,
+    setMcpPanelOpen,
+    setMcpSelectedTab,
+    setMcpInventory,
+    setMcpPendingRestartCount,
+    setMcpLoading,
+    setMcpLastError,
+    setMcpLastOperation,
+    setMcpTemplates,
+    setMcpDiffPreview,
     setProjectSessions,
     setIsEnhancing,
     setPromptEnhancerSettings,

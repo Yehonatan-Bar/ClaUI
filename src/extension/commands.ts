@@ -699,6 +699,13 @@ export function registerCommands(
       tabManager.postToActiveTab({ type: 'teamDetected', teamName: '' });
     }),
 
+    vscode.commands.registerCommand('claudeMirror.toggleMcpPanel', () => {
+      const tab = tabManager.getOrCreateTab();
+      tab.reveal();
+      tab.postMessage({ type: 'toggleMcpPanel', open: true, tab: 'session' });
+      log('Opened MCP panel in active ClaUi tab');
+    }),
+
     // Fork conversation from a specific message (opens a new tab)
     vscode.commands.registerCommand(
       'claudeMirror.forkFromMessage',

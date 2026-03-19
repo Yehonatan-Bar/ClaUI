@@ -1,6 +1,19 @@
 import { create } from 'zustand';
 import type { ContentBlock } from '../../extension/types/stream-json';
-import type { CodexReasoningEffort, HandoffStage, ProviderCapabilities, ProviderId, TypingTheme } from '../../extension/types/webview-messages';
+import type {
+  BugReportContext,
+  CodexReasoningEffort,
+  HandoffStage,
+  McpConfigDiffPreview,
+  McpConfigPaths,
+  McpMutationRecord,
+  McpNextAction,
+  McpServerInfo,
+  McpTemplateDefinition,
+  ProviderCapabilities,
+  ProviderId,
+  TypingTheme,
+} from '../../extension/types/webview-messages';
 import type {
   AchievementAwardPayload,
   AchievementGoalPayload,
@@ -303,8 +316,20 @@ export interface AppState {
     tools: string[];
     model: string;
     cwd: string;
-    mcpServers: string[];
+    mcpServers: McpServerInfo[];
   } | null;
+
+  mcpPanelOpen: boolean;
+  mcpSelectedTab: 'session' | 'workspace' | 'add' | 'debug';
+  mcpInventory: McpServerInfo[];
+  mcpPendingMutations: McpMutationRecord[];
+  mcpPendingRestartCount: number;
+  mcpLoading: boolean;
+  mcpLastError: string | null;
+  mcpLastOperation: { op: string; name?: string; success: boolean; restartNeeded?: boolean; nextAction?: McpNextAction } | null;
+  mcpConfigPaths: McpConfigPaths | null;
+  mcpTemplates: McpTemplateDefinition[];
+  mcpDiffPreview: McpConfigDiffPreview | null;
 
   // Project-level analytics (cross-session, from workspaceState)
   projectSessions: SessionSummary[];
@@ -403,8 +428,10 @@ export interface AppState {
   bugReportChatLoading: boolean;
   bugReportPreviewFiles: Array<{ name: string; sizeBytes: number; preview?: string }>;
   bugReportError: string | null;
+  bugReportContext: BugReportContext | null;
   setBugReportPanelOpen: (open: boolean) => void;
   setBugReportMode: (mode: 'quick' | 'ai') => void;
+  setBugReportContext: (context: BugReportContext | null) => void;
   bugReportReset: () => void;
 
   // Token-Usage Ratio
@@ -568,7 +595,16 @@ export interface AppState {
   setSendSettingsPopoverOpen: (open: boolean) => void;
   setPromptTranslatorSettings: (settings: { translateEnabled: boolean; autoTranslate: boolean }) => void;
   setTurnAnalysisSettings: (settings: { enabled: boolean; analysisModel: string }) => void;
-  setSessionMetadata: (meta: { tools: string[]; model: string; cwd: string; mcpServers: string[] }) => void;
+  setSessionMetadata: (meta: { tools: string[]; model: string; cwd: string; mcpServers: McpServerInfo[] }) => void;
+  setMcpPanelOpen: (open: boolean) => void;
+  setMcpSelectedTab: (tab: 'session' | 'workspace' | 'add' | 'debug') => void;
+  setMcpInventory: (servers: McpServerInfo[], configPaths?: McpConfigPaths | null) => void;
+  setMcpPendingRestartCount: (count: number) => void;
+  setMcpLoading: (loading: boolean) => void;
+  setMcpLastError: (error: string | null) => void;
+  setMcpLastOperation: (operation: { op: string; name?: string; success: boolean; restartNeeded?: boolean; nextAction?: McpNextAction } | null) => void;
+  setMcpTemplates: (templates: McpTemplateDefinition[]) => void;
+  setMcpDiffPreview: (preview: McpConfigDiffPreview | null) => void;
   setProjectSessions: (sessions: SessionSummary[]) => void;
   setProjectDashboardMode: (mode: 'session' | 'project' | 'user') => void;
   setSkillGenSettings: (settings: { enabled: boolean; threshold: number }) => void;
@@ -837,6 +873,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   turnAnalysisEnabled: true,
   analysisModel: 'claude-haiku-4-5-20251001',
   sessionMetadata: null,
+  mcpPanelOpen: false,
+  mcpSelectedTab: 'session',
+  mcpInventory: [],
+  mcpPendingMutations: [],
+  mcpPendingRestartCount: 0,
+  mcpLoading: false,
+  mcpLastError: null,
+  mcpLastOperation: null,
+  mcpConfigPaths: null,
+  mcpTemplates: [],
+  mcpDiffPreview: null,
   projectSessions: [],
   projectDashboardMode: 'session',
   sessionActivityStarted: false,
@@ -922,8 +969,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   bugReportChatLoading: false,
   bugReportPreviewFiles: [],
   bugReportError: null,
+  bugReportContext: null,
   setBugReportPanelOpen: (open) => set({ bugReportPanelOpen: open }),
   setBugReportMode: (mode) => set({ bugReportMode: mode }),
+  setBugReportContext: (context) => set({ bugReportContext: context }),
   bugReportReset: () => set({
     bugReportPanelOpen: false,
     bugReportMode: 'quick' as 'quick' | 'ai',
@@ -933,6 +982,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     bugReportChatLoading: false,
     bugReportPreviewFiles: [],
     bugReportError: null,
+    bugReportContext: null,
   }),
 
   // Token-Usage Ratio
@@ -1842,6 +1892,29 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSessionMetadata: (meta) =>
     set({ sessionMetadata: meta }),
 
+  setMcpPanelOpen: (open) => set({ mcpPanelOpen: open }),
+  setMcpSelectedTab: (tab) => set({ mcpSelectedTab: tab }),
+  setMcpInventory: (servers, configPaths) =>
+    set((state) => ({
+      mcpInventory: servers,
+      mcpConfigPaths: configPaths ?? state.mcpConfigPaths,
+      mcpPendingMutations: servers
+        .filter((server) => server.pendingMutation)
+        .map((server) => ({
+          name: server.name,
+          scope: server.scope,
+          kind: server.pendingMutation!,
+          timestamp: Date.now(),
+          restartRequired: !!server.restartRequired,
+        })),
+    })),
+  setMcpPendingRestartCount: (count) => set({ mcpPendingRestartCount: count }),
+  setMcpLoading: (loading) => set({ mcpLoading: loading }),
+  setMcpLastError: (error) => set({ mcpLastError: error }),
+  setMcpLastOperation: (operation) => set({ mcpLastOperation: operation }),
+  setMcpTemplates: (templates) => set({ mcpTemplates: templates }),
+  setMcpDiffPreview: (preview) => set({ mcpDiffPreview: preview }),
+
   setProjectSessions: (sessions) =>
     set({ projectSessions: sessions }),
 
@@ -2079,6 +2152,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       bugReportChatLoading: false,
       bugReportPreviewFiles: [],
       bugReportError: null,
+      bugReportContext: null,
       isEnhancing: false,
       enhancerPopoverOpen: false,
       enhanceComparisonData: null,
@@ -2090,6 +2164,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       promptTranslateEnabled: state.promptTranslateEnabled,
       autoTranslateEnabled: state.autoTranslateEnabled,
       sessionMetadata: null,
+      mcpPanelOpen: false,
+      mcpSelectedTab: 'session' as const,
+      mcpInventory: [],
+      mcpPendingMutations: [],
+      mcpPendingRestartCount: 0,
+      mcpLoading: false,
+      mcpLastError: null,
+      mcpLastOperation: null,
+      mcpConfigPaths: null,
+      mcpTemplates: [],
+      mcpDiffPreview: null,
       projectSessions: [],
       sessionActivityStarted: false,
       sessionActivityElapsedMs: 0,

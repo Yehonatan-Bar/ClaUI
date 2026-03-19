@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../../../state/store';
 import type { ChatMessage } from '../../../state/store';
 import type { ContentBlock } from '../../../../extension/types/stream-json';
+import type { McpServerInfo } from '../../../../extension/types/webview-messages';
 import { DASH_COLORS } from '../dashboardUtils';
 
 // --- Styles ---
@@ -49,6 +50,20 @@ const pillStyle = (color: string) => ({
   marginBottom: '4px',
 });
 
+function mcpPillStyle(server: McpServerInfo): React.CSSProperties {
+  const color =
+    server.effectiveStatus === 'active' ? DASH_COLORS.green :
+    server.effectiveStatus === 'pending_restart' ? DASH_COLORS.amber :
+    server.effectiveStatus === 'needs_auth' ? '#fb8500' :
+    server.effectiveStatus === 'broken' ? DASH_COLORS.red :
+    DASH_COLORS.purple;
+
+  return {
+    ...pillStyle(color),
+    cursor: 'pointer',
+  };
+}
+
 // --- Helpers ---
 function formatBlockContent(block: ContentBlock): string {
   if (block.type === 'text') {
@@ -81,6 +96,8 @@ function roleColor(role: string): string {
 const SessionMetadataSection: React.FC = () => {
   const meta = useAppStore((s) => s.sessionMetadata);
   const sessionId = useAppStore((s) => s.sessionId);
+  const setMcpPanelOpen = useAppStore((s) => s.setMcpPanelOpen);
+  const setMcpSelectedTab = useAppStore((s) => s.setMcpSelectedTab);
 
   if (!meta) {
     return (
@@ -109,7 +126,23 @@ const SessionMetadataSection: React.FC = () => {
         <span style={{ color: DASH_COLORS.textMuted }}>MCP Servers</span>
         <span>
           {meta.mcpServers.length > 0
-            ? meta.mcpServers.map((s, i) => <span key={i} style={pillStyle(DASH_COLORS.purple)}>{s}</span>)
+            ? meta.mcpServers.map((server) => (
+                <button
+                  key={`${server.name}-${server.scope}`}
+                  style={{
+                    ...mcpPillStyle(server),
+                    border: 'none',
+                  }}
+                  onClick={() => {
+                    setMcpSelectedTab('session');
+                    setMcpPanelOpen(true);
+                  }}
+                  title={`${server.name} | ${server.effectiveStatus} | ${server.tools.length} tool${server.tools.length === 1 ? '' : 's'}`}
+                >
+                  {server.name}
+                  {server.tools.length > 0 ? ` (${server.tools.length})` : ''}
+                </button>
+              ))
             : <span style={{ color: DASH_COLORS.textMuted }}>none</span>}
         </span>
       </div>
