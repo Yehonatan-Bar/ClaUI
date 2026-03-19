@@ -1,6 +1,6 @@
 # ClaUi - Changelog
 
-## v0.1.001 - 2026-03-19
+## v0.1.01 - 2026-03-19
 
 **Fix: MCP chip hidden when no servers are configured**
 
