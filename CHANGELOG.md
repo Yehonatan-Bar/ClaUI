@@ -1,5 +1,16 @@
 # ClaUi - Changelog
 
+## v0.1.103 - 2026-03-19
+
+**Fix: Activity Summary persists across turns**
+
+- Activity summary panel no longer disappears when the user sends a new prompt
+- Previously, the summary was cleared on every `processBusy: true` event, making it visible only in a narrow window between Haiku response and the next user message
+- Now the summary stays visible until a new summary replaces it or the user dismisses it with the X button
+- Existing dismiss features: X button (top-right), "Disable permanently" button (appears for 4 seconds after dismiss), and toggle in VitalsInfoPanel dropdown
+
+---
+
 ## v0.1.01 - 2026-03-19
 
 **Fix: MCP chip hidden when no servers are configured**

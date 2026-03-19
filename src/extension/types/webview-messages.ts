@@ -447,6 +447,11 @@ export interface SetAdventureWidgetEnabledRequest {
   enabled: boolean;
 }
 
+export interface SetActivitySummaryEnabledRequest {
+  type: 'setActivitySummaryEnabled';
+  enabled: boolean;
+}
+
 export interface SetTranslationLanguageRequest {
   type: 'setTranslationLanguage';
   language: string;
@@ -792,6 +797,7 @@ export type WebviewToExtensionMessage =
   | SetVitalsEnabledRequest
   | SetDetailedDiffViewEnabledRequest
   | SetAdventureWidgetEnabledRequest
+  | SetActivitySummaryEnabledRequest
   | SetTranslationLanguageRequest
   | AdventureDebugLogMessage
   | UiDebugLogMessage
@@ -1310,6 +1316,11 @@ export interface FileOldContentMessage {
 
 export interface AdventureWidgetSettingMessage {
   type: 'adventureWidgetSetting';
+  enabled: boolean;
+}
+
+export interface ActivitySummarySettingMessage {
+  type: 'activitySummarySetting';
   enabled: boolean;
 }
 
@@ -1911,6 +1922,7 @@ export type ExtensionToWebviewMessage =
   | DetailedDiffViewSettingMessage
   | FileOldContentMessage
   | AdventureWidgetSettingMessage
+  | ActivitySummarySettingMessage
   | AdventureBeatMessage
   | TurnSemanticsMessage
   | TurnAnalysisSettingsMessage

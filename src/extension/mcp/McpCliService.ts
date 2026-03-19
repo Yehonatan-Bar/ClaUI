@@ -112,6 +112,11 @@ export class McpCliService {
 
   private resolveWindowsScriptPath(configured: string): CliInvocation | null {
     const ext = path.extname(configured).toLowerCase();
+
+    // Explicit .cmd/.ps1 path provided by user
+    if (ext === '.cmd') {
+      return { command: 'cmd.exe', prefixArgs: ['/c', configured] };
+    }
     if (ext === '.ps1') {
       return {
         command: 'powershell',
@@ -119,24 +124,38 @@ export class McpCliService {
       };
     }
 
+    // Absolute or relative path (contains directory separator) - check sibling .cmd then .ps1
     if (configured.includes(path.sep) || configured.includes('/')) {
-      const siblingPs1 = `${configured}.ps1`;
-      if (!ext && fs.existsSync(siblingPs1)) {
-        return {
-          command: 'powershell',
-          prefixArgs: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', siblingPs1],
-        };
+      if (!ext) {
+        const siblingCmd = `${configured}.cmd`;
+        if (fs.existsSync(siblingCmd)) {
+          return { command: 'cmd.exe', prefixArgs: ['/c', siblingCmd] };
+        }
+        const siblingPs1 = `${configured}.ps1`;
+        if (fs.existsSync(siblingPs1)) {
+          return {
+            command: 'powershell',
+            prefixArgs: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', siblingPs1],
+          };
+        }
       }
       return null;
     }
 
+    // Bare command name - scan PATH for .cmd first, then .ps1
     const pathDirs = (process.env.PATH ?? '').split(path.delimiter).filter(Boolean);
     for (const dir of pathDirs) {
-      const candidate = path.join(dir, `${configured}.ps1`);
-      if (fs.existsSync(candidate)) {
+      const cmdCandidate = path.join(dir, `${configured}.cmd`);
+      if (fs.existsSync(cmdCandidate)) {
+        return { command: 'cmd.exe', prefixArgs: ['/c', cmdCandidate] };
+      }
+    }
+    for (const dir of pathDirs) {
+      const ps1Candidate = path.join(dir, `${configured}.ps1`);
+      if (fs.existsSync(ps1Candidate)) {
         return {
           command: 'powershell',
-          prefixArgs: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', candidate],
+          prefixArgs: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1Candidate],
         };
       }
     }

@@ -37,6 +37,8 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
   const skillGenEnabled = useAppStore((s) => s.skillGenEnabled);
   const usageWidgetEnabled = useAppStore((s) => s.usageWidgetEnabled);
   const setUsageWidgetEnabled = useAppStore((s) => s.setUsageWidgetEnabled);
+  const activitySummaryEnabled = useAppStore((s) => s.activitySummaryEnabled);
+  const setActivitySummaryEnabled = useAppStore((s) => s.setActivitySummaryEnabled);
   const hasApiKey = useAppStore((s) => s.hasApiKey);
   const maskedApiKey = useAppStore((s) => s.maskedApiKey);
   const claudeAuthLoggedIn = useAppStore((s) => s.claudeAuthLoggedIn);
@@ -391,6 +393,20 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
         <button
           className={`vitals-info-toggle-btn ${vitalsEnabled ? 'on' : 'off'}`}
           onClick={handleToggle}
+        >
+          <span className="vitals-toggle-knob" />
+        </button>
+      </div>
+
+      <div className="vitals-info-toggle-row">
+        <span data-tooltip="Show AI-generated activity summaries in the busy indicator while Claude is working.">Activity Summary</span>
+        <button
+          className={`vitals-info-toggle-btn ${activitySummaryEnabled ? 'on' : 'off'}`}
+          onClick={() => {
+            const next = !activitySummaryEnabled;
+            setActivitySummaryEnabled(next);
+            postToExtension({ type: 'setActivitySummaryEnabled', enabled: next });
+          }}
         >
           <span className="vitals-toggle-knob" />
         </button>

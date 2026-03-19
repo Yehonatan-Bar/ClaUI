@@ -169,6 +169,8 @@ export interface AppState {
 
   // Activity summary (from Haiku)
   activitySummary: { shortLabel: string; fullSummary: string } | null;
+  activitySummaryDismissed: boolean; // temporarily dismissed for current turn
+  activitySummaryEnabled: boolean; // VS Code setting mirror
 
   // Permission mode
   permissionMode: 'full-access' | 'supervised';
@@ -517,6 +519,8 @@ export interface AppState {
   setToolActivity: (detail: string | null) => void;
   setThinkingEffort: (effort: string | null) => void;
   setActivitySummary: (summary: { shortLabel: string; fullSummary: string } | null) => void;
+  setActivitySummaryDismissed: (dismissed: boolean) => void;
+  setActivitySummaryEnabled: (enabled: boolean) => void;
   setPromptHistoryPanelOpen: (open: boolean) => void;
   setPermissionMode: (mode: 'full-access' | 'supervised') => void;
   setProjectPromptHistory: (history: string[]) => void;
@@ -800,6 +804,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentToolActivity: null,
   currentThinkingEffort: null,
   activitySummary: null,
+  activitySummaryDismissed: false,
+  activitySummaryEnabled: true,
   permissionMode: 'full-access' as const,
   gitPushSettings: null,
   gitPushResult: null,
@@ -1055,6 +1061,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         currentToolActivity: null,
         currentThinkingEffort: null,
         activitySummary: null,
+        activitySummaryDismissed: false,
         sessionSkills: [],
         sessionActivityElapsedMs: finalElapsed,
         sessionActivityRunningSinceMs: null,
@@ -1500,6 +1507,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setThinkingEffort: (effort) => set({ currentThinkingEffort: effort }),
 
   setActivitySummary: (summary) => set({ activitySummary: summary }),
+  setActivitySummaryDismissed: (dismissed) => set({ activitySummaryDismissed: dismissed }),
+  setActivitySummaryEnabled: (enabled) => set({ activitySummaryEnabled: enabled }),
 
   setPermissionMode: (mode) => set({ permissionMode: mode }),
 
@@ -2095,6 +2104,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       globalPromptHistory: [],
       currentToolActivity: null,
       activitySummary: null,
+      activitySummaryDismissed: false,
       sessionSkills: [],
       permissionMode: 'full-access' as const,
       gitPushSettings: null,

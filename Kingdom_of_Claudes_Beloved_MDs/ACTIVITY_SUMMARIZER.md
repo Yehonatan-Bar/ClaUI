@@ -41,6 +41,19 @@ Periodically summarizes Claude's tool activity via Haiku and updates the busy in
 
    The activity summary state is cleared at the start of each new turn (`processBusy` with `busy=true`), so each turn starts with "Thinking..." and transitions to the summary after the threshold is reached.
 
+### Dismiss / Disable Permanently
+
+The activity summary panel includes a dismiss X button (top-right corner):
+
+1. **Dismiss (X)**: Clicking the X sets `activitySummaryDismissed = true` in the store, hiding the summary for the current turn. A "Disable permanently" button appears for 4 seconds.
+2. **Disable permanently**: Clicking it sends `setActivitySummaryEnabled: false` to the extension, which updates the VS Code setting `claudeMirror.activitySummary` to `false`.
+3. **Re-enable**: Toggle "Activity Summary" back on in the View dropdown (VitalsInfoPanel).
+4. **Reset on new turn**: `activitySummaryDismissed` resets to `false` on each new turn (`processBusy` with `busy=true`), on `endSession`, and on `reset`.
+
+Store fields:
+- `activitySummaryDismissed` (boolean): temporary per-turn dismiss
+- `activitySummaryEnabled` (boolean): mirrors VS Code setting, synced via `activitySummarySetting` message
+
 ### Haiku Prompt
 
 ```
@@ -64,6 +77,8 @@ Match the language of any file paths or context. Reply with ONLY the two lines.
 |---------|------|---------|-------------|
 | `claudeMirror.activitySummary` | boolean | `true` | Enable/disable the feature |
 | `claudeMirror.activitySummaryThreshold` | number | `3` | Tool uses before triggering a summary |
+
+The `claudeMirror.activitySummary` setting can also be toggled from the **View > VitalsInfoPanel** "Activity Summary" toggle, or permanently disabled via the "Disable permanently" button that appears after dismissing the summary panel.
 
 ## Relationship to SessionNamer
 

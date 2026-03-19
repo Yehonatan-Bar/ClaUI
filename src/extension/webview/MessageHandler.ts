@@ -1714,6 +1714,11 @@ export class MessageHandler {
           vscode.workspace.getConfiguration('claudeMirror').update('adventureWidget', msg.enabled, true);
           break;
 
+        case 'setActivitySummaryEnabled':
+          this.log(`Setting activity summary to: ${msg.enabled}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('activitySummary', msg.enabled, true);
+          break;
+
         case 'adventureDebugLog': {
           let payloadText = '';
           if (msg.payload) {
@@ -2715,6 +2720,8 @@ export class MessageHandler {
           this.sendVpmSetting();
           // Send detailed diff view setting
           this.sendDetailedDiffViewSetting();
+          // Send activity summary setting
+          this.sendActivitySummarySetting();
           // Send adventure widget setting
           this.sendAdventureWidgetSetting();
           // Send usage widget setting and auto-fetch initial usage data
@@ -3148,6 +3155,17 @@ export class MessageHandler {
     });
   }
 
+  /** Read activity summary setting from VS Code config and send to webview */
+  private sendActivitySummarySetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const enabled = config.get<boolean>('activitySummary', true);
+    this.log(`Sending activity summary setting: enabled=${enabled}`);
+    this.webview.postMessage({
+      type: 'activitySummarySetting',
+      enabled,
+    });
+  }
+
   /** Read adventure widget setting from VS Code config and send to webview */
   private sendAdventureWidgetSetting(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -3452,6 +3470,9 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.adventureWidget')) {
         this.sendAdventureWidgetSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.activitySummary')) {
+        this.sendActivitySummarySetting();
       }
       if (e.affectsConfiguration('claudeMirror.usageWidget')) {
         this.sendUsageWidgetSetting();

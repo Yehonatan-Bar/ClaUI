@@ -45,6 +45,8 @@ export function useClaudeStream(): void {
     setGlobalPromptHistory,
     setToolActivity,
     setActivitySummary,
+    setActivitySummaryDismissed,
+    setActivitySummaryEnabled,
     setPermissionMode,
     setGitPushSettings,
     setGitPushResult,
@@ -335,9 +337,10 @@ export function useClaudeStream(): void {
           setBusy(msg.busy);
           if (msg.busy) {
             // Process becomes busy (e.g. user sent a message) -
-            // clear any pending approval bar and previous activity summary
+            // clear any pending approval bar; keep activity summary visible
+            // until a new one replaces it or the user dismisses it
             setPendingApproval(null);
-            setActivitySummary(null);
+            setActivitySummaryDismissed(false);
           } else {
             // Process becomes idle (e.g. cancel or result) -
             // finalize any in-progress streaming so partial content is preserved
@@ -614,6 +617,10 @@ export function useClaudeStream(): void {
 
         case 'adventureWidgetSetting':
           setAdventureEnabled(msg.enabled);
+          break;
+
+        case 'activitySummarySetting':
+          setActivitySummaryEnabled(msg.enabled);
           break;
 
         case 'adventureBeat':
@@ -911,6 +918,8 @@ export function useClaudeStream(): void {
     setGlobalPromptHistory,
     setToolActivity,
     setActivitySummary,
+    setActivitySummaryDismissed,
+    setActivitySummaryEnabled,
     setPermissionMode,
     setGitPushSettings,
     setGitPushResult,

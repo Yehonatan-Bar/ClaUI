@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { useClaudeStream } from './hooks/useClaudeStream';
 import { useAppStore } from './state/store';
 import { MessageList } from './components/ChatView/MessageList';
@@ -73,8 +73,25 @@ export const App: React.FC = () => {
     teamPanelOpen,
     currentThinkingEffort,
     chatSearchOpen,
+    activitySummaryDismissed,
+    setActivitySummaryDismissed,
   } = useAppStore();
   const forkInit = useAppStore((s) => s.forkInit);
+  const [showDisablePermanently, setShowDisablePermanently] = useState(false);
+
+  const handleDismissActivitySummary = useCallback(() => {
+    setActivitySummaryDismissed(true);
+    setShowDisablePermanently(true);
+    const timer = setTimeout(() => setShowDisablePermanently(false), 4000);
+    return () => clearTimeout(timer);
+  }, [setActivitySummaryDismissed]);
+
+  const handleDisableActivitySummaryPermanently = useCallback(() => {
+    setShowDisablePermanently(false);
+    setActivitySummaryDismissed(true);
+    postToExtension({ type: 'setActivitySummaryEnabled', enabled: false });
+  }, [setActivitySummaryDismissed]);
+
   const hasMessages = messages.length > 0 || streamingMessageId !== null;
   const [scrollFraction, setScrollFraction] = React.useState(0);
   const activityText = activitySummary ? `${activitySummary.shortLabel} ${activitySummary.fullSummary}` : '';
@@ -318,38 +335,61 @@ export const App: React.FC = () => {
         <>
           {pendingApproval && providerCapabilities.supportsPlanApproval ? (
             <PlanApprovalBar />
-          ) : (isBusy || !!activitySummary) ? (
-            <div
-              className={`busy-indicator ${activitySummary ? 'busy-indicator-with-activity' : ''} ${!isBusy && activitySummary ? 'busy-indicator-idle' : ''}`}
-            >
-              <div className="busy-indicator-main">
-                {isBusy && (
-                  <span className="thinking-dots">
-                    <span className="thinking-dot" />
-                    <span className="thinking-dot" />
-                    <span className="thinking-dot" />
-                  </span>
-                )}
-                <span className="busy-indicator-text" dir={activityDir}>
-                  {isBusy ? (
-                    isResuming ? 'Resuming conversation...' : (
-                      currentToolActivity ? currentToolActivity + '...' : (
-                        activitySummary ? activitySummary.shortLabel + '...' : (
-                          currentThinkingEffort ? `Thinking with ${currentThinkingEffort} effort...` : 'Thinking...'
-                        )
-                      )
-                    )
-                  ) : (
-                    activitySummary ? activitySummary.shortLabel : ''
-                  )}
-                </span>
-              </div>
-              {activitySummary && (
-                <div className="activity-summary-detail" dir={activityDir}>
-                  {activitySummary.fullSummary}
+          ) : (isBusy || !!activitySummary || showDisablePermanently) ? (
+            <>
+              {showDisablePermanently && activitySummaryDismissed && (
+                <div className="activity-summary-disable-bar">
+                  <button
+                    className="activity-summary-disable-btn"
+                    onClick={handleDisableActivitySummaryPermanently}
+                  >
+                    Disable permanently
+                  </button>
                 </div>
               )}
-            </div>
+              {(!activitySummaryDismissed || isBusy) && (
+                <div
+                  className={`busy-indicator ${activitySummary && !activitySummaryDismissed ? 'busy-indicator-with-activity' : ''} ${!isBusy && activitySummary && !activitySummaryDismissed ? 'busy-indicator-idle' : ''}`}
+                >
+                  {activitySummary && !activitySummaryDismissed && (
+                    <button
+                      className="activity-summary-dismiss-btn"
+                      onClick={handleDismissActivitySummary}
+                      title="Dismiss"
+                    >
+                      x
+                    </button>
+                  )}
+                  <div className="busy-indicator-main">
+                    {isBusy && (
+                      <span className="thinking-dots">
+                        <span className="thinking-dot" />
+                        <span className="thinking-dot" />
+                        <span className="thinking-dot" />
+                      </span>
+                    )}
+                    <span className="busy-indicator-text" dir={activityDir}>
+                      {isBusy ? (
+                        isResuming ? 'Resuming conversation...' : (
+                          currentToolActivity ? currentToolActivity + '...' : (
+                            activitySummary && !activitySummaryDismissed ? activitySummary.shortLabel + '...' : (
+                              currentThinkingEffort ? `Thinking with ${currentThinkingEffort} effort...` : 'Thinking...'
+                            )
+                          )
+                        )
+                      ) : (
+                        activitySummary && !activitySummaryDismissed ? activitySummary.shortLabel : ''
+                      )}
+                    </span>
+                  </div>
+                  {activitySummary && !activitySummaryDismissed && (
+                    <div className="activity-summary-detail" dir={activityDir}>
+                      {activitySummary.fullSummary}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           ) : null}
           {providerCapabilities.supportsCodexConsult && codexConsultPanelOpen && (
             <CodexConsultPanel onClose={() => setCodexConsultPanelOpen(false)} />
