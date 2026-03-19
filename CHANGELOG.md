@@ -1,5 +1,37 @@
 # ClaUi - Changelog
 
+## v0.1.001 - 2026-03-19
+
+**Fix: MCP chip hidden when no servers are configured**
+
+- The MCP status chip in the status bar is now completely hidden when there are no MCP servers in the inventory
+- Previously, the chip always rendered (even showing "MCP error" with red styling when MCP had no servers), which was confusing
+- When servers exist, the chip continues to show count, login, restart, and error states as before
+
+**Improvement: Usage data auto-refresh**
+
+- Usage data now auto-fetches when the webview first loads (on `ready` event), so the usage metric shows real data immediately
+- After each Claude turn completes, usage data is automatically refreshed (throttled to once per 60 seconds to avoid excessive API calls)
+- Previously, usage data only loaded when the user manually clicked the usage button
+
+**Improvement: Progressive right-side status bar collapse**
+
+- Status bar right-side elements (session timer, MCP chip, usage metric) now progressively collapse into their respective dropdowns as the panel narrows
+- Stage 1 (< 580px): session timer moves into the View dropdown
+- Stage 2 (< 500px): MCP chip moves into the Tools dropdown
+- Stage 3 (< 430px): usage metric moves into the View dropdown
+- All stages use hysteresis (20px gap between collapse and expand thresholds) to prevent flickering at boundary widths
+- New CSS styles for collapsed elements inside dropdowns: labeled rows, full-width usage widget, and upward-opening usage popover
+
+**Fix: Happy Coder session ID capture and seamless switch-back**
+
+- Happy CLI emits its session ID as a raw `[DEV] Session: <id>` text line (not a JSON `system/init` event like Claude CLI)
+- `ClaudeProcessManager` now detects this pattern and synthesizes a proper `system/init` event, so Happy sessions are tracked in `SessionStore` and appear in History
+- This enables resuming Happy sessions from History (Ctrl+Shift+H) and the command palette, and supports the cross-device flow: start locally, continue on mobile, return to local seamlessly
+- Updated `REMOTE_SESSIONS.md` documentation with the session ID capture mechanism and cross-device resume flow
+
+---
+
 ## v0.1.000 - 2026-03-19
 
 **Feature: MCP management and visibility (Phase 1A + 1B)**
