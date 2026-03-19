@@ -173,6 +173,8 @@ export class MessageHandler {
   private approvalResponseProcessed = false;
   /** Last known input_tokens from AssistantMessage (always present, unlike ResultSuccess.usage) */
   private lastAssistantInputTokens = 0;
+  /** Timestamp of last automatic usage data refresh (to throttle API calls) */
+  private lastUsageAutoFetchMs = 0;
   /** Model ID from the most recent messageStart (e.g. "claude-sonnet-4-20250514") */
   private currentTurnModel = '';
   /** Tracks whether EnterPlanMode was called in this session */
@@ -2715,8 +2717,9 @@ export class MessageHandler {
           this.sendDetailedDiffViewSetting();
           // Send adventure widget setting
           this.sendAdventureWidgetSetting();
-          // Send usage widget setting
+          // Send usage widget setting and auto-fetch initial usage data
           this.sendUsageWidgetSetting();
+          void this.fetchAndSendUsage();
           // Send usage-limit deferred queue state
           this.postUsageLimitState();
           this.postUsageQueuedPromptState();
@@ -3957,6 +3960,12 @@ export class MessageHandler {
             inputTokens: contextWindowTokens,
             outputTokens: success.usage?.output_tokens ?? 0,
           });
+          // Auto-refresh subscription usage data after each turn (throttled to once per 60s)
+          const now = Date.now();
+          if (now - this.lastUsageAutoFetchMs > 60_000) {
+            this.lastUsageAutoFetchMs = now;
+            void this.fetchAndSendUsage();
+          }
           // Session Vitals: emit turn completion record
           const successTurn = {
             turnIndex: this.turnIndex++,

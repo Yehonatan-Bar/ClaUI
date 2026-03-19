@@ -39,6 +39,8 @@ export class ClaudeProcessManager extends EventEmitter {
   private stdoutBuffer = '';
   private log: (msg: string) => void = () => {};
   private _cancelledByUser = false;
+  private startModel = '';
+  private startCwd = '';
 
   constructor(private readonly context: vscode.ExtensionContext) {
     super();
@@ -108,6 +110,8 @@ export class ClaudeProcessManager extends EventEmitter {
       undefined;
 
     this._cancelledByUser = false;
+    this.startModel = selectedModel;
+    this.startCwd = cwd || '';
 
     this.log(`Spawning: ${cliPath} ${args.join(' ')}`);
     this.log(`CWD: ${cwd || '(none)'}`);
@@ -176,6 +180,26 @@ export class ClaudeProcessManager extends EventEmitter {
         }
         this.emit('event', event);
       } catch {
+        // Happy CLI emits session ID as a raw "[DEV] Session: <id>" line
+        // instead of a JSON system/init event. Capture it and synthesize
+        // a system/init event so the entire downstream pipeline works.
+        if (!this.sessionId) {
+          const happySessionMatch = trimmed.match(/^\[DEV\] Session:\s*(\S+)/);
+          if (happySessionMatch) {
+            this.sessionId = happySessionMatch[1];
+            this.log(`Happy session ID captured from raw line: ${this.sessionId}`);
+            const syntheticInit: CliOutputEvent = {
+              type: 'system',
+              subtype: 'init',
+              session_id: this.sessionId,
+              model: this.startModel || 'unknown',
+              tools: [],
+              cwd: this.startCwd,
+              mcp_servers: [],
+            };
+            this.emit('event', syntheticInit);
+          }
+        }
         // Non-JSON line (e.g. progress indicators) - emit as raw
         this.emit('raw', trimmed);
       }

@@ -1859,6 +1859,40 @@ html, body, #root {
   margin-left: auto;
 }
 
+/* Collapsed right-side elements shown inside dropdowns */
+.status-bar-collapsed-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+}
+
+.status-bar-collapsed-label {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+/* Usage wrapper needs full width when inside a dropdown */
+.status-bar-group-dropdown-item .status-bar-usage-wrapper {
+  width: 100%;
+}
+
+.status-bar-group-dropdown-item .status-bar-usage-metric-btn {
+  width: 100%;
+  justify-content: space-between;
+}
+
+/* Usage popover positioning when inside dropdown - open upward */
+.status-bar-group-dropdown-item .status-bar-usage-popover {
+  bottom: auto;
+  top: 100%;
+  right: -12px;
+  margin-top: 4px;
+}
+
 /* Section labels inside dropdowns */
 .status-bar-group-dropdown-section-label {
   font-size: 10px;
@@ -2083,6 +2117,7 @@ html, body, #root {
 }
 
 .status-bar-usage-bar-inline-fill {
+  display: block;
   height: 100%;
   border-radius: 2px;
   transition: width 0.5s ease, background 0.5s ease;

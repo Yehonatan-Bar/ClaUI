@@ -1,21 +1,15 @@
 # Happy Provider (`remote`) Sessions
 
-## What Is Happy Coder?
+## What This Is
 
-Happy Coder is an **external CLI tool** (not built in this repo) that acts as a **remote AI coding relay**. It wraps the Claude Code CLI and routes AI sessions through a relay server, enabling **cross-device access** -- including continuing a local coding session on a mobile device and returning back to the local session afterwards.
-
-The core use case: a developer starts a Claude Code session locally in VS Code, then picks up that same session on their phone (e.g. while away from the desk), and later returns to the local machine where the session continues seamlessly. The relay server and mobile interface are part of the Happy Coder ecosystem, not part of ClaUi.
-
-## ClaUi Integration Approach
-
-The provider id is still `remote`, but the ClaUi integration is intentionally simple:
+The provider id is still `remote`, but the implementation is now intentionally simple:
 
 - No custom WebSocket client
 - No custom crypto/auth module
 - No custom demux/message handler/session tab stack
 - Reuse the existing Claude session pipeline end-to-end
 
-Happy CLI is treated as a Claude-compatible executable. ClaUi just swaps the spawned command from `claude` to `happy`. All remote/mobile/cross-device capabilities are handled transparently by the Happy CLI and its relay server -- ClaUi only sees the same JSON stream it gets from the regular Claude CLI.
+Happy CLI is treated as a Claude-compatible executable. ClaUi just swaps the spawned command from `claude` to `happy`.
 
 ---
 
@@ -28,8 +22,7 @@ Happy CLI is treated as a Claude-compatible executable. ClaUi just swaps the spa
 5. `MessageHandler` also reads the per-tab override from `WebviewBridge.getCliPathOverride()` for webview-driven starts/restarts (`startSession`, `clearSession`, `resumeSession`, `forkSession`, edit-and-resend resume).
 6. Before starting a new session, `MessageHandler.syncProviderOverrideForNewSession()` checks whether the provider dropdown setting differs from the tab's current provider and updates the CLI path override accordingly. This allows seamless Claude <-> Happy switching within the same tab.
 7. `ClaudeProcessManager` spawns the overridden CLI path with the same stream-json flags used for Claude.
-8. Happy CLI emits the session ID as a raw `[DEV] Session: <id>` line (not a JSON `system/init` event like Claude). `ClaudeProcessManager.handleStdoutChunk()` detects this pattern, captures the session ID, and synthesizes a `system/init` event so the entire downstream pipeline (`StreamDemux`, `SessionTab`, `SessionStore`) works identically to Claude sessions.
-9. Standard `StreamDemux`, `MessageHandler`, control protocol, analytics, forking, and history all work unchanged.
+7. Standard `StreamDemux`, `MessageHandler`, control protocol, analytics, forking, and history all work unchanged.
 
 ---
 
@@ -46,18 +39,6 @@ When a Happy session exits with auth-related stderr (`auth required`, `not authe
 `Happy Coder requires authentication. Run "ClaUi: Authenticate Happy Coder" from the Command Palette.`
 
 Non-fatal stderr notices such as `Using Claude Code vX.Y.Z from npm` are intentionally ignored for UI error banners (they still appear in logs).
-
----
-
-## Cross-Device Session Resume
-
-Happy Coder enables continuing a local session on mobile and returning back. ClaUi supports this via the standard session resume flow:
-
-1. **Via History** (Ctrl+Shift+H): Happy sessions are stored in `SessionStore` with `provider: 'remote'`. Picking one creates a Happy tab and runs `happy --resume <id>`.
-2. **Via Command Palette** (`ClaUi: Resume Session`): Enter the session ID. If the session was previously opened in ClaUi, the stored provider is used.
-3. **Auto-resume on cancel**: When the user cancels a Happy session, the exit handler detects `cancelledByUser` and auto-resumes with `happy --resume <id>`.
-
-**Session ID capture**: Happy CLI does not emit a JSON `system/init` event. Instead, it outputs `[DEV] Session: <id>` as a raw text line. `ClaudeProcessManager` parses this and synthesizes a `system/init` event so sessions are tracked in `SessionStore` and appear in History.
 
 ---
 
@@ -80,7 +61,6 @@ Removed settings:
 - `src/extension/process/ClaudeProcessManager.ts`
   - Adds `ProcessStartOptions.cliPathOverride?: string`
   - Spawns `options?.cliPathOverride || claudeMirror.cliPath`
-  - Parses Happy `[DEV] Session:` raw line and synthesizes `system/init` event
 - `src/extension/session/SessionTab.ts`
   - Adds `setCliPathOverride(path)`
   - Exposes `getCliPathOverride()` and `getProvider()` via `WebviewBridge`

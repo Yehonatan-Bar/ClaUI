@@ -1,6 +1,6 @@
 # ClaUi - Changelog
 
-## v0.2.00 - 2026-03-19
+## v0.1.000 - 2026-03-19
 
 **Feature: MCP management and visibility (Phase 1A + 1B)**
 
