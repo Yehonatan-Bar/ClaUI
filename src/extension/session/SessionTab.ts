@@ -386,6 +386,30 @@ export class SessionTab implements WebviewBridge {
 
   async switchModel(model: string): Promise<void> {
     const sessionToResume = this.processManager.currentSessionId;
+    const atSessionStart = this.messageHandler.isAtSessionStart;
+
+    // At the beginning of a session (no messages sent yet), restart fresh with the new model
+    // rather than resuming, so the session is clean and uses the correct model from the start.
+    if (atSessionStart) {
+      this.log(`[Tab ${this.tabNumber}] Switching model to "${model}" at session start (fresh restart)`);
+      this.suppressNextExit = true;
+      this.postMessage({ type: 'processBusy', busy: true });
+      this.processManager.stop();
+      try {
+        await this.processManager.start({
+          model,
+          cliPathOverride: this.cliPathOverride ?? undefined,
+        });
+        this.log(`[Tab ${this.tabNumber}] Session restarted fresh with model "${model}"`);
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        this.log(`[Tab ${this.tabNumber}] Failed to restart with model: ${errMsg}`);
+        this.postMessage({ type: 'error', message: `Failed to restart with model: ${errMsg}` });
+        this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+      }
+      return;
+    }
+
     if (!sessionToResume) {
       this.log(`[Tab ${this.tabNumber}] Cannot switch model: no active session`);
       return;

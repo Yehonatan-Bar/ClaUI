@@ -470,6 +470,11 @@ export class MessageHandler {
     this.authManager = manager;
   }
 
+  /** True when no user message has been sent in the current session (i.e. session start) */
+  get isAtSessionStart(): boolean {
+    return !this.firstMessageSent;
+  }
+
   /** Read the API key from SecretStorage (returns undefined if no key set) */
   private async getApiKey(): Promise<string | undefined> {
     if (!this.secrets) return undefined;
