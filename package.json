@@ -2,7 +2,7 @@
   "name": "claude-code-mirror",
   "displayName": "ClaUi",
   "description": "The full IDE experience for Claude Code - multi-tab sessions, analytics, achievements, dual providers, prompt enhancement, and deep customization",
-  "version": "0.1.103",
+  "version": "0.1.104",
   "publisher": "JhonBar",
   "icon": "images/icon.png",
   "engines": {
