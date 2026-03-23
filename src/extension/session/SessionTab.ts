@@ -152,6 +152,7 @@ export class SessionTab implements WebviewBridge {
     );
     this.messageHandler.setSessionNameGetter(() => this.baseTitle);
     this.messageHandler.setWorkspaceState(context.workspaceState);
+    this.messageHandler.setGlobalState(context.globalState);
     this.messageHandler.setProjectAnalyticsStore(this.projectAnalyticsStore);
     this.messageHandler.setSecrets(context.secrets);
     this.messageHandler.setAuthManager(new AuthManager());

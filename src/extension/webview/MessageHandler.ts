@@ -307,6 +307,8 @@ export class MessageHandler {
   private projectAnalyticsStore: ProjectAnalyticsStore | null = null;
   /** Workspace-scoped state for project-level persistence */
   private workspaceState: vscode.Memento | null = null;
+  /** Global state for user-level persistence (e.g. onboarding flags) */
+  private globalState: vscode.Memento | null = null;
   private secrets: vscode.SecretStorage | null = null;
   private authManager: AuthManager | null = null;
   private bugReportService: BugReportService | null = null;
@@ -442,6 +444,11 @@ export class MessageHandler {
   /** Attach workspaceState for project-level persistence (e.g. ultrathink lock) */
   setWorkspaceState(ws: vscode.Memento): void {
     this.workspaceState = ws;
+  }
+
+  /** Attach globalState for user-level persistence (e.g. onboarding flags) */
+  setGlobalState(gs: vscode.Memento): void {
+    this.globalState = gs;
   }
 
   /** Attach the global TokenUsageRatioTracker */
@@ -1935,6 +1942,17 @@ export class MessageHandler {
           break;
         }
 
+        case 'skillGenOnboardingDecision': {
+          this.log(`[SkillGen:Onboard][INFO] onboardingDecision | accepted=${msg.accepted}`);
+          void this.globalState?.update('claui.skillGenOnboardingSeen', true);
+          if (!msg.accepted) {
+            void vscode.workspace.getConfiguration('claudeMirror').update('skillGen.enabled', false, true);
+          }
+          // Re-send settings so the webview hides the onboarding FAB
+          this.sendSkillGenSettings();
+          break;
+        }
+
         case 'showHistory':
           this.log('Webview requested history view');
           vscode.commands.executeCommand('claudeMirror.showHistory');
@@ -3326,12 +3344,14 @@ export class MessageHandler {
   /** Read skill generation settings and send to webview */
   private sendSkillGenSettings(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
+    const onboardingSeen = this.globalState?.get<boolean>('claui.skillGenOnboardingSeen', false) ?? false;
     this.webview.postMessage({
       type: 'skillGenSettings',
       enabled: config.get<boolean>('skillGen.enabled', true),
       threshold: config.get<number>('skillGen.threshold', 30),
       docsDirectory: config.get<string>('skillGen.docsDirectory', ''),
       autoRun: config.get<boolean>('skillGen.autoRun', false),
+      onboardingSeen,
     });
   }
 

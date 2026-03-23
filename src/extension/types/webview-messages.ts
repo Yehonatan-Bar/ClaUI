@@ -619,6 +619,11 @@ export interface OpenSkillGenGuideRequest {
   type: 'openSkillGenGuide';
 }
 
+export interface SkillGenOnboardingDecisionRequest {
+  type: 'skillGenOnboardingDecision';
+  accepted: boolean;
+}
+
 export interface SetGitHubSyncEnabledRequest {
   type: 'setGitHubSyncEnabled';
   enabled: boolean;
@@ -830,6 +835,7 @@ export type WebviewToExtensionMessage =
   | SkillGenUiLogMessage
   | SkillUsageReportMessage
   | OpenSkillGenGuideRequest
+  | SkillGenOnboardingDecisionRequest
   | SetGitHubSyncEnabledRequest
   | GitHubSyncRequest
   | AddFriendRequest
@@ -1544,6 +1550,7 @@ export interface SkillGenSettingsMessage {
   threshold: number;
   docsDirectory: string;
   autoRun: boolean;
+  onboardingSeen: boolean;
 }
 
 export interface SkillGenStatusMessage {

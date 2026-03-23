@@ -6423,6 +6423,225 @@ html, body, #root {
 }
 
 /* ============================================================
+   SkillDocs First-Time Onboarding
+   ============================================================ */
+
+@keyframes skilldocs-fab-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(120, 200, 120, 0.7),
+                0 2px 8px rgba(0, 0, 0, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(120, 200, 120, 0),
+                0 4px 16px rgba(0, 0, 0, 0.5);
+    transform: scale(1.04);
+  }
+}
+
+.skilldocs-fab {
+  position: fixed;
+  bottom: 44px;
+  left: 12px;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px 7px 10px;
+  background: linear-gradient(135deg,
+    var(--vscode-button-background, #0e639c),
+    color-mix(in srgb, var(--vscode-button-background, #0e639c) 70%, #2ecc71 30%)
+  );
+  color: var(--vscode-button-foreground, #fff);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  animation: skilldocs-fab-glow 2s ease-in-out infinite;
+  transition: opacity 0.15s;
+}
+
+.skilldocs-fab:hover {
+  opacity: 0.9;
+  animation-play-state: paused;
+}
+
+.skilldocs-fab-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.skilldocs-fab-label {
+  line-height: 1;
+}
+
+/* Modal */
+.skilldocs-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.skilldocs-modal {
+  background: var(--vscode-editor-background, #1e1e1e);
+  border: 1px solid var(--vscode-panel-border, #555);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.skilldocs-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border, #444);
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.skilldocs-modal-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--vscode-editor-foreground, #e6edf3);
+  flex: 1;
+}
+
+.skilldocs-lang-wrapper {
+  position: relative;
+}
+
+.skilldocs-translate-btn {
+  background: var(--vscode-button-secondaryBackground, rgba(255,255,255,0.08));
+  color: var(--vscode-button-secondaryForeground, #ccc);
+  border: 1px solid var(--vscode-panel-border, #555);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.skilldocs-translate-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.12));
+}
+
+.skilldocs-lang-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 700;
+  background: var(--vscode-editor-background, #252526);
+  border: 1px solid var(--vscode-panel-border, #555);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 6px;
+  min-width: 200px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.skilldocs-lang-option {
+  background: none;
+  border: none;
+  color: var(--vscode-editor-foreground, #ccc);
+  font-size: 12px;
+  padding: 5px 8px;
+  text-align: left;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s;
+  white-space: nowrap;
+}
+
+.skilldocs-lang-option:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.1));
+}
+
+.skilldocs-lang-option.active {
+  background: var(--vscode-list-activeSelectionBackground, rgba(14, 99, 156, 0.4));
+  color: var(--vscode-list-activeSelectionForeground, #fff);
+}
+
+.skilldocs-modal-body {
+  padding: 14px 18px 0;
+  color: var(--vscode-editor-foreground, #d4d4d4);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.skilldocs-modal-body .skilldocs-para {
+  margin: 0 0 4px;
+}
+
+.skilldocs-modal-body .skilldocs-bullet {
+  margin: 0;
+  padding-inline-start: 4px;
+}
+
+.skilldocs-modal-question {
+  padding: 14px 18px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-editor-foreground, #e6edf3);
+}
+
+.skilldocs-modal-footer {
+  display: flex;
+  gap: 10px;
+  padding: 4px 18px 18px;
+}
+
+.skilldocs-enable-btn {
+  flex: 1;
+  padding: 8px 16px;
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.skilldocs-enable-btn:hover {
+  opacity: 0.88;
+}
+
+.skilldocs-skip-btn {
+  padding: 8px 16px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground, #888);
+  border: 1px solid var(--vscode-panel-border, #555);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.skilldocs-skip-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.08));
+}
+
+/* ============================================================
    Bug Report Panel
    ============================================================ */
 

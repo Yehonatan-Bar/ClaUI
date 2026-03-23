@@ -19,7 +19,7 @@ import { UsageWidget } from './components/Usage/UsageWidget';
 import { SessionTimeline } from './components/Vitals/SessionTimeline';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { DashboardPanel } from './components/Dashboard';
-import { SkillGenPanel } from './components/SkillGen';
+import { SkillGenPanel, SkillGenOnboarding } from './components/SkillGen';
 import { BugReportPanel } from './components/BugReport';
 import { McpPanel } from './components/McpPanel';
 import { CodexConsultPanel } from './components/InputArea/CodexConsultPanel';
@@ -49,6 +49,7 @@ export const App: React.FC = () => {
     textSettings,
     typingTheme,
     pendingApproval,
+    provider,
     providerCapabilities,
     promptHistoryPanelOpen,
     currentToolActivity,
@@ -65,6 +66,7 @@ export const App: React.FC = () => {
     dashboardOpen,
     mcpPanelOpen,
     skillGenPanelOpen,
+    skillGenOnboardingSeen,
     communityPanelOpen,
     codexConsultPanelOpen,
     setCodexConsultPanelOpen,
@@ -410,6 +412,8 @@ export const App: React.FC = () => {
         <WelcomeScreen />
       )}
       {achievementsEnabled && <AchievementToastStack />}
+      {/* SkillDocs first-time onboarding FAB — shown until user makes a choice */}
+      {!skillGenOnboardingSeen && provider !== 'codex' && <SkillGenOnboarding />}
       <GlobalTooltip delay={400} />
       <ImageLightbox />
     </div>

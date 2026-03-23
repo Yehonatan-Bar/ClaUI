@@ -55,6 +55,7 @@ export const StatusBar: React.FC<{
     skillGenPendingDocs,
     skillGenThreshold,
     skillGenRunStatus,
+    skillGenOnboardingSeen,
     setSkillGenPanelOpen,
     setSkillGenShowInfo,
     isConnected,
@@ -576,7 +577,7 @@ export const StatusBar: React.FC<{
         {babelFishOpen && <BabelFishPanel onClose={() => setBabelFishOpen(false)} />}
       </div>
       <div className="status-bar-group-dropdown-separator" />
-      {skillGenEnabled && !isCodexUi && (
+      {skillGenEnabled && !isCodexUi && skillGenOnboardingSeen && (
         <div className="status-bar-group-dropdown-item-row">
           <button
             className={`status-bar-group-dropdown-item ${skillGenPendingDocs >= skillGenThreshold ? 'threshold-reached' : ''}`}

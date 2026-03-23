@@ -417,6 +417,7 @@ export interface AppState {
   skillGenHistory: SkillGenRunHistoryEntry[];
   skillGenPanelOpen: boolean;
   skillGenShowInfo: boolean;
+  skillGenOnboardingSeen: boolean;
 
   // Bug Report
   bugReportPanelOpen: boolean;
@@ -612,7 +613,7 @@ export interface AppState {
   setMcpDiffPreview: (preview: McpConfigDiffPreview | null) => void;
   setProjectSessions: (sessions: SessionSummary[]) => void;
   setProjectDashboardMode: (mode: 'session' | 'project' | 'user') => void;
-  setSkillGenSettings: (settings: { enabled: boolean; threshold: number }) => void;
+  setSkillGenSettings: (settings: { enabled: boolean; threshold: number; onboardingSeen: boolean }) => void;
   setSkillGenStatus: (status: { pendingDocs: number; threshold: number; runStatus: SkillGenRunStatus; progress: number; progressLabel: string; lastRun: SkillGenRunHistoryEntry | null; history: SkillGenRunHistoryEntry[] }) => void;
   setSkillGenProgress: (update: { runStatus: SkillGenRunStatus; progress: number; progressLabel: string }) => void;
   setSkillGenPanelOpen: (open: boolean) => void;
@@ -966,6 +967,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   skillGenHistory: [],
   skillGenPanelOpen: false,
   skillGenShowInfo: false,
+  skillGenOnboardingSeen: false,
 
   // Bug Report
   bugReportPanelOpen: false,
@@ -1937,7 +1939,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Skill Generation actions
   setSkillGenSettings: (settings) =>
-    set({ skillGenEnabled: settings.enabled, skillGenThreshold: settings.threshold }),
+    set({ skillGenEnabled: settings.enabled, skillGenThreshold: settings.threshold, skillGenOnboardingSeen: settings.onboardingSeen }),
 
   setSkillGenStatus: (status) =>
     set({

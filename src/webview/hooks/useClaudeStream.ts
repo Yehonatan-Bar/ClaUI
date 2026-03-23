@@ -701,7 +701,7 @@ export function useClaudeStream(): void {
 
         // --- Skill Generation ---
         case 'skillGenSettings':
-          setSkillGenSettings({ enabled: msg.enabled, threshold: msg.threshold });
+          setSkillGenSettings({ enabled: msg.enabled, threshold: msg.threshold, onboardingSeen: msg.onboardingSeen });
           break;
 
         case 'skillGenStatus':
