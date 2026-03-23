@@ -50,20 +50,36 @@ The structured prompt sent to Claude CLI:
 The user wants to consult with the Codex GPT expert about the following question.
 
 INSTRUCTIONS:
-1. Formulate a comprehensive consultation prompt that includes:
-   - Background context about the system/codebase you are working on
-   - The specific problem or question described below
-   - Any relevant code context from our recent conversation
-2. Call the mcp__codex__codex tool with this enriched prompt.
+1. Formulate a SHORT and CONCISE consultation prompt:
+   - Keep the total prompt under 200 words
+   - Include only the essential context needed to answer the question
+   - Do NOT dump full code snippets, file contents, or architecture descriptions
+   - One clear question, minimal background - the expert is smart, give just enough context
+   - NEVER send multiple parallel codex calls - one call at a time
+2. Call the mcp__codex__codex tool with this focused prompt.
    CRITICAL: You MUST pass these parameters to prevent the Codex session from hanging:
    - "approval-policy": "never"  (there is no interactive user to approve shell commands)
-   - "sandbox": "workspace-write"  (allow read/write access for code analysis)
+   - "sandbox": "read-only"  (consultation is read-only analysis, not implementation)
 3. Present the Codex response clearly to the user
 4. Then analyze the response and continue with implementation based on the advice
+
+IMPORTANT: Long prompts cause Codex to take 5-10+ minutes and risk timeout.
+A focused 100-word prompt gets the same quality answer as a 500-word one.
 
 USER'S QUESTION:
 {question}
 ```
+
+## Prompt Length Guidelines
+
+**Root cause of past failures**: Claude was told to make "comprehensive" prompts with full context, resulting in 400+ word prompts with detailed code snippets, architecture descriptions, and multiple evaluation criteria. These caused Codex to take 5-10+ minutes, often exceeding the timeout or causing session termination.
+
+**Rules for prompt construction**:
+- **Under 200 words** total prompt to Codex
+- **One focused question** per call - don't ask Codex to evaluate 7 options in one prompt
+- **Essential context only** - the expert model is capable; it doesn't need every detail
+- **No parallel calls** - send one codex call, wait for result, then send another if needed
+- **Read-only sandbox** - consultations are for advice, not implementation
 
 ## Timeout Protection
 

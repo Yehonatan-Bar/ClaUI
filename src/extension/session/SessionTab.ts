@@ -28,7 +28,7 @@ import { TeamWatcher } from '../teams/TeamWatcher';
 import { TeamDetector } from '../teams/TeamDetector';
 import { TeamActions } from '../teams/TeamActions';
 import type { TeamStateSnapshot } from '../teams/TeamTypes';
-import type { CliOutputEvent, AssistantMessage } from '../types/stream-json';
+import type { CliOutputEvent, AssistantMessage, ResultSuccess, ResultError } from '../types/stream-json';
 import type {
   ExtensionToWebviewMessage,
   ProviderId,
@@ -957,6 +957,12 @@ export class SessionTab implements WebviewBridge {
       // Diagnostic: log raw result event
       if (event.type === 'result') {
         tabLog(`[DIAG] result raw: ${JSON.stringify(event).slice(0, 500)}`);
+        // Direct bypass: call MessageHandler.handleResultEvent directly.
+        // The demux.on('result') listener has been observed to silently not fire
+        // in webpack production builds despite being registered. This direct path
+        // guarantees turnComplete events are emitted. A dedup guard in
+        // handleResultEvent prevents double-processing if the demux path also fires.
+        this.messageHandler.handleResultEvent(event as ResultSuccess | ResultError, 'wireProcessEvents');
       }
       // Diagnostic: log raw assistant message usage
       if (event.type === 'assistant') {

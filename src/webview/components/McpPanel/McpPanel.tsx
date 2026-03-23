@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { useAppStore } from '../../state/store';
 import type { BugReportContext, McpServerInfo, ProviderId } from '../../../extension/types/webview-messages';
@@ -129,7 +129,21 @@ export const McpPanel: React.FC = () => {
       mcpLastOperation?.nextAction === 'restart-session' ||
       mcpLastOperation?.restartNeeded
     );
-  const restartBannerVisible = hasRestartAction || hasReconnectAction;
+
+  // Track restart operation lifecycle for user feedback
+  const [restartInFlight, setRestartInFlight] = useState(false);
+  const restartSucceeded = mcpLastOperation?.op === 'restartSession' && mcpLastOperation?.success === true;
+  const restartFailed = mcpLastOperation?.op === 'restartSession' && mcpLastOperation?.success === false;
+
+  // Clear in-flight state when the restart operation result arrives
+  useEffect(() => {
+    if (mcpLastOperation?.op === 'restartSession') {
+      setRestartInFlight(false);
+    }
+  }, [mcpLastOperation]);
+
+  // Show banner when restart is needed, in progress, or just succeeded (waiting for reload)
+  const restartBannerVisible = hasRestartAction || hasReconnectAction || restartInFlight;
 
   return (
     <div
@@ -233,7 +247,11 @@ export const McpPanel: React.FC = () => {
             style={{
               padding: '12px 18px',
               borderBottom: '1px solid rgba(148, 163, 184, 0.12)',
-              background: 'rgba(210, 153, 34, 0.12)',
+              background: restartSucceeded
+                ? 'rgba(46, 160, 67, 0.12)'
+                : restartFailed
+                  ? 'rgba(248, 81, 73, 0.12)'
+                  : 'rgba(210, 153, 34, 0.12)',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
@@ -241,31 +259,51 @@ export const McpPanel: React.FC = () => {
               flexWrap: 'wrap',
             }}
           >
-            <div style={{ fontSize: 12, color: '#f2cc60' }}>
-              {hasRestartAction
-                ? 'Config changed. Restart the active Claude session to load updated MCP settings.'
-                : 'One or more MCP servers look disconnected. Try reconnecting the active Claude session.'}
+            <div style={{
+              fontSize: 12,
+              color: restartSucceeded
+                ? '#7ee787'
+                : restartFailed
+                  ? '#f85149'
+                  : '#f2cc60',
+            }}>
+              {restartInFlight
+                ? 'Restarting session...'
+                : restartSucceeded
+                  ? 'Session restarted successfully. MCP servers are reloading...'
+                  : restartFailed
+                    ? `Restart failed: ${mcpLastError || 'Unknown error'}`
+                    : hasRestartAction
+                      ? 'Config changed. Restart the active Claude session to load updated MCP settings.'
+                      : 'One or more MCP servers look disconnected. Try reconnecting the active Claude session.'}
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button
-                onClick={() => {
-                  setMcpLoading(true);
-                  postToExtension({ type: 'mcpRestartSession' });
-                }}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  border: '1px solid rgba(210, 153, 34, 0.3)',
-                  background: 'rgba(210, 153, 34, 0.18)',
-                  color: '#fff3bf',
-                  cursor: 'pointer',
-                  fontSize: 12,
-                  fontWeight: 700,
-                }}
-              >
-                {hasRestartAction ? 'Restart session now' : 'Try reconnect'}
-              </button>
-              {hasRestartAction && (
+              {!restartSucceeded && (
+                <button
+                  onClick={() => {
+                    setRestartInFlight(true);
+                    setMcpLoading(true);
+                    postToExtension({ type: 'mcpRestartSession' });
+                  }}
+                  disabled={restartInFlight || mcpLoading}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: `1px solid ${restartInFlight ? 'rgba(148, 163, 184, 0.2)' : 'rgba(210, 153, 34, 0.3)'}`,
+                    background: restartInFlight ? 'rgba(148, 163, 184, 0.08)' : 'rgba(210, 153, 34, 0.18)',
+                    color: restartInFlight ? '#8b949e' : '#fff3bf',
+                    cursor: restartInFlight || mcpLoading ? 'not-allowed' : 'pointer',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    opacity: restartInFlight || mcpLoading ? 0.6 : 1,
+                  }}
+                >
+                  {restartInFlight
+                    ? 'Restarting...'
+                    : hasRestartAction ? 'Restart session now' : 'Try reconnect'}
+                </button>
+              )}
+              {hasRestartAction && !restartSucceeded && !restartInFlight && (
                 <button
                   onClick={() => setMcpSelectedTab('session')}
                   style={{

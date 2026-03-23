@@ -80,8 +80,8 @@ export const InputArea: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoMgr = useMemo(() => new UndoManager(), []);
   const [ultrathinkAnim, setUltrathinkAnim] = useState<string | null>(null);
-  const ultrathinkLocked = useAppStore((s) => s.ultrathinkLocked);
-  const setUltrathinkLocked = useAppStore((s) => s.setUltrathinkLocked);
+  const ultrathinkMode = useAppStore((s) => s.ultrathinkMode);
+  const setUltrathinkMode = useAppStore((s) => s.setUltrathinkMode);
   const {
     provider,
     selectedProvider,
@@ -411,8 +411,8 @@ export const InputArea: React.FC = () => {
     let trimmed = text.trim();
     if ((!trimmed && pendingImages.length === 0) || !isConnected || inputLockedByHandoff) return;
 
-    // Auto-prepend "ultrathink" when the lock is active
-    if (ultrathinkLocked && trimmed && !trimmed.toLowerCase().startsWith('ultrathink')) {
+    // Auto-prepend "ultrathink" when mode is 'single' or 'locked'
+    if (ultrathinkMode !== 'off' && trimmed && !trimmed.toLowerCase().startsWith('ultrathink')) {
       trimmed = 'ultrathink ' + trimmed;
     }
 
@@ -587,11 +587,17 @@ export const InputArea: React.FC = () => {
     setCodexSteerArmed(false);
     undoMgr.reset();
 
+    // Reset ultrathink mode from 'single' to 'off' after sending
+    if (ultrathinkMode === 'single') {
+      setUltrathinkMode('off');
+      postToExtension({ type: 'setUltrathinkMode', mode: 'off' } as any);
+    }
+
     // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [text, pendingImages, isConnected, inputLockedByHandoff, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer, promptTranslateEnabled, autoTranslateEnabled, isTranslatingPrompt, setIsTranslatingPrompt, isCodexBusy, codexSteerArmed, logUiDebug, ultrathinkLocked, isUsageLimitMode]);
+  }, [text, pendingImages, isConnected, inputLockedByHandoff, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer, promptTranslateEnabled, autoTranslateEnabled, isTranslatingPrompt, setIsTranslatingPrompt, isCodexBusy, codexSteerArmed, logUiDebug, ultrathinkMode, isUsageLimitMode]);
 
   /** Cancel the in-flight request */
   const cancelRequest = useCallback(() => {
@@ -969,31 +975,55 @@ export const InputArea: React.FC = () => {
     postToExtension({ type: 'clearSession' });
   }, []);
 
-  /** Inject "ultrathink" keyword with a random animation */
+  /** Cycle ultrathink mode: off -> single -> locked -> off */
   const handleUltrathink = useCallback(() => {
     if (ultrathinkAnim) return; // Guard against double-click during animation
-    const anims = ['rocket', 'brain', 'wizard', 'turbo'];
-    const picked = anims[Math.floor(Math.random() * anims.length)];
-    setUltrathinkAnim(picked);
-    setTimeout(() => {
+    const nextMode = ultrathinkMode === 'off' ? 'single' : ultrathinkMode === 'single' ? 'locked' : 'off';
+
+    // Play animation when activating (off -> single)
+    if (nextMode === 'single') {
+      const anims = ['rocket', 'brain', 'wizard', 'turbo'];
+      const picked = anims[Math.floor(Math.random() * anims.length)];
+      setUltrathinkAnim(picked);
+      setTimeout(() => {
+        setText((prev) => {
+          if (prev.toLowerCase().startsWith('ultrathink')) return prev;
+          const newText = 'ultrathink ' + prev;
+          undoMgr.push(newText, 'ultrathink '.length);
+          return newText;
+        });
+        setUltrathinkAnim(null);
+        requestAnimationFrame(() => {
+          const el = textareaRef.current;
+          if (el) {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+            el.focus();
+            el.selectionStart = el.selectionEnd = el.value.length;
+          }
+        });
+      }, 1200);
+    } else if (nextMode === 'off') {
+      // Turning off: remove "ultrathink " prefix if present
       setText((prev) => {
-        if (prev.toLowerCase().startsWith('ultrathink')) return prev;
-        const newText = 'ultrathink ' + prev;
-        undoMgr.push(newText, 'ultrathink '.length);
-        return newText;
-      });
-      setUltrathinkAnim(null);
-      requestAnimationFrame(() => {
-        const el = textareaRef.current;
-        if (el) {
-          el.style.height = 'auto';
-          el.style.height = el.scrollHeight + 'px';
-          el.focus();
-          el.selectionStart = el.selectionEnd = el.value.length;
+        const lower = prev.toLowerCase();
+        if (lower.startsWith('ultrathink ')) {
+          const newText = prev.slice('ultrathink '.length);
+          undoMgr.push(newText, 0);
+          return newText;
         }
+        if (lower === 'ultrathink') {
+          undoMgr.push('', 0);
+          return '';
+        }
+        return prev;
       });
-    }, 1200);
-  }, [ultrathinkAnim, undoMgr]);
+    }
+    // No animation for single -> locked (just visual state change)
+
+    setUltrathinkMode(nextMode);
+    postToExtension({ type: 'setUltrathinkMode', mode: nextMode } as any);
+  }, [ultrathinkAnim, ultrathinkMode, undoMgr]);
 
   // Consume file paths inserted by picker or Explorer context command
   useEffect(() => {
@@ -1545,29 +1575,23 @@ export const InputArea: React.FC = () => {
         <div className="browse-stack">
           <div className="ultrathink-wrapper">
             <button
-              className={`ut-lock-toggle${ultrathinkLocked ? ' active' : ''}`}
-              onClick={() => {
-                const next = !ultrathinkLocked;
-                setUltrathinkLocked(next);
-                postToExtension({ type: 'setUltrathinkLocked', locked: next } as any);
-              }}
-              data-tooltip={ultrathinkLocked ? "Unlock ultrathink" : "Lock ultrathink on every prompt"}
-            >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                {ultrathinkLocked ? (
-                  <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>
-                ) : (
-                  <><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></>
-                )}
-              </svg>
-            </button>
-            <button
-              className={`ultrathink-button${ultrathinkAnim ? ' animating' : ''}${ultrathinkLocked ? ' locked' : ''}`}
+              className={`ultrathink-button${ultrathinkAnim ? ' animating' : ''}${ultrathinkMode === 'single' ? ' mode-single' : ''}${ultrathinkMode === 'locked' ? ' mode-locked' : ''}`}
               onClick={handleUltrathink}
               disabled={!isConnected || !!ultrathinkAnim || inputLockedByHandoff}
-              data-tooltip={ultrathinkLocked ? "Ultrathink LOCKED - auto-injected every prompt" : "Ultrathink - boost reasoning power"}
+              data-tooltip={
+                ultrathinkMode === 'locked' ? "Ultrathink ALWAYS ON (click to turn off)"
+                : ultrathinkMode === 'single' ? "Ultrathink ON for this prompt (click to lock)"
+                : "Ultrathink - boost reasoning power"
+              }
             >
               <span className="ut-default-icon">&#x1F9E0;</span>
+              {ultrathinkMode === 'locked' && !ultrathinkAnim && (
+                <span className="ut-lock-badge">
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </span>
+              )}
               {ultrathinkAnim && (
                 <div className={`ultrathink-anim ultrathink-anim-${ultrathinkAnim}`}>
                   {ultrathinkAnim === 'rocket' && <span className="ut-emoji">&#x1F680;</span>}

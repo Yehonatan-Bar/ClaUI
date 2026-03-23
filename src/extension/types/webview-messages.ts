@@ -857,7 +857,7 @@ export type WebviewToExtensionMessage =
   | TeamShutdownAgentRequest
   | SetSummaryModeEnabledRequest
   | SetVpmEnabledRequest
-  | SetUltrathinkLockedRequest
+  | SetUltrathinkModeRequest
   | StartBtwSessionRequest
   | SendBtwMessageRequest
   | CloseBtwSessionRequest
@@ -1338,10 +1338,10 @@ export interface SetSummaryModeEnabledRequest {
   enabled: boolean;
 }
 
-/** Webview -> Extension: persist ultrathink lock at project level */
-export interface SetUltrathinkLockedRequest {
-  type: 'setUltrathinkLocked';
-  locked: boolean;
+/** Webview -> Extension: persist ultrathink mode at project level */
+export interface SetUltrathinkModeRequest {
+  type: 'setUltrathinkMode';
+  mode: 'off' | 'single' | 'locked';
 }
 
 /** Extension -> Webview: send Visual Progress Mode setting */
@@ -1379,10 +1379,10 @@ export interface SummaryModeSettingMessage {
   enabled: boolean;
 }
 
-/** Extension -> Webview: send ultrathink lock state (project-level) */
-export interface UltrathinkLockedSettingMessage {
-  type: 'ultrathinkLockedSetting';
-  locked: boolean;
+/** Extension -> Webview: send ultrathink mode state (project-level) */
+export interface UltrathinkModeSettingMessage {
+  type: 'ultrathinkModeSetting';
+  mode: 'off' | 'single' | 'locked';
 }
 
 /** Extension -> Webview: tell the webview to focus the input textarea */
@@ -1961,7 +1961,7 @@ export type ExtensionToWebviewMessage =
   | VpmSettingMessage
   | VisualProgressCardMessage
   | VisualProgressCardUpdateMessage
-  | UltrathinkLockedSettingMessage
+  | UltrathinkModeSettingMessage
   | FocusInputMessage
   | BtwSessionStartedMessage
   | BtwUserMessageMessage

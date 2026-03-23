@@ -231,8 +231,9 @@ export interface AppState {
   // Context usage widget
   contextWidgetVisible: boolean;
 
-  // Ultrathink lock (project-level, persisted via workspaceState)
-  ultrathinkLocked: boolean;
+  // Ultrathink mode: 'off' | 'single' (one-shot) | 'locked' (always on)
+  // Persisted via workspaceState at project level.
+  ultrathinkMode: 'off' | 'single' | 'locked';
 
   // Usage widget
   usageWidgetEnabled: boolean;
@@ -556,7 +557,7 @@ export interface AppState {
   clearVisualProgressCards: () => void;
   setDetailedDiffEnabled: (enabled: boolean) => void;
   addWriteOldContent: (toolUseId: string, filePath: string, oldContent: string) => void;
-  setUltrathinkLocked: (locked: boolean) => void;
+  setUltrathinkMode: (mode: 'off' | 'single' | 'locked') => void;
   setVitalsEnabled: (enabled: boolean) => void;
   setContextWidgetVisible: (visible: boolean) => void;
   setUsageWidgetEnabled: (enabled: boolean) => void;
@@ -829,7 +830,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   visualProgressCards: [],
   detailedDiffEnabled: false,
   writeOldContentByToolId: {},
-  ultrathinkLocked: false,
+  ultrathinkMode: 'off' as 'off' | 'single' | 'locked',
   vitalsEnabled: false,
   turnHistory: [],
   turnByMessageId: {},
@@ -1508,7 +1509,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActivitySummary: (summary) => set({ activitySummary: summary }),
   setActivitySummaryDismissed: (dismissed) => set({ activitySummaryDismissed: dismissed }),
-  setActivitySummaryEnabled: (enabled) => set({ activitySummaryEnabled: enabled }),
+  setActivitySummaryEnabled: (enabled) => set({
+    activitySummaryEnabled: enabled,
+    // Clear any existing summary when disabling so it doesn't linger in the UI
+    ...(enabled ? {} : { activitySummary: null, activitySummaryDismissed: false }),
+  }),
 
   setPermissionMode: (mode) => set({ permissionMode: mode }),
 
@@ -1718,7 +1723,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     })),
 
-  setUltrathinkLocked: (locked) => set({ ultrathinkLocked: locked }),
+  setUltrathinkMode: (mode) => set({ ultrathinkMode: mode }),
 
   setVitalsEnabled: (enabled) =>
     set((state) => {
@@ -2126,7 +2131,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       summaryByMessageId: {},
       detailedDiffEnabled: state.detailedDiffEnabled,
       writeOldContentByToolId: {},
-      ultrathinkLocked: state.ultrathinkLocked,
+      ultrathinkMode: state.ultrathinkMode,
       vitalsEnabled: state.vitalsEnabled,
       adventureEnabled: state.adventureEnabled,
       adventureBeats: [],

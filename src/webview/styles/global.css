@@ -730,17 +730,14 @@ html, body, #root {
   font-size: 12px;
 }
 
-.browse-stack .ut-lock-toggle {
-  position: static;
-  width: 12px;
-  height: 12px;
-  padding: 0;
-  border-radius: 50%;
+.browse-stack .ut-lock-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
 }
-
-.browse-stack .ut-lock-toggle svg {
-  width: 8px;
-  height: 8px;
+.browse-stack .ut-lock-badge svg {
+  width: 6px;
+  height: 6px;
 }
 
 .browse-button {
@@ -796,39 +793,34 @@ html, body, #root {
   line-height: 1;
   overflow: visible;
 }
-/* Locked state: persistent glow */
-.ultrathink-button.locked {
+/* Single-use state: subtle glow */
+.ultrathink-button.mode-single {
   border-color: #4fc3f7;
-  box-shadow: 0 0 6px rgba(79, 195, 247, 0.35);
-  background: rgba(79, 195, 247, 0.08);
+  box-shadow: 0 0 4px rgba(79, 195, 247, 0.25);
+  background: rgba(79, 195, 247, 0.06);
 }
-/* Lock toggle badge */
-.ut-lock-toggle {
+/* Locked state: strong persistent glow */
+.ultrathink-button.mode-locked {
+  border-color: #4fc3f7;
+  box-shadow: 0 0 8px rgba(79, 195, 247, 0.45);
+  background: rgba(79, 195, 247, 0.12);
+}
+/* Lock badge icon (visible only in locked mode) */
+.ut-lock-badge {
   position: absolute;
-  bottom: -4px;
-  right: -4px;
+  bottom: -3px;
+  right: -3px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  padding: 0;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  border: 1px solid var(--vscode-input-border, #3c3c3c);
   background: var(--vscode-editor-background, #1e1e1e);
-  color: var(--vscode-descriptionForeground);
-  cursor: pointer;
-  z-index: 10;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.ut-lock-toggle:hover {
-  border-color: var(--vscode-focusBorder);
-  background: var(--vscode-toolbar-hoverBackground);
-}
-.ut-lock-toggle.active {
-  border-color: #4fc3f7;
-  background: rgba(79, 195, 247, 0.2);
+  border: 1px solid #4fc3f7;
   color: #4fc3f7;
+  z-index: 10;
+  pointer-events: none;
 }
 .ultrathink-button:hover {
   background: var(--vscode-toolbar-hoverBackground);

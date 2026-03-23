@@ -1,21 +1,31 @@
 # Ultrathink Button & Glow Effect
 
-Brain icon button in the input area that injects the `ultrathink` keyword to boost Claude's reasoning effort for the next turn. Plays a randomly-chosen CSS animation on each click for visual flair. The word "ultrathink" also appears with an animated rainbow glow effect wherever it appears in chat messages.
+Brain icon button in the input area that controls the `ultrathink` keyword injection to boost Claude's reasoning effort. The button has **three states** that cycle on each click: off -> single -> locked -> off. The word "ultrathink" also appears with an animated rainbow glow effect wherever it appears in chat messages.
 
-Includes a **lock toggle** (small lock button above the brain button inside the browse stack). When locked, "ultrathink " is automatically prepended to every outgoing prompt without needing to click the brain button each time. The brain button shows a persistent cyan glow while locked.
+## Three-State Cycle
 
-The lock state is **persisted at project level** via VS Code's `workspaceState`. When the user locks ultrathink in any session tab, it remains locked across all sessions in that project until explicitly unlocked. New tabs and reloads restore the lock state automatically.
+| State | Visual | Behavior |
+|-------|--------|----------|
+| **Off** | Default (no glow) | No auto-injection. Click to activate for one prompt |
+| **Single** | Subtle cyan glow | "ultrathink " prepended to the next send, then auto-resets to Off |
+| **Locked** | Strong cyan glow + lock badge | "ultrathink " auto-prepended to every outgoing prompt |
+
+Each click advances to the next state. To go from Single to Off, the user clicks twice (Single -> Locked -> Off).
+
+When activating (Off -> Single), a random animation plays and "ultrathink " is prepended to the current textarea text. When transitioning to Locked, only the visual state changes (no animation). When turning off (Locked -> Off), the "ultrathink " prefix is removed from the textarea if present.
+
+The mode state is **persisted at project level** via VS Code's `workspaceState`. New tabs and reloads restore the mode automatically.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `src/webview/components/InputArea/InputArea.tsx` | Button JSX, lock toggle handler, animation logic |
-| `src/webview/state/store.ts` | Zustand store: `ultrathinkLocked` state + `setUltrathinkLocked` setter |
-| `src/webview/hooks/useClaudeStream.ts` | Receives `ultrathinkLockedSetting` message from extension |
-| `src/extension/webview/MessageHandler.ts` | Persists lock in `workspaceState`, sends on `ready` |
+| `src/webview/components/InputArea/InputArea.tsx` | Button JSX, 3-state cycle handler, animation logic, reset on send |
+| `src/webview/state/store.ts` | Zustand store: `ultrathinkMode` state + `setUltrathinkMode` setter |
+| `src/webview/hooks/useClaudeStream.ts` | Receives `ultrathinkModeSetting` message from extension |
+| `src/extension/webview/MessageHandler.ts` | Persists mode in `workspaceState`, sends on `ready`, migrates old boolean key |
 | `src/extension/session/SessionTab.ts` | Wires `workspaceState` to MessageHandler |
-| `src/extension/types/webview-messages.ts` | `SetUltrathinkLockedRequest` + `UltrathinkLockedSettingMessage` |
+| `src/extension/types/webview-messages.ts` | `SetUltrathinkModeRequest` + `UltrathinkModeSettingMessage` |
 | `src/webview/components/ChatView/MarkdownContent.tsx` | Transforms "ultrathink" in rendered messages into `<span class="ultrathink-glow">` |
 | `src/webview/components/ChatView/StreamingText.tsx` | Splits streaming text to render "ultrathink" with glow styling |
 | `src/webview/styles/global.css` | Button styles, 4 animation keyframes, and `.ultrathink-glow` rainbow effect |
@@ -23,23 +33,31 @@ The lock state is **persisted at project level** via VS Code's `workspaceState`.
 ## How It Works
 
 1. User clicks the brain button (top item in the vertical browse stack, above browse/paperclip)
-2. `handleUltrathink` picks a random animation from `['rocket', 'brain', 'wizard', 'turbo']`
-3. Sets `ultrathinkAnim` state to the chosen animation name
-4. CSS animation plays for 1.2 seconds via conditional class `ultrathink-anim-{name}`
-5. After 1.2s timeout: prepends `"ultrathink "` to textarea text, clears animation state, resizes textarea, focuses and places cursor at end
+2. State cycles: off -> single -> locked -> off
+3. On Off -> Single: `handleUltrathink` picks a random animation from `['rocket', 'brain', 'wizard', 'turbo']`, plays it for 1.2s, then prepends `"ultrathink "` to textarea text
+4. On Single -> Locked: Visual state changes only (stronger glow + lock badge appears)
+5. On Locked -> Off: Removes "ultrathink " prefix from textarea if present
 
 ## State
 
 - `ultrathinkAnim`: Local React state in InputArea. `null` = idle (brain icon visible), `'rocket' | 'brain' | 'wizard' | 'turbo'` = animation playing
-- `ultrathinkLocked`: Zustand store state, persisted via `workspaceState` (project-level). `false` = manual mode, `true` = auto-inject on every send
+- `ultrathinkMode`: Zustand store state, persisted via `workspaceState` (project-level). `'off'` | `'single'` | `'locked'`
 
-### Persistence Flow (Lock)
+### Persistence Flow
 
-1. User toggles lock -> `setUltrathinkLocked(next)` updates Zustand store
-2. Simultaneously sends `{ type: 'setUltrathinkLocked', locked }` to extension
-3. `MessageHandler` persists to `workspaceState` key `'claui.ultrathinkLocked'`
-4. On webview `ready`, `MessageHandler.sendUltrathinkLockedSetting()` reads from `workspaceState` and sends `{ type: 'ultrathinkLockedSetting', locked }` to webview
-5. `useClaudeStream` receives it and calls `setUltrathinkLocked` in Zustand store
+1. User clicks brain button -> `setUltrathinkMode(nextMode)` updates Zustand store
+2. Simultaneously sends `{ type: 'setUltrathinkMode', mode }` to extension
+3. `MessageHandler` persists to `workspaceState` key `'claui.ultrathinkMode'`
+4. On webview `ready`, `MessageHandler.sendUltrathinkModeSetting()` reads from `workspaceState` and sends `{ type: 'ultrathinkModeSetting', mode }` to webview
+5. `useClaudeStream` receives it and calls `setUltrathinkMode` in Zustand store
+
+### Single-Use Reset
+
+When the user sends a message while in `'single'` mode, after the message is dispatched, the mode is automatically reset to `'off'` (both in Zustand store and persisted via extension message).
+
+### Backward Compatibility
+
+`MessageHandler.sendUltrathinkModeSetting()` checks for the old boolean key `'claui.ultrathinkLocked'`. If found, it migrates the value (`true` -> `'locked'`, `false` -> `'off'`) to the new `'claui.ultrathinkMode'` key and deletes the old key.
 
 ## The 4 Animations
 
@@ -56,50 +74,51 @@ All animations are pure CSS using transforms, opacity, filter, box-shadow, and p
 
 | Scenario | Behavior |
 |----------|----------|
-| Empty textarea | Results in `"ultrathink "` (with trailing space) |
+| Empty textarea + activate | Results in `"ultrathink "` (with trailing space) |
 | Text already starts with `"ultrathink"` (case-insensitive) | Animation plays but text is not modified |
 | Disconnected / not connected | Button is disabled |
 | Double-click during animation | Guarded by `ultrathinkAnim` state check - second click is no-op |
 | Undo after injection | Works - new text is pushed to `UndoManager` |
-| Lock active + text already starts with "ultrathink" | No double-prepend (case-insensitive check) |
-| Lock active + empty text | Sends "ultrathink " (same as manual click on empty) |
+| Single/Locked mode + text already starts with "ultrathink" | No double-prepend (case-insensitive check) |
+| Single/Locked mode + empty text | Sends "ultrathink " (same as manual click on empty) |
+| Turn off while "ultrathink " is in textarea | Prefix is removed from textarea |
 
 ## CSS Class Structure
 
 ```
 .browse-stack                   - Vertical stack container (ultrathink on top, browse below)
 .browse-stack .ultrathink-wrapper - Inline-flex wrapper scoped for stacked layout
-.ultrathink-wrapper             - Inline-flex column for lock (top) + brain button (bottom)
+.ultrathink-wrapper             - Inline-flex wrapper for the brain button
 .ultrathink-button              - Base button (global default 32x32; compact in browse stack)
 .ultrathink-button:hover        - VS Code hover background + focus border
 .ultrathink-button:disabled     - Grayed out
 .ultrathink-button.animating    - Blue border glow, pointer-events: none
-.ultrathink-button.locked       - Persistent cyan glow (border + box-shadow + background tint)
+.ultrathink-button.mode-single  - Subtle cyan glow (border + light box-shadow + background tint)
+.ultrathink-button.mode-locked  - Strong cyan glow (border + prominent box-shadow + background tint)
   .ut-default-icon              - Brain emoji (hidden during animation via opacity: 0)
+  .ut-lock-badge                - Small lock icon badge (visible only in locked mode)
   .ultrathink-anim              - Absolute-positioned animation container (z-index: 50)
     .ultrathink-anim-rocket     - Rocket animation variant
     .ultrathink-anim-brain      - Brain fire animation variant
     .ultrathink-anim-wizard     - Wizard animation variant
     .ultrathink-anim-turbo      - Turbo animation variant
       .ut-emoji                 - The animated emoji element (font-size: 20px)
-.ut-lock-toggle                 - Lock button (global default absolute badge; compact static top button in browse stack)
-.ut-lock-toggle.active          - Cyan highlight when locked
 ```
 
 ## JSX Structure
 
 ```tsx
 <div className="ultrathink-wrapper">
-  <button className={`ut-lock-toggle${ultrathinkLocked ? ' active' : ''}`}
-          onClick={() => setUltrathinkLocked(prev => !prev)}
-          data-tooltip="...">
-    <svg>{/* locked/unlocked padlock icon */}</svg>
-  </button>
-  <button className={`ultrathink-button${ultrathinkAnim ? ' animating' : ''}${ultrathinkLocked ? ' locked' : ''}`}
+  <button className={`ultrathink-button${ultrathinkAnim ? ' animating' : ''}${ultrathinkMode === 'single' ? ' mode-single' : ''}${ultrathinkMode === 'locked' ? ' mode-locked' : ''}`}
           onClick={handleUltrathink}
           disabled={!isConnected || !!ultrathinkAnim}
           data-tooltip="...">
     <span className="ut-default-icon">{brain emoji}</span>
+    {ultrathinkMode === 'locked' && !ultrathinkAnim && (
+      <span className="ut-lock-badge">
+        <svg>{/* small padlock icon */}</svg>
+      </span>
+    )}
     {ultrathinkAnim && (
       <div className={`ultrathink-anim ultrathink-anim-${ultrathinkAnim}`}>
         {/* Conditionally render the animation-specific emoji */}

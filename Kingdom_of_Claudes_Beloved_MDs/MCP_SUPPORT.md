@@ -148,7 +148,12 @@ After successful mutations ClaUi:
 3. records pending mutation truth when needed
 4. rebuilds merged inventory
 5. posts `mcpOperationResult`
-6. surfaces restart/reconnect CTAs in the panel
+6. surfaces restart/reconnect CTAs in the panel with lifecycle feedback:
+   - **Idle**: amber banner with "Restart session now" button
+   - **In-flight**: button disabled, text changes to "Restarting...", banner text shows "Restarting session..."
+   - **Success**: banner turns green with "Session restarted successfully. MCP servers are reloading..."
+   - **Failure**: banner turns red with error message; button re-enables for retry
+   - Banner auto-dismisses when `system_init` refreshes inventory with `pendingRestartCount: 0`
 
 ## Webview State
 

@@ -95,7 +95,13 @@ Pixel-art dungeon crawler canvas, documented separately.
 CLI ResultSuccess/ResultError
     |
     v
-MessageHandler.ts (result handler)
+SessionTab.wireProcessEvents
+    - Detects event.type === 'result'
+    - Calls messageHandler.handleResultEvent() DIRECTLY (primary path)
+    - Also passes to demux.handleEvent() (demux listener is a secondary path)
+    |
+    v
+MessageHandler.handleResultEvent() (public method, dedup-guarded)
     - Snapshots toolNames BEFORE clearApprovalTracking()
     - Builds TurnRecord with categorizeTurn() helper
     - postMessage({ type: 'turnComplete', turn })
@@ -173,7 +179,7 @@ export interface TurnRecord {
 ## Performance
 
 - Vitals components only update on `turnComplete` events (once per completed turn), NOT on streaming text deltas
-- `SessionTimeline` uses `React.memo` with custom comparator - re-renders only when turn count or scroll fraction changes
+- `SessionTimeline` uses `React.memo` with custom comparator - re-renders when turn history reference or scroll fraction changes
 - `WeatherWidget` and `CostHeatBar` use `React.memo`
 - `turnByMessageId` provides O(1) lookup in `MessageBubble` (no array scanning)
 - Turn history capped at 200 entries to prevent memory growth

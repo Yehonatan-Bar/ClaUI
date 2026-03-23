@@ -131,5 +131,6 @@ export const SessionTimeline: React.FC<SessionTimelineProps> = React.memo(
   },
   (prev, next) =>
     prev.turnHistory.length === next.turnHistory.length &&
+    prev.turnHistory === next.turnHistory &&
     Math.abs(prev.scrollFraction - next.scrollFraction) < 0.01
 );

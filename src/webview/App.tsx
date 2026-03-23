@@ -75,6 +75,7 @@ export const App: React.FC = () => {
     chatSearchOpen,
     activitySummaryDismissed,
     setActivitySummaryDismissed,
+    activitySummaryEnabled,
   } = useAppStore();
   const forkInit = useAppStore((s) => s.forkInit);
   const [showDisablePermanently, setShowDisablePermanently] = useState(false);
@@ -335,7 +336,7 @@ export const App: React.FC = () => {
         <>
           {pendingApproval && providerCapabilities.supportsPlanApproval ? (
             <PlanApprovalBar />
-          ) : (isBusy || !!activitySummary || showDisablePermanently) ? (
+          ) : (isBusy || (!!activitySummary && activitySummaryEnabled) || showDisablePermanently) ? (
             <>
               {showDisablePermanently && activitySummaryDismissed && (
                 <div className="activity-summary-disable-bar">

@@ -206,6 +206,9 @@ export class MessageHandler {
   private exitPlanApproveResumeFallbackCycleId: number | null = null;
   /** True while the CLI is between messageStart and result (assistant turn in progress) */
   private inAssistantTurn = false;
+  /** Guard: last turnIndex for which result was handled (prevents double-fire if both
+   *  the demux listener AND the direct wireProcessEvents path deliver the same result) */
+  private lastResultHandledTurnIndex = -1;
   /** Thinking effort level detected from system init or content blocks */
   private currentThinkingEffort: string | null = null;
   /** Separate timer for post-approve nudge, decoupled from approval cycle state so it
@@ -1682,10 +1685,10 @@ export class MessageHandler {
           vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', msg.mode, true);
           break;
 
-        case 'setUltrathinkLocked':
-          this.log(`Setting ultrathink locked to: ${msg.locked}`);
+        case 'setUltrathinkMode':
+          this.log(`Setting ultrathink mode to: ${msg.mode}`);
           if (this.workspaceState) {
-            void this.workspaceState.update('claui.ultrathinkLocked', msg.locked);
+            void this.workspaceState.update('claui.ultrathinkMode', msg.mode);
           }
           break;
 
@@ -2600,16 +2603,21 @@ export class MessageHandler {
             'The user wants to consult with the Codex GPT expert about the following question.',
             '',
             'INSTRUCTIONS:',
-            '1. Formulate a comprehensive consultation prompt that includes:',
-            '   - Background context about the system/codebase you are working on',
-            '   - The specific problem or question described below',
-            '   - Any relevant code context from our recent conversation',
-            '2. Call the mcp__codex__codex tool with this enriched prompt.',
+            '1. Formulate a SHORT and CONCISE consultation prompt:',
+            '   - Keep the total prompt under 200 words',
+            '   - Include only the essential context needed to answer the question',
+            '   - Do NOT dump full code snippets, file contents, or architecture descriptions',
+            '   - One clear question, minimal background - the expert is smart, give just enough context',
+            '   - NEVER send multiple parallel codex calls - one call at a time',
+            '2. Call the mcp__codex__codex tool with this focused prompt.',
             '   CRITICAL: You MUST pass these parameters to prevent the Codex session from hanging:',
             '   - "approval-policy": "never"  (there is no interactive user to approve shell commands)',
-            '   - "sandbox": "workspace-write"  (allow read/write access for code analysis)',
+            '   - "sandbox": "read-only"  (consultation is read-only analysis, not implementation)',
             '3. Present the Codex response clearly to the user',
             '4. Then analyze the response and continue with implementation based on the advice',
+            '',
+            'IMPORTANT: Long prompts cause Codex to take 5-10+ minutes and risk timeout.',
+            'A focused 100-word prompt gets the same quality answer as a 500-word one.',
             '',
             "USER'S QUESTION:",
             question,
@@ -2710,8 +2718,8 @@ export class MessageHandler {
           this.sendPermissionModeSetting();
           // Send git push settings
           this.sendGitPushSettings();
-          // Send ultrathink lock state (project-level)
-          this.sendUltrathinkLockedSetting();
+          // Send ultrathink mode (project-level)
+          this.sendUltrathinkModeSetting();
           // Send session vitals setting
           this.sendVitalsSetting();
           // Send summary mode setting
@@ -3110,11 +3118,20 @@ export class MessageHandler {
     });
   }
 
-  /** Read ultrathink lock state from workspaceState and send to webview */
-  private sendUltrathinkLockedSetting(): void {
-    const locked = this.workspaceState?.get<boolean>('claui.ultrathinkLocked', false) ?? false;
-    this.log(`Sending ultrathink locked setting: locked=${locked}`);
-    this.webview.postMessage({ type: 'ultrathinkLockedSetting', locked });
+  /** Read ultrathink mode from workspaceState and send to webview */
+  private sendUltrathinkModeSetting(): void {
+    // Backward compat: migrate old boolean key to new mode string
+    const oldLocked = this.workspaceState?.get<boolean>('claui.ultrathinkLocked');
+    if (oldLocked !== undefined) {
+      const migrated = oldLocked ? 'locked' : 'off';
+      void this.workspaceState?.update('claui.ultrathinkMode', migrated);
+      void this.workspaceState?.update('claui.ultrathinkLocked', undefined);
+      this.log(`Migrated ultrathink locked=${oldLocked} -> mode=${migrated}`);
+    }
+    const raw = this.workspaceState?.get<string>('claui.ultrathinkMode', 'off') ?? 'off';
+    const mode = (raw === 'single' || raw === 'locked') ? raw : 'off' as const;
+    this.log(`Sending ultrathink mode setting: mode=${mode}`);
+    this.webview.postMessage({ type: 'ultrathinkModeSetting', mode });
   }
 
   /** Read session vitals setting from VS Code config and send to webview */
@@ -3921,193 +3938,217 @@ export class MessageHandler {
     this.demux.on(
       'result',
       (event: ResultSuccess | ResultError) => {
-        this.log(`[RESULT_HANDLER] Entered result handler: subtype=${event.subtype} raw=${JSON.stringify(event).slice(0, 500)}`);
-        this.inAssistantTurn = false;
-        try {
-        // Codex consultation: log result timing if a consultation was in flight
-        if (this._codexConsultStartedAt) {
-          const elapsed = Date.now() - this._codexConsultStartedAt;
-          const hadCodexTool = this.currentMessageToolNames.some(n => n.includes('codex'));
-          this.log(`[CODEX_CONSULT] Result received: elapsed=${elapsed}ms, subtype=${event.subtype}, codexToolUsed=${hadCodexTool}, tools=[${this.currentMessageToolNames.join(',')}]`);
-          this._codexConsultStartedAt = null;
-          this.clearCodexConsultTimeout();
-        }
-        this.logApprovalState(`result:${event.subtype}`);
-        // Snapshot BEFORE clearing (clearApprovalTracking resets the array)
-        const toolNamesSnapshot = [...this.currentMessageToolNames];
-        const adventureSnapshot = this.snapshotAdventureMetadata();
-        const bashCommandsSnapshot = [...this.currentBashCommands];
-        const messageIdSnapshot = this.lastMessageId;
-        if (toolNamesSnapshot.length > 0 || this.pendingApprovalCycleResumeObserved) {
-          this.markApprovalCycleResultObserved(`result:${event.subtype}`);
-        }
-
-        // Preserve pendingApprovalTool across the result event if an approval
-        // bar is currently visible in the webview. The `result` event fires
-        // when the CLI turn completes, but the user may not have responded to
-        // the approval bar yet. Without this, the approval response handler
-        // can't identify which tool was pending.
-        const savedApprovalTool = this.pendingApprovalTool;
-        this.clearApprovalTracking({
-          preserveApprovalCycle: !!savedApprovalTool || this.pendingApprovalCycleId != null,
-        });
-        if (savedApprovalTool) {
-          this.pendingApprovalTool = savedApprovalTool;
-          this.log(`Preserved pendingApprovalTool=${savedApprovalTool} across result event`);
-        }
-        if (event.subtype === 'success') {
-          this.achievementService.onResult(this.tabId, true);
-          if (this.usageLimitActive) {
-            this.clearUsageLimitState('successful result after usage-limit mode', {
-              notifyWebview: true,
-              clearQueuedPrompt: true,
-            });
-          }
-          const success = event as ResultSuccess;
-          // result.usage is CUMULATIVE across all API calls in the turn.
-          // For context-window display we need the LAST API call's input
-          // tokens (= actual prompt size). lastAssistantInputTokens is set
-          // from the most recent message_start event and reflects that.
-          // Only fall back to the cumulative value when no messageStart was seen.
-          const resultTotalInput = (success.usage?.input_tokens ?? 0)
-            + (success.usage?.cache_creation_input_tokens ?? 0)
-            + (success.usage?.cache_read_input_tokens ?? 0);
-          const contextWindowTokens = this.lastAssistantInputTokens || resultTotalInput;
-          this.log(`costUpdate: result.total=${resultTotalInput} (input=${success.usage?.input_tokens} cache_create=${success.usage?.cache_creation_input_tokens} cache_read=${success.usage?.cache_read_input_tokens}) lastAssistant=${this.lastAssistantInputTokens} contextWindow=${contextWindowTokens}`);
-          this.webview.postMessage({
-            type: 'costUpdate',
-            costUsd: success.cost_usd ?? 0,
-            totalCostUsd: success.total_cost_usd ?? 0,
-            inputTokens: contextWindowTokens,
-            outputTokens: success.usage?.output_tokens ?? 0,
-          });
-          // Auto-refresh subscription usage data after each turn (throttled to once per 60s)
-          const now = Date.now();
-          if (now - this.lastUsageAutoFetchMs > 60_000) {
-            this.lastUsageAutoFetchMs = now;
-            void this.fetchAndSendUsage();
-          }
-          // Session Vitals: emit turn completion record
-          const successTurn = {
-            turnIndex: this.turnIndex++,
-            toolNames: toolNamesSnapshot,
-            toolCount: toolNamesSnapshot.length,
-            durationMs: (success as any).duration_ms ?? 0,
-            costUsd: success.cost_usd ?? 0,
-            totalCostUsd: success.total_cost_usd ?? 0,
-            isError: false,
-            category: categorizeTurn(toolNamesSnapshot, false),
-            timestamp: Date.now(),
-            messageId: messageIdSnapshot,
-            adventureArtifacts: adventureSnapshot.artifacts,
-            adventureIndicators: adventureSnapshot.indicators,
-            adventureCommandTags: adventureSnapshot.commandTags,
-            inputTokens: (success as any).usage?.input_tokens ?? 0,
-            outputTokens: (success as any).usage?.output_tokens ?? 0,
-            cacheCreationTokens: (success as any).usage?.cache_creation_input_tokens ?? 0,
-            cacheReadTokens: (success as any).usage?.cache_read_input_tokens ?? 0,
-            bashCommands: bashCommandsSnapshot,
-          };
-          this.log(`Emitting turnComplete: turn=${successTurn.turnIndex} category=${successTurn.category} tools=[${successTurn.toolNames.join(',')}]`);
-          this.webview.postMessage({ type: 'turnComplete', turn: successTurn });
-          this.turnRecords.push(successTurn as TurnRecord);
-          // Token-Usage Ratio Tracker: record turn and sample if due
-          if (this.tokenRatioTracker) {
-            const shouldSample = this.tokenRatioTracker.recordTurn({
-              inputTokens: successTurn.inputTokens ?? 0,
-              outputTokens: successTurn.outputTokens ?? 0,
-              cacheCreationTokens: successTurn.cacheCreationTokens ?? 0,
-              cacheReadTokens: successTurn.cacheReadTokens ?? 0,
-              model: this.currentTurnModel,
-            });
-            if (shouldSample) {
-              void this.sampleTokenUsageRatio();
-            }
-          }
-          // TurnAnalyzer: fire-and-forget semantic analysis
-          if (this.turnAnalyzer) {
-            void this.turnAnalyzer.analyze({
-              messageId: messageIdSnapshot,
-              userMessage: this.lastUserMessageText,
-              toolNames: toolNamesSnapshot,
-              bashCommands: bashCommandsSnapshot,
-              isError: false,
-              recentUserMessages: this.recentUserMessages.slice(-3),
-            });
-          }
-          // Adventure Widget: generate and send beat
-          if (this.adventureInterpreter) {
-            const beat = this.adventureInterpreter.interpret(successTurn as TurnRecord);
-            this.emitAdventureBeat(beat, 'resultSuccess');
-          }
-          // Babel Fish: clear dedup set at end of turn
-          this.babelFishTranslatedIds.clear();
-        } else {
-          this.achievementService.onResult(this.tabId, false);
-          const error = event as ResultError;
-          this.handleUsageLimitDetected(error.error);
-          this.webview.postMessage({
-            type: 'error',
-            message: error.error,
-          });
-          // Session Vitals: emit error turn record
-          const errorTurn = {
-            turnIndex: this.turnIndex++,
-            toolNames: toolNamesSnapshot,
-            toolCount: toolNamesSnapshot.length,
-            durationMs: 0,
-            costUsd: 0,
-            totalCostUsd: 0,
-            isError: true,
-            category: 'error' as const,
-            timestamp: Date.now(),
-            messageId: messageIdSnapshot,
-            adventureArtifacts: adventureSnapshot.artifacts,
-            adventureIndicators: adventureSnapshot.indicators,
-            adventureCommandTags: adventureSnapshot.commandTags,
-            bashCommands: bashCommandsSnapshot,
-          };
-          this.log(`Emitting turnComplete (error): turn=${errorTurn.turnIndex}`);
-          this.webview.postMessage({ type: 'turnComplete', turn: errorTurn });
-          this.turnRecords.push(errorTurn as TurnRecord);
-          // Token-Usage Ratio Tracker: record turn (0 tokens for error turns)
-          if (this.tokenRatioTracker) {
-            const shouldSample = this.tokenRatioTracker.recordTurn({
-              inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0,
-              model: this.currentTurnModel,
-            });
-            if (shouldSample) {
-              void this.sampleTokenUsageRatio();
-            }
-          }
-          // TurnAnalyzer: fire-and-forget semantic analysis for error turns
-          if (this.turnAnalyzer) {
-            void this.turnAnalyzer.analyze({
-              messageId: messageIdSnapshot,
-              userMessage: this.lastUserMessageText,
-              toolNames: toolNamesSnapshot,
-              bashCommands: bashCommandsSnapshot,
-              isError: true,
-              recentUserMessages: this.recentUserMessages.slice(-3),
-            });
-          }
-          // Adventure Widget: generate and send beat
-          if (this.adventureInterpreter) {
-            const beat = this.adventureInterpreter.interpret(errorTurn as TurnRecord);
-            this.emitAdventureBeat(beat, 'resultError');
-          }
-        }
-        this.currentAdventureArtifacts.clear();
-        this.currentAdventureIndicators.clear();
-        this.currentAdventureCommandTags.clear();
-        // Clear tool activity indicator before marking idle
-        this.webview.postMessage({ type: 'toolActivity', toolName: '', detail: '' });
-        this.webview.postMessage({ type: 'processBusy', busy: false });
-        } catch (err) {
-          this.log(`[RESULT_HANDLER] ERROR in result handler: ${err instanceof Error ? err.stack || err.message : String(err)}`);
-        }
+        this.log(`[RESULT_HANDLER] demux result listener fired: subtype=${event.subtype}`);
+        this.handleResultEvent(event, 'demux');
       }
     );
+  }
+
+  /**
+   * Handle a CLI result event (turn completed). Called from both the demux
+   * 'result' listener AND directly from SessionTab.wireProcessEvents as a
+   * reliable backup path (the demux listener has been observed to silently
+   * not fire in some webpack-bundled builds).
+   */
+  handleResultEvent(event: ResultSuccess | ResultError, source: string = 'unknown'): void {
+    // Dedup guard: the same result can arrive via both the demux listener
+    // and the direct wireProcessEvents path. Use turnIndex to detect dupes.
+    const nextTurn = this.turnIndex;
+    if (nextTurn === this.lastResultHandledTurnIndex) {
+      this.log(`[RESULT_HANDLER] Skipping duplicate result (turnIndex=${nextTurn}, source=${source})`);
+      return;
+    }
+    this.lastResultHandledTurnIndex = nextTurn;
+
+    this.log(`[RESULT_HANDLER] Processing result: subtype=${event.subtype} source=${source} turnIndex=${nextTurn}`);
+    this.inAssistantTurn = false;
+    try {
+      // Codex consultation: log result timing if a consultation was in flight
+      if (this._codexConsultStartedAt) {
+        const elapsed = Date.now() - this._codexConsultStartedAt;
+        const hadCodexTool = this.currentMessageToolNames.some(n => n.includes('codex'));
+        this.log(`[CODEX_CONSULT] Result received: elapsed=${elapsed}ms, subtype=${event.subtype}, codexToolUsed=${hadCodexTool}, tools=[${this.currentMessageToolNames.join(',')}]`);
+        this._codexConsultStartedAt = null;
+        this.clearCodexConsultTimeout();
+      }
+      this.logApprovalState(`result:${event.subtype}`);
+      // Snapshot BEFORE clearing (clearApprovalTracking resets the array)
+      const toolNamesSnapshot = [...this.currentMessageToolNames];
+      const adventureSnapshot = this.snapshotAdventureMetadata();
+      const bashCommandsSnapshot = [...this.currentBashCommands];
+      const messageIdSnapshot = this.lastMessageId;
+      if (toolNamesSnapshot.length > 0 || this.pendingApprovalCycleResumeObserved) {
+        this.markApprovalCycleResultObserved(`result:${event.subtype}`);
+      }
+
+      // Preserve pendingApprovalTool across the result event if an approval
+      // bar is currently visible in the webview. The `result` event fires
+      // when the CLI turn completes, but the user may not have responded to
+      // the approval bar yet. Without this, the approval response handler
+      // can't identify which tool was pending.
+      const savedApprovalTool = this.pendingApprovalTool;
+      this.clearApprovalTracking({
+        preserveApprovalCycle: !!savedApprovalTool || this.pendingApprovalCycleId != null,
+      });
+      if (savedApprovalTool) {
+        this.pendingApprovalTool = savedApprovalTool;
+        this.log(`Preserved pendingApprovalTool=${savedApprovalTool} across result event`);
+      }
+      if (event.subtype === 'success') {
+        this.achievementService.onResult(this.tabId, true);
+        if (this.usageLimitActive) {
+          this.clearUsageLimitState('successful result after usage-limit mode', {
+            notifyWebview: true,
+            clearQueuedPrompt: true,
+          });
+        }
+        const success = event as ResultSuccess;
+        // result.usage is CUMULATIVE across all API calls in the turn.
+        // For context-window display we need the LAST API call's input
+        // tokens (= actual prompt size). lastAssistantInputTokens is set
+        // from the most recent message_start event and reflects that.
+        // Only fall back to the cumulative value when no messageStart was seen.
+        const resultTotalInput = (success.usage?.input_tokens ?? 0)
+          + (success.usage?.cache_creation_input_tokens ?? 0)
+          + (success.usage?.cache_read_input_tokens ?? 0);
+        const contextWindowTokens = this.lastAssistantInputTokens || resultTotalInput;
+        this.log(`costUpdate: result.total=${resultTotalInput} (input=${success.usage?.input_tokens} cache_create=${success.usage?.cache_creation_input_tokens} cache_read=${success.usage?.cache_read_input_tokens}) lastAssistant=${this.lastAssistantInputTokens} contextWindow=${contextWindowTokens}`);
+        this.webview.postMessage({
+          type: 'costUpdate',
+          costUsd: success.cost_usd ?? 0,
+          totalCostUsd: success.total_cost_usd ?? 0,
+          inputTokens: contextWindowTokens,
+          outputTokens: success.usage?.output_tokens ?? 0,
+        });
+        // Auto-refresh subscription usage data after each turn (throttled to once per 60s)
+        const now = Date.now();
+        if (now - this.lastUsageAutoFetchMs > 60_000) {
+          this.lastUsageAutoFetchMs = now;
+          void this.fetchAndSendUsage();
+        }
+        // Session Vitals: emit turn completion record
+        const successTurn = {
+          turnIndex: this.turnIndex++,
+          toolNames: toolNamesSnapshot,
+          toolCount: toolNamesSnapshot.length,
+          durationMs: (success as any).duration_ms ?? 0,
+          costUsd: success.cost_usd ?? 0,
+          totalCostUsd: success.total_cost_usd ?? 0,
+          isError: false,
+          category: categorizeTurn(toolNamesSnapshot, false),
+          timestamp: Date.now(),
+          messageId: messageIdSnapshot,
+          adventureArtifacts: adventureSnapshot.artifacts,
+          adventureIndicators: adventureSnapshot.indicators,
+          adventureCommandTags: adventureSnapshot.commandTags,
+          inputTokens: (success as any).usage?.input_tokens ?? 0,
+          outputTokens: (success as any).usage?.output_tokens ?? 0,
+          cacheCreationTokens: (success as any).usage?.cache_creation_input_tokens ?? 0,
+          cacheReadTokens: (success as any).usage?.cache_read_input_tokens ?? 0,
+          bashCommands: bashCommandsSnapshot,
+        };
+        this.log(`Emitting turnComplete: turn=${successTurn.turnIndex} category=${successTurn.category} tools=[${successTurn.toolNames.join(',')}]`);
+        this.webview.postMessage({ type: 'turnComplete', turn: successTurn });
+        this.turnRecords.push(successTurn as TurnRecord);
+        // Update the dedup guard with the actual assigned turnIndex
+        this.lastResultHandledTurnIndex = successTurn.turnIndex;
+        // Token-Usage Ratio Tracker: record turn and sample if due
+        if (this.tokenRatioTracker) {
+          const shouldSample = this.tokenRatioTracker.recordTurn({
+            inputTokens: successTurn.inputTokens ?? 0,
+            outputTokens: successTurn.outputTokens ?? 0,
+            cacheCreationTokens: successTurn.cacheCreationTokens ?? 0,
+            cacheReadTokens: successTurn.cacheReadTokens ?? 0,
+            model: this.currentTurnModel,
+          });
+          if (shouldSample) {
+            void this.sampleTokenUsageRatio();
+          }
+        }
+        // TurnAnalyzer: fire-and-forget semantic analysis
+        if (this.turnAnalyzer) {
+          void this.turnAnalyzer.analyze({
+            messageId: messageIdSnapshot,
+            userMessage: this.lastUserMessageText,
+            toolNames: toolNamesSnapshot,
+            bashCommands: bashCommandsSnapshot,
+            isError: false,
+            recentUserMessages: this.recentUserMessages.slice(-3),
+          });
+        }
+        // Adventure Widget: generate and send beat
+        if (this.adventureInterpreter) {
+          const beat = this.adventureInterpreter.interpret(successTurn as TurnRecord);
+          this.emitAdventureBeat(beat, 'resultSuccess');
+        }
+        // Babel Fish: clear dedup set at end of turn
+        this.babelFishTranslatedIds.clear();
+      } else {
+        this.achievementService.onResult(this.tabId, false);
+        const error = event as ResultError;
+        this.handleUsageLimitDetected(error.error);
+        this.webview.postMessage({
+          type: 'error',
+          message: error.error,
+        });
+        // Session Vitals: emit error turn record
+        const errorTurn = {
+          turnIndex: this.turnIndex++,
+          toolNames: toolNamesSnapshot,
+          toolCount: toolNamesSnapshot.length,
+          durationMs: 0,
+          costUsd: 0,
+          totalCostUsd: 0,
+          isError: true,
+          category: 'error' as const,
+          timestamp: Date.now(),
+          messageId: messageIdSnapshot,
+          adventureArtifacts: adventureSnapshot.artifacts,
+          adventureIndicators: adventureSnapshot.indicators,
+          adventureCommandTags: adventureSnapshot.commandTags,
+          bashCommands: bashCommandsSnapshot,
+        };
+        this.log(`Emitting turnComplete (error): turn=${errorTurn.turnIndex}`);
+        this.webview.postMessage({ type: 'turnComplete', turn: errorTurn });
+        this.turnRecords.push(errorTurn as TurnRecord);
+        // Update the dedup guard with the actual assigned turnIndex
+        this.lastResultHandledTurnIndex = errorTurn.turnIndex;
+        // Token-Usage Ratio Tracker: record turn (0 tokens for error turns)
+        if (this.tokenRatioTracker) {
+          const shouldSample = this.tokenRatioTracker.recordTurn({
+            inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0,
+            model: this.currentTurnModel,
+          });
+          if (shouldSample) {
+            void this.sampleTokenUsageRatio();
+          }
+        }
+        // TurnAnalyzer: fire-and-forget semantic analysis for error turns
+        if (this.turnAnalyzer) {
+          void this.turnAnalyzer.analyze({
+            messageId: messageIdSnapshot,
+            userMessage: this.lastUserMessageText,
+            toolNames: toolNamesSnapshot,
+            bashCommands: bashCommandsSnapshot,
+            isError: true,
+            recentUserMessages: this.recentUserMessages.slice(-3),
+          });
+        }
+        // Adventure Widget: generate and send beat
+        if (this.adventureInterpreter) {
+          const beat = this.adventureInterpreter.interpret(errorTurn as TurnRecord);
+          this.emitAdventureBeat(beat, 'resultError');
+        }
+      }
+      this.currentAdventureArtifacts.clear();
+      this.currentAdventureIndicators.clear();
+      this.currentAdventureCommandTags.clear();
+      // Clear tool activity indicator before marking idle
+      this.webview.postMessage({ type: 'toolActivity', toolName: '', detail: '' });
+      this.webview.postMessage({ type: 'processBusy', busy: false });
+    } catch (err) {
+      this.log(`[RESULT_HANDLER] ERROR in result handler: ${err instanceof Error ? err.stack || err.message : String(err)}`);
+    }
   }
 
   /** Emit adventure beat with a unique monotonically increasing index (not tied to turnIndex). */

@@ -372,7 +372,7 @@ claude-code-mirror/
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/GIT_PUSH_BUTTON.md`
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**Ultrathink Button & Glow** - Brain icon button in the input area that injects the "ultrathink" keyword to boost Claude's reasoning effort. The ultrathink controls sit above the browse/paperclip button in a vertical `browse-stack`, with the lock button above the brain button. On click, plays one of 4 random CSS animations (Rocket Launch, Brain on Fire, Wizard Staff, Turbo/NOS) for 1.2s, then prepends "ultrathink " to the input text. Includes a lock toggle that, when active, auto-prepends "ultrathink" to every outgoing prompt. The word "ultrathink" also displays with an animated rainbow glow effect (cycling colors, sparkle particles) in both completed and streaming chat messages.
+**Ultrathink Button & Glow** - Brain icon button in the input area with a 3-state cycle (off -> single -> locked -> off). Single mode prepends "ultrathink" for one prompt then resets. Locked mode auto-prepends on every prompt with a lock badge indicator. On activation, plays one of 4 random CSS animations. The word "ultrathink" displays with an animated rainbow glow effect in chat messages.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ULTRATHINK_BUTTON.md`
 
 **Prompt Navigation Arrows** - Up/down arrow buttons above the Send button that scroll the chat view to the previous/next user prompt. Filters messages by `role === 'user'`, tracks an index ref, and uses `data-message-id` DOM queries with `scrollIntoView({ behavior: 'smooth', block: 'center' })`. Navigation index resets when new messages arrive.

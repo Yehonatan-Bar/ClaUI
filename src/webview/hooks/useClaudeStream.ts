@@ -59,7 +59,7 @@ export function useClaudeStream(): void {
     addAchievementToast,
     setAchievementGoals,
     setSessionRecap,
-    setUltrathinkLocked,
+    setUltrathinkMode,
     setVitalsEnabled,
     rebuildTurnHistoryFromMessages,
     setAdventureEnabled,
@@ -443,10 +443,13 @@ export function useClaudeStream(): void {
           break;
 
         case 'activitySummary':
-          setActivitySummary({
-            shortLabel: msg.shortLabel,
-            fullSummary: msg.fullSummary,
-          });
+          // Only accept summaries when the feature is enabled
+          if (useAppStore.getState().activitySummaryEnabled) {
+            setActivitySummary({
+              shortLabel: msg.shortLabel,
+              fullSummary: msg.fullSummary,
+            });
+          }
           break;
 
         case 'planApprovalRequired': {
@@ -599,8 +602,8 @@ export function useClaudeStream(): void {
           addTurnRecord(msg.turn);
           break;
 
-        case 'ultrathinkLockedSetting':
-          setUltrathinkLocked(msg.locked);
+        case 'ultrathinkModeSetting':
+          setUltrathinkMode(msg.mode);
           break;
 
         case 'vitalsSetting':
@@ -932,7 +935,7 @@ export function useClaudeStream(): void {
     addAchievementToast,
     setAchievementGoals,
     setSessionRecap,
-    setUltrathinkLocked,
+    setUltrathinkMode,
     setVitalsEnabled,
     rebuildTurnHistoryFromMessages,
     setAdventureEnabled,
