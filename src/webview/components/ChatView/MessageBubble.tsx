@@ -19,13 +19,15 @@ interface MessageBubbleProps {
   isBusy?: boolean;
   onEditAndResend?: (messageId: string, newText: string) => void;
   onFork?: (messageId: string, messageText: string) => void;
+  onCheckpointRevert?: (messageId: string) => void;
+  onCheckpointRedo?: (messageId: string) => void;
 }
 
 /**
  * Renders a single completed message (user or assistant).
  * User messages show an Edit button on hover (hidden while assistant is busy).
  */
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, onEditAndResend, onFork }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, onEditAndResend, onFork, onCheckpointRevert, onCheckpointRedo }) => {
   const isUser = message.role === 'user';
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -43,6 +45,44 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   const hasOnlyText = isUser && contentBlocks.every((b) => b.type === 'text');
   const canEdit = hasOnlyText && !isBusy && !!onEditAndResend;
   const canFork = isUser && hasOnlyText && !!onFork && providerCapabilities.supportsFork;
+
+  // Checkpoint revert/redo state
+  const checkpointState = useAppStore((s) => s.checkpointState);
+  const allMessages = useAppStore((s) => s.messages);
+  const checkpointTurnIndex = useMemo(() => {
+    if (!isUser || !checkpointState) return null;
+    const myIdx = allMessages.findIndex(m => m.id === message.id);
+    if (myIdx < 0) return null;
+    // Find the boundary: next user message or end of array
+    const nextUserIdx = allMessages.findIndex((m, i) => i > myIdx && m.role === 'user');
+    const endIdx = nextUserIdx >= 0 ? nextUserIdx : allMessages.length;
+    // Check ALL assistant messages in this turn (there can be multiple:
+    // one with tool_use blocks, one with the text response after tool execution)
+    for (let i = myIdx + 1; i < endIdx; i++) {
+      if (allMessages[i].role === 'assistant') {
+        const cp = checkpointState.checkpoints.find(c => c.messageId === allMessages[i].id);
+        if (cp) return cp.turnIndex;
+      }
+    }
+    return null;
+  }, [isUser, checkpointState, allMessages, message.id]);
+
+  const canRevert = checkpointTurnIndex !== null && !isBusy
+    && (checkpointState?.revertedToIndex === null
+        || checkpointTurnIndex < checkpointState!.revertedToIndex!);
+
+  const isInRevertedRange = useMemo(() => {
+    if (!checkpointState || checkpointState.revertedToIndex === null) return false;
+    // For user messages: check if the turn for this user message is in the reverted range
+    if (isUser) {
+      return checkpointTurnIndex !== null && checkpointTurnIndex >= checkpointState.revertedToIndex;
+    }
+    // For assistant messages: check if there's a checkpoint with this message's id in reverted range
+    const cp = checkpointState.checkpoints.find(c => c.messageId === message.id);
+    return cp !== undefined && cp.turnIndex >= checkpointState.revertedToIndex;
+  }, [checkpointState, checkpointTurnIndex, isUser, message.id]);
+
+  const canRedo = isUser && isInRevertedRange && !isBusy && checkpointTurnIndex !== null;
 
   // Translation state from store
   const translations = useAppStore((s) => s.translations);
@@ -208,7 +248,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   };
 
   return (
-    <div className={`message ${isUser ? 'message-user' : 'message-assistant'}${isSearchMatch ? ' search-match' : ''}${isCurrentSearchMatch ? ' search-current-match' : ''}`} data-message-id={message.id} style={vitalsBorderStyle}>
+    <div className={`message ${isUser ? 'message-user' : 'message-assistant'}${isSearchMatch ? ' search-match' : ''}${isCurrentSearchMatch ? ' search-current-match' : ''}${isInRevertedRange ? ' message-reverted' : ''}`} data-message-id={message.id} style={vitalsBorderStyle}>
       {vitalsBorderStyle && (
         <div
           className="intensity-border-zone"
@@ -266,6 +306,24 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
             data-tooltip="Fork conversation from this message"
           >
             Fork
+          </button>
+        )}
+        {canRevert && !isEditing && (
+          <button
+            className="checkpoint-revert-btn"
+            onClick={() => onCheckpointRevert?.(message.id)}
+            data-tooltip="Revert file changes from this prompt onwards"
+          >
+            Revert
+          </button>
+        )}
+        {canRedo && !isEditing && (
+          <button
+            className="checkpoint-redo-btn"
+            onClick={() => onCheckpointRedo?.(message.id)}
+            data-tooltip="Re-apply file changes"
+          >
+            Redo
           </button>
         )}
         {!isUser && textContent && providerCapabilities.supportsTranslation && !babelFishEnabled && (

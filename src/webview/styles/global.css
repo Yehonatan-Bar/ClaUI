@@ -3857,6 +3857,39 @@ html, body, #root {
   border-color: var(--vscode-focusBorder);
 }
 
+/* Checkpoint revert/redo buttons — always visible when rendered */
+.checkpoint-revert-btn,
+.checkpoint-redo-btn {
+  float: right;
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 3px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  margin-right: 4px;
+}
+
+.checkpoint-revert-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: #f4a460;
+  border-color: #f4a460;
+}
+
+.checkpoint-redo-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: #4caf50;
+  border-color: #4caf50;
+}
+
+/* Reverted messages appear dimmed */
+.message-reverted {
+  opacity: 0.4;
+}
+
 .edit-message-area {
   margin-top: 4px;
 }

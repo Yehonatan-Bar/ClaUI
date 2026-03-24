@@ -29,6 +29,7 @@ import type {
   TurnSemantics,
   CommunityFriendProfilePayload,
   UsageStat,
+  CheckpointState,
 } from '../../extension/types/webview-messages';
 import type { AdventureBeat } from '../components/Vitals/adventure/types';
 import { deriveTurnHistoryFromMessages } from '../utils/turnVitals';
@@ -227,6 +228,16 @@ export interface AppState {
   turnHistory: TurnRecord[];
   turnByMessageId: Record<string, TurnRecord>;
   weather: WeatherState;
+
+  // Checkpoint revert/redo
+  checkpointState: CheckpointState | null;
+  checkpointResult: {
+    success: boolean;
+    action: 'revert' | 'redo';
+    targetTurnIndex: number;
+    error?: string;
+    conflicts?: string[];
+  } | null;
 
   // Context usage widget
   contextWidgetVisible: boolean;
@@ -560,6 +571,9 @@ export interface AppState {
   addWriteOldContent: (toolUseId: string, filePath: string, oldContent: string) => void;
   setUltrathinkMode: (mode: 'off' | 'single' | 'locked') => void;
   setVitalsEnabled: (enabled: boolean) => void;
+  setCheckpointState: (state: CheckpointState) => void;
+  setCheckpointResult: (result: AppState['checkpointResult']) => void;
+  clearCheckpointResult: () => void;
   setContextWidgetVisible: (visible: boolean) => void;
   setUsageWidgetEnabled: (enabled: boolean) => void;
   setUsageData: (stats: UsageStat[], fetchedAt: number, error?: string) => void;
@@ -836,6 +850,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   turnHistory: [],
   turnByMessageId: {},
   weather: { ...initialWeather },
+  checkpointState: null,
+  checkpointResult: null,
   contextWidgetVisible: true,
   usageWidgetEnabled: false,
   usageStats: [],
@@ -1294,27 +1310,37 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   /**
    * Convert current streaming state into a finalized ChatMessage.
-   * Always builds from accumulated streaming blocks (they are the complete picture).
-   * The assistant snapshot is only used for metadata like model name - its content
-   * is NOT used because --include-partial-messages sends incremental (not cumulative)
-   * assistant events that may only contain the most recently completed block.
+   * Prefer accumulated streaming blocks because they are the complete picture.
+   * If Claude ends a message without any streamed blocks, fall back to the
+   * last assistant snapshot so text-only replies are not dropped from history.
    */
   finalizeStreamingMessage: () => {
     const state = get();
+    const snapshot = state.lastAssistantSnapshot;
+    const hasStreamingBlocks = state.streamingBlocks.length > 0;
+    const canUseSnapshotOnly =
+      !hasStreamingBlocks &&
+      snapshot?.messageId === state.streamingMessageId &&
+      Array.isArray(snapshot.content) &&
+      snapshot.content.length > 0;
+
     console.error('[FINALIZE] called', {
       streamingMessageId: state.streamingMessageId,
       streamingBlocksLength: state.streamingBlocks.length,
       streamingBlockTypes: state.streamingBlocks.map(b => `${b.type}[${b.blockIndex}]`),
       currentMessagesCount: state.messages.length,
+      snapshotMessageId: snapshot?.messageId,
+      canUseSnapshotOnly,
     });
 
-    if (!state.streamingMessageId || state.streamingBlocks.length === 0) {
+    if (!state.streamingMessageId || (!hasStreamingBlocks && !canUseSnapshotOnly)) {
       console.error('[FINALIZE] SKIPPED - nothing to finalize');
       return;
     }
 
-    const snapshot = state.lastAssistantSnapshot;
-    const content = buildContentFromBlocks(state.streamingBlocks);
+    const content = hasStreamingBlocks
+      ? buildContentFromBlocks(state.streamingBlocks)
+      : snapshot!.content;
     const model = snapshot?.messageId === state.streamingMessageId
       ? snapshot.model
       : undefined;
@@ -1502,6 +1528,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         turnHistory: retainedTurns,
         turnByMessageId: buildTurnByMessageId(retainedTurns),
         weather: calculateWeather(retainedTurns),
+        checkpointState: null,
+        checkpointResult: null,
       };
     }),
 
@@ -1741,6 +1769,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
+  setCheckpointState: (checkpointState) => set({ checkpointState }),
+  setCheckpointResult: (checkpointResult) => set({ checkpointResult }),
+  clearCheckpointResult: () => set({ checkpointResult: null }),
   setContextWidgetVisible: (visible) => set({ contextWidgetVisible: visible }),
   setUsageWidgetEnabled: (enabled) => set({ usageWidgetEnabled: enabled }),
 
@@ -2093,6 +2124,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       scheduledMessage: { scheduled: false, text: null, scheduledAtMs: null, summary: null },
       scheduleMessageEnabled: false,
       scheduleMessageAtMs: null,
+      checkpointState: null,
+      checkpointResult: null,
       messages: [],
       streamingMessageId: null,
       streamingBlocks: [],

@@ -62,7 +62,7 @@ claude-code-mirror/
 |   |   |   +-- ControlProtocol.ts        #   Higher-level command API
 |   |   +-- webview/
 |   |   |   +-- WebviewProvider.ts        #   buildWebviewHtml() utility + legacy class
-|   |   |   +-- MessageHandler.ts         #   postMessage bridge (uses WebviewBridge interface)
+|   |   |   +-- MessageHandler.ts         #   postMessage bridge (uses WebviewBridge interface, broadcasts checkpoint state/reset)
 |   |   |   +-- HtmlPreviewPanel.ts       #   Opens HTML code blocks as rendered preview tabs
 |   |   +-- session/
 |   |   |   +-- SessionTab.ts             #   Per-tab bundle (process+demux+panel+handler)
@@ -84,6 +84,7 @@ claude-code-mirror/
 |   |   |   +-- TokenUsageRatioTracker.ts #   Correlates token consumption with usage % (per-model + global, persisted)
 |   |   |   +-- SessionDiscovery.ts       #   Discover all Claude sessions from ~/.claude/projects/ filesystem
 |   |   |   +-- ChatSearchService.ts      #   Cross-session text search via raw JSONL string matching
+|   |   |   +-- CheckpointManager.ts      #   Per-session file change checkpoint for revert/redo
 |   |   |   +-- SessionFork.ts            #   Phase 3 stub (rewind)
 |   |   +-- terminal/                     #   Phase 2 stubs
 |   |   +-- feedback/
@@ -132,7 +133,7 @@ claude-code-mirror/
 |   +-- webview/                          # React webview code (browser context)
 |       +-- index.tsx                     #   React entry point
 |       +-- App.tsx                       #   Main app with welcome/chat/status (StatusBar extracted to components/StatusBar/)
-|       +-- state/store.ts               #   Zustand state management
+|       +-- state/store.ts               #   Zustand state management, including snapshot-only assistant finalize fallback
 |       +-- hooks/
 |       |   +-- useClaudeStream.ts        #   postMessage event dispatcher
 |       |   +-- useRtlDetection.ts        #   detectRtl() helper for InputArea (messages use dir="auto")
@@ -141,8 +142,8 @@ claude-code-mirror/
 |       |   +-- useOutsideClick.ts      #   Centralized outside-click manager for all dropdowns/popovers
 |       +-- components/
 |       |   +-- ChatView/
-|       |   |   +-- MessageList.tsx       #   Scrollable message list with scroll-to-bottom button
-|       |   |   +-- MessageBubble.tsx     #   Single message with content blocks
+|       |   |   +-- MessageList.tsx       #   Scrollable message list with scroll-to-bottom button and checkpoint action dispatch
+|       |   |   +-- MessageBubble.tsx     #   Single message with content blocks and per-turn checkpoint revert/redo affordances
 |       |   |   +-- StreamingText.tsx     #   In-progress text with cursor
 |       |   |   +-- ToolUseBlock.tsx      #   Tool use display (collapsible, plan-aware, TodoWrite visual card, agent/team delegation)
 |       |   |   +-- AgentSpawnBlock.tsx  #   Inline agent spawn card with type badge, status dot, collapsible prompt/result
@@ -330,6 +331,9 @@ claude-code-mirror/
 
 **ActivitySummarizer** - Periodically summarizes Claude's tool activity via Haiku. After every N tool uses (configurable, default 3), sends enriched tool names to Haiku for a short label + full summary. Displays a detailed summary panel in the busy indicator (short label + full sentence). Updates status bar tooltip. Does NOT overwrite tab title (session name stays fixed). Debounces rapid tool uses, prevents concurrent calls.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ACTIVITY_SUMMARIZER.md`
+
+**CheckpointManager** - Per-session file change tracking for revert/redo. Captures file content before and after each code-write tool (Write, Edit, MultiEdit, NotebookEdit) executes. Each user prompt that modifies files creates a checkpoint. Users can revert all file changes from a specific prompt onward, and redo to re-apply them. Session-isolated with conflict detection for external modifications. Files > 1MB and binary files are skipped.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/CHECKPOINT_MANAGER.md`
 
 **Message Translation** -- Translates assistant message text to a configurable target language (default: Hebrew) using a one-shot Claude Sonnet 4.6 CLI call. Language is selectable via the gear icon panel next to Vitals, or via the `claudeMirror.translationLanguage` VS Code setting. Supports 10 languages: Hebrew, Arabic, Russian, Spanish, French, German, Portuguese, Chinese, Japanese, Korean. RTL layout is applied automatically for Hebrew and Arabic. Triggered by a per-message button showing the target language name. Translations are cached per message; toggling is instant after first translation. Code blocks and technical terms are preserved.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/MESSAGE_TRANSLATION.md`

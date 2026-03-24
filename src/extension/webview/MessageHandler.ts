@@ -17,6 +17,7 @@ import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import { getStoredApiKey, setStoredApiKey, maskApiKey } from '../process/envUtils';
 import type { TokenUsageRatioTracker } from '../session/TokenUsageRatioTracker';
+import type { CheckpointManager } from '../session/CheckpointManager';
 import { parseUsageLimitError } from '../process/usageLimitParser';
 import { AuthManager } from '../auth/AuthManager';
 import { BugReportService } from '../feedback/BugReportService';
@@ -260,6 +261,8 @@ export class MessageHandler {
   private skillUsageTracker: import('../skillgen/SkillUsageTracker').SkillUsageTracker | null = null;
   /** Global token-usage ratio tracker (shared across all tabs) */
   private tokenRatioTracker: TokenUsageRatioTracker | null = null;
+  /** Per-session checkpoint manager for revert/redo of file changes */
+  private checkpointManager: CheckpointManager | null = null;
 
   /** Bash command strings seen in the current assistant message */
   private currentBashCommands: string[] = [];
@@ -454,6 +457,10 @@ export class MessageHandler {
   /** Attach the global TokenUsageRatioTracker */
   setTokenRatioTracker(tracker: TokenUsageRatioTracker): void {
     this.tokenRatioTracker = tracker;
+  }
+
+  setCheckpointManager(manager: CheckpointManager): void {
+    this.checkpointManager = manager;
   }
 
   /** Set the log directory path for bug reports */
@@ -870,6 +877,21 @@ export class MessageHandler {
    * intermittent duplicate-prompt bug where the CLI echo arrives long after
    * the 2-second dedup window that was previously used.
    */
+  private postCheckpointState(): void {
+    if (!this.checkpointManager) return;
+    this.webview.postMessage({
+      type: 'checkpointState',
+      state: this.checkpointManager.getState(),
+    });
+  }
+
+  private resetCheckpointState(reason: string): void {
+    if (!this.checkpointManager) return;
+    this.log(`[CHECKPOINT] Resetting checkpoint state: ${reason}`);
+    this.checkpointManager.reset();
+    this.postCheckpointState();
+  }
+
   private postUserMessage(content: ContentBlock[], isOptimistic = false): void {
     const text = content
       .filter((b) => b.type === 'text')
@@ -1508,6 +1530,7 @@ export class MessageHandler {
           this.activitySummarizer?.reset();
           this.adventureInterpreter?.reset();
           this.turnRecords = [];
+          this.resetCheckpointState('clearSession');
           this.log('clearSession - stopping current process and starting fresh');
           this.achievementService.onSessionEnd(this.tabId);
           this.processManager.stop();
@@ -2263,6 +2286,36 @@ export class MessageHandler {
           this.handleChatSearchResumeSession(msg.sessionId);
           break;
 
+        case 'checkpointRevert': {
+          if (!this.checkpointManager) break;
+          const cpRevertResult = this.checkpointManager.revert(msg.turnIndex);
+          this.webview.postMessage({
+            type: 'checkpointResult',
+            success: cpRevertResult.success,
+            action: 'revert',
+            targetTurnIndex: msg.turnIndex,
+            error: cpRevertResult.error,
+            conflicts: cpRevertResult.conflicts.length > 0 ? cpRevertResult.conflicts : undefined,
+          });
+          this.postCheckpointState();
+          break;
+        }
+
+        case 'checkpointRedo': {
+          if (!this.checkpointManager) break;
+          const cpRedoResult = this.checkpointManager.redo(msg.turnIndex);
+          this.webview.postMessage({
+            type: 'checkpointResult',
+            success: cpRedoResult.success,
+            action: 'redo',
+            targetTurnIndex: msg.turnIndex,
+            error: cpRedoResult.error,
+            conflicts: cpRedoResult.conflicts.length > 0 ? cpRedoResult.conflicts : undefined,
+          });
+          this.postCheckpointState();
+          break;
+        }
+
         case 'editAndResend':
           this.log(`Edit-and-resend: resuming session with edited prompt`);
           this.clearUsageLimitState('editAndResend', { notifyWebview: true, clearQueuedPrompt: true });
@@ -2276,6 +2329,7 @@ export class MessageHandler {
           this.resetExitPlanModeProcessed('edit-and-resend restart');
           this.activitySummarizer?.reset();
           this.turnRecords = [];
+          this.resetCheckpointState('editAndResend');
           this.achievementService.abandonSession(this.tabId);
           this.webview.postMessage({ type: 'processBusy', busy: true });
           {
@@ -3758,6 +3812,20 @@ export class MessageHandler {
               }
             }
           }
+          // Checkpoint: capture before-content for ALL code-write tools (unconditional)
+          this.log(`[CHECKPOINT-DEBUG] blockStop toolName="${toolName}" isWriteTool=${CODE_WRITE_TOOLS.includes(toolName)} hasManager=${!!this.checkpointManager}`);
+          if (CODE_WRITE_TOOLS.includes(toolName) && this.checkpointManager) {
+            try {
+              const parsed = JSON.parse(rawInput);
+              const cpFilePath: string = parsed.file_path || parsed.notebook_path || '';
+              this.log(`[CHECKPOINT-DEBUG] parsed file_path="${cpFilePath}"`);
+              if (cpFilePath) {
+                this.checkpointManager.captureBeforeContent(cpFilePath, toolName);
+              }
+            } catch (e) {
+              this.log(`[CHECKPOINT-DEBUG] JSON parse error: ${e}`);
+            }
+          }
         }
         this.toolBlockIds.delete(data.blockIndex);
         this.toolBlockNames.delete(data.blockIndex);
@@ -4075,6 +4143,14 @@ export class MessageHandler {
         this.log(`Emitting turnComplete: turn=${successTurn.turnIndex} category=${successTurn.category} tools=[${successTurn.toolNames.join(',')}]`);
         this.webview.postMessage({ type: 'turnComplete', turn: successTurn });
         this.turnRecords.push(successTurn as TurnRecord);
+        // Checkpoint: finalize turn and broadcast state to webview
+        this.log(`[CHECKPOINT-DEBUG] handleResultEvent: hasManager=${!!this.checkpointManager} turnIndex=${successTurn.turnIndex} messageId=${messageIdSnapshot}`);
+        if (this.checkpointManager) {
+          this.checkpointManager.finalizeTurn(successTurn.turnIndex, messageIdSnapshot);
+          const cpState = this.checkpointManager.getState();
+          this.log(`[CHECKPOINT-DEBUG] After finalizeTurn: ${cpState.checkpoints.length} checkpoints, revertedToIndex=${cpState.revertedToIndex}`);
+          this.postCheckpointState();
+        }
         // Update the dedup guard with the actual assigned turnIndex
         this.lastResultHandledTurnIndex = successTurn.turnIndex;
         // Token-Usage Ratio Tracker: record turn and sample if due

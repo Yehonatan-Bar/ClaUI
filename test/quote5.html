@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Silmarillion Quote - The Last Ride of Fingolfin</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Crimson+Text:ital,wght@0,400;1,400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #060408;
+    overflow: hidden;
+    font-family: 'Crimson Text', serif;
+  }
+
+  /* Sparse cold stars — the sky above Angband */
+  .stars {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+  }
+  .star {
+    position: absolute;
+    background: #fff;
+    border-radius: 50%;
+    animation: twinkle var(--d) infinite ease-in-out alternate;
+  }
+  @keyframes twinkle {
+    from { opacity: 0.04; transform: scale(1); }
+    to   { opacity: 0.65; transform: scale(1.4); }
+  }
+
+  /* Fingolfin's star-light — cold blue glow from above */
+  .glow-king {
+    position: fixed;
+    width: 600px; height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse,
+      rgba(100,150,220,0.11) 0%,
+      rgba(60,100,180,0.06) 45%,
+      transparent 70%
+    );
+    top: 30%; left: 50%;
+    transform: translate(-50%, -50%);
+    animation: breatheKing 12s ease-in-out infinite;
+  }
+
+  /* Angband's deep fire — faint red heat rising from below */
+  .glow-angband {
+    position: fixed;
+    width: 900px; height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse,
+      rgba(200,60,20,0.10) 0%,
+      rgba(140,30,10,0.05) 50%,
+      transparent 75%
+    );
+    bottom: -50px; left: 50%;
+    transform: translateX(-50%);
+    animation: breatheAngband 8s ease-in-out infinite;
+  }
+
+  @keyframes breatheKing {
+    0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1);   }
+    50%       { opacity: 1;   transform: translate(-50%, -50%) scale(1.12); }
+  }
+  @keyframes breatheAngband {
+    0%, 100% { opacity: 0.5; }
+    50%       { opacity: 0.9; }
+  }
+
+  /* Embers drifting upward from the fires */
+  .ember {
+    position: fixed;
+    width: 2px;
+    border-radius: 2px;
+    background: linear-gradient(to top, transparent, rgba(220,100,40,0.45), transparent);
+    animation: drift var(--rd) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes drift {
+    0%   { opacity: 0;   transform: translateY(0)   scaleY(1); }
+    25%  { opacity: 0.5; }
+    100% { opacity: 0;   transform: translateY(-200px) scaleY(1.8); }
+  }
+
+  /* Gates of Angband — jagged black peaks and fortress walls */
+  .hall-layer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 320px;
+    pointer-events: none;
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 10;
+    max-width: 700px;
+    text-align: center;
+    padding: 68px 60px;
+    border: 1px solid rgba(100,150,220,0.20);
+    background: rgba(6, 4, 10, 0.84);
+    backdrop-filter: blur(14px);
+    border-radius: 4px;
+    box-shadow:
+      0 0 80px rgba(60,100,200,0.10),
+      0 0 30px rgba(100,150,220,0.05),
+      0 20px 80px rgba(180,50,10,0.07),
+      inset 0 0 50px rgba(0,0,0,0.70);
+    animation: fadeIn 2.5s ease forwards;
+    opacity: 0;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .corner {
+    position: absolute;
+    width: 28px; height: 28px;
+    border-color: rgba(100,150,220,0.38);
+    border-style: solid;
+  }
+  .corner.tl { top: -1px; left: -1px;   border-width: 2px 0 0 2px; }
+  .corner.tr { top: -1px; right: -1px;  border-width: 2px 2px 0 0; }
+  .corner.bl { bottom: -1px; left: -1px;  border-width: 0 0 2px 2px; }
+  .corner.br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+  .subtitle {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 10px;
+    letter-spacing: 6px;
+    color: rgba(100,150,220,0.50);
+    text-transform: uppercase;
+    margin-bottom: 36px;
+  }
+
+  .divider {
+    width: 120px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(100,150,220,0.40), transparent);
+    margin: 0 auto 36px;
+  }
+
+  blockquote {
+    font-size: 26px;
+    line-height: 1.9;
+    color: #cdd6e8;
+    font-style: italic;
+    letter-spacing: 0.3px;
+    margin-bottom: 36px;
+    text-shadow: 0 2px 24px rgba(80,120,200,0.18);
+  }
+
+  blockquote .highlight {
+    color: #90b8e4;
+    font-style: normal;
+  }
+
+  .divider2 {
+    width: 60px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(100,150,220,0.30), transparent);
+    margin: 0 auto 24px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 11px;
+    color: rgba(100,150,220,0.42);
+    letter-spacing: 3px;
+    line-height: 1.8;
+  }
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+<div class="glow-king"></div>
+<div class="glow-angband"></div>
+<div class="embers" id="embers"></div>
+
+<!-- The Gates of Angband — black iron peaks and fortress walls -->
+<svg class="hall-layer" viewBox="0 0 1440 320" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="skyFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#060408" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#060408" stop-opacity="1"/>
+    </linearGradient>
+    <linearGradient id="peakFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0e0b14"/>
+      <stop offset="100%" stop-color="#080610"/>
+    </linearGradient>
+    <radialGradient id="gateGlow" cx="50%" cy="100%" r="60%">
+      <stop offset="0%" stop-color="rgba(200,55,15,0.18)"/>
+      <stop offset="100%" stop-color="rgba(200,55,15,0)"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Hellish glow at the base of the gates -->
+  <ellipse cx="720" cy="310" rx="320" ry="60" fill="url(#gateGlow)"/>
+
+  <!-- Distant jagged mountain range -->
+  <polygon points="0,320 0,220 80,160 130,200 200,130 260,180 340,100 400,155 480,80 540,140 620,60 680,120 720,45 760,120 820,60 880,140 960,80 1040,155 1100,100 1180,180 1260,130 1330,200 1380,160 1440,220 1440,320"
+    fill="#0a0812"/>
+
+  <!-- Closer fortress silhouette — the walls of Angband -->
+  <polygon points="0,320 0,260 60,260 60,240 80,220 100,240 100,255 150,255 150,230 170,210 190,230 190,255 250,255 250,240 280,215 310,240 310,255 360,255 360,270 400,270 400,255 440,240 480,240 510,220 530,240 540,240 540,255 580,255 580,270 620,270 620,255 640,235 660,220 680,235 700,255 720,260 740,255 760,235 780,220 800,235 820,255 820,270 860,270 860,255 900,255 900,240 910,220 930,240 960,240 1000,220 1030,240 1080,240 1080,255 1130,255 1130,240 1160,215 1190,240 1190,255 1240,255 1240,270 1280,270 1280,255 1340,255 1340,240 1360,225 1380,240 1380,260 1440,260 1440,320"
+    fill="url(#peakFill)"/>
+
+  <!-- Central gate arch — twin towers -->
+  <rect x="640" y="235" width="30" height="85" fill="#080610"/>
+  <rect x="770" y="235" width="30" height="85" fill="#080610"/>
+  <!-- gate arch -->
+  <path d="M640 250 Q720 195 800 250" stroke="#0f0c18" stroke-width="3" fill="#0a0812"/>
+  <!-- gate opening glows red -->
+  <rect x="680" y="268" width="80" height="52" fill="#0c0510"/>
+  <ellipse cx="720" cy="270" rx="40" ry="10" fill="rgba(180,40,10,0.22)"/>
+
+  <!-- Iron battlements on towers -->
+  <rect x="635" y="228" width="8"  height="12" fill="#0a0812"/>
+  <rect x="648" y="228" width="8"  height="12" fill="#0a0812"/>
+  <rect x="661" y="228" width="8"  height="12" fill="#0a0812"/>
+  <rect x="765" y="228" width="8"  height="12" fill="#0a0812"/>
+  <rect x="778" y="228" width="8"  height="12" fill="#0a0812"/>
+  <rect x="791" y="228" width="8"  height="12" fill="#0a0812"/>
+
+  <!-- Floor — stone ground before the gates -->
+  <rect x="0" y="295" width="1440" height="25" fill="#060408"/>
+  <line x1="0" y1="296" x2="1440" y2="296" stroke="rgba(90,60,30,0.10)" stroke-width="1"/>
+
+  <!-- Sky fade overlay -->
+  <rect width="1440" height="320" fill="url(#skyFade)"/>
+</svg>
+
+<div class="card">
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
+
+  <p class="subtitle">The Silmarillion &mdash; Of the Ruin of Beleriand</p>
+  <div class="divider"></div>
+
+  <blockquote>
+    He rode alone to Angband<br>
+    and smote upon its gates,<br>
+    and challenged Morgoth<br>
+    to come forth to<br>
+    <span class="highlight">single combat.</span>
+  </blockquote>
+
+  <div class="divider2"></div>
+  <p class="attribution">Of Fingolfin, High King of the Noldor<br>The Silmarillion</p>
+</div>
+
+<script>
+  // Stars — cold and sparse above Angband
+  const starsEl = document.getElementById('stars');
+  for (let i = 0; i < 90; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 1.6 + 0.3;
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      top:${Math.random()*65}%;
+      left:${Math.random()*100}%;
+      --d:${(Math.random()*7+3).toFixed(1)}s;
+      animation-delay:${(Math.random()*9).toFixed(1)}s;
+    `;
+    starsEl.appendChild(s);
+  }
+
+  // Embers rising from the fires of Angband
+  const embersEl = document.getElementById('embers');
+  for (let i = 0; i < 18; i++) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    const height = Math.random() * 70 + 25;
+    e.style.cssText = `
+      height:${height}px;
+      bottom:${Math.random()*60}px;
+      left:${(Math.random()*40+30)}%;
+      --rd:${(Math.random()*6+4).toFixed(1)}s;
+      animation-delay:${(Math.random()*9).toFixed(1)}s;
+    `;
+    embersEl.appendChild(e);
+  }
+</script>
+</body>
+</html>

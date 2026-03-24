@@ -868,7 +868,9 @@ export type WebviewToExtensionMessage =
   | SendBtwMessageRequest
   | CloseBtwSessionRequest
   | ChatSearchProjectRequest
-  | ChatSearchResumeSessionRequest;
+  | ChatSearchResumeSessionRequest
+  | CheckpointRevertRequest
+  | CheckpointRedoRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -1864,6 +1866,52 @@ export interface BtwSessionEndedMessage {
   error?: string;
 }
 
+// --- Checkpoint Types ---
+
+export interface CheckpointFileEntry {
+  filePath: string;
+  before: string | null;
+  after: string | null;
+  toolName: string;
+}
+
+export interface CheckpointSummary {
+  turnIndex: number;
+  messageId: string;
+  timestamp: number;
+  fileCount: number;
+  filePaths: string[];
+}
+
+export interface CheckpointState {
+  checkpoints: CheckpointSummary[];
+  revertedToIndex: number | null;
+}
+
+export interface CheckpointStateMessage {
+  type: 'checkpointState';
+  state: CheckpointState;
+}
+
+export interface CheckpointResultMessage {
+  type: 'checkpointResult';
+  success: boolean;
+  action: 'revert' | 'redo';
+  targetTurnIndex: number;
+  error?: string;
+  conflicts?: string[];
+}
+
+export interface CheckpointRevertRequest {
+  type: 'checkpointRevert';
+  turnIndex: number;
+}
+
+export interface CheckpointRedoRequest {
+  type: 'checkpointRedo';
+  turnIndex: number;
+}
+
 /** Serializable chat message for passing between webview instances (e.g. fork) */
 export interface SerializedChatMessage {
   id: string;
@@ -1978,4 +2026,6 @@ export type ExtensionToWebviewMessage =
   | BtwMessageStopMessage
   | BtwResultMessage
   | BtwSessionEndedMessage
-  | ChatSearchProjectResultMessage;
+  | ChatSearchProjectResultMessage
+  | CheckpointStateMessage
+  | CheckpointResultMessage;

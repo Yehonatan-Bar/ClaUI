@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arcane</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital,wght@0,400;1,400&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0a0a0f;
+      overflow: hidden;
+      font-family: 'Crimson Text', serif;
+    }
+
+    .bg {
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(123, 31, 162, 0.15) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 50%, rgba(21, 101, 192, 0.15) 0%, transparent 60%),
+        radial-gradient(ellipse at 50% 80%, rgba(0, 188, 212, 0.08) 0%, transparent 50%);
+      animation: breathe 8s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+
+    .particles {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .particle {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: rgba(0, 220, 255, 0.6);
+      border-radius: 50%;
+      animation: float linear infinite;
+    }
+
+    @keyframes float {
+      0% { transform: translateY(100vh) translateX(0); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { transform: translateY(-10vh) translateX(30px); opacity: 0; }
+    }
+
+    .card {
+      position: relative;
+      max-width: 680px;
+      width: 90%;
+      padding: 60px 56px;
+      text-align: center;
+      border: 1px solid rgba(0, 200, 255, 0.15);
+      border-radius: 4px;
+      background: rgba(10, 10, 20, 0.85);
+      backdrop-filter: blur(20px);
+      box-shadow:
+        0 0 60px rgba(123, 31, 162, 0.2),
+        0 0 120px rgba(21, 101, 192, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #00dcff, #7b1fa2, transparent);
+    }
+
+    .card::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0, 220, 255, 0.5), transparent);
+    }
+
+    .rune {
+      font-family: 'Cinzel', serif;
+      font-size: 11px;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      color: rgba(0, 200, 255, 0.5);
+      margin-bottom: 36px;
+    }
+
+    .hex-divider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin: 28px 0;
+    }
+
+    .hex-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0, 200, 255, 0.3));
+    }
+
+    .hex-line:last-child {
+      background: linear-gradient(270deg, transparent, rgba(0, 200, 255, 0.3));
+    }
+
+    .hex-gem {
+      width: 8px;
+      height: 8px;
+      border: 1px solid rgba(0, 200, 255, 0.5);
+      transform: rotate(45deg);
+      background: rgba(0, 200, 255, 0.15);
+      box-shadow: 0 0 8px rgba(0, 200, 255, 0.3);
+    }
+
+    .quote {
+      font-size: 26px;
+      line-height: 1.65;
+      color: rgba(230, 230, 255, 0.92);
+      font-style: italic;
+      font-weight: 400;
+      text-shadow: 0 0 40px rgba(123, 31, 162, 0.4);
+      position: relative;
+    }
+
+    .quote::before {
+      content: '\201C';
+      font-size: 80px;
+      color: rgba(123, 31, 162, 0.3);
+      position: absolute;
+      top: -20px;
+      left: -16px;
+      line-height: 1;
+      font-family: Georgia, serif;
+    }
+
+    .attribution {
+      margin-top: 36px;
+      font-family: 'Cinzel', serif;
+      font-size: 12px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(123, 31, 162, 0.8);
+    }
+
+    .glow-orb {
+      position: fixed;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+      animation: drift 20s ease-in-out infinite;
+    }
+
+    .orb-1 {
+      background: rgba(123, 31, 162, 0.12);
+      top: -100px;
+      left: -100px;
+      animation-delay: 0s;
+    }
+
+    .orb-2 {
+      background: rgba(21, 101, 192, 0.12);
+      bottom: -100px;
+      right: -100px;
+      animation-delay: -10s;
+    }
+
+    @keyframes drift {
+      0%, 100% { transform: translate(0, 0); }
+      33% { transform: translate(40px, 20px); }
+      66% { transform: translate(-20px, 40px); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg"></div>
+
+  <div class="glow-orb orb-1"></div>
+  <div class="glow-orb orb-2"></div>
+
+  <div class="particles" id="particles"></div>
+
+  <div class="card">
+    <div class="rune">Arcane &nbsp;&bull;&nbsp; Piltover &nbsp;&bull;&nbsp; Undercity</div>
+
+    <div class="hex-divider">
+      <div class="hex-line"></div>
+      <div class="hex-gem"></div>
+      <div class="hex-line"></div>
+    </div>
+
+    <p class="quote">
+      There are no coincidences, only the inevitable.
+    </p>
+
+    <div class="hex-divider">
+      <div class="hex-line"></div>
+      <div class="hex-gem"></div>
+      <div class="hex-line"></div>
+    </div>
+
+    <div class="attribution">Silco &nbsp;&mdash;&nbsp; Season I</div>
+  </div>
+
+  <script>
+    const container = document.getElementById('particles');
+    for (let i = 0; i < 28; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      p.style.left = Math.random() * 100 + '%';
+      p.style.animationDuration = (8 + Math.random() * 14) + 's';
+      p.style.animationDelay = (-Math.random() * 20) + 's';
+      p.style.width = p.style.height = (1 + Math.random() * 2) + 'px';
+      p.style.opacity = 0.3 + Math.random() * 0.7;
+      container.appendChild(p);
+    }
+  </script>
+
+</body>
+</html>

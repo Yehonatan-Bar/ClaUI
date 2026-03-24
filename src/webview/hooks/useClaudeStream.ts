@@ -618,6 +618,20 @@ export function useClaudeStream(): void {
           addWriteOldContent(msg.toolUseId, msg.filePath, msg.oldContent);
           break;
 
+        case 'checkpointState':
+          useAppStore.getState().setCheckpointState(msg.state);
+          break;
+
+        case 'checkpointResult':
+          useAppStore.getState().setCheckpointResult({
+            success: msg.success,
+            action: msg.action,
+            targetTurnIndex: msg.targetTurnIndex,
+            error: msg.error,
+            conflicts: msg.conflicts,
+          });
+          break;
+
         case 'adventureWidgetSetting':
           setAdventureEnabled(msg.enabled);
           break;

@@ -15,6 +15,7 @@ import { PromptEnhancer } from './PromptEnhancer';
 import { PromptTranslator } from './PromptTranslator';
 import { ConversationReader } from './ConversationReader';
 import { FileLogger } from './FileLogger';
+import { CheckpointManager } from './CheckpointManager';
 import type { AchievementService } from '../achievements/AchievementService';
 import type { SessionStore } from './SessionStore';
 import type { ProjectAnalyticsStore } from './ProjectAnalyticsStore';
@@ -186,6 +187,11 @@ export class SessionTab implements WebviewBridge {
     this.processManager.setLogger(tabLog);
     this.messageHandler.setLogger(tabLog);
 
+    // Wire per-session checkpoint manager for file revert/redo
+    const checkpointMgr = new CheckpointManager(tabLog);
+    checkpointMgr.setWorkspaceRoot(vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath ?? '');
+    this.messageHandler.setCheckpointManager(checkpointMgr);
+
     // Wire auto-naming: Haiku generates a short title from the first message
     const sessionNamer = new SessionNamer();
     sessionNamer.setLogger(tabLog);
@@ -305,6 +311,11 @@ export class SessionTab implements WebviewBridge {
     if (outbound.type === 'processBusy') {
       this.setBusy(outbound.busy);
     }
+    // When a session ends, always stop the busy animation —
+    // processBusy:false may never arrive if handleResultEvent didn't fire
+    if (outbound.type === 'sessionEnded') {
+      this.setBusy(false);
+    }
     if (outbound.type === 'assistantMessage') {
       this.resolveAssistantReplyWaiters(true);
     }
@@ -402,6 +413,7 @@ export class SessionTab implements WebviewBridge {
           cliPathOverride: this.cliPathOverride ?? undefined,
         });
         this.log(`[Tab ${this.tabNumber}] Session restarted fresh with model "${model}"`);
+        this.postMessage({ type: 'processBusy', busy: false });
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
         this.log(`[Tab ${this.tabNumber}] Failed to restart with model: ${errMsg}`);
@@ -428,6 +440,7 @@ export class SessionTab implements WebviewBridge {
         cliPathOverride: this.cliPathOverride ?? undefined,
       });
       this.log(`[Tab ${this.tabNumber}] Session resumed with model "${model}"`);
+      this.postMessage({ type: 'processBusy', busy: false });
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       this.log(`[Tab ${this.tabNumber}] Failed to switch model: ${errMsg}`);

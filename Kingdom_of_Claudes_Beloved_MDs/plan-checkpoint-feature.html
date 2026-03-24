@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkpoint - Revert/Redo Feature Plan</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f1117;
+      color: #e0e0e0;
+      padding: 40px 20px;
+      line-height: 1.7;
+    }
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 28px;
+      color: #a78bfa;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #a78bfa33;
+      padding-bottom: 12px;
+    }
+    .subtitle {
+      color: #9ca3af;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    h2 {
+      font-size: 20px;
+      color: #60a5fa;
+      margin-top: 36px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h2 .num {
+      background: #60a5fa22;
+      color: #60a5fa;
+      border: 1px solid #60a5fa44;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    p { margin-bottom: 14px; color: #c9d1d9; }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e6edf3;
+      margin-bottom: 10px;
+    }
+    .highlight {
+      background: #1a1f2e;
+      border-right: 3px solid #a78bfa;
+      padding: 16px 20px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    ul {
+      padding-right: 24px;
+      margin-bottom: 14px;
+    }
+    li {
+      margin-bottom: 8px;
+      color: #b0b8c4;
+    }
+    li strong { color: #e6edf3; }
+    .flow-diagram {
+      background: #1a1f2e;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 24px;
+      margin: 20px 0;
+      text-align: center;
+      direction: ltr;
+    }
+    .flow-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .flow-box {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 13px;
+      color: #c9d1d9;
+    }
+    .flow-box.active {
+      border-color: #a78bfa;
+      color: #a78bfa;
+      background: #a78bfa11;
+    }
+    .flow-box.new {
+      border-color: #4caf50;
+      color: #4caf50;
+      background: #4caf5011;
+    }
+    .flow-arrow {
+      color: #484f58;
+      font-size: 20px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-new { background: #23863533; color: #3fb950; border: 1px solid #23863555; }
+    .badge-modify { background: #b0860033; color: #d29922; border: 1px solid #b0860055; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    th {
+      background: #21262d;
+      color: #8b949e;
+      font-weight: 600;
+      text-align: right;
+      padding: 10px 14px;
+      font-size: 13px;
+      border-bottom: 1px solid #30363d;
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #21262d;
+      font-size: 14px;
+      color: #c9d1d9;
+    }
+    .edge-cases {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .edge-case {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .edge-case .label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #f4a460;
+      margin-bottom: 4px;
+    }
+    .edge-case .desc {
+      font-size: 13px;
+      color: #8b949e;
+    }
+    @media (max-width: 600px) {
+      .edge-cases { grid-template-columns: 1fr; }
+      .flow-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Checkpoint - Revert/Redo</h1>
+    <p class="subtitle">תוכנית פיתוח לפיצ'ר חדש ב-ClaUi | מרץ 2026</p>
+
+    <div class="highlight">
+      <p><strong>מה זה?</strong> יכולת לבטל ולהחזיר שינויים בקבצים שבוצעו על ידי Claude במהלך סשן. כל הודעה של המשתמש מקבלת כפתור "חזרה לאחור" שמאפשר לחזור למצב הקוד כפי שהיה לפני אותה הודעה.</p>
+    </div>
+
+    <h2><span class="num">1</span>הרעיון המרכזי</h2>
+    <div class="card">
+      <p>כל פעם שהמשתמש שולח הודעה ו-Claude עורך קבצים (כותב, עורך, משנה) - המערכת שומרת "צילום מצב" של הקבצים לפני ואחרי השינוי.</p>
+      <p>המשתמש יכול בכל שלב:</p>
+      <ul>
+        <li><strong>לחזור אחורה (Revert)</strong> - לחיצה על כפתור בהודעה מסוימת מבטלת את כל השינויים מאותה נקודה ועד סוף הסשן</li>
+        <li><strong>לחזור קדימה (Redo)</strong> - אם חזר אחורה, יכול להחיל מחדש את השינויים שבוטלו</li>
+      </ul>
+    </div>
+
+    <h2><span class="num">2</span>דוגמה מעשית</h2>
+    <div class="card">
+      <p>נניח שבסשן נשלחו 5 הודעות. בכל אחת Claude שינה קבצים שונים:</p>
+      <table>
+        <tr><th>הודעה</th><th>שינוי</th><th>כפתור</th></tr>
+        <tr><td>הודעה 1</td><td>יצירת קובץ חדש</td><td>Revert</td></tr>
+        <tr><td>הודעה 2</td><td>עריכת 3 קבצים</td><td>Revert</td></tr>
+        <tr><td>הודעה 3</td><td>שינוי קובץ קיים</td><td>Revert</td></tr>
+        <tr><td>הודעה 4</td><td>עריכת 2 קבצים</td><td>Revert</td></tr>
+        <tr><td>הודעה 5</td><td>שינוי קובץ אחד</td><td>Revert</td></tr>
+      </table>
+      <p>אם המשתמש לוחץ <strong>Revert</strong> על הודעה 3 - כל השינויים של הודעות 3, 4 ו-5 מבוטלים. הקבצים חוזרים למצב שהיה אחרי הודעה 2.</p>
+      <p>ההודעות 3-5 מוצגות מעומעמות, ולידן מופיע כפתור <strong>Redo</strong> להחלה מחדש.</p>
+    </div>
+
+    <h2><span class="num">3</span>איך זה עובד מאחורי הקלעים</h2>
+    <div class="flow-diagram">
+      <div class="flow-row">
+        <div class="flow-box active">User sends prompt</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-box">Claude modifies files</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-box new">Checkpoint saved</div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-box" style="font-size:12px; color:#8b949e;">Before each file edit:<br>save current file content</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-box" style="font-size:12px; color:#8b949e;">After turn completes:<br>save new file content</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-box" style="font-size:12px; color:#8b949e;">Store: before/after<br>per file, per prompt</div>
+      </div>
+    </div>
+
+    <h2><span class="num">4</span>בידוד סשנים</h2>
+    <div class="card">
+      <p>כל סשן (טאב) מנהל את ה-checkpoints שלו באופן עצמאי. אם שני סשנים רצים במקביל ושניהם עורכים קבצים, הם לא מתערבבים.</p>
+      <p>אם סשן A ערך קובץ ואחריו סשן B ערך את אותו קובץ - בעת ניסיון לחזור אחורה בסשן A, המערכת תזהה שהקובץ שונה מבחוץ ותתריע למשתמש.</p>
+    </div>
+
+    <h2><span class="num">5</span>מה נבנה</h2>
+    <div class="card">
+      <table>
+        <tr><th>רכיב</th><th>סוג</th><th>תיאור</th></tr>
+        <tr>
+          <td>CheckpointManager</td>
+          <td><span class="badge badge-new">חדש</span></td>
+          <td>מנוע ה-checkpoint - שמירה, ביטול, והחלה מחדש של שינויים</td>
+        </tr>
+        <tr>
+          <td>כפתור Revert/Redo</td>
+          <td><span class="badge badge-modify">שינוי</span></td>
+          <td>כפתורים חדשים על כל הודעת משתמש (ליד Fork ו-Edit)</td>
+        </tr>
+        <tr>
+          <td>מצב ויזואלי "מבוטל"</td>
+          <td><span class="badge badge-modify">שינוי</span></td>
+          <td>הודעות שבוטלו מוצגות מעומעמות</td>
+        </tr>
+        <tr>
+          <td>זיהוי קונפליקטים</td>
+          <td><span class="badge badge-new">חדש</span></td>
+          <td>אם קובץ שונה מחוץ לסשן - התראה למשתמש</td>
+        </tr>
+      </table>
+    </div>
+
+    <h2><span class="num">6</span>מקרי קצה</h2>
+    <div class="edge-cases">
+      <div class="edge-case">
+        <div class="label">סשנים מקבילים</div>
+        <div class="desc">כל סשן מנהל checkpoints בנפרד. זיהוי קונפליקטים מגן על קבצים משותפים.</div>
+      </div>
+      <div class="edge-case">
+        <div class="label">קבצים חדשים</div>
+        <div class="desc">קובץ שנוצר על ידי Claude יימחק בעת חזרה לאחור.</div>
+      </div>
+      <div class="edge-case">
+        <div class="label">קבצים גדולים</div>
+        <div class="desc">קבצים מעל 1MB לא ייעקבו לחיסכון בזיכרון.</div>
+      </div>
+      <div class="edge-case">
+        <div class="label">עריכה מחדש (Edit & Resend)</div>
+        <div class="desc">איפוס כל ה-checkpoints כי הסשן מתחיל מנקודה שונה.</div>
+      </div>
+      <div class="edge-case">
+        <div class="label">ענף Redo נמחק</div>
+        <div class="desc">אם המשתמש חזר אחורה ואז שלח הודעה חדשה - השינויים הישנים נמחקים.</div>
+      </div>
+      <div class="edge-case">
+        <div class="label">שינויים חיצוניים</div>
+        <div class="desc">אם קובץ שונה ידנית - המערכת מזהה ומתריעה במקום לדרוס.</div>
+      </div>
+    </div>
+
+    <h2><span class="num">7</span>מגבלות ידועות (שלב 1)</h2>
+    <div class="card">
+      <ul>
+        <li>שינויים שנעשו דרך פקודות Bash (למשל mv, cp, sed) <strong>לא ייעקבו</strong> - רק כלי העריכה הייעודיים של Claude</li>
+        <li>קבצים בינאריים (תמונות, PDF) לא ייעקבו</li>
+        <li>מגבלת זיכרון: עד 50MB סה"כ לאחסון snapshots לכל סשן</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

@@ -153,6 +153,38 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
     setBtwPopup(null);
   }, [setBtwPopup]);
 
+  /** Find the checkpoint associated with a user message by checking all
+   *  assistant messages between it and the next user message. */
+  const findCheckpointForUserMessage = useCallback((messageId: string) => {
+    const state = useAppStore.getState();
+    const msgs = state.messages;
+    const myIdx = msgs.findIndex(m => m.id === messageId);
+    if (myIdx < 0) return null;
+    const nextUserIdx = msgs.findIndex((m, i) => i > myIdx && m.role === 'user');
+    const endIdx = nextUserIdx >= 0 ? nextUserIdx : msgs.length;
+    for (let i = myIdx + 1; i < endIdx; i++) {
+      if (msgs[i].role === 'assistant') {
+        const cp = state.checkpointState?.checkpoints.find(c => c.messageId === msgs[i].id);
+        if (cp) return cp;
+      }
+    }
+    return null;
+  }, []);
+
+  /** Checkpoint revert: revert file changes from a specific user prompt onward */
+  const handleCheckpointRevert = useCallback((messageId: string) => {
+    const cp = findCheckpointForUserMessage(messageId);
+    if (!cp) return;
+    postToExtension({ type: 'checkpointRevert', turnIndex: cp.turnIndex });
+  }, [findCheckpointForUserMessage]);
+
+  /** Checkpoint redo: re-apply previously reverted file changes */
+  const handleCheckpointRedo = useCallback((messageId: string) => {
+    const cp = findCheckpointForUserMessage(messageId);
+    if (!cp) return;
+    postToExtension({ type: 'checkpointRedo', turnIndex: cp.turnIndex });
+  }, [findCheckpointForUserMessage]);
+
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     userScrolledUp.current = false;
@@ -173,6 +205,8 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
           isBusy={isBusy}
           onEditAndResend={handleEditAndResend}
           onFork={handleFork}
+          onCheckpointRevert={handleCheckpointRevert}
+          onCheckpointRedo={handleCheckpointRedo}
         />
       ))}
 

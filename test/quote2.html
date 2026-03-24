@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LOTR Quote - Galadriel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=EB+Garamond:ital,wght@0,400;1,400;1,600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #040812;
+    overflow: hidden;
+    font-family: 'EB Garamond', serif;
+  }
+
+  /* Animated aurora background */
+  .aurora {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .aurora-band {
+    position: absolute;
+    width: 200%;
+    height: 300px;
+    border-radius: 50%;
+    filter: blur(80px);
+    animation: drift var(--dur) ease-in-out infinite alternate;
+    opacity: 0.35;
+  }
+  .ab1 { background: rgba(60,180,180,0.6);  top: 5%;  left: -30%; --dur: 9s;  }
+  .ab2 { background: rgba(100,60,200,0.5);  top: 15%; left: -10%; --dur: 13s; animation-delay: -4s; }
+  .ab3 { background: rgba(40,160,120,0.4);  top: 30%; left: -20%; --dur: 11s; animation-delay: -2s; }
+  @keyframes drift {
+    from { transform: translateX(0)   scaleY(1);   }
+    to   { transform: translateX(15%) scaleY(1.3); }
+  }
+
+  /* Mirror of Galadriel basin (SVG) */
+  .basin-wrap {
+    position: fixed;
+    bottom: -60px;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .basin-wrap svg { display: block; }
+
+  /* Reflection shimmer overlay in the basin */
+  .shimmer {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 340px;
+    height: 110px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(100,200,255,0.15) 0%, transparent 70%);
+    animation: shimmer 3s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 2;
+  }
+  @keyframes shimmer {
+    0%, 100% { opacity: 0.4; transform: translateX(-50%) scaleX(1);   }
+    50%       { opacity: 0.9; transform: translateX(-50%) scaleX(1.05); }
+  }
+
+  /* Floating particles */
+  .particles { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(160,230,255,0.7);
+    animation: float var(--fd) ease-in-out infinite;
+  }
+  @keyframes float {
+    0%   { transform: translateY(0)    opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    100% { transform: translateY(-120px); opacity: 0; }
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 660px;
+    text-align: center;
+    padding: 60px 52px;
+    border: 1px solid rgba(100,200,255,0.2);
+    background: rgba(4, 8, 22, 0.72);
+    backdrop-filter: blur(16px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 80px rgba(60,140,220,0.18),
+      0 0 160px rgba(60,80,180,0.1),
+      inset 0 0 60px rgba(0,0,20,0.6);
+    animation: appear 2.2s cubic-bezier(.2,.8,.4,1) forwards;
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  @keyframes appear {
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  /* Elvish ring ornament top */
+  .ring-ornament {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 56px; height: 56px;
+  }
+
+  .eyebrow {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(100,200,255,0.45);
+    text-transform: uppercase;
+    margin-bottom: 32px;
+    margin-top: 10px;
+  }
+
+  .line-sep {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 0 auto 32px;
+    width: fit-content;
+  }
+  .line-sep span {
+    display: block;
+    width: 70px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(100,200,255,0.4));
+  }
+  .line-sep span:last-child {
+    background: linear-gradient(90deg, rgba(100,200,255,0.4), transparent);
+  }
+  .line-sep svg { flex-shrink: 0; }
+
+  blockquote {
+    font-size: 26px;
+    line-height: 1.75;
+    color: #c8e8f8;
+    font-style: italic;
+    letter-spacing: 0.2px;
+    margin-bottom: 38px;
+    text-shadow: 0 0 30px rgba(80,180,255,0.25);
+  }
+  blockquote em {
+    color: #7dd4f8;
+    font-style: normal;
+  }
+
+  .line-sep2 {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 26px; width: fit-content;
+  }
+  .line-sep2 span {
+    display: block; width: 40px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(100,200,255,0.3));
+  }
+  .line-sep2 span:last-child {
+    background: linear-gradient(90deg, rgba(100,200,255,0.3), transparent);
+  }
+
+  .attribution {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 10px;
+    color: rgba(100,200,255,0.4);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="aurora">
+  <div class="aurora-band ab1"></div>
+  <div class="aurora-band ab2"></div>
+  <div class="aurora-band ab3"></div>
+</div>
+
+<!-- Mirror of Galadriel basin -->
+<div class="basin-wrap">
+  <svg width="420" height="200" viewBox="0 0 420 200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="waterGrad" cx="50%" cy="40%" r="50%">
+        <stop offset="0%" stop-color="#1a4060" stop-opacity="0.9"/>
+        <stop offset="60%" stop-color="#0a1a30" stop-opacity="0.95"/>
+        <stop offset="100%" stop-color="#040810" stop-opacity="1"/>
+      </radialGradient>
+      <radialGradient id="waterShine" cx="50%" cy="30%" r="40%">
+        <stop offset="0%" stop-color="#60c0ff" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="transparent" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <!-- Pedestal -->
+    <rect x="185" y="150" width="50" height="40" rx="4" fill="rgba(30,40,60,0.9)"/>
+    <rect x="170" y="185" width="80" height="12" rx="3" fill="rgba(40,55,80,0.9)"/>
+    <!-- Basin bowl -->
+    <ellipse cx="210" cy="148" rx="130" ry="30" fill="rgba(30,40,60,0.95)"/>
+    <ellipse cx="210" cy="140" rx="120" ry="22" fill="url(#waterGrad)"/>
+    <ellipse cx="210" cy="138" rx="110" ry="16" fill="url(#waterShine)"/>
+    <!-- Rim highlight -->
+    <ellipse cx="210" cy="140" rx="120" ry="22" fill="none"
+             stroke="rgba(80,160,220,0.3)" stroke-width="1.5"/>
+  </svg>
+</div>
+<div class="shimmer"></div>
+
+<div class="particles" id="particles"></div>
+
+<div class="card">
+  <!-- Ring ornament -->
+  <div class="ring-ornament">
+    <svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(100,200,255,0.35)" stroke-width="1.5"/>
+      <circle cx="28" cy="28" r="18" fill="none" stroke="rgba(100,200,255,0.2)"  stroke-width="1"/>
+      <circle cx="28" cy="28" r="6"  fill="rgba(100,200,255,0.5)"/>
+      <line x1="28" y1="4"  x2="28" y2="52" stroke="rgba(100,200,255,0.15)" stroke-width="0.8"/>
+      <line x1="4"  y1="28" x2="52" y2="28" stroke="rgba(100,200,255,0.15)" stroke-width="0.8"/>
+    </svg>
+  </div>
+
+  <p class="eyebrow">Viktor &mdash; Arcane, Season 1</p>
+
+  <div class="line-sep">
+    <span></span>
+    <svg width="10" height="10" viewBox="0 0 10 10">
+      <polygon points="5,0 10,5 5,10 0,5" fill="rgba(100,200,255,0.5)"/>
+    </svg>
+    <span></span>
+  </div>
+
+  <blockquote>
+    In the pursuit of great,<br>
+    we failed to do <em>good.</em>
+  </blockquote>
+
+  <div class="line-sep2">
+    <span></span>
+    <svg width="6" height="6" viewBox="0 0 6 6">
+      <circle cx="3" cy="3" r="2.5" fill="rgba(100,200,255,0.4)"/>
+    </svg>
+    <span></span>
+  </div>
+  <p class="attribution">Viktor<br>Arcane</p>
+</div>
+
+<script>
+  const p = document.getElementById('particles');
+  for (let i = 0; i < 30; i++) {
+    const el = document.createElement('div');
+    el.className = 'particle';
+    const size = Math.random() * 3 + 1;
+    el.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${20+Math.random()*60}%;
+      bottom:${10+Math.random()*30}%;
+      --fd:${(Math.random()*5+4).toFixed(1)}s;
+      animation-delay:${(Math.random()*8).toFixed(1)}s;
+    `;
+    p.appendChild(el);
+  }
+</script>
+</body>
+</html>
