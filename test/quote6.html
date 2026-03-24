@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Silmarillion Quote - The Ainulindalë</title>
+<title>Silmarillion Quote - The Two Trees of Valinor</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Crimson+Text:ital,wght@0,400;1,400&display=swap');
 
@@ -35,14 +35,14 @@
     to   { opacity: 0.75; transform: scale(1.5); }
   }
 
-  /* Dual glow — amber flame (Imperishable Fire) on the right, deep violet (the Void) on the left */
+  /* Dual glow — gold (Laurelin) on the right, silver (Telperion) on the left */
   .glow-gold {
     position: fixed;
     width: 420px; height: 600px;
     border-radius: 50%;
     background: radial-gradient(ellipse,
-      rgba(220,140,40,0.16) 0%,
-      rgba(190,100,20,0.06) 40%,
+      rgba(220,180,60,0.14) 0%,
+      rgba(200,160,40,0.06) 40%,
       transparent 70%
     );
     top: 20%; right: 10%;
@@ -58,8 +58,8 @@
     width: 420px; height: 600px;
     border-radius: 50%;
     background: radial-gradient(ellipse,
-      rgba(100,80,200,0.14) 0%,
-      rgba(70,50,160,0.06) 40%,
+      rgba(180,200,230,0.14) 0%,
+      rgba(140,160,200,0.06) 40%,
       transparent 70%
     );
     top: 20%; left: 10%;
@@ -107,10 +107,10 @@
     width: 28px; height: 28px;
     border-style: solid;
   }
-  .corner.tl { top: -1px; left: -1px;   border-width: 2px 0 0 2px; border-color: rgba(100,80,200,0.40); }
-  .corner.tr { top: -1px; right: -1px;  border-width: 2px 2px 0 0; border-color: rgba(220,140,40,0.40); }
-  .corner.bl { bottom: -1px; left: -1px;  border-width: 0 0 2px 2px; border-color: rgba(100,80,200,0.40); }
-  .corner.br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; border-color: rgba(220,140,40,0.40); }
+  .corner.tl { top: -1px; left: -1px;   border-width: 2px 0 0 2px; border-color: rgba(180,200,230,0.40); }
+  .corner.tr { top: -1px; right: -1px;  border-width: 2px 2px 0 0; border-color: rgba(220,180,60,0.40); }
+  .corner.bl { bottom: -1px; left: -1px;  border-width: 0 0 2px 2px; border-color: rgba(180,200,230,0.40); }
+  .corner.br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; border-color: rgba(220,180,60,0.40); }
 
   .subtitle {
     font-family: 'Cinzel Decorative', cursive;
@@ -139,12 +139,12 @@
   }
 
   blockquote .gold {
-    color: #e08830;
+    color: #d4b440;
     font-style: normal;
   }
 
   blockquote .silver {
-    color: #9080e0;
+    color: #b0c4e8;
     font-style: normal;
   }
 
@@ -170,46 +170,51 @@
 <div class="glow-silver"></div>
 <div class="glow-gold"></div>
 
-<!-- Primordial void — waves of the Music rising from the deep -->
+<!-- Hills of Valinor with two tree silhouettes -->
 <svg class="hills-layer" viewBox="0 0 1440 300" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="skyFade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#07060e" stop-opacity="0"/>
       <stop offset="100%" stop-color="#07060e" stop-opacity="1"/>
     </linearGradient>
-    <radialGradient id="flameGlow" cx="0.75" cy="0" r="0.6">
-      <stop offset="0%" stop-color="rgba(220,120,30,0.10)"/>
+    <radialGradient id="silverLight" cx="0.5" cy="0" r="0.8">
+      <stop offset="0%" stop-color="rgba(180,200,230,0.12)"/>
       <stop offset="100%" stop-color="transparent"/>
     </radialGradient>
-    <radialGradient id="voidGlow" cx="0.25" cy="0" r="0.6">
-      <stop offset="0%" stop-color="rgba(90,60,180,0.10)"/>
+    <radialGradient id="goldLight" cx="0.5" cy="0" r="0.8">
+      <stop offset="0%" stop-color="rgba(220,180,60,0.12)"/>
       <stop offset="100%" stop-color="transparent"/>
     </radialGradient>
   </defs>
 
-  <!-- Void light pools -->
-  <rect width="1440" height="300" fill="url(#voidGlow)"/>
-  <rect width="1440" height="300" fill="url(#flameGlow)"/>
+  <!-- Back hills -->
+  <path d="M0 300 L0 200 Q180 140 360 165 Q540 190 720 150 Q900 110 1080 145 Q1260 180 1440 160 L1440 300 Z"
+        fill="rgba(12,10,28,0.7)"/>
 
-  <!-- Deep wave — first swell of the Music -->
-  <path d="M0 300 L0 230 Q120 210 240 220 Q360 230 480 215 Q600 200 720 210 Q840 220 960 208 Q1080 196 1200 212 Q1320 228 1440 218 L1440 300 Z"
-        fill="rgba(10,8,26,0.55)"/>
+  <!-- Front hills -->
+  <path d="M0 300 L0 240 Q200 195 400 210 Q600 225 720 195 Q840 165 960 190 Q1100 215 1250 205 Q1350 195 1440 220 L1440 300 Z"
+        fill="rgba(8,7,20,0.9)"/>
 
-  <!-- Mid wave -->
-  <path d="M0 300 L0 255 Q180 238 360 248 Q540 258 720 242 Q900 226 1080 244 Q1260 262 1440 250 L1440 300 Z"
-        fill="rgba(8,6,20,0.75)"/>
+  <!-- Tree silhouette left — Telperion (silver) -->
+  <g opacity="0.35">
+    <rect x="340" y="130" width="6" height="80" rx="3" fill="#0c0a1c"/>
+    <ellipse cx="343" cy="115" rx="35" ry="40" fill="#0c0a1c"/>
+    <ellipse cx="343" cy="105" rx="18" ry="20" fill="url(#silverLight)"/>
+  </g>
 
-  <!-- Foreground — the deep -->
-  <path d="M0 300 L0 278 Q360 265 720 272 Q1080 279 1440 268 L1440 300 Z"
-        fill="rgba(6,5,16,0.92)"/>
+  <!-- Tree silhouette right — Laurelin (gold) -->
+  <g opacity="0.35">
+    <rect x="1080" y="115" width="6" height="80" rx="3" fill="#0c0a1c"/>
+    <ellipse cx="1083" cy="100" rx="38" ry="42" fill="#0c0a1c"/>
+    <ellipse cx="1083" cy="90" rx="20" ry="22" fill="url(#goldLight)"/>
+  </g>
 
   <!-- Sky overlay -->
   <rect width="1440" height="300" fill="url(#skyFade)"/>
 
-  <!-- Faint flame spark — centre right -->
-  <ellipse cx="1020" cy="240" rx="90" ry="8" fill="rgba(200,110,20,0.04)"/>
-  <!-- Faint void shimmer — centre left -->
-  <ellipse cx="420"  cy="252" rx="90" ry="8" fill="rgba(90,60,180,0.04)"/>
+  <!-- Light pools at base of each tree -->
+  <ellipse cx="343"  cy="210" rx="80" ry="12" fill="rgba(160,180,220,0.05)"/>
+  <ellipse cx="1083" cy="195" rx="80" ry="12" fill="rgba(200,170,60,0.05)"/>
 </svg>
 
 <div class="card">
@@ -218,33 +223,34 @@
   <div class="corner bl"></div>
   <div class="corner br"></div>
 
-  <p class="subtitle">The Silmarillion &mdash; Ain&ucirc;lind&aleg;</p>
+  <p class="subtitle">The Silmarillion &mdash; Of the Beginning of Days</p>
   <div class="divider"></div>
 
   <blockquote>
-    No theme may be played that hath not<br>
-    its uttermost source in <span class="gold">me</span>,<br>
-    nor can any alter the <span class="silver">music</span> in my despite.<br>
-    For he that attempteth this shall be but<br>
-    mine <span class="gold">instrument</span> in the devising<br>
-    of things more wonderful,<br>
-    which he himself hath not imagined.
+    In seven hours the glory of each tree<br>
+    waxed to full and waned again to naught;<br>
+    and each awoke once more to life<br>
+    an hour before the other ceased to shine.<br>
+    Thus in Valinor twice every day<br>
+    there came a gentle hour of softer light<br>
+    when both trees were faint and their<br>
+    <span class="gold">gold</span> and <span class="silver">silver</span> beams were mingled.
   </blockquote>
 
   <div class="divider2"></div>
-  <p class="attribution">Il&uacute;vatar to Melkor<br>Ain&ucirc;lind&aleg; &mdash; The Silmarillion</p>
+  <p class="attribution">The Two Trees of Valinor<br>The Silmarillion</p>
 </div>
 
 <script>
-  // Stars — cold void whites with rare sparks of flame and deep violet
+  // Stars — warm and cool tones intermixed, reflecting the mingled light
   const container = document.getElementById('stars');
   for (let i = 0; i < 180; i++) {
     const s = document.createElement('div');
     s.className = 'star';
     const size = Math.random() * 2.0 + 0.3;
     const r = Math.random();
-    const hue = r < 0.10 ? 'rgba(220,130,40,0.9)'
-              : r < 0.22 ? 'rgba(130,100,220,0.9)'
+    const hue = r < 0.15 ? 'rgba(220,190,100,0.9)'
+              : r < 0.30 ? 'rgba(170,190,240,0.9)'
               : '#ffffff';
     s.style.cssText = `
       width:${size}px; height:${size}px;

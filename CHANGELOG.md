@@ -1,5 +1,83 @@
 # ClaUi - Changelog
 
+## v0.1.107 - 2026-03-24
+
+**Feature: Checkpoint — Revert & Redo File Changes**
+
+- Each user message that resulted in file changes now shows a **Revert** button in the message header (next to Edit/Fork/Copy)
+- Clicking Revert undoes all file changes made by Claude from that prompt through the end of the session, restoring each file to its state before that turn
+- After reverting, a **Redo** button appears on the reverted messages, allowing re-applying the changes
+- Supports all four file-writing tools: `Write`, `Edit`, `MultiEdit`, `NotebookEdit`
+- Session-isolated: each tab has its own independent checkpoint history — reverting in one tab never affects another
+- Conflict detection: if a file was modified externally after Claude wrote it, the revert skips that file and reports the conflict rather than silently overwriting
+- Redo branch management: if the user reverts and then sends a new prompt, the old redo branch is discarded (like Git — new work replaces the old future)
+- Files larger than 1MB and binary files are skipped automatically
+- Reverted messages are visually dimmed (opacity 0.4) to indicate they are in the reverted range
+- New backend class: `CheckpointManager.ts` (one instance per session tab)
+
+---
+
+## v0.1.106 - 2026-03-23
+
+**Feature: SkillDocs first-time onboarding**
+
+- Added a floating action button (FAB) with a pulsing green glow at the bottom-left for users who have not yet seen the SkillDocs onboarding
+- Clicking the FAB opens a modal explaining what SkillDocs does: reads SR-PTD docs, uses AI to detect patterns, and generates skill files in `~/.claude/skills/`
+- Modal supports 16 languages (English, Hebrew, Arabic, Spanish, French, German, Russian, Chinese, Japanese, Korean, Portuguese, Italian, Dutch, Polish, Turkish, Hindi); Hebrew and Arabic use RTL layout
+- Two decision buttons: "Enable" and "Skip" — decision is persisted in VS Code `globalState` and survives across workspaces and sessions
+- If the user skips, SkillGen is disabled globally; if enabled, the SkillGen button appears in the StatusBar Tools dropdown
+- The SkillGen dropdown item is hidden until onboarding is completed (the FAB is the sole entry point beforehand)
+- New component: `SkillGenOnboarding.tsx`; new message type: `skillGenOnboardingDecision`
+
+---
+
+## v0.1.105 - 2026-03-23
+
+**Improvement: Clean model switch at session start**
+
+- When switching models before any message has been sent, the session now performs a fresh start with the new model instead of a stop-and-resume
+- Previously, switching the model on an empty session still used the resume path, which was semantically incorrect
+- Added `isAtSessionStart` getter on `MessageHandler` (returns `true` when `firstMessageSent` is still false)
+- `SessionTab.switchModel()` uses this flag to decide: fresh start (no messages yet) vs. resume with the new model (mid-conversation)
+
+---
+
+## v0.1.104 - 2026-03-23
+
+**Bug Fix: Activity Summary visible when feature is disabled**
+
+- The Activity Summary bar could appear even after the feature was toggled off, because stale summary data remained in the Zustand store
+- Fixed by gating the layout condition on `activitySummaryEnabled` in `App.tsx`, guarding incoming `activitySummary` messages in `useClaudeStream.ts`, and clearing the summary when the setting is disabled in `store.ts`
+
+**Improvement: Ultrathink 3-state mode (off / single / locked)**
+
+- Replaced the 2-state toggle (off/locked) with a 3-state cycle: **off → single → locked → off**
+- `single` mode auto-resets to `off` after one message is sent (one-shot ultrathink)
+- `locked` mode persists across messages (equivalent to the old "locked")
+- Removed the separate lock toggle button — the brain button now cycles through all three states; a lock badge icon appears in `locked` mode
+- Workspace state key migrated from boolean `claui.ultrathinkLocked` to string `claui.ultrathinkMode` (`'off'` | `'single'` | `'locked'`), with backward-compatibility conversion
+
+**Improvement: MCP restart banner lifecycle feedback**
+
+- The MCP panel's restart banner now reflects the full operation lifecycle: amber (idle) → "Restarting..." (in-flight) → green success or red failure
+- Restart button is disabled while in-flight and hidden after success
+
+**Fix: Result handler reliability — dual-path processing**
+
+- The `result` event handler was extracted from the inline demux listener into a public `handleResultEvent()` method with a dedup guard
+- Added a direct call path from `SessionTab.wireProcessEvents` as a reliable backup, since the demux `EventEmitter` listener has been observed to silently not fire in webpack production builds
+
+**Fix: SessionTimeline stale memo comparator**
+
+- `SessionTimeline` `React.memo` comparator now checks reference equality on `turnHistory`, not just array length, ensuring re-renders when new items are appended
+
+**Improvement: Codex consultation prompts shortened**
+
+- Consultation prompts rewritten to stay under 200 words; previous verbose prompts (400+ words) caused 5–10 minute hangs
+- Consultation sandbox changed from `workspace-write` to `read-only`
+
+---
+
 ## v0.1.103 - 2026-03-19
 
 **Fix: Activity Summary persists across turns**
