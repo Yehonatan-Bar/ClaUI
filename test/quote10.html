@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Silmarillion - Fingolfin's Challenge to Morgoth</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #030208;
+    overflow: hidden;
+    font-family: 'EB Garamond', serif;
+  }
+
+  /* Dark iron sky of Angband - oppressive, cold */
+  .sky {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 100% 50% at 50% 100%, rgba(40,55,90,0.25) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 35% 75%, rgba(20,30,65,0.2) 0%, transparent 50%),
+      linear-gradient(to bottom, #010108 0%, #050312 50%, #0a0618 100%);
+  }
+
+  /* Faint lightning flashes from Grond's strikes */
+  .flash-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    animation: flash 8s ease-in-out infinite;
+    background: radial-gradient(ellipse 50% 60% at 50% 60%, rgba(180,200,255,0.08) 0%, transparent 70%);
+  }
+  @keyframes flash {
+    0%, 85%, 100% { opacity: 0; }
+    87% { opacity: 1; }
+    89% { opacity: 0.1; }
+    91% { opacity: 0.7; }
+    93% { opacity: 0; }
+  }
+
+  /* Stars - Varda's stars shine even over Angband */
+  .stars { position: fixed; inset: 0; pointer-events: none; }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    animation: tw var(--d) infinite ease-in-out alternate;
+  }
+  @keyframes tw {
+    from { opacity: 0.06; transform: scale(1); }
+    to   { opacity: 1;    transform: scale(1.4); }
+  }
+
+  /* Silver gleam - Fingolfin's armor / Ringil's light */
+  .ringil-glow {
+    position: fixed;
+    width: 200px; height: 340px;
+    bottom: 60px; left: 38%;
+    background: radial-gradient(ellipse at 50% 85%, rgba(160,195,255,0.2) 0%, transparent 60%);
+    pointer-events: none;
+    animation: ringilPulse 3s ease-in-out infinite alternate;
+  }
+  @keyframes ringilPulse {
+    from { opacity: 0.3; }
+    to   { opacity: 0.85; }
+  }
+
+  /* Dark fire glow from Angband pits */
+  .angband-fire {
+    position: fixed;
+    width: 100%; height: 180px;
+    bottom: 0; left: 0;
+    background: radial-gradient(ellipse 40% 100% at 62% 100%, rgba(120,30,0,0.18) 0%, transparent 65%);
+    pointer-events: none;
+    animation: firePulse 7s ease-in-out infinite alternate;
+  }
+  @keyframes firePulse {
+    from { opacity: 0.3; }
+    to   { opacity: 0.7; }
+  }
+
+  /* Frost particles from Ringil */
+  .frost-layer { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  .frost {
+    position: absolute;
+    border-radius: 50%;
+    animation: frostdrift var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes frostdrift {
+    0%   { opacity: 0; transform: translateY(0) translateX(0); }
+    20%  { opacity: 0.7; }
+    80%  { opacity: 0.2; }
+    100% { opacity: 0; transform: translateY(-100px) translateX(var(--dx)); }
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 700px;
+    text-align: center;
+    padding: 60px 54px;
+    border: 1px solid rgba(130,165,230,0.2);
+    background: rgba(3, 2, 10, 0.82);
+    backdrop-filter: blur(14px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 80px rgba(80,120,210,0.14),
+      0 0 160px rgba(40,60,150,0.07),
+      inset 0 0 55px rgba(0,0,10,0.7);
+    animation: unveil 2.8s cubic-bezier(.2,.8,.3,1) forwards;
+    opacity: 0;
+  }
+  @keyframes unveil {
+    from { opacity: 0; transform: scale(0.96) translateY(18px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* Corner ornaments - Noldorin style, angular */
+  .ec { position: absolute; width: 44px; height: 44px; }
+  .ec.tl { top:-1px; left:-1px; }
+  .ec.tr { top:-1px; right:-1px; transform: scaleX(-1); }
+  .ec.bl { bottom:-1px; left:-1px; transform: scaleY(-1); }
+  .ec.br { bottom:-1px; right:-1px; transform: scale(-1,-1); }
+
+  .eyebrow {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(130,165,230,0.45);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    margin-top: 6px;
+  }
+
+  .age-line {
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: rgba(130,165,230,0.22);
+    margin-bottom: 28px;
+    font-style: italic;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 28px; width: fit-content;
+  }
+  .sep-l { width: 70px; height: 1px; background: linear-gradient(90deg, transparent, rgba(130,165,240,0.45)); }
+  .sep-r { width: 70px; height: 1px; background: linear-gradient(90deg, rgba(130,165,240,0.45), transparent); }
+
+  .scene-label {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 12px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(155,185,240,0.38);
+    margin-bottom: 26px;
+  }
+
+  .narrative {
+    font-size: 22px;
+    line-height: 1.85;
+    color: rgba(185,205,240,0.72);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,0,12,0.8);
+  }
+
+  .main-quote {
+    font-size: 27px;
+    line-height: 1.8;
+    color: #c0d4f0;
+    font-style: italic;
+    margin-bottom: 16px;
+    text-shadow: 0 0 28px rgba(110,145,230,0.2), 0 2px 8px rgba(0,0,12,0.8);
+  }
+  .main-quote .hl {
+    color: #dce8ff;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 22px rgba(160,195,255,0.55);
+  }
+
+  .ringil-text {
+    font-size: 20px;
+    line-height: 1.85;
+    color: rgba(170,200,255,0.65);
+    font-style: italic;
+    margin-bottom: 36px;
+    text-shadow: 0 2px 12px rgba(0,0,12,0.7);
+  }
+  .ringil-text .ice {
+    color: rgba(190,220,255,0.9);
+    text-shadow: 0 0 18px rgba(140,185,255,0.5);
+  }
+
+  .thin-sep {
+    width: 50px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(130,165,240,0.35), transparent);
+    margin: 0 auto 24px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 10px;
+    color: rgba(130,165,230,0.38);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="sky"></div>
+<div class="flash-layer"></div>
+<div class="ringil-glow"></div>
+<div class="angband-fire"></div>
+<div class="stars" id="stars"></div>
+
+<!-- Angband gates and Thangorodrim -->
+<svg style="position:fixed;bottom:0;left:0;right:0;height:320px;pointer-events:none;"
+     viewBox="0 0 1440 320" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ironG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0c0a18"/>
+      <stop offset="100%" stop-color="#020108"/>
+    </linearGradient>
+    <radialGradient id="pitFire" cx="62%" cy="100%" r="25%">
+      <stop offset="0%" stop-color="#a02800" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gateIron" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#181425"/>
+      <stop offset="100%" stop-color="#060410"/>
+    </linearGradient>
+    <radialGradient id="smokeG" cx="50%" cy="0%" r="50%">
+      <stop offset="0%" stop-color="#2a2030" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Smoke rising from Thangorodrim -->
+  <ellipse cx="720" cy="30" rx="400" ry="120" fill="url(#smokeG)"/>
+
+  <!-- Thangorodrim - three volcanic peaks -->
+  <!-- Left peak -->
+  <path d="M440 320 L560 42 L620 115 L680 320 Z" fill="#080614" opacity="0.95"/>
+  <path d="M556 52 Q565 80 568 120" stroke="rgba(160,40,0,0.2)" stroke-width="3" fill="none"/>
+  <!-- Center peak (tallest) -->
+  <path d="M600 320 L720 8 L840 320 Z" fill="#0a0818"/>
+  <path d="M716 18 Q725 55 728 110" stroke="rgba(180,45,0,0.25)" stroke-width="4" fill="none"/>
+  <!-- Faint fire at summit -->
+  <circle cx="720" cy="14" r="6" fill="rgba(180,50,0,0.3)"/>
+  <circle cx="720" cy="14" r="12" fill="rgba(140,30,0,0.1)"/>
+  <!-- Right peak -->
+  <path d="M760 320 L880 52 L940 130 L1000 320 Z" fill="#080614" opacity="0.95"/>
+  <path d="M876 62 Q882 90 884 125" stroke="rgba(160,40,0,0.18)" stroke-width="3" fill="none"/>
+
+  <!-- Ered Engrin (Iron Mountains) extending to sides -->
+  <path d="M0 320 L0 200 L80 160 L160 195 L240 140 L320 175 L400 150 L440 200 L440 320 Z"
+        fill="#070512" opacity="0.8"/>
+  <path d="M1000 320 L1000 200 L1080 160 L1160 195 L1240 145 L1320 180 L1400 155 L1440 190 L1440 320 Z"
+        fill="#070512" opacity="0.8"/>
+
+  <!-- Dark fire glow at base -->
+  <ellipse cx="880" cy="320" rx="350" ry="140" fill="url(#pitFire)"/>
+
+  <!-- Gates of Angband -->
+  <rect x="640" y="195" width="160" height="125" fill="url(#gateIron)"/>
+  <!-- Gate arch -->
+  <path d="M640 195 Q720 155 800 195" fill="#0c0a1a" stroke="rgba(50,40,80,0.3)" stroke-width="2"/>
+  <!-- Iron rivets on gate -->
+  <g fill="rgba(45,35,70,0.4)">
+    <circle cx="680" cy="225" r="4"/><circle cx="760" cy="225" r="4"/>
+    <circle cx="680" cy="260" r="4"/><circle cx="760" cy="260" r="4"/>
+    <circle cx="680" cy="295" r="4"/><circle cx="760" cy="295" r="4"/>
+  </g>
+  <!-- Gate division -->
+  <line x1="720" y1="158" x2="720" y2="320" stroke="rgba(50,40,80,0.3)" stroke-width="2"/>
+
+  <!-- Desolate ground -->
+  <path d="M0 320 L0 280 Q360 260 720 270 Q1080 280 1440 265 L1440 320 Z"
+        fill="url(#ironG)"/>
+
+  <!-- Fingolfin - lone figure before the gates -->
+  <g transform="translate(540, 245)" opacity="0.7">
+    <!-- Horse (Rochallor) -->
+    <ellipse cx="0" cy="16" rx="20" ry="10" fill="rgba(210,220,240,0.12)"/>
+    <path d="M-18,12 Q-22,4 -18,-2" stroke="rgba(210,220,240,0.1)" stroke-width="2" fill="none"/>
+    <!-- Legs -->
+    <line x1="-10" y1="24" x2="-12" y2="38" stroke="rgba(210,220,240,0.1)" stroke-width="1.5"/>
+    <line x1="-4" y1="24" x2="-5" y2="38" stroke="rgba(210,220,240,0.1)" stroke-width="1.5"/>
+    <line x1="6" y1="24" x2="5" y2="38" stroke="rgba(210,220,240,0.1)" stroke-width="1.5"/>
+    <line x1="12" y1="24" x2="14" y2="38" stroke="rgba(210,220,240,0.1)" stroke-width="1.5"/>
+    <!-- Fingolfin on horse -->
+    <rect x="-3" y="-6" width="6" height="18" fill="rgba(160,190,240,0.15)"/>
+    <circle cx="0" cy="-12" r="6" fill="rgba(160,190,240,0.12)"/>
+    <!-- Crown of the High King -->
+    <path d="M-5,-17 L-3,-22 L0,-18 L3,-22 L5,-17" stroke="rgba(180,210,255,0.35)" stroke-width="1" fill="none"/>
+    <!-- Ringil (sword) - gleaming -->
+    <line x1="6" y1="-4" x2="26" y2="-30" stroke="rgba(180,210,255,0.5)" stroke-width="1.5"/>
+    <circle cx="26" cy="-30" r="3" fill="rgba(180,210,255,0.2)"/>
+    <!-- Shield gleam -->
+    <ellipse cx="-8" cy="2" rx="6" ry="8" fill="rgba(160,195,240,0.08)" stroke="rgba(160,195,240,0.15)" stroke-width="0.5"/>
+  </g>
+
+  <!-- Morgoth's shadow emerging (massive, dark) -->
+  <g transform="translate(720, 140)" opacity="0.4">
+    <ellipse cx="0" cy="40" rx="55" ry="30" fill="rgba(5,0,15,0.5)"/>
+    <rect x="-18" y="-50" width="36" height="90" fill="rgba(5,0,15,0.4)" rx="8"/>
+    <circle cx="0" cy="-65" r="22" fill="rgba(5,0,15,0.35)"/>
+    <!-- Iron Crown - three Silmarils -->
+    <path d="M-20,-82 L-12,-95 L0,-85 L12,-95 L20,-82" stroke="rgba(30,20,50,0.4)" stroke-width="2.5" fill="none"/>
+    <circle cx="-12" cy="-95" r="3" fill="rgba(255,240,220,0.15)"/>
+    <circle cx="0" cy="-88" r="3" fill="rgba(255,240,220,0.18)"/>
+    <circle cx="12" cy="-95" r="3" fill="rgba(255,240,220,0.15)"/>
+    <!-- Grond (hammer) -->
+    <line x1="25" y1="-40" x2="65" y2="-80" stroke="rgba(20,10,35,0.45)" stroke-width="4"/>
+    <rect x="55" y="-96" width="22" height="20" rx="3" fill="rgba(15,8,30,0.4)"/>
+  </g>
+</svg>
+
+<div class="frost-layer" id="frostLayer"></div>
+
+<div class="card">
+  <div class="ec tl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 28 M2 2 L28 2" stroke="rgba(130,165,240,0.5)" stroke-width="1.5" fill="none"/>
+    <path d="M2 2 L12 12" stroke="rgba(130,165,240,0.25)" stroke-width="1" fill="none"/>
+    <circle cx="2" cy="2" r="3" fill="none" stroke="rgba(130,165,240,0.35)" stroke-width="1"/>
+  </svg></div>
+  <div class="ec tr"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 28 M2 2 L28 2" stroke="rgba(130,165,240,0.5)" stroke-width="1.5" fill="none"/>
+    <path d="M2 2 L12 12" stroke="rgba(130,165,240,0.25)" stroke-width="1" fill="none"/>
+    <circle cx="2" cy="2" r="3" fill="none" stroke="rgba(130,165,240,0.35)" stroke-width="1"/>
+  </svg></div>
+  <div class="ec bl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 28 M2 2 L28 2" stroke="rgba(130,165,240,0.5)" stroke-width="1.5" fill="none"/>
+    <path d="M2 2 L12 12" stroke="rgba(130,165,240,0.25)" stroke-width="1" fill="none"/>
+    <circle cx="2" cy="2" r="3" fill="none" stroke="rgba(130,165,240,0.35)" stroke-width="1"/>
+  </svg></div>
+  <div class="ec br"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 28 M2 2 L28 2" stroke="rgba(130,165,240,0.5)" stroke-width="1.5" fill="none"/>
+    <path d="M2 2 L12 12" stroke="rgba(130,165,240,0.25)" stroke-width="1" fill="none"/>
+    <circle cx="2" cy="2" r="3" fill="none" stroke="rgba(130,165,240,0.35)" stroke-width="1"/>
+  </svg></div>
+
+  <p class="eyebrow">The Silmarillion &mdash; Of the Ruin of Beleriand</p>
+  <p class="age-line">&#9670; &nbsp; Quenta Silmarillion &nbsp; &#9670;</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="14" height="14" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg">
+      <!-- Eight-pointed star of the Noldor -->
+      <polygon points="7,0 8.2,5 14,5.5 9.2,8.5 10.8,14 7,10.5 3.2,14 4.8,8.5 0,5.5 5.8,5"
+               fill="rgba(130,165,240,0.55)"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="scene-label">The Duel Before Angband</p>
+
+  <p class="narrative">
+    He passed over Dor-nu-Fauglith like a wind amid the dust,<br>
+    and all that beheld his onset fled in amaze,
+  </p>
+
+  <p class="main-quote">
+    thinking that <span class="hl">Orom&euml; himself</span> was come:<br>
+    for a great madness of rage was upon him,<br>
+    so that his eyes <span class="hl">shone like the eyes of the Valar.</span>
+  </p>
+
+  <p class="ringil-text">
+    He came alone to Angband's gates, and he sounded<br>
+    his horn, and smote once more upon the brazen doors,<br>
+    and challenged Morgoth to come forth<br>
+    to <span class="ice">single combat.</span>
+  </p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">Fingolfin, High King of the Noldor<br>The Gates of Angband &mdash; First Age, Year 456</p>
+</div>
+
+<script>
+  // Stars - cold and bright over Angband
+  const starsEl = document.getElementById('stars');
+  for (let i = 0; i < 200; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2.2 + 0.3;
+    const color = `rgba(190,210,255,${(Math.random() * 0.5 + 0.3).toFixed(2)})`;
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      top:${Math.random() * 55}%;
+      left:${Math.random() * 100}%;
+      background:${color};
+      --d:${(Math.random() * 5 + 2).toFixed(1)}s;
+      animation-delay:${(Math.random() * 7).toFixed(1)}s;
+    `;
+    starsEl.appendChild(s);
+  }
+
+  // Frost particles from Ringil's blade
+  const frostEl = document.getElementById('frostLayer');
+  for (let i = 0; i < 25; i++) {
+    const el = document.createElement('div');
+    el.className = 'frost';
+    const size = Math.random() * 3 + 0.8;
+    const alpha = (Math.random() * 0.4 + 0.3).toFixed(2);
+    const color = `rgba(170,210,255,${alpha})`;
+    const dx = ((Math.random() - 0.5) * 60).toFixed(0) + 'px';
+    el.style.cssText = `
+      width:${size}px; height:${size}px;
+      background:${color};
+      box-shadow: 0 0 ${(size * 3).toFixed(1)}px ${color};
+      left:${32 + Math.random() * 15}%;
+      bottom:${8 + Math.random() * 25}%;
+      --d:${(Math.random() * 6 + 4).toFixed(1)}s;
+      --dx:${dx};
+      animation-delay:${(Math.random() * 10).toFixed(1)}s;
+    `;
+    frostEl.appendChild(el);
+  }
+</script>
+</body>
+</html>

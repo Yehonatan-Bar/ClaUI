@@ -111,6 +111,7 @@ export class CodexMessageHandler {
   private webviewPostQueue: Promise<void> = Promise.resolve();
   private messageTranslator: MessageTranslator | null = null;
   private bugReportService: BugReportService | null = null;
+  private chatSearchService: import('../session/ChatSearchService').ChatSearchService | null = null;
   private extensionVersion = '0.0.0';
   private logDir = '';
   /** Dedup: last userMessage text posted to webview, with timestamp. */
@@ -743,6 +744,14 @@ export class CodexMessageHandler {
             this.bugReportService.dispose();
             this.bugReportService = null;
           }
+          break;
+
+        case 'chatSearchProject':
+          this.handleChatSearchProject(msg.query, msg.requestId);
+          break;
+
+        case 'chatSearchResumeSession':
+          this.handleChatSearchResumeSession(msg.sessionId);
           break;
 
         default:
@@ -1498,6 +1507,28 @@ export class CodexMessageHandler {
 
   private getConfiguredCodexModelLabel(): string {
     return this.session.getCurrentModel() || 'Codex (default)';
+  }
+
+  private async handleChatSearchProject(query: string, requestId: number): Promise<void> {
+    if (!this.chatSearchService) {
+      const { ChatSearchService } = require('../session/ChatSearchService');
+      this.chatSearchService = new ChatSearchService(this.log);
+    }
+
+    const result = await this.chatSearchService!.searchProject(query, requestId);
+    if (result) {
+      this.webview.postMessage({
+        type: 'chatSearchProjectResults',
+        requestId,
+        results: result.results,
+        totalMatches: result.totalMatches,
+      });
+    }
+  }
+
+  private handleChatSearchResumeSession(sessionId: string): void {
+    this.log(`[ChatSearch] Resuming session: ${sessionId}`);
+    vscode.commands.executeCommand('claudeMirror.resumeSession', sessionId);
   }
 
   private errMsg(err: unknown): string {

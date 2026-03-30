@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Discworld - Death (Hogfather)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #050810;
+    overflow: hidden;
+    font-family: 'Cormorant Garamond', serif;
+  }
+
+  /* Hogswatch night sky — deep indigo with cold stars */
+  .sky {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 110% 50% at 50% 100%, rgba(18, 22, 48, 0.75) 0%, transparent 55%),
+      radial-gradient(ellipse 50% 35% at 15% 20%, rgba(20, 28, 65, 0.25) 0%, transparent 50%),
+      radial-gradient(ellipse 45% 30% at 82% 15%, rgba(25, 18, 55, 0.2) 0%, transparent 50%);
+  }
+
+  /* Moon */
+  .moon {
+    position: fixed;
+    top: 52px;
+    left: 14%;
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 35%, rgba(210, 220, 240, 0.18) 0%, rgba(160, 175, 210, 0.06) 55%, transparent 75%);
+    box-shadow: 0 0 60px rgba(180, 195, 230, 0.08), 0 0 120px rgba(140, 160, 200, 0.04);
+    pointer-events: none;
+  }
+
+  /* Stars twinkling */
+  .star-field { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(210, 220, 245, 0.7);
+    animation: twinkle var(--t) ease-in-out infinite alternate;
+  }
+  @keyframes twinkle {
+    from { opacity: var(--lo); transform: scale(0.8); }
+    to   { opacity: var(--hi); transform: scale(1.2); }
+  }
+
+  /* Hourglass sand — Death's domain */
+  .sand-layer { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  .grain {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(200, 195, 170, 0.5);
+    animation: sand-fall var(--d) linear infinite;
+    opacity: 0;
+  }
+  @keyframes sand-fall {
+    0%   { transform: translateY(-10px) translateX(0); opacity: 0; }
+    6%   { opacity: var(--op); }
+    90%  { opacity: calc(var(--op) * 0.4); }
+    100% { transform: translateY(105vh) translateX(var(--dx)); opacity: 0; }
+  }
+
+  /* Snow */
+  .snow-layer { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+  .flake {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(220, 228, 245, 0.55);
+    animation: snowfall var(--s) linear infinite;
+    opacity: 0;
+  }
+  @keyframes snowfall {
+    0%   { transform: translateY(-8px) translateX(0) rotate(0deg); opacity: 0; }
+    8%   { opacity: var(--op); }
+    85%  { opacity: calc(var(--op) * 0.5); }
+    100% { transform: translateY(105vh) translateX(var(--dx)) rotate(var(--r)); opacity: 0; }
+  }
+
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 740px;
+    text-align: center;
+    padding: 58px 52px;
+    border: 1px solid rgba(140, 155, 195, 0.18);
+    background: rgba(6, 8, 18, 0.9);
+    backdrop-filter: blur(12px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 80px rgba(100, 120, 180, 0.07),
+      0 0 160px rgba(60, 75, 120, 0.03),
+      inset 0 0 60px rgba(0, 0, 0, 0.7);
+    animation: surface 2.5s ease forwards;
+    opacity: 0;
+  }
+  @keyframes surface {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .cn { position: absolute; width: 36px; height: 36px; }
+  .cn.tl { top: -1px; left: -1px; }
+  .cn.tr { top: -1px; right: -1px; transform: scaleX(-1); }
+  .cn.bl { bottom: -1px; left: -1px; transform: scaleY(-1); }
+  .cn.br { bottom: -1px; right: -1px; transform: scale(-1, -1); }
+
+  .eyebrow {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(160, 175, 215, 0.4);
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  .sep {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 0 auto 30px;
+    width: fit-content;
+  }
+  .sep-l {
+    width: 80px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(140, 155, 195, 0.35));
+  }
+  .sep-r {
+    width: 80px;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(140, 155, 195, 0.35), transparent);
+  }
+
+  .susan-voice {
+    font-size: 19px;
+    line-height: 1.8;
+    color: rgba(195, 200, 220, 0.65);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 15px rgba(0, 0, 0, 0.7);
+  }
+
+  .death-voice {
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: rgba(230, 235, 250, 0.88);
+    letter-spacing: 2.5px;
+    line-height: 1.75;
+    margin-bottom: 22px;
+    text-transform: uppercase;
+    text-shadow:
+      0 0 20px rgba(180, 195, 240, 0.2),
+      0 2px 8px rgba(0, 0, 0, 0.85);
+  }
+
+  .key-line {
+    font-family: 'Cinzel', serif;
+    font-size: 23px;
+    font-weight: 700;
+    color: #c8d4f0;
+    letter-spacing: 2px;
+    line-height: 1.6;
+    margin-bottom: 22px;
+    text-transform: uppercase;
+    text-shadow:
+      0 0 30px rgba(170, 190, 240, 0.35),
+      0 0 65px rgba(120, 145, 200, 0.18),
+      0 2px 6px rgba(0, 0, 0, 0.9);
+    animation: bone-glow 3.5s ease-in-out infinite alternate;
+  }
+  @keyframes bone-glow {
+    from { text-shadow: 0 0 22px rgba(170, 190, 240, 0.22), 0 0 55px rgba(120, 145, 200, 0.1); }
+    to   { text-shadow: 0 0 42px rgba(190, 210, 250, 0.45), 0 0 85px rgba(140, 165, 220, 0.22); }
+  }
+
+  .final-line {
+    font-family: 'Cinzel', serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: rgba(200, 210, 240, 0.72);
+    letter-spacing: 2px;
+    line-height: 1.7;
+    margin-bottom: 28px;
+    text-transform: uppercase;
+    text-shadow:
+      0 0 15px rgba(150, 170, 210, 0.18),
+      0 2px 6px rgba(0, 0, 0, 0.85);
+  }
+
+  .thin-sep {
+    width: 48px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(140, 155, 195, 0.3), transparent);
+    margin: 0 auto 22px;
+  }
+
+  /* Hourglass icon */
+  .hourglass {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    opacity: 0.35;
+  }
+
+  .attribution {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: rgba(160, 175, 215, 0.35);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="sky"></div>
+<div class="moon"></div>
+<div class="star-field" id="starField"></div>
+
+<!-- Ankh-Morpork rooftops on Hogswatch Eve -->
+<svg style="position:fixed;bottom:0;left:0;right:0;height:340px;pointer-events:none;z-index:1;"
+     viewBox="0 0 1440 340" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="roofG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0e1020"/>
+      <stop offset="100%" stop-color="#060810"/>
+    </linearGradient>
+    <linearGradient id="wallG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a0c18"/>
+      <stop offset="100%" stop-color="#050710"/>
+    </linearGradient>
+    <linearGradient id="snowG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(200,210,235,0.12)"/>
+      <stop offset="100%" stop-color="rgba(180,190,215,0.04)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Ground / street -->
+  <rect x="0" y="280" width="1440" height="60" fill="#060810"/>
+  <!-- Snow on ground -->
+  <rect x="0" y="276" width="1440" height="8" fill="url(#snowG)"/>
+
+  <!-- Far buildings -->
+  <g opacity="0.7">
+    <rect x="50" y="160" width="60" height="120" fill="url(#wallG)"/>
+    <path d="M45 160 L80 128 L115 160 Z" fill="#080a16"/>
+    <rect x="55" y="169" width="10" height="14" fill="rgba(180,155,80,0.06)"/>
+    <rect x="80" y="180" width="10" height="14" fill="rgba(180,155,80,0.05)"/>
+
+    <rect x="200" y="140" width="75" height="140" fill="url(#wallG)"/>
+    <path d="M195 140 L237 95 L280 140 Z" fill="#080a16"/>
+    <rect x="262" y="226" width="8" height="30" fill="rgba(24,18,8,0.9)"/>
+
+    <rect x="380" y="170" width="55" height="110" fill="url(#wallG)"/>
+    <path d="M375 170 L407 138 L440 170 Z" fill="#080a16"/>
+  </g>
+
+  <!-- Unseen University tower (far right) -->
+  <rect x="1220" y="90" width="50" height="190" fill="url(#wallG)"/>
+  <path d="M1215 90 L1245 38 L1275 90 Z" fill="#0a0d1a"/>
+  <!-- Octarine glow at top -->
+  <circle cx="1245" cy="50" r="8" fill="rgba(120,80,200,0.12)"/>
+  <circle cx="1245" cy="50" r="3" fill="rgba(140,95,220,0.2)"/>
+
+  <!-- Mid buildings -->
+  <rect x="500" y="185" width="80" height="95" fill="url(#wallG)"/>
+  <path d="M495 185 L540 152 L585 185 Z" fill="#080a16"/>
+  <!-- Snow on roof -->
+  <path d="M498 186 L540 154 L582 186" stroke="rgba(200,210,235,0.1)" stroke-width="3" fill="none"/>
+  <!-- Chimney -->
+  <rect x="555" y="160" width="14" height="28" fill="#0a0c18"/>
+  <!-- Smoke wisp -->
+  <path d="M562 160 Q568 145 560 130 Q554 118 562 105" stroke="rgba(160,170,200,0.06)" stroke-width="3" fill="none"/>
+
+  <!-- Window with warm light -->
+  <rect x="518" y="208" width="12" height="16" fill="rgba(200,165,80,0.08)"/>
+  <rect x="540" y="216" width="12" height="16" fill="rgba(200,165,80,0.06)"/>
+
+  <!-- Near buildings -->
+  <rect x="680" y="200" width="95" height="80" fill="url(#wallG)"/>
+  <path d="M675 200 L727 165 L780 200 Z" fill="#080a16"/>
+  <rect x="720" y="245" width="16" height="35" fill="rgba(20,15,10,0.9)"/>
+
+  <rect x="820" y="190" width="70" height="90" fill="url(#wallG)"/>
+  <path d="M815 190 L855 155 L895 190 Z" fill="#080a16"/>
+  <rect x="858" y="166" width="12" height="26" fill="#0a0c18"/>
+
+  <rect x="980" y="210" width="110" height="70" fill="url(#wallG)"/>
+  <path d="M975 210 L1035 170 L1095 210 Z" fill="#080a16"/>
+  <!-- Snow on roof -->
+  <path d="M978 211 L1035 172 L1092 211" stroke="rgba(200,210,235,0.1)" stroke-width="3" fill="none"/>
+
+  <rect x="1100" y="195" width="65" height="85" fill="url(#wallG)"/>
+  <path d="M1095 195 L1132 158 L1170 195 Z" fill="#080a16"/>
+</svg>
+
+<div class="sand-layer" id="sandLayer"></div>
+<div class="snow-layer" id="snowLayer"></div>
+
+<div class="card">
+  <div class="cn tl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(140, 155, 195, 0.38)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(140, 155, 195, 0.28)"/>
+  </svg></div>
+  <div class="cn tr"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(140, 155, 195, 0.38)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(140, 155, 195, 0.28)"/>
+  </svg></div>
+  <div class="cn bl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(140, 155, 195, 0.38)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(140, 155, 195, 0.28)"/>
+  </svg></div>
+  <div class="cn br"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(140, 155, 195, 0.38)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(140, 155, 195, 0.28)"/>
+  </svg></div>
+
+  <p class="eyebrow">Discworld &mdash; Hogfather</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <!-- Hourglass icon -->
+    <svg width="18" height="22" viewBox="0 0 18 22" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="1" width="14" height="2" rx="0.5" fill="rgba(160, 175, 215, 0.45)"/>
+      <rect x="2" y="19" width="14" height="2" rx="0.5" fill="rgba(160, 175, 215, 0.45)"/>
+      <path d="M4 3 L4 8 L9 12 L14 8 L14 3" stroke="rgba(160, 175, 215, 0.4)" stroke-width="1.2" fill="none"/>
+      <path d="M4 19 L4 14 L9 12 L14 14 L14 19" stroke="rgba(160, 175, 215, 0.4)" stroke-width="1.2" fill="none"/>
+      <path d="M6 17 Q9 14.5 12 17" fill="rgba(200, 195, 170, 0.2)"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="susan-voice">
+    "You're saying humans need fantasies<br>
+    to make life bearable."
+  </p>
+
+  <p class="death-voice">
+    No. Humans need fantasy<br>
+    to be human.
+  </p>
+
+  <p class="key-line">
+    To be the place where the<br>
+    falling angel meets<br>
+    the rising ape.
+  </p>
+
+  <p class="susan-voice">
+    "Tooth fairies? Hogfathers?"
+  </p>
+
+  <p class="death-voice">
+    Yes. As practice. You have to start<br>
+    out learning to believe the little lies.
+  </p>
+
+  <p class="susan-voice">
+    "So we can believe the big ones?"
+  </p>
+
+  <p class="final-line">
+    Yes. Justice. Mercy. Duty.<br>
+    That sort of thing.
+  </p>
+
+  <div class="hourglass">
+    <svg width="32" height="44" viewBox="0 0 32 44" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4" y="2" width="24" height="3" rx="1" stroke="rgba(160,175,215,0.3)" stroke-width="1" fill="none"/>
+      <rect x="4" y="39" width="24" height="3" rx="1" stroke="rgba(160,175,215,0.3)" stroke-width="1" fill="none"/>
+      <path d="M7 5 L7 16 L16 22 L25 16 L25 5" stroke="rgba(160,175,215,0.25)" stroke-width="1" fill="none"/>
+      <path d="M7 39 L7 28 L16 22 L25 28 L25 39" stroke="rgba(160,175,215,0.25)" stroke-width="1" fill="none"/>
+      <path d="M10 36 Q16 30 22 36 L22 39 L10 39 Z" fill="rgba(200,195,170,0.1)"/>
+      <!-- Sand stream -->
+      <line x1="16" y1="20" x2="16" y2="30" stroke="rgba(200,195,170,0.15)" stroke-width="0.8"/>
+    </svg>
+  </div>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">Death<br>Hogswatch Eve, Ankh-Morpork</p>
+</div>
+
+<script>
+  // Stars
+  const starField = document.getElementById('starField');
+  for (let i = 0; i < 90; i++) {
+    const el = document.createElement('div');
+    el.className = 'star';
+    const sz = (Math.random() * 2.2 + 0.5).toFixed(1);
+    const lo = (Math.random() * 0.15 + 0.05).toFixed(2);
+    const hi = (Math.random() * 0.5 + 0.3).toFixed(2);
+    el.style.cssText = `
+      width:${sz}px; height:${sz}px;
+      left:${Math.random() * 100}%;
+      top:${Math.random() * 55}%;
+      --t:${(Math.random() * 4 + 2).toFixed(1)}s;
+      --lo:${lo};
+      --hi:${hi};
+      animation-delay:${(Math.random() * 5).toFixed(1)}s;
+    `;
+    starField.appendChild(el);
+  }
+
+  // Hourglass sand (golden grains drifting down)
+  const sandLayer = document.getElementById('sandLayer');
+  for (let i = 0; i < 30; i++) {
+    const el = document.createElement('div');
+    el.className = 'grain';
+    const sz = (Math.random() * 1.8 + 0.5).toFixed(1);
+    const dx = (Math.random() * 30 - 15).toFixed(0) + 'px';
+    const op = (Math.random() * 0.22 + 0.06).toFixed(2);
+    el.style.cssText = `
+      width:${sz}px; height:${sz}px;
+      left:${Math.random() * 100}%;
+      top:-6px;
+      --d:${(Math.random() * 12 + 8).toFixed(1)}s;
+      --dx:${dx};
+      --op:${op};
+      animation-delay:${(Math.random() * 14).toFixed(1)}s;
+    `;
+    sandLayer.appendChild(el);
+  }
+
+  // Snow
+  const snowLayer = document.getElementById('snowLayer');
+  for (let i = 0; i < 50; i++) {
+    const el = document.createElement('div');
+    el.className = 'flake';
+    const sz = (Math.random() * 3.5 + 1).toFixed(1);
+    const dx = (Math.random() * 60 - 30).toFixed(0) + 'px';
+    const rot = (Math.random() * 360).toFixed(0) + 'deg';
+    const op = (Math.random() * 0.3 + 0.1).toFixed(2);
+    el.style.cssText = `
+      width:${sz}px; height:${sz}px;
+      left:${Math.random() * 100}%;
+      top:-8px;
+      --s:${(Math.random() * 10 + 8).toFixed(1)}s;
+      --dx:${dx};
+      --r:${rot};
+      --op:${op};
+      animation-delay:${(Math.random() * 14).toFixed(1)}s;
+    `;
+    snowLayer.appendChild(el);
+  }
+</script>
+</body>
+</html>

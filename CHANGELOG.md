@@ -1,5 +1,56 @@
 # ClaUi - Changelog
 
+## v0.1.109 - 2026-03-30
+
+**Feature: Tab Name Chip**
+
+- Added a floating chip in the top-left corner of the webview that displays the current tab's session name
+- The chip is invisible at rest and fades in when hovering anywhere over the window (opacity 0.55), making it unobtrusive during normal use
+- Hovering directly over the chip brings it to full opacity and reveals a tooltip with the full Activity Summary text
+- The last Activity Summary text is persisted in `lastActivitySummaryText` so the tooltip remains available even after the session goes idle
+- `SessionTab.setTabName()` now sends a `tabNameUpdate` message to the webview on every name change, and also sends the current name immediately on `ready` so the chip is populated from the first moment the panel opens
+- New message type: `TabNameUpdateMessage`
+
+**Feature: Chat Search in Codex Sessions**
+
+- Codex sessions now support project-wide Chat Search (previously only available in Claude sessions)
+- `CodexMessageHandler` handles `chatSearchProject` and `chatSearchResumeSession` messages, lazy-loading `ChatSearchService`
+- Resuming a session from search results now executes `claudeMirror.resumeSession` command directly
+
+**Improvement: Tab Wrapping for Multiple ClaUi Tabs**
+
+- When a second (or subsequent) ClaUi tab is opened, the extension now automatically enables `workbench.editor.wrapTabs` globally, preventing tabs from overflowing into a horizontal scroll bar
+
+**Improvement: Chat Search Available on Empty Sessions**
+
+- The Chat Search bar is now rendered outside the `hasMessages` conditional in `App.tsx`, so project-wide search is accessible even before any messages are sent
+
+**Improvement: Chat Search Stays Open on Resume**
+
+- Clicking a project search result to resume a session no longer closes the search bar, allowing users to browse and open multiple results without re-opening search each time
+
+**Fix: Chat Search Searches All Sessions**
+
+- `ChatSearchService.searchProject()` no longer requires a `workspacePath` parameter and now calls `discoverAll()` instead of `discoverForWorkspace()`, so cross-session search covers all sessions regardless of which workspace folder is active
+
+**Fix: Chat Search Dropdown Positioning**
+
+- Removed `position: absolute` from `.chat-search-project-dropdown`, fixing layout issues where the dropdown overlapped other content instead of flowing naturally
+
+**Fix: Resume Session Accepts Direct ID**
+
+- `claudeMirror.resumeSession` command now accepts an optional `passedSessionId` parameter, skipping the input box prompt when called programmatically (e.g., from Chat Search)
+
+**Fix: Checkpoint File Path Extraction for Large Writes**
+
+- Checkpoint's `captureBeforeContent` now extracts `file_path`/`notebook_path` via regex before falling back to `JSON.parse`, because `rawInput` can be truncated at 8000 chars (memory guard) causing parse failures for Write tools with large file content
+
+**Fix: InputArea Stale Closure**
+
+- Added `scheduleMessageEnabled` and `scheduleMessageAtMs` to the `useCallback` dependency array in `InputArea`, preventing a stale closure when scheduled-message state changes
+
+---
+
 ## v0.1.107 - 2026-03-24
 
 **Feature: Checkpoint — Revert & Redo File Changes**

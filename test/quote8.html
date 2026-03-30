@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Silmarillion - The Doom of Mandos</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #020208;
+    overflow: hidden;
+    font-family: 'EB Garamond', serif;
+  }
+
+  /* Dense starfield */
+  .stars { position: fixed; inset: 0; pointer-events: none; }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    animation: tw var(--d) infinite ease-in-out alternate;
+  }
+  @keyframes tw {
+    from { opacity: 0.08; transform: scale(1); }
+    to   { opacity: 1;    transform: scale(1.5); }
+  }
+
+  /* Two Trees light — silver (Telperion) and gold (Laurelin) */
+  .tree-light { position: fixed; inset: 0; pointer-events: none; }
+  .tl-silver {
+    position: absolute;
+    width: 55%; height: 65%;
+    bottom: 55px; left: 5%;
+    background: radial-gradient(ellipse at 65% 100%, rgba(175,210,255,0.22) 0%, transparent 65%);
+    animation: silverPulse 8s ease-in-out infinite alternate;
+  }
+  @keyframes silverPulse {
+    from { opacity: 0.45; }
+    to   { opacity: 1; }
+  }
+  .tl-gold {
+    position: absolute;
+    width: 55%; height: 65%;
+    bottom: 55px; right: 5%;
+    background: radial-gradient(ellipse at 35% 100%, rgba(255,218,110,0.18) 0%, transparent 65%);
+    animation: goldPulse 12s ease-in-out infinite alternate;
+    animation-delay: -5s;
+  }
+  @keyframes goldPulse {
+    from { opacity: 0.35; }
+    to   { opacity: 0.9; }
+  }
+
+  /* Rising silver and gold motes (light of the Trees) */
+  .motes { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .mote {
+    position: absolute;
+    border-radius: 50%;
+    animation: moterise var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes moterise {
+    0%   { opacity: 0; transform: translateY(0) scale(1); }
+    18%  { opacity: 0.85; }
+    82%  { opacity: 0.4; }
+    100% { opacity: 0; transform: translateY(-170px) scale(0.35); }
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 680px;
+    text-align: center;
+    padding: 62px 56px;
+    border: 1px solid rgba(155,185,240,0.22);
+    background: rgba(2, 2, 12, 0.78);
+    backdrop-filter: blur(14px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 80px rgba(95,125,220,0.16),
+      0 0 160px rgba(55,75,180,0.08),
+      inset 0 0 60px rgba(0,0,12,0.65);
+    animation: unveil 2.8s cubic-bezier(.2,.8,.3,1) forwards;
+    opacity: 0;
+  }
+  @keyframes unveil {
+    from { opacity: 0; transform: scale(0.96) translateY(16px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* Elvish corner ornaments */
+  .ec { position: absolute; width: 44px; height: 44px; }
+  .ec.tl { top:-1px; left:-1px; }
+  .ec.tr { top:-1px; right:-1px; transform: scaleX(-1); }
+  .ec.bl { bottom:-1px; left:-1px; transform: scaleY(-1); }
+  .ec.br { bottom:-1px; right:-1px; transform: scale(-1,-1); }
+
+  .eyebrow {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(148,178,240,0.45);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    margin-top: 6px;
+  }
+
+  .age-line {
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: rgba(148,178,240,0.25);
+    margin-bottom: 28px;
+    font-style: italic;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 28px; width: fit-content;
+  }
+  .sep-l { width: 70px; height: 1px; background: linear-gradient(90deg, transparent, rgba(155,185,240,0.4)); }
+  .sep-r { width: 70px; height: 1px; background: linear-gradient(90deg, rgba(155,185,240,0.4), transparent); }
+
+  .doom-label {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 12px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(175,200,255,0.42);
+    margin-bottom: 26px;
+  }
+
+  blockquote {
+    font-size: 27px;
+    line-height: 1.8;
+    color: #c5d8f2;
+    font-style: italic;
+    letter-spacing: 0.2px;
+    margin-bottom: 14px;
+    text-shadow: 0 0 30px rgba(115,150,240,0.2), 0 2px 8px rgba(0,0,12,0.8);
+  }
+
+  blockquote .hl {
+    color: #e6f0ff;
+    font-style: normal;
+    text-shadow: 0 0 22px rgba(175,210,255,0.55);
+  }
+
+  .prophecy-end {
+    font-size: 20px;
+    line-height: 1.85;
+    color: rgba(188,210,250,0.58);
+    font-style: italic;
+    margin-bottom: 38px;
+    text-shadow: 0 2px 10px rgba(0,0,12,0.7);
+  }
+
+  .thin-sep {
+    width: 50px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(148,178,240,0.35), transparent);
+    margin: 0 auto 24px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 10px;
+    color: rgba(148,175,235,0.4);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<div class="tree-light">
+  <div class="tl-silver"></div>
+  <div class="tl-gold"></div>
+</div>
+
+<!-- Pelóri mountains and Two Trees scene -->
+<svg style="position:fixed;bottom:0;left:0;right:0;height:280px;pointer-events:none;"
+     viewBox="0 0 1440 280" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="mtG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a0820"/>
+      <stop offset="100%" stop-color="#000008"/>
+    </linearGradient>
+    <radialGradient id="silverGlow" cx="29%" cy="100%" r="36%">
+      <stop offset="0%" stop-color="#b8d4ff" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#000010" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="goldGlow" cx="71%" cy="100%" r="36%">
+      <stop offset="0%" stop-color="#ffd878" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#000010" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Two Trees halos (behind mountains) -->
+  <ellipse cx="420"  cy="280" rx="520" ry="200" fill="url(#silverGlow)"/>
+  <ellipse cx="1020" cy="280" rx="520" ry="200" fill="url(#goldGlow)"/>
+
+  <!-- Pelóri far range (background) -->
+  <path d="M0 280 L0 200 L80 140 L170 182 L260 100 L340 158 L420 90 L500 138 L580 80 L660 132 L740 70 L820 128 L900 86 L980 122 L1060 96 L1140 142 L1220 108 L1310 162 L1380 122 L1440 152 L1440 280 Z"
+        fill="url(#mtG)" opacity="0.7"/>
+
+  <!-- Pelóri near range -->
+  <path d="M0 280 L0 235 L100 172 L200 212 L310 152 L420 198 L520 142 L620 192 L720 137 L820 182 L920 148 L1020 188 L1120 153 L1220 192 L1330 163 L1440 196 L1440 280 Z"
+        fill="#050414"/>
+
+  <!-- Telperion (silver tree) — visible in gap left of center -->
+  <g transform="translate(365, 48)" opacity="0.55">
+    <rect x="28" y="124" width="8"  height="56" fill="rgba(195,218,255,0.5)"/>
+    <line x1="32" y1="142" x2="9"  y2="116" stroke="rgba(188,214,255,0.48)" stroke-width="3"   stroke-linecap="round"/>
+    <line x1="32" y1="132" x2="57" y2="106" stroke="rgba(188,214,255,0.48)" stroke-width="3"   stroke-linecap="round"/>
+    <line x1="32" y1="124" x2="16" y2="100" stroke="rgba(188,214,255,0.42)" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="32" y1="124" x2="50" y2="94"  stroke="rgba(188,214,255,0.42)" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="32" y1="136" x2="4"  y2="126" stroke="rgba(188,214,255,0.36)" stroke-width="2"   stroke-linecap="round"/>
+    <ellipse cx="32" cy="100" rx="28" ry="22" fill="rgba(178,208,255,0.18)"/>
+    <ellipse cx="32" cy="100" rx="14" ry="11" fill="rgba(200,224,255,0.26)"/>
+    <!-- silver dew drops -->
+    <circle cx="14" cy="120" r="2" fill="rgba(200,224,255,0.5)"/>
+    <circle cx="52" cy="112" r="1.5" fill="rgba(200,224,255,0.45)"/>
+    <circle cx="22" cy="104" r="1.5" fill="rgba(200,224,255,0.4)"/>
+  </g>
+
+  <!-- Laurelin (gold tree) — visible in gap right of center -->
+  <g transform="translate(978, 38)" opacity="0.5">
+    <rect x="28" y="134" width="10" height="58" fill="rgba(218,184,75,0.5)"/>
+    <line x1="33" y1="150" x2="6"  y2="116" stroke="rgba(210,176,68,0.48)" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="33" y1="140" x2="64" y2="112" stroke="rgba(210,176,68,0.48)" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="33" y1="134" x2="14" y2="108" stroke="rgba(210,176,68,0.42)" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="33" y1="134" x2="54" y2="102" stroke="rgba(210,176,68,0.42)" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="33" y1="144" x2="-2" y2="132" stroke="rgba(210,176,68,0.36)" stroke-width="2"   stroke-linecap="round"/>
+    <line x1="33" y1="144" x2="68" y2="130" stroke="rgba(210,176,68,0.36)" stroke-width="2"   stroke-linecap="round"/>
+    <ellipse cx="33" cy="106" rx="34" ry="24" fill="rgba(220,184,68,0.15)"/>
+    <ellipse cx="33" cy="106" rx="17" ry="12" fill="rgba(235,200,88,0.2)"/>
+    <!-- golden flower clusters -->
+    <circle cx="16" cy="122" r="2.5" fill="rgba(240,210,90,0.55)"/>
+    <circle cx="52" cy="114" r="2"   fill="rgba(240,210,90,0.5)"/>
+    <circle cx="62" cy="128" r="2"   fill="rgba(240,210,90,0.45)"/>
+  </g>
+
+  <!-- Taniquetil — tallest peak, throne of Manwë, center -->
+  <path d="M660 280 L720 28 L780 280 Z" fill="#0a0818" opacity="0.92"/>
+  <!-- Faint star above Taniquetil (Varda's light) -->
+  <circle cx="720" cy="20" r="3" fill="rgba(220,235,255,0.7)"/>
+  <circle cx="720" cy="20" r="6" fill="rgba(180,210,255,0.15)"/>
+</svg>
+
+<div class="motes" id="motes"></div>
+
+<div class="card">
+  <div class="ec tl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 28 M2 2 L28 2" stroke="rgba(148,178,240,0.55)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="3" fill="none" stroke="rgba(148,178,240,0.4)" stroke-width="1"/>
+  </svg></div>
+  <div class="ec tr"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 28 M2 2 L28 2" stroke="rgba(148,178,240,0.55)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="3" fill="none" stroke="rgba(148,178,240,0.4)" stroke-width="1"/>
+  </svg></div>
+  <div class="ec bl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 28 M2 2 L28 2" stroke="rgba(148,178,240,0.55)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="3" fill="none" stroke="rgba(148,178,240,0.4)" stroke-width="1"/>
+  </svg></div>
+  <div class="ec br"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 28 M2 2 L28 2" stroke="rgba(148,178,240,0.55)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="3" fill="none" stroke="rgba(148,178,240,0.4)" stroke-width="1"/>
+  </svg></div>
+
+  <p class="eyebrow">The Silmarillion &mdash; Of the Flight of the Noldor</p>
+  <p class="age-line">&#9670; &nbsp; Quenta Silmarillion &nbsp; &#9670;</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="6" cy="6" r="5" fill="none" stroke="rgba(148,178,240,0.52)" stroke-width="1"/>
+      <circle cx="6" cy="6" r="2" fill="rgba(148,178,240,0.6)"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="doom-label">The Doom of Mandos</p>
+
+  <blockquote>
+    <span class="hl">Tears unnumbered</span> ye shall shed;<br>
+    and the Valar will fence Valinor against you,<br>
+    and shut you out,
+  </blockquote>
+
+  <p class="prophecy-end">
+    so that not even the echo of your lamentation<br>
+    shall pass over the mountains.
+  </p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">N&aacute;mo Mandos, Doomsman of the Valar<br>The Halls of Mandos, Aman &mdash; First Age</p>
+</div>
+
+<script>
+  // Stars — denser than usual, some warm gold for Laurelin's memory
+  const starsEl = document.getElementById('stars');
+  for (let i = 0; i < 260; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2.4 + 0.4;
+    const isGold = Math.random() > 0.88;
+    const color = isGold
+      ? `rgba(255,235,160,${(Math.random() * 0.5 + 0.4).toFixed(2)})`
+      : `rgba(210,225,255,${(Math.random() * 0.5 + 0.4).toFixed(2)})`;
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      top:${Math.random() * 100}%;
+      left:${Math.random() * 100}%;
+      background:${color};
+      --d:${(Math.random() * 5 + 2).toFixed(1)}s;
+      animation-delay:${(Math.random() * 7).toFixed(1)}s;
+    `;
+    starsEl.appendChild(s);
+  }
+
+  // Rising motes of silver (Telperion) and gold (Laurelin)
+  const motesEl = document.getElementById('motes');
+  for (let i = 0; i < 38; i++) {
+    const el = document.createElement('div');
+    el.className = 'mote';
+    const size = Math.random() * 3 + 0.8;
+    const isGold = Math.random() > 0.5;
+    const alpha = (Math.random() * 0.4 + 0.4).toFixed(2);
+    const color = isGold
+      ? `rgba(245,200,78,${alpha})`
+      : `rgba(178,210,255,${alpha})`;
+    // Gold motes cluster toward right, silver toward left
+    const xPos = isGold ? 54 + Math.random() * 30 : 16 + Math.random() * 28;
+    el.style.cssText = `
+      width:${size}px; height:${size}px;
+      background:${color};
+      box-shadow: 0 0 ${(size * 3).toFixed(1)}px ${color};
+      left:${xPos}%;
+      bottom:${4 + Math.random() * 28}%;
+      --d:${(Math.random() * 7 + 5).toFixed(1)}s;
+      animation-delay:${(Math.random() * 12).toFixed(1)}s;
+    `;
+    motesEl.appendChild(el);
+  }
+</script>
+</body>
+</html>

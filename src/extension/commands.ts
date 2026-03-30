@@ -307,8 +307,8 @@ export function registerCommands(
     }),
 
     // Resume an existing session in a NEW tab
-    vscode.commands.registerCommand('claudeMirror.resumeSession', async () => {
-      const sessionId = await vscode.window.showInputBox({
+    vscode.commands.registerCommand('claudeMirror.resumeSession', async (passedSessionId?: string) => {
+      const sessionId = passedSessionId || await vscode.window.showInputBox({
         prompt: 'Enter session ID to resume',
         placeHolder: 'session-id',
       });

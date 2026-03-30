@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lord of the Rings - The Bridge of Khazad-dum</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #060304;
+    overflow: hidden;
+    font-family: 'EB Garamond', serif;
+  }
+
+  /* Deep cavern of Moria - darkness lit by fire */
+  .cavern {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 80%, rgba(140,40,10,0.15) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 50% at 30% 90%, rgba(180,60,0,0.1) 0%, transparent 50%),
+      radial-gradient(ellipse 40% 50% at 70% 90%, rgba(180,60,0,0.08) 0%, transparent 50%),
+      linear-gradient(to bottom, #020102 0%, #080305 40%, #0c0506 100%);
+  }
+
+  /* Balrog fire pulse - deep red-orange glow */
+  .fire-pulse {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    animation: firePulse 4s ease-in-out infinite alternate;
+    background: radial-gradient(ellipse 70% 50% at 50% 85%, rgba(200,60,0,0.12) 0%, transparent 60%);
+  }
+  @keyframes firePulse {
+    0%   { opacity: 0.3; }
+    50%  { opacity: 1; }
+    100% { opacity: 0.4; }
+  }
+
+  /* Shadow and flame flicker */
+  .flame-flicker {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    animation: flicker 0.15s steps(2) infinite;
+    background: radial-gradient(ellipse 30% 40% at 50% 90%, rgba(255,120,20,0.04) 0%, transparent 60%);
+  }
+  @keyframes flicker {
+    0%   { opacity: 0.5; }
+    50%  { opacity: 1; }
+    100% { opacity: 0.7; }
+  }
+
+  /* Sparse embers floating upward */
+  .embers { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .ember {
+    position: absolute;
+    border-radius: 50%;
+    animation: emberdrift var(--d) ease-out infinite;
+    opacity: 0;
+  }
+  @keyframes emberdrift {
+    0%   { opacity: 0; transform: translateY(0) translateX(0) scale(1); }
+    15%  { opacity: 0.9; }
+    70%  { opacity: 0.4; }
+    100% { opacity: 0; transform: translateY(var(--dy)) translateX(var(--dx)) scale(0.2); }
+  }
+
+  /* White light - Gandalf's staff */
+  .staff-light {
+    position: fixed;
+    width: 160px; height: 280px;
+    bottom: 80px; left: 42%;
+    background: radial-gradient(ellipse at 50% 80%, rgba(220,230,255,0.18) 0%, transparent 55%);
+    pointer-events: none;
+    animation: staffGlow 2.5s ease-in-out infinite alternate;
+  }
+  @keyframes staffGlow {
+    from { opacity: 0.4; }
+    to   { opacity: 1; }
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 720px;
+    text-align: center;
+    padding: 60px 54px;
+    border: 1px solid rgba(200,140,60,0.2);
+    background: rgba(6, 3, 4, 0.85);
+    backdrop-filter: blur(14px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 80px rgba(180,60,0,0.12),
+      0 0 160px rgba(100,30,0,0.06),
+      inset 0 0 60px rgba(0,0,0,0.7);
+    animation: unveil 2.8s cubic-bezier(.2,.8,.3,1) forwards;
+    opacity: 0;
+  }
+  @keyframes unveil {
+    from { opacity: 0; transform: scale(0.96) translateY(18px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* Corner ornaments - Dwarven angular style */
+  .ec { position: absolute; width: 44px; height: 44px; }
+  .ec.tl { top:-1px; left:-1px; }
+  .ec.tr { top:-1px; right:-1px; transform: scaleX(-1); }
+  .ec.bl { bottom:-1px; left:-1px; transform: scaleY(-1); }
+  .ec.br { bottom:-1px; right:-1px; transform: scale(-1,-1); }
+
+  .eyebrow {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(200,150,80,0.45);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    margin-top: 6px;
+  }
+
+  .age-line {
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: rgba(200,150,80,0.22);
+    margin-bottom: 28px;
+    font-style: italic;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 28px; width: fit-content;
+  }
+  .sep-l { width: 70px; height: 1px; background: linear-gradient(90deg, transparent, rgba(200,150,80,0.45)); }
+  .sep-r { width: 70px; height: 1px; background: linear-gradient(90deg, rgba(200,150,80,0.45), transparent); }
+
+  .scene-label {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 12px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(210,160,90,0.38);
+    margin-bottom: 26px;
+  }
+
+  .narrative {
+    font-size: 21px;
+    line-height: 1.85;
+    color: rgba(210,185,150,0.7);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,0,0,0.8);
+  }
+
+  .main-quote {
+    font-size: 30px;
+    line-height: 1.75;
+    color: #e8dcc8;
+    font-style: italic;
+    margin-bottom: 16px;
+    text-shadow: 0 0 28px rgba(220,230,255,0.15), 0 2px 8px rgba(0,0,0,0.8);
+  }
+  .main-quote .hl {
+    color: #fff;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 22px rgba(220,230,255,0.6);
+  }
+  .main-quote .fire {
+    color: #e8a050;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 22px rgba(220,100,20,0.5);
+  }
+
+  .aftermath {
+    font-size: 19px;
+    line-height: 1.85;
+    color: rgba(200,170,130,0.6);
+    font-style: italic;
+    margin-bottom: 36px;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.7);
+  }
+
+  .thin-sep {
+    width: 50px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(200,150,80,0.35), transparent);
+    margin: 0 auto 24px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 10px;
+    color: rgba(200,150,80,0.38);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="cavern"></div>
+<div class="fire-pulse"></div>
+<div class="flame-flicker"></div>
+<div class="staff-light"></div>
+<div class="embers" id="embers"></div>
+
+<!-- Moria: Bridge, Chasm, Pillars -->
+<svg style="position:fixed;bottom:0;left:0;right:0;height:360px;pointer-events:none;"
+     viewBox="0 0 1440 360" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="abyssG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a0305"/>
+      <stop offset="100%" stop-color="#000"/>
+    </linearGradient>
+    <radialGradient id="deepFire" cx="50%" cy="100%" r="40%">
+      <stop offset="0%" stop-color="#c03000" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="pillarG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1418"/>
+      <stop offset="100%" stop-color="#080508"/>
+    </linearGradient>
+    <linearGradient id="bridgeG" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0c0808"/>
+      <stop offset="50%" stop-color="#181214"/>
+      <stop offset="100%" stop-color="#0c0808"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Deep chasm glow -->
+  <ellipse cx="720" cy="360" rx="600" ry="200" fill="url(#deepFire)"/>
+
+  <!-- Cavern walls - left -->
+  <path d="M0 0 L0 360 L260 360 L260 280 Q280 260 260 240 L260 60 Q240 40 260 20 L260 0 Z"
+        fill="#080506" opacity="0.9"/>
+  <!-- Cavern walls - right -->
+  <path d="M1440 0 L1440 360 L1180 360 L1180 280 Q1160 260 1180 240 L1180 60 Q1200 40 1180 20 L1180 0 Z"
+        fill="#080506" opacity="0.9"/>
+
+  <!-- Dwarven pillars - left side -->
+  <rect x="280" y="0" width="40" height="360" fill="url(#pillarG)" opacity="0.7"/>
+  <rect x="380" y="0" width="35" height="360" fill="url(#pillarG)" opacity="0.5"/>
+  <!-- Dwarven pillars - right side -->
+  <rect x="1120" y="0" width="40" height="360" fill="url(#pillarG)" opacity="0.7"/>
+  <rect x="1025" y="0" width="35" height="360" fill="url(#pillarG)" opacity="0.5"/>
+
+  <!-- Pillar carvings (runes) -->
+  <g stroke="rgba(120,80,50,0.15)" stroke-width="1" fill="none">
+    <path d="M290 80 L305 95 L290 110"/>
+    <path d="M290 130 L310 145 L290 160"/>
+    <path d="M1130 80 L1145 95 L1130 110"/>
+    <path d="M1130 130 L1150 145 L1130 160"/>
+  </g>
+
+  <!-- The Bridge of Khazad-dum - narrow stone arc -->
+  <path d="M440 265 Q720 240 1000 265 L1000 278 Q720 253 440 278 Z"
+        fill="url(#bridgeG)" stroke="rgba(80,50,40,0.25)" stroke-width="1"/>
+  <!-- Bridge surface detail -->
+  <line x1="500" y1="268" x2="940" y2="268" stroke="rgba(80,60,45,0.12)" stroke-width="0.5"/>
+
+  <!-- Abyss below bridge -->
+  <rect x="380" y="280" width="680" height="80" fill="url(#abyssG)"/>
+
+  <!-- Gandalf - small figure in the center of the bridge -->
+  <g transform="translate(700, 240)" opacity="0.8">
+    <!-- Staff (with light) -->
+    <line x1="0" y1="-8" x2="0" y2="-48" stroke="rgba(220,230,255,0.45)" stroke-width="2"/>
+    <circle cx="0" cy="-50" r="5" fill="rgba(220,235,255,0.25)"/>
+    <circle cx="0" cy="-50" r="10" fill="rgba(220,235,255,0.08)"/>
+    <!-- Body - grey robes -->
+    <path d="M-6 10 L-4 -6 L4 -6 L6 10 Z" fill="rgba(180,175,170,0.18)"/>
+    <!-- Head -->
+    <circle cx="0" cy="-12" r="5" fill="rgba(180,175,170,0.15)"/>
+    <!-- Hat point -->
+    <path d="M-4,-16 L0,-26 L4,-16" fill="rgba(140,135,130,0.12)"/>
+    <!-- Glamdring (sword) -->
+    <line x1="5" y1="-4" x2="16" y2="-20" stroke="rgba(200,210,240,0.4)" stroke-width="1.5"/>
+  </g>
+
+  <!-- Balrog - massive shadow of flame approaching from left -->
+  <g transform="translate(500, 160)" opacity="0.5">
+    <!-- Shadow mass -->
+    <ellipse cx="0" cy="60" rx="70" ry="35" fill="rgba(5,0,0,0.5)"/>
+    <rect x="-28" y="-30" width="56" height="90" fill="rgba(10,0,0,0.4)" rx="12"/>
+    <circle cx="0" cy="-48" r="24" fill="rgba(10,0,0,0.35)"/>
+    <!-- Wings of shadow -->
+    <path d="M-28,-20 Q-100,-60 -120,-20 Q-90,10 -28,20" fill="rgba(5,0,0,0.2)"/>
+    <path d="M28,-20 Q100,-60 120,-20 Q90,10 28,20" fill="rgba(5,0,0,0.2)"/>
+    <!-- Eyes - fire -->
+    <circle cx="-8" cy="-50" r="3" fill="rgba(220,80,0,0.4)"/>
+    <circle cx="8" cy="-50" r="3" fill="rgba(220,80,0,0.4)"/>
+    <!-- Fire wreathing the shadow -->
+    <ellipse cx="0" cy="10" rx="40" ry="60" fill="none" stroke="rgba(200,60,0,0.12)" stroke-width="3"/>
+    <!-- Whip of flame -->
+    <path d="M30,0 Q60,-30 90,-15 Q110,5 140,-10" stroke="rgba(220,80,0,0.25)" stroke-width="2" fill="none"/>
+  </g>
+</svg>
+
+<div class="card">
+  <div class="ec tl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 28 M2 2 L28 2" stroke="rgba(200,150,80,0.5)" stroke-width="1.5" fill="none"/>
+    <path d="M2 14 L14 2" stroke="rgba(200,150,80,0.25)" stroke-width="1" fill="none"/>
+    <rect x="0" y="0" width="5" height="5" fill="none" stroke="rgba(200,150,80,0.35)" stroke-width="1"/>
+  </svg></div>
+  <div class="ec tr"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 28 M2 2 L28 2" stroke="rgba(200,150,80,0.5)" stroke-width="1.5" fill="none"/>
+    <path d="M2 14 L14 2" stroke="rgba(200,150,80,0.25)" stroke-width="1" fill="none"/>
+    <rect x="0" y="0" width="5" height="5" fill="none" stroke="rgba(200,150,80,0.35)" stroke-width="1"/>
+  </svg></div>
+  <div class="ec bl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 28 M2 2 L28 2" stroke="rgba(200,150,80,0.5)" stroke-width="1.5" fill="none"/>
+    <path d="M2 14 L14 2" stroke="rgba(200,150,80,0.25)" stroke-width="1" fill="none"/>
+    <rect x="0" y="0" width="5" height="5" fill="none" stroke="rgba(200,150,80,0.35)" stroke-width="1"/>
+  </svg></div>
+  <div class="ec br"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 28 M2 2 L28 2" stroke="rgba(200,150,80,0.5)" stroke-width="1.5" fill="none"/>
+    <path d="M2 14 L14 2" stroke="rgba(200,150,80,0.25)" stroke-width="1" fill="none"/>
+    <rect x="0" y="0" width="5" height="5" fill="none" stroke="rgba(200,150,80,0.35)" stroke-width="1"/>
+  </svg></div>
+
+  <p class="eyebrow">The Lord of the Rings &mdash; The Fellowship of the Ring</p>
+  <p class="age-line">&#9670; &nbsp; A Journey in the Dark &nbsp; &#9670;</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="14" height="14" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg">
+      <!-- Dwarven anvil symbol -->
+      <rect x="3" y="8" width="8" height="3" rx="0.5" fill="rgba(200,150,80,0.55)"/>
+      <polygon points="7,1 10,7 4,7" fill="rgba(200,150,80,0.45)"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="scene-label">The Bridge of Khazad-d&ucirc;m</p>
+
+  <p class="narrative">
+    The Balrog made no answer. The fire in it seemed to die,<br>
+    but the darkness grew. It stepped forward slowly<br>
+    on to the bridge, and suddenly it drew itself up<br>
+    to a great height, and its wings were spread<br>
+    from wall to wall.
+  </p>
+
+  <p class="main-quote">
+    <span class="hl">&ldquo;You cannot pass!&rdquo;</span> he said.<br>
+    &ldquo;I am a servant of the Secret Fire,<br>
+    wielder of the <span class="hl">flame of Anor.</span><br>
+    You cannot pass. The <span class="fire">dark fire</span> will not avail you,<br>
+    flame of <span class="fire">Ud&ucirc;n.</span><br>
+    Go back to the Shadow!<br>
+    <span class="hl">You shall not pass!&rdquo;</span>
+  </p>
+
+  <p class="aftermath">
+    The bridge cracked. Right at the Balrog's feet it broke,<br>
+    and the stone upon which it stood crashed into the gulf,<br>
+    while the rest remained, poised, quivering like<br>
+    a tongue of rock thrust out into emptiness.
+  </p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">Gandalf the Grey<br>The Mines of Moria &mdash; Third Age, January 15, 3019</p>
+</div>
+
+<script>
+  // Embers rising from the abyss
+  const embersEl = document.getElementById('embers');
+  for (let i = 0; i < 40; i++) {
+    const el = document.createElement('div');
+    el.className = 'ember';
+    const size = Math.random() * 3 + 0.5;
+    const hue = 15 + Math.random() * 25;
+    const alpha = (Math.random() * 0.5 + 0.4).toFixed(2);
+    const color = `hsla(${hue}, 90%, 55%, ${alpha})`;
+    const dy = (-(Math.random() * 250 + 100)).toFixed(0) + 'px';
+    const dx = ((Math.random() - 0.5) * 120).toFixed(0) + 'px';
+    el.style.cssText = `
+      width:${size}px; height:${size}px;
+      background:${color};
+      box-shadow: 0 0 ${(size * 4).toFixed(1)}px ${color};
+      left:${25 + Math.random() * 50}%;
+      bottom:${Math.random() * 15}%;
+      --d:${(Math.random() * 7 + 3).toFixed(1)}s;
+      --dy:${dy};
+      --dx:${dx};
+      animation-delay:${(Math.random() * 10).toFixed(1)}s;
+    `;
+    embersEl.appendChild(el);
+  }
+</script>
+</body>
+</html>

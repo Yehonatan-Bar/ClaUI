@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Silmarillion - The Ainulindale: Music of the Ainur</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #020208;
+    overflow: hidden;
+    font-family: 'EB Garamond', serif;
+  }
+
+  /* The Timeless Halls - infinite void before creation */
+  .void {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 90% 70% at 50% 40%, rgba(40,20,80,0.15) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 50% at 25% 35%, rgba(80,40,120,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse 50% 50% at 75% 45%, rgba(30,60,130,0.08) 0%, transparent 50%),
+      linear-gradient(to bottom, #010106 0%, #030210 50%, #020108 100%);
+  }
+
+  /* The Flame Imperishable - central golden radiance */
+  .flame-imperishable {
+    position: fixed;
+    width: 400px; height: 400px;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -55%);
+    background: radial-gradient(
+      circle at 50% 50%,
+      rgba(255,220,140,0.08) 0%,
+      rgba(200,160,80,0.04) 30%,
+      transparent 60%
+    );
+    pointer-events: none;
+    animation: imperPulse 8s ease-in-out infinite alternate;
+  }
+  @keyframes imperPulse {
+    from { opacity: 0.4; transform: translate(-50%, -55%) scale(0.9); }
+    to   { opacity: 1; transform: translate(-50%, -55%) scale(1.1); }
+  }
+
+  /* Musical waves - the Great Music visualized */
+  .music-layer { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+  .wave {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid;
+    animation: waveExpand var(--d) ease-out infinite;
+    opacity: 0;
+  }
+  @keyframes waveExpand {
+    0%   { opacity: 0; transform: scale(0.2); }
+    10%  { opacity: var(--peak); }
+    80%  { opacity: 0.02; }
+    100% { opacity: 0; transform: scale(1); }
+  }
+
+  /* Light motes - the themes becoming visible */
+  .motes { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .mote {
+    position: absolute;
+    border-radius: 50%;
+    animation: moteDrift var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes moteDrift {
+    0%   { opacity: 0; transform: translate(0, 0) scale(0.5); }
+    30%  { opacity: 0.8; }
+    70%  { opacity: 0.3; }
+    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.2); }
+  }
+
+  /* Discord ripple - Melkor's dissonance */
+  .discord {
+    position: fixed;
+    width: 300px; height: 300px;
+    top: 60%; left: 70%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 1px solid rgba(120,30,60,0.08);
+    pointer-events: none;
+    animation: discordPulse 6s ease-in-out infinite;
+  }
+  @keyframes discordPulse {
+    0%, 100% { opacity: 0; transform: translate(-50%,-50%) scale(0.5); }
+    50%      { opacity: 0.5; transform: translate(-50%,-50%) scale(1.3); border-color: rgba(150,30,50,0.12); }
+  }
+
+  /* Stars awakening */
+  .stars { position: fixed; inset: 0; pointer-events: none; }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    animation: starBirth var(--d) infinite ease-in-out alternate;
+  }
+  @keyframes starBirth {
+    from { opacity: 0; transform: scale(0.6); }
+    to   { opacity: 1; transform: scale(1.3); }
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 720px;
+    text-align: center;
+    padding: 60px 54px;
+    border: 1px solid rgba(180,140,220,0.15);
+    background: rgba(3, 2, 10, 0.82);
+    backdrop-filter: blur(16px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 80px rgba(120,80,180,0.1),
+      0 0 180px rgba(60,40,120,0.05),
+      inset 0 0 60px rgba(0,0,10,0.7);
+    animation: unveil 3s cubic-bezier(.2,.8,.3,1) forwards;
+    opacity: 0;
+  }
+  @keyframes unveil {
+    from { opacity: 0; transform: scale(0.96) translateY(18px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* Corner ornaments - celestial, curved */
+  .ec { position: absolute; width: 44px; height: 44px; }
+  .ec.tl { top:-1px; left:-1px; }
+  .ec.tr { top:-1px; right:-1px; transform: scaleX(-1); }
+  .ec.bl { bottom:-1px; left:-1px; transform: scaleY(-1); }
+  .ec.br { bottom:-1px; right:-1px; transform: scale(-1,-1); }
+
+  .eyebrow {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(180,150,220,0.45);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    margin-top: 6px;
+  }
+
+  .age-line {
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: rgba(180,150,220,0.22);
+    margin-bottom: 28px;
+    font-style: italic;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 28px; width: fit-content;
+  }
+  .sep-l { width: 70px; height: 1px; background: linear-gradient(90deg, transparent, rgba(180,150,220,0.45)); }
+  .sep-r { width: 70px; height: 1px; background: linear-gradient(90deg, rgba(180,150,220,0.45), transparent); }
+
+  .scene-label {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 12px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(190,160,230,0.38);
+    margin-bottom: 26px;
+  }
+
+  .narrative {
+    font-size: 21px;
+    line-height: 1.85;
+    color: rgba(200,185,225,0.7);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,0,12,0.8);
+  }
+
+  .main-quote {
+    font-size: 26px;
+    line-height: 1.85;
+    color: #d5cce6;
+    font-style: italic;
+    margin-bottom: 16px;
+    text-shadow: 0 0 28px rgba(150,120,200,0.15), 0 2px 8px rgba(0,0,12,0.8);
+  }
+  .main-quote .hl {
+    color: #efe6ff;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 22px rgba(180,150,240,0.5);
+  }
+  .main-quote .gold {
+    color: #f0dca0;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 18px rgba(240,200,100,0.4);
+  }
+
+  .discord-text {
+    font-size: 20px;
+    line-height: 1.85;
+    color: rgba(190,160,180,0.6);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 12px rgba(0,0,12,0.7);
+  }
+  .discord-text .dark {
+    color: rgba(180,100,120,0.85);
+    text-shadow: 0 0 14px rgba(150,50,70,0.3);
+  }
+
+  .resolve-text {
+    font-size: 22px;
+    line-height: 1.85;
+    color: rgba(210,195,235,0.75);
+    font-style: italic;
+    margin-bottom: 36px;
+    text-shadow: 0 2px 14px rgba(0,0,12,0.8);
+  }
+  .resolve-text .hl {
+    color: #efe6ff;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 18px rgba(180,150,240,0.5);
+  }
+
+  .thin-sep {
+    width: 50px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(180,150,220,0.35), transparent);
+    margin: 0 auto 24px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 10px;
+    color: rgba(180,150,220,0.38);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="void"></div>
+<div class="flame-imperishable"></div>
+<div class="discord"></div>
+<div class="stars" id="stars"></div>
+<div class="music-layer" id="musicLayer"></div>
+<div class="motes" id="motes"></div>
+
+<!-- Iluvatar and the Ainur - abstract celestial SVG -->
+<svg style="position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;pointer-events:none;z-index:0;"
+     viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="throneG" cx="50%" cy="30%" r="35%">
+      <stop offset="0%" stop-color="rgba(200,170,255,0.06)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <radialGradient id="flameG" cx="50%" cy="50%" r="30%">
+      <stop offset="0%" stop-color="rgba(255,220,140,0.05)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Throne of Iluvatar - subtle radiance at top center -->
+  <ellipse cx="720" cy="180" rx="280" ry="180" fill="url(#throneG)"/>
+
+  <!-- Flame Imperishable symbol -->
+  <ellipse cx="720" cy="220" rx="30" ry="40" fill="url(#flameG)"/>
+  <path d="M720 190 Q730 170 720 150 Q710 170 720 190" fill="rgba(255,215,120,0.06)" stroke="rgba(255,215,120,0.1)" stroke-width="0.5"/>
+
+  <!-- The Ainur in a semicircle - subtle luminous figures -->
+  <g opacity="0.25">
+    <!-- Manwe (air/wind - blue) -->
+    <circle cx="520" cy="350" r="12" fill="rgba(100,150,240,0.15)"/>
+    <circle cx="520" cy="350" r="24" fill="none" stroke="rgba(100,150,240,0.06)" stroke-width="1"/>
+
+    <!-- Varda (stars - white/silver) -->
+    <circle cx="580" cy="310" r="11" fill="rgba(220,220,255,0.18)"/>
+    <circle cx="580" cy="310" r="22" fill="none" stroke="rgba(220,220,255,0.07)" stroke-width="1"/>
+
+    <!-- Ulmo (water - deep blue) -->
+    <circle cx="460" cy="400" r="13" fill="rgba(60,100,200,0.14)"/>
+    <circle cx="460" cy="400" r="26" fill="none" stroke="rgba(60,100,200,0.05)" stroke-width="1"/>
+
+    <!-- Aule (earth - warm amber) -->
+    <circle cx="640" cy="290" r="11" fill="rgba(200,160,80,0.14)"/>
+    <circle cx="640" cy="290" r="22" fill="none" stroke="rgba(200,160,80,0.06)" stroke-width="1"/>
+
+    <!-- Yavanna (nature - green) -->
+    <circle cx="680" cy="280" r="10" fill="rgba(80,180,100,0.12)"/>
+    <circle cx="680" cy="280" r="20" fill="none" stroke="rgba(80,180,100,0.05)" stroke-width="1"/>
+
+    <!-- Nienna (sorrow - silver-grey) -->
+    <circle cx="920" cy="350" r="10" fill="rgba(170,170,200,0.12)"/>
+    <circle cx="920" cy="350" r="20" fill="none" stroke="rgba(170,170,200,0.05)" stroke-width="1"/>
+
+    <!-- Mandos (fate - dark purple) -->
+    <circle cx="860" cy="310" r="11" fill="rgba(120,80,160,0.12)"/>
+    <circle cx="860" cy="310" r="22" fill="none" stroke="rgba(120,80,160,0.05)" stroke-width="1"/>
+
+    <!-- Orome (hunt - green-gold) -->
+    <circle cx="800" cy="290" r="10" fill="rgba(160,180,80,0.12)"/>
+
+    <!-- Melkor (discord - dark red, separate, larger) -->
+    <circle cx="1000" cy="420" r="16" fill="rgba(140,30,50,0.12)"/>
+    <circle cx="1000" cy="420" r="32" fill="none" stroke="rgba(140,30,50,0.06)" stroke-width="1.5"/>
+    <circle cx="1000" cy="420" r="48" fill="none" stroke="rgba(140,30,50,0.03)" stroke-width="1"/>
+  </g>
+
+  <!-- Musical connections - lines of theme between the Ainur -->
+  <g stroke-width="0.5" fill="none" opacity="0.15">
+    <path d="M520 350 Q600 300 640 290" stroke="rgba(140,170,240,0.3)"/>
+    <path d="M580 310 Q620 285 680 280" stroke="rgba(200,200,255,0.3)"/>
+    <path d="M460 400 Q500 360 520 350" stroke="rgba(80,120,210,0.3)"/>
+    <path d="M860 310 Q840 295 800 290" stroke="rgba(140,110,180,0.3)"/>
+    <path d="M920 350 Q880 325 860 310" stroke="rgba(170,170,200,0.3)"/>
+    <!-- Melkor's discordant line -->
+    <path d="M1000 420 Q900 380 860 310" stroke="rgba(140,30,50,0.2)" stroke-dasharray="4 6"/>
+  </g>
+</svg>
+
+<div class="card">
+  <div class="ec tl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 Q2 22 22 22 M2 2 Q22 2 22 22" stroke="rgba(180,150,220,0.35)" stroke-width="1" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(180,150,220,0.4)"/>
+    <circle cx="22" cy="22" r="1.5" fill="rgba(180,150,220,0.25)"/>
+  </svg></div>
+  <div class="ec tr"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 Q2 22 22 22 M2 2 Q22 2 22 22" stroke="rgba(180,150,220,0.35)" stroke-width="1" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(180,150,220,0.4)"/>
+    <circle cx="22" cy="22" r="1.5" fill="rgba(180,150,220,0.25)"/>
+  </svg></div>
+  <div class="ec bl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 Q2 22 22 22 M2 2 Q22 2 22 22" stroke="rgba(180,150,220,0.35)" stroke-width="1" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(180,150,220,0.4)"/>
+    <circle cx="22" cy="22" r="1.5" fill="rgba(180,150,220,0.25)"/>
+  </svg></div>
+  <div class="ec br"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 Q2 22 22 22 M2 2 Q22 2 22 22" stroke="rgba(180,150,220,0.35)" stroke-width="1" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(180,150,220,0.4)"/>
+    <circle cx="22" cy="22" r="1.5" fill="rgba(180,150,220,0.25)"/>
+  </svg></div>
+
+  <p class="eyebrow">The Silmarillion &mdash; Ainulindal&euml;</p>
+  <p class="age-line">&#9670; &nbsp; The Music of the Ainur &nbsp; &#9670;</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+      <!-- Flame Imperishable symbol -->
+      <path d="M8 1 Q11 5 10 9 Q9 12 8 14 Q7 12 6 9 Q5 5 8 1" fill="rgba(255,215,120,0.45)" stroke="rgba(255,215,120,0.3)" stroke-width="0.5"/>
+      <circle cx="8" cy="8" r="2" fill="rgba(255,230,160,0.35)"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="scene-label">Before the Beginning of Days</p>
+
+  <p class="narrative">
+    There was Eru, the One, who in Arda is called Il&uacute;vatar;<br>
+    and he made first the Ainur, the Holy Ones,<br>
+    that were the offspring of his thought.
+  </p>
+
+  <p class="main-quote">
+    And he spoke to them, propounding to them<br>
+    themes of music; and they sang before him,<br>
+    and he was glad. But for a long while they sang<br>
+    only each alone, or but few together,<br>
+    while the rest hearkened; for each comprehended<br>
+    only that part of the mind of <span class="gold">Il&uacute;vatar</span><br>
+    from which he came, and in the understanding<br>
+    of their brethren they <span class="hl">grew but slowly.</span>
+  </p>
+
+  <p class="discord-text">
+    But now Il&uacute;vatar sat and hearkened, and for a great while<br>
+    it seemed good to him, for in the music there were no flaws.<br>
+    But as the theme progressed, it came into the heart<br>
+    of <span class="dark">Melkor</span> to interweave matters of his own imagining<br>
+    that were not in accord with the theme of Il&uacute;vatar;<br>
+    for he sought therein to increase the power<br>
+    and glory of <span class="dark">the part assigned to himself.</span>
+  </p>
+
+  <p class="resolve-text">
+    Then Il&uacute;vatar arose, and the Ainur perceived<br>
+    that he smiled; and he lifted up his left hand,<br>
+    and a <span class="hl">new theme</span> began amid the storm.
+  </p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">The Ainulindal&euml;<br>The Timeless Halls &mdash; Before the Beginning of Arda</p>
+</div>
+
+<script>
+  // Stars in the void - being born from the Music
+  const starsEl = document.getElementById('stars');
+  for (let i = 0; i < 150; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2 + 0.3;
+    const hue = Math.random() > 0.7 ? 260 + Math.random() * 40 : 220 + Math.random() * 30;
+    const sat = 30 + Math.random() * 40;
+    const light = 70 + Math.random() * 25;
+    const alpha = (Math.random() * 0.5 + 0.2).toFixed(2);
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      top:${Math.random() * 100}%;
+      left:${Math.random() * 100}%;
+      background:hsla(${hue},${sat}%,${light}%,${alpha});
+      --d:${(Math.random() * 6 + 3).toFixed(1)}s;
+      animation-delay:${(Math.random() * 8).toFixed(1)}s;
+    `;
+    starsEl.appendChild(s);
+  }
+
+  // Musical wave rings - expanding from center
+  const musicEl = document.getElementById('musicLayer');
+  for (let i = 0; i < 12; i++) {
+    const w = document.createElement('div');
+    w.className = 'wave';
+    const size = 200 + Math.random() * 500;
+    const hue = Math.random() > 0.3 ? (240 + Math.random() * 60) : (30 + Math.random() * 20);
+    const alpha = (Math.random() * 0.08 + 0.02).toFixed(3);
+    const peak = (Math.random() * 0.15 + 0.05).toFixed(2);
+    w.style.cssText = `
+      width:${size}px; height:${size}px;
+      top:50%; left:50%;
+      margin-top:${-size / 2}px;
+      margin-left:${-size / 2}px;
+      border-color:hsla(${hue},50%,70%,${alpha});
+      --d:${(Math.random() * 10 + 6).toFixed(1)}s;
+      --peak:${peak};
+      animation-delay:${(Math.random() * 12).toFixed(1)}s;
+    `;
+    musicEl.appendChild(w);
+  }
+
+  // Light motes - themes of the Music becoming visible
+  const motesEl = document.getElementById('motes');
+  for (let i = 0; i < 30; i++) {
+    const m = document.createElement('div');
+    m.className = 'mote';
+    const size = Math.random() * 4 + 1;
+    const hue = [240, 270, 200, 45, 140, 320][Math.floor(Math.random() * 6)];
+    const alpha = (Math.random() * 0.4 + 0.2).toFixed(2);
+    const color = `hsla(${hue},60%,75%,${alpha})`;
+    const dx = ((Math.random() - 0.5) * 160).toFixed(0) + 'px';
+    const dy = ((Math.random() - 0.5) * 160).toFixed(0) + 'px';
+    m.style.cssText = `
+      width:${size}px; height:${size}px;
+      background:${color};
+      box-shadow: 0 0 ${(size * 5).toFixed(1)}px ${color};
+      top:${20 + Math.random() * 60}%;
+      left:${20 + Math.random() * 60}%;
+      --d:${(Math.random() * 12 + 6).toFixed(1)}s;
+      --dx:${dx};
+      --dy:${dy};
+      animation-delay:${(Math.random() * 15).toFixed(1)}s;
+    `;
+    motesEl.appendChild(m);
+  }
+</script>
+</body>
+</html>

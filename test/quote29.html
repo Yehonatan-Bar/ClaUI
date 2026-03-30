@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Discworld - Death on the Hogfather</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #020408;
+    overflow: hidden;
+    font-family: 'Crimson Text', serif;
+  }
+
+  /* Deep cosmos sky */
+  .sky {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 100% 60% at 50% 0%, rgba(15,25,60,0.6) 0%, transparent 60%),
+      radial-gradient(ellipse 80% 40% at 30% 20%, rgba(20,30,80,0.3) 0%, transparent 50%),
+      radial-gradient(ellipse 50% 50% at 70% 80%, rgba(10,15,45,0.4) 0%, transparent 50%);
+  }
+
+  /* Stars */
+  .stars-layer { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    background: #fff;
+    animation: twinkle var(--d) ease-in-out infinite alternate;
+  }
+  @keyframes twinkle {
+    from { opacity: var(--o1); transform: scale(1); }
+    to   { opacity: var(--o2); transform: scale(var(--s)); }
+  }
+
+  /* Hourglass sand falling */
+  .sand-layer { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .sand {
+    position: absolute;
+    background: rgba(180,160,100,0.5);
+    border-radius: 50%;
+    animation: sandfall var(--d) linear infinite;
+    opacity: 0;
+  }
+  @keyframes sandfall {
+    0%   { transform: translateY(-10px) translateX(0); opacity: 0; }
+    5%   { opacity: 0.6; }
+    90%  { opacity: 0.15; }
+    100% { transform: translateY(105vh) translateX(var(--dx)); opacity: 0; }
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 760px;
+    text-align: center;
+    padding: 60px 56px;
+    border: 1px solid rgba(100,130,200,0.2);
+    background: rgba(5, 8, 18, 0.85);
+    backdrop-filter: blur(12px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 80px rgba(60,80,180,0.12),
+      0 0 160px rgba(30,40,100,0.08),
+      inset 0 0 60px rgba(0,0,0,0.7);
+    animation: surface 2.8s ease forwards;
+    opacity: 0;
+  }
+  @keyframes surface {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Corner ornaments */
+  .cn { position: absolute; width: 36px; height: 36px; }
+  .cn.tl { top:-1px; left:-1px; }
+  .cn.tr { top:-1px; right:-1px; transform: scaleX(-1); }
+  .cn.bl { bottom:-1px; left:-1px; transform: scaleY(-1); }
+  .cn.br { bottom:-1px; right:-1px; transform: scale(-1,-1); }
+
+  .eyebrow {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(120,145,210,0.45);
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 28px; width: fit-content;
+  }
+  .sep-l { width: 80px; height: 1px; background: linear-gradient(90deg, transparent, rgba(100,130,200,0.4)); }
+  .sep-r { width: 80px; height: 1px; background: linear-gradient(90deg, rgba(100,130,200,0.4), transparent); }
+
+  .susan {
+    font-size: 18px;
+    line-height: 1.9;
+    color: rgba(180,190,220,0.65);
+    font-style: italic;
+    margin-bottom: 24px;
+    text-shadow: 0 2px 18px rgba(0,0,0,0.7);
+  }
+
+  .death-voice {
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: rgba(200,210,240,0.92);
+    letter-spacing: 2.5px;
+    line-height: 1.9;
+    margin-bottom: 22px;
+    text-transform: uppercase;
+    text-shadow:
+      0 0 25px rgba(120,160,255,0.35),
+      0 0 50px rgba(80,110,200,0.15),
+      0 2px 6px rgba(0,0,0,0.9);
+  }
+
+  .death-highlight {
+    font-family: 'Cinzel', serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: #c8d8ff;
+    letter-spacing: 3px;
+    line-height: 1.5;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    text-shadow:
+      0 0 35px rgba(140,175,255,0.6),
+      0 0 70px rgba(90,120,220,0.3),
+      0 2px 6px rgba(0,0,0,0.9);
+    animation: glow 3s ease-in-out infinite alternate;
+  }
+  @keyframes glow {
+    from { text-shadow: 0 0 25px rgba(130,165,255,0.4), 0 0 55px rgba(80,110,200,0.2); }
+    to   { text-shadow: 0 0 45px rgba(150,185,255,0.75), 0 0 90px rgba(100,140,240,0.45); }
+  }
+
+  .death-final {
+    font-family: 'Cinzel', serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: rgba(180,195,235,0.75);
+    letter-spacing: 2px;
+    line-height: 1.8;
+    margin-bottom: 36px;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px rgba(100,140,220,0.25);
+  }
+
+  .thin-sep {
+    width: 48px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(100,130,200,0.35), transparent);
+    margin: 0 auto 22px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: rgba(120,145,210,0.4);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="sky"></div>
+<div class="stars-layer" id="starsLayer"></div>
+
+<!-- Great A'Tuin and the Disc silhouette -->
+<svg style="position:fixed;bottom:0;left:0;right:0;height:320px;pointer-events:none;z-index:3;"
+     viewBox="0 0 1440 320" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="discGlow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="rgba(60,80,160,0.15)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <linearGradient id="turtleG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a0e1a"/>
+      <stop offset="100%" stop-color="#020306"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Cosmic glow behind the Disc -->
+  <ellipse cx="720" cy="140" rx="500" ry="120" fill="url(#discGlow)"/>
+
+  <!-- The Disc (flat world edge) -->
+  <ellipse cx="720" cy="195" rx="420" ry="22" fill="#080c18" stroke="rgba(80,110,180,0.15)" stroke-width="1"/>
+  <!-- Rim mountains (Cori Celesti hint) -->
+  <path d="M560 195 L600 172 L640 185 L680 165 L720 155 L760 165 L800 185 L840 172 L880 195"
+        fill="none" stroke="rgba(100,130,200,0.2)" stroke-width="1.5"/>
+  <!-- Hub — Cori Celesti peak -->
+  <line x1="720" y1="155" x2="720" y2="138" stroke="rgba(140,170,230,0.3)" stroke-width="1"/>
+  <circle cx="720" cy="136" r="2" fill="rgba(160,190,240,0.4)"/>
+
+  <!-- Four Elephants (simplified) -->
+  <g fill="#060a14" stroke="rgba(70,90,150,0.12)" stroke-width="0.8">
+    <!-- Elephant 1 (left) -->
+    <path d="M450 210 L460 195 L480 195 L490 210 L480 215 L460 215 Z"/>
+    <path d="M455 215 L455 240 M475 215 L475 240 M485 215 L485 240 M465 215 L465 240"/>
+    <!-- Elephant 2 (center-left) -->
+    <path d="M620 210 L630 195 L650 195 L660 210 L650 215 L630 215 Z"/>
+    <path d="M625 215 L625 240 M645 215 L645 240 M655 215 L655 240 M635 215 L635 240"/>
+    <!-- Elephant 3 (center-right) -->
+    <path d="M780 210 L790 195 L810 195 L820 210 L810 215 L790 215 Z"/>
+    <path d="M785 215 L785 240 M805 215 L805 240 M815 215 L815 240 M795 215 L795 240"/>
+    <!-- Elephant 4 (right) -->
+    <path d="M950 210 L960 195 L980 195 L990 210 L980 215 L960 215 Z"/>
+    <path d="M955 215 L955 240 M975 215 L975 240 M985 215 L985 240 M965 215 L965 240"/>
+  </g>
+
+  <!-- Great A'Tuin (cosmic turtle) -->
+  <ellipse cx="720" cy="280" rx="340" ry="55" fill="url(#turtleG)" stroke="rgba(50,70,120,0.12)" stroke-width="1"/>
+  <!-- Shell pattern -->
+  <path d="M500 275 Q610 250 720 255 Q830 250 940 275" fill="none" stroke="rgba(60,80,140,0.1)" stroke-width="1"/>
+  <path d="M540 285 Q630 265 720 268 Q810 265 900 285" fill="none" stroke="rgba(60,80,140,0.08)" stroke-width="1"/>
+  <!-- Head -->
+  <ellipse cx="400" cy="278" rx="40" ry="18" fill="#050810"/>
+  <!-- Eye -->
+  <circle cx="385" cy="274" r="2.5" fill="rgba(100,140,200,0.25)"/>
+  <!-- Flippers -->
+  <path d="M420 300 Q380 320 350 318" fill="#04070e" stroke="rgba(50,70,120,0.1)" stroke-width="0.8"/>
+  <path d="M1020 300 Q1060 320 1090 318" fill="#04070e" stroke="rgba(50,70,120,0.1)" stroke-width="0.8"/>
+  <!-- Tail -->
+  <path d="M1060 280 Q1100 278 1120 290" fill="none" stroke="rgba(50,70,120,0.1)" stroke-width="1.5"/>
+
+  <!-- Hourglass — Death's symbol, centered below disc -->
+  <g transform="translate(710, 100)" stroke="rgba(140,170,230,0.35)" stroke-width="1.2" fill="none">
+    <path d="M0 0 L20 0 L10 18 L20 36 L0 36 L10 18 Z"/>
+    <!-- Sand in top -->
+    <path d="M3 3 L17 3 L10 14 Z" fill="rgba(180,160,100,0.12)" stroke="none"/>
+    <!-- Sand in bottom -->
+    <path d="M10 22 L17 33 L3 33 Z" fill="rgba(180,160,100,0.08)" stroke="none"/>
+  </g>
+</svg>
+
+<div class="sand-layer" id="sandLayer"></div>
+
+<div class="card">
+  <div class="cn tl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(100,130,200,0.45)" stroke-width="2" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(100,130,200,0.35)"/>
+  </svg></div>
+  <div class="cn tr"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(100,130,200,0.45)" stroke-width="2" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(100,130,200,0.35)"/>
+  </svg></div>
+  <div class="cn bl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(100,130,200,0.45)" stroke-width="2" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(100,130,200,0.35)"/>
+  </svg></div>
+  <div class="cn br"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(100,130,200,0.45)" stroke-width="2" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(100,130,200,0.35)"/>
+  </svg></div>
+
+  <p class="eyebrow">Discworld &mdash; Hogfather</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="20" height="36" viewBox="0 0 20 36" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0 0 L20 0 L10 16 L20 36 L0 36 L10 16 Z" fill="none" stroke="rgba(120,155,220,0.5)" stroke-width="1.2"/>
+      <path d="M3 2 L17 2 L10 13 Z" fill="rgba(180,160,100,0.2)"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="susan">
+    "You're saying humans need fantasies<br>
+    to make life bearable."
+  </p>
+
+  <p class="death-voice">
+    No. Humans need fantasy<br>to be human.
+  </p>
+
+  <p class="death-highlight">
+    To be the place where the<br>
+    falling angel meets the rising ape.
+  </p>
+
+  <p class="susan">
+    "Tooth fairies? Hogfathers?"
+  </p>
+
+  <p class="death-voice">
+    Yes. As practice. You have to start out<br>
+    learning to believe the little lies.
+  </p>
+
+  <p class="susan">
+    "So we can believe the big ones?"
+  </p>
+
+  <p class="death-final">
+    Yes. Justice. Mercy. Duty.<br>That sort of thing.
+  </p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">Death<br>Hogfather &mdash; Terry Pratchett</p>
+</div>
+
+<script>
+  // Stars
+  const starsLayer = document.getElementById('starsLayer');
+  for (let i = 0; i < 180; i++) {
+    const el = document.createElement('div');
+    el.className = 'star';
+    const size = Math.random() * 2.5 + 0.5;
+    const o1 = (Math.random() * 0.4 + 0.2).toFixed(2);
+    const o2 = (Math.random() * 0.5 + 0.5).toFixed(2);
+    const s = (Math.random() * 0.5 + 1).toFixed(2);
+    el.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random() * 100}%;
+      top:${Math.random() * 75}%;
+      --d:${(Math.random() * 4 + 2).toFixed(1)}s;
+      --o1:${o1}; --o2:${o2}; --s:${s};
+      animation-delay:${(Math.random() * 5).toFixed(1)}s;
+    `;
+    starsLayer.appendChild(el);
+  }
+
+  // Sand particles (hourglass sand drifting)
+  const sandLayer = document.getElementById('sandLayer');
+  for (let i = 0; i < 30; i++) {
+    const el = document.createElement('div');
+    el.className = 'sand';
+    const w = Math.random() * 2 + 0.8;
+    const dx = (Math.random() * 40 - 20).toFixed(0) + 'px';
+    el.style.cssText = `
+      width:${w}px; height:${w}px;
+      left:${40 + Math.random() * 20}%;
+      top:-6px;
+      --d:${(Math.random() * 14 + 8).toFixed(1)}s;
+      --dx:${dx};
+      animation-delay:${(Math.random() * 15).toFixed(1)}s;
+    `;
+    sandLayer.appendChild(el);
+  }
+</script>
+</body>
+</html>

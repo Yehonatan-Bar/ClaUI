@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Two Towers - The Great Stories</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #070a06;
+    overflow: hidden;
+    font-family: 'EB Garamond', serif;
+  }
+
+  /* Ithilien at dusk - green shadows and distant fire of Mordor */
+  .ithilien-sky {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 50% 60% at 85% 70%, rgba(180,60,20,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 50% at 20% 40%, rgba(40,80,50,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 30%, rgba(20,40,35,0.12) 0%, transparent 60%),
+      linear-gradient(to bottom, #050805 0%, #080c08 40%, #0a0908 100%);
+  }
+
+  /* Mordor glow - ominous red on the eastern horizon */
+  .mordor-glow {
+    position: fixed;
+    width: 600px; height: 500px;
+    bottom: 10%; right: -5%;
+    background: radial-gradient(
+      ellipse 60% 50% at 50% 70%,
+      rgba(200,60,20,0.04) 0%,
+      rgba(160,40,15,0.02) 40%,
+      transparent 70%
+    );
+    pointer-events: none;
+    animation: mordorPulse 8s ease-in-out infinite alternate;
+  }
+  @keyframes mordorPulse {
+    from { opacity: 0.4; }
+    to   { opacity: 1; }
+  }
+
+  /* Ithilien starlight - the garden land still holds beauty */
+  .garden-light {
+    position: fixed;
+    width: 500px; height: 500px;
+    top: 5%; left: 15%;
+    background: radial-gradient(
+      circle at 50% 50%,
+      rgba(160,200,140,0.03) 0%,
+      rgba(140,180,120,0.015) 40%,
+      transparent 65%
+    );
+    pointer-events: none;
+    animation: gardenGlow 12s ease-in-out infinite alternate;
+  }
+  @keyframes gardenGlow {
+    from { opacity: 0.3; transform: scale(0.9); }
+    to   { opacity: 0.9; transform: scale(1.1); }
+  }
+
+  /* Stars - glimpsed through the canopy */
+  .stars { position: fixed; inset: 0; pointer-events: none; }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    animation: starTwinkle var(--d) infinite ease-in-out alternate;
+  }
+  @keyframes starTwinkle {
+    from { opacity: 0.05; transform: scale(0.6); }
+    to   { opacity: 1; transform: scale(1.3); }
+  }
+
+  /* Fireflies - the lingering beauty of Ithilien */
+  .fireflies { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .firefly {
+    position: absolute;
+    border-radius: 50%;
+    animation: fireflyDrift var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes fireflyDrift {
+    0%   { opacity: 0; transform: translate(0, 0) scale(0.5); }
+    30%  { opacity: var(--peak); transform: translate(var(--dx1), var(--dy1)) scale(1); }
+    70%  { opacity: calc(var(--peak) * 0.6); transform: translate(var(--dx2), var(--dy2)) scale(0.8); }
+    100% { opacity: 0; transform: translate(var(--dx3), var(--dy3)) scale(0.3); }
+  }
+
+  /* Leaf particles - drifting foliage */
+  .leaves { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  .leaf {
+    position: absolute;
+    width: 2px;
+    border-radius: 40%;
+    animation: leafFall var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes leafFall {
+    0%   { opacity: 0; transform: translateY(0) rotate(0deg); }
+    20%  { opacity: var(--a); }
+    80%  { opacity: calc(var(--a) * 0.3); }
+    100% { opacity: 0; transform: translateY(200px) rotate(360deg); }
+  }
+
+  /* Hope light - a single beam breaking through darkness */
+  .hope-light {
+    position: fixed;
+    width: 300px; height: 600px;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(
+      to bottom,
+      rgba(220,220,180,0.02) 0%,
+      rgba(200,210,170,0.01) 50%,
+      transparent 100%
+    );
+    pointer-events: none;
+    animation: hopeBeam 10s ease-in-out infinite alternate;
+  }
+  @keyframes hopeBeam {
+    from { opacity: 0.2; }
+    to   { opacity: 0.8; }
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 740px;
+    text-align: center;
+    padding: 60px 54px;
+    border: 1px solid rgba(140,180,130,0.15);
+    background: rgba(7, 10, 6, 0.88);
+    backdrop-filter: blur(16px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 80px rgba(100,140,90,0.06),
+      0 0 180px rgba(60,90,50,0.03),
+      inset 0 0 60px rgba(0,5,0,0.7);
+    animation: unveil 3s cubic-bezier(.2,.8,.3,1) forwards;
+    opacity: 0;
+  }
+  @keyframes unveil {
+    from { opacity: 0; transform: scale(0.96) translateY(18px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* Corner ornaments - leaf and vine motif */
+  .ec { position: absolute; width: 44px; height: 44px; }
+  .ec.tl { top:-1px; left:-1px; }
+  .ec.tr { top:-1px; right:-1px; transform: scaleX(-1); }
+  .ec.bl { bottom:-1px; left:-1px; transform: scaleY(-1); }
+  .ec.br { bottom:-1px; right:-1px; transform: scale(-1,-1); }
+
+  .eyebrow {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(140,180,130,0.45);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    margin-top: 6px;
+  }
+
+  .age-line {
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: rgba(140,180,130,0.22);
+    margin-bottom: 28px;
+    font-style: italic;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 28px; width: fit-content;
+  }
+  .sep-l { width: 70px; height: 1px; background: linear-gradient(90deg, transparent, rgba(140,180,130,0.45)); }
+  .sep-r { width: 70px; height: 1px; background: linear-gradient(90deg, rgba(140,180,130,0.45), transparent); }
+
+  .scene-label {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 12px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(140,180,130,0.38);
+    margin-bottom: 26px;
+  }
+
+  .context-text {
+    font-size: 17px;
+    line-height: 1.85;
+    color: rgba(140,170,130,0.5);
+    font-style: italic;
+    margin-bottom: 24px;
+    text-shadow: 0 2px 14px rgba(0,5,0,0.8);
+  }
+
+  .speaker {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 10px;
+    letter-spacing: 5px;
+    color: rgba(180,200,140,0.35);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .main-quote {
+    font-size: 24px;
+    line-height: 1.85;
+    color: #bfcfb0;
+    font-style: italic;
+    margin-bottom: 18px;
+    text-shadow: 0 0 28px rgba(120,160,100,0.1), 0 2px 8px rgba(0,5,0,0.8);
+  }
+  .main-quote .gold {
+    color: #e8d8a0;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 20px rgba(220,190,100,0.4);
+  }
+  .main-quote .green {
+    color: #c8e0a8;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 18px rgba(160,200,120,0.4);
+  }
+  .main-quote .silver {
+    color: #dce4d0;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 18px rgba(190,210,170,0.5);
+  }
+
+  .inner-quote {
+    font-size: 22px;
+    line-height: 1.85;
+    color: rgba(190,210,170,0.72);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,5,0,0.8);
+  }
+  .inner-quote .warm {
+    color: #e0cca0;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 16px rgba(210,180,100,0.35);
+  }
+  .inner-quote .light {
+    color: #e8e8c8;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 20px rgba(220,220,170,0.5);
+  }
+
+  .resolve-text {
+    font-size: 25px;
+    line-height: 1.85;
+    color: rgba(200,220,180,0.8);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,5,0,0.8);
+  }
+  .resolve-text .hl {
+    color: #e8e8c8;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 22px rgba(220,220,170,0.55);
+  }
+
+  .thin-sep {
+    width: 50px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(140,180,130,0.35), transparent);
+    margin: 0 auto 24px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 10px;
+    color: rgba(140,180,130,0.38);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="ithilien-sky"></div>
+<div class="mordor-glow"></div>
+<div class="garden-light"></div>
+<div class="hope-light"></div>
+<div class="stars" id="stars"></div>
+<div class="fireflies" id="fireflies"></div>
+<div class="leaves" id="leaves"></div>
+
+<!-- Ithilien landscape - ruins and garden SVG -->
+<svg style="position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;pointer-events:none;z-index:1;"
+     viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="treeG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(100,140,80,0.06)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </linearGradient>
+    <radialGradient id="mordorFireG" cx="90%" cy="80%" r="30%">
+      <stop offset="0%" stop-color="rgba(200,60,20,0.04)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Mordor's distant glow on the horizon -->
+  <ellipse cx="1300" cy="800" rx="300" ry="200" fill="url(#mordorFireG)"/>
+
+  <!-- Ithilien trees and ruins -->
+  <g opacity="0.1" stroke="rgba(120,160,100,0.3)" stroke-width="0.6" fill="none">
+    <!-- Old Gondorian ruin - broken arch -->
+    <path d="M300 800 L310 700 Q380 620 450 700 L460 800"/>
+    <path d="M330 750 L335 710 Q380 675 425 710 L430 750"/>
+    <!-- Broken pillar -->
+    <line x1="380" y1="800" x2="380" y2="680"/>
+    <line x1="390" y1="800" x2="390" y2="720"/>
+
+    <!-- Trees - tall beeches of Ithilien -->
+    <path d="M200 800 L200 500 Q180 460 160 420 M200 500 Q220 460 240 430"/>
+    <path d="M600 800 L600 480 Q580 430 560 400 M600 480 Q620 440 650 410"/>
+    <path d="M900 800 L900 520 Q880 480 870 440 M900 520 Q930 470 950 430"/>
+
+    <!-- Canopy shapes -->
+    <ellipse cx="200" cy="420" rx="60" ry="30" opacity="0.5"/>
+    <ellipse cx="600" cy="400" rx="70" ry="35" opacity="0.5"/>
+    <ellipse cx="900" cy="430" rx="55" ry="28" opacity="0.5"/>
+  </g>
+
+  <!-- Two small figures - Sam and Frodo sitting on stone -->
+  <g opacity="0.15">
+    <!-- Frodo -->
+    <ellipse cx="700" cy="640" rx="10" ry="18" fill="rgba(140,160,180,0.12)"/>
+    <circle cx="700" cy="625" r="6" fill="rgba(140,160,180,0.08)"/>
+    <!-- Sam -->
+    <ellipse cx="740" cy="645" rx="12" ry="16" fill="rgba(160,180,140,0.14)"/>
+    <circle cx="740" cy="630" r="7" fill="rgba(160,180,140,0.1)"/>
+    <!-- The stone they sit on -->
+    <path d="M680 660 Q720 650 760 662" stroke="rgba(140,140,120,0.15)" stroke-width="1.5" fill="rgba(100,100,90,0.04)"/>
+    <!-- Sam gesturing upward -->
+    <path d="M748 635 Q760 620 765 610" stroke="rgba(160,180,140,0.1)" stroke-width="0.8" fill="none"/>
+  </g>
+
+  <!-- Mount Doom - distant, glowing faintly -->
+  <g opacity="0.08">
+    <path d="M1200 800 L1250 600 L1300 800" fill="rgba(100,40,20,0.08)" stroke="rgba(180,60,30,0.1)" stroke-width="0.5"/>
+    <circle cx="1250" cy="590" r="15" fill="rgba(220,80,30,0.04)"/>
+  </g>
+</svg>
+
+<div class="card">
+  <div class="ec tl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(140,180,130,0.35)" stroke-width="1" fill="none"/>
+    <path d="M8 16 Q6 10 12 6" stroke="rgba(140,180,130,0.2)" stroke-width="0.5" fill="none"/>
+    <!-- Leaf -->
+    <path d="M4 18 Q8 14 10 8 Q6 12 2 16" fill="rgba(120,160,100,0.2)" stroke="rgba(140,180,130,0.25)" stroke-width="0.3"/>
+    <circle cx="20" cy="2" r="1.5" fill="rgba(140,180,130,0.35)"/>
+  </svg></div>
+  <div class="ec tr"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(140,180,130,0.35)" stroke-width="1" fill="none"/>
+    <path d="M8 16 Q6 10 12 6" stroke="rgba(140,180,130,0.2)" stroke-width="0.5" fill="none"/>
+    <path d="M4 18 Q8 14 10 8 Q6 12 2 16" fill="rgba(120,160,100,0.2)" stroke="rgba(140,180,130,0.25)" stroke-width="0.3"/>
+    <circle cx="20" cy="2" r="1.5" fill="rgba(140,180,130,0.35)"/>
+  </svg></div>
+  <div class="ec bl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(140,180,130,0.35)" stroke-width="1" fill="none"/>
+    <path d="M8 16 Q6 10 12 6" stroke="rgba(140,180,130,0.2)" stroke-width="0.5" fill="none"/>
+    <path d="M4 18 Q8 14 10 8 Q6 12 2 16" fill="rgba(120,160,100,0.2)" stroke="rgba(140,180,130,0.25)" stroke-width="0.3"/>
+    <circle cx="20" cy="2" r="1.5" fill="rgba(140,180,130,0.35)"/>
+  </svg></div>
+  <div class="ec br"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(140,180,130,0.35)" stroke-width="1" fill="none"/>
+    <path d="M8 16 Q6 10 12 6" stroke="rgba(140,180,130,0.2)" stroke-width="0.5" fill="none"/>
+    <path d="M4 18 Q8 14 10 8 Q6 12 2 16" fill="rgba(120,160,100,0.2)" stroke="rgba(140,180,130,0.25)" stroke-width="0.3"/>
+    <circle cx="20" cy="2" r="1.5" fill="rgba(140,180,130,0.35)"/>
+  </svg></div>
+
+  <p class="eyebrow">The Lord of the Rings</p>
+  <p class="age-line">&#9670; &nbsp; The Two Towers &nbsp; &#9670;</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+      <!-- Star of Earendil symbol -->
+      <circle cx="8" cy="8" r="1.5" fill="rgba(220,220,170,0.5)"/>
+      <path d="M8 2 L8 14 M2 8 L14 8 M4 4 L12 12 M12 4 L4 12" stroke="rgba(220,220,170,0.3)" stroke-width="0.4" fill="none"/>
+      <circle cx="8" cy="8" r="4" fill="none" stroke="rgba(220,220,170,0.15)" stroke-width="0.3"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="scene-label">Samwise &amp; Frodo in Ithilien</p>
+
+  <p class="context-text">
+    It's like in the great stories, Mr. Frodo.<br>
+    The ones that really mattered.
+  </p>
+
+  <p class="speaker">Samwise Gamgee</p>
+
+  <p class="main-quote">
+    Folk in those stories had lots of chances<br>
+    of turning back, only they didn't.<br>
+    They kept going. Because they were<br>
+    holding on to <span class="gold">something.</span>
+  </p>
+
+  <p class="context-text">
+    "What are we holding on to, Sam?"
+  </p>
+
+  <p class="resolve-text">
+    That there's some <span class="hl">good</span> in this world,<br>
+    Mr. Frodo&hellip;<br>
+    and it's <span class="hl">worth fighting for.</span>
+  </p>
+
+  <p class="inner-quote">
+    And when the <span class="warm">sun shines</span> it will shine out<br>
+    the <span class="light">clearer.</span>
+  </p>
+
+  <p class="main-quote">
+    Even darkness must pass.<br>
+    A new day will come. And when the sun shines<br>
+    it will shine out the <span class="green">clearer.</span>
+  </p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">The Two Towers<br>The Stairs of Cirith Ungol &mdash; Ithilien</p>
+</div>
+
+<script>
+  // Stars glimpsed through the canopy
+  const starsEl = document.getElementById('stars');
+  for (let i = 0; i < 70; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 1.6 + 0.3;
+    const hue = 80 + Math.random() * 60;
+    const alpha = (Math.random() * 0.25 + 0.08).toFixed(2);
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      top:${Math.random() * 50}%;
+      left:${Math.random() * 100}%;
+      background:hsla(${hue},30%,80%,${alpha});
+      --d:${(Math.random() * 6 + 3).toFixed(1)}s;
+      animation-delay:${(Math.random() * 8).toFixed(1)}s;
+    `;
+    starsEl.appendChild(s);
+  }
+
+  // Fireflies - the beauty still alive in Ithilien
+  const firefliesEl = document.getElementById('fireflies');
+  for (let i = 0; i < 18; i++) {
+    const f = document.createElement('div');
+    f.className = 'firefly';
+    const size = Math.random() * 3 + 1.5;
+    const hue = 60 + Math.random() * 50;
+    const alpha = (Math.random() * 0.4 + 0.2).toFixed(2);
+    const color = `hsla(${hue},50%,70%,${alpha})`;
+    const peak = (Math.random() * 0.5 + 0.2).toFixed(2);
+    const makeDx = () => ((Math.random() - 0.5) * 120).toFixed(0) + 'px';
+    const makeDy = () => ((Math.random() - 0.5) * 80).toFixed(0) + 'px';
+    f.style.cssText = `
+      width:${size}px; height:${size}px;
+      background:${color};
+      box-shadow: 0 0 ${(size * 5).toFixed(1)}px ${color}, 0 0 ${(size * 12).toFixed(1)}px hsla(${hue},50%,70%,${(alpha * 0.3).toFixed(2)});
+      top:${30 + Math.random() * 55}%;
+      left:${10 + Math.random() * 80}%;
+      --d:${(Math.random() * 12 + 6).toFixed(1)}s;
+      --peak:${peak};
+      --dx1:${makeDx()}; --dy1:${makeDy()};
+      --dx2:${makeDx()}; --dy2:${makeDy()};
+      --dx3:${makeDx()}; --dy3:${makeDy()};
+      animation-delay:${(Math.random() * 10).toFixed(1)}s;
+    `;
+    firefliesEl.appendChild(f);
+  }
+
+  // Falling leaves
+  const leavesEl = document.getElementById('leaves');
+  for (let i = 0; i < 15; i++) {
+    const l = document.createElement('div');
+    l.className = 'leaf';
+    const h = 8 + Math.random() * 12;
+    const hue = 80 + Math.random() * 60;
+    const a = (Math.random() * 0.08 + 0.03).toFixed(3);
+    l.style.cssText = `
+      height:${h}px;
+      left:${Math.random() * 100}%;
+      top:${-Math.random() * 10}%;
+      background: hsla(${hue},40%,50%,${a});
+      --a:${a};
+      --d:${(Math.random() * 10 + 6).toFixed(1)}s;
+      animation-delay:${(Math.random() * 15).toFixed(1)}s;
+    `;
+    leavesEl.appendChild(l);
+  }
+</script>
+</body>
+</html>

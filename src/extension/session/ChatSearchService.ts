@@ -23,8 +23,7 @@ export class ChatSearchService {
    */
   async searchProject(
     query: string,
-    requestId: number,
-    workspacePath: string
+    requestId: number
   ): Promise<{ results: ChatSearchProjectResult[]; totalMatches: number } | null> {
     this.currentRequestId = requestId;
 
@@ -32,7 +31,7 @@ export class ChatSearchService {
       return { results: [], totalMatches: 0 };
     }
 
-    const sessions = await this.discovery.discoverForWorkspace(workspacePath);
+    const sessions = await this.discovery.discoverAll();
     this.log(`[ChatSearch] Searching ${sessions.length} sessions for "${query}" (req ${requestId})`);
 
     const queryLower = query.toLowerCase();

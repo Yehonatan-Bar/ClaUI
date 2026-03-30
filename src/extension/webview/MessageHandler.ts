@@ -2921,24 +2921,13 @@ export class MessageHandler {
   }
 
   private async handleChatSearchProject(query: string, requestId: number): Promise<void> {
-    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!workspacePath) {
-      this.webview.postMessage({
-        type: 'chatSearchProjectResults',
-        requestId,
-        results: [],
-        totalMatches: 0,
-      });
-      return;
-    }
-
     // Lazy-init the search service
     if (!this.chatSearchService) {
       const { ChatSearchService } = require('../session/ChatSearchService');
       this.chatSearchService = new ChatSearchService(this.log);
     }
 
-    const result = await this.chatSearchService!.searchProject(query, requestId, workspacePath);
+    const result = await this.chatSearchService!.searchProject(query, requestId);
     if (result) {
       this.webview.postMessage({
         type: 'chatSearchProjectResults',
@@ -3815,15 +3804,27 @@ export class MessageHandler {
           // Checkpoint: capture before-content for ALL code-write tools (unconditional)
           this.log(`[CHECKPOINT-DEBUG] blockStop toolName="${toolName}" isWriteTool=${CODE_WRITE_TOOLS.includes(toolName)} hasManager=${!!this.checkpointManager}`);
           if (CODE_WRITE_TOOLS.includes(toolName) && this.checkpointManager) {
-            try {
-              const parsed = JSON.parse(rawInput);
-              const cpFilePath: string = parsed.file_path || parsed.notebook_path || '';
-              this.log(`[CHECKPOINT-DEBUG] parsed file_path="${cpFilePath}"`);
-              if (cpFilePath) {
-                this.checkpointManager.captureBeforeContent(cpFilePath, toolName);
+            // Extract file_path using regex first - rawInput may be truncated
+            // at 8000 chars (toolBlockContexts memory guard), causing JSON.parse
+            // to fail for Write tools with large file content. The file_path
+            // field always appears near the start of the JSON input.
+            let cpFilePath = '';
+            const fpMatch = rawInput.match(/"(?:file_path|notebook_path)"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+            if (fpMatch) {
+              // Unescape JSON string escapes (backslashes in Windows paths)
+              cpFilePath = fpMatch[1].replace(/\\(.)/g, '$1');
+            } else {
+              // Fallback: try full JSON parse (works when input is small enough)
+              try {
+                const parsed = JSON.parse(rawInput);
+                cpFilePath = parsed.file_path || parsed.notebook_path || '';
+              } catch (e) {
+                this.log(`[CHECKPOINT-DEBUG] Could not extract file_path from rawInput (${rawInput.length} chars): ${e}`);
               }
-            } catch (e) {
-              this.log(`[CHECKPOINT-DEBUG] JSON parse error: ${e}`);
+            }
+            this.log(`[CHECKPOINT-DEBUG] file_path="${cpFilePath}"`);
+            if (cpFilePath) {
+              this.checkpointManager.captureBeforeContent(cpFilePath, toolName);
             }
           }
         }

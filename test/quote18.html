@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Silmarillion - The Flight of the Noldor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0a0204;
+    overflow: hidden;
+    font-family: 'EB Garamond', serif;
+  }
+
+  /* The shore of Losgar - dark sky, burning ships */
+  .sky {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 80% 40% at 50% 80%, rgba(120,30,10,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse 50% 50% at 30% 20%, rgba(20,10,40,0.06) 0%, transparent 45%),
+      radial-gradient(ellipse 50% 50% at 70% 15%, rgba(15,10,35,0.06) 0%, transparent 45%),
+      linear-gradient(to bottom, #06020a 0%, #0a0308 45%, #120408 75%, #0e0306 100%);
+  }
+
+  /* The burning of the ships at Losgar - distant fire glow */
+  .fire-glow {
+    position: fixed;
+    width: 800px; height: 300px;
+    bottom: 5%; left: 50%;
+    transform: translateX(-50%);
+    background: radial-gradient(
+      ellipse at 50% 80%,
+      rgba(220,80,20,0.08) 0%,
+      rgba(180,50,10,0.04) 30%,
+      rgba(140,30,5,0.02) 50%,
+      transparent 70%
+    );
+    pointer-events: none;
+    animation: firePulse 3s ease-in-out infinite alternate;
+  }
+  @keyframes firePulse {
+    from { opacity: 0.6; transform: translateX(-50%) scaleY(0.85); }
+    to   { opacity: 1; transform: translateX(-50%) scaleY(1.15); }
+  }
+
+  /* The Silmarils' captured light - cold white glow above */
+  .silmaril-light {
+    position: fixed;
+    width: 300px; height: 300px;
+    top: 10%; left: 50%;
+    transform: translateX(-50%);
+    background: radial-gradient(
+      circle at 50% 50%,
+      rgba(230,240,255,0.05) 0%,
+      rgba(200,210,240,0.025) 30%,
+      rgba(170,180,220,0.01) 50%,
+      transparent 65%
+    );
+    pointer-events: none;
+    animation: silmarilGlow 6s ease-in-out infinite alternate;
+  }
+  @keyframes silmarilGlow {
+    from { opacity: 0.4; transform: translateX(-50%) scale(0.85); }
+    to   { opacity: 1; transform: translateX(-50%) scale(1.1); }
+  }
+
+  /* Embers rising from the burning ships */
+  .embers { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .ember {
+    position: absolute;
+    border-radius: 50%;
+    animation: emberRise var(--d) ease-out infinite;
+    opacity: 0;
+  }
+  @keyframes emberRise {
+    0%   { opacity: 0; transform: translateY(0) translateX(0) scale(1); }
+    15%  { opacity: var(--peak); }
+    60%  { opacity: calc(var(--peak) * 0.5); transform: translateY(var(--dy)) translateX(var(--dx)) scale(0.6); }
+    100% { opacity: 0; transform: translateY(calc(var(--dy) * 2)) translateX(calc(var(--dx) * 1.5)) scale(0.1); }
+  }
+
+  /* Stars of Varda - the Noldor leave the light of the stars behind */
+  .stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    animation: starFade var(--d) infinite ease-in-out;
+  }
+  @keyframes starFade {
+    0%   { opacity: var(--base); transform: scale(1); }
+    50%  { opacity: var(--peak); transform: scale(1.3); }
+    100% { opacity: var(--base); transform: scale(1); }
+  }
+
+  /* Smoke from the burning ships */
+  .smoke { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+  .smoke-wisp {
+    position: absolute;
+    border-radius: 50%;
+    animation: smokeDrift var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes smokeDrift {
+    0%   { opacity: 0; transform: translateY(0) translateX(0) scale(0.5); }
+    30%  { opacity: var(--peak); transform: translateY(var(--dy1)) translateX(var(--dx1)) scale(1); }
+    60%  { opacity: calc(var(--peak) * 0.5); transform: translateY(var(--dy2)) translateX(var(--dx2)) scale(1.5); }
+    100% { opacity: 0; transform: translateY(var(--dy3)) translateX(var(--dx3)) scale(2); }
+  }
+
+  /* Fire reflections on the water */
+  .reflections { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+  .reflection {
+    position: absolute;
+    animation: reflectionShimmer var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes reflectionShimmer {
+    0%   { opacity: 0; }
+    30%  { opacity: var(--peak); }
+    70%  { opacity: var(--peak); }
+    100% { opacity: 0; }
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 760px;
+    text-align: center;
+    padding: 60px 54px;
+    border: 1px solid rgba(200,100,60,0.15);
+    background: rgba(10, 4, 6, 0.9);
+    backdrop-filter: blur(16px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 80px rgba(200,80,30,0.05),
+      0 0 200px rgba(140,40,15,0.03),
+      inset 0 0 60px rgba(0,0,0,0.7);
+    animation: unveil 3s cubic-bezier(.2,.8,.3,1) forwards;
+    opacity: 0;
+  }
+  @keyframes unveil {
+    from { opacity: 0; transform: scale(0.96) translateY(18px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* Corner ornaments - Noldorin star and flame motif */
+  .ec { position: absolute; width: 44px; height: 44px; }
+  .ec.tl { top:-1px; left:-1px; }
+  .ec.tr { top:-1px; right:-1px; transform: scaleX(-1); }
+  .ec.bl { bottom:-1px; left:-1px; transform: scaleY(-1); }
+  .ec.br { bottom:-1px; right:-1px; transform: scale(-1,-1); }
+
+  .eyebrow {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(220,140,80,0.45);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    margin-top: 6px;
+  }
+
+  .age-line {
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: rgba(200,120,70,0.22);
+    margin-bottom: 28px;
+    font-style: italic;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 28px; width: fit-content;
+  }
+  .sep-l { width: 70px; height: 1px; background: linear-gradient(90deg, transparent, rgba(220,140,80,0.45)); }
+  .sep-r { width: 70px; height: 1px; background: linear-gradient(90deg, rgba(220,140,80,0.45), transparent); }
+
+  .scene-label {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 12px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(220,140,80,0.38);
+    margin-bottom: 26px;
+  }
+
+  .narrative {
+    font-size: 20px;
+    line-height: 1.85;
+    color: rgba(200,160,130,0.6);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,0,0,0.8);
+  }
+  .narrative .hl {
+    color: rgba(240,200,150,0.9);
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 18px rgba(220,160,100,0.4);
+  }
+
+  .main-quote {
+    font-size: 24px;
+    line-height: 1.9;
+    color: #dcc0a0;
+    font-style: italic;
+    margin-bottom: 18px;
+    text-shadow: 0 0 28px rgba(200,120,60,0.1), 0 2px 8px rgba(0,0,0,0.8);
+  }
+  .main-quote .fire {
+    color: #f0a860;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 22px rgba(240,140,40,0.5);
+  }
+  .main-quote .silmaril {
+    color: #e0e8f8;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 22px rgba(200,210,250,0.55);
+  }
+  .main-quote .doom {
+    color: #c0a090;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 16px rgba(160,100,80,0.4);
+  }
+
+  .oath-text {
+    font-size: 22px;
+    line-height: 1.9;
+    color: rgba(220,170,130,0.75);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,0,0,0.8);
+  }
+  .oath-text .sworn {
+    color: #e8c090;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 16px rgba(220,170,100,0.45);
+  }
+  .oath-text .dark {
+    color: #d0a0a0;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 14px rgba(200,100,100,0.35);
+  }
+  .oath-text .blood {
+    color: #c88070;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 14px rgba(200,80,60,0.4);
+  }
+
+  .burning-text {
+    font-size: 21px;
+    line-height: 1.85;
+    color: rgba(220,140,90,0.7);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,0,0,0.8);
+  }
+  .burning-text .flame {
+    color: #f0b060;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 18px rgba(240,160,50,0.5);
+  }
+
+  .lament-text {
+    font-size: 20px;
+    line-height: 1.85;
+    color: rgba(180,160,180,0.6);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,0,0,0.8);
+  }
+  .lament-text .tears {
+    color: #c0c8e0;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 14px rgba(160,170,220,0.4);
+  }
+
+  .thin-sep {
+    width: 50px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(220,140,80,0.35), transparent);
+    margin: 0 auto 24px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 10px;
+    color: rgba(220,140,80,0.38);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="sky"></div>
+<div class="fire-glow"></div>
+<div class="silmaril-light"></div>
+<div class="stars" id="stars"></div>
+<div class="smoke" id="smoke"></div>
+<div class="embers" id="embers"></div>
+<div class="reflections" id="reflections"></div>
+
+<!-- The shore of Losgar - ships burning, sea, mountains -->
+<svg style="position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;pointer-events:none;z-index:0;"
+     viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="seaG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(20,30,50,0.05)"/>
+      <stop offset="100%" stop-color="rgba(10,15,25,0.08)"/>
+    </linearGradient>
+    <radialGradient id="shipFire1" cx="30%" cy="80%" r="15%">
+      <stop offset="0%" stop-color="rgba(240,120,30,0.06)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <radialGradient id="shipFire2" cx="55%" cy="82%" r="12%">
+      <stop offset="0%" stop-color="rgba(240,100,20,0.05)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <radialGradient id="shipFire3" cx="75%" cy="78%" r="10%">
+      <stop offset="0%" stop-color="rgba(220,90,20,0.04)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <linearGradient id="silG" x1="0.4" y1="0" x2="0.6" y2="1">
+      <stop offset="0%" stop-color="rgba(230,240,255,0.15)"/>
+      <stop offset="100%" stop-color="rgba(200,210,240,0)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Three Silmarils above - the light of the Trees captured -->
+  <g opacity="0.6">
+    <!-- Left Silmaril -->
+    <circle cx="620" cy="80" r="5" fill="rgba(230,240,255,0.12)">
+      <animate attributeName="r" values="4;6;4" dur="5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="620" cy="80" r="15" fill="rgba(230,240,255,0.02)"/>
+
+    <!-- Center Silmaril -->
+    <circle cx="720" cy="60" r="6" fill="rgba(230,240,255,0.15)">
+      <animate attributeName="r" values="5;7;5" dur="6s" begin="1s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="720" cy="60" r="20" fill="rgba(230,240,255,0.025)"/>
+
+    <!-- Right Silmaril -->
+    <circle cx="820" cy="80" r="5" fill="rgba(230,240,255,0.12)">
+      <animate attributeName="r" values="4;6;4" dur="5.5s" begin="2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="820" cy="80" r="15" fill="rgba(230,240,255,0.02)"/>
+  </g>
+
+  <!-- The sea - dark water -->
+  <rect x="0" y="720" width="1440" height="180" fill="url(#seaG)"/>
+
+  <!-- Burning ships - the Teleri's white ships at Losgar -->
+  <g opacity="0.7">
+    <!-- Ship 1 - largest, fully ablaze -->
+    <g>
+      <path d="M350 760 Q370 730 400 740 Q420 720 450 740 L460 760 Z"
+            fill="rgba(80,40,20,0.1)" stroke="rgba(160,80,30,0.12)" stroke-width="0.5"/>
+      <!-- Mast -->
+      <line x1="400" y1="740" x2="400" y2="690" stroke="rgba(120,60,20,0.1)" stroke-width="1"/>
+      <!-- Flames -->
+      <path d="M370 740 Q380 710 390 720 Q395 695 405 715 Q415 700 420 725 Q435 710 440 740"
+            fill="rgba(240,120,30,0.06)" stroke="rgba(240,140,40,0.1)" stroke-width="0.3">
+        <animate attributeName="d"
+                 values="M370 740 Q380 710 390 720 Q395 695 405 715 Q415 700 420 725 Q435 710 440 740;
+                         M370 740 Q375 715 385 725 Q400 690 410 718 Q420 705 425 728 Q430 715 440 740;
+                         M370 740 Q380 710 390 720 Q395 695 405 715 Q415 700 420 725 Q435 710 440 740"
+                 dur="2s" repeatCount="indefinite"/>
+      </path>
+    </g>
+
+    <!-- Ship 2 -->
+    <g>
+      <path d="M680 770 Q700 745 720 755 Q740 735 760 755 L770 770 Z"
+            fill="rgba(70,35,18,0.08)" stroke="rgba(140,70,25,0.1)" stroke-width="0.5"/>
+      <line x1="720" y1="750" x2="720" y2="705" stroke="rgba(100,50,18,0.08)" stroke-width="0.8"/>
+      <path d="M695 755 Q705 728 715 738 Q720 715 730 732 Q740 720 745 742 Q752 730 758 755"
+            fill="rgba(220,100,25,0.05)" stroke="rgba(220,120,35,0.08)" stroke-width="0.3">
+        <animate attributeName="d"
+                 values="M695 755 Q705 728 715 738 Q720 715 730 732 Q740 720 745 742 Q752 730 758 755;
+                         M695 755 Q700 732 710 740 Q725 710 735 735 Q742 722 748 745 Q755 732 758 755;
+                         M695 755 Q705 728 715 738 Q720 715 730 732 Q740 720 745 742 Q752 730 758 755"
+                 dur="2.5s" repeatCount="indefinite"/>
+      </path>
+    </g>
+
+    <!-- Ship 3 - smaller, further away -->
+    <g>
+      <path d="M1020 775 Q1035 758 1050 765 Q1060 750 1075 765 L1080 775 Z"
+            fill="rgba(60,30,15,0.06)" stroke="rgba(120,60,22,0.08)" stroke-width="0.4"/>
+      <line x1="1050" y1="762" x2="1050" y2="730" stroke="rgba(90,45,15,0.06)" stroke-width="0.6"/>
+      <path d="M1030 765 Q1038 745 1045 752 Q1050 738 1058 750 Q1065 740 1068 758 Q1072 748 1075 765"
+            fill="rgba(200,90,22,0.04)" stroke="rgba(200,100,30,0.07)" stroke-width="0.3">
+        <animate attributeName="d"
+                 values="M1030 765 Q1038 745 1045 752 Q1050 738 1058 750 Q1065 740 1068 758 Q1072 748 1075 765;
+                         M1030 765 Q1035 748 1042 755 Q1052 735 1060 752 Q1067 742 1070 760 Q1074 750 1075 765;
+                         M1030 765 Q1038 745 1045 752 Q1050 738 1058 750 Q1065 740 1068 758 Q1072 748 1075 765"
+                 dur="3s" repeatCount="indefinite"/>
+      </path>
+    </g>
+  </g>
+
+  <!-- Ship fire glows on the water -->
+  <circle cx="400" cy="800" r="120" fill="url(#shipFire1)">
+    <animate attributeName="opacity" values="0.5;0.8;0.5" dur="3s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="720" cy="810" r="100" fill="url(#shipFire2)">
+    <animate attributeName="opacity" values="0.4;0.7;0.4" dur="3.5s" begin="0.5s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="1050" cy="805" r="80" fill="url(#shipFire3)">
+    <animate attributeName="opacity" values="0.3;0.6;0.3" dur="4s" begin="1s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- Feanor's star - the House of Finwe emblem -->
+  <g transform="translate(720,450)" opacity="0.04">
+    <path d="M0 -30 L5 -8 L28 -8 L9 5 L16 28 L0 14 L-16 28 L-9 5 L-28 -8 L-5 -8 Z"
+          fill="rgba(240,200,150,0.3)" stroke="rgba(240,200,150,0.2)" stroke-width="0.5"/>
+  </g>
+
+  <!-- Distant mountains of Middle-earth on the horizon -->
+  <g fill="rgba(20,15,25,0.15)" stroke="none">
+    <path d="M0 750 L80 680 L150 720 L250 660 L340 710 L440 650 L520 700 L600 680 L680 710 L750 660 L840 700 L920 640 L1000 690 L1100 670 L1180 700 L1260 650 L1340 690 L1440 660 L1440 750 Z"/>
+  </g>
+</svg>
+
+<div class="card">
+  <div class="ec tl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <!-- Noldorin star and flame corner -->
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(220,140,80,0.35)" stroke-width="1" fill="none"/>
+    <path d="M6 16 Q5 8 12 5" stroke="rgba(220,140,80,0.2)" stroke-width="0.5" fill="none"/>
+    <!-- Star of Feanor -->
+    <path d="M11 9 L12 6 L13 9 L16 8 L14 10 L16 12 L13 11 L12 14 L11 11 L8 12 L10 10 L8 8 Z"
+          fill="rgba(230,240,255,0.12)" stroke="rgba(230,240,255,0.2)" stroke-width="0.3"/>
+    <circle cx="20" cy="2" r="1.5" fill="rgba(220,140,80,0.35)"/>
+    <circle cx="2" cy="20" r="1.5" fill="rgba(220,140,80,0.35)"/>
+  </svg></div>
+  <div class="ec tr"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(220,140,80,0.35)" stroke-width="1" fill="none"/>
+    <path d="M6 16 Q5 8 12 5" stroke="rgba(220,140,80,0.2)" stroke-width="0.5" fill="none"/>
+    <path d="M11 9 L12 6 L13 9 L16 8 L14 10 L16 12 L13 11 L12 14 L11 11 L8 12 L10 10 L8 8 Z"
+          fill="rgba(230,240,255,0.12)" stroke="rgba(230,240,255,0.2)" stroke-width="0.3"/>
+    <circle cx="20" cy="2" r="1.5" fill="rgba(220,140,80,0.35)"/>
+    <circle cx="2" cy="20" r="1.5" fill="rgba(220,140,80,0.35)"/>
+  </svg></div>
+  <div class="ec bl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(220,140,80,0.35)" stroke-width="1" fill="none"/>
+    <path d="M6 16 Q5 8 12 5" stroke="rgba(220,140,80,0.2)" stroke-width="0.5" fill="none"/>
+    <path d="M11 9 L12 6 L13 9 L16 8 L14 10 L16 12 L13 11 L12 14 L11 11 L8 12 L10 10 L8 8 Z"
+          fill="rgba(230,240,255,0.12)" stroke="rgba(230,240,255,0.2)" stroke-width="0.3"/>
+    <circle cx="20" cy="2" r="1.5" fill="rgba(220,140,80,0.35)"/>
+    <circle cx="2" cy="20" r="1.5" fill="rgba(220,140,80,0.35)"/>
+  </svg></div>
+  <div class="ec br"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(220,140,80,0.35)" stroke-width="1" fill="none"/>
+    <path d="M6 16 Q5 8 12 5" stroke="rgba(220,140,80,0.2)" stroke-width="0.5" fill="none"/>
+    <path d="M11 9 L12 6 L13 9 L16 8 L14 10 L16 12 L13 11 L12 14 L11 11 L8 12 L10 10 L8 8 Z"
+          fill="rgba(230,240,255,0.12)" stroke="rgba(230,240,255,0.2)" stroke-width="0.3"/>
+    <circle cx="20" cy="2" r="1.5" fill="rgba(220,140,80,0.35)"/>
+    <circle cx="2" cy="20" r="1.5" fill="rgba(220,140,80,0.35)"/>
+  </svg></div>
+
+  <p class="eyebrow">The Silmarillion</p>
+  <p class="age-line">&#9670; &nbsp; Of the Flight of the Noldor &middot; The Oath of F&euml;anor &nbsp; &#9670;</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+      <!-- Silmaril symbol -->
+      <circle cx="8" cy="8" r="4" fill="rgba(230,240,255,0.15)" stroke="rgba(230,240,255,0.3)" stroke-width="0.5"/>
+      <circle cx="8" cy="8" r="2" fill="rgba(240,245,255,0.25)"/>
+      <circle cx="8" cy="8" r="7" fill="none" stroke="rgba(230,240,255,0.1)" stroke-width="0.3"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="scene-label">The Burning of the Ships</p>
+
+  <p class="narrative">
+    Then F&euml;anor, mightiest of the <span class="hl">Noldor,</span><br>
+    whose works were held in wonder,<br>
+    crafted three jewels: the <span class="hl">Silmarils.</span>
+  </p>
+
+  <p class="main-quote">
+    The inner fire of the <span class="silmaril">Silmarils</span><br>
+    F&euml;anor made of the blended <span class="fire">light</span><br>
+    of the Trees of Valinor,<br>
+    which lives in them yet, though the Trees<br>
+    have long <span class="doom">withered and shine no more.</span>
+  </p>
+
+  <p class="oath-text">
+    Then F&euml;anor swore a terrible oath.<br>
+    His seven sons leapt to his side<br>
+    and took the <span class="sworn">selfsame vow</span> together,<br>
+    and red as <span class="blood">blood</span> shone their drawn swords.
+  </p>
+
+  <p class="main-quote">
+    They swore an oath which none shall break,<br>
+    and none should take, by the name of<br>
+    <span class="silmaril">Il&uacute;vatar,</span> calling the <span class="doom">Everlasting Dark</span><br>
+    upon them if they kept it not.
+  </p>
+
+  <p class="burning-text">
+    And F&euml;anor set <span class="flame">fire</span> to the white ships<br>
+    of the Teleri. So in that place which was called<br>
+    <span class="flame">Losgar</span> at the mouth of the Firth of Drengist<br>
+    ended the fairest vessels that ever sailed the sea,<br>
+    in a great burning, bright and terrible.
+  </p>
+
+  <p class="lament-text">
+    And Fingolfin and his people saw the light afar off,<br>
+    red beneath the clouds; and they knew<br>
+    that they were <span class="tears">betrayed.</span><br>
+    This was the first of the fruits<br>
+    of the Kinslaying and the <span class="tears">Doom of the Noldor.</span>
+  </p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">Of the Flight of the Noldor<br>The Silmarillion &mdash; Quenta Silmarillion, Chapter IX</p>
+</div>
+
+<script>
+  // Stars of Varda in the dark sky above
+  const starsEl = document.getElementById('stars');
+  for (let i = 0; i < 100; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 1.5 + 0.3;
+    const hue = 210 + Math.random() * 40;
+    const base = (Math.random() * 0.15 + 0.05).toFixed(2);
+    const peak = (Math.random() * 0.4 + 0.2).toFixed(2);
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      top:${Math.random() * 50}%;
+      left:${Math.random() * 100}%;
+      background:hsla(${hue},40%,85%,${peak});
+      box-shadow: 0 0 ${(size * 2).toFixed(1)}px hsla(${hue},40%,85%,${(peak * 0.5).toFixed(2)});
+      --d:${(Math.random() * 8 + 3).toFixed(1)}s;
+      --base:${base};
+      --peak:${peak};
+      animation-delay:${(Math.random() * 8).toFixed(1)}s;
+    `;
+    starsEl.appendChild(s);
+  }
+
+  // Rising embers from the burning ships
+  const embersEl = document.getElementById('embers');
+  for (let i = 0; i < 40; i++) {
+    const e = document.createElement('div');
+    e.className = 'ember';
+    const size = Math.random() * 2.5 + 0.5;
+    const hue = 15 + Math.random() * 25;
+    const alpha = (Math.random() * 0.5 + 0.2).toFixed(2);
+    const peak = (Math.random() * 0.6 + 0.3).toFixed(2);
+    e.style.cssText = `
+      width:${size}px; height:${size}px;
+      background:hsla(${hue},80%,55%,${alpha});
+      box-shadow: 0 0 ${(size * 4).toFixed(1)}px hsla(${hue},80%,55%,${(alpha * 0.4).toFixed(2)});
+      bottom:${10 + Math.random() * 15}%;
+      left:${20 + Math.random() * 60}%;
+      --d:${(Math.random() * 6 + 3).toFixed(1)}s;
+      --peak:${peak};
+      --dy:${(-(Math.random() * 300 + 100)).toFixed(0)}px;
+      --dx:${((Math.random() - 0.5) * 100).toFixed(0)}px;
+      animation-delay:${(Math.random() * 8).toFixed(1)}s;
+    `;
+    embersEl.appendChild(e);
+  }
+
+  // Smoke wisps rising
+  const smokeEl = document.getElementById('smoke');
+  for (let i = 0; i < 15; i++) {
+    const w = document.createElement('div');
+    w.className = 'smoke-wisp';
+    const size = Math.random() * 60 + 20;
+    const alpha = (Math.random() * 0.03 + 0.01).toFixed(3);
+    const peak = (Math.random() * 0.04 + 0.02).toFixed(3);
+    const makeDx = () => ((Math.random() - 0.5) * 150).toFixed(0) + 'px';
+    w.style.cssText = `
+      width:${size}px; height:${size}px;
+      background:radial-gradient(circle, rgba(80,50,30,${alpha}) 0%, transparent 70%);
+      bottom:${15 + Math.random() * 10}%;
+      left:${20 + Math.random() * 60}%;
+      --d:${(Math.random() * 12 + 6).toFixed(1)}s;
+      --peak:${peak};
+      --dx1:${makeDx()}; --dy1:${(-Math.random() * 100 - 50).toFixed(0)}px;
+      --dx2:${makeDx()}; --dy2:${(-Math.random() * 200 - 100).toFixed(0)}px;
+      --dx3:${makeDx()}; --dy3:${(-Math.random() * 350 - 150).toFixed(0)}px;
+      animation-delay:${(Math.random() * 10).toFixed(1)}s;
+    `;
+    smokeEl.appendChild(w);
+  }
+
+  // Fire reflections on the water surface
+  const reflEl = document.getElementById('reflections');
+  for (let i = 0; i < 12; i++) {
+    const r = document.createElement('div');
+    r.className = 'reflection';
+    const w = Math.random() * 30 + 5;
+    const h = Math.random() * 2 + 0.5;
+    const hue = 20 + Math.random() * 20;
+    const alpha = (Math.random() * 0.06 + 0.02).toFixed(3);
+    const peak = (Math.random() * 0.08 + 0.03).toFixed(3);
+    r.style.cssText = `
+      width:${w}px; height:${h}px;
+      background:hsla(${hue},70%,50%,${alpha});
+      border-radius:1px;
+      bottom:${2 + Math.random() * 10}%;
+      left:${20 + Math.random() * 60}%;
+      --d:${(Math.random() * 4 + 2).toFixed(1)}s;
+      --peak:${peak};
+      animation-delay:${(Math.random() * 5).toFixed(1)}s;
+    `;
+    reflEl.appendChild(r);
+  }
+</script>
+</body>
+</html>

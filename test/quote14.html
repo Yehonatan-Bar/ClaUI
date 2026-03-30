@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Silmarillion - Of Beren and L&uacute;thien</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #06030a;
+    overflow: hidden;
+    font-family: 'EB Garamond', serif;
+  }
+
+  /* The Halls of Mandos - deep stone darkness with distant echoes */
+  .halls {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 70% 50% at 50% 50%, rgba(50,30,70,0.1) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 20% 60%, rgba(30,20,60,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse 40% 40% at 80% 40%, rgba(40,25,65,0.06) 0%, transparent 50%),
+      linear-gradient(to bottom, #04020a 0%, #080414 50%, #050210 100%);
+  }
+
+  /* Luthien's song - radiance emanating from center */
+  .song-radiance {
+    position: fixed;
+    width: 600px; height: 600px;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(
+      circle at 50% 50%,
+      rgba(200,180,240,0.06) 0%,
+      rgba(160,140,210,0.03) 35%,
+      transparent 60%
+    );
+    pointer-events: none;
+    animation: songPulse 6s ease-in-out infinite alternate;
+  }
+  @keyframes songPulse {
+    from { opacity: 0.4; transform: translate(-50%, -50%) scale(0.85); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+  }
+
+  /* Niphredil and elanor - small luminous flowers */
+  .flowers { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .flower {
+    position: absolute;
+    border-radius: 50%;
+    animation: flowerBloom var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes flowerBloom {
+    0%   { opacity: 0; transform: scale(0.3) rotate(0deg); }
+    30%  { opacity: var(--peak); transform: scale(1) rotate(30deg); }
+    70%  { opacity: calc(var(--peak) * 0.5); transform: scale(1.1) rotate(60deg); }
+    100% { opacity: 0; transform: scale(0.5) rotate(90deg); }
+  }
+
+  /* Mandos tears - the Vala moved to pity */
+  .tears { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  .tear {
+    position: absolute;
+    width: 1.5px;
+    border-radius: 0 0 50% 50%;
+    background: linear-gradient(to bottom, transparent, rgba(180,170,220,var(--a)), transparent);
+    animation: tearFall var(--d) ease-in infinite;
+    opacity: 0;
+  }
+  @keyframes tearFall {
+    0%   { opacity: 0; transform: translateY(0); }
+    20%  { opacity: 0.8; }
+    100% { opacity: 0; transform: translateY(120px); }
+  }
+
+  /* Song waves - concentric rings of melody */
+  .song-waves { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+  .song-wave {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid;
+    animation: songWaveExpand var(--d) ease-out infinite;
+    opacity: 0;
+  }
+  @keyframes songWaveExpand {
+    0%   { opacity: 0; transform: scale(0.1); }
+    15%  { opacity: var(--peak); }
+    85%  { opacity: 0.01; }
+    100% { opacity: 0; transform: scale(1); }
+  }
+
+  /* Stars through the stone - Varda's light piercing through */
+  .stars { position: fixed; inset: 0; pointer-events: none; }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    animation: starTwinkle var(--d) infinite ease-in-out alternate;
+  }
+  @keyframes starTwinkle {
+    from { opacity: 0.05; transform: scale(0.5); }
+    to   { opacity: 1; transform: scale(1.4); }
+  }
+
+  /* Silmaril glow - the jewel's memory */
+  .silmaril-memory {
+    position: fixed;
+    width: 200px; height: 200px;
+    top: 15%; left: 50%;
+    transform: translateX(-50%);
+    background: radial-gradient(
+      circle at 50% 50%,
+      rgba(220,230,255,0.04) 0%,
+      rgba(200,210,250,0.02) 30%,
+      transparent 60%
+    );
+    pointer-events: none;
+    animation: silmarilGlow 8s ease-in-out infinite alternate;
+  }
+  @keyframes silmarilGlow {
+    from { opacity: 0.3; transform: translateX(-50%) scale(0.8); }
+    to   { opacity: 1; transform: translateX(-50%) scale(1.2); }
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 740px;
+    text-align: center;
+    padding: 60px 54px;
+    border: 1px solid rgba(170,150,210,0.15);
+    background: rgba(6, 3, 12, 0.85);
+    backdrop-filter: blur(16px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 80px rgba(140,120,190,0.08),
+      0 0 180px rgba(80,60,140,0.04),
+      inset 0 0 60px rgba(0,0,10,0.7);
+    animation: unveil 3s cubic-bezier(.2,.8,.3,1) forwards;
+    opacity: 0;
+  }
+  @keyframes unveil {
+    from { opacity: 0; transform: scale(0.96) translateY(18px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* Corner ornaments - intertwined vines (Luthien's nature) */
+  .ec { position: absolute; width: 44px; height: 44px; }
+  .ec.tl { top:-1px; left:-1px; }
+  .ec.tr { top:-1px; right:-1px; transform: scaleX(-1); }
+  .ec.bl { bottom:-1px; left:-1px; transform: scaleY(-1); }
+  .ec.br { bottom:-1px; right:-1px; transform: scale(-1,-1); }
+
+  .eyebrow {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(170,150,210,0.45);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    margin-top: 6px;
+  }
+
+  .age-line {
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: rgba(170,150,210,0.22);
+    margin-bottom: 28px;
+    font-style: italic;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 28px; width: fit-content;
+  }
+  .sep-l { width: 70px; height: 1px; background: linear-gradient(90deg, transparent, rgba(170,150,210,0.45)); }
+  .sep-r { width: 70px; height: 1px; background: linear-gradient(90deg, rgba(170,150,210,0.45), transparent); }
+
+  .scene-label {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 12px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(170,150,210,0.38);
+    margin-bottom: 26px;
+  }
+
+  .narrative {
+    font-size: 20px;
+    line-height: 1.85;
+    color: rgba(190,175,215,0.65);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,0,12,0.8);
+  }
+  .narrative .hl {
+    color: rgba(220,210,245,0.9);
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 18px rgba(180,160,230,0.4);
+  }
+
+  .main-quote {
+    font-size: 24px;
+    line-height: 1.85;
+    color: #d0c4e4;
+    font-style: italic;
+    margin-bottom: 18px;
+    text-shadow: 0 0 28px rgba(150,130,200,0.12), 0 2px 8px rgba(0,0,12,0.8);
+  }
+  .main-quote .silver {
+    color: #e8e0f5;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 22px rgba(200,190,240,0.5);
+  }
+  .main-quote .flower-text {
+    color: #e0d0f0;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 16px rgba(200,180,240,0.4);
+  }
+
+  .song-text {
+    font-size: 22px;
+    line-height: 1.9;
+    color: rgba(210,200,235,0.78);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,0,12,0.8);
+  }
+  .song-text .sorrow {
+    color: rgba(180,160,210,0.9);
+    text-shadow: 0 0 14px rgba(150,130,200,0.35);
+  }
+  .song-text .beauty {
+    color: #e8daf5;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 20px rgba(200,180,240,0.5);
+  }
+
+  .resolution {
+    font-size: 21px;
+    line-height: 1.85;
+    color: rgba(200,185,225,0.7);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,0,12,0.8);
+  }
+  .resolution .hl {
+    color: #e8e0f5;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 18px rgba(200,190,240,0.5);
+  }
+  .resolution .mortal {
+    color: #d8c8a8;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 14px rgba(200,180,140,0.3);
+  }
+
+  .thin-sep {
+    width: 50px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(170,150,210,0.35), transparent);
+    margin: 0 auto 24px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 10px;
+    color: rgba(170,150,210,0.38);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="halls"></div>
+<div class="song-radiance"></div>
+<div class="silmaril-memory"></div>
+<div class="stars" id="stars"></div>
+<div class="song-waves" id="songWaves"></div>
+<div class="flowers" id="flowers"></div>
+<div class="tears" id="tears"></div>
+
+<!-- Luthien before Mandos - abstract figures SVG -->
+<svg style="position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;pointer-events:none;z-index:0;"
+     viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="luthienG" cx="50%" cy="55%" r="20%">
+      <stop offset="0%" stop-color="rgba(200,180,240,0.06)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <radialGradient id="mandosG" cx="50%" cy="25%" r="25%">
+      <stop offset="0%" stop-color="rgba(100,80,140,0.05)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <linearGradient id="throneG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(80,60,120,0.08)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- The Halls - stone arches and pillars -->
+  <g opacity="0.08" stroke="rgba(140,120,180,0.4)" stroke-width="0.7" fill="none">
+    <!-- Grand arch -->
+    <path d="M400 800 L400 350 Q720 100 1040 350 L1040 800"/>
+    <!-- Inner arches -->
+    <path d="M500 800 L500 420 Q720 220 940 420 L940 800"/>
+    <path d="M580 800 L580 470 Q720 310 860 470 L860 800"/>
+    <!-- Pillars -->
+    <line x1="400" y1="800" x2="400" y2="350"/>
+    <line x1="1040" y1="800" x2="1040" y2="350"/>
+    <!-- Floor line -->
+    <line x1="300" y1="800" x2="1140" y2="800"/>
+  </g>
+
+  <!-- Mandos on his throne - abstract dark figure -->
+  <g opacity="0.15">
+    <!-- Throne shape -->
+    <path d="M680 240 L660 300 L660 400 L780 400 L780 300 L760 240 Z" fill="url(#throneG)" stroke="rgba(100,80,140,0.1)" stroke-width="0.5"/>
+    <!-- Mandos figure - hooded presence -->
+    <ellipse cx="720" cy="310" rx="30" ry="40" fill="rgba(60,40,90,0.15)"/>
+    <path d="M690 290 Q720 260 750 290" fill="rgba(50,30,80,0.12)" stroke="rgba(80,60,120,0.08)" stroke-width="0.5"/>
+    <!-- Dark aura -->
+    <circle cx="720" cy="310" r="60" fill="rgba(50,30,80,0.04)"/>
+  </g>
+
+  <!-- Luthien - luminous singing figure -->
+  <g opacity="0.2">
+    <!-- Figure -->
+    <ellipse cx="720" cy="560" rx="18" ry="30" fill="rgba(200,180,240,0.12)"/>
+    <!-- Hair flowing -->
+    <path d="M702 545 Q690 570 685 600 Q680 630 690 660" stroke="rgba(30,20,50,0.15)" stroke-width="2" fill="none"/>
+    <path d="M738 545 Q750 570 755 600 Q760 630 750 660" stroke="rgba(30,20,50,0.15)" stroke-width="2" fill="none"/>
+    <!-- Song radiance from figure -->
+    <circle cx="720" cy="550" r="35" fill="rgba(200,180,240,0.04)"/>
+    <circle cx="720" cy="550" r="70" fill="rgba(200,180,240,0.02)"/>
+    <circle cx="720" cy="550" r="110" fill="rgba(200,180,240,0.01)"/>
+  </g>
+
+  <!-- Beren's spirit - faint, waiting -->
+  <g opacity="0.08">
+    <ellipse cx="580" cy="600" rx="14" ry="25" fill="rgba(180,160,140,0.15)"/>
+    <circle cx="580" cy="590" r="25" fill="rgba(180,160,140,0.03)"/>
+  </g>
+
+  <!-- Musical notes ascending - abstract song lines -->
+  <g stroke-width="0.5" fill="none" opacity="0.1">
+    <path d="M720 550 Q700 480 680 400 Q660 320 680 260" stroke="rgba(200,180,240,0.3)">
+      <animate attributeName="opacity" values="0;0.3;0" dur="8s" repeatCount="indefinite"/>
+    </path>
+    <path d="M720 550 Q740 470 750 380 Q760 300 740 250" stroke="rgba(210,190,245,0.25)">
+      <animate attributeName="opacity" values="0;0.25;0" dur="10s" begin="2s" repeatCount="indefinite"/>
+    </path>
+    <path d="M720 550 Q710 460 700 370 Q690 280 710 230" stroke="rgba(190,170,230,0.2)">
+      <animate attributeName="opacity" values="0;0.2;0" dur="9s" begin="4s" repeatCount="indefinite"/>
+    </path>
+  </g>
+</svg>
+
+<div class="card">
+  <div class="ec tl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(170,150,210,0.35)" stroke-width="1" fill="none"/>
+    <path d="M6 18 Q4 8 14 4" stroke="rgba(170,150,210,0.2)" stroke-width="0.5" fill="none"/>
+    <circle cx="2" cy="20" r="2" fill="rgba(170,150,210,0.4)"/>
+    <circle cx="20" cy="2" r="2" fill="rgba(170,150,210,0.4)"/>
+    <circle cx="11" cy="8" r="1" fill="rgba(200,180,240,0.25)"/>
+  </svg></div>
+  <div class="ec tr"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(170,150,210,0.35)" stroke-width="1" fill="none"/>
+    <path d="M6 18 Q4 8 14 4" stroke="rgba(170,150,210,0.2)" stroke-width="0.5" fill="none"/>
+    <circle cx="2" cy="20" r="2" fill="rgba(170,150,210,0.4)"/>
+    <circle cx="20" cy="2" r="2" fill="rgba(170,150,210,0.4)"/>
+    <circle cx="11" cy="8" r="1" fill="rgba(200,180,240,0.25)"/>
+  </svg></div>
+  <div class="ec bl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(170,150,210,0.35)" stroke-width="1" fill="none"/>
+    <path d="M6 18 Q4 8 14 4" stroke="rgba(170,150,210,0.2)" stroke-width="0.5" fill="none"/>
+    <circle cx="2" cy="20" r="2" fill="rgba(170,150,210,0.4)"/>
+    <circle cx="20" cy="2" r="2" fill="rgba(170,150,210,0.4)"/>
+    <circle cx="11" cy="8" r="1" fill="rgba(200,180,240,0.25)"/>
+  </svg></div>
+  <div class="ec br"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(170,150,210,0.35)" stroke-width="1" fill="none"/>
+    <path d="M6 18 Q4 8 14 4" stroke="rgba(170,150,210,0.2)" stroke-width="0.5" fill="none"/>
+    <circle cx="2" cy="20" r="2" fill="rgba(170,150,210,0.4)"/>
+    <circle cx="20" cy="2" r="2" fill="rgba(170,150,210,0.4)"/>
+    <circle cx="11" cy="8" r="1" fill="rgba(200,180,240,0.25)"/>
+  </svg></div>
+
+  <p class="eyebrow">The Silmarillion</p>
+  <p class="age-line">&#9670; &nbsp; Of Beren and L&uacute;thien &nbsp; &#9670;</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+      <!-- Niphredil flower symbol -->
+      <circle cx="8" cy="8" r="2" fill="rgba(200,180,240,0.4)"/>
+      <path d="M8 2 Q9 5 8 6" stroke="rgba(200,180,240,0.35)" stroke-width="0.6" fill="none"/>
+      <path d="M8 14 Q7 11 8 10" stroke="rgba(200,180,240,0.35)" stroke-width="0.6" fill="none"/>
+      <path d="M2 8 Q5 7 6 8" stroke="rgba(200,180,240,0.35)" stroke-width="0.6" fill="none"/>
+      <path d="M14 8 Q11 9 10 8" stroke="rgba(200,180,240,0.35)" stroke-width="0.6" fill="none"/>
+      <path d="M3.8 3.8 Q5.5 5.5 6.2 6.2" stroke="rgba(200,180,240,0.25)" stroke-width="0.5" fill="none"/>
+      <path d="M12.2 12.2 Q10.5 10.5 9.8 9.8" stroke="rgba(200,180,240,0.25)" stroke-width="0.5" fill="none"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="scene-label">The Song Before Mandos</p>
+
+  <p class="narrative">
+    The song of L&uacute;thien before Mandos was the<br>
+    <span class="hl">song most fair</span> that ever in words was woven,<br>
+    and the song most sorrowful that ever the world shall hear.
+  </p>
+
+  <p class="main-quote">
+    Unchanged, imperishable, it is sung still<br>
+    in Valinor beyond the hearing of the world,<br>
+    and listening the Valar are <span class="silver">grieved.</span><br>
+    For L&uacute;thien wove two themes of words,<br>
+    of the sorrow of the Eldar<br>
+    and the <span class="flower-text">grief of Men;</span>
+  </p>
+
+  <p class="song-text">
+    of the Two Kindreds that were made by Il&uacute;vatar<br>
+    to dwell in Arda, the <span class="beauty">Kingdom of Earth</span><br>
+    amid the innumerable stars.
+  </p>
+
+  <p class="resolution">
+    And as she knelt before him her tears fell upon his feet<br>
+    like rain upon the stones; and <span class="hl">Mandos was moved<br>
+    to pity,</span> who never before was so moved,<br>
+    nor has been since.
+  </p>
+
+  <p class="narrative">
+    And he summoned the spirit of Beren,<br>
+    and L&uacute;thien chose to become <span class="hl">mortal,</span><br>
+    and to die indeed from the world,<br>
+    that so she might follow him.
+  </p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">Of Beren and L&uacute;thien<br>The Halls of Mandos &mdash; The First Age of the Sun</p>
+</div>
+
+<script>
+  // Stars piercing through the Halls
+  const starsEl = document.getElementById('stars');
+  for (let i = 0; i < 80; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 1.5 + 0.3;
+    const hue = 260 + Math.random() * 30;
+    const alpha = (Math.random() * 0.3 + 0.1).toFixed(2);
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      top:${Math.random() * 100}%;
+      left:${Math.random() * 100}%;
+      background:hsla(${hue},35%,75%,${alpha});
+      --d:${(Math.random() * 6 + 3).toFixed(1)}s;
+      animation-delay:${(Math.random() * 8).toFixed(1)}s;
+    `;
+    starsEl.appendChild(s);
+  }
+
+  // Song waves - concentric rings from Luthien's position
+  const wavesEl = document.getElementById('songWaves');
+  for (let i = 0; i < 10; i++) {
+    const w = document.createElement('div');
+    w.className = 'song-wave';
+    const size = 150 + Math.random() * 400;
+    const hue = 260 + Math.random() * 30;
+    const alpha = (Math.random() * 0.06 + 0.02).toFixed(3);
+    const peak = (Math.random() * 0.12 + 0.04).toFixed(2);
+    w.style.cssText = `
+      width:${size}px; height:${size}px;
+      top:55%; left:50%;
+      margin-top:${-size / 2}px;
+      margin-left:${-size / 2}px;
+      border-color:hsla(${hue},45%,70%,${alpha});
+      --d:${(Math.random() * 12 + 6).toFixed(1)}s;
+      --peak:${peak};
+      animation-delay:${(Math.random() * 10).toFixed(1)}s;
+    `;
+    wavesEl.appendChild(w);
+  }
+
+  // Niphredil flowers - small luminous blooms appearing and fading
+  const flowersEl = document.getElementById('flowers');
+  for (let i = 0; i < 20; i++) {
+    const f = document.createElement('div');
+    f.className = 'flower';
+    const size = Math.random() * 5 + 2;
+    const hue = Math.random() > 0.5 ? (270 + Math.random() * 20) : (240 + Math.random() * 30);
+    const alpha = (Math.random() * 0.3 + 0.15).toFixed(2);
+    const color = `hsla(${hue},50%,80%,${alpha})`;
+    const peak = (Math.random() * 0.4 + 0.2).toFixed(2);
+    f.style.cssText = `
+      width:${size}px; height:${size}px;
+      background:${color};
+      box-shadow: 0 0 ${(size * 4).toFixed(1)}px ${color}, 0 0 ${(size * 8).toFixed(1)}px hsla(${hue},50%,80%,${(alpha * 0.3).toFixed(2)});
+      top:${50 + Math.random() * 45}%;
+      left:${15 + Math.random() * 70}%;
+      --d:${(Math.random() * 10 + 5).toFixed(1)}s;
+      --peak:${peak};
+      animation-delay:${(Math.random() * 12).toFixed(1)}s;
+    `;
+    flowersEl.appendChild(f);
+  }
+
+  // Mandos's tears - rare, slow falling drops
+  const tearsEl = document.getElementById('tears');
+  for (let i = 0; i < 12; i++) {
+    const t = document.createElement('div');
+    t.className = 'tear';
+    const h = 15 + Math.random() * 25;
+    const a = (Math.random() * 0.08 + 0.03).toFixed(3);
+    t.style.cssText = `
+      height:${h}px;
+      left:${35 + Math.random() * 30}%;
+      top:${20 + Math.random() * 20}%;
+      --a:${a};
+      --d:${(Math.random() * 6 + 4).toFixed(1)}s;
+      animation-delay:${(Math.random() * 15).toFixed(1)}s;
+    `;
+    tearsEl.appendChild(t);
+  }
+</script>
+</body>
+</html>

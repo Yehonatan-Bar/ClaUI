@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Discworld - Granny Weatherwax on Sin</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #050805;
+    overflow: hidden;
+    font-family: 'EB Garamond', serif;
+  }
+
+  /* Dark forest sky with aurora hints */
+  .sky {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 90% 35% at 50% 0%, rgba(20,50,30,0.45) 0%, transparent 55%),
+      radial-gradient(ellipse 60% 30% at 25% 15%, rgba(40,20,60,0.3) 0%, transparent 50%),
+      radial-gradient(ellipse 50% 25% at 75% 10%, rgba(20,50,40,0.25) 0%, transparent 50%);
+  }
+
+  /* Firefly particles */
+  .firefly-layer { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .firefly {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(160,200,80,0.7);
+    box-shadow: 0 0 6px rgba(140,190,60,0.5), 0 0 14px rgba(100,160,40,0.25);
+    animation: drift var(--d) ease-in-out infinite alternate;
+  }
+  @keyframes drift {
+    0%   { transform: translate(0, 0); opacity: 0; }
+    15%  { opacity: var(--peak); }
+    50%  { transform: translate(var(--dx), var(--dy)); opacity: var(--peak); }
+    85%  { opacity: var(--peak); }
+    100% { transform: translate(var(--dx2), var(--dy2)); opacity: 0; }
+  }
+
+  /* Candle flicker glow */
+  .candle-glow {
+    position: fixed;
+    width: 400px; height: 300px;
+    bottom: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse, rgba(180,120,40,0.08) 0%, transparent 60%);
+    pointer-events: none;
+    animation: flicker 2s ease-in-out infinite;
+    z-index: 1;
+  }
+  @keyframes flicker {
+    0%   { opacity: 0.6; transform: translateX(-50%) scaleY(1); }
+    25%  { opacity: 0.85; transform: translateX(-50%) scaleY(1.04); }
+    50%  { opacity: 0.55; transform: translateX(-50%) scaleY(0.97); }
+    75%  { opacity: 0.9; transform: translateX(-50%) scaleY(1.02); }
+    100% { opacity: 0.6; transform: translateX(-50%) scaleY(1); }
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 700px;
+    text-align: center;
+    padding: 60px 56px;
+    border: 1px solid rgba(80,120,60,0.22);
+    background: rgba(8, 12, 8, 0.85);
+    backdrop-filter: blur(10px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 70px rgba(40,80,30,0.12),
+      0 0 140px rgba(60,30,80,0.08),
+      inset 0 0 60px rgba(0,0,0,0.7);
+    animation: surface 2.5s ease forwards;
+    opacity: 0;
+  }
+  @keyframes surface {
+    from { opacity: 0; transform: translateY(22px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Corner ornaments */
+  .cn { position: absolute; width: 36px; height: 36px; }
+  .cn.tl { top:-1px; left:-1px; }
+  .cn.tr { top:-1px; right:-1px; transform: scaleX(-1); }
+  .cn.bl { bottom:-1px; left:-1px; transform: scaleY(-1); }
+  .cn.br { bottom:-1px; right:-1px; transform: scale(-1,-1); }
+
+  .eyebrow {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(100,150,80,0.42);
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 28px; width: fit-content;
+  }
+  .sep-l { width: 80px; height: 1px; background: linear-gradient(90deg, transparent, rgba(90,140,65,0.4)); }
+  .sep-r { width: 80px; height: 1px; background: linear-gradient(90deg, rgba(90,140,65,0.4), transparent); }
+
+  .lead-quote {
+    font-size: 22px;
+    line-height: 1.85;
+    color: rgba(200,210,180,0.7);
+    font-style: italic;
+    margin-bottom: 28px;
+    text-shadow: 0 2px 18px rgba(0,0,0,0.7);
+  }
+
+  .core-quote {
+    font-size: 34px;
+    font-weight: 600;
+    font-style: italic;
+    color: #b8d480;
+    letter-spacing: 0.5px;
+    line-height: 1.45;
+    margin-bottom: 14px;
+    text-shadow:
+      0 0 30px rgba(120,180,50,0.45),
+      0 0 60px rgba(80,130,30,0.2),
+      0 2px 6px rgba(0,0,0,0.9);
+    animation: witchlight 3.5s ease-in-out infinite alternate;
+  }
+  @keyframes witchlight {
+    from { text-shadow: 0 0 20px rgba(110,170,45,0.35), 0 0 45px rgba(70,120,25,0.15); }
+    to   { text-shadow: 0 0 40px rgba(140,200,60,0.65), 0 0 80px rgba(100,160,40,0.35); }
+  }
+
+  .sub-line {
+    font-size: 26px;
+    font-weight: 600;
+    font-style: italic;
+    color: rgba(180,210,140,0.8);
+    margin-bottom: 36px;
+    text-shadow: 0 0 22px rgba(100,160,40,0.3);
+    line-height: 1.4;
+  }
+
+  .thin-sep {
+    width: 48px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(90,140,65,0.35), transparent);
+    margin: 0 auto 22px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: rgba(100,150,80,0.4);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="sky"></div>
+<div class="candle-glow"></div>
+
+<!-- Ramtops forest silhouette -->
+<svg style="position:fixed;bottom:0;left:0;right:0;height:340px;pointer-events:none;z-index:3;"
+     viewBox="0 0 1440 340" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="forestG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a140a" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#020402" stop-opacity="1"/>
+    </linearGradient>
+    <linearGradient id="mountainG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0c100c"/>
+      <stop offset="100%" stop-color="#050805"/>
+    </linearGradient>
+    <radialGradient id="moonG" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(180,200,160,0.15)"/>
+      <stop offset="80%" stop-color="rgba(120,140,100,0.05)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Moon glow -->
+  <circle cx="1120" cy="50" r="80" fill="url(#moonG)"/>
+  <circle cx="1120" cy="50" r="18" fill="rgba(200,215,180,0.1)" stroke="rgba(180,200,160,0.12)" stroke-width="0.5"/>
+
+  <!-- Ramtop mountains (background) -->
+  <path d="M0 340 L0 200 L80 140 L150 175 L220 110 L300 160 L380 90 L450 130 L530 100
+           L600 145 L680 80 L760 120 L840 95 L920 140 L1000 75 L1080 115 L1160 85
+           L1240 130 L1320 100 L1400 145 L1440 120 L1440 340 Z"
+        fill="url(#mountainG)"/>
+
+  <!-- Pine tree silhouettes (foreground forest) -->
+  <g fill="url(#forestG)">
+    <!-- Trees - left group -->
+    <polygon points="40,340 55,210 70,340"/>
+    <polygon points="80,340 100,190 120,340"/>
+    <polygon points="55,340 75,230 95,340"/>
+    <polygon points="130,340 145,205 160,340"/>
+    <polygon points="170,340 190,185 210,340"/>
+    <polygon points="195,340 210,215 225,340"/>
+    <!-- Trees - left-center -->
+    <polygon points="260,340 278,195 296,340"/>
+    <polygon points="300,340 320,175 340,340"/>
+    <polygon points="330,340 345,210 360,340"/>
+    <polygon points="375,340 395,190 415,340"/>
+    <!-- Trees - center (gap for card) -->
+    <polygon points="420,340 435,220 450,340"/>
+    <!-- Trees - right-center -->
+    <polygon points="990,340 1005,215 1020,340"/>
+    <polygon points="1030,340 1050,180 1070,340"/>
+    <polygon points="1065,340 1080,210 1095,340"/>
+    <polygon points="1100,340 1120,190 1140,340"/>
+    <!-- Trees - right group -->
+    <polygon points="1165,340 1185,185 1205,340"/>
+    <polygon points="1210,340 1225,205 1240,340"/>
+    <polygon points="1255,340 1275,195 1295,340"/>
+    <polygon points="1310,340 1330,175 1350,340"/>
+    <polygon points="1355,340 1370,210 1385,340"/>
+    <polygon points="1395,340 1415,190 1435,340"/>
+  </g>
+
+  <!-- Granny's cottage - tiny, in the forest -->
+  <g transform="translate(150, 270)">
+    <!-- Walls -->
+    <rect x="0" y="10" width="30" height="20" fill="#080c08"/>
+    <!-- Roof -->
+    <polygon points="-3,10 15,-5 33,10" fill="#0a0e0a" stroke="rgba(80,100,60,0.12)" stroke-width="0.5"/>
+    <!-- Door -->
+    <rect x="10" y="18" width="8" height="12" fill="#060a06"/>
+    <!-- Window with faint warm light -->
+    <rect x="22" y="14" width="5" height="5" fill="rgba(180,130,40,0.12)"/>
+    <!-- Chimney smoke -->
+    <path d="M24 -5 Q26 -15 22 -25 Q20 -32 24 -40" fill="none" stroke="rgba(120,130,110,0.1)" stroke-width="1.5"/>
+  </g>
+
+  <!-- Nanny Ogg's cat (Greebo) lurking -->
+  <g transform="translate(1200, 310)">
+    <ellipse cx="0" cy="0" rx="8" ry="5" fill="#060a06"/>
+    <circle cx="-6" cy="-4" r="3" fill="#070b07"/>
+    <!-- Eyes -->
+    <circle cx="-7" cy="-5" r="1" fill="rgba(160,180,40,0.3)"/>
+    <circle cx="-5" cy="-5" r="1" fill="rgba(160,180,40,0.3)"/>
+    <!-- Tail -->
+    <path d="M8 -2 Q14 -10 18 -5" fill="none" stroke="#060a06" stroke-width="2"/>
+  </g>
+</svg>
+
+<div class="firefly-layer" id="fireflyLayer"></div>
+
+<div class="card">
+  <div class="cn tl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(90,140,65,0.5)" stroke-width="2" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(90,140,65,0.4)"/>
+  </svg></div>
+  <div class="cn tr"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(90,140,65,0.5)" stroke-width="2" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(90,140,65,0.4)"/>
+  </svg></div>
+  <div class="cn bl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(90,140,65,0.5)" stroke-width="2" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(90,140,65,0.4)"/>
+  </svg></div>
+  <div class="cn br"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(90,140,65,0.5)" stroke-width="2" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(90,140,65,0.4)"/>
+  </svg></div>
+
+  <p class="eyebrow">Discworld &mdash; Carpe Jugulum</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+      <!-- Witch's hat -->
+      <polygon points="9,0 14,13 4,13" fill="none" stroke="rgba(100,150,70,0.5)" stroke-width="1"/>
+      <line x1="2" y1="13" x2="16" y2="13" stroke="rgba(100,150,70,0.5)" stroke-width="1.2"/>
+      <ellipse cx="9" cy="14.5" rx="8" ry="3" fill="none" stroke="rgba(100,150,70,0.4)" stroke-width="0.8"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="lead-quote">
+    There is a very interesting debate raging at the moment<br>
+    about the nature of sin, for example.
+  </p>
+
+  <p class="core-quote">
+    "And sin, young man, is when you<br>
+    treat people like things."
+  </p>
+
+  <p class="sub-line">
+    Including yourself.<br>
+    That's what sin is.
+  </p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">Esmerelda "Granny" Weatherwax<br>Carpe Jugulum &mdash; Terry Pratchett</p>
+</div>
+
+<script>
+  // Fireflies
+  const layer = document.getElementById('fireflyLayer');
+  for (let i = 0; i < 25; i++) {
+    const el = document.createElement('div');
+    el.className = 'firefly';
+    const size = Math.random() * 3 + 1.5;
+    const dx = (Math.random() * 60 - 30).toFixed(0) + 'px';
+    const dy = (Math.random() * 40 - 20).toFixed(0) + 'px';
+    const dx2 = (Math.random() * 80 - 40).toFixed(0) + 'px';
+    const dy2 = (Math.random() * 50 - 25).toFixed(0) + 'px';
+    const peak = (Math.random() * 0.4 + 0.3).toFixed(2);
+    el.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random() * 100}%;
+      top:${30 + Math.random() * 60}%;
+      --d:${(Math.random() * 6 + 4).toFixed(1)}s;
+      --dx:${dx}; --dy:${dy};
+      --dx2:${dx2}; --dy2:${dy2};
+      --peak:${peak};
+      animation-delay:${(Math.random() * 8).toFixed(1)}s;
+    `;
+    layer.appendChild(el);
+  }
+</script>
+</body>
+</html>

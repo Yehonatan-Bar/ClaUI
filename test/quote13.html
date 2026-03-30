@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Return of the King - The White Shores</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #060812;
+    overflow: hidden;
+    font-family: 'EB Garamond', serif;
+  }
+
+  /* The siege of Minas Tirith - dark sky with distant fire */
+  .siege-sky {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 80% 60% at 30% 70%, rgba(120,40,20,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(100,30,15,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse 100% 60% at 50% 20%, rgba(20,30,60,0.12) 0%, transparent 60%),
+      linear-gradient(to bottom, #030510 0%, #080a18 40%, #0a0812 100%);
+  }
+
+  /* The White Tower - Minas Tirith glow */
+  .white-tower {
+    position: fixed;
+    width: 500px; height: 600px;
+    top: 10%; left: 50%;
+    transform: translateX(-50%);
+    background: radial-gradient(
+      ellipse 40% 60% at 50% 30%,
+      rgba(200,210,240,0.04) 0%,
+      rgba(180,190,220,0.02) 40%,
+      transparent 70%
+    );
+    pointer-events: none;
+    animation: towerGlow 10s ease-in-out infinite alternate;
+  }
+  @keyframes towerGlow {
+    from { opacity: 0.5; }
+    to   { opacity: 1; }
+  }
+
+  /* The grey rain-curtain - gentle silver veil */
+  .rain-curtain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+  }
+  .rain-drop {
+    position: absolute;
+    width: 1px;
+    background: linear-gradient(to bottom, transparent, rgba(180,190,220,var(--a)), transparent);
+    animation: rainFall var(--d) linear infinite;
+    opacity: 0;
+  }
+  @keyframes rainFall {
+    0%   { opacity: 0; transform: translateY(-20px); }
+    10%  { opacity: 1; }
+    90%  { opacity: 0.3; }
+    100% { opacity: 0; transform: translateY(100vh); }
+  }
+
+  /* The white shores - light breaking through */
+  .white-shores {
+    position: fixed;
+    width: 100%;
+    height: 200px;
+    bottom: 0;
+    background: linear-gradient(
+      to top,
+      rgba(220,225,240,0.03) 0%,
+      rgba(200,210,235,0.015) 40%,
+      transparent 100%
+    );
+    pointer-events: none;
+    animation: shoresBreath 12s ease-in-out infinite alternate;
+  }
+  @keyframes shoresBreath {
+    from { opacity: 0.3; }
+    to   { opacity: 1; }
+  }
+
+  /* Golden morning light - hope beyond shadow */
+  .morning-light {
+    position: fixed;
+    width: 800px; height: 800px;
+    top: -20%; right: -10%;
+    background: radial-gradient(
+      circle at 50% 50%,
+      rgba(255,230,170,0.03) 0%,
+      rgba(255,210,130,0.015) 40%,
+      transparent 65%
+    );
+    pointer-events: none;
+    animation: morningRise 15s ease-in-out infinite alternate;
+  }
+  @keyframes morningRise {
+    from { opacity: 0.2; transform: translate(5%, 5%); }
+    to   { opacity: 0.8; transform: translate(-5%, -5%); }
+  }
+
+  /* Stars - fading as dawn approaches */
+  .stars { position: fixed; inset: 0; pointer-events: none; }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    animation: starFade var(--d) infinite ease-in-out alternate;
+  }
+  @keyframes starFade {
+    from { opacity: 0.1; }
+    to   { opacity: 1; }
+  }
+
+  /* Silver mist particles */
+  .mist { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .mist-particle {
+    position: absolute;
+    border-radius: 50%;
+    animation: mistDrift var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes mistDrift {
+    0%   { opacity: 0; transform: translate(0, 0) scale(0.8); }
+    40%  { opacity: var(--peak); }
+    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.5); }
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 720px;
+    text-align: center;
+    padding: 60px 54px;
+    border: 1px solid rgba(180,190,220,0.15);
+    background: rgba(6, 8, 18, 0.85);
+    backdrop-filter: blur(16px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 80px rgba(160,170,210,0.08),
+      0 0 180px rgba(100,110,160,0.04),
+      inset 0 0 60px rgba(0,0,10,0.7);
+    animation: unveil 3s cubic-bezier(.2,.8,.3,1) forwards;
+    opacity: 0;
+  }
+  @keyframes unveil {
+    from { opacity: 0; transform: scale(0.96) translateY(18px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* Corner ornaments - tower and arch motif */
+  .ec { position: absolute; width: 44px; height: 44px; }
+  .ec.tl { top:-1px; left:-1px; }
+  .ec.tr { top:-1px; right:-1px; transform: scaleX(-1); }
+  .ec.bl { bottom:-1px; left:-1px; transform: scaleY(-1); }
+  .ec.br { bottom:-1px; right:-1px; transform: scale(-1,-1); }
+
+  .eyebrow {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(180,190,220,0.45);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    margin-top: 6px;
+  }
+
+  .age-line {
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: rgba(180,190,220,0.22);
+    margin-bottom: 28px;
+    font-style: italic;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 28px; width: fit-content;
+  }
+  .sep-l { width: 70px; height: 1px; background: linear-gradient(90deg, transparent, rgba(180,190,220,0.45)); }
+  .sep-r { width: 70px; height: 1px; background: linear-gradient(90deg, rgba(180,190,220,0.45), transparent); }
+
+  .scene-label {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 12px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(180,190,220,0.38);
+    margin-bottom: 26px;
+  }
+
+  .context-text {
+    font-size: 17px;
+    line-height: 1.85;
+    color: rgba(160,170,200,0.5);
+    font-style: italic;
+    margin-bottom: 24px;
+    text-shadow: 0 2px 14px rgba(0,0,12,0.8);
+  }
+
+  .speaker {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 10px;
+    letter-spacing: 5px;
+    color: rgba(200,210,240,0.35);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .main-quote {
+    font-size: 25px;
+    line-height: 1.85;
+    color: #c8cfe0;
+    font-style: italic;
+    margin-bottom: 18px;
+    text-shadow: 0 0 28px rgba(160,170,220,0.12), 0 2px 8px rgba(0,0,12,0.8);
+  }
+  .main-quote .silver {
+    color: #e0e6f2;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 22px rgba(200,210,240,0.5);
+  }
+  .main-quote .gold {
+    color: #f0dca0;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 18px rgba(240,200,100,0.4);
+  }
+  .main-quote .white {
+    color: #f0f2ff;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 24px rgba(220,225,255,0.6);
+  }
+
+  .vision-text {
+    font-size: 23px;
+    line-height: 1.85;
+    color: rgba(210,215,235,0.75);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,0,12,0.8);
+  }
+  .vision-text .white {
+    color: #f0f2ff;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 24px rgba(220,225,255,0.6);
+  }
+  .vision-text .green {
+    color: #b8d8a0;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 18px rgba(140,200,100,0.35);
+  }
+  .vision-text .gold {
+    color: #f0dca0;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 18px rgba(240,200,100,0.4);
+  }
+
+  .thin-sep {
+    width: 50px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(180,190,220,0.35), transparent);
+    margin: 0 auto 24px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 10px;
+    color: rgba(180,190,220,0.38);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="siege-sky"></div>
+<div class="white-tower"></div>
+<div class="white-shores"></div>
+<div class="morning-light"></div>
+<div class="stars" id="stars"></div>
+<div class="rain-curtain" id="rain"></div>
+<div class="mist" id="mist"></div>
+
+<!-- Minas Tirith - architectural silhouette SVG -->
+<svg style="position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;pointer-events:none;z-index:1;"
+     viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="towerG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(200,210,240,0.06)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </linearGradient>
+    <radialGradient id="sunriseG" cx="85%" cy="15%" r="40%">
+      <stop offset="0%" stop-color="rgba(255,230,170,0.04)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Distant sunrise glow -->
+  <ellipse cx="1200" cy="120" rx="400" ry="300" fill="url(#sunriseG)"/>
+
+  <!-- Minas Tirith silhouette - minimal, ghostly -->
+  <g opacity="0.12" stroke="rgba(180,190,220,0.3)" stroke-width="0.5" fill="none">
+    <!-- City tiers -->
+    <path d="M600 800 L620 700 L640 650 L660 600 L680 560 L700 530 L720 510 L740 530 L760 560 L780 600 L800 650 L820 700 L840 800"/>
+    <!-- Tower of Ecthelion -->
+    <path d="M710 510 L710 380 L720 340 L730 380 L730 510"/>
+    <circle cx="720" cy="330" r="8" fill="rgba(200,210,240,0.06)"/>
+    <!-- Tower glow -->
+    <circle cx="720" cy="330" r="20" fill="rgba(200,210,240,0.03)"/>
+    <circle cx="720" cy="330" r="40" fill="rgba(200,210,240,0.015)"/>
+    <!-- Level walls -->
+    <path d="M630 720 Q720 690 810 720"/>
+    <path d="M650 670 Q720 645 790 670"/>
+    <path d="M670 625 Q720 605 770 625"/>
+  </g>
+
+  <!-- The far shore - barely visible, luminous horizon -->
+  <g opacity="0.08">
+    <line x1="0" y1="850" x2="1440" y2="850" stroke="rgba(220,225,240,0.3)" stroke-width="1"/>
+    <rect x="0" y="850" width="1440" height="50" fill="rgba(220,225,240,0.02)"/>
+  </g>
+</svg>
+
+<div class="card">
+  <div class="ec tl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 20 M2 2 L20 2" stroke="rgba(180,190,220,0.35)" stroke-width="1" fill="none"/>
+    <path d="M2 2 Q12 6 16 16" stroke="rgba(180,190,220,0.2)" stroke-width="0.5" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(180,190,220,0.4)"/>
+  </svg></div>
+  <div class="ec tr"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 20 M2 2 L20 2" stroke="rgba(180,190,220,0.35)" stroke-width="1" fill="none"/>
+    <path d="M2 2 Q12 6 16 16" stroke="rgba(180,190,220,0.2)" stroke-width="0.5" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(180,190,220,0.4)"/>
+  </svg></div>
+  <div class="ec bl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 20 M2 2 L20 2" stroke="rgba(180,190,220,0.35)" stroke-width="1" fill="none"/>
+    <path d="M2 2 Q12 6 16 16" stroke="rgba(180,190,220,0.2)" stroke-width="0.5" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(180,190,220,0.4)"/>
+  </svg></div>
+  <div class="ec br"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 20 M2 2 L20 2" stroke="rgba(180,190,220,0.35)" stroke-width="1" fill="none"/>
+    <path d="M2 2 Q12 6 16 16" stroke="rgba(180,190,220,0.2)" stroke-width="0.5" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(180,190,220,0.4)"/>
+  </svg></div>
+
+  <p class="eyebrow">The Lord of the Rings</p>
+  <p class="age-line">&#9670; &nbsp; The Return of the King &nbsp; &#9670;</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+      <!-- White Tree of Gondor symbol -->
+      <path d="M8 14 L8 7 M8 7 Q5 4 4 1 M8 7 Q11 4 12 1 M8 9 Q6 7 4 6 M8 9 Q10 7 12 6" stroke="rgba(200,210,240,0.5)" stroke-width="0.8" fill="none"/>
+      <circle cx="8" cy="7" r="1.5" fill="rgba(200,210,240,0.3)"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="scene-label">Gandalf &amp; Pippin at the Siege</p>
+
+  <p class="context-text">
+    Pippin glanced in some wonder at the face now close beside his own,<br>
+    for the sound of that laugh had been gay and merry.<br>
+    Yet in the wizard's face he saw at first only lines of care and sorrow;<br>
+    though as he looked more intently he perceived<br>
+    that under all there was a great joy: a fountain of mirth<br>
+    enough to set a kingdom laughing, were it to gush forth.
+  </p>
+
+  <p class="speaker">Gandalf speaks</p>
+
+  <p class="main-quote">
+    <span class="silver">End?</span> No, the journey doesn't end here.<br>
+    Death is just another path, one that we all must take.<br>
+    The <span class="silver">grey rain-curtain</span> of this world rolls back,<br>
+    and all turns to <span class="gold">silver glass,</span><br>
+    and then you see it.
+  </p>
+
+  <p class="vision-text">
+    <span class="white">White shores,</span> and beyond,<br>
+    a far <span class="green">green country</span><br>
+    under a swift <span class="gold">sunrise.</span>
+  </p>
+
+  <p class="context-text">
+    "Well, that isn't so bad," said Pippin, and he smiled.
+  </p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">The Return of the King<br>Minas Tirith &mdash; The Siege of Gondor</p>
+</div>
+
+<script>
+  // Stars - fading as dawn approaches
+  const starsEl = document.getElementById('stars');
+  for (let i = 0; i < 100; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 1.8 + 0.3;
+    const hue = 220 + Math.random() * 30;
+    const alpha = (Math.random() * 0.35 + 0.1).toFixed(2);
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      top:${Math.random() * 60}%;
+      left:${Math.random() * 100}%;
+      background:hsla(${hue},30%,80%,${alpha});
+      --d:${(Math.random() * 5 + 3).toFixed(1)}s;
+      animation-delay:${(Math.random() * 6).toFixed(1)}s;
+    `;
+    starsEl.appendChild(s);
+  }
+
+  // Grey rain-curtain
+  const rainEl = document.getElementById('rain');
+  for (let i = 0; i < 60; i++) {
+    const r = document.createElement('div');
+    r.className = 'rain-drop';
+    const h = 30 + Math.random() * 60;
+    const a = (Math.random() * 0.06 + 0.02).toFixed(3);
+    r.style.cssText = `
+      height:${h}px;
+      left:${Math.random() * 100}%;
+      top:${-Math.random() * 20}%;
+      --a:${a};
+      --d:${(Math.random() * 4 + 2).toFixed(1)}s;
+      animation-delay:${(Math.random() * 8).toFixed(1)}s;
+    `;
+    rainEl.appendChild(r);
+  }
+
+  // Silver mist particles - the veil between worlds
+  const mistEl = document.getElementById('mist');
+  for (let i = 0; i < 25; i++) {
+    const m = document.createElement('div');
+    m.className = 'mist-particle';
+    const size = Math.random() * 6 + 2;
+    const hue = 220 + Math.random() * 20;
+    const alpha = (Math.random() * 0.15 + 0.05).toFixed(2);
+    const color = `hsla(${hue},25%,80%,${alpha})`;
+    const dx = ((Math.random() - 0.5) * 200).toFixed(0) + 'px';
+    const dy = ((Math.random() - 0.5) * 100).toFixed(0) + 'px';
+    const peak = (Math.random() * 0.3 + 0.1).toFixed(2);
+    m.style.cssText = `
+      width:${size}px; height:${size}px;
+      background:${color};
+      box-shadow: 0 0 ${(size * 6).toFixed(1)}px ${color};
+      top:${30 + Math.random() * 50}%;
+      left:${10 + Math.random() * 80}%;
+      --d:${(Math.random() * 14 + 8).toFixed(1)}s;
+      --dx:${dx};
+      --dy:${dy};
+      --peak:${peak};
+      animation-delay:${(Math.random() * 12).toFixed(1)}s;
+    `;
+    mistEl.appendChild(m);
+  }
+</script>
+</body>
+</html>

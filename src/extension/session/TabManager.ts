@@ -100,6 +100,14 @@ export class TabManager {
     const existingTab = this.getActiveTab() ?? this.getAnyTab();
     const viewColumn = existingTab?.viewColumn ?? vscode.ViewColumn.Beside;
 
+    // Enable VS Code tab wrapping when multiple ClaUi tabs exist so tabs
+    // wrap to a new row instead of overflowing with a horizontal scroll bar.
+    if (this.tabs.size >= 1) {
+      void vscode.workspace
+        .getConfiguration('workbench.editor')
+        .update('wrapTabs', true, vscode.ConfigurationTarget.Global);
+    }
+
     const tab = new SessionTab(
       this.context,
       tabNumber,
@@ -134,6 +142,13 @@ export class TabManager {
 
     const existingTab = this.getActiveTab() ?? this.getAnyTab();
     const viewColumn = existingTab?.viewColumn ?? vscode.ViewColumn.Beside;
+
+    // Enable VS Code tab wrapping when multiple ClaUi tabs exist.
+    if (this.tabs.size >= 1) {
+      void vscode.workspace
+        .getConfiguration('workbench.editor')
+        .update('wrapTabs', true, vscode.ConfigurationTarget.Global);
+    }
 
     const tab = new CodexSessionTab(
       this.context,

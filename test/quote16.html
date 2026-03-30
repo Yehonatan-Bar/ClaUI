@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Silmarillion - Ainulindal&euml;</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #02020a;
+    overflow: hidden;
+    font-family: 'EB Garamond', serif;
+  }
+
+  /* The Timeless Halls - the Void before creation */
+  .void {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 40%, rgba(30,20,80,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 50% at 30% 60%, rgba(60,30,100,0.05) 0%, transparent 50%),
+      radial-gradient(ellipse 50% 50% at 70% 30%, rgba(20,40,100,0.05) 0%, transparent 50%),
+      linear-gradient(to bottom, #010108 0%, #030218 50%, #020112 100%);
+  }
+
+  /* The Flame Imperishable - Iluvatar's creative fire at the center */
+  .flame-imperishable {
+    position: fixed;
+    width: 400px; height: 400px;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(
+      circle at 50% 50%,
+      rgba(255,220,140,0.06) 0%,
+      rgba(240,180,100,0.03) 25%,
+      rgba(200,140,80,0.015) 45%,
+      transparent 65%
+    );
+    pointer-events: none;
+    animation: flamePulse 5s ease-in-out infinite alternate;
+  }
+  @keyframes flamePulse {
+    from { opacity: 0.4; transform: translate(-50%, -50%) scale(0.85); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+  }
+
+  /* Music waves - the Great Music rippling outward */
+  .music-waves { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+  .music-wave {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid;
+    animation: waveExpand var(--d) ease-out infinite;
+    opacity: 0;
+  }
+  @keyframes waveExpand {
+    0%   { opacity: 0; transform: scale(0.05); }
+    10%  { opacity: var(--peak); }
+    80%  { opacity: 0.02; }
+    100% { opacity: 0; transform: scale(1); }
+  }
+
+  /* Harmony particles - the themes of the Ainur */
+  .harmony { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .note {
+    position: absolute;
+    border-radius: 50%;
+    animation: noteDrift var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes noteDrift {
+    0%   { opacity: 0; transform: translate(0, 0) scale(0.3); }
+    25%  { opacity: var(--peak); transform: translate(var(--dx1), var(--dy1)) scale(1); }
+    50%  { opacity: calc(var(--peak) * 0.7); transform: translate(var(--dx2), var(--dy2)) scale(1.2); }
+    75%  { opacity: calc(var(--peak) * 0.4); transform: translate(var(--dx3), var(--dy3)) scale(0.8); }
+    100% { opacity: 0; transform: translate(var(--dx4), var(--dy4)) scale(0.2); }
+  }
+
+  /* Discord threads - Melkor's dissonance (darker, redder particles) */
+  .discord { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  .discord-note {
+    position: absolute;
+    border-radius: 50%;
+    animation: discordPulse var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes discordPulse {
+    0%   { opacity: 0; transform: scale(0.5) rotate(0deg); }
+    30%  { opacity: var(--peak); transform: scale(1.3) rotate(45deg); }
+    60%  { opacity: calc(var(--peak) * 0.5); transform: scale(0.7) rotate(90deg); }
+    100% { opacity: 0; transform: scale(1.5) rotate(180deg); }
+  }
+
+  /* Vision of Ea - the world that will be, glimpsed in the music */
+  .vision-ea {
+    position: fixed;
+    width: 700px; height: 700px;
+    top: 55%; left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 50% 50%,
+      rgba(60,100,180,0.03) 0%,
+      rgba(40,80,140,0.015) 35%,
+      rgba(30,60,100,0.008) 55%,
+      transparent 70%
+    );
+    pointer-events: none;
+    animation: eaVision 14s ease-in-out infinite alternate;
+    opacity: 0.3;
+  }
+  @keyframes eaVision {
+    from { opacity: 0.1; transform: translate(-50%, -50%) scale(0.8); }
+    to   { opacity: 0.5; transform: translate(-50%, -50%) scale(1.1); }
+  }
+
+  /* Distant stars being born from the music */
+  .stars { position: fixed; inset: 0; pointer-events: none; }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    animation: starBirth var(--d) infinite ease-in-out;
+  }
+  @keyframes starBirth {
+    0%   { opacity: 0; transform: scale(0); }
+    50%  { opacity: 1; transform: scale(1.5); }
+    100% { opacity: 0.1; transform: scale(0.8); }
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 760px;
+    text-align: center;
+    padding: 60px 54px;
+    border: 1px solid rgba(140,120,200,0.15);
+    background: rgba(3, 2, 12, 0.88);
+    backdrop-filter: blur(16px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 80px rgba(100,80,180,0.07),
+      0 0 200px rgba(60,40,140,0.04),
+      inset 0 0 60px rgba(0,0,15,0.7);
+    animation: unveil 3s cubic-bezier(.2,.8,.3,1) forwards;
+    opacity: 0;
+  }
+  @keyframes unveil {
+    from { opacity: 0; transform: scale(0.96) translateY(18px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* Corner ornaments - celestial flame motif */
+  .ec { position: absolute; width: 44px; height: 44px; }
+  .ec.tl { top:-1px; left:-1px; }
+  .ec.tr { top:-1px; right:-1px; transform: scaleX(-1); }
+  .ec.bl { bottom:-1px; left:-1px; transform: scaleY(-1); }
+  .ec.br { bottom:-1px; right:-1px; transform: scale(-1,-1); }
+
+  .eyebrow {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(160,140,220,0.45);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    margin-top: 6px;
+  }
+
+  .age-line {
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: rgba(160,140,220,0.22);
+    margin-bottom: 28px;
+    font-style: italic;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 28px; width: fit-content;
+  }
+  .sep-l { width: 70px; height: 1px; background: linear-gradient(90deg, transparent, rgba(160,140,220,0.45)); }
+  .sep-r { width: 70px; height: 1px; background: linear-gradient(90deg, rgba(160,140,220,0.45), transparent); }
+
+  .scene-label {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 12px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(160,140,220,0.38);
+    margin-bottom: 26px;
+  }
+
+  .narrative {
+    font-size: 20px;
+    line-height: 1.85;
+    color: rgba(170,155,210,0.65);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,0,15,0.8);
+  }
+  .narrative .hl {
+    color: rgba(220,210,245,0.9);
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 18px rgba(180,160,230,0.4);
+  }
+
+  .main-quote {
+    font-size: 24px;
+    line-height: 1.9;
+    color: #ccc0e4;
+    font-style: italic;
+    margin-bottom: 18px;
+    text-shadow: 0 0 28px rgba(140,120,200,0.12), 0 2px 8px rgba(0,0,15,0.8);
+  }
+  .main-quote .flame {
+    color: #f0d8a0;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 22px rgba(240,200,120,0.5);
+  }
+  .main-quote .music {
+    color: #d8c8f0;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 20px rgba(190,170,240,0.5);
+  }
+  .main-quote .void-text {
+    color: #a8b0d8;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 16px rgba(140,150,200,0.4);
+  }
+
+  .discord-text {
+    font-size: 21px;
+    line-height: 1.85;
+    color: rgba(180,140,160,0.7);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,0,15,0.8);
+  }
+  .discord-text .dark {
+    color: #c8a0a0;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 14px rgba(180,100,100,0.35);
+  }
+
+  .resolution-text {
+    font-size: 23px;
+    line-height: 1.85;
+    color: rgba(200,190,230,0.75);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 14px rgba(0,0,15,0.8);
+  }
+  .resolution-text .hl {
+    color: #e8e0f5;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 20px rgba(210,200,245,0.55);
+  }
+  .resolution-text .ea {
+    color: #a8c8f0;
+    font-style: normal;
+    font-weight: 600;
+    text-shadow: 0 0 18px rgba(120,170,240,0.45);
+  }
+
+  .thin-sep {
+    width: 50px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(160,140,220,0.35), transparent);
+    margin: 0 auto 24px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 10px;
+    color: rgba(160,140,220,0.38);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="void"></div>
+<div class="flame-imperishable"></div>
+<div class="vision-ea"></div>
+<div class="stars" id="stars"></div>
+<div class="music-waves" id="musicWaves"></div>
+<div class="harmony" id="harmony"></div>
+<div class="discord" id="discord"></div>
+
+<!-- The Timeless Halls - abstract celestial architecture -->
+<svg style="position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;pointer-events:none;z-index:0;"
+     viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="flameG" cx="50%" cy="50%" r="20%">
+      <stop offset="0%" stop-color="rgba(255,220,140,0.05)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <radialGradient id="eaG" cx="50%" cy="60%" r="30%">
+      <stop offset="0%" stop-color="rgba(60,100,180,0.03)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+  </defs>
+
+  <!-- The Flame Imperishable - central divine fire -->
+  <circle cx="720" cy="450" r="180" fill="url(#flameG)">
+    <animate attributeName="r" values="160;200;160" dur="6s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- Ainur arranged in cosmic choir - abstract figures in a circle -->
+  <g opacity="0.12" stroke="rgba(160,140,220,0.2)" stroke-width="0.5" fill="none">
+    <!-- The great circle of the Ainur -->
+    <circle cx="720" cy="450" r="300" stroke-dasharray="8 12" opacity="0.5"/>
+    <circle cx="720" cy="450" r="320" stroke-dasharray="4 20" opacity="0.3"/>
+
+    <!-- Individual Ainur - abstract luminous forms around the circle -->
+    <!-- Manwe - at the top, air spirit -->
+    <ellipse cx="720" cy="150" rx="12" ry="20" fill="rgba(140,180,240,0.08)"/>
+    <circle cx="720" cy="150" r="25" fill="rgba(140,180,240,0.02)"/>
+
+    <!-- Varda - beside Manwe, starlight -->
+    <ellipse cx="790" cy="165" rx="10" ry="18" fill="rgba(220,220,250,0.1)"/>
+    <circle cx="790" cy="165" r="20" fill="rgba(220,220,250,0.03)"/>
+
+    <!-- Ulmo - left, water spirit -->
+    <ellipse cx="430" cy="380" rx="14" ry="22" fill="rgba(80,140,200,0.08)"/>
+    <circle cx="430" cy="380" r="28" fill="rgba(80,140,200,0.02)"/>
+
+    <!-- Aule - right, crafting spirit -->
+    <ellipse cx="1010" cy="400" rx="13" ry="20" fill="rgba(200,160,100,0.08)"/>
+    <circle cx="1010" cy="400" r="24" fill="rgba(200,160,100,0.02)"/>
+
+    <!-- Melkor - below, separate, darker -->
+    <ellipse cx="720" cy="760" rx="16" ry="24" fill="rgba(140,60,60,0.08)"/>
+    <circle cx="720" cy="760" r="30" fill="rgba(140,60,60,0.03)"/>
+
+    <!-- Yavanna - lower left, nature -->
+    <ellipse cx="500" cy="650" rx="11" ry="18" fill="rgba(100,160,80,0.07)"/>
+
+    <!-- Nienna - lower right, weeping -->
+    <ellipse cx="940" cy="620" rx="10" ry="18" fill="rgba(160,150,200,0.07)"/>
+  </g>
+
+  <!-- Musical staff lines radiating from center - the Great Music -->
+  <g stroke-width="0.3" fill="none" opacity="0.08">
+    <path d="M720 450 Q600 300 400 200" stroke="rgba(180,160,240,0.4)">
+      <animate attributeName="opacity" values="0;0.3;0" dur="12s" repeatCount="indefinite"/>
+    </path>
+    <path d="M720 450 Q840 300 1040 200" stroke="rgba(180,160,240,0.35)">
+      <animate attributeName="opacity" values="0;0.25;0" dur="14s" begin="2s" repeatCount="indefinite"/>
+    </path>
+    <path d="M720 450 Q580 500 350 550" stroke="rgba(100,150,220,0.3)">
+      <animate attributeName="opacity" values="0;0.2;0" dur="11s" begin="4s" repeatCount="indefinite"/>
+    </path>
+    <path d="M720 450 Q860 520 1100 580" stroke="rgba(200,180,120,0.3)">
+      <animate attributeName="opacity" values="0;0.2;0" dur="13s" begin="6s" repeatCount="indefinite"/>
+    </path>
+    <!-- Melkor's discord - jagged line -->
+    <path d="M720 450 Q700 550 680 620 Q730 660 710 750" stroke="rgba(160,80,80,0.25)">
+      <animate attributeName="opacity" values="0;0.3;0.1;0.25;0" dur="9s" begin="3s" repeatCount="indefinite"/>
+    </path>
+  </g>
+</svg>
+
+<div class="card">
+  <div class="ec tl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(160,140,220,0.35)" stroke-width="1" fill="none"/>
+    <path d="M6 16 Q5 8 12 5" stroke="rgba(160,140,220,0.2)" stroke-width="0.5" fill="none"/>
+    <!-- Flame symbol -->
+    <path d="M10 12 Q12 6 11 2 Q14 7 12 12" fill="rgba(240,200,120,0.15)" stroke="rgba(240,200,120,0.2)" stroke-width="0.3"/>
+    <circle cx="20" cy="2" r="1.5" fill="rgba(160,140,220,0.35)"/>
+    <circle cx="2" cy="20" r="1.5" fill="rgba(160,140,220,0.35)"/>
+  </svg></div>
+  <div class="ec tr"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(160,140,220,0.35)" stroke-width="1" fill="none"/>
+    <path d="M6 16 Q5 8 12 5" stroke="rgba(160,140,220,0.2)" stroke-width="0.5" fill="none"/>
+    <path d="M10 12 Q12 6 11 2 Q14 7 12 12" fill="rgba(240,200,120,0.15)" stroke="rgba(240,200,120,0.2)" stroke-width="0.3"/>
+    <circle cx="20" cy="2" r="1.5" fill="rgba(160,140,220,0.35)"/>
+    <circle cx="2" cy="20" r="1.5" fill="rgba(160,140,220,0.35)"/>
+  </svg></div>
+  <div class="ec bl"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(160,140,220,0.35)" stroke-width="1" fill="none"/>
+    <path d="M6 16 Q5 8 12 5" stroke="rgba(160,140,220,0.2)" stroke-width="0.5" fill="none"/>
+    <path d="M10 12 Q12 6 11 2 Q14 7 12 12" fill="rgba(240,200,120,0.15)" stroke="rgba(240,200,120,0.2)" stroke-width="0.3"/>
+    <circle cx="20" cy="2" r="1.5" fill="rgba(160,140,220,0.35)"/>
+    <circle cx="2" cy="20" r="1.5" fill="rgba(160,140,220,0.35)"/>
+  </svg></div>
+  <div class="ec br"><svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 20 Q2 2 20 2" stroke="rgba(160,140,220,0.35)" stroke-width="1" fill="none"/>
+    <path d="M6 16 Q5 8 12 5" stroke="rgba(160,140,220,0.2)" stroke-width="0.5" fill="none"/>
+    <path d="M10 12 Q12 6 11 2 Q14 7 12 12" fill="rgba(240,200,120,0.15)" stroke="rgba(240,200,120,0.2)" stroke-width="0.3"/>
+    <circle cx="20" cy="2" r="1.5" fill="rgba(160,140,220,0.35)"/>
+    <circle cx="2" cy="20" r="1.5" fill="rgba(160,140,220,0.35)"/>
+  </svg></div>
+
+  <p class="eyebrow">The Silmarillion</p>
+  <p class="age-line">&#9670; &nbsp; Ainulindal&euml; &middot; The Music of the Ainur &nbsp; &#9670;</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+      <!-- Flame Imperishable symbol -->
+      <path d="M8 2 Q10 5 9 8 Q11 6 10 3 Q12 7 9 11" stroke="rgba(240,200,120,0.45)" stroke-width="0.6" fill="rgba(240,200,120,0.15)"/>
+      <path d="M8 2 Q6 5 7 8 Q5 6 6 3 Q4 7 7 11" stroke="rgba(240,200,120,0.35)" stroke-width="0.5" fill="rgba(240,200,120,0.1)"/>
+      <circle cx="8" cy="11" r="1.5" fill="rgba(240,200,120,0.3)"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="scene-label">The Great Music</p>
+
+  <p class="narrative">
+    In the beginning there was <span class="hl">Il&uacute;vatar,</span><br>
+    and he made first the Ainur, the Holy Ones,<br>
+    that were the offspring of his thought.
+  </p>
+
+  <p class="main-quote">
+    And he spoke to them, propounding to them<br>
+    themes of <span class="music">music;</span> and they sang before him,<br>
+    and he was glad.
+  </p>
+
+  <p class="narrative">
+    But for a long while they sang only each alone,<br>
+    or but few together, while the rest hearkened;<br>
+    for each comprehended only that part of the mind<br>
+    of Il&uacute;vatar from which <span class="hl">he came.</span>
+  </p>
+
+  <p class="main-quote">
+    Then Il&uacute;vatar said to them:<br>
+    &lsquo;Of the theme that I have declared to you,<br>
+    I will now that ye make in harmony together<br>
+    a <span class="music">Great Music.</span>&rsquo;
+  </p>
+
+  <p class="main-quote">
+    And a sound arose of endless interchanging melodies<br>
+    woven in harmony that passed beyond hearing<br>
+    into the depths and into the heights,<br>
+    and the music and the echo of the music<br>
+    went out into the <span class="void-text">Void,</span><br>
+    and it was not void.
+  </p>
+
+  <p class="discord-text">
+    But <span class="dark">Melkor</span> wove into his music<br>
+    thoughts of his own that were not in accord<br>
+    with the theme of Il&uacute;vatar,<br>
+    for he sought therein to increase<br>
+    the power and glory of the part assigned to himself.
+  </p>
+
+  <p class="resolution-text">
+    Then Il&uacute;vatar arose, and the Ainur perceived<br>
+    that he <span class="hl">smiled.</span> And he raised his left hand,<br>
+    and a new theme began amid the storm.<br>
+    And he said: <span class="ea">&lsquo;E&auml;!&rsquo;</span><br>
+    <span class="hl">Let these things Be!</span>
+  </p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">Ainulindal&euml;<br>The Music of the Ainur &mdash; Before the Beginning of Days</p>
+</div>
+
+<script>
+  // Stars being born from the music
+  const starsEl = document.getElementById('stars');
+  for (let i = 0; i < 120; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 1.8 + 0.3;
+    const hue = 220 + Math.random() * 60;
+    const alpha = (Math.random() * 0.3 + 0.1).toFixed(2);
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      top:${Math.random() * 100}%;
+      left:${Math.random() * 100}%;
+      background:hsla(${hue},40%,80%,${alpha});
+      --d:${(Math.random() * 8 + 4).toFixed(1)}s;
+      animation-delay:${(Math.random() * 10).toFixed(1)}s;
+    `;
+    starsEl.appendChild(s);
+  }
+
+  // Music waves - concentric rings from the center
+  const wavesEl = document.getElementById('musicWaves');
+  for (let i = 0; i < 15; i++) {
+    const w = document.createElement('div');
+    w.className = 'music-wave';
+    const size = 200 + Math.random() * 600;
+    const hue = 240 + Math.random() * 40;
+    const alpha = (Math.random() * 0.05 + 0.02).toFixed(3);
+    const peak = (Math.random() * 0.1 + 0.04).toFixed(2);
+    w.style.cssText = `
+      width:${size}px; height:${size}px;
+      top:50%; left:50%;
+      margin-top:${-size / 2}px;
+      margin-left:${-size / 2}px;
+      border-color:hsla(${hue},50%,70%,${alpha});
+      --d:${(Math.random() * 16 + 8).toFixed(1)}s;
+      --peak:${peak};
+      animation-delay:${(Math.random() * 12).toFixed(1)}s;
+    `;
+    wavesEl.appendChild(w);
+  }
+
+  // Harmony particles - the Ainur's themes
+  const harmonyEl = document.getElementById('harmony');
+  for (let i = 0; i < 30; i++) {
+    const n = document.createElement('div');
+    n.className = 'note';
+    const size = Math.random() * 4 + 1.5;
+    // Different hues for different Ainur themes
+    const themes = [
+      { hue: 210, name: 'Manwe' },
+      { hue: 260, name: 'Varda' },
+      { hue: 200, name: 'Ulmo' },
+      { hue: 35, name: 'Aule' },
+      { hue: 120, name: 'Yavanna' },
+      { hue: 280, name: 'Nienna' }
+    ];
+    const theme = themes[Math.floor(Math.random() * themes.length)];
+    const alpha = (Math.random() * 0.35 + 0.15).toFixed(2);
+    const color = `hsla(${theme.hue},50%,70%,${alpha})`;
+    const peak = (Math.random() * 0.4 + 0.2).toFixed(2);
+    const makeDx = () => ((Math.random() - 0.5) * 200).toFixed(0) + 'px';
+    const makeDy = () => ((Math.random() - 0.5) * 200).toFixed(0) + 'px';
+    n.style.cssText = `
+      width:${size}px; height:${size}px;
+      background:${color};
+      box-shadow: 0 0 ${(size * 5).toFixed(1)}px ${color}, 0 0 ${(size * 12).toFixed(1)}px hsla(${theme.hue},50%,70%,${(alpha * 0.25).toFixed(2)});
+      top:${20 + Math.random() * 60}%;
+      left:${15 + Math.random() * 70}%;
+      --d:${(Math.random() * 14 + 7).toFixed(1)}s;
+      --peak:${peak};
+      --dx1:${makeDx()}; --dy1:${makeDy()};
+      --dx2:${makeDx()}; --dy2:${makeDy()};
+      --dx3:${makeDx()}; --dy3:${makeDy()};
+      --dx4:${makeDx()}; --dy4:${makeDy()};
+      animation-delay:${(Math.random() * 12).toFixed(1)}s;
+    `;
+    harmonyEl.appendChild(n);
+  }
+
+  // Discord notes - Melkor's dissonance
+  const discordEl = document.getElementById('discord');
+  for (let i = 0; i < 8; i++) {
+    const d = document.createElement('div');
+    d.className = 'discord-note';
+    const size = Math.random() * 3 + 1;
+    const hue = 0 + Math.random() * 30;
+    const alpha = (Math.random() * 0.2 + 0.08).toFixed(2);
+    const color = `hsla(${hue},50%,50%,${alpha})`;
+    const peak = (Math.random() * 0.25 + 0.1).toFixed(2);
+    d.style.cssText = `
+      width:${size}px; height:${size}px;
+      background:${color};
+      box-shadow: 0 0 ${(size * 6).toFixed(1)}px ${color};
+      top:${50 + Math.random() * 40}%;
+      left:${30 + Math.random() * 40}%;
+      --d:${(Math.random() * 8 + 4).toFixed(1)}s;
+      --peak:${peak};
+      animation-delay:${(Math.random() * 10).toFixed(1)}s;
+    `;
+    discordEl.appendChild(d);
+  }
+</script>
+</body>
+</html>

@@ -8760,10 +8760,6 @@ html, body, #root {
 /* --- Project results dropdown --- */
 
 .chat-search-project-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
   max-height: 320px;
   overflow-y: auto;
   background: var(--vscode-editorWidget-background, var(--vscode-sideBar-background, #252526));

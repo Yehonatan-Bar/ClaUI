@@ -146,11 +146,10 @@ export const ChatSearchBar: React.FC = () => {
     inputRef.current?.focus();
   }, [setChatSearchScope, localQuery, chatSearchProjectRequestId]);
 
-  // Resume a session from project results
+  // Resume a session from project results (keep search open for browsing more results)
   const handleResumeSession = useCallback((sessionId: string) => {
     postToExtension({ type: 'chatSearchResumeSession', sessionId });
-    setChatSearchOpen(false);
-  }, [setChatSearchOpen]);
+  }, []);
 
   // Highlight matching text in snippet
   const highlightSnippet = (snippet: string, query: string) => {

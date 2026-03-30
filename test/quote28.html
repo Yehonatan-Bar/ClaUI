@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Discworld - Granny Weatherwax (Carpe Jugulum)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #060a05;
+    overflow: hidden;
+    font-family: 'Cormorant Garamond', serif;
+  }
+
+  /* Ramtops night — deep forest green, bruised purple, cold mist */
+  .sky {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 100% 55% at 50% 100%, rgba(12, 28, 16, 0.75) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 40% at 18% 25%, rgba(30, 15, 50, 0.22) 0%, transparent 50%),
+      radial-gradient(ellipse 50% 35% at 80% 20%, rgba(18, 35, 22, 0.25) 0%, transparent 50%),
+      radial-gradient(ellipse 70% 45% at 50% 10%, rgba(8, 5, 15, 0.6) 0%, transparent 55%);
+  }
+
+  /* Moon behind clouds */
+  .moon {
+    position: fixed;
+    top: 44px;
+    right: 18%;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 42% 38%, rgba(200, 210, 195, 0.14) 0%, rgba(160, 180, 155, 0.05) 55%, transparent 74%);
+    box-shadow: 0 0 50px rgba(170, 190, 160, 0.06), 0 0 100px rgba(130, 155, 120, 0.03);
+    pointer-events: none;
+  }
+
+  /* Stars */
+  .star-field { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(200, 210, 195, 0.6);
+    animation: twinkle var(--t) ease-in-out infinite alternate;
+  }
+  @keyframes twinkle {
+    from { opacity: var(--lo); transform: scale(0.8); }
+    to   { opacity: var(--hi); transform: scale(1.2); }
+  }
+
+  /* Fireflies */
+  .firefly-layer { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+  .firefly {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(180, 210, 80, 0.6);
+    box-shadow: 0 0 8px rgba(160, 200, 60, 0.35), 0 0 18px rgba(140, 185, 50, 0.15);
+    animation: fly var(--f) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes fly {
+    0%   { transform: translate(0, 0); opacity: 0; }
+    15%  { opacity: var(--op); }
+    40%  { transform: translate(var(--dx1), var(--dy1)); opacity: var(--op); }
+    60%  { opacity: 0.02; }
+    75%  { transform: translate(var(--dx2), var(--dy2)); opacity: var(--op); }
+    90%  { opacity: var(--op); }
+    100% { transform: translate(0, 0); opacity: 0; }
+  }
+
+  /* Mist drifting */
+  .mist-layer { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+  .mist {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(140, 160, 135, 0.06) 0%, transparent 70%);
+    animation: drift var(--m) ease-in-out infinite alternate;
+  }
+  @keyframes drift {
+    from { transform: translateX(var(--x1)) scaleX(1); opacity: var(--op); }
+    to   { transform: translateX(var(--x2)) scaleX(1.3); opacity: calc(var(--op) * 0.5); }
+  }
+
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 720px;
+    text-align: center;
+    padding: 58px 52px;
+    border: 1px solid rgba(100, 140, 85, 0.18);
+    background: rgba(6, 10, 6, 0.92);
+    backdrop-filter: blur(12px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 80px rgba(60, 100, 50, 0.06),
+      0 0 160px rgba(35, 60, 30, 0.03),
+      inset 0 0 60px rgba(0, 0, 0, 0.72);
+    animation: surface 2.5s ease forwards;
+    opacity: 0;
+  }
+  @keyframes surface {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .cn { position: absolute; width: 36px; height: 36px; }
+  .cn.tl { top: -1px; left: -1px; }
+  .cn.tr { top: -1px; right: -1px; transform: scaleX(-1); }
+  .cn.bl { bottom: -1px; left: -1px; transform: scaleY(-1); }
+  .cn.br { bottom: -1px; right: -1px; transform: scale(-1, -1); }
+
+  .eyebrow {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(130, 165, 105, 0.42);
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  .sep {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 0 auto 30px;
+    width: fit-content;
+  }
+  .sep-l {
+    width: 80px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(100, 140, 85, 0.35));
+  }
+  .sep-r {
+    width: 80px;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(100, 140, 85, 0.35), transparent);
+  }
+
+  .narrative {
+    font-size: 18px;
+    line-height: 1.85;
+    color: rgba(185, 195, 175, 0.52);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 15px rgba(0, 0, 0, 0.72);
+  }
+
+  .granny-voice {
+    font-size: 22px;
+    line-height: 1.75;
+    color: rgba(218, 225, 210, 0.82);
+    margin-bottom: 22px;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
+  }
+
+  .key-line {
+    font-family: 'Cinzel', serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: #a8c888;
+    line-height: 1.55;
+    margin-bottom: 22px;
+    text-shadow:
+      0 0 28px rgba(130, 175, 90, 0.3),
+      0 0 60px rgba(85, 130, 55, 0.14),
+      0 2px 6px rgba(0, 0, 0, 0.88);
+    animation: witch-glow 3.5s ease-in-out infinite alternate;
+  }
+  @keyframes witch-glow {
+    from { text-shadow: 0 0 20px rgba(130, 175, 90, 0.18), 0 0 50px rgba(85, 130, 55, 0.06); }
+    to   { text-shadow: 0 0 38px rgba(150, 195, 110, 0.38), 0 0 80px rgba(100, 150, 68, 0.18); }
+  }
+
+  .sub-line {
+    font-size: 20px;
+    font-weight: 600;
+    color: rgba(175, 200, 155, 0.68);
+    line-height: 1.7;
+    margin-bottom: 18px;
+    text-shadow:
+      0 0 15px rgba(110, 150, 75, 0.18),
+      0 2px 6px rgba(0, 0, 0, 0.82);
+  }
+
+  .context {
+    font-size: 16px;
+    line-height: 1.85;
+    color: rgba(170, 185, 160, 0.42);
+    font-style: italic;
+    margin-bottom: 28px;
+  }
+
+  .hat-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    opacity: 0.3;
+  }
+
+  .thin-sep {
+    width: 48px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(100, 140, 85, 0.3), transparent);
+    margin: 0 auto 22px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: rgba(130, 165, 105, 0.35);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="sky"></div>
+<div class="moon"></div>
+<div class="star-field" id="starField"></div>
+
+<!-- Ramtops landscape: mountains, forest, Granny's cottage -->
+<svg style="position:fixed;bottom:0;left:0;right:0;height:360px;pointer-events:none;z-index:1;"
+     viewBox="0 0 1440 360" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="mtG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0c1a10"/>
+      <stop offset="100%" stop-color="#060a05"/>
+    </linearGradient>
+    <linearGradient id="treeG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a1608"/>
+      <stop offset="100%" stop-color="#050c04"/>
+    </linearGradient>
+    <linearGradient id="cottG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#12100a"/>
+      <stop offset="100%" stop-color="#080705"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Far mountains (Ramtops) -->
+  <path d="M0 360 L0 180 L80 110 L160 155 L250 80 L340 130 L430 95 L520 150 L600 120 L680 160 L760 100 L850 140 L940 85 L1020 125 L1100 105 L1180 145 L1260 90 L1340 130 L1440 110 L1440 360 Z" fill="url(#mtG)" opacity="0.6"/>
+
+  <!-- Closer mountains -->
+  <path d="M0 360 L0 220 L120 160 L230 200 L350 145 L460 190 L560 165 L660 205 L780 158 L880 195 L1000 155 L1100 188 L1200 162 L1320 198 L1440 170 L1440 360 Z" fill="#081208" opacity="0.85"/>
+
+  <!-- Forest treeline -->
+  <g fill="url(#treeG)" opacity="0.95">
+    <!-- Pine trees as triangles -->
+    <path d="M0 270 L15 220 L30 270 Z"/>
+    <path d="M25 268 L44 210 L63 268 Z"/>
+    <path d="M58 270 L75 225 L92 270 Z"/>
+    <path d="M88 268 L108 205 L128 268 Z"/>
+    <path d="M122 270 L140 218 L158 270 Z"/>
+    <path d="M152 268 L172 212 L192 268 Z"/>
+    <path d="M188 270 L205 222 L222 270 Z"/>
+    <path d="M218 268 L238 208 L258 268 Z"/>
+    <path d="M252 270 L270 220 L288 270 Z"/>
+    <path d="M285 268 L305 215 L325 268 Z"/>
+    <path d="M320 270 L338 222 L356 270 Z"/>
+    <path d="M352 268 L372 210 L392 268 Z"/>
+
+    <!-- Gap for cottage area -->
+
+    <path d="M620 270 L638 218 L656 270 Z"/>
+    <path d="M650 268 L670 208 L690 268 Z"/>
+    <path d="M685 270 L705 215 L725 270 Z"/>
+    <path d="M720 268 L742 210 L764 268 Z"/>
+    <path d="M758 270 L778 220 L798 270 Z"/>
+    <path d="M795 268 L815 212 L835 268 Z"/>
+    <path d="M830 270 L850 218 L870 270 Z"/>
+    <path d="M865 268 L888 205 L911 268 Z"/>
+    <path d="M905 270 L925 215 L945 270 Z"/>
+    <path d="M940 268 L960 210 L980 268 Z"/>
+    <path d="M975 270 L995 220 L1015 270 Z"/>
+    <path d="M1010 268 L1030 208 L1050 268 Z"/>
+    <path d="M1045 270 L1065 218 L1085 270 Z"/>
+    <path d="M1080 268 L1100 212 L1120 268 Z"/>
+    <path d="M1115 270 L1135 215 L1155 270 Z"/>
+    <path d="M1150 268 L1175 205 L1200 268 Z"/>
+    <path d="M1195 270 L1215 220 L1235 270 Z"/>
+    <path d="M1230 268 L1250 210 L1270 268 Z"/>
+    <path d="M1265 270 L1285 218 L1305 270 Z"/>
+    <path d="M1300 268 L1322 208 L1344 268 Z"/>
+    <path d="M1340 270 L1360 215 L1380 270 Z"/>
+    <path d="M1375 268 L1398 210 L1421 268 Z"/>
+    <path d="M1415 270 L1435 222 L1440 270 Z"/>
+  </g>
+
+  <!-- Granny's cottage -->
+  <g>
+    <!-- Walls -->
+    <rect x="440" y="242" width="80" height="38" fill="url(#cottG)"/>
+    <!-- Roof -->
+    <path d="M432 242 L480 210 L528 242 Z" fill="#0d0c08"/>
+    <!-- Chimney -->
+    <rect x="500" y="215" width="12" height="28" fill="#0e0d09"/>
+    <!-- Smoke -->
+    <path d="M506 215 Q512 200 505 185 Q500 172 508 158" stroke="rgba(140,155,130,0.06)" stroke-width="2.5" fill="none"/>
+    <!-- Door -->
+    <rect x="470" y="258" width="14" height="22" fill="rgba(15,12,8,0.9)"/>
+    <!-- Window with warm light -->
+    <rect x="448" y="252" width="12" height="10" fill="rgba(195,165,80,0.08)"/>
+    <!-- Garden fence -->
+    <g stroke="rgba(80,65,40,0.12)" stroke-width="1" fill="none">
+      <line x1="428" y1="280" x2="428" y2="268"/>
+      <line x1="436" y1="280" x2="436" y2="270"/>
+      <line x1="444" y1="280" x2="444" y2="268"/>
+      <line x1="530" y1="280" x2="530" y2="268"/>
+      <line x1="538" y1="280" x2="538" y2="270"/>
+      <line x1="546" y1="280" x2="546" y2="268"/>
+      <line x1="428" y1="272" x2="546" y2="272"/>
+    </g>
+  </g>
+
+  <!-- Ground -->
+  <rect x="0" y="270" width="1440" height="90" fill="#050804"/>
+  <path d="M0 270 Q180 262 360 270 Q540 278 720 268 Q900 258 1080 270 Q1260 280 1440 268" stroke="rgba(60,80,45,0.08)" stroke-width="2" fill="none"/>
+</svg>
+
+<div class="firefly-layer" id="fireflyLayer"></div>
+<div class="mist-layer" id="mistLayer"></div>
+
+<div class="card">
+  <div class="cn tl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(100, 140, 85, 0.38)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(100, 140, 85, 0.28)"/>
+  </svg></div>
+  <div class="cn tr"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(100, 140, 85, 0.38)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(100, 140, 85, 0.28)"/>
+  </svg></div>
+  <div class="cn bl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(100, 140, 85, 0.38)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(100, 140, 85, 0.28)"/>
+  </svg></div>
+  <div class="cn br"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(100, 140, 85, 0.38)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(100, 140, 85, 0.28)"/>
+  </svg></div>
+
+  <p class="eyebrow">Discworld &mdash; Carpe Jugulum</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <!-- Witch's hat icon -->
+    <svg width="20" height="22" viewBox="0 0 20 22" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10 1 L4 15 L16 15 Z" stroke="rgba(130,165,105,0.45)" stroke-width="1.2" fill="none"/>
+      <ellipse cx="10" cy="17" rx="9" ry="3.5" stroke="rgba(130,165,105,0.4)" stroke-width="1.2" fill="none"/>
+      <path d="M8 1 Q12 4 10.5 8" stroke="rgba(130,165,105,0.3)" stroke-width="0.8" fill="none"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="narrative">
+    She'd never needed to be liked.<br>
+    She had something better than that,<br>
+    something that went deeper<br>
+    and lasted longer.
+  </p>
+
+  <p class="granny-voice">
+    "And sin, young man, is when you<br>
+    treat people as things."
+  </p>
+
+  <p class="key-line">
+    "Including yourself.<br>
+    That's what sin is."
+  </p>
+
+  <p class="narrative">
+    The vampires had expected fear.<br>
+    They had expected weakness. They had not<br>
+    expected an old woman who held the dark<br>
+    at bay by refusing to look away from it.
+  </p>
+
+  <p class="sub-line">
+    She was the other edge<br>
+    of the scissors.
+  </p>
+
+  <p class="context">
+    Headology was not magic. It was something<br>
+    far more dangerous: it was knowing exactly<br>
+    who you were, and never flinching from it.
+  </p>
+
+  <div class="hat-icon">
+    <svg width="42" height="48" viewBox="0 0 42 48" xmlns="http://www.w3.org/2000/svg">
+      <path d="M21 3 L9 32 L33 32 Z" stroke="rgba(130,165,105,0.25)" stroke-width="1" fill="none"/>
+      <ellipse cx="21" cy="35" rx="18" ry="6" stroke="rgba(130,165,105,0.22)" stroke-width="1" fill="none"/>
+      <path d="M17 3 Q23 8 21 16" stroke="rgba(130,165,105,0.18)" stroke-width="0.8" fill="none"/>
+      <!-- Small buckle on hat -->
+      <rect x="16" y="28" width="10" height="5" rx="1" stroke="rgba(130,165,105,0.2)" stroke-width="0.8" fill="none"/>
+    </svg>
+  </div>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">Esmerelda &ldquo;Granny&rdquo; Weatherwax<br>Witch of Lancre</p>
+</div>
+
+<script>
+  // Stars
+  const starField = document.getElementById('starField');
+  for (let i = 0; i < 75; i++) {
+    const el = document.createElement('div');
+    el.className = 'star';
+    const sz = (Math.random() * 2 + 0.5).toFixed(1);
+    const lo = (Math.random() * 0.1 + 0.03).toFixed(2);
+    const hi = (Math.random() * 0.45 + 0.2).toFixed(2);
+    el.style.cssText = `
+      width:${sz}px; height:${sz}px;
+      left:${Math.random() * 100}%;
+      top:${Math.random() * 50}%;
+      --t:${(Math.random() * 4 + 2).toFixed(1)}s;
+      --lo:${lo};
+      --hi:${hi};
+      animation-delay:${(Math.random() * 5).toFixed(1)}s;
+    `;
+    starField.appendChild(el);
+  }
+
+  // Fireflies
+  const fireflyLayer = document.getElementById('fireflyLayer');
+  for (let i = 0; i < 18; i++) {
+    const el = document.createElement('div');
+    el.className = 'firefly';
+    const dx1 = (Math.random() * 50 - 25).toFixed(0) + 'px';
+    const dy1 = (Math.random() * 30 - 15).toFixed(0) + 'px';
+    const dx2 = (Math.random() * 40 - 20).toFixed(0) + 'px';
+    const dy2 = (Math.random() * 30 - 15).toFixed(0) + 'px';
+    const op = (Math.random() * 0.4 + 0.15).toFixed(2);
+    el.style.cssText = `
+      left:${Math.random() * 80 + 10}%;
+      top:${Math.random() * 30 + 55}%;
+      --f:${(Math.random() * 6 + 4).toFixed(1)}s;
+      --dx1:${dx1};
+      --dy1:${dy1};
+      --dx2:${dx2};
+      --dy2:${dy2};
+      --op:${op};
+      animation-delay:${(Math.random() * 8).toFixed(1)}s;
+    `;
+    fireflyLayer.appendChild(el);
+  }
+
+  // Mist patches
+  const mistLayer = document.getElementById('mistLayer');
+  for (let i = 0; i < 8; i++) {
+    const el = document.createElement('div');
+    el.className = 'mist';
+    const w = (Math.random() * 300 + 150).toFixed(0);
+    const h = (Math.random() * 80 + 40).toFixed(0);
+    const x1 = (Math.random() * 30 - 15).toFixed(0) + 'px';
+    const x2 = (Math.random() * 30 - 15).toFixed(0) + 'px';
+    const op = (Math.random() * 0.5 + 0.2).toFixed(2);
+    el.style.cssText = `
+      width:${w}px; height:${h}px;
+      left:${Math.random() * 90}%;
+      top:${Math.random() * 20 + 65}%;
+      --m:${(Math.random() * 12 + 8).toFixed(1)}s;
+      --x1:${x1};
+      --x2:${x2};
+      --op:${op};
+      animation-delay:${(Math.random() * 10).toFixed(1)}s;
+    `;
+    mistLayer.appendChild(el);
+  }
+</script>
+</body>
+</html>

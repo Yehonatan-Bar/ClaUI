@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Discworld - Ankh-Morpork City Watch</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #05070a;
+    font-family: 'Libre Baskerville', serif;
+  }
+
+  .sky {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 110% 54% at 50% 100%, rgba(118, 70, 24, 0.3) 0%, transparent 58%),
+      radial-gradient(ellipse 76% 46% at 18% 20%, rgba(18, 58, 68, 0.18) 0%, transparent 65%),
+      radial-gradient(ellipse 66% 42% at 82% 16%, rgba(16, 36, 60, 0.22) 0%, transparent 63%),
+      linear-gradient(180deg, #0b1319 0%, #05070a 100%);
+  }
+
+  .mist {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 42% 18% at 24% 78%, rgba(126, 150, 164, 0.08) 0%, transparent 70%),
+      radial-gradient(ellipse 48% 18% at 76% 82%, rgba(126, 150, 164, 0.08) 0%, transparent 72%),
+      radial-gradient(ellipse 60% 22% at 50% 100%, rgba(200, 160, 94, 0.06) 0%, transparent 70%);
+    animation: mistShift 11s ease-in-out infinite alternate;
+  }
+
+  @keyframes mistShift {
+    from { transform: translateY(0); opacity: 0.8; }
+    to { transform: translateY(-10px); opacity: 1; }
+  }
+
+  .rain-layer,
+  .ember-layer,
+  .star-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .star-layer { z-index: 1; }
+  .rain-layer { z-index: 4; }
+  .ember-layer { z-index: 3; }
+
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    animation: twinkle var(--d) ease-in-out infinite alternate;
+  }
+
+  @keyframes twinkle {
+    from { opacity: var(--o1); }
+    to { opacity: var(--o2); }
+  }
+
+  .drop {
+    position: absolute;
+    width: 1px;
+    height: 72px;
+    background: linear-gradient(180deg, rgba(190, 218, 235, 0) 0%, rgba(190, 218, 235, 0.6) 55%, rgba(190, 218, 235, 0) 100%);
+    transform: rotate(12deg);
+    animation: rainFall var(--d) linear infinite;
+    opacity: 0;
+  }
+
+  @keyframes rainFall {
+    0% { transform: translate3d(0, -18vh, 0) rotate(12deg); opacity: 0; }
+    10% { opacity: 0.5; }
+    100% { transform: translate3d(var(--mx), 115vh, 0) rotate(12deg); opacity: 0; }
+  }
+
+  .ember {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(226, 174, 88, 0.55);
+    box-shadow: 0 0 14px rgba(226, 174, 88, 0.22);
+    animation: emberDrift var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+
+  @keyframes emberDrift {
+    0% { transform: translate3d(0, 0, 0); opacity: 0; }
+    15% { opacity: 0.52; }
+    80% { opacity: 0.18; }
+    100% { transform: translate3d(var(--x), calc(-1 * var(--y)), 0); opacity: 0; }
+  }
+
+  .card {
+    position: relative;
+    z-index: 20;
+    width: min(760px, calc(100vw - 40px));
+    padding: 62px 58px;
+    text-align: center;
+    border: 1px solid rgba(188, 144, 76, 0.22);
+    border-radius: 2px;
+    background: rgba(9, 11, 14, 0.84);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 0 90px rgba(116, 80, 32, 0.14), inset 0 0 72px rgba(0, 0, 0, 0.68);
+    animation: surface 2.4s ease forwards;
+    opacity: 0;
+  }
+
+  @keyframes surface {
+    from { transform: translateY(24px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .cn { position: absolute; width: 36px; height: 36px; }
+  .cn.tl { top: -1px; left: -1px; }
+  .cn.tr { top: -1px; right: -1px; transform: scaleX(-1); }
+  .cn.bl { bottom: -1px; left: -1px; transform: scaleY(-1); }
+  .cn.br { bottom: -1px; right: -1px; transform: scale(-1, -1); }
+
+  .eyebrow {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(198, 154, 82, 0.48);
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  .sep {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: fit-content;
+    margin: 0 auto 30px;
+  }
+
+  .sep-l,
+  .sep-r {
+    width: 82px;
+    height: 1px;
+  }
+
+  .sep-l { background: linear-gradient(90deg, transparent, rgba(198, 154, 82, 0.42)); }
+  .sep-r { background: linear-gradient(90deg, rgba(198, 154, 82, 0.42), transparent); }
+
+  .lead-quote {
+    font-size: 22px;
+    line-height: 1.85;
+    font-style: italic;
+    color: rgba(222, 204, 170, 0.74);
+    margin-bottom: 22px;
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.82);
+  }
+
+  .main-quote {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(28px, 4vw, 38px);
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: 1px;
+    color: #e2b86c;
+    margin-bottom: 18px;
+    text-shadow: 0 0 22px rgba(226, 174, 88, 0.36), 0 0 56px rgba(66, 120, 150, 0.12), 0 2px 8px rgba(0, 0, 0, 0.88);
+    animation: badgeGlow 3.5s ease-in-out infinite alternate;
+  }
+
+  @keyframes badgeGlow {
+    from { text-shadow: 0 0 16px rgba(226, 174, 88, 0.28), 0 0 42px rgba(66, 120, 150, 0.08), 0 2px 8px rgba(0, 0, 0, 0.88); }
+    to { text-shadow: 0 0 34px rgba(234, 190, 98, 0.58), 0 0 74px rgba(66, 120, 150, 0.16), 0 2px 8px rgba(0, 0, 0, 0.92); }
+  }
+
+  .badge-line {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(124, 168, 188, 0.4);
+    margin-bottom: 24px;
+  }
+
+  .context-line {
+    font-size: 19px;
+    line-height: 1.75;
+    font-style: italic;
+    color: rgba(192, 176, 146, 0.58);
+    margin-bottom: 36px;
+  }
+
+  .thin-sep {
+    width: 48px;
+    height: 1px;
+    margin: 0 auto 24px;
+    background: linear-gradient(90deg, transparent, rgba(198, 154, 82, 0.36), transparent);
+  }
+
+  .attribution,
+  .footer-line {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 3px;
+    line-height: 2;
+    text-transform: uppercase;
+  }
+
+  .attribution { color: rgba(198, 154, 82, 0.42); }
+  .footer-line {
+    margin-top: 16px;
+    color: rgba(124, 168, 188, 0.28);
+    letter-spacing: 4px;
+  }
+
+  @media (max-width: 640px) {
+    .card { padding: 44px 28px; }
+    .lead-quote { font-size: 20px; }
+    .context-line { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+<div class="sky"></div>
+<div class="mist"></div>
+
+<svg style="position:fixed;inset:0;pointer-events:none;z-index:2;" viewBox="0 0 1440 900" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="stoneG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#162129"/>
+      <stop offset="100%" stop-color="#090c11"/>
+    </linearGradient>
+    <linearGradient id="lampPole" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2f2418"/>
+      <stop offset="100%" stop-color="#120f0c"/>
+    </linearGradient>
+    <radialGradient id="lampGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(255, 206, 114, 0.95)"/>
+      <stop offset="58%" stop-color="rgba(220, 156, 62, 0.28)"/>
+      <stop offset="100%" stop-color="rgba(220, 156, 62, 0)"/>
+    </radialGradient>
+  </defs>
+
+  <path d="M0 900 L0 510 L32 500 L56 458 L88 496 L126 488 L162 434 L186 454 L224 446 L252 486 L292 476 L324 420 L352 472 L390 484 L426 464 L452 490 L490 478 L524 430 L552 486 L592 500 L624 486 L662 452 L694 490 L734 500 L770 482 L808 446 L838 490 L874 502 L912 486 L946 452 L978 494 L1012 502 L1044 486 L1080 438 L1112 482 L1150 500 L1184 488 L1222 458 L1250 492 L1286 502 L1322 490 L1360 464 L1392 498 L1440 488 L1440 900 Z" fill="url(#stoneG)"/>
+  <path d="M0 900 L0 690 Q220 660 470 684 Q760 714 980 682 Q1210 650 1440 678 L1440 900 Z" fill="rgba(8, 10, 14, 0.94)"/>
+  <g fill="rgba(16, 12, 10, 0.92)"><rect x="0" y="676" width="1440" height="224"/></g>
+  <g fill="rgba(40, 32, 24, 0.46)"><path d="M0 900 L0 770 Q120 734 240 770 T480 770 T720 770 T960 770 T1200 770 T1440 770 L1440 900 Z"/></g>
+
+  <g stroke="rgba(90, 84, 70, 0.24)" stroke-width="2">
+    <line x1="160" y1="740" x2="130" y2="900"/>
+    <line x1="260" y1="740" x2="230" y2="900"/>
+    <line x1="360" y1="740" x2="330" y2="900"/>
+    <line x1="460" y1="740" x2="430" y2="900"/>
+    <line x1="560" y1="740" x2="530" y2="900"/>
+    <line x1="660" y1="740" x2="630" y2="900"/>
+    <line x1="760" y1="740" x2="730" y2="900"/>
+    <line x1="860" y1="740" x2="830" y2="900"/>
+    <line x1="960" y1="740" x2="930" y2="900"/>
+    <line x1="1060" y1="740" x2="1030" y2="900"/>
+    <line x1="1160" y1="740" x2="1130" y2="900"/>
+    <line x1="1260" y1="740" x2="1230" y2="900"/>
+  </g>
+
+  <g transform="translate(250,0)">
+    <rect x="-6" y="360" width="12" height="300" fill="url(#lampPole)"/>
+    <path d="M-26 368 H26" stroke="#2c2116" stroke-width="6" stroke-linecap="round"/>
+    <rect x="-16" y="372" width="32" height="46" rx="4" fill="rgba(34, 24, 16, 0.96)"/>
+    <circle cx="0" cy="394" r="56" fill="url(#lampGlow)" opacity="0.55"/>
+    <rect x="-8" y="380" width="16" height="28" rx="3" fill="rgba(255, 212, 130, 0.7)">
+      <animate attributeName="opacity" values="0.62;0.82;0.62" dur="2.2s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+
+  <g transform="translate(1180,0)">
+    <rect x="-6" y="330" width="12" height="330" fill="url(#lampPole)"/>
+    <path d="M-26 338 H26" stroke="#2c2116" stroke-width="6" stroke-linecap="round"/>
+    <rect x="-16" y="342" width="32" height="46" rx="4" fill="rgba(34, 24, 16, 0.96)"/>
+    <circle cx="0" cy="364" r="62" fill="url(#lampGlow)" opacity="0.6"/>
+    <rect x="-8" y="350" width="16" height="28" rx="3" fill="rgba(255, 212, 130, 0.74)">
+      <animate attributeName="opacity" values="0.58;0.84;0.58" dur="2.6s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+
+  <g opacity="0.16" transform="translate(710,590)">
+    <path d="M0 0 C-34 10 -48 44 -44 78 L-20 78 C-16 48 -10 36 0 30 C10 36 16 48 20 78 L44 78 C48 44 34 10 0 0 Z" fill="rgba(255,255,255,0.9)"/>
+    <rect x="-8" y="74" width="16" height="46" rx="3" fill="rgba(255,255,255,0.9)"/>
+  </g>
+</svg>
+
+<div class="star-layer" id="starLayer"></div>
+<div class="ember-layer" id="emberLayer"></div>
+<div class="rain-layer" id="rainLayer"></div>
+
+<div class="card">
+  <div class="cn tl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(198,154,82,0.5)" stroke-width="2" fill="none"/><circle cx="2" cy="2" r="2.5" fill="rgba(198,154,82,0.38)"/></svg></div>
+  <div class="cn tr"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(198,154,82,0.5)" stroke-width="2" fill="none"/><circle cx="2" cy="2" r="2.5" fill="rgba(198,154,82,0.38)"/></svg></div>
+  <div class="cn bl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(198,154,82,0.5)" stroke-width="2" fill="none"/><circle cx="2" cy="2" r="2.5" fill="rgba(198,154,82,0.38)"/></svg></div>
+  <div class="cn br"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(198,154,82,0.5)" stroke-width="2" fill="none"/><circle cx="2" cy="2" r="2.5" fill="rgba(198,154,82,0.38)"/></svg></div>
+
+  <p class="eyebrow">Discworld &mdash; Ankh-Morpork City Watch</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="20" height="18" viewBox="0 0 20 18" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10 1 L17 4 V9 C17 12.5 14.6 15.4 10 17 C5.4 15.4 3 12.5 3 9 V4 Z" fill="none" stroke="rgba(198,154,82,0.56)" stroke-width="1.2"/>
+      <line x1="10" y1="4" x2="10" y2="13" stroke="rgba(198,154,82,0.36)" stroke-width="1"/>
+      <line x1="6.5" y1="8.5" x2="13.5" y2="8.5" stroke="rgba(198,154,82,0.36)" stroke-width="1"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="lead-quote">
+    Ankh-Morpork never slept.<br>
+    It merely changed witnesses.
+  </p>
+
+  <p class="main-quote">
+    A watchman did not promise<br>
+    a perfect city.<br>
+    He promised to keep walking until morning.
+  </p>
+
+  <p class="badge-line">Boots . Badge . Lantern . Dawn</p>
+
+  <p class="context-line">
+    Rain glossed the cobbles, the lamps made halos out of smoke,
+    and somewhere beyond the fog a pair of stubborn boots kept time with the night.
+  </p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">Original homage text<br>Inspired by Terry Pratchett's Discworld</p>
+  <p class="footer-line">The Watch Is On The Street</p>
+</div>
+
+<script>
+  const starLayer = document.getElementById('starLayer');
+  for (let i = 0; i < 40; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    const size = Math.random() * 2 + 0.4;
+    const o1 = (Math.random() * 0.14 + 0.03).toFixed(2);
+    const o2 = (Math.random() * 0.18 + 0.12).toFixed(2);
+    star.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random() * 100}%;
+      top:${Math.random() * 42}%;
+      --o1:${o1};
+      --o2:${o2};
+      --d:${(Math.random() * 4 + 2).toFixed(1)}s;
+      animation-delay:${(Math.random() * 5).toFixed(1)}s;
+    `;
+    starLayer.appendChild(star);
+  }
+
+  const emberLayer = document.getElementById('emberLayer');
+  for (let i = 0; i < 26; i++) {
+    const ember = document.createElement('div');
+    ember.className = 'ember';
+    const size = Math.random() * 3 + 1;
+    const x = (Math.random() * 70 - 35).toFixed(0) + 'px';
+    const y = (Math.random() * 160 + 80).toFixed(0) + 'px';
+    ember.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random() * 100}%;
+      bottom:${Math.random() * 28 + 10}%;
+      --x:${x};
+      --y:${y};
+      --d:${(Math.random() * 8 + 7).toFixed(1)}s;
+      animation-delay:${(Math.random() * 10).toFixed(1)}s;
+    `;
+    emberLayer.appendChild(ember);
+  }
+
+  const rainLayer = document.getElementById('rainLayer');
+  for (let i = 0; i < 120; i++) {
+    const drop = document.createElement('div');
+    drop.className = 'drop';
+    const mx = (Math.random() * 40 - 20).toFixed(0) + 'px';
+    drop.style.cssText = `
+      left:${Math.random() * 100}%;
+      top:${Math.random() * 100 - 120}vh;
+      --mx:${mx};
+      --d:${(Math.random() * 1.3 + 1.1).toFixed(2)}s;
+      animation-delay:${(Math.random() * 2).toFixed(2)}s;
+      opacity:0;
+    `;
+    rainLayer.appendChild(drop);
+  }
+</script>
+</body>
+</html>

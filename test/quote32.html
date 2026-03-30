@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Discworld - GNU Terry Pratchett</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #08060e;
+    overflow: hidden;
+    font-family: 'Crimson Text', serif;
+  }
+
+  /* Dusk sky — amber to deep purple */
+  .sky {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 100% 45% at 50% 100%, rgba(120,60,15,0.35) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 35% at 25% 85%, rgba(90,40,20,0.25) 0%, transparent 50%),
+      radial-gradient(ellipse 50% 30% at 75% 80%, rgba(100,50,25,0.2) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 10%, rgba(25,15,45,0.5) 0%, transparent 60%);
+  }
+
+  /* Stars */
+  .stars {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    background: #fff;
+    animation: twinkle var(--t) ease-in-out infinite alternate;
+  }
+  @keyframes twinkle {
+    from { opacity: var(--o1); }
+    to   { opacity: var(--o2); }
+  }
+
+  /* Clacks signal light — pulses like a semaphore */
+  .clacks-signal {
+    position: fixed;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .signal-light {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255,180,50,0.9);
+    box-shadow: 0 0 12px rgba(255,160,30,0.8), 0 0 30px rgba(255,140,20,0.4);
+    animation: blink var(--b) step-end infinite;
+  }
+  @keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0.1; }
+  }
+
+  /* Firefly-like particles — overhead message lights */
+  .msg-layer { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  .msg-particle {
+    position: absolute;
+    background: rgba(255,180,60,0.6);
+    border-radius: 50%;
+    animation: msgfly var(--d) linear infinite;
+    opacity: 0;
+  }
+  @keyframes msgfly {
+    0%   { transform: translateX(0) translateY(0); opacity: 0; }
+    10%  { opacity: 0.7; }
+    50%  { opacity: 0.3; }
+    90%  { opacity: 0.5; }
+    100% { transform: translateX(var(--mx)) translateY(var(--my)); opacity: 0; }
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 720px;
+    text-align: center;
+    padding: 62px 58px;
+    border: 1px solid rgba(200,140,50,0.2);
+    background: rgba(8, 6, 14, 0.88);
+    backdrop-filter: blur(12px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 70px rgba(200,140,50,0.1),
+      0 0 140px rgba(140,80,20,0.06),
+      inset 0 0 60px rgba(0,0,0,0.7);
+    animation: surface 2.6s ease forwards;
+    opacity: 0;
+  }
+  @keyframes surface {
+    from { opacity: 0; transform: translateY(26px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Corner ornaments */
+  .cn { position: absolute; width: 36px; height: 36px; }
+  .cn.tl { top:-1px; left:-1px; }
+  .cn.tr { top:-1px; right:-1px; transform: scaleX(-1); }
+  .cn.bl { bottom:-1px; left:-1px; transform: scaleY(-1); }
+  .cn.br { bottom:-1px; right:-1px; transform: scale(-1,-1); }
+
+  .eyebrow {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(200,150,60,0.48);
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 30px; width: fit-content;
+  }
+  .sep-l { width: 80px; height: 1px; background: linear-gradient(90deg, transparent, rgba(200,150,60,0.4)); }
+  .sep-r { width: 80px; height: 1px; background: linear-gradient(90deg, rgba(200,150,60,0.4), transparent); }
+
+  .lead-quote {
+    font-size: 23px;
+    line-height: 1.8;
+    color: rgba(220,200,160,0.75);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.8);
+  }
+
+  .main-quote {
+    font-family: 'Cinzel', serif;
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1.5;
+    color: #e8b840;
+    letter-spacing: 1px;
+    margin-bottom: 22px;
+    text-shadow:
+      0 0 25px rgba(230,170,40,0.5),
+      0 0 55px rgba(200,140,20,0.25),
+      0 2px 6px rgba(0,0,0,0.9);
+    animation: signal-glow 3.5s ease-in-out infinite alternate;
+  }
+  @keyframes signal-glow {
+    from { text-shadow: 0 0 18px rgba(230,170,40,0.35), 0 0 45px rgba(200,140,20,0.18); }
+    to   { text-shadow: 0 0 35px rgba(240,190,50,0.7), 0 0 75px rgba(210,150,30,0.4); }
+  }
+
+  .gnu-line {
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    font-weight: 400;
+    color: rgba(200,160,70,0.55);
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    margin-bottom: 30px;
+    animation: gnu-pulse 2s ease-in-out infinite;
+  }
+  @keyframes gnu-pulse {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 0.85; }
+  }
+
+  .context-line {
+    font-size: 18px;
+    font-style: italic;
+    color: rgba(190,170,130,0.55);
+    margin-bottom: 38px;
+    line-height: 1.7;
+  }
+
+  .thin-sep {
+    width: 48px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(200,150,60,0.35), transparent);
+    margin: 0 auto 24px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: rgba(200,150,60,0.4);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="sky"></div>
+
+<!-- Clacks towers — the semaphore network on the Disc -->
+<svg style="position:fixed;bottom:0;left:0;right:0;height:320px;pointer-events:none;z-index:1;"
+     viewBox="0 0 1440 320" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="groundG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#120e1a" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#04030a" stop-opacity="1"/>
+    </linearGradient>
+    <linearGradient id="towerG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2a1f10"/>
+      <stop offset="100%" stop-color="#0c0806"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rolling hills -->
+  <path d="M0 320 L0 240 Q150 210 320 230 Q500 260 680 225 Q860 195 1050 220 Q1200 240 1440 215 L1440 320 Z"
+        fill="url(#groundG)"/>
+
+  <!-- Distant hills -->
+  <path d="M0 260 Q200 235 400 250 Q650 270 900 240 Q1100 225 1300 248 L1440 240 L1440 320 L0 320 Z"
+        fill="rgba(8,6,14,0.7)"/>
+
+  <!-- Clacks Tower 1 — left -->
+  <g transform="translate(200, 0)">
+    <!-- Main post -->
+    <rect x="0" y="100" width="12" height="200" fill="url(#towerG)"/>
+    <!-- Cross beam -->
+    <rect x="-20" y="95" width="52" height="6" rx="1" fill="#1a1208"/>
+    <!-- Semaphore shutters -->
+    <rect x="-18" y="80" width="10" height="14" rx="1" fill="#1a1208" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;0.3;0.8;0.8;0.3;0.8" dur="2.5s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="1" y="80" width="10" height="14" rx="1" fill="#1a1208" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;0.8;0.3;0.8;0.8;0.3" dur="2.5s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="20" y="80" width="10" height="14" rx="1" fill="#1a1208" opacity="0.8">
+      <animate attributeName="opacity" values="0.3;0.8;0.8;0.3;0.8;0.8" dur="2.5s" repeatCount="indefinite"/>
+    </rect>
+    <!-- Signal lights -->
+    <circle cx="-13" cy="87" r="3" fill="rgba(255,170,40,0.7)">
+      <animate attributeName="opacity" values="1;0.1;1;1;0.1;1" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="6" cy="87" r="3" fill="rgba(255,170,40,0.7)">
+      <animate attributeName="opacity" values="1;1;0.1;1;1;0.1" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="25" cy="87" r="3" fill="rgba(255,170,40,0.7)">
+      <animate attributeName="opacity" values="0.1;1;1;0.1;1;1" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+    <!-- Platform -->
+    <rect x="-10" y="140" width="32" height="4" rx="1" fill="#150f08"/>
+  </g>
+
+  <!-- Clacks Tower 2 — center-right -->
+  <g transform="translate(1000, 0)">
+    <rect x="0" y="80" width="14" height="210" fill="url(#towerG)"/>
+    <rect x="-22" y="74" width="58" height="7" rx="1" fill="#1a1208"/>
+    <!-- Semaphore shutters -->
+    <rect x="-20" y="58" width="11" height="15" rx="1" fill="#1a1208" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;0.3;0.8;0.3;0.8;0.8" dur="3s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="2" y="58" width="11" height="15" rx="1" fill="#1a1208" opacity="0.8">
+      <animate attributeName="opacity" values="0.3;0.8;0.3;0.8;0.8;0.3" dur="3s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="24" y="58" width="11" height="15" rx="1" fill="#1a1208" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;0.8;0.3;0.8;0.3;0.8" dur="3s" repeatCount="indefinite"/>
+    </rect>
+    <!-- Signal lights -->
+    <circle cx="-14" cy="66" r="3.5" fill="rgba(255,170,40,0.7)">
+      <animate attributeName="opacity" values="1;0.1;1;0.1;1;1" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="7" cy="66" r="3.5" fill="rgba(255,170,40,0.7)">
+      <animate attributeName="opacity" values="0.1;1;0.1;1;1;0.1" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="30" cy="66" r="3.5" fill="rgba(255,170,40,0.7)">
+      <animate attributeName="opacity" values="1;1;0.1;1;0.1;1" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <rect x="-8" y="128" width="30" height="4" rx="1" fill="#150f08"/>
+  </g>
+
+  <!-- Clacks Tower 3 — far right, smaller (distant) -->
+  <g transform="translate(1320, 0)" opacity="0.5">
+    <rect x="0" y="150" width="8" height="130" fill="url(#towerG)"/>
+    <rect x="-12" y="146" width="32" height="5" rx="1" fill="#1a1208"/>
+    <circle cx="-6" cy="142" r="2" fill="rgba(255,170,40,0.6)">
+      <animate attributeName="opacity" values="1;0.1;1;0.1" dur="1.8s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="4" cy="142" r="2" fill="rgba(255,170,40,0.6)">
+      <animate attributeName="opacity" values="0.1;1;0.1;1" dur="1.8s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="14" cy="142" r="2" fill="rgba(255,170,40,0.6)">
+      <animate attributeName="opacity" values="1;1;0.1;0.1" dur="1.8s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Distant tower — far left -->
+  <g transform="translate(60, 0)" opacity="0.35">
+    <rect x="0" y="170" width="7" height="100" fill="url(#towerG)"/>
+    <rect x="-10" y="166" width="27" height="4" rx="1" fill="#1a1208"/>
+    <circle cx="-4" cy="163" r="2" fill="rgba(255,170,40,0.5)">
+      <animate attributeName="opacity" values="0.1;1;1;0.1" dur="2.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="4" cy="163" r="2" fill="rgba(255,170,40,0.5)">
+      <animate attributeName="opacity" values="1;0.1;0.1;1" dur="2.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="12" cy="163" r="2" fill="rgba(255,170,40,0.5)">
+      <animate attributeName="opacity" values="0.1;0.1;1;1" dur="2.2s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+</svg>
+
+<div class="stars" id="starLayer"></div>
+<div class="msg-layer" id="msgLayer"></div>
+
+<div class="card">
+  <div class="cn tl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(200,150,60,0.5)" stroke-width="2" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(200,150,60,0.45)"/>
+  </svg></div>
+  <div class="cn tr"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(200,150,60,0.5)" stroke-width="2" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(200,150,60,0.45)"/>
+  </svg></div>
+  <div class="cn bl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(200,150,60,0.5)" stroke-width="2" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(200,150,60,0.45)"/>
+  </svg></div>
+  <div class="cn br"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(200,150,60,0.5)" stroke-width="2" fill="none"/>
+    <circle cx="2" cy="2" r="2.5" fill="rgba(200,150,60,0.45)"/>
+  </svg></div>
+
+  <p class="eyebrow">Discworld &mdash; Going Postal</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <!-- Clacks shutter icon -->
+    <svg width="20" height="16" viewBox="0 0 20 16" xmlns="http://www.w3.org/2000/svg">
+      <rect x="1" y="4" width="5" height="8" rx="1" fill="rgba(200,150,60,0.5)"/>
+      <rect x="8" y="4" width="5" height="8" rx="1" fill="rgba(200,150,60,0.25)"/>
+      <rect x="15" y="4" width="5" height="8" rx="1" fill="rgba(200,150,60,0.5)"/>
+      <line x1="0" y1="8" x2="20" y2="8" stroke="rgba(200,150,60,0.3)" stroke-width="1"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="lead-quote">
+    Do you not know that a man is not dead<br>
+    while his name is still spoken?
+  </p>
+
+  <p class="main-quote">
+    "A man is not dead<br>
+    while his name is still spoken."
+  </p>
+
+  <p class="gnu-line">GNU Terry Pratchett</p>
+
+  <p class="context-line">
+    Send the name along the Clacks.<br>
+    G: send on. N: do not log. U: turn around at the end of the line.
+  </p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">The Clacks Overhead Protocol<br>Terry Pratchett &mdash; Going Postal</p>
+</div>
+
+<script>
+  // Stars
+  const starLayer = document.getElementById('starLayer');
+  for (let i = 0; i < 100; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2.2 + 0.5;
+    const o1 = (Math.random() * 0.25 + 0.1).toFixed(2);
+    const o2 = (Math.random() * 0.5 + 0.35).toFixed(2);
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random() * 100}%;
+      top:${Math.random() * 55}%;
+      --t:${(Math.random() * 4 + 2).toFixed(1)}s;
+      --o1:${o1};
+      --o2:${o2};
+      animation-delay:${(Math.random() * 5).toFixed(1)}s;
+    `;
+    starLayer.appendChild(s);
+  }
+
+  // Message particles — traveling like overhead signals
+  const msgLayer = document.getElementById('msgLayer');
+  for (let i = 0; i < 18; i++) {
+    const el = document.createElement('div');
+    el.className = 'msg-particle';
+    const w = Math.random() * 3 + 1.5;
+    const mx = (Math.random() * 400 - 200).toFixed(0) + 'px';
+    const my = (Math.random() * 60 - 30).toFixed(0) + 'px';
+    el.style.cssText = `
+      width:${w}px; height:${w}px;
+      left:${Math.random() * 100}%;
+      top:${Math.random() * 40 + 10}%;
+      --d:${(Math.random() * 8 + 5).toFixed(1)}s;
+      --mx:${mx};
+      --my:${my};
+      animation-delay:${(Math.random() * 10).toFixed(1)}s;
+    `;
+    msgLayer.appendChild(el);
+  }
+</script>
+</body>
+</html>

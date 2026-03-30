@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The First Law - Sand dan Glokta (The Blade Itself)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0a0908;
+    overflow: hidden;
+    font-family: 'EB Garamond', serif;
+  }
+
+  /* The Agriont - sickly yellows and oppressive stone */
+  .sky {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 100% 60% at 50% 100%, rgba(20,18,12,0.7) 0%, transparent 55%),
+      radial-gradient(ellipse 55% 40% at 30% 75%, rgba(30,25,15,0.35) 0%, transparent 50%),
+      radial-gradient(ellipse 50% 35% at 70% 70%, rgba(25,18,12,0.3) 0%, transparent 50%),
+      radial-gradient(ellipse 70% 50% at 50% 10%, rgba(12,10,8,0.7) 0%, transparent 55%);
+  }
+
+  /* Sickly torch glow from below-right */
+  .torchlight {
+    position: fixed;
+    width: 500px; height: 500px;
+    bottom: -100px;
+    right: 5%;
+    background: radial-gradient(ellipse, rgba(200,150,60,0.035) 0%, transparent 55%);
+    pointer-events: none;
+    animation: torch-flicker 3s ease-in-out infinite;
+  }
+  @keyframes torch-flicker {
+    0%   { opacity: 0.7; }
+    30%  { opacity: 1; }
+    50%  { opacity: 0.65; }
+    70%  { opacity: 0.9; }
+    100% { opacity: 0.7; }
+  }
+
+  /* Second torch glow from left */
+  .torchlight-2 {
+    position: fixed;
+    width: 400px; height: 400px;
+    bottom: -80px;
+    left: 8%;
+    background: radial-gradient(ellipse, rgba(180,130,50,0.025) 0%, transparent 50%);
+    pointer-events: none;
+    animation: torch-flicker-2 4s ease-in-out infinite;
+  }
+  @keyframes torch-flicker-2 {
+    0%   { opacity: 0.8; }
+    40%  { opacity: 0.6; }
+    60%  { opacity: 1; }
+    80%  { opacity: 0.7; }
+    100% { opacity: 0.8; }
+  }
+
+  /* Dust motes */
+  .dust-layer { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  .dust {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(200,180,140,0.4);
+    animation: float-dust var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes float-dust {
+    0%   { transform: translate(0, 0); opacity: 0; }
+    20%  { opacity: var(--op); }
+    50%  { transform: translate(var(--dx), var(--dy)); opacity: var(--op); }
+    80%  { opacity: 0; }
+    100% { transform: translate(var(--dx2), var(--dy2)); opacity: 0; }
+  }
+
+  /* Drip effect - water drops in dungeon */
+  .drip-layer { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+  .drip {
+    position: absolute;
+    width: 2px;
+    height: 6px;
+    border-radius: 0 0 2px 2px;
+    background: linear-gradient(to bottom, transparent, rgba(140,150,160,0.25));
+    animation: dripping var(--drip-d) ease-in infinite;
+    opacity: 0;
+  }
+  @keyframes dripping {
+    0%   { transform: translateY(0); opacity: 0; height: 0; }
+    5%   { opacity: 0.6; height: 6px; }
+    60%  { opacity: 0.4; }
+    100% { transform: translateY(120px); opacity: 0; height: 2px; }
+  }
+
+  /* Stone texture overlay */
+  .stone-texture {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.03;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(120,110,90,0.3) 40px, rgba(120,110,90,0.3) 41px),
+      repeating-linear-gradient(90deg, transparent, transparent 80px, rgba(120,110,90,0.2) 80px, rgba(120,110,90,0.2) 81px);
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 720px;
+    text-align: center;
+    padding: 58px 52px;
+    border: 1px solid rgba(170,150,100,0.15);
+    background: rgba(10, 9, 8, 0.93);
+    backdrop-filter: blur(12px);
+    border-radius: 3px;
+    box-shadow:
+      0 0 80px rgba(120,100,50,0.05),
+      0 0 160px rgba(80,65,30,0.025),
+      inset 0 0 60px rgba(0,0,0,0.7);
+    animation: surface 2.5s ease forwards;
+    opacity: 0;
+  }
+  @keyframes surface {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Corner ornaments */
+  .cn { position: absolute; width: 36px; height: 36px; }
+  .cn.tl { top:-1px; left:-1px; }
+  .cn.tr { top:-1px; right:-1px; transform: scaleX(-1); }
+  .cn.bl { bottom:-1px; left:-1px; transform: scaleY(-1); }
+  .cn.br { bottom:-1px; right:-1px; transform: scale(-1,-1); }
+
+  .eyebrow {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(190,170,110,0.4);
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 30px; width: fit-content;
+  }
+  .sep-l { width: 80px; height: 1px; background: linear-gradient(90deg, transparent, rgba(190,170,110,0.3)); }
+  .sep-r { width: 80px; height: 1px; background: linear-gradient(90deg, rgba(190,170,110,0.3), transparent); }
+
+  .narrative {
+    font-size: 18px;
+    line-height: 1.85;
+    color: rgba(190,180,160,0.5);
+    font-style: italic;
+    margin-bottom: 24px;
+    text-shadow: 0 2px 15px rgba(0,0,0,0.7);
+  }
+
+  .glokta-voice {
+    font-size: 21px;
+    line-height: 1.75;
+    color: rgba(220,210,180,0.82);
+    margin-bottom: 22px;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+  }
+
+  .inner-voice {
+    font-size: 19px;
+    line-height: 1.85;
+    color: rgba(200,180,130,0.6);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+  }
+
+  .key-line {
+    font-family: 'Cinzel', serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: #c8a855;
+    line-height: 1.5;
+    margin-bottom: 20px;
+    text-shadow:
+      0 0 28px rgba(190,160,60,0.4),
+      0 0 60px rgba(150,120,40,0.2),
+      0 2px 6px rgba(0,0,0,0.85);
+    animation: gold-glow 3.5s ease-in-out infinite alternate;
+  }
+  @keyframes gold-glow {
+    from { text-shadow: 0 0 20px rgba(190,160,60,0.2), 0 0 50px rgba(150,120,40,0.1); }
+    to   { text-shadow: 0 0 38px rgba(210,180,80,0.45), 0 0 80px rgba(170,140,50,0.25); }
+  }
+
+  .pain-line {
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: #a88858;
+    line-height: 1.6;
+    margin-bottom: 18px;
+    text-shadow:
+      0 0 18px rgba(160,130,70,0.3),
+      0 2px 6px rgba(0,0,0,0.85);
+  }
+
+  .context {
+    font-size: 16px;
+    line-height: 1.85;
+    color: rgba(180,165,130,0.4);
+    font-style: italic;
+    margin-bottom: 28px;
+  }
+
+  /* Inquisition seal */
+  .seal {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 22px;
+    opacity: 0.2;
+  }
+
+  .thin-sep {
+    width: 48px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(190,170,110,0.3), transparent);
+    margin: 0 auto 22px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: rgba(190,170,110,0.35);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="sky"></div>
+<div class="torchlight"></div>
+<div class="torchlight-2"></div>
+<div class="stone-texture"></div>
+
+<!-- Agriont architecture silhouette -->
+<svg style="position:fixed;bottom:0;left:0;right:0;height:350px;pointer-events:none;z-index:1;"
+     viewBox="0 0 1440 350" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="wallG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0e0c0a"/>
+      <stop offset="100%" stop-color="#080706"/>
+    </linearGradient>
+  </defs>
+
+  <!-- City walls and towers -->
+  <path d="M0 350 L0 260
+    L30 260 L30 240 L35 240 L35 260
+    L60 260 L60 240 L65 240 L65 260
+    L90 260 L90 240 L95 240 L95 260
+    L120 260 L120 220 L130 200 L140 220 L140 260
+    L180 260 L180 240 L185 240 L185 260
+    L210 260 L210 240 L215 240 L215 260
+    L250 260 L250 180 L260 155 L270 180 L270 260
+    L310 260 L310 240 L315 240 L315 260
+    L340 260 L340 240 L345 240 L345 260
+    L380 260 L380 230 L390 210 L400 230 L400 260
+    L440 260 L440 240 L445 240 L445 260
+    L480 260 L480 240 L485 240 L485 260
+    L520 260 L520 190 L528 160 L535 130 L542 160 L550 190 L550 260
+    L590 260 L590 240 L595 240 L595 260
+    L630 260 L630 240 L635 240 L635 260
+    L670 260 L670 220 L680 195 L690 220 L690 260
+    L730 260 L730 240 L735 240 L735 260
+    L770 260 L770 240 L775 240 L775 260
+    L810 260 L810 200 L820 170 L830 200 L830 260
+    L870 260 L870 240 L875 240 L875 260
+    L910 260 L910 240 L915 240 L915 260
+    L950 260 L950 175 L958 145 L965 115 L972 145 L980 175 L980 260
+    L1020 260 L1020 240 L1025 240 L1025 260
+    L1060 260 L1060 240 L1065 240 L1065 260
+    L1100 260 L1100 215 L1110 190 L1120 215 L1120 260
+    L1160 260 L1160 240 L1165 240 L1165 260
+    L1200 260 L1200 240 L1205 240 L1205 260
+    L1240 260 L1240 225 L1250 205 L1260 225 L1260 260
+    L1300 260 L1300 240 L1305 240 L1305 260
+    L1340 260 L1340 240 L1345 240 L1345 260
+    L1380 260 L1380 210 L1390 185 L1400 210 L1400 260
+    L1440 260 L1440 350 Z" fill="url(#wallG)"/>
+
+  <!-- Ground -->
+  <rect x="0" y="300" width="1440" height="50" fill="#060504"/>
+</svg>
+
+<div class="dust-layer" id="dustLayer"></div>
+<div class="drip-layer" id="dripLayer"></div>
+
+<div class="card">
+  <div class="cn tl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(190,170,110,0.35)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(190,170,110,0.25)"/>
+  </svg></div>
+  <div class="cn tr"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(190,170,110,0.35)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(190,170,110,0.25)"/>
+  </svg></div>
+  <div class="cn bl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(190,170,110,0.35)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(190,170,110,0.25)"/>
+  </svg></div>
+  <div class="cn br"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(190,170,110,0.35)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(190,170,110,0.25)"/>
+  </svg></div>
+
+  <p class="eyebrow">The First Law &mdash; The Blade Itself</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <!-- Inquisition scales icon -->
+    <svg width="22" height="22" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">
+      <line x1="11" y1="2" x2="11" y2="20" stroke="rgba(190,170,110,0.45)" stroke-width="1.2"/>
+      <line x1="3" y1="8" x2="19" y2="8" stroke="rgba(190,170,110,0.45)" stroke-width="1.2"/>
+      <path d="M3 8 Q3 14 6 14" stroke="rgba(190,170,110,0.35)" stroke-width="1" fill="none"/>
+      <path d="M19 8 Q19 14 16 14" stroke="rgba(190,170,110,0.35)" stroke-width="1" fill="none"/>
+      <circle cx="11" cy="2" r="1.5" fill="rgba(190,170,110,0.3)"/>
+      <line x1="7" y1="20" x2="15" y2="20" stroke="rgba(190,170,110,0.4)" stroke-width="1.2"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="inner-voice">
+    Why do I do this?
+  </p>
+
+  <p class="narrative">
+    The stairs were the worst part. Every step<br>
+    sent a lance of fire through his ruined leg,<br>
+    from hip to toe. He clutched the banister<br>
+    with white-knuckled fingers and dragged<br>
+    himself upward, one agonising step at a time.
+  </p>
+
+  <p class="glokta-voice">
+    "Body found floating by the docks.<br>
+    Water in the lungs. Water in the stomach.<br>
+    But that proves nothing, of course."
+  </p>
+
+  <p class="inner-voice">
+    We all have our pain. I have mine and<br>
+    you will have yours, before this is done.
+  </p>
+
+  <p class="key-line">
+    "We should forgive our enemies,<br>
+    but not before they are hanged."
+  </p>
+
+  <p class="narrative">
+    He paused on the landing, his leg<br>
+    screaming, his gums throbbing where<br>
+    his teeth had been, and smiled his<br>
+    toothless, ruined, merciless smile.
+  </p>
+
+  <p class="pain-line">
+    That's what Superior Glokta did.<br>
+    He made people afraid.<br>
+    He asked the questions no one else<br>
+    was willing to ask.
+  </p>
+
+  <p class="inner-voice">
+    And why? Because I have nothing left<br>
+    to lose. A cripple has few fears.
+  </p>
+
+  <div class="thin-sep" style="margin-top: 12px;"></div>
+
+  <!-- Inquisition seal -->
+  <svg class="seal" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="20" cy="20" r="18" stroke="rgba(190,170,110,0.5)" stroke-width="1" fill="none"/>
+    <circle cx="20" cy="20" r="14" stroke="rgba(190,170,110,0.3)" stroke-width="0.5" fill="none"/>
+    <!-- Eye of the Inquisition -->
+    <ellipse cx="20" cy="18" rx="8" ry="5" stroke="rgba(190,170,110,0.4)" stroke-width="1" fill="none"/>
+    <circle cx="20" cy="18" r="2.5" fill="rgba(190,170,110,0.25)"/>
+    <!-- Sword below -->
+    <line x1="20" y1="24" x2="20" y2="34" stroke="rgba(190,170,110,0.35)" stroke-width="1"/>
+    <line x1="17" y1="26" x2="23" y2="26" stroke="rgba(190,170,110,0.35)" stroke-width="1"/>
+  </svg>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">Sand dan Glokta<br>Superior of the Inquisition</p>
+</div>
+
+<script>
+  // Dust motes
+  const dustLayer = document.getElementById('dustLayer');
+  for (let i = 0; i < 20; i++) {
+    const el = document.createElement('div');
+    el.className = 'dust';
+    const sz = (Math.random() * 2.5 + 0.5).toFixed(1);
+    const dx = (Math.random() * 60 - 30).toFixed(0) + 'px';
+    const dy = (Math.random() * 40 - 50).toFixed(0) + 'px';
+    const dx2 = (Math.random() * 80 - 40).toFixed(0) + 'px';
+    const dy2 = (Math.random() * 60 - 70).toFixed(0) + 'px';
+    const op = (Math.random() * 0.3 + 0.1).toFixed(2);
+    el.style.cssText = `
+      width:${sz}px; height:${sz}px;
+      left:${Math.random() * 100}%;
+      top:${Math.random() * 40 + 50}%;
+      --d:${(Math.random() * 12 + 8).toFixed(1)}s;
+      --dx:${dx}; --dy:${dy};
+      --dx2:${dx2}; --dy2:${dy2};
+      --op:${op};
+      animation-delay:${(Math.random() * 15).toFixed(1)}s;
+    `;
+    dustLayer.appendChild(el);
+  }
+
+  // Dripping water
+  const dripLayer = document.getElementById('dripLayer');
+  for (let i = 0; i < 6; i++) {
+    const el = document.createElement('div');
+    el.className = 'drip';
+    el.style.cssText = `
+      left:${Math.random() * 100}%;
+      top:${Math.random() * 20}%;
+      --drip-d:${(Math.random() * 4 + 3).toFixed(1)}s;
+      animation-delay:${(Math.random() * 8).toFixed(1)}s;
+    `;
+    dripLayer.appendChild(el);
+  }
+</script>
+</body>
+</html>

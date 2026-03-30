@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Discworld - Death</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #030308;
+    font-family: 'Libre Baskerville', serif;
+  }
+
+  .void {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 90% 50% at 50% 100%, rgba(22, 28, 64, 0.25) 0%, transparent 60%),
+      radial-gradient(ellipse 70% 40% at 20% 30%, rgba(8, 14, 42, 0.2) 0%, transparent 65%),
+      radial-gradient(ellipse 60% 38% at 80% 20%, rgba(14, 8, 38, 0.22) 0%, transparent 60%),
+      linear-gradient(180deg, #06060e 0%, #030308 100%);
+  }
+
+  .sand-mist {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 38% 16% at 30% 80%, rgba(180, 190, 220, 0.05) 0%, transparent 70%),
+      radial-gradient(ellipse 44% 16% at 70% 84%, rgba(180, 190, 220, 0.05) 0%, transparent 72%),
+      radial-gradient(ellipse 56% 20% at 50% 100%, rgba(140, 160, 210, 0.04) 0%, transparent 70%);
+    animation: sandShift 14s ease-in-out infinite alternate;
+  }
+
+  @keyframes sandShift {
+    from { transform: translateY(0); opacity: 0.7; }
+    to { transform: translateY(-8px); opacity: 1; }
+  }
+
+  .star-layer,
+  .sand-layer,
+  .scythe-gleam-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .star-layer { z-index: 1; }
+  .sand-layer { z-index: 3; }
+  .scythe-gleam-layer { z-index: 4; }
+
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(200, 210, 240, 0.9);
+    animation: twinkle var(--d) ease-in-out infinite alternate;
+  }
+
+  @keyframes twinkle {
+    from { opacity: var(--o1); }
+    to { opacity: var(--o2); }
+  }
+
+  .grain {
+    position: absolute;
+    width: 1.5px;
+    height: 1.5px;
+    border-radius: 50%;
+    background: rgba(200, 195, 170, 0.6);
+    animation: sandFall var(--d) linear infinite;
+    opacity: 0;
+  }
+
+  @keyframes sandFall {
+    0% { transform: translate3d(0, -6vh, 0); opacity: 0; }
+    8% { opacity: 0.55; }
+    92% { opacity: 0.3; }
+    100% { transform: translate3d(var(--mx), 18vh, 0); opacity: 0; }
+  }
+
+  .gleam {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: rgba(180, 200, 255, 0.7);
+    box-shadow: 0 0 10px rgba(180, 200, 255, 0.4);
+    animation: gleamPulse var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+
+  @keyframes gleamPulse {
+    0% { transform: scale(0.5); opacity: 0; }
+    50% { transform: scale(1.2); opacity: 0.6; }
+    100% { transform: scale(0.5); opacity: 0; }
+  }
+
+  .card {
+    position: relative;
+    z-index: 20;
+    width: min(760px, calc(100vw - 40px));
+    padding: 62px 58px;
+    text-align: center;
+    border: 1px solid rgba(140, 160, 210, 0.18);
+    border-radius: 2px;
+    background: rgba(6, 6, 14, 0.88);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 0 90px rgba(60, 70, 120, 0.1), inset 0 0 72px rgba(0, 0, 0, 0.72);
+    animation: surface 2.6s ease forwards;
+    opacity: 0;
+  }
+
+  @keyframes surface {
+    from { transform: translateY(24px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .cn { position: absolute; width: 36px; height: 36px; }
+  .cn.tl { top: -1px; left: -1px; }
+  .cn.tr { top: -1px; right: -1px; transform: scaleX(-1); }
+  .cn.bl { bottom: -1px; left: -1px; transform: scaleY(-1); }
+  .cn.br { bottom: -1px; right: -1px; transform: scale(-1, -1); }
+
+  .eyebrow {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(140, 160, 210, 0.42);
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  .sep {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: fit-content;
+    margin: 0 auto 30px;
+  }
+
+  .sep-l,
+  .sep-r {
+    width: 82px;
+    height: 1px;
+  }
+
+  .sep-l { background: linear-gradient(90deg, transparent, rgba(140, 160, 210, 0.36)); }
+  .sep-r { background: linear-gradient(90deg, rgba(140, 160, 210, 0.36), transparent); }
+
+  .lead-quote {
+    font-size: 22px;
+    line-height: 1.85;
+    font-style: italic;
+    color: rgba(190, 200, 225, 0.65);
+    margin-bottom: 22px;
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.85);
+  }
+
+  .main-quote {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(26px, 3.8vw, 36px);
+    font-weight: 700;
+    line-height: 1.5;
+    letter-spacing: 2.5px;
+    color: #c8d4f0;
+    margin-bottom: 18px;
+    text-transform: uppercase;
+    text-shadow: 0 0 22px rgba(160, 180, 240, 0.3), 0 0 60px rgba(100, 120, 200, 0.1), 0 2px 8px rgba(0, 0, 0, 0.9);
+    animation: deathGlow 4s ease-in-out infinite alternate;
+  }
+
+  @keyframes deathGlow {
+    from { text-shadow: 0 0 16px rgba(160, 180, 240, 0.22), 0 0 42px rgba(100, 120, 200, 0.06), 0 2px 8px rgba(0, 0, 0, 0.9); }
+    to { text-shadow: 0 0 38px rgba(180, 200, 255, 0.48), 0 0 80px rgba(100, 120, 200, 0.14), 0 2px 8px rgba(0, 0, 0, 0.94); }
+  }
+
+  .badge-line {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(140, 160, 210, 0.35);
+    margin-bottom: 24px;
+  }
+
+  .context-line {
+    font-size: 19px;
+    line-height: 1.75;
+    font-style: italic;
+    color: rgba(170, 175, 200, 0.5);
+    margin-bottom: 36px;
+  }
+
+  .thin-sep {
+    width: 48px;
+    height: 1px;
+    margin: 0 auto 24px;
+    background: linear-gradient(90deg, transparent, rgba(140, 160, 210, 0.3), transparent);
+  }
+
+  .attribution,
+  .footer-line {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 3px;
+    line-height: 2;
+    text-transform: uppercase;
+  }
+
+  .attribution { color: rgba(140, 160, 210, 0.36); }
+  .footer-line {
+    margin-top: 16px;
+    color: rgba(100, 120, 180, 0.24);
+    letter-spacing: 4px;
+  }
+
+  @media (max-width: 640px) {
+    .card { padding: 44px 28px; }
+    .lead-quote { font-size: 20px; }
+    .context-line { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+<div class="void"></div>
+<div class="sand-mist"></div>
+
+<svg style="position:fixed;inset:0;pointer-events:none;z-index:2;" viewBox="0 0 1440 900" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="floorG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0e0e1a"/>
+      <stop offset="100%" stop-color="#040408"/>
+    </linearGradient>
+    <radialGradient id="hourglassGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(180, 195, 240, 0.12)"/>
+      <stop offset="60%" stop-color="rgba(120, 140, 200, 0.04)"/>
+      <stop offset="100%" stop-color="rgba(120, 140, 200, 0)"/>
+    </radialGradient>
+    <linearGradient id="scytheG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="rgba(180, 200, 240, 0.35)"/>
+      <stop offset="50%" stop-color="rgba(220, 230, 255, 0.6)"/>
+      <stop offset="100%" stop-color="rgba(140, 160, 210, 0.2)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Dark floor / domain of Death -->
+  <rect x="0" y="640" width="1440" height="260" fill="url(#floorG)"/>
+  <path d="M0 900 L0 740 Q360 710 720 740 Q1080 770 1440 730 L1440 900 Z" fill="rgba(4, 4, 8, 0.95)"/>
+
+  <!-- Subtle tile pattern on the floor -->
+  <g stroke="rgba(60, 65, 90, 0.1)" stroke-width="1">
+    <line x1="0" y1="760" x2="1440" y2="760"/>
+    <line x1="0" y1="800" x2="1440" y2="800"/>
+    <line x1="0" y1="840" x2="1440" y2="840"/>
+    <line x1="0" y1="880" x2="1440" y2="880"/>
+    <line x1="120" y1="700" x2="80" y2="900"/>
+    <line x1="300" y1="700" x2="260" y2="900"/>
+    <line x1="480" y1="700" x2="440" y2="900"/>
+    <line x1="660" y1="700" x2="620" y2="900"/>
+    <line x1="840" y1="700" x2="800" y2="900"/>
+    <line x1="1020" y1="700" x2="980" y2="900"/>
+    <line x1="1200" y1="700" x2="1160" y2="900"/>
+    <line x1="1380" y1="700" x2="1340" y2="900"/>
+  </g>
+
+  <!-- Giant hourglass silhouette (left) -->
+  <g transform="translate(200, 280)" opacity="0.08">
+    <path d="M-40 0 H40 L8 80 L40 160 H-40 L-8 80 Z" fill="rgba(180, 200, 240, 0.9)" stroke="rgba(180, 200, 240, 0.4)" stroke-width="1"/>
+    <!-- Sand grains inside -->
+    <circle cx="0" cy="76" r="1.5" fill="rgba(200, 190, 160, 0.8)">
+      <animate attributeName="cy" values="40;76;110;76;40" dur="6s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.8;0.4;0.8;0.4;0.8" dur="6s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Giant hourglass silhouette (right) -->
+  <g transform="translate(1240, 260)" opacity="0.08">
+    <path d="M-44 0 H44 L9 88 L44 176 H-44 L-9 88 Z" fill="rgba(180, 200, 240, 0.9)" stroke="rgba(180, 200, 240, 0.4)" stroke-width="1"/>
+    <circle cx="0" cy="84" r="1.5" fill="rgba(200, 190, 160, 0.8)">
+      <animate attributeName="cy" values="44;84;120;84;44" dur="7s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.8;0.4;0.8;0.4;0.8" dur="7s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Scythe silhouette (center background) -->
+  <g transform="translate(720, 120)" opacity="0.06">
+    <!-- Handle -->
+    <line x1="0" y1="0" x2="0" y2="520" stroke="rgba(140, 150, 180, 0.8)" stroke-width="4" stroke-linecap="round"/>
+    <!-- Blade -->
+    <path d="M0 20 Q-120 60 -180 140 Q-160 80 -40 40 Z" fill="url(#scytheG)"/>
+  </g>
+
+  <!-- Hourglass ambient glow -->
+  <circle cx="200" cy="360" r="120" fill="url(#hourglassGlow)"/>
+  <circle cx="1240" cy="348" r="130" fill="url(#hourglassGlow)"/>
+</svg>
+
+<div class="star-layer" id="starLayer"></div>
+<div class="sand-layer" id="sandLayer"></div>
+<div class="scythe-gleam-layer" id="gleamLayer"></div>
+
+<div class="card">
+  <div class="cn tl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(140,160,210,0.45)" stroke-width="2" fill="none"/><circle cx="2" cy="2" r="2.5" fill="rgba(140,160,210,0.32)"/></svg></div>
+  <div class="cn tr"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(140,160,210,0.45)" stroke-width="2" fill="none"/><circle cx="2" cy="2" r="2.5" fill="rgba(140,160,210,0.32)"/></svg></div>
+  <div class="cn bl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(140,160,210,0.45)" stroke-width="2" fill="none"/><circle cx="2" cy="2" r="2.5" fill="rgba(140,160,210,0.32)"/></svg></div>
+  <div class="cn br"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(140,160,210,0.45)" stroke-width="2" fill="none"/><circle cx="2" cy="2" r="2.5" fill="rgba(140,160,210,0.32)"/></svg></div>
+
+  <p class="eyebrow">Discworld &mdash; Death</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="22" height="34" viewBox="0 0 22 34" xmlns="http://www.w3.org/2000/svg">
+      <!-- Hourglass icon -->
+      <path d="M3 2 H19 L12 15 L19 28 H3 L10 15 Z" fill="none" stroke="rgba(140,160,210,0.5)" stroke-width="1.2"/>
+      <line x1="2" y1="2" x2="20" y2="2" stroke="rgba(140,160,210,0.4)" stroke-width="1.4"/>
+      <line x1="2" y1="28" x2="20" y2="28" stroke="rgba(140,160,210,0.4)" stroke-width="1.4"/>
+      <!-- Sand -->
+      <circle cx="11" cy="14" r="1" fill="rgba(200,190,160,0.5)">
+        <animate attributeName="cy" values="8;14;22;14;8" dur="4s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.5;0.3;0.5;0.3;0.5" dur="4s" repeatCount="indefinite"/>
+      </circle>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="lead-quote">
+    There is no justice.<br>
+    There is just me.
+  </p>
+
+  <p class="main-quote">
+    What can the harvest hope for,<br>
+    if not for the care<br>
+    of the reaper man?
+  </p>
+
+  <p class="badge-line">Scythe . Hourglass . Binky . Duty</p>
+
+  <p class="context-line">
+    The sand fell, one grain at a time, in the black hall where
+    the shelves stretched to infinity and every life had its own small glass,
+    counting down in silence.
+  </p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">Original homage text<br>Inspired by Terry Pratchett's Discworld</p>
+  <p class="footer-line">There Is No Darkness But Ignorance</p>
+</div>
+
+<script>
+  const starLayer = document.getElementById('starLayer');
+  for (let i = 0; i < 55; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    const size = Math.random() * 2 + 0.3;
+    const o1 = (Math.random() * 0.12 + 0.02).toFixed(2);
+    const o2 = (Math.random() * 0.2 + 0.1).toFixed(2);
+    star.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${Math.random() * 100}%;
+      top:${Math.random() * 48}%;
+      --o1:${o1};
+      --o2:${o2};
+      --d:${(Math.random() * 5 + 2).toFixed(1)}s;
+      animation-delay:${(Math.random() * 6).toFixed(1)}s;
+    `;
+    starLayer.appendChild(star);
+  }
+
+  // Sand grains falling in a narrow column (like an hourglass)
+  const sandLayer = document.getElementById('sandLayer');
+  for (let i = 0; i < 60; i++) {
+    const grain = document.createElement('div');
+    grain.className = 'grain';
+    const mx = (Math.random() * 20 - 10).toFixed(0) + 'px';
+    // Cluster sand around center and the two hourglass positions
+    const positions = [14, 50, 86];
+    const basePos = positions[Math.floor(Math.random() * 3)];
+    const leftPos = basePos + (Math.random() * 6 - 3);
+    grain.style.cssText = `
+      left:${leftPos}%;
+      top:${Math.random() * 40 + 30}%;
+      --mx:${mx};
+      --d:${(Math.random() * 4 + 3).toFixed(2)}s;
+      animation-delay:${(Math.random() * 8).toFixed(2)}s;
+    `;
+    sandLayer.appendChild(grain);
+  }
+
+  // Faint gleams (scythe-edge sparkles)
+  const gleamLayer = document.getElementById('gleamLayer');
+  for (let i = 0; i < 12; i++) {
+    const gleam = document.createElement('div');
+    gleam.className = 'gleam';
+    gleam.style.cssText = `
+      left:${Math.random() * 100}%;
+      top:${Math.random() * 60 + 10}%;
+      --d:${(Math.random() * 6 + 4).toFixed(1)}s;
+      animation-delay:${(Math.random() * 10).toFixed(1)}s;
+    `;
+    gleamLayer.appendChild(gleam);
+  }
+</script>
+</body>
+</html>

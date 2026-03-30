@@ -310,10 +310,12 @@ export const App: React.FC = () => {
       {/* Agent Teams widget: floating team status, appears when a team is active */}
       {teamActive && <TeamStatusWidget />}
 
+      {/* Search bar — available even without messages (for project-wide search) */}
+      {chatSearchOpen && <ChatSearchBar />}
+
       {/* Always show messages if they exist, regardless of connection state */}
       {hasMessages ? (
         <div className={`chat-area-wrapper ${summaryModeEnabled ? 'sm-split-layout' : ''} ${vpmEnabled ? 'vpm-split-layout' : ''}`}>
-          {chatSearchOpen && <ChatSearchBar />}
           {summaryModeEnabled && <SummaryModeWidget />}
           {vpmEnabled && <VisualProgressView />}
           <MessageList onScrollFractionChange={setScrollFraction} />

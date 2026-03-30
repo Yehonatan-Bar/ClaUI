@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LOTR - Theoden's Charge at Pelennor Fields</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Lora:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #080612;
+    overflow: hidden;
+    font-family: 'Lora', serif;
+  }
+
+  /* Pre-dawn sky turning gold at the horizon */
+  .sky {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 140% 45% at 50% 100%, rgba(210,155,50,0.45) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 35% at 30% 90%, rgba(185,100,30,0.25) 0%, transparent 45%),
+      radial-gradient(ellipse 70% 25% at 75% 85%, rgba(220,130,40,0.2) 0%, transparent 40%),
+      linear-gradient(to bottom, #04020a 0%, #0d0818 40%, #1a0c22 70%, #2a1520 100%);
+  }
+
+  /* Dawn glow pulsing at horizon */
+  .dawn-glow {
+    position: fixed;
+    width: 100%; height: 220px;
+    bottom: 0; left: 0;
+    background: radial-gradient(ellipse 70% 100% at 50% 100%, rgba(240,175,55,0.25) 0%, transparent 70%);
+    pointer-events: none;
+    animation: dawnPulse 6s ease-in-out infinite alternate;
+  }
+  @keyframes dawnPulse {
+    from { opacity: 0.5; }
+    to   { opacity: 1; }
+  }
+
+  /* Stars fading in dawn */
+  .stars { position: fixed; inset: 0; pointer-events: none; }
+  .star {
+    position: absolute;
+    border-radius: 50%;
+    animation: twFade var(--d) infinite ease-in-out alternate;
+  }
+  @keyframes twFade {
+    from { opacity: 0.05; }
+    to   { opacity: var(--max-o); }
+  }
+
+  /* Dust kicked up by horses */
+  .dust-layer { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  .dust {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(180,150,100,0.2);
+    animation: dustrise var(--d) ease-out infinite;
+    opacity: 0;
+  }
+  @keyframes dustrise {
+    0%   { opacity: 0; transform: translateY(0) scale(1); }
+    15%  { opacity: 0.5; }
+    100% { opacity: 0; transform: translateY(-120px) scale(3); }
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 740px;
+    text-align: center;
+    padding: 58px 52px;
+    border: 1px solid rgba(210,160,60,0.28);
+    background: rgba(6, 4, 14, 0.8);
+    backdrop-filter: blur(12px);
+    border-radius: 2px;
+    box-shadow:
+      0 0 70px rgba(210,155,50,0.18),
+      0 0 140px rgba(160,100,20,0.08),
+      inset 0 0 55px rgba(0,0,10,0.7);
+    animation: riseCard 2.6s ease forwards;
+    opacity: 0;
+  }
+  @keyframes riseCard {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Corner ornaments - horse/Rohan inspired */
+  .cn { position: absolute; width: 40px; height: 40px; }
+  .cn.tl { top:-1px; left:-1px; }
+  .cn.tr { top:-1px; right:-1px; transform: scaleX(-1); }
+  .cn.bl { bottom:-1px; left:-1px; transform: scaleY(-1); }
+  .cn.br { bottom:-1px; right:-1px; transform: scale(-1,-1); }
+
+  .eyebrow {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(210,170,80,0.5);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .age-line {
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: rgba(210,170,80,0.25);
+    margin-bottom: 28px;
+    font-style: italic;
+  }
+
+  .sep {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 auto 28px; width: fit-content;
+  }
+  .sep-l { width: 80px; height: 1px; background: linear-gradient(90deg, transparent, rgba(210,160,60,0.5)); }
+  .sep-r { width: 80px; height: 1px; background: linear-gradient(90deg, rgba(210,160,60,0.5), transparent); }
+
+  .rally-cry {
+    font-size: 20px;
+    line-height: 1.85;
+    color: rgba(225,200,150,0.75);
+    font-style: italic;
+    margin-bottom: 22px;
+    text-shadow: 0 2px 16px rgba(0,0,0,0.8);
+  }
+
+  .main-quote {
+    font-size: 28px;
+    line-height: 1.75;
+    color: #e8d5a8;
+    font-style: italic;
+    margin-bottom: 18px;
+    text-shadow: 0 0 28px rgba(210,160,60,0.25), 0 2px 8px rgba(0,0,12,0.8);
+  }
+  .main-quote .hl {
+    color: #ffd866;
+    font-weight: 600;
+    font-style: normal;
+    text-shadow: 0 0 24px rgba(240,195,55,0.6);
+  }
+
+  .battle-cry {
+    font-size: 42px;
+    font-weight: 700;
+    font-style: normal;
+    color: #ffc740;
+    letter-spacing: 6px;
+    line-height: 1.3;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    text-shadow:
+      0 0 35px rgba(255,195,40,0.7),
+      0 0 70px rgba(230,150,0,0.4),
+      0 2px 6px rgba(0,0,0,0.9);
+    animation: warCry 1.8s ease-in-out infinite alternate;
+  }
+  @keyframes warCry {
+    from { text-shadow: 0 0 25px rgba(255,190,30,0.5), 0 0 55px rgba(220,140,0,0.3); letter-spacing: 6px; }
+    to   { text-shadow: 0 0 50px rgba(255,210,50,0.9), 0 0 100px rgba(240,165,0,0.55); letter-spacing: 8px; }
+  }
+
+  .death-chant {
+    font-size: 32px;
+    font-weight: 600;
+    color: rgba(255,185,55,0.85);
+    letter-spacing: 14px;
+    margin-bottom: 36px;
+    text-shadow: 0 0 25px rgba(240,150,20,0.5);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+  }
+
+  .thin-sep {
+    width: 50px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(210,160,60,0.4), transparent);
+    margin: 0 auto 24px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 10px;
+    color: rgba(210,165,70,0.42);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="sky"></div>
+<div class="dawn-glow"></div>
+<div class="stars" id="stars"></div>
+
+<!-- Pelennor Fields landscape with Minas Tirith -->
+<svg style="position:fixed;bottom:0;left:0;right:0;height:300px;pointer-events:none;"
+     viewBox="0 0 1440 300" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="fieldG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1020"/>
+      <stop offset="100%" stop-color="#040208"/>
+    </linearGradient>
+    <radialGradient id="dawnG" cx="50%" cy="100%" r="60%">
+      <stop offset="0%" stop-color="#d4a030" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="towerG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8dcc8" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#0a0614" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Dawn glow on field -->
+  <ellipse cx="720" cy="300" rx="800" ry="200" fill="url(#dawnG)"/>
+
+  <!-- Mindolluin mountain behind Minas Tirith -->
+  <path d="M0 300 L60 200 L140 230 L200 165 L280 210 L340 140 L400 185 L440 300 Z" fill="#0c0818" opacity="0.8"/>
+
+  <!-- Minas Tirith - white city, tiered -->
+  <g opacity="0.35">
+    <!-- Base tier -->
+    <rect x="160" y="195" width="140" height="105" fill="url(#towerG)"/>
+    <!-- Second tier -->
+    <rect x="175" y="170" width="110" height="30" fill="rgba(200,190,170,0.1)"/>
+    <!-- Third tier -->
+    <rect x="190" y="150" width="80" height="25" fill="rgba(200,190,170,0.09)"/>
+    <!-- Fourth tier -->
+    <rect x="205" y="135" width="50" height="20" fill="rgba(200,190,170,0.08)"/>
+    <!-- Tower of Ecthelion -->
+    <rect x="222" y="95" width="16" height="45" fill="rgba(215,205,185,0.12)"/>
+    <polygon points="222,95 230,72 238,95" fill="rgba(220,210,190,0.14)"/>
+    <!-- Faint white gleam -->
+    <circle cx="230" cy="78" r="4" fill="rgba(240,235,220,0.15)"/>
+    <circle cx="230" cy="78" r="8" fill="rgba(220,215,200,0.05)"/>
+  </g>
+
+  <!-- Pelennor plain -->
+  <path d="M0 300 L0 248 Q360 220 720 238 Q1080 255 1440 240 L1440 300 Z" fill="url(#fieldG)"/>
+
+  <!-- Hills on the right (Emyn Arnen) -->
+  <path d="M1100 300 L1160 230 L1240 255 L1320 215 L1400 245 L1440 220 L1440 300 Z" fill="#0e0818" opacity="0.6"/>
+
+  <!-- Charging Rohirrim silhouettes (small, coming from right) -->
+  <g fill="rgba(15,8,4,0.9)">
+    <!-- Horse and rider shapes (simplified) -->
+    <g transform="translate(820, 248)">
+      <ellipse cx="0" cy="8" rx="12" ry="7"/><rect x="-2" y="-4" width="4" height="12"/>
+      <rect x="-1" y="-18" width="2" height="14"/><circle cx="0" cy="-20" r="4"/>
+    </g>
+    <g transform="translate(860, 252)">
+      <ellipse cx="0" cy="8" rx="11" ry="6"/><rect x="-2" y="-3" width="4" height="11"/>
+      <rect x="-1" y="-16" width="2" height="13"/><circle cx="0" cy="-18" r="3.5"/>
+    </g>
+    <g transform="translate(900, 250)">
+      <ellipse cx="0" cy="8" rx="12" ry="7"/><rect x="-2" y="-4" width="4" height="12"/>
+      <rect x="-1" y="-18" width="2" height="14"/><circle cx="0" cy="-20" r="4"/>
+    </g>
+    <g transform="translate(940, 254)">
+      <ellipse cx="0" cy="7" rx="10" ry="6"/><rect x="-2" y="-3" width="3" height="10"/>
+      <rect x="-1" y="-15" width="2" height="12"/><circle cx="0" cy="-17" r="3"/>
+    </g>
+    <g transform="translate(980, 252)">
+      <ellipse cx="0" cy="8" rx="11" ry="6"/><rect x="-2" y="-3" width="4" height="11"/>
+      <rect x="-1" y="-16" width="2" height="13"/><circle cx="0" cy="-18" r="3.5"/>
+    </g>
+    <g transform="translate(1020, 255)">
+      <ellipse cx="0" cy="7" rx="10" ry="6"/><rect x="-2" y="-3" width="3" height="10"/>
+      <rect x="-1" y="-15" width="2" height="12"/><circle cx="0" cy="-17" r="3"/>
+    </g>
+    <g transform="translate(1060, 251)">
+      <ellipse cx="0" cy="8" rx="11" ry="6"/><rect x="-2" y="-4" width="4" height="12"/>
+      <rect x="-1" y="-17" width="2" height="13"/><circle cx="0" cy="-19" r="3.5"/>
+    </g>
+    <g transform="translate(1100, 254)">
+      <ellipse cx="0" cy="7" rx="10" ry="6"/><rect x="-2" y="-3" width="3" height="10"/>
+      <rect x="-1" y="-15" width="2" height="12"/><circle cx="0" cy="-17" r="3"/>
+    </g>
+
+    <!-- Spears / lances -->
+    <line x1="820" y1="228" x2="808" y2="215" stroke="rgba(180,155,100,0.3)" stroke-width="1.5"/>
+    <line x1="860" y1="234" x2="848" y2="220" stroke="rgba(180,155,100,0.25)" stroke-width="1.5"/>
+    <line x1="900" y1="230" x2="888" y2="216" stroke="rgba(180,155,100,0.3)" stroke-width="1.5"/>
+    <line x1="940" y1="237" x2="928" y2="224" stroke="rgba(180,155,100,0.25)" stroke-width="1.5"/>
+    <line x1="1020" y1="235" x2="1008" y2="222" stroke="rgba(180,155,100,0.25)" stroke-width="1.5"/>
+    <line x1="1060" y1="232" x2="1048" y2="218" stroke="rgba(180,155,100,0.3)" stroke-width="1.5"/>
+  </g>
+
+  <!-- Theoden at the head - slightly larger, with banner -->
+  <g transform="translate(780, 244)" fill="rgba(12,6,2,0.92)">
+    <ellipse cx="0" cy="10" rx="14" ry="8"/>
+    <rect x="-3" y="-5" width="5" height="15"/>
+    <rect x="-1" y="-22" width="2" height="17"/>
+    <circle cx="0" cy="-24" r="5"/>
+    <!-- Crown hint -->
+    <path d="M-5,-28 L-3,-32 L0,-29 L3,-32 L5,-28" stroke="rgba(210,175,60,0.5)" stroke-width="1" fill="none"/>
+    <!-- Banner -->
+    <line x1="8" y1="-22" x2="8" y2="8" stroke="rgba(80,60,30,0.6)" stroke-width="1.5"/>
+    <path d="M8,-22 L28,-18 L28,-12 L8,-16 Z" fill="rgba(55,100,45,0.3)" stroke="rgba(210,170,60,0.2)" stroke-width="0.5"/>
+  </g>
+</svg>
+
+<div class="dust-layer" id="dustLayer"></div>
+
+<div class="card">
+  <div class="cn tl"><svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 26 M2 2 L26 2" stroke="rgba(210,160,60,0.55)" stroke-width="1.5" fill="none"/>
+    <path d="M2 2 Q8 8 14 6 Q8 12 6 18" stroke="rgba(210,160,60,0.3)" stroke-width="1" fill="none"/>
+  </svg></div>
+  <div class="cn tr"><svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 26 M2 2 L26 2" stroke="rgba(210,160,60,0.55)" stroke-width="1.5" fill="none"/>
+    <path d="M2 2 Q8 8 14 6 Q8 12 6 18" stroke="rgba(210,160,60,0.3)" stroke-width="1" fill="none"/>
+  </svg></div>
+  <div class="cn bl"><svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 26 M2 2 L26 2" stroke="rgba(210,160,60,0.55)" stroke-width="1.5" fill="none"/>
+    <path d="M2 2 Q8 8 14 6 Q8 12 6 18" stroke="rgba(210,160,60,0.3)" stroke-width="1" fill="none"/>
+  </svg></div>
+  <div class="cn br"><svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 26 M2 2 L26 2" stroke="rgba(210,160,60,0.55)" stroke-width="1.5" fill="none"/>
+    <path d="M2 2 Q8 8 14 6 Q8 12 6 18" stroke="rgba(210,160,60,0.3)" stroke-width="1" fill="none"/>
+  </svg></div>
+
+  <p class="eyebrow">The Lord of the Rings &mdash; The Return of the King</p>
+  <p class="age-line">&#9670; &nbsp; The Battle of the Pelennor Fields &nbsp; &#9670;</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="18" height="14" viewBox="0 0 18 14" xmlns="http://www.w3.org/2000/svg">
+      <!-- Horse head silhouette (Rohan symbol) -->
+      <path d="M2 12 Q2 6 6 4 Q8 3 9 1 Q10 3 12 4 Q16 6 16 10 L14 12 L12 10 Q10 11 8 10 Q6 11 4 10 L2 12 Z"
+            fill="rgba(210,170,60,0.6)"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="rally-cry">
+    Arise, arise, Riders of Th&eacute;oden!<br>
+    Spear shall be shaken, shield shall be splintered,<br>
+    a sword-day, a red day, ere the sun rises!
+  </p>
+
+  <p class="main-quote">
+    <span class="hl">Ride now, ride now!</span> Ride!<br>
+    Ride for ruin and the world's ending!
+  </p>
+
+  <p class="battle-cry">Death!</p>
+
+  <p class="death-chant">Death! &nbsp; Death! &nbsp; Death!</p>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">Th&eacute;oden King, Lord of the Mark<br>The Pelennor Fields &mdash; March 15, T.A. 3019</p>
+</div>
+
+<script>
+  // Stars - fading as dawn approaches
+  const starsEl = document.getElementById('stars');
+  for (let i = 0; i < 140; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2 + 0.3;
+    const yPos = Math.random() * 60; // stars mostly in upper sky
+    const maxO = (0.15 + (1 - yPos / 60) * 0.35).toFixed(2); // brighter higher up
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      top:${yPos}%;
+      left:${Math.random() * 100}%;
+      background:rgba(220,215,200,${(Math.random() * 0.4 + 0.3).toFixed(2)});
+      --d:${(Math.random() * 4 + 2).toFixed(1)}s;
+      --max-o:${maxO};
+      animation-delay:${(Math.random() * 6).toFixed(1)}s;
+    `;
+    starsEl.appendChild(s);
+  }
+
+  // Dust from charging horses
+  const dustEl = document.getElementById('dustLayer');
+  for (let i = 0; i < 30; i++) {
+    const el = document.createElement('div');
+    el.className = 'dust';
+    const size = Math.random() * 18 + 6;
+    el.style.cssText = `
+      width:${size}px; height:${size}px;
+      left:${50 + Math.random() * 40}%;
+      bottom:${2 + Math.random() * 12}%;
+      --d:${(Math.random() * 5 + 3).toFixed(1)}s;
+      animation-delay:${(Math.random() * 8).toFixed(1)}s;
+    `;
+    dustEl.appendChild(el);
+  }
+</script>
+</body>
+</html>

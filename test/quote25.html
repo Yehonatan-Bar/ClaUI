@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The First Law - Jezal dan Luthar (Before They Are Hanged)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #090b12;
+    overflow: hidden;
+    font-family: 'EB Garamond', serif;
+  }
+
+  /* Union luxury - velvet darks, old gold, candle smoke */
+  .sky {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 90% 55% at 50% 100%, rgba(18, 16, 20, 0.72) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 50% at 15% 20%, rgba(120, 95, 40, 0.12) 0%, transparent 50%),
+      radial-gradient(ellipse 70% 50% at 85% 18%, rgba(110, 90, 45, 0.1) 0%, transparent 50%),
+      radial-gradient(ellipse 80% 55% at 50% 0%, rgba(10, 12, 22, 0.82) 0%, transparent 58%);
+  }
+
+  .chandelier-glow {
+    position: fixed;
+    top: -140px;
+    left: 50%;
+    width: 620px;
+    height: 320px;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse, rgba(220, 185, 95, 0.08) 0%, transparent 62%);
+    pointer-events: none;
+    animation: chandelier-sway 8s ease-in-out infinite alternate;
+  }
+  @keyframes chandelier-sway {
+    from { transform: translateX(-50%) translateY(0); opacity: 0.72; }
+    to   { transform: translateX(-50%) translateY(8px); opacity: 1; }
+  }
+
+  .window-glow {
+    position: fixed;
+    top: 8%;
+    width: 280px;
+    height: 520px;
+    pointer-events: none;
+    background: linear-gradient(to bottom, rgba(180, 190, 220, 0.04), transparent 75%);
+    filter: blur(8px);
+    opacity: 0.75;
+  }
+  .window-glow.left { left: 6%; }
+  .window-glow.right { right: 6%; }
+
+  .marble-texture {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.045;
+    background-image:
+      repeating-linear-gradient(105deg, transparent, transparent 28px, rgba(185, 175, 150, 0.18) 29px, transparent 31px),
+      repeating-linear-gradient(25deg, transparent, transparent 46px, rgba(150, 140, 120, 0.12) 47px, transparent 49px);
+  }
+
+  .dust-layer { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+  .dust {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(220, 205, 165, 0.52);
+    animation: float-dust var(--d) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes float-dust {
+    0%   { transform: translate(0, 0); opacity: 0; }
+    20%  { opacity: var(--op); }
+    50%  { transform: translate(var(--dx), var(--dy)); opacity: var(--op); }
+    80%  { opacity: 0; }
+    100% { transform: translate(var(--dx2), var(--dy2)); opacity: 0; }
+  }
+
+  .spark-layer { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+  .spark {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: rgba(230, 205, 120, 0.75);
+    box-shadow: 0 0 8px rgba(220, 185, 90, 0.4);
+    animation: glint var(--g) ease-in-out infinite;
+    opacity: 0;
+  }
+  @keyframes glint {
+    0%, 100% { transform: scale(0.4); opacity: 0; }
+    40%      { transform: scale(1); opacity: var(--op); }
+    60%      { transform: scale(0.6); opacity: 0; }
+  }
+
+  .card {
+    position: relative;
+    z-index: 20;
+    max-width: 720px;
+    text-align: center;
+    padding: 58px 52px;
+    border: 1px solid rgba(190, 160, 90, 0.18);
+    background: rgba(10, 11, 18, 0.92);
+    backdrop-filter: blur(12px);
+    border-radius: 3px;
+    box-shadow:
+      0 0 80px rgba(130, 100, 45, 0.08),
+      0 0 160px rgba(75, 55, 25, 0.03),
+      inset 0 0 60px rgba(0, 0, 0, 0.72);
+    animation: surface 2.5s ease forwards;
+    opacity: 0;
+  }
+  @keyframes surface {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .cn { position: absolute; width: 36px; height: 36px; }
+  .cn.tl { top: -1px; left: -1px; }
+  .cn.tr { top: -1px; right: -1px; transform: scaleX(-1); }
+  .cn.bl { bottom: -1px; left: -1px; transform: scaleY(-1); }
+  .cn.br { bottom: -1px; right: -1px; transform: scale(-1, -1); }
+
+  .eyebrow {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 7px;
+    color: rgba(200, 175, 120, 0.42);
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  .sep {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 0 auto 30px;
+    width: fit-content;
+  }
+  .sep-l {
+    width: 80px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(190, 160, 90, 0.35));
+  }
+  .sep-r {
+    width: 80px;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(190, 160, 90, 0.35), transparent);
+  }
+
+  .narrative {
+    font-size: 18px;
+    line-height: 1.85;
+    color: rgba(200, 193, 176, 0.58);
+    font-style: italic;
+    margin-bottom: 24px;
+    text-shadow: 0 2px 15px rgba(0, 0, 0, 0.72);
+  }
+
+  .jezal-voice {
+    font-size: 22px;
+    line-height: 1.75;
+    color: rgba(225, 214, 188, 0.84);
+    margin-bottom: 22px;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.62);
+  }
+
+  .key-line {
+    font-family: 'Cinzel', serif;
+    font-size: 25px;
+    font-weight: 700;
+    color: #d6b46d;
+    line-height: 1.55;
+    margin-bottom: 20px;
+    text-shadow:
+      0 0 28px rgba(210, 170, 80, 0.36),
+      0 0 60px rgba(160, 120, 45, 0.18),
+      0 2px 6px rgba(0, 0, 0, 0.85);
+    animation: gold-glow 3.5s ease-in-out infinite alternate;
+  }
+  @keyframes gold-glow {
+    from { text-shadow: 0 0 20px rgba(210, 170, 80, 0.22), 0 0 50px rgba(160, 120, 45, 0.08); }
+    to   { text-shadow: 0 0 38px rgba(225, 190, 100, 0.4), 0 0 80px rgba(175, 135, 60, 0.2); }
+  }
+
+  .humility-line {
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: #b99a65;
+    line-height: 1.7;
+    margin-bottom: 18px;
+    text-shadow:
+      0 0 18px rgba(170, 140, 80, 0.24),
+      0 2px 6px rgba(0, 0, 0, 0.85);
+  }
+
+  .context {
+    font-size: 16px;
+    line-height: 1.85;
+    color: rgba(190, 176, 145, 0.44);
+    font-style: italic;
+    margin-bottom: 28px;
+  }
+
+  .laurel {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 22px;
+    opacity: 0.3;
+  }
+  .laurel svg { width: 34px; height: 18px; }
+
+  .thin-sep {
+    width: 48px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(190, 160, 90, 0.3), transparent);
+    margin: 0 auto 22px;
+  }
+
+  .attribution {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: rgba(200, 175, 120, 0.35);
+    letter-spacing: 3px;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="sky"></div>
+<div class="chandelier-glow"></div>
+<div class="window-glow left"></div>
+<div class="window-glow right"></div>
+<div class="marble-texture"></div>
+
+<!-- Union hall silhouette -->
+<svg style="position:fixed;bottom:0;left:0;right:0;height:360px;pointer-events:none;z-index:1;"
+     viewBox="0 0 1440 360" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="hallG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#11141e"/>
+      <stop offset="100%" stop-color="#07080d"/>
+    </linearGradient>
+  </defs>
+
+  <path d="M0 360 L0 250
+    L70 250 L70 210 L95 210 L95 250
+    L150 250 L150 180 L170 160 L190 180 L190 250
+    L250 250 L250 205 L270 205 L270 250
+    L330 250 L330 190 L345 175 L360 190 L360 250
+    L450 250 L450 150 L490 120 L530 150 L530 250
+    L620 250 L620 205 L640 205 L640 250
+    L690 250 L690 145 L720 115 L750 145 L750 250
+    L820 250 L820 205 L840 205 L840 250
+    L900 250 L900 170 L920 150 L940 170 L940 250
+    L1030 250 L1030 205 L1050 205 L1050 250
+    L1110 250 L1110 180 L1135 160 L1160 180 L1160 250
+    L1240 250 L1240 210 L1265 210 L1265 250
+    L1320 250 L1320 190 L1340 175 L1360 190 L1360 250
+    L1440 250 L1440 360 Z" fill="url(#hallG)"/>
+
+  <!-- Central facade -->
+  <g opacity="0.85">
+    <rect x="590" y="90" width="260" height="160" fill="#0d1018"/>
+    <polygon points="570,90 720,40 870,90" fill="#0b0d14"/>
+    <rect x="690" y="150" width="60" height="100" fill="#090b12"/>
+    <rect x="620" y="120" width="22" height="130" fill="#0a0c13"/>
+    <rect x="670" y="120" width="22" height="130" fill="#0a0c13"/>
+    <rect x="748" y="120" width="22" height="130" fill="#0a0c13"/>
+    <rect x="798" y="120" width="22" height="130" fill="#0a0c13"/>
+  </g>
+
+  <!-- Banners -->
+  <path d="M610 102 L642 102 L636 160 L626 170 L616 160 Z" fill="rgba(120, 25, 25, 0.2)"/>
+  <path d="M798 102 L830 102 L824 160 L814 170 L804 160 Z" fill="rgba(120, 25, 25, 0.2)"/>
+
+  <rect x="0" y="304" width="1440" height="56" fill="#05070d"/>
+</svg>
+
+<div class="dust-layer" id="dustLayer"></div>
+<div class="spark-layer" id="sparkLayer"></div>
+
+<div class="card">
+  <div class="cn tl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(190, 160, 90, 0.38)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(190, 160, 90, 0.28)"/>
+  </svg></div>
+  <div class="cn tr"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(190, 160, 90, 0.38)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(190, 160, 90, 0.28)"/>
+  </svg></div>
+  <div class="cn bl"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(190, 160, 90, 0.38)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(190, 160, 90, 0.28)"/>
+  </svg></div>
+  <div class="cn br"><svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2 2 L2 24 M2 2 L24 2" stroke="rgba(190, 160, 90, 0.38)" stroke-width="1.5" fill="none"/>
+    <circle cx="2" cy="2" r="2" fill="rgba(190, 160, 90, 0.28)"/>
+  </svg></div>
+
+  <p class="eyebrow">The First Law &mdash; Before They Are Hanged</p>
+
+  <div class="sep">
+    <div class="sep-l"></div>
+    <svg width="20" height="26" viewBox="0 0 20 26" xmlns="http://www.w3.org/2000/svg">
+      <line x1="10" y1="2" x2="10" y2="20" stroke="rgba(190, 160, 90, 0.5)" stroke-width="1.5"/>
+      <path d="M6 20 L10 25 L14 20" stroke="rgba(190, 160, 90, 0.45)" stroke-width="1.2" fill="none"/>
+      <line x1="4" y1="8" x2="16" y2="8" stroke="rgba(190, 160, 90, 0.45)" stroke-width="1.2"/>
+      <circle cx="10" cy="2" r="1.6" fill="rgba(190, 160, 90, 0.35)"/>
+    </svg>
+    <div class="sep-r"></div>
+  </div>
+
+  <p class="narrative">
+    The mirrors of Adua had always been kind.<br>
+    A straight back, a polished coat, a smile<br>
+    rehearsed in candlelight; they could make<br>
+    vanity look perilously close to virtue.
+  </p>
+
+  <p class="jezal-voice">
+    "A man can live a long time on applause,<br>
+    if no one has yet asked him for courage."
+  </p>
+
+  <p class="narrative">
+    But campaign roads, cold camps, and ugly<br>
+    choices had a way of scraping gilt from the soul.<br>
+    Underneath the shine there had to be something<br>
+    sturdier than pride, or nothing at all.
+  </p>
+
+  <p class="key-line">
+    "Glory is only noise.<br>
+    The hard part is becoming worth the noise."
+  </p>
+
+  <p class="humility-line">
+    Rank lends shine.<br>
+    Suffering lends shape.
+  </p>
+
+  <p class="context">
+    The Union taught him how to bow in the right rooms.<br>
+    Defeat taught him how to stand when no one was looking.
+  </p>
+
+  <div class="thin-sep" style="margin-top: 12px;"></div>
+
+  <div class="laurel">
+    <svg viewBox="0 0 34 18" xmlns="http://www.w3.org/2000/svg">
+      <path d="M31 2 C25 5 22 9 20 16" stroke="rgba(190, 160, 90, 0.45)" stroke-width="1.2" fill="none"/>
+      <path d="M27 3 L24 5 M25 6 L22 8 M23 9 L20 11 M21 12 L18 14" stroke="rgba(190, 160, 90, 0.35)" stroke-width="1"/>
+    </svg>
+    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="9" cy="9" r="7" stroke="rgba(190, 160, 90, 0.38)" stroke-width="1" fill="none"/>
+      <circle cx="9" cy="9" r="2" fill="rgba(190, 160, 90, 0.22)"/>
+    </svg>
+    <svg viewBox="0 0 34 18" xmlns="http://www.w3.org/2000/svg" style="transform:scaleX(-1);">
+      <path d="M31 2 C25 5 22 9 20 16" stroke="rgba(190, 160, 90, 0.45)" stroke-width="1.2" fill="none"/>
+      <path d="M27 3 L24 5 M25 6 L22 8 M23 9 L20 11 M21 12 L18 14" stroke="rgba(190, 160, 90, 0.35)" stroke-width="1"/>
+    </svg>
+  </div>
+
+  <div class="thin-sep"></div>
+  <p class="attribution">Jezal dan Luthar<br>Officer of the King's Own</p>
+</div>
+
+<script>
+  const dustLayer = document.getElementById('dustLayer');
+  for (let i = 0; i < 22; i++) {
+    const el = document.createElement('div');
+    el.className = 'dust';
+    const sz = (Math.random() * 2.6 + 0.6).toFixed(1);
+    const dx = (Math.random() * 70 - 35).toFixed(0) + 'px';
+    const dy = (Math.random() * 36 - 48).toFixed(0) + 'px';
+    const dx2 = (Math.random() * 90 - 45).toFixed(0) + 'px';
+    const dy2 = (Math.random() * 50 - 60).toFixed(0) + 'px';
+    const op = (Math.random() * 0.28 + 0.1).toFixed(2);
+    el.style.cssText = `
+      width:${sz}px; height:${sz}px;
+      left:${Math.random() * 100}%;
+      top:${Math.random() * 48 + 32}%;
+      --d:${(Math.random() * 13 + 8).toFixed(1)}s;
+      --dx:${dx}; --dy:${dy};
+      --dx2:${dx2}; --dy2:${dy2};
+      --op:${op};
+      animation-delay:${(Math.random() * 15).toFixed(1)}s;
+    `;
+    dustLayer.appendChild(el);
+  }
+
+  const sparkLayer = document.getElementById('sparkLayer');
+  for (let i = 0; i < 12; i++) {
+    const el = document.createElement('div');
+    el.className = 'spark';
+    const op = (Math.random() * 0.45 + 0.2).toFixed(2);
+    el.style.cssText = `
+      left:${Math.random() * 70 + 15}%;
+      top:${Math.random() * 30 + 8}%;
+      --g:${(Math.random() * 4 + 2.5).toFixed(1)}s;
+      --op:${op};
+      animation-delay:${(Math.random() * 8).toFixed(1)}s;
+    `;
+    sparkLayer.appendChild(el);
+  }
+</script>
+</body>
+</html>

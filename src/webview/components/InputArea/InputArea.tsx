@@ -597,7 +597,7 @@ export const InputArea: React.FC = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [text, pendingImages, isConnected, inputLockedByHandoff, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer, promptTranslateEnabled, autoTranslateEnabled, isTranslatingPrompt, setIsTranslatingPrompt, isCodexBusy, codexSteerArmed, logUiDebug, ultrathinkMode, isUsageLimitMode]);
+  }, [text, pendingImages, isConnected, inputLockedByHandoff, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer, promptTranslateEnabled, autoTranslateEnabled, isTranslatingPrompt, setIsTranslatingPrompt, isCodexBusy, codexSteerArmed, logUiDebug, ultrathinkMode, isUsageLimitMode, scheduleMessageEnabled, scheduleMessageAtMs]);
 
   /** Cancel the in-flight request */
   const cancelRequest = useCallback(() => {
