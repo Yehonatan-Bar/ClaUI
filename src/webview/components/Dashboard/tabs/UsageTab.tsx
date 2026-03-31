@@ -105,10 +105,13 @@ export const UsageTab: React.FC = () => {
     return groups;
   }, [usageStats]);
 
-  // Always show the standard periods, even if API didn't return data for some of them.
+  // Only show periods that have data (the API only returns a subset of all possible periods).
   const availablePeriods = React.useMemo(() => {
-    const unknown = Object.keys(periodGroups).filter((p) => !PERIOD_ORDER.includes(p));
-    return [...PERIOD_ORDER, ...unknown];
+    const withData = Object.keys(periodGroups).filter(p => (periodGroups[p]?.length ?? 0) > 0);
+    // Sort by preferred order, then append any unknown periods
+    const ordered = PERIOD_ORDER.filter(p => withData.includes(p));
+    const unknown = withData.filter(p => !PERIOD_ORDER.includes(p));
+    return [...ordered, ...unknown];
   }, [periodGroups]);
 
   // Auto-select a period with data when possible, otherwise keep/show first tab.

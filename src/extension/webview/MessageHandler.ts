@@ -3276,6 +3276,11 @@ export class MessageHandler {
     const fetcher = new UsageFetcher(cliPath, apiKey);
     const result = await fetcher.fetch();
     this.log(`Usage fetch result: ${result.stats.length} stats, error=${result.error ?? 'none'}`);
+    // Diagnostic: log raw API response once to see which period buckets Anthropic returns.
+    // Remove after investigation is complete.
+    if (result.rawDiagnostic) {
+      this.log(`[USAGE_RAW_API] Full response:\n${result.rawDiagnostic}`);
+    }
     this.webview.postMessage({
       type: 'usageData',
       stats: result.stats,

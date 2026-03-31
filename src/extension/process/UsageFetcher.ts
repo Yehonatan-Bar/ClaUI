@@ -8,6 +8,8 @@ export interface UsageFetchResult {
   stats: UsageStat[];
   fetchedAt: number;
   error?: string;
+  /** Raw API response dump for diagnostics (temporary — remove after investigation) */
+  rawDiagnostic?: string;
 }
 
 interface OAuthCredentials {
@@ -119,11 +121,19 @@ export class UsageFetcher {
 
     try {
       const data = await this.callUsageApi(accessToken);
+
+      // One-time diagnostic: capture raw API response for logging.
+      // Remove this block after investigation is complete.
+      let rawDiagnostic: string | undefined;
+      try {
+        rawDiagnostic = JSON.stringify(data, null, 2);
+      } catch { /* diagnostic only */ }
+
       const stats = this.parseResponse(data);
       if (stats.length === 0) {
-        return { stats: [], fetchedAt: Date.now(), error: 'No usage data returned by API.' };
+        return { stats: [], fetchedAt: Date.now(), error: 'No usage data returned by API.', rawDiagnostic };
       }
-      return { stats, fetchedAt: Date.now() };
+      return { stats, fetchedAt: Date.now(), rawDiagnostic };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return { stats: [], fetchedAt: Date.now(), error: msg };
