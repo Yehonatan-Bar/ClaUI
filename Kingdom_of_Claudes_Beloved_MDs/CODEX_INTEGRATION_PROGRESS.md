@@ -1,5 +1,12 @@
 # Codex Integration Progress
 
+## 2026-04-09 - Codex scheduled messages support
+
+- Wired `scheduleMessage` / `cancelScheduledMessage` into `CodexMessageHandler`.
+- Added Codex-side scheduled prompt state, timer dispatch, and webview sync via `scheduledMessageState`.
+- Scheduled prompts now survive webview reloads in Codex tabs, show the same banner/status as Claude, and are cleared on Codex session lifecycle actions (`start`, `resume`, `stop`, `clear`, `edit-and-resend`).
+- When the timer fires during an active Codex turn, dispatch is retried after 15 seconds instead of being dropped immediately.
+
 ## Codex CLI Error Detection and Auto-Detect Validation
 
 **CLI Missing Detection** (`CodexSessionTab.isLikelyCodexCliMissing()`):

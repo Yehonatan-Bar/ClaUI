@@ -21,6 +21,7 @@ import type {
   TurnRecord,
   TurnCategory,
   TypingTheme,
+  WebviewImageData,
   WebviewToExtensionMessage,
 } from '../types/webview-messages';
 
@@ -118,6 +119,10 @@ export class CodexMessageHandler {
   private lastPostedUserMsg: { text: string; time: number } | null = null;
   /** One-time handoff context staged by provider switch. Injected on first user turn only. */
   private pendingHandoffPrompt: string | null = null;
+  /** User-scheduled message queued for future dispatch. */
+  private scheduledPrompt: { text: string; images?: WebviewImageData[] } | null = null;
+  private scheduledPromptAtMs: number | null = null;
+  private scheduledPromptTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Set extension metadata for bug reports */
   setExtensionMeta(version: string, logDir: string): void {
@@ -241,6 +246,152 @@ export class CodexMessageHandler {
     return { text, consumeOnSuccess: true };
   }
 
+  private formatScheduledTime(ms: number): string {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(new Date(ms));
+  }
+
+  private postScheduledMessageState(summary?: string): void {
+    this.postToWebview({
+      type: 'scheduledMessageState',
+      scheduled: !!this.scheduledPrompt,
+      text: this.scheduledPrompt?.text?.slice(0, 80),
+      scheduledAtMs: this.scheduledPromptAtMs ?? undefined,
+      summary,
+    });
+  }
+
+  private clearScheduledPromptTimer(): void {
+    if (this.scheduledPromptTimer) {
+      clearTimeout(this.scheduledPromptTimer);
+      this.scheduledPromptTimer = null;
+    }
+  }
+
+  private clearScheduledPromptState(notifyWebview: boolean): void {
+    this.clearScheduledPromptTimer();
+    this.scheduledPrompt = null;
+    this.scheduledPromptAtMs = null;
+    if (notifyWebview) {
+      this.postScheduledMessageState();
+    }
+  }
+
+  private schedulePromptDispatch(delayMs?: number): void {
+    if (!this.scheduledPrompt || this.scheduledPromptAtMs == null) {
+      return;
+    }
+    this.clearScheduledPromptTimer();
+    const computedDelay = delayMs != null
+      ? Math.max(0, delayMs)
+      : Math.max(0, this.scheduledPromptAtMs - Date.now());
+    this.scheduledPromptTimer = setTimeout(() => {
+      this.scheduledPromptTimer = null;
+      this.tryDispatchScheduledPrompt();
+    }, computedDelay);
+  }
+
+  private buildPromptContent(text: string, images?: WebviewImageData[]): ContentBlock[] {
+    const content: ContentBlock[] = [];
+    if (text) {
+      content.push({ type: 'text', text });
+    }
+    for (const img of images ?? []) {
+      content.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: img.mediaType,
+          data: img.base64,
+        },
+      });
+    }
+    return content;
+  }
+
+  private async dispatchPrompt(text: string, images?: WebviewImageData[], opts?: { steer?: boolean }): Promise<void> {
+    const normalizedImages = images && images.length > 0 ? images : undefined;
+    if (text.trim()) {
+      this.achievementService.onUserPrompt(this.tabId, text);
+      void this.promptHistoryStore.addPrompt(text);
+    }
+    const content = this.buildPromptContent(text, normalizedImages);
+    this.postUserMessage(content, true);
+    this.postToWebview({ type: 'processBusy', busy: true });
+
+    const deferred = this.buildDeferredHandoffPayload(text, { imageCount: normalizedImages?.length ?? 0 });
+    try {
+      if (normalizedImages) {
+        await this.session.sendWithImages(deferred.text, normalizedImages, { steer: !!opts?.steer });
+      } else {
+        await this.session.sendText(deferred.text, { steer: !!opts?.steer });
+      }
+      if (deferred.consumeOnSuccess) {
+        this.pendingHandoffPrompt = null;
+      }
+    } catch (err) {
+      this.postToWebview({ type: 'processBusy', busy: this.session.isTurnRunning() });
+      throw err;
+    }
+  }
+
+  private tryDispatchScheduledPrompt(): void {
+    if (!this.scheduledPrompt || this.scheduledPromptAtMs == null) {
+      return;
+    }
+    if (!this.session.isSessionActive()) {
+      this.log('[ScheduledMessage][Codex] Session not active at fire time; clearing scheduled prompt');
+      this.clearScheduledPromptState(true);
+      this.postToWebview({
+        type: 'error',
+        message: 'Scheduled message cancelled: session is not running.',
+      });
+      return;
+    }
+    if (this.session.isTurnRunning() && this.session.isBusyState()) {
+      this.log('[ScheduledMessage][Codex] Turn busy at fire time; retrying in 15s');
+      this.schedulePromptDispatch(15_000);
+      return;
+    }
+
+    const queued = this.scheduledPrompt;
+    void this.dispatchPrompt(queued.text, queued.images)
+      .then(() => {
+        this.clearScheduledPromptState(true);
+      })
+      .catch((err) => {
+        const message = this.errMsg(err);
+        this.log(`[ScheduledMessage][Codex] Scheduled prompt dispatch failed: ${message}`);
+        this.postToWebview({
+          type: 'error',
+          message: `Failed to send scheduled message: ${message}`,
+        });
+        this.schedulePromptDispatch(15_000);
+      });
+  }
+
+  private scheduleMessage(text: string, scheduledAtMs: number, images?: WebviewImageData[]): void {
+    const normalizedImages = images && images.length > 0 ? images : undefined;
+    const hasPayload = text.trim().length > 0 || !!normalizedImages;
+    if (!hasPayload) {
+      return;
+    }
+
+    const wasScheduled = !!this.scheduledPrompt;
+    this.scheduledPrompt = { text, images: normalizedImages };
+    this.scheduledPromptAtMs = scheduledAtMs;
+    this.schedulePromptDispatch();
+
+    const scheduledLabel = this.formatScheduledTime(scheduledAtMs);
+    const summary = wasScheduled
+      ? `Scheduled message updated. Will send at ${scheduledLabel}.`
+      : `Message scheduled for ${scheduledLabel}.`;
+    this.postScheduledMessageState(summary);
+    this.log(`[ScheduledMessage][Codex] Prompt scheduled for ${scheduledLabel} (updated=${wasScheduled})`);
+  }
+
   initialize(): void {
     this.bindWebviewMessages();
     this.bindDemuxEvents();
@@ -283,6 +434,7 @@ export class CodexMessageHandler {
         }
 
         case 'startSession':
+          this.clearScheduledPromptState(true);
           this.clearPendingHandoffPrompt();
           void this.session.startSession({ cwd: msg.workspacePath }).catch((err) => {
             this.webview.postMessage({ type: 'error', message: `Failed to start Codex session: ${this.errMsg(err)}` });
@@ -290,6 +442,7 @@ export class CodexMessageHandler {
           break;
 
         case 'resumeSession':
+          this.clearScheduledPromptState(true);
           this.clearPendingHandoffPrompt();
           void this.session.startSession({ resume: msg.sessionId }).catch((err) => {
             this.webview.postMessage({ type: 'error', message: `Failed to resume Codex session: ${this.errMsg(err)}` });
@@ -297,11 +450,13 @@ export class CodexMessageHandler {
           break;
 
         case 'stopSession':
+          this.clearScheduledPromptState(true);
           this.clearPendingHandoffPrompt();
           this.session.stopSession();
           break;
 
         case 'clearSession':
+          this.clearScheduledPromptState(true);
           this.clearPendingHandoffPrompt();
           void this.session.clearSession({ cwd: msg.workspacePath }).catch((err) => {
             this.webview.postMessage({ type: 'error', message: `Failed to clear Codex session: ${this.errMsg(err)}` });
@@ -317,25 +472,11 @@ export class CodexMessageHandler {
             });
             break;
           }
-          this.achievementService.onUserPrompt(this.tabId, msg.text);
-          void this.promptHistoryStore.addPrompt(msg.text);
-          this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock], true);
-          this.postToWebview({ type: 'processBusy', busy: true });
-          {
-            const deferred = this.buildDeferredHandoffPayload(msg.text);
-            void this.session.sendText(deferred.text, { steer: !!msg.steer })
-              .then(() => {
-                if (deferred.consumeOnSuccess) {
-                  this.pendingHandoffPrompt = null;
-                }
-              })
-              .catch((err) => {
-                const message = this.errMsg(err);
-                this.log(`Codex sendText failed: ${message}`);
-                this.postToWebview({ type: 'processBusy', busy: this.session.isTurnRunning() });
-                this.postToWebview({ type: 'error', message: `Failed to send Codex message: ${message}` });
-              });
-          }
+          void this.dispatchPrompt(msg.text, undefined, { steer: !!msg.steer }).catch((err) => {
+            const message = this.errMsg(err);
+            this.log(`Codex sendText failed: ${message}`);
+            this.postToWebview({ type: 'error', message: `Failed to send Codex message: ${message}` });
+          });
           break;
 
         case 'sendMessageWithImages': {
@@ -347,43 +488,22 @@ export class CodexMessageHandler {
             });
             break;
           }
-          if (msg.text.trim()) {
-            this.achievementService.onUserPrompt(this.tabId, msg.text);
-            void this.promptHistoryStore.addPrompt(msg.text);
-          }
-          const content: ContentBlock[] = [];
-          if (msg.text) {
-            content.push({ type: 'text', text: msg.text });
-          }
-          for (const img of msg.images) {
-            content.push({
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: img.mediaType,
-                data: img.base64,
-              },
-            });
-          }
-          this.postUserMessage(content, true);
-          this.postToWebview({ type: 'processBusy', busy: true });
-          {
-            const deferred = this.buildDeferredHandoffPayload(msg.text, { imageCount: msg.images.length });
-            void this.session.sendWithImages(deferred.text, msg.images, { steer: !!msg.steer })
-              .then(() => {
-                if (deferred.consumeOnSuccess) {
-                  this.pendingHandoffPrompt = null;
-                }
-              })
-              .catch((err) => {
-                const message = this.errMsg(err);
-                this.log(`Codex sendWithImages failed: ${message}`);
-                this.postToWebview({ type: 'processBusy', busy: this.session.isTurnRunning() });
-                this.postToWebview({ type: 'error', message: `Failed to send Codex message with images: ${message}` });
-              });
-          }
+          void this.dispatchPrompt(msg.text, msg.images, { steer: !!msg.steer }).catch((err) => {
+            const message = this.errMsg(err);
+            this.log(`Codex sendWithImages failed: ${message}`);
+            this.postToWebview({ type: 'error', message: `Failed to send Codex message with images: ${message}` });
+          });
           break;
         }
+
+        case 'scheduleMessage':
+          this.scheduleMessage(msg.text, msg.scheduledAtMs, msg.images);
+          break;
+
+        case 'cancelScheduledMessage':
+          this.log('[ScheduledMessage][Codex] User cancelled scheduled message');
+          this.clearScheduledPromptState(true);
+          break;
 
         case 'cancelRequest':
           this.achievementService.onCancel(this.tabId);
@@ -647,6 +767,7 @@ export class CodexMessageHandler {
         }
 
         case 'editAndResend':
+          this.clearScheduledPromptState(true);
           if (msg.text.trim()) {
             void this.promptHistoryStore.addPrompt(msg.text);
           }
@@ -930,6 +1051,7 @@ export class CodexMessageHandler {
     this.sendCodexModelSetting();
     this.sendCodexModelOptions();
     this.sendCodexReasoningEffortSetting();
+    this.postScheduledMessageState();
     void this.sendApiKeySetting();
   }
 
