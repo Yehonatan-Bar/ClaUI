@@ -364,6 +364,39 @@ export class MessageHandler {
     this.pendingHandoffPrompt = null;
   }
 
+  /**
+   * Reset deferred/session-bound UI state when the host starts/stops/restarts a
+   * session outside the normal webview command flow.
+   */
+  resetTransientStateForHostLifecycle(
+    reason: string,
+    options?: { notifyWebview?: boolean; clearHandoff?: boolean },
+  ): void {
+    const notifyWebview = options?.notifyWebview ?? true;
+    const clearHandoff = options?.clearHandoff ?? true;
+    this.log(`[Lifecycle] Resetting deferred state (${reason})`);
+    this.clearUsageLimitState(`host lifecycle: ${reason}`, {
+      notifyWebview,
+      clearQueuedPrompt: true,
+    });
+    this.clearScheduledPromptState(notifyWebview);
+    this.exitPlanModeBarActive = false;
+    this.cancelExitPlanApproveResumeFallback();
+    this.cancelPostApproveNudge();
+    this.clearApprovalTracking();
+    this.clearCodexConsultTimeout();
+    this._codexConsultStartedAt = null;
+    if (clearHandoff) {
+      this.clearPendingHandoffPrompt();
+    }
+  }
+
+  dispose(): void {
+    this.resetTransientStateForHostLifecycle('handler dispose', {
+      notifyWebview: false,
+    });
+  }
+
   /** Attach a SessionNamer for auto-generating tab titles */
   setSessionNamer(namer: SessionNamer): void {
     this.sessionNamer = namer;

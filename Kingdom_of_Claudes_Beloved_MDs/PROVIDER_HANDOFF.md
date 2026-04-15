@@ -1,4 +1,4 @@
-# Provider Handoff (Claude <-> Codex)
+# Provider Handoff (Claude Code <-> Codex)
 
 ## Goal
 
@@ -6,7 +6,7 @@ Allow switching providers mid-session while preserving practical task continuity
 
 ## What Happens
 
-1. User triggers `Switch (Carry Context)` from status bar (or command palette command).
+1. User triggers `Switch (Carry Context)` from the status bar, `Carry to Claude Code` from a Codex tab, or a command palette command.
 2. Extension validates source tab is idle and handoff feature is enabled.
 3. Source tab snapshot is collected and normalized.
 4. A `HandoffCapsule` is built and (optionally) persisted as JSON/Markdown artifact under managed logs.
@@ -37,6 +37,12 @@ Allow switching providers mid-session while preserving practical task continuity
 
 - `claudeMirror.handoff.enabled`
 - `claudeMirror.handoff.storeArtifacts`
+
+## Direct Codex -> Claude Code Entry Points
+
+- AI chip CTA in Codex tabs: `Carry to Claude Code`
+- Command palette: `ClaUi: Carry Codex Session to Claude Code`
+- Generic command remains available: `ClaUi: Switch Provider (Carry Context)`
 
 ## Main Files
 

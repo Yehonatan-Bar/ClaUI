@@ -16,7 +16,15 @@ try {
     throw "No .vsix file found after packaging"
   }
 
-  code --install-extension $vsixPath --force
+  $codeCli = Get-Command code.cmd -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+  if (-not $codeCli) {
+    $codeCli = Get-Command code -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+  }
+  if (-not $codeCli) {
+    throw "VS Code CLI was not found. Ensure 'code' or 'code.cmd' is on PATH."
+  }
+
+  & $codeCli --install-extension $vsixPath --force
 
   & (Join-Path $PSScriptRoot "verify-installed.ps1")
 

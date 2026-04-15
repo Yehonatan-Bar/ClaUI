@@ -1,5 +1,14 @@
 # ClaUi - Changelog
 
+## v0.1.111 - 2026-04-15
+
+**Improvement: Explicit Codex -> Claude Code handoff entry points**
+
+- Added a dedicated command palette action: `ClaUi: Carry Codex Session to Claude Code`
+- Codex-tab handoff CTA now says `Carry to Claude Code`, and the handoff banner uses `Claude Code` for the Claude target label
+- `scripts/verify-installed.ps1` now verifies that the new command is present in the installed manifest and runtime bundle
+- Restored a visible ultrathink lock button above the brain icon as a direct shortcut to `locked` mode while keeping the existing 3-state brain-button flow
+
 ## v0.1.109 - 2026-03-30
 
 **Feature: Tab Name Chip**

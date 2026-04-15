@@ -505,3 +505,10 @@ Implemented cross-provider switching with structured context transfer (`Handoff 
 - Cross-provider transfer remains prompt/capsule based; no shared internal model memory is possible.
 - Metadata linking depends on available persisted session IDs; very early failures may produce partial linkage.
 - Capsule quality depends on recoverable text/history; very long sessions are deterministically truncated and marked `truncated=true`.
+
+## 2026-04-15 - Explicit Codex -> Claude Code Handoff Surface
+
+- Added a direct command palette entry: `ClaUi: Carry Codex Session to Claude Code`
+- Codex-tab carry CTA now says `Carry to Claude Code` instead of the generic `Carry to Claude`
+- Handoff status banner also renders the Claude target as `Claude Code`
+- Installed-extension verification now checks that the new manifest contribution is actually packaged

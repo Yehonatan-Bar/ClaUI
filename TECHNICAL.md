@@ -376,7 +376,7 @@ claude-code-mirror/
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/GIT_PUSH_BUTTON.md`
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**Ultrathink Button & Glow** - Brain icon button in the input area with a 3-state cycle (off -> single -> locked -> off). Single mode prepends "ultrathink" for one prompt then resets. Locked mode auto-prepends on every prompt with a lock badge indicator. On activation, plays one of 4 random CSS animations. The word "ultrathink" displays with an animated rainbow glow effect in chat messages.
+**Ultrathink Button & Glow** - Brain icon button in the input area with a 3-state cycle (off -> single -> locked -> off), plus a separate lock button rendered directly above it as a shortcut to toggle `locked` mode. Single mode prepends "ultrathink" for one prompt then resets. Locked mode auto-prepends on every prompt and highlights both the brain button and the lock button. On activation, plays one of 4 random CSS animations. The word "ultrathink" displays with an animated rainbow glow effect in chat messages.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ULTRATHINK_BUTTON.md`
 
 **Prompt Navigation Arrows** - Up/down arrow buttons above the Send button that scroll the chat view to the previous/next user prompt. Filters messages by `role === 'user'`, tracks an index ref, and uses `data-message-id` DOM queries with `scrollIntoView({ behavior: 'smooth', block: 'center' })`. Navigation index resets when new messages arrive.
@@ -791,7 +791,7 @@ npm install -g @vscode/vsce
 
 ---
 
-## 2026-03-05 - Provider Handoff (Claude <-> Codex) Mid-Session
+## 2026-03-05 - Provider Handoff (Claude Code <-> Codex) Mid-Session
 
 ### New Components (Component Index Additions)
 
@@ -821,18 +821,23 @@ npm install -g @vscode/vsce
 - `src/extension/webview/CodexMessageHandler.ts`
   - Added `switchProviderWithContext` handling, deferred handoff-context injection on first user turn, and clipboard support for handoff fallback.
 - `src/extension/commands.ts`
-  - Added command: `claudeMirror.switchProviderWithContext` (explicit command-palette flow).
+  - Added commands:
+    - `claudeMirror.switchProviderWithContext` (generic explicit command-palette flow).
+    - `claudeMirror.carryCodexToClaudeCode` (direct Codex -> Claude Code command-palette flow).
 - `src/extension/types/webview-messages.ts`
   - Added `switchProviderWithContext` request and `handoffProgress` extension event.
 - `src/webview/state/store.ts`
   - Added handoff UI state (`handoffStage`, target, error, artifact/manual prompt).
 - `src/webview/hooks/useClaudeStream.ts`
   - Handles `handoffProgress` and auto-clears completed state.
+- `src/webview/components/StatusBar/AIChip.tsx`
+  - Uses `Claude Code` naming in handoff-only CTA/tooltip text, while keeping the regular provider chip label as `Claude`.
 - `src/webview/components/StatusBar/StatusBar.tsx`
   - Added clear action split:
     - `Switch (Carry Context)`
     - existing provider buttons keep `Open Clean Session` behavior.
   - Added one-line handoff progress/failure banner and manual fallback button.
+  - Uses `Claude Code` naming in the handoff banner target label.
 - `src/webview/components/InputArea/InputArea.tsx`
   - Locks input/actions during active handoff stages and shows lock/progress indicator.
 - `src/extension/session/SessionStore.ts`
@@ -858,6 +863,7 @@ Under `src/extension/session/`:
 Added command in `package.json`:
 
 - `claudeMirror.switchProviderWithContext` (`ClaUi: Switch Provider (Carry Context)`)
+- `claudeMirror.carryCodexToClaudeCode` (`ClaUi: Carry Codex Session to Claude Code`)
 
 Added settings:
 
@@ -869,6 +875,7 @@ Added settings:
 - Cross-provider resume is still clean-session based (no shared hidden memory transfer).
 - Context transfer uses `HandoffCapsule` + deferred first-user-turn injection (no automatic send on switch).
 - On failure, target tab remains open and manual capsule prompt is available for copy/send fallback.
+- Codex-origin handoff surfaces `Claude Code` explicitly in CTA, banner, and command-palette wording; the provider id remains `claude`.
 
 ### Detail Doc
 

@@ -129,6 +129,10 @@
       {
         "command": "claudeMirror.switchProviderWithContext",
         "title": "ClaUi: Switch Provider (Carry Context)"
+      },
+      {
+        "command": "claudeMirror.carryCodexToClaudeCode",
+        "title": "ClaUi: Carry Codex Session to Claude Code"
       }
     ],
     "configuration": {
@@ -148,7 +152,7 @@
             "remote"
           ],
           "enumDescriptions": [
-            "Claude (current runtime)",
+            "Claude Code (current runtime)",
             "Codex (UI/settings only for now)",
             "Happy Coder (remote AI coding relay)"
           ],
@@ -162,7 +166,7 @@
         "claudeMirror.handoff.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable cross-provider session handoff (Claude <-> Codex) with context capsule transfer."
+          "description": "Enable cross-provider session handoff (Claude Code <-> Codex) with context capsule transfer."
         },
         "claudeMirror.handoff.storeArtifacts": {
           "type": "boolean",

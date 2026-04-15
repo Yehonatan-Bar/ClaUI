@@ -467,7 +467,13 @@ export class SessionTab implements WebviewBridge {
 
   /** Start a new CLI session in this tab (Claude by default, Happy when overridden) */
   async startSession(options?: { resume?: string; fork?: boolean; cwd?: string }): Promise<void> {
-    this.messageHandler.clearPendingHandoffPrompt();
+    this.messageHandler.resetTransientStateForHostLifecycle(
+      options?.resume
+        ? 'SessionTab.startSession(resume)'
+        : options?.fork
+          ? 'SessionTab.startSession(fork)'
+          : 'SessionTab.startSession',
+    );
     if (options?.fork) {
       this.forkInProgress = true;
     }
@@ -538,6 +544,7 @@ export class SessionTab implements WebviewBridge {
 
   /** Stop the CLI session in this tab */
   stopSession(): void {
+    this.messageHandler.resetTransientStateForHostLifecycle('SessionTab.stopSession');
     this.processManager.stop();
   }
 
@@ -601,6 +608,7 @@ export class SessionTab implements WebviewBridge {
       return;
     }
     this.disposed = true;
+    this.messageHandler.dispose();
     this.stopThinkingAnimation();
     this.resolveAssistantReplyWaiters(false);
     this.clearFocusInputTimer();

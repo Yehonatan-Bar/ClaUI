@@ -158,6 +158,71 @@ export function registerCommands(
     vscode.workspace.getConfiguration('claudeMirror').get<ProviderId>('provider', 'claude');
   const providerLabel = (provider: ProviderId): string =>
     provider === 'codex' ? 'Codex' : provider === 'remote' ? 'Happy' : 'Claude';
+  const handoffProviderLabel = (provider: ProviderId | 'claude' | 'codex'): string =>
+    provider === 'claude' ? 'Claude Code' : providerLabel(provider);
+  const runProviderHandoff = async (
+    args?: { sourceTabId?: string; targetProvider?: 'claude' | 'codex'; keepSourceOpen?: boolean },
+    options?: { requireSourceProvider?: 'claude' | 'codex' }
+  ): Promise<void> => {
+    const sourceTab = args?.sourceTabId ? tabManager.getTabById(args.sourceTabId) : tabManager.getActiveTab();
+    if (!sourceTab) {
+      const requiredSource = options?.requireSourceProvider;
+      const guidance = requiredSource ? ` Open a ${handoffProviderLabel(requiredSource)} tab and try again.` : '';
+      vscode.window.showWarningMessage(`No active ClaUi tab for provider handoff.${guidance}`);
+      return;
+    }
+
+    const sourceProvider = sourceTab.getProvider();
+    if (options?.requireSourceProvider && sourceProvider !== options.requireSourceProvider) {
+      vscode.window.showWarningMessage(
+        `This command requires an active ${handoffProviderLabel(options.requireSourceProvider)} tab.`
+      );
+      return;
+    }
+
+    if (sourceProvider !== 'claude' && sourceProvider !== 'codex') {
+      vscode.window.showWarningMessage(
+        `Provider handoff is currently supported only for Claude Code/Codex tabs (current: ${handoffProviderLabel(sourceProvider)}).`
+      );
+      return;
+    }
+
+    let targetProvider = args?.targetProvider;
+    if (!targetProvider) {
+      const targetPick = await vscode.window.showQuickPick(
+        [
+          { label: 'Codex', provider: 'codex' as const },
+          { label: 'Claude Code', provider: 'claude' as const },
+        ].filter((item) => item.provider !== sourceProvider),
+        {
+          placeHolder: `Switch ${handoffProviderLabel(sourceProvider)} session to...`,
+          ignoreFocusOut: true,
+        },
+      );
+      if (!targetPick) {
+        return;
+      }
+      targetProvider = targetPick.provider;
+    }
+
+    const keepSourceOpen = args?.keepSourceOpen ?? true;
+
+    try {
+      await vscode.workspace.getConfiguration('claudeMirror').update('provider', targetProvider, true);
+      const result = await tabManager.handoffSession({
+        sourceTabId: sourceTab.id,
+        targetProvider,
+        keepSourceOpen,
+      });
+      const artifactHint = result.artifactPath ? ` Artifact: ${result.artifactPath}` : '';
+      vscode.window.showInformationMessage(
+        `${handoffProviderLabel(sourceProvider)} -> ${handoffProviderLabel(targetProvider)} handoff completed.${artifactHint}`
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      vscode.window.showErrorMessage(`Provider handoff failed: ${message}`);
+    }
+  };
   let showHistoryInFlight = false;
   let showHistorySeq = 0;
   let openPlanDocsInFlight = false;
@@ -183,53 +248,21 @@ export function registerCommands(
     vscode.commands.registerCommand(
       'claudeMirror.switchProviderWithContext',
       async (args?: { sourceTabId?: string; targetProvider?: 'claude' | 'codex'; keepSourceOpen?: boolean }) => {
-        const sourceTab = args?.sourceTabId ? tabManager.getTabById(args.sourceTabId) : tabManager.getActiveTab();
-        if (!sourceTab) {
-          vscode.window.showWarningMessage('No active ClaUi tab for provider handoff.');
-          return;
-        }
+        await runProviderHandoff(args);
+      }
+    ),
 
-        const sourceProvider = sourceTab.getProvider();
-        if (sourceProvider !== 'claude' && sourceProvider !== 'codex') {
-          vscode.window.showWarningMessage(`Provider handoff is currently supported only for Claude/Codex tabs (current: ${providerLabel(sourceProvider)}).`);
-          return;
-        }
-
-        let targetProvider = args?.targetProvider;
-        if (!targetProvider) {
-          const targetPick = await vscode.window.showQuickPick(
-            [
-              { label: 'Codex', provider: 'codex' as const },
-              { label: 'Claude', provider: 'claude' as const },
-            ].filter((item) => item.provider !== sourceProvider),
-            {
-              placeHolder: `Switch ${providerLabel(sourceProvider)} session to...`,
-              ignoreFocusOut: true,
-            },
-          );
-          if (!targetPick) {
-            return;
-          }
-          targetProvider = targetPick.provider;
-        }
-
-        const keepSourceOpen = args?.keepSourceOpen ?? true;
-
-        try {
-          await vscode.workspace.getConfiguration('claudeMirror').update('provider', targetProvider, true);
-          const result = await tabManager.handoffSession({
-            sourceTabId: sourceTab.id,
-            targetProvider,
-            keepSourceOpen,
-          });
-          const artifactHint = result.artifactPath ? ` Artifact: ${result.artifactPath}` : '';
-          vscode.window.showInformationMessage(
-            `${providerLabel(sourceProvider)} → ${providerLabel(targetProvider)} handoff completed.${artifactHint}`
-          );
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          vscode.window.showErrorMessage(`Provider handoff failed: ${message}`);
-        }
+    vscode.commands.registerCommand(
+      'claudeMirror.carryCodexToClaudeCode',
+      async (args?: { sourceTabId?: string; keepSourceOpen?: boolean }) => {
+        await runProviderHandoff(
+          {
+            sourceTabId: args?.sourceTabId,
+            targetProvider: 'claude',
+            keepSourceOpen: args?.keepSourceOpen,
+          },
+          { requireSourceProvider: 'codex' },
+        );
       }
     ),
 

@@ -185,6 +185,29 @@ export class CodexMessageHandler {
   }
 
   /**
+   * Reset deferred/session-bound UI state when the host starts/stops/restarts a
+   * Codex session outside the normal webview command flow.
+   */
+  resetTransientStateForHostLifecycle(
+    reason: string,
+    options?: { notifyWebview?: boolean; clearHandoff?: boolean },
+  ): void {
+    const notifyWebview = options?.notifyWebview ?? true;
+    const clearHandoff = options?.clearHandoff ?? true;
+    this.log(`[Lifecycle][Codex] Resetting deferred state (${reason})`);
+    this.clearScheduledPromptState(notifyWebview);
+    if (clearHandoff) {
+      this.clearPendingHandoffPrompt();
+    }
+  }
+
+  dispose(): void {
+    this.resetTransientStateForHostLifecycle('handler dispose', {
+      notifyWebview: false,
+    });
+  }
+
+  /**
    * Serialize Codex live UI messages to avoid end-of-turn ordering races in the
    * webview (agent_message + turn.completed can arrive back-to-back).
    */

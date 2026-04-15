@@ -276,7 +276,7 @@ export const StatusBar: React.FC<{
     setContextWidgetVisible(!contextWidgetVisible);
   };
 
-  const providerLabel = (p: string): string => p === 'codex' ? 'Codex' : p === 'remote' ? 'Happy' : 'Claude';
+  const providerLabel = (p: string): string => p === 'codex' ? 'Codex' : p === 'remote' ? 'Happy' : 'Claude Code';
 
   const isHandoffRunning =
     handoffStage !== 'idle' &&

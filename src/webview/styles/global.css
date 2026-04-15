@@ -730,14 +730,17 @@ html, body, #root {
   font-size: 12px;
 }
 
-.browse-stack .ut-lock-badge {
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
+.browse-stack .ut-lock-toggle {
+  position: static;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border-radius: 50%;
 }
-.browse-stack .ut-lock-badge svg {
-  width: 6px;
-  height: 6px;
+
+.browse-stack .ut-lock-toggle svg {
+  width: 9px;
+  height: 9px;
 }
 
 .browse-button {
@@ -773,6 +776,9 @@ html, body, #root {
 .ultrathink-wrapper {
   position: relative;
   display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   flex-shrink: 0;
 }
 .ultrathink-button {
@@ -805,22 +811,35 @@ html, body, #root {
   box-shadow: 0 0 8px rgba(79, 195, 247, 0.45);
   background: rgba(79, 195, 247, 0.12);
 }
-/* Lock badge icon (visible only in locked mode) */
-.ut-lock-badge {
-  position: absolute;
-  bottom: -3px;
-  right: -3px;
+/* Lock toggle above the ultrathink button */
+.ut-lock-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
   border-radius: 50%;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
   background: var(--vscode-editor-background, #1e1e1e);
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.ut-lock-toggle:hover {
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+.ut-lock-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ut-lock-toggle.active {
+  background: rgba(79, 195, 247, 0.2);
   border: 1px solid #4fc3f7;
   color: #4fc3f7;
-  z-index: 10;
-  pointer-events: none;
+  box-shadow: 0 0 6px rgba(79, 195, 247, 0.28);
 }
 .ultrathink-button:hover {
   background: var(--vscode-toolbar-hoverBackground);

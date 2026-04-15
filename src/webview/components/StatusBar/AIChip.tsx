@@ -21,6 +21,12 @@ const PROVIDER_LABELS: Record<ProviderId, string> = {
   remote: 'Happy',
 };
 
+const HANDOFF_PROVIDER_LABELS: Record<ProviderId, string> = {
+  claude: 'Claude Code',
+  codex: 'Codex',
+  remote: 'Happy',
+};
+
 const PROVIDER_COLORS: Record<ProviderId, string> = {
   claude: 'var(--vscode-button-background, #0e639c)',
   codex: '#238636',
@@ -163,9 +169,9 @@ export const AIChip: React.FC<AIChipProps> = ({ isOpen, onToggle, displayMode = 
               <button
                 className="ai-chip-dropdown-item carry-btn"
                 onClick={handleCarryContext}
-                data-tooltip="Switch current tab to selected provider and carry context"
+                data-tooltip={`Switch current tab to ${HANDOFF_PROVIDER_LABELS[carryTarget]} and carry context`}
               >
-                Carry to {PROVIDER_LABELS[carryTarget]}
+                Carry to {HANDOFF_PROVIDER_LABELS[carryTarget]}
               </button>
             </>
           )}

@@ -24,6 +24,7 @@ if (-not (Test-Path $bundlePath)) {
 $packageText = Get-Content -Path $packageJsonPath -Raw
 $requiredManifestEntries = @(
   "claudeMirror.sendFilePathToChat",
+  "claudeMirror.carryCodexToClaudeCode",
   "ctrl+alt+shift+c",
   "explorer/context",
   "editor/context"
@@ -35,8 +36,15 @@ foreach ($entry in $requiredManifestEntries) {
   }
 }
 
-if (-not (Select-String -Path $bundlePath -Pattern "sendFilePathToChat" -Quiet)) {
-  throw "Installed extension.js does not contain sendFilePathToChat symbol"
+$requiredBundleSymbols = @(
+  "sendFilePathToChat",
+  "carryCodexToClaudeCode"
+)
+
+foreach ($symbol in $requiredBundleSymbols) {
+  if (-not (Select-String -Path $bundlePath -Pattern $symbol -Quiet)) {
+    throw "Installed extension.js does not contain expected symbol: $symbol"
+  }
 }
 
 Write-Host "Installed extension verified:"

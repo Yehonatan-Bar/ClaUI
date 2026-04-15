@@ -231,7 +231,13 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   }
 
   async startSession(options?: { resume?: string; fork?: boolean; cwd?: string }): Promise<void> {
-    this.messageHandler.clearPendingHandoffPrompt();
+    this.messageHandler.resetTransientStateForHostLifecycle(
+      options?.resume
+        ? 'CodexSessionTab.startSession(resume)'
+        : options?.fork
+          ? 'CodexSessionTab.startSession(fork)'
+          : 'CodexSessionTab.startSession',
+    );
     const isFork = !!options?.fork;
 
     this.sessionCwd =
@@ -272,6 +278,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   }
 
   async clearSession(options?: { cwd?: string }): Promise<void> {
+    this.messageHandler.resetTransientStateForHostLifecycle('CodexSessionTab.clearSession');
     this.saveProjectAnalytics();
     this.clearTurnCompletedExitWatchdog();
     if (this.processManager.isTurnRunning) {
@@ -287,6 +294,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   }
 
   stopSession(): void {
+    this.messageHandler.resetTransientStateForHostLifecycle('CodexSessionTab.stopSession');
     this.saveProjectAnalytics();
     this.clearTurnCompletedExitWatchdog();
     if (this.processManager.isTurnRunning) {
@@ -632,6 +640,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       return;
     }
     this.disposed = true;
+    this.messageHandler.dispose();
     this.clearTurnCompletedExitWatchdog();
     this.endTurnDiagnostics('tab dispose()');
     this.stopThinkingAnimation();
