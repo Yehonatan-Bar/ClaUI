@@ -270,6 +270,7 @@
           "default": "",
           "enum": [
             "",
+            "claude-opus-4-7",
             "claude-sonnet-4-6",
             "claude-sonnet-4-5-20250929",
             "claude-opus-4-6",
@@ -277,6 +278,7 @@
           ],
           "enumDescriptions": [
             "Default (CLI default)",
+            "Claude Opus 4.7",
             "Claude Sonnet 4.6",
             "Claude Sonnet 4.5",
             "Claude Opus 4.6",

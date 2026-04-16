@@ -55,7 +55,7 @@ A comprehensive catalog of every feature and capability in the ClaUi VS Code ext
 
 ## 5. Model & Provider Selection
 
-- **Model selector** - Dropdown in the status bar for choosing: Sonnet 4.6, Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default. Persisted to VS Code settings and synced on startup. Changing the model takes effect immediately -- the current session is stopped and resumed with the new model (live switch)
+- **Model selector** - Dropdown in the status bar for choosing: Opus 4.7, Sonnet 4.6, Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default. Persisted to VS Code settings and synced on startup. Changing the model takes effect immediately -- the current session is stopped and resumed with the new model (live switch). Runtime IDs such as `claude-opus-4-7` are shown as friendly labels in the AI chip, message badges, and dashboard metadata.
 - **Dual provider support** - Switch between Claude and Codex (OpenAI GPT) providers
 - **Provider selector** - "Codex" quick-switch button and "Provider" dropdown (Claude / Codex) in the status bar. Selection is persisted
 - **Codex integration** - Full runtime support via `codex exec --json`:
@@ -553,7 +553,7 @@ Mac users: Replace `Ctrl` with `Cmd` for all shortcuts.
 | `claudeMirror.autoNameSessions` | `true` | Auto-generate tab names from first message |
 | `claudeMirror.activitySummary` | `true` | Periodically summarize tool activity via Haiku |
 | `claudeMirror.activitySummaryThreshold` | `3` | Tool uses before triggering summary (1-10) |
-| `claudeMirror.model` | `""` | Claude model for new sessions |
+| `claudeMirror.model` | `""` | Claude model for new sessions (empty = CLI default; includes Opus 4.7) |
 | `claudeMirror.permissionMode` | `"full-access"` | Permission mode (full-access / supervised) |
 | `claudeMirror.enableFileLogging` | `true` | Write logs to disk files |
 | `claudeMirror.logDirectory` | `""` | Directory for log files |

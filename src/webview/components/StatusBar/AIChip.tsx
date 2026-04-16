@@ -7,6 +7,7 @@ import { PermissionModeSelector } from '../PermissionModeSelector/PermissionMode
 import type { ProviderId } from '../../../extension/types/webview-messages';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
+import { getClaudeModelCompactLabel, getClaudeModelLabel } from '../../utils/claudeModelDisplay';
 
 interface AIChipProps {
   isOpen: boolean;
@@ -68,10 +69,8 @@ export const AIChip: React.FC<AIChipProps> = ({ isOpen, onToggle, displayMode = 
   const providerColor = PROVIDER_COLORS[currentProvider] || PROVIDER_COLORS.claude;
 
   // Shorten model name for compact display
-  const modelDisplayName = model ?? '';
-  const shortModelName = modelDisplayName
-    .replace(/^claude-/i, '')
-    .replace(/-\d{8}$/, '');
+  const modelDisplayName = getClaudeModelLabel(model);
+  const shortModelName = getClaudeModelCompactLabel(model);
 
   const handleOpenProviderTab = (targetProvider: ProviderId) => {
     if (provider === targetProvider || isBusy || isHandoffRunning) return;

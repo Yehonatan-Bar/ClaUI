@@ -227,7 +227,7 @@ claude-code-mirror/
 **TextSettingsBar** - In-webview UI for adjusting chat text font size, font family, and typing personality theme. Supports Hebrew-friendly font presets and three rendering themes: Terminal Hacker, Retro, and Zen. Settings are stored in Zustand and synced from VS Code configuration on startup and on change.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**ModelSelector** - Dropdown in the status bar for choosing the Claude model (Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default). Selection is persisted to VS Code settings (`claudeMirror.model`) and synced back to the webview on startup and on change.
+**ModelSelector** - Dropdown in the status bar for choosing the Claude model (Opus 4.7, Sonnet 4.6, Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default). Selection is persisted to VS Code settings (`claudeMirror.model`) and synced back to the webview on startup and on change. Runtime model IDs from Claude Code are display-normalized through `claudeModelDisplay.ts` (for example `claude-opus-4-7` -> `Opus 4.7`).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **PermissionModeSelector** - Dropdown for choosing permission mode (Full Access or Supervised). Supervised mode restricts Claude to read-only tools. Applied on next session start via `--allowedTools`.

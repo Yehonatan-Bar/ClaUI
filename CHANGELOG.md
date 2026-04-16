@@ -1,5 +1,13 @@
 # ClaUi - Changelog
 
+## v0.1.113 - 2026-04-16
+
+**Improvement: Claude Opus 4.7 display support**
+
+- Added `claude-opus-4-7` as a first-class Claude model option in `claudeMirror.model` and the status-bar model selector
+- Added shared Claude model display normalization so runtime IDs such as `claude-opus-4-7` render as `Opus 4.7` in the AI chip, assistant message badges, and dashboard metadata
+- Kept CLI default behavior intact: when no extension model override is selected, the UI still uses the runtime model reported by Claude Code
+
 ## v0.1.112 - 2026-04-16
 
 **Feature: Restore Open Sessions on VS Code Startup**

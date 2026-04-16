@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { SessionSummary } from '../../../../extension/types/webview-messages';
 import { DASH_COLORS, formatDuration, formatTokens } from '../dashboardUtils';
+import { getClaudeModelLabel } from '../../../utils/claudeModelDisplay';
 
 interface ProjectSessionsTabProps {
   sessions: SessionSummary[];
@@ -196,7 +197,7 @@ export const ProjectSessionsTab: React.FC<ProjectSessionsTabProps> = ({ sessions
                   >
                     <td style={tdStyle}>{session.sessionName || 'Unnamed'}</td>
                     <td style={tdStyle}>{new Date(session.startedAt).toLocaleDateString()}</td>
-                    <td style={tdStyle}>{session.model}</td>
+                    <td style={tdStyle}>{getClaudeModelLabel(session.model) || '-'}</td>
                     <td style={tdStyle}>{session.totalTurns}</td>
                     <td style={{ ...tdStyle, color: session.totalErrors > 0 ? DASH_COLORS.red : DASH_COLORS.text }}>
                       {session.totalErrors}

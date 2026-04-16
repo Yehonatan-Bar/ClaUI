@@ -230,7 +230,7 @@ claude-code-mirror/
 |       |   |   +-- ContextUsageWidget.tsx  #   Thin draggable context strip (blue-first gradient + hover tooltip hit-zone)
 |       |   +-- StatusBar/
 |       |   |   +-- StatusBar.tsx            #   Grouped status bar: AI Chip + Session/Tools/View dropdowns + metrics
-|       |   |   +-- AIChip.tsx               #   Compound control: Provider + Model + Permissions in one chip
+|       |   |   +-- AIChip.tsx               #   Compound control: Provider + display-normalized Model + Permissions in one chip
 |       |   |   +-- StatusBarGroupButton.tsx #   Reusable dropdown group button (uses useOutsideClick for outside-click handling)
 |       |   +-- McpPanel/
 |       |   |   +-- McpPanel.tsx         #   Full-screen MCP inventory overlay (Session/Workspace/Add/Debug)
@@ -250,6 +250,9 @@ claude-code-mirror/
 |           +-- global.css                #   VS Code theme variables
 |           +-- markdown.css              #   Markdown element styles (headers, lists, tables, etc.)
 |           +-- rtl.css                   #   RTL-specific overrides (includes Markdown RTL rules)
+|       +-- utils/
+|           +-- claudeModelDisplay.ts     #   Shared Claude model options + raw model ID -> friendly label mapping
+|           +-- modelContextLimits.ts     #   Context window heuristics for Claude/Codex/Gemini models
 +-- sr-ptd-skill/                         # Bundled SR-PTD skill (installed to ~/.claude/skills/)
 |   +-- SKILL.md                          #   Main skill instructions (949 lines)
 |   +-- CLAUDE_MD_INSTRUCTIONS.md         #   Template for CLAUDE.md injection
@@ -371,7 +374,7 @@ claude-code-mirror/
 **TextSettingsBar** - In-webview UI for adjusting chat text font size, font family, and typing personality theme. Supports Hebrew-friendly font presets and four rendering themes: Terminal Hacker, Retro, Zen, and Neo Zen. Settings are stored in Zustand and synced from VS Code configuration on startup and on change.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**ModelSelector** - Dropdown in the status bar for choosing the Claude model (Sonnet 4.6, Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default). Selection is persisted to VS Code settings (`claudeMirror.model`) and synced back to the webview on startup and on change. Changing the model takes effect immediately: the current session is stopped and resumed with the new model (live switch via `SessionTab.switchModel()`). Shows the currently active model label when connected.
+**ModelSelector** - Dropdown in the status bar for choosing the Claude model (Opus 4.7, Sonnet 4.6, Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default). Selection is persisted to VS Code settings (`claudeMirror.model`) and synced back to the webview on startup and on change. Changing the model takes effect immediately: the current session is stopped and resumed with the new model (live switch via `SessionTab.switchModel()`). Shows the currently active runtime model label when connected; `claudeModelDisplay.ts` maps IDs like `claude-opus-4-7` to `Opus 4.7` in the AI chip, message badges, and dashboard metadata.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **PermissionModeSelector** - Dropdown in the status bar for choosing between "Full Access" and "Supervised" modes. Selection is persisted to VS Code settings (`claudeMirror.permissionMode`). In the Claude path, "Full Access" passes `--permission-mode bypassPermissions` and "Supervised" passes `--allowedTools` (read-only tool set). In the Codex path, "Full Access" passes `--dangerously-bypass-approvals-and-sandbox` and "Supervised" passes `--sandbox read-only`. Changes take effect on the next process/session start (Claude) or next turn spawn (Codex).
@@ -503,7 +506,7 @@ claude-code-mirror/
 | `claudeMirror.autoNameSessions` | `true` | Auto-generate tab names from first message (Claude: Haiku, Codex: one-shot codex exec) |
 | `claudeMirror.activitySummary` | `true` | Periodically summarize tool activity in busy indicator via Haiku |
 | `claudeMirror.activitySummaryThreshold` | `3` | Tool uses before triggering an activity summary (1-10) |
-| `claudeMirror.model` | `""` | Claude model to use for new sessions (empty = CLI default) |
+| `claudeMirror.model` | `""` | Claude model to use for new sessions (empty = CLI default; choices include Opus 4.7/Sonnet 4.6/Sonnet 4.5/Opus 4.6/Haiku 4.5) |
 | `claudeMirror.permissionMode` | `"full-access"` | Permission mode: "full-access" (all tools) or "supervised" (read-only tools only) |
 | `claudeMirror.enableFileLogging` | `true` | Write logs to disk files in addition to the Output Channel |
 | `claudeMirror.logDirectory` | `""` | Directory for log files (empty = extension's default storage) |

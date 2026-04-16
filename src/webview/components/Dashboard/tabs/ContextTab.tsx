@@ -4,6 +4,7 @@ import type { ChatMessage } from '../../../state/store';
 import type { ContentBlock } from '../../../../extension/types/stream-json';
 import type { McpServerInfo } from '../../../../extension/types/webview-messages';
 import { DASH_COLORS } from '../dashboardUtils';
+import { getClaudeModelLabel } from '../../../utils/claudeModelDisplay';
 
 // --- Styles ---
 const cardStyle = {
@@ -118,7 +119,7 @@ const SessionMetadataSection: React.FC = () => {
         <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>{sessionId || '-'}</span>
 
         <span style={{ color: DASH_COLORS.textMuted }}>Model</span>
-        <span style={{ color: DASH_COLORS.green }}>{meta.model || '-'}</span>
+        <span style={{ color: DASH_COLORS.green }}>{meta.model ? getClaudeModelLabel(meta.model) : '-'}</span>
 
         <span style={{ color: DASH_COLORS.textMuted }}>Working Dir</span>
         <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>{meta.cwd || '-'}</span>
@@ -195,7 +196,7 @@ const MessageBlock: React.FC<MessageBlockProps> = ({ message, index, expanded, o
           </span>
           {message.model && (
             <span style={{ color: DASH_COLORS.textMuted, fontSize: '11px' }}>
-              {message.model}
+              {getClaudeModelLabel(message.model)}
             </span>
           )}
           {toolUseBlocks.length > 0 && (

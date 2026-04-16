@@ -1,15 +1,7 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
-
-/** Available Claude Code models with display labels */
-const MODEL_OPTIONS = [
-  { label: 'Default', value: '' },
-  { label: 'Sonnet 4.6', value: 'claude-sonnet-4-6' },
-  { label: 'Sonnet 4.5', value: 'claude-sonnet-4-5-20250929' },
-  { label: 'Opus 4.6', value: 'claude-opus-4-6' },
-  { label: 'Haiku 4.5', value: 'claude-haiku-4-5-20251001' },
-];
+import { CLAUDE_MODEL_OPTIONS, getClaudeModelLabel } from '../../utils/claudeModelDisplay';
 
 /**
  * Model selector dropdown for choosing which Claude model to use.
@@ -17,6 +9,16 @@ const MODEL_OPTIONS = [
  */
 export const ModelSelector: React.FC = () => {
   const { selectedModel, model, isConnected, setSelectedModel } = useAppStore();
+
+  const modelOptions = useMemo(() => {
+    if (!selectedModel || CLAUDE_MODEL_OPTIONS.some((opt) => opt.value === selectedModel)) {
+      return CLAUDE_MODEL_OPTIONS;
+    }
+    return [
+      ...CLAUDE_MODEL_OPTIONS,
+      { label: `Custom (${getClaudeModelLabel(selectedModel)})`, value: selectedModel },
+    ];
+  }, [selectedModel]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const newModel = e.target.value;
@@ -26,7 +28,7 @@ export const ModelSelector: React.FC = () => {
 
   // Resolve display label for active model (from CLI, shown as hint)
   const activeModelLabel = model && model !== 'connecting...' && model !== 'connected' && model !== 'unknown'
-    ? MODEL_OPTIONS.find(o => model.includes(o.value) || o.value.includes(model))?.label || model
+    ? getClaudeModelLabel(model)
     : null;
 
   return (
@@ -40,7 +42,7 @@ export const ModelSelector: React.FC = () => {
           ? `Active: ${activeModelLabel}`
           : 'Select model'}
       >
-        {MODEL_OPTIONS.map((opt) => (
+        {modelOptions.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
           </option>

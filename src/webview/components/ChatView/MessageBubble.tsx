@@ -13,6 +13,7 @@ import { renderTextWithFileLinks } from './filePathLinks';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { deriveTurnFromAssistantMessage } from '../../utils/turnVitals';
 import { detectRtl } from '../../hooks/useRtlDetection';
+import { getClaudeModelLabel } from '../../utils/claudeModelDisplay';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -264,7 +265,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
         )}
         {message.model && (
           <span style={{ marginLeft: 8, fontWeight: 400, opacity: 0.7 }}>
-            {message.model}
+            {getClaudeModelLabel(message.model)}
           </span>
         )}
         {!isUser && message.thinkingEffort && (

@@ -6,6 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { DASH_COLORS, CATEGORY_COLORS, formatDuration } from '../dashboardUtils';
+import { getClaudeModelLabel } from '../../../utils/claudeModelDisplay';
 
 interface ProjectOverviewTabProps {
   sessions: SessionSummary[];
@@ -51,7 +52,7 @@ function getSessionLabel(s: SessionSummary): string {
 function findMostUsedModel(sessions: SessionSummary[]): string {
   const freq: Record<string, number> = {};
   for (const s of sessions) {
-    const m = s.model || 'unknown';
+    const m = getClaudeModelLabel(s.model) || 'unknown';
     freq[m] = (freq[m] ?? 0) + 1;
   }
   const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
@@ -74,7 +75,7 @@ function aggregateRecord(sessions: SessionSummary[], key: 'toolFrequency' | 'cat
 function buildModelUsageData(sessions: SessionSummary[]): { name: string; count: number }[] {
   const freq: Record<string, number> = {};
   for (const s of sessions) {
-    const m = s.model || 'unknown';
+    const m = getClaudeModelLabel(s.model) || 'unknown';
     freq[m] = (freq[m] ?? 0) + 1;
   }
   return Object.entries(freq)
