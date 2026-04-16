@@ -1562,6 +1562,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       this.sessionStartedAt = this.sessionStartedAt || new Date().toISOString();
       this.analyticsSaved = false;
       tabLog(`Codex thread id set: ${data.threadId}`);
+      this.callbacks.onSessionIdAssigned?.(this.id, data.threadId);
       const restored = this.restoreSessionName(data.threadId);
       if (restored) {
         this.deferredAutoSessionName = null;
@@ -1585,6 +1586,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
   private setTabName(name: string): void {
     this.baseTitle = name;
+    this.callbacks.onNameChanged?.(this.id, name);
     if (this.disposed) return;
     if (this.isBusy) {
       this.applyThinkingFrame();

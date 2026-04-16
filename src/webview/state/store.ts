@@ -246,6 +246,9 @@ export interface AppState {
   // Persisted via workspaceState at project level.
   ultrathinkMode: 'off' | 'single' | 'locked';
 
+  // Restore-sessions-on-startup toggle (mirrors claudeMirror.restoreSessionsOnStartup)
+  restoreSessionsEnabled: boolean;
+
   // Usage widget
   usageWidgetEnabled: boolean;
   usageStats: UsageStat[];
@@ -576,6 +579,7 @@ export interface AppState {
   clearCheckpointResult: () => void;
   setContextWidgetVisible: (visible: boolean) => void;
   setUsageWidgetEnabled: (enabled: boolean) => void;
+  setRestoreSessionsEnabled: (enabled: boolean) => void;
   setUsageData: (stats: UsageStat[], fetchedAt: number, error?: string) => void;
   setUsageLimitState: (state: { active: boolean; resetAtMs: number | null; resetDisplay: string; rawMessage: string | null }) => void;
   setUsageQueuedPromptState: (state: { queued: boolean; scheduledSendAtMs: number | null; summary: string | null }) => void;
@@ -854,6 +858,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   checkpointResult: null,
   contextWidgetVisible: true,
   usageWidgetEnabled: false,
+  restoreSessionsEnabled: true,
   usageStats: [],
   usageFetchedAt: null,
   usageError: undefined,
@@ -1774,6 +1779,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearCheckpointResult: () => set({ checkpointResult: null }),
   setContextWidgetVisible: (visible) => set({ contextWidgetVisible: visible }),
   setUsageWidgetEnabled: (enabled) => set({ usageWidgetEnabled: enabled }),
+  setRestoreSessionsEnabled: (enabled) => set({ restoreSessionsEnabled: enabled }),
 
   setUsageData: (stats, fetchedAt, error) =>
     set({ usageStats: stats, usageFetchedAt: fetchedAt, usageError: error }),

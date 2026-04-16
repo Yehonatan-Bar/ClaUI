@@ -128,14 +128,6 @@ export function activate(context: vscode.ExtensionContext): void {
     )
   );
 
-  // First install: auto-open a Claude session so the user sees ClaUI immediately
-  const hasLaunched = context.globalState.get<boolean>('claui.hasLaunched', false);
-  if (!hasLaunched) {
-    void context.globalState.update('claui.hasLaunched', true);
-    log('First install detected - auto-opening ClaUI session');
-    void vscode.commands.executeCommand('claudeMirror.startSession');
-  }
-
   // Permanent launcher status bar item (always visible)
   const launcherItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
   launcherItem.text = '$(comment-discussion) ClaUI';
@@ -146,6 +138,39 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Kill orphaned ClaUi processes from previous sessions that weren't cleaned up
   cleanupOrphanedProcesses(log);
+
+  // Optional: restore open session tabs that were active when VS Code last closed.
+  // Runs AFTER orphan cleanup so it can safely reclaim CLI ports/locks.
+  // The first-install auto-open only fires if restoration didn't produce any tabs.
+  const restoreEnabled = config.get<boolean>('restoreSessionsOnStartup', true);
+  const hasLaunched = context.globalState.get<boolean>('claui.hasLaunched', false);
+
+  const runFirstInstallIfNeeded = (restoredCount: number) => {
+    if (restoredCount > 0) {
+      return;
+    }
+    if (!hasLaunched) {
+      void context.globalState.update('claui.hasLaunched', true);
+      log('First install detected - auto-opening ClaUI session');
+      void vscode.commands.executeCommand('claudeMirror.startSession');
+    }
+  };
+
+  if (restoreEnabled) {
+    log('[OpenTabsSnapshot] Restore-on-startup enabled; attempting to restore sessions...');
+    void tabManager.restoreFromSnapshot().then(
+      (restoredCount) => {
+        log(`[OpenTabsSnapshot] Restore complete (${restoredCount} tabs)`);
+        runFirstInstallIfNeeded(restoredCount);
+      },
+      (err) => {
+        log(`[OpenTabsSnapshot] Restore failed: ${err instanceof Error ? err.message : String(err)}`);
+        runFirstInstallIfNeeded(0);
+      }
+    );
+  } else {
+    runFirstInstallIfNeeded(0);
+  }
 
   log('Extension activated');
 }

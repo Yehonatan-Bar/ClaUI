@@ -16,6 +16,11 @@ import { HandoffArtifactStore } from './handoff/HandoffArtifactStore';
 import { HandoffOrchestrator, type HandoffTargetRuntime } from './handoff/HandoffOrchestrator';
 import type { HandoffProvider, HandoffSessionRequest } from './handoff/HandoffTypes';
 import { isHandoffProvider } from './handoff/HandoffTypes';
+import {
+  OpenTabsSnapshotStore,
+  type OpenTabSnapshotEntry,
+  type OpenTabsSnapshot,
+} from './OpenTabsSnapshot';
 
 /** Distinct colors for tab header bars, cycling through the palette */
 const TAB_COLORS = [
@@ -45,6 +50,13 @@ export class TabManager {
   private readonly handoffOrchestrator: HandoffOrchestrator;
   private readonly handoffLocks = new Set<string>();
   private readonly handoffLastByTab = new Map<string, number>();
+
+  private readonly snapshotStore: OpenTabsSnapshotStore;
+  private readonly snapshotEntries = new Map<string, OpenTabSnapshotEntry>();
+  private snapshotDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private isRestoringSnapshot = false;
+  private static readonly SNAPSHOT_DEBOUNCE_MS = 500;
+  private static readonly MAX_RESTORE = 10;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -76,6 +88,8 @@ export class TabManager {
       new HandoffArtifactStore(artifactsRoot, this.log, { persistToDisk: storeArtifacts }),
       this.log,
     );
+
+    this.snapshotStore = new OpenTabsSnapshotStore(context.workspaceState);
   }
 
   /** Create a new tab with its own independent Claude session */
@@ -118,6 +132,8 @@ export class TabManager {
       {
         onClosed: (tabId) => this.handleTabClosed(tabId),
         onFocused: (tabId) => this.handleTabFocused(tabId),
+        onSessionIdAssigned: (tabId, sessionId) => this.handleSessionIdAssigned(tabId, sessionId),
+        onNameChanged: (tabId, name) => this.handleNameChanged(tabId, name),
       },
       this.sessionStore,
       this.projectAnalyticsStore,
@@ -131,6 +147,7 @@ export class TabManager {
 
     this.tabs.set(tab.id, tab);
     this.activeTabId = tab.id;
+    this.seedSnapshotEntry(tab);
     this.log(`Tab created: ${tab.id} color=${tabColor} column=${viewColumn} (total: ${this.tabs.size})`);
     return tab;
   }
@@ -160,6 +177,8 @@ export class TabManager {
       {
         onClosed: (tabId) => this.handleTabClosed(tabId),
         onFocused: (tabId) => this.handleTabFocused(tabId),
+        onSessionIdAssigned: (tabId, sessionId) => this.handleSessionIdAssigned(tabId, sessionId),
+        onNameChanged: (tabId, name) => this.handleNameChanged(tabId, name),
       },
       this.sessionStore,
       this.projectAnalyticsStore,
@@ -171,6 +190,7 @@ export class TabManager {
 
     this.tabs.set(tab.id, tab);
     this.activeTabId = tab.id;
+    this.seedSnapshotEntry(tab);
     this.log(`Codex tab created: ${tab.id} color=${tabColor} column=${viewColumn} (total: ${this.tabs.size})`);
     return tab;
   }
@@ -182,6 +202,13 @@ export class TabManager {
       .getConfiguration('claudeMirror')
       .get<string>('happy.cliPath', 'happy');
     tab.setCliPathOverride(happyCliPath);
+    // Upgrade the just-seeded entry now that provider/cliPath are known.
+    const entry = this.snapshotEntries.get(tab.id);
+    if (entry) {
+      entry.provider = 'remote';
+      entry.cliPathOverride = happyCliPath;
+      this.schedulePersistSnapshot();
+    }
     this.log(`Happy provider tab created: ${tab.id} cliPath=${happyCliPath}`);
     return tab;
   }
@@ -325,6 +352,9 @@ export class TabManager {
 
   /** Dispose all tabs (used during extension deactivation) */
   closeAllTabs(): void {
+    // Flush any pending snapshot write before we tear everything down so
+    // that a graceful VS Code shutdown preserves the "what was open" record.
+    this.flushSnapshotSync();
     for (const tab of this.tabs.values()) {
       tab.dispose();
     }
@@ -405,6 +435,8 @@ export class TabManager {
 
   private handleTabClosed(tabId: string): void {
     this.tabs.delete(tabId);
+    this.snapshotEntries.delete(tabId);
+    this.schedulePersistSnapshot();
     this.log(`Tab closed: ${tabId} (remaining: ${this.tabs.size})`);
 
     if (this.activeTabId === tabId) {
@@ -421,6 +453,229 @@ export class TabManager {
 
   private handleTabFocused(tabId: string): void {
     this.activeTabId = tabId;
+    this.schedulePersistSnapshot();
     this.log(`Tab focused: ${tabId}`);
+  }
+
+  // --- Open-tabs snapshot (restore-on-startup feature) ---
+
+  private seedSnapshotEntry(tab: ManagedTab): void {
+    if (this.isRestoringSnapshot) {
+      // Don't overwrite the snapshot while we're replaying it.
+      return;
+    }
+    const entry: OpenTabSnapshotEntry = {
+      tabNumber: tab.tabNumber,
+      provider: tab.getProvider() as ProviderId,
+      sessionId: tab.sessionId ?? '',
+      workspacePath: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+      savedAt: new Date().toISOString(),
+    };
+    this.snapshotEntries.set(tab.id, entry);
+    this.schedulePersistSnapshot();
+  }
+
+  private handleSessionIdAssigned(tabId: string, sessionId: string): void {
+    const entry = this.snapshotEntries.get(tabId);
+    if (!entry) {
+      return;
+    }
+    entry.sessionId = sessionId;
+    entry.savedAt = new Date().toISOString();
+    this.schedulePersistSnapshot();
+  }
+
+  private handleNameChanged(tabId: string, name: string): void {
+    const entry = this.snapshotEntries.get(tabId);
+    if (!entry) {
+      return;
+    }
+    // Skip default placeholder names assigned during construction so the
+    // snapshot only carries user-meaningful or auto-generated session names.
+    if (!this.isDefaultTabName(name, entry.tabNumber)) {
+      entry.customName = name;
+      entry.savedAt = new Date().toISOString();
+      this.schedulePersistSnapshot();
+    }
+  }
+
+  private isDefaultTabName(name: string, tabNumber: number): boolean {
+    return (
+      name === `ClaUi ${tabNumber}` ||
+      name === `Codex ${tabNumber}` ||
+      name === `Session ${tabNumber}`
+    );
+  }
+
+  private schedulePersistSnapshot(): void {
+    if (this.isRestoringSnapshot) {
+      return;
+    }
+    if (this.snapshotDebounceTimer) {
+      clearTimeout(this.snapshotDebounceTimer);
+    }
+    this.snapshotDebounceTimer = setTimeout(() => {
+      this.snapshotDebounceTimer = null;
+      void this.persistSnapshotNow();
+    }, TabManager.SNAPSHOT_DEBOUNCE_MS);
+  }
+
+  private buildSnapshot(): OpenTabsSnapshot {
+    const activeEntry = this.activeTabId ? this.snapshotEntries.get(this.activeTabId) : undefined;
+    const activeSessionId = activeEntry?.sessionId || undefined;
+    return {
+      version: 1,
+      entries: Array.from(this.snapshotEntries.values()).filter((e) => !!e.sessionId),
+      activeSessionId,
+    };
+  }
+
+  private async persistSnapshotNow(): Promise<void> {
+    try {
+      await this.snapshotStore.set(this.buildSnapshot());
+    } catch (err) {
+      this.log(`[OpenTabsSnapshot] Failed to persist: ${err}`);
+    }
+  }
+
+  /** Synchronous fire-and-forget flush used during deactivation. */
+  private flushSnapshotSync(): void {
+    if (this.snapshotDebounceTimer) {
+      clearTimeout(this.snapshotDebounceTimer);
+      this.snapshotDebounceTimer = null;
+    }
+    // Memento.update returns a Thenable; we can't await during deactivate,
+    // but VS Code keeps the event loop alive long enough to flush.
+    try {
+      void this.snapshotStore.set(this.buildSnapshot());
+    } catch (err) {
+      this.log(`[OpenTabsSnapshot] Failed to flush on deactivate: ${err}`);
+    }
+  }
+
+  /**
+   * Restore tabs from the last-saved snapshot in this workspace.
+   * Returns the number of successfully restored tabs.
+   *
+   * Designed to be called during activate() after cleanupOrphanedProcesses.
+   */
+  async restoreFromSnapshot(): Promise<number> {
+    const snapshot = this.snapshotStore.get();
+    if (snapshot.entries.length === 0) {
+      this.log('[OpenTabsSnapshot] No entries to restore');
+      return 0;
+    }
+
+    const currentWorkspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+    // Filter: workspace match + must have a sessionId, then de-dup by sessionId.
+    const seen = new Set<string>();
+    let entries = snapshot.entries
+      .filter((e) => !!e.sessionId)
+      .filter((e) => !currentWorkspace || !e.workspacePath || e.workspacePath === currentWorkspace)
+      .filter((e) => {
+        if (seen.has(e.sessionId)) { return false; }
+        seen.add(e.sessionId);
+        return true;
+      });
+
+    entries.sort((a, b) => a.tabNumber - b.tabNumber);
+
+    const truncated = entries.length > TabManager.MAX_RESTORE;
+    if (truncated) {
+      entries = entries.slice(0, TabManager.MAX_RESTORE);
+    }
+
+    if (entries.length === 0) {
+      this.log('[OpenTabsSnapshot] All snapshot entries filtered out');
+      return 0;
+    }
+
+    this.log(`[OpenTabsSnapshot] Restoring ${entries.length} session(s)...`);
+    this.isRestoringSnapshot = true;
+    let restored = 0;
+    let failed = 0;
+
+    try {
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: `Restoring ${entries.length} ClaUi session${entries.length === 1 ? '' : 's'}...`,
+          cancellable: false,
+        },
+        async (progress) => {
+          const increment = 100 / entries.length;
+          for (const entry of entries) {
+            const label = entry.customName || `${entry.provider} session ${entry.tabNumber}`;
+            progress.report({ increment, message: label });
+            try {
+              const tab = this.createTabForProvider(entry.provider);
+
+              // For remote (Happy) tabs, prefer the live setting over the
+              // snapshot value in case the user has since moved the CLI.
+              if (entry.provider === 'remote' && tab instanceof SessionTab) {
+                const livePath = vscode.workspace
+                  .getConfiguration('claudeMirror')
+                  .get<string>('happy.cliPath', '');
+                const chosenPath = livePath || entry.cliPathOverride || 'happy';
+                tab.setCliPathOverride(chosenPath);
+              }
+
+              await tab.startSession({ resume: entry.sessionId });
+              restored++;
+            } catch (err) {
+              failed++;
+              this.log(
+                `[OpenTabsSnapshot] Failed to restore session ${entry.sessionId.slice(0, 8)}: ${err instanceof Error ? err.message : String(err)}`
+              );
+            }
+          }
+        }
+      );
+    } finally {
+      this.isRestoringSnapshot = false;
+    }
+
+    // Focus the originally-active session if it was restored.
+    if (snapshot.activeSessionId) {
+      for (const tab of this.tabs.values()) {
+        if (tab.sessionId === snapshot.activeSessionId && !tab.isDisposed) {
+          tab.reveal();
+          break;
+        }
+      }
+    }
+
+    // Repopulate snapshotEntries with the newly-restored tabs so subsequent
+    // edits (close, focus, name change) flow through the normal persistence
+    // path. Each restored tab already emits onSessionIdAssigned, but
+    // seedSnapshotEntry was skipped while isRestoringSnapshot was true.
+    this.snapshotEntries.clear();
+    for (const tab of this.tabs.values()) {
+      this.snapshotEntries.set(tab.id, {
+        tabNumber: tab.tabNumber,
+        provider: tab.getProvider() as ProviderId,
+        sessionId: tab.sessionId ?? '',
+        cliPathOverride:
+          tab instanceof SessionTab ? (tab.getCliPathOverride() ?? undefined) : undefined,
+        workspacePath: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+        savedAt: new Date().toISOString(),
+      });
+    }
+    void this.persistSnapshotNow();
+
+    if (truncated) {
+      void vscode.window.showInformationMessage(
+        `ClaUi restored the ${TabManager.MAX_RESTORE} most recent sessions. Older sessions can be reopened from Conversation History (Ctrl+Shift+H).`
+      );
+    }
+    if (failed > 0) {
+      void vscode.window.showWarningMessage(
+        `ClaUi restored ${restored} of ${restored + failed} sessions. ${failed} could not be resumed.`
+      );
+    }
+
+    this.log(`[OpenTabsSnapshot] Restored ${restored}/${entries.length} sessions (${failed} failed)`);
+    return restored;
   }
 }

@@ -75,6 +75,7 @@ claude-code-mirror/
 |   |   |   +-- MessageTranslator.ts      #   Translates assistant messages to Hebrew via Sonnet CLI call
 |   |   |   +-- FileLogger.ts             #   Per-session file logging with rotation and rename
 |   |   |   +-- SessionStore.ts           #   Persists session metadata in globalState
+|   |   |   +-- OpenTabsSnapshot.ts       #   Persists list of open tabs per-workspace for restore-on-startup
 |   |   |   +-- ProjectAnalyticsStore.ts  #   Persists SessionSummary in workspaceState (per-project)
 |   |   |   +-- ConversationReader.ts     #   Reads conversation history from Claude's session JSONL files
 |   |   |   +-- PromptHistoryStore.ts     #   Persists prompt history (project + global scope)
@@ -290,8 +291,11 @@ claude-code-mirror/
 **SessionTab** - Bundles all per-tab resources (process, demux, control, message handler, webview panel) and wires them together. Each tab is fully independent with its own CLI process. Generates a colored SVG icon for the VS Code tab bar and supports tab renaming via a hover button. Supports per-tab CLI override (`cliPathOverride`) so Happy provider sessions can reuse the same pipeline while spawning `happy` instead of `claude`. Exposes `getCliPathOverride()` and `getProvider()` via `WebviewBridge`, stamps `sessionStarted` with the active provider, and persists provider-aware metadata/analytics (`claude` vs `remote`). Detects missing CLI binaries and Happy auth-required stderr patterns, suppresses known non-fatal CLI stderr notices (for example `Using Claude Code v... from npm`), and sends targeted guidance to the webview instead of generic noise. Focus behavior is hardened: window-focus events no longer call `panel.reveal()`, `focusInput` is delayed/throttled, and diagnostic logs capture schedule/suppress/post decisions.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**TabManager** - Manages all SessionTab instances. Tracks the active (focused) tab, provides create/close/closeAll methods, shares a single status bar item, assigns distinct colors from an 8-color palette, and groups tabs in the same editor column.
+**TabManager** - Manages all SessionTab instances. Tracks the active (focused) tab, provides create/close/closeAll methods, shares a single status bar item, assigns distinct colors from an 8-color palette, and groups tabs in the same editor column. Owns the open-tabs snapshot: listens to `onSessionIdAssigned` / `onNameChanged` / focus / close callbacks, writes a debounced per-workspace snapshot to `workspaceState`, and exposes `restoreFromSnapshot()` for startup restoration.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**Session Restore on Startup** - Optional feature (setting `claudeMirror.restoreSessionsOnStartup`, default off). When enabled, automatically reopens and resumes all ClaUi tabs (Claude / Codex / Happy) that were open when VS Code last closed. Uses each session's persistent `session_id` / `threadId` via `tab.startSession({ resume })`. Snapshot is stored per-workspace in `workspaceState`, capped at 10 tabs, and restored serially with a progress notification.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_RESTORE.md`
 
 **ClaUiSidebarViewProvider** - Provides the Activity Bar sidebar launcher view (`claui.sidebarLauncher`) and forwards button clicks from the sidebar webview to existing extension commands (start session, history, discovery, logs). This gives ClaUi a dedicated left-side VS Code icon without moving the main chat UI into the sidebar.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ACTIVITY_BAR_LAUNCHER.md`

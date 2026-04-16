@@ -1,13 +1,66 @@
 # ClaUi - Changelog
 
-## v0.1.111 - 2026-04-15
+## v0.1.112 - 2026-04-16
+
+**Feature: Restore Open Sessions on VS Code Startup**
+
+- New setting `claudeMirror.restoreSessionsOnStartup` (default `true`): when VS Code reopens a workspace, all ClaUi session tabs that were open when it last closed are automatically resumed using each session's persistent `session_id` / `threadId` via `--resume` / `codex exec resume`
+- Per-workspace snapshot stored in `workspaceState` under `claudeMirror.openTabsSnapshot`: entries record `tabNumber`, `provider`, `sessionId`, optional `customName`, and (for remote/Happy tabs) `cliPathOverride`
+- Writes are debounced 500 ms and coalesce across tab create / focus / close / rename / session-id-assigned events; `closeAllTabs()` performs a final synchronous flush so VS Code crashes still preserve recent state
+- `TabManager.restoreFromSnapshot()` runs after orphan cleanup in `activate()`, filters entries to the current workspace, de-dupes by `sessionId`, caps at 10 tabs, and spawns them serially inside a progress notification; per-tab failures are caught and summarized in a toast
+- First-install auto-open is suppressed only when restoration actually produced tabs, so a fresh workspace with an empty snapshot still sees the welcome tab
+- Toggle is exposed in two synchronized places: the VS Code Settings editor (`restoreSessionsOnStartup`) and the in-app gear panel (StatusBar ⚙ → VitalsInfoPanel, row labeled "Restore Last Sessions"); `onDidChangeConfiguration` keeps both views in sync
+- `SessionTabCallbacks` gained two optional hooks (`onSessionIdAssigned`, `onNameChanged`) fired by both `SessionTab` and `CodexSessionTab` so the snapshot can track IDs and user-assigned names as they become available
+- Default placeholder names (`ClaUi N`, `Codex N`, `Session N`) are filtered via `isDefaultTabName` so only user-meaningful names are persisted
+- `DiagnosticsCollector` includes `restoreSessionsOnStartup` in bug-report settings output
+
+**Feature: Scheduled Prompts for Codex Sessions**
+
+- Users can schedule a message to be sent to Codex at a future time using the scheduled-message UI in the input area
+- Backend (`CodexMessageHandler`) queues the prompt with an optional image payload and dispatches it via `setTimeout` when the scheduled time arrives
+- If the session is busy at fire time, the dispatch retries automatically after 15 seconds; if the session is no longer active, the scheduled message is cancelled with a user-visible error
+- Scheduling state (pending text preview, target time) is synced to the webview via `scheduledMessageState` messages so the UI can show/cancel the queued prompt
+- Scheduled prompts are cleared on session start, resume, stop, clear, and edit-and-resend to avoid stale dispatches
 
 **Improvement: Explicit Codex -> Claude Code handoff entry points**
 
-- Added a dedicated command palette action: `ClaUi: Carry Codex Session to Claude Code`
-- Codex-tab handoff CTA now says `Carry to Claude Code`, and the handoff banner uses `Claude Code` for the Claude target label
-- `scripts/verify-installed.ps1` now verifies that the new command is present in the installed manifest and runtime bundle
-- Restored a visible ultrathink lock button above the brain icon as a direct shortcut to `locked` mode while keeping the existing 3-state brain-button flow
+- Added a dedicated command palette action: `ClaUi: Carry Codex Session to Claude Code` (`claudeMirror.carryCodexToClaudeCode`) which only activates from a Codex tab
+- The generic `switchProviderWithContext` command now shares the same `runProviderHandoff()` helper, reducing code duplication
+- Codex-tab handoff CTA now says `Carry to Claude Code` and the handoff banner uses `Claude Code` for the Claude target label throughout the UI (AIChip, StatusBar, package.json descriptions)
+- `scripts/verify-installed.ps1` verifies the new command is present in both the manifest and the runtime bundle
+- `scripts/deploy-local.ps1` now explicitly resolves the `code.cmd` / `code` CLI path instead of relying on bare shell resolution
+
+**Improvement: Ultrathink lock button restored as a dedicated control**
+
+- Restored a visible lock-toggle button above the brain icon as a direct shortcut to `locked` mode
+- The lock button is a small circle with a lock/unlock SVG icon that toggles between `off` and `locked`; the brain button continues to cycle `off -> single -> locked -> off`
+- Extracted `persistUltrathinkMode()` and `stripUltrathinkPrefix()` helpers to share logic between the lock toggle and the brain cycle, fixing a stale-closure bug in `sendMessage` (missing `setUltrathinkMode` in dependency array)
+- Removed the non-interactive lock badge overlay that was previously displayed on the brain in locked mode
+- CSS updated: `.ut-lock-badge` replaced by `.ut-lock-toggle` with hover, active, and disabled states; `.ultrathink-wrapper` now uses column flex layout with a 2px gap
+
+**Improvement: Handler lifecycle reset on session transitions**
+
+- Both `MessageHandler` and `CodexMessageHandler` now expose `resetTransientStateForHostLifecycle(reason)` which clears scheduled prompts, handoff state, usage-limit queues, plan-mode flags, and approval tracking in one call
+- `SessionTab` and `CodexSessionTab` call this method on `startSession`, `stopSession`, `clearSession`, and `dispose`, replacing scattered `clearPendingHandoffPrompt()` calls
+- Both handlers now implement `dispose()` to clean up timers and deferred state when a tab is destroyed
+
+---
+
+## v0.1.110 - 2026-03-31
+
+**Improvement: Usage API diagnostic logging**
+
+- `UsageFetcher` now captures the raw JSON response from the Anthropic usage API and passes it through as `rawDiagnostic` on the fetch result
+- `MessageHandler` logs the full raw API response under the `[USAGE_RAW_API]` tag for investigating which period buckets the API actually returns
+
+**Improvement: Token Ratio Tab rewrite**
+
+- Replaced the flat multi-period layout with a two-quota-window view: **5-Hour Quota** and **7-Day Quota** (the two windows the API actually provides)
+- Added an X-axis time-range selector (24 Hours / 14 Days / 30 Days / 2 Months) so users can zoom the chart history independently of the quota window
+- Axis tick formatting now adapts to the selected time range (time-only for 24h, date-only for longer ranges)
+- Refactored bucket-key parsing into `parseBucketModelLabel()` for cleaner per-window grouping
+
+---
 
 ## v0.1.109 - 2026-03-30
 

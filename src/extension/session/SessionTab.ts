@@ -44,6 +44,10 @@ import { BackgroundSession } from './BackgroundSession';
 export interface SessionTabCallbacks {
   onClosed: (tabId: string) => void;
   onFocused: (tabId: string) => void;
+  /** Fired once when the CLI reports its persistent session/thread id. */
+  onSessionIdAssigned?: (tabId: string, sessionId: string) => void;
+  /** Fired whenever the tab's display name changes (auto-named, restored, or user-renamed). */
+  onNameChanged?: (tabId: string, name: string) => void;
 }
 
 /**
@@ -809,6 +813,7 @@ export class SessionTab implements WebviewBridge {
   /** Update the VS Code panel title */
   private setTabName(name: string): void {
     this.baseTitle = name;
+    this.callbacks.onNameChanged?.(this.id, name);
     if (this.disposed) {
       return;
     }
@@ -1446,6 +1451,7 @@ export class SessionTab implements WebviewBridge {
 
       tabLog(`[SessionStore] Saving initial metadata: session=${event.session_id}, model=${event.model}`);
       this.persistSessionMetadata();
+      this.callbacks.onSessionIdAssigned?.(this.id, event.session_id);
 
       // Startup recovery: if this session already owns a team, start watching it.
       // This covers VS Code reload and session resume scenarios.

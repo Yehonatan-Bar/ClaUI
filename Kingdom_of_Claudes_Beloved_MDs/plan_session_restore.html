@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>שחזור סשנים בפתיחת VS Code - סיכום למנהל</title>
+<style>
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #f5f7fb;
+    color: #1e2a3b;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 32px 48px;
+    line-height: 1.7;
+  }
+  h1 {
+    color: #1a4d8f;
+    border-bottom: 3px solid #1a4d8f;
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+  }
+  h2 {
+    color: #235a9e;
+    margin-top: 36px;
+    border-right: 5px solid #235a9e;
+    padding-right: 12px;
+  }
+  h3 {
+    color: #2f6dbd;
+  }
+  .status-box {
+    background: #e7f3ff;
+    border: 1px solid #b2d4f5;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px 24px;
+  }
+  .status-box strong { color: #1a4d8f; }
+  .summary-box {
+    background: #fff;
+    border: 1px solid #d7dee8;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 20px 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  th {
+    background: #1a4d8f;
+    color: #fff;
+    padding: 10px 12px;
+    text-align: right;
+    font-weight: 600;
+  }
+  td {
+    padding: 10px 12px;
+    border-top: 1px solid #e2e8f0;
+  }
+  tr:nth-child(even) td { background: #f9fbfe; }
+  .pros {
+    background: #e8f7ee;
+    border-right: 5px solid #2d8a4a;
+    padding: 14px 18px;
+    margin: 16px 0;
+    border-radius: 6px;
+  }
+  .risks {
+    background: #fef3e7;
+    border-right: 5px solid #c97a16;
+    padding: 14px 18px;
+    margin: 16px 0;
+    border-radius: 6px;
+  }
+  .note {
+    background: #f2eefc;
+    border-right: 5px solid #6b3fa0;
+    padding: 14px 18px;
+    margin: 16px 0;
+    border-radius: 6px;
+  }
+  ul, ol {
+    padding-right: 24px;
+  }
+  li { margin: 6px 0; }
+  .tag {
+    display: inline-block;
+    background: #1a4d8f;
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+    margin-left: 6px;
+  }
+  .tag.off {
+    background: #8998af;
+  }
+  .tag.on {
+    background: #2d8a4a;
+  }
+  .footer-links {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 2px dashed #b2c0d4;
+    color: #5a6a82;
+    font-size: 14px;
+  }
+  code {
+    background: #eef2f8;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "Consolas", monospace;
+    font-size: 13px;
+    direction: ltr;
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+
+<h1>שחזור אוטומטי של סשני ClaUi בפתיחה מחדש של VS Code</h1>
+
+<div class="status-box">
+  <div><strong>תאריך:</strong> 16 באפריל 2026</div>
+  <div><strong>סטטוס:</strong> <span class="tag on">הושלם ונפרס</span></div>
+  <div><strong>גרסה:</strong> 0.1.112</div>
+  <div><strong>סוג שינוי:</strong> פיצ'ר חדש</div>
+  <div><strong>השפעה על משתמשים קיימים:</strong> אפס (מושבת כברירת מחדל)</div>
+  <div><strong>רמת מורכבות:</strong> בינונית</div>
+</div>
+
+<h2>במשפט אחד</h2>
+<div class="summary-box">
+  <strong>הוספנו יכולת שמזכרת את הסשנים שהיו פתוחים לפני שסגרת את VS Code, ופותחת אותם מחדש אוטומטית בפעם הבאה שתפתח את אותו פרויקט.</strong>
+</div>
+
+<h2>הבעיה שנפתרה</h2>
+<p>
+עד היום, כשמשתמש סגר את VS Code וחזר אליו, הוא היה צריך לפתוח כל סשן מחדש ידנית
+דרך היסטוריית השיחות. אם היו לו חמש שיחות פתוחות עם Claude ו-Codex - כולן נעלמו בסגירה, והיה עליו לזכור
+אילו שיחות היו פעילות ולהחיות כל אחת בנפרד.
+</p>
+<p>
+הפיצ'ר החדש שומר בשקט, ברקע, תמונת מצב של הסשנים הפתוחים - וברגע שהמשתמש מפעיל את ההגדרה,
+הפתיחה מחדש של הפרויקט ב-VS Code תחזיר את כל הסשנים אוטומטית, עם התוכן ושם הטאב שהמשתמש נתן להם.
+</p>
+
+<h2>איך זה עובד מבחינת המשתמש</h2>
+<ol>
+  <li>המשתמש נכנס להגדרות VS Code ומחפש "ClaUi Restore Sessions On Startup".</li>
+  <li>מפעיל את המתג (כברירת מחדל כבוי).</li>
+  <li>ממשיך לעבוד רגיל - פותח שיחות, נותן להן שמות, סוגר ופותח.</li>
+  <li>בפעם הבאה שהפרויקט נפתח: הודעת התקדמות מופיעה ("משחזר N סשנים"), הסשנים נפתחים בזה אחר זה בסדר המקורי, עם הצבעים והשמות המקוריים, ועם ההיסטוריה המלאה של השיחה.</li>
+</ol>
+
+<h2>החלטות עיצוב מרכזיות</h2>
+<table>
+  <thead>
+  <tr>
+    <th>נושא</th>
+    <th>ההחלטה</th>
+    <th>הנימוק</th>
+  </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>ברירת מחדל</td>
+      <td><span class="tag off">כבוי</span></td>
+      <td>פריסה זהירה - משתמשים שלא ציפו לשחזור לא יופתעו מפתיחת טאבים אחרי עדכון</td>
+    </tr>
+    <tr>
+      <td>היקף השחזור</td>
+      <td>לפי פרויקט</td>
+      <td>כל חלון VS Code משחזר רק את הסשנים של הפרויקט שלו. אין "דליפה" בין פרויקטים</td>
+    </tr>
+    <tr>
+      <td>מספר מרבי של טאבים</td>
+      <td>10</td>
+      <td>פתיחה סדרתית של 10 טאבים לוקחת כ-10-20 שניות. מעבר לזה - עדיף להשתמש בהיסטוריית השיחות</td>
+    </tr>
+    <tr>
+      <td>תדירות שמירה</td>
+      <td>כל שינוי, דחוס ל-500ms</td>
+      <td>התמונה נשמרת גם אם VS Code קורס, לא רק בסגירה נקייה</td>
+    </tr>
+    <tr>
+      <td>שמות שמוצמדים ידנית</td>
+      <td>נשמרים</td>
+      <td>אם המשתמש נתן שם לטאב - השם יחזור. שמות ברירת מחדל ("ClaUi 3") לא נשמרים כדי לא להכביד</td>
+    </tr>
+    <tr>
+      <td>סדר הטאבים בשחזור</td>
+      <td>לפי הסדר המקורי</td>
+      <td>משמר את הצבעים והחוויה הוויזואלית</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>מה מאחורי הקלעים</h2>
+<p>
+VS Code מספק אחסון מתמיד לכל פרויקט. אנחנו משתמשים בו כדי לשמור רשומה קטנה עם פרטי כל סשן פתוח:
+מספר הטאב, סוג הספק (Claude / Codex / Happy), מזהה הסשן הקבוע, שם מותאם אישית אם יש.
+</p>
+<p>
+כשהסשן נכנס לפעולה או משתנה שמו - הרשומה מתעדכנת בלוח זמנים מרוכך (500ms) כדי לא להכביד על הדיסק
+אבל כן לשרוד קריסות. בסגירה רגילה של VS Code יש "שטיפה" סופית סינכרונית לדיסק.
+</p>
+<p>
+בפתיחה מחדש: אם ההגדרה מופעלת, המערכת קוראת את התמונה, מסננת רשומות לא תקינות (סשנים בלי מזהה, פרויקט אחר, כפילויות),
+ופותחת את הטאבים אחד אחרי השני עם מנגנון "--resume" של ה-CLI. אם סשן מסוים נכשל (כי הקובץ נמחק וכו') - הוא מדלג עליו
+ומציג הודעה מסכמת בסוף.
+</p>
+
+<h2>טיפול במקרי קצה</h2>
+<table>
+  <thead>
+    <tr>
+      <th>מקרה</th>
+      <th>התנהגות</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>VS Code קרס בלי סגירה מסודרת</td>
+      <td>השמירות הדחוסות כבר לכדו את המצב האחרון</td>
+    </tr>
+    <tr>
+      <td>קובץ הסשן נמחק מהדיסק</td>
+      <td>המערכת מדלגת עליו ומדווחת: "שוחזרו X מתוך Y"</td>
+    </tr>
+    <tr>
+      <td>היו יותר מ-10 טאבים</td>
+      <td>10 הראשונים נפתחים, הודעה מפנה את המשתמש להיסטוריה</td>
+    </tr>
+    <tr>
+      <td>נתיב ה-CLI של Happy Coder השתנה</td>
+      <td>ההגדרה העדכנית מנצחת; התמונה היא גיבוי</td>
+    </tr>
+    <tr>
+      <td>המשתמש הפעיל ופתח פרויקט ריק</td>
+      <td>לא נפתח שום טאב; התנהגות "התקנה ראשונה" עדיין עובדת</td>
+    </tr>
+    <tr>
+      <td>פרויקט אחר מאותו VS Code</td>
+      <td>רואה רק את הטאבים שלו; אין זליגה</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>יתרונות עיקריים</h2>
+<div class="pros">
+  <ul>
+    <li><strong>חיסכון זמן:</strong> המשתמש לא משחזר ידנית שיחות אחרי כל סגירה</li>
+    <li><strong>שמירת הקשר:</strong> ההיסטוריה, השם, הצבע - הכל חוזר</li>
+    <li><strong>בטוח:</strong> מושבת כברירת מחדל, אף אחד לא יופתע</li>
+    <li><strong>עמיד לקריסות:</strong> שמירה דחוסה גם אם VS Code נסגר בפתאומיות</li>
+    <li><strong>ניתן להשבתה מיידית:</strong> כיבוי ההגדרה - חוזרים להתנהגות הישנה</li>
+  </ul>
+</div>
+
+<h2>סיכונים ומגבלות</h2>
+<div class="risks">
+  <ul>
+    <li><strong>תלות במזהי CLI:</strong> אם מחיקת JSONL או עדכון CLI ישבור את <code>--resume</code>, שחזור יכשל לסשנים מסוימים. יש הודעה ברורה למשתמש.</li>
+    <li><strong>חלון ראשון בלבד:</strong> VS Code עם כמה חלונות של אותו פרויקט - רק הראשון שיפתח יקבל את השחזור.</li>
+    <li><strong>זמן אתחול:</strong> שחזור סדרתי של 10 טאבים לוקח 10-20 שניות. לא ניתן להקטין בגלל תחרות על ה-CLI.</li>
+    <li><strong>תמונת מצב מוגבלת:</strong> אם משתמש ישנה את הפרויקט בידיים (Git checkout וכו') - הטאבים עדיין יחזרו כי הם תלויים בפרויקט, לא בקוד.</li>
+  </ul>
+</div>
+
+<h2>איך מפעילים</h2>
+<ol>
+  <li>בתפריט <strong>File → Preferences → Settings</strong></li>
+  <li>מחפשים: <code>restoreSessionsOnStartup</code></li>
+  <li>מסמנים את תיבת הסימון</li>
+  <li>סוגרים ופותחים את VS Code - וזהו</li>
+</ol>
+
+<h2>איך מוודאים שהכל עובד</h2>
+<ol>
+  <li>פתיחת שלושה טאבי ClaUi (שני Claude + אחד Codex), שליחת הודעה בכל אחד, שינוי שם לטאב אחד</li>
+  <li>סגירת VS Code בצורה רגילה</li>
+  <li>פתיחה מחדש של אותו פרויקט</li>
+  <li>ציפייה: הודעת התקדמות, שלושת הטאבים נפתחים לפי הסדר, עם השמות והצבעים המקוריים</li>
+  <li>מבחן קריסה: הרג VS Code דרך Task Manager באמצע סשן - לאחר פתיחה מחדש הטאבים עדיין חוזרים</li>
+  <li>מבחן פרויקט אחר: פותחים פרויקט B, וידוא שלא נפתחים טאבים של פרויקט A</li>
+  <li>מבחן סשן שבור: מחיקת קובץ JSONL ידנית, פתיחה מחדש - הודעה "שוחזרו X מתוך Y" תופיע</li>
+</ol>
+
+<div class="note">
+  <strong>שימו לב:</strong> הפיצ'ר אינו נוגע בשום חלק אחר של התוסף. משתמשים שלא ידליקו את ההגדרה יקבלו את אותה חוויה
+  שהיתה להם קודם, ללא שינוי. זאת סיבה שבחרנו ברירת מחדל "כבוי" - זה פיצ'ר תוספתי לחלוטין.
+</div>
+
+<h2>מסמכים קשורים</h2>
+<div class="footer-links">
+  <ul>
+    <li><strong>תיעוד טכני מפורט:</strong> <code>Kingdom_of_Claudes_Beloved_MDs/SESSION_RESTORE.md</code></li>
+    <li><strong>אינדקס רכיבי המערכת:</strong> <code>TECHNICAL.md</code> (כניסה חדשה: "Session Restore on Startup")</li>
+    <li><strong>מסמך SR-PTD:</strong> <code>C:\projects\Skills\Dev_doc_for_skills\SR-PTD_2026-04-16_claui-restore-sessions-on-startup_feature.md</code></li>
+    <li><strong>קובץ התוכנית:</strong> <code>C:\Users\yoni.bar\.claude\plans\warm-imagining-thimble.md</code></li>
+  </ul>
+</div>
+
+</body>
+</html>

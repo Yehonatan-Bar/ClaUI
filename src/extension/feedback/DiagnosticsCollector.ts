@@ -109,6 +109,7 @@ function getClaUiSettings(): string[] {
   const config = vscode.workspace.getConfiguration('claudeMirror');
   const keys = [
     'cliPath', 'model', 'permissionMode', 'autoNameSessions',
+    'restoreSessionsOnStartup',
     'sessionVitals', 'adventureWidget', 'chatFontSize', 'typingTheme',
   ];
   return keys.map(k => `  ${k}: ${JSON.stringify(config.get(k))}`);

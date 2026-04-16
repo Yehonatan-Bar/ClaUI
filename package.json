@@ -248,6 +248,11 @@
           "default": true,
           "description": "Automatically generate session tab names from the first message using Claude Haiku"
         },
+        "claudeMirror.restoreSessionsOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "When VS Code reopens this workspace, automatically resume all ClaUi session tabs (Claude and Codex) that were open when it last closed. Up to 10 tabs are restored serially."
+        },
         "claudeMirror.activitySummary": {
           "type": "boolean",
           "default": true,

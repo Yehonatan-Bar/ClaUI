@@ -678,6 +678,11 @@ export interface SetUsageWidgetEnabledRequest {
   enabled: boolean;
 }
 
+export interface SetRestoreSessionsEnabledRequest {
+  type: 'setRestoreSessionsEnabled';
+  enabled: boolean;
+}
+
 // --- Agent Teams (Webview -> Extension) ---
 
 export interface TeamPanelOpenRequest {
@@ -847,6 +852,7 @@ export type WebviewToExtensionMessage =
   | SetApiKeyRequest
   | RequestUsageMessage
   | SetUsageWidgetEnabledRequest
+  | SetRestoreSessionsEnabledRequest
   | GetTokenRatioDataRequest
   | ClearTokenRatioDataRequest
   | ForceResampleTokenRatioRequest
@@ -1668,6 +1674,11 @@ export interface UsageWidgetSettingMessage {
   enabled: boolean;
 }
 
+export interface RestoreSessionsSettingMessage {
+  type: 'restoreSessionsSetting';
+  enabled: boolean;
+}
+
 // --- Token-Usage Ratio Tracker ---
 
 export interface TokenUsageRatioSample {
@@ -2001,6 +2012,7 @@ export type ExtensionToWebviewMessage =
   | ClaudeAuthStatusMessage
   | UsageDataMessage
   | UsageWidgetSettingMessage
+  | RestoreSessionsSettingMessage
   | TokenRatioDataMessage
   | BugReportOpenMessage
   | BugReportStatusMessage

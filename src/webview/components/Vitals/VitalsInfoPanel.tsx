@@ -37,6 +37,8 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
   const skillGenEnabled = useAppStore((s) => s.skillGenEnabled);
   const usageWidgetEnabled = useAppStore((s) => s.usageWidgetEnabled);
   const setUsageWidgetEnabled = useAppStore((s) => s.setUsageWidgetEnabled);
+  const restoreSessionsEnabled = useAppStore((s) => s.restoreSessionsEnabled);
+  const setRestoreSessionsEnabled = useAppStore((s) => s.setRestoreSessionsEnabled);
   const activitySummaryEnabled = useAppStore((s) => s.activitySummaryEnabled);
   const setActivitySummaryEnabled = useAppStore((s) => s.setActivitySummaryEnabled);
   const hasApiKey = useAppStore((s) => s.hasApiKey);
@@ -104,6 +106,12 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
     if (next) {
       postToExtension({ type: 'requestUsage' });
     }
+  };
+
+  const handleRestoreSessionsToggle = () => {
+    const next = !restoreSessionsEnabled;
+    setRestoreSessionsEnabled(next);
+    postToExtension({ type: 'setRestoreSessionsEnabled', enabled: next });
   };
 
   const handleSaveApiKey = () => {
@@ -386,6 +394,16 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
             <span className="vitals-toggle-knob" />
           </button>
         </div>
+      </div>
+
+      <div className="vitals-info-toggle-row">
+        <span data-tooltip="When VS Code reopens this workspace, automatically resume all ClaUi session tabs that were open when it last closed. Up to 10 tabs restored serially.">Restore Last Sessions</span>
+        <button
+          className={`vitals-info-toggle-btn ${restoreSessionsEnabled ? 'on' : 'off'}`}
+          onClick={handleRestoreSessionsToggle}
+        >
+          <span className="vitals-toggle-knob" />
+        </button>
       </div>
 
       <div className="vitals-info-toggle-row">

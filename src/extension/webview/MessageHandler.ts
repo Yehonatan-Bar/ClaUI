@@ -2793,6 +2793,14 @@ export class MessageHandler {
           break;
         }
 
+        case 'setRestoreSessionsEnabled': {
+          this.log(`Setting restoreSessionsOnStartup: ${msg.enabled}`);
+          void vscode.workspace
+            .getConfiguration('claudeMirror')
+            .update('restoreSessionsOnStartup', msg.enabled, vscode.ConfigurationTarget.Global);
+          break;
+        }
+
         case 'getTokenRatioData': {
           this.log('Sending token ratio data to webview');
           this.sendTokenRatioData();
@@ -2845,6 +2853,8 @@ export class MessageHandler {
           // Send usage widget setting and auto-fetch initial usage data
           this.sendUsageWidgetSetting();
           void this.fetchAndSendUsage();
+          // Send restore-sessions-on-startup setting
+          this.sendRestoreSessionsSetting();
           // Send usage-limit deferred queue state
           this.postUsageLimitState();
           this.postUsageQueuedPromptState();
@@ -3301,6 +3311,13 @@ export class MessageHandler {
     this.webview.postMessage({ type: 'usageWidgetSetting', enabled });
   }
 
+  /** Read restoreSessionsOnStartup setting from VS Code config and send to webview */
+  private sendRestoreSessionsSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const enabled = config.get<boolean>('restoreSessionsOnStartup', true);
+    this.webview.postMessage({ type: 'restoreSessionsSetting', enabled });
+  }
+
   /** Fetch Claude usage data from CLI and send to the webview */
   private async fetchAndSendUsage(): Promise<void> {
     const { UsageFetcher } = await import('../process/UsageFetcher');
@@ -3599,6 +3616,9 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.usageWidget')) {
         this.sendUsageWidgetSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.restoreSessionsOnStartup')) {
+        this.sendRestoreSessionsSetting();
       }
       if (e.affectsConfiguration('claudeMirror.translationLanguage')) {
         this.sendTranslationLanguageSetting();

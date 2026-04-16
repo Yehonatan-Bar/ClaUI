@@ -92,6 +92,7 @@ export function useClaudeStream(): void {
     setApiKeySetting,
     setClaudeAuthStatus,
     setUsageWidgetEnabled,
+    setRestoreSessionsEnabled,
     setUsageData,
     setUsageLimitState,
     setUsageQueuedPromptState,
@@ -755,6 +756,10 @@ export function useClaudeStream(): void {
           setUsageWidgetEnabled(msg.enabled);
           break;
 
+        case 'restoreSessionsSetting':
+          setRestoreSessionsEnabled(msg.enabled);
+          break;
+
         case 'usageData':
           setUsageData(msg.stats, msg.fetchedAt, msg.error);
           break;
@@ -979,6 +984,7 @@ export function useClaudeStream(): void {
     setApiKeySetting,
     setClaudeAuthStatus,
     setUsageWidgetEnabled,
+    setRestoreSessionsEnabled,
     setUsageData,
     setUsageLimitState,
     setUsageQueuedPromptState,
