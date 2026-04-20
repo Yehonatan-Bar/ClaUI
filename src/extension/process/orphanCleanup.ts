@@ -36,10 +36,15 @@ foreach ($p in $procs) {
   }
 }
 Write-Output "killed:$killed total:$(($procs | Measure-Object).Count)"
-`.trim().replace(/\n/g, '; ');
+`.trim();
+
+  // -EncodedCommand takes a base64 UTF-16LE blob, so we don't have to fight
+  // cmd.exe's quote handling. Inline -Command "..." breaks because the script
+  // itself contains double quotes (e.g. "Name='node.exe'").
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
 
   exec(
-    `powershell -NoProfile -NonInteractive -Command "${script}"`,
+    `powershell -NoProfile -NonInteractive -EncodedCommand ${encoded}`,
     { timeout: 10_000 },
     (err, stdout) => {
       if (err) {

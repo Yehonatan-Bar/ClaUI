@@ -12,7 +12,7 @@ import { MarkdownContent } from './MarkdownContent';
 import { renderTextWithFileLinks } from './filePathLinks';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { deriveTurnFromAssistantMessage } from '../../utils/turnVitals';
-import { detectRtl } from '../../hooks/useRtlDetection';
+import { resolveDir } from '../../hooks/useRtlDetection';
 import { getClaudeModelLabel } from '../../utils/claudeModelDisplay';
 
 interface MessageBubbleProps {
@@ -99,6 +99,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   const hasTranslation = message.id in translations;
   const isShowingTranslation = showingTranslation.has(message.id);
   const isRtlLanguage = translationLanguage === 'Hebrew' || translationLanguage === 'Arabic';
+  const forceLtr = useAppStore((s) => s.messageForcedLtr.has(message.id));
+  const toggleMessageForcedLtr = useAppStore((s) => s.toggleMessageForcedLtr);
+  const rtlLanguageDir: 'rtl' | 'ltr' | 'auto' = forceLtr ? 'ltr' : (isRtlLanguage ? 'rtl' : 'auto');
 
   // Summary Mode: hide tool blocks in messages (animation lives in the persistent SummaryModeWidget)
   const summaryModeEnabled = useAppStore((s) => s.summaryModeEnabled);
@@ -282,6 +285,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
             {copied ? 'Copied!' : 'Copy'}
           </button>
         )}
+        {textContent && (
+          <button
+            className={`alignment-message-btn${forceLtr ? ' forced-ltr' : ''}`}
+            onClick={() => toggleMessageForcedLtr(message.id)}
+            data-tooltip={forceLtr ? 'Restore automatic alignment' : 'Force left alignment for this message'}
+          >
+            {forceLtr ? 'Auto' : 'LTR'}
+          </button>
+        )}
         {hasCollapsibles && !shouldShowSummaryMode && (
           <button
             className="toggle-all-btn"
@@ -370,32 +382,32 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
         </div>
       ) : isUser && userOriginalText ? (
         <div className="babel-fish-user-message">
-          <div className="babel-fish-user-line" dir={isRtlLanguage ? 'rtl' : 'auto'}>
+          <div className="babel-fish-user-line" dir={rtlLanguageDir}>
             <span className="babel-fish-user-label">You wrote:</span>
-            <TextBlockRenderer text={userOriginalText} />
+            <TextBlockRenderer text={userOriginalText} forceLtr={forceLtr} />
           </div>
           <div className="babel-fish-user-line">
             <span className="babel-fish-user-label">Claude Code received:</span>
-            <TextBlockRenderer text={textContent} />
+            <TextBlockRenderer text={textContent} forceLtr={forceLtr} />
           </div>
         </div>
       ) : isShowingTranslation ? (
-        <div dir={isRtlLanguage ? 'rtl' : 'auto'}>
-          <TextBlockRenderer text={translations[message.id]} />
+        <div dir={rtlLanguageDir}>
+          <TextBlockRenderer text={translations[message.id]} forceLtr={forceLtr} />
           {contentBlocks
             .filter((block) => block.type !== 'text')
             .map((block, index) => (
-              <ContentBlockRenderer key={`orig-${index}`} block={block} />
+              <ContentBlockRenderer key={`orig-${index}`} block={block} forceLtr={forceLtr} />
             ))}
         </div>
       ) : shouldShowSummaryMode ? (
-        <div dir={detectRtl(textContent) ? 'rtl' : 'auto'}>
+        <div dir={resolveDir(textContent, forceLtr)}>
           {contentBlocks.filter(b => b.type === 'text').map((block, i) => (
-            <ContentBlockRenderer key={`text-${i}`} block={block} />
+            <ContentBlockRenderer key={`text-${i}`} block={block} forceLtr={forceLtr} />
           ))}
         </div>
       ) : (
-        <ContentBlockList contentBlocks={contentBlocks} />
+        <ContentBlockList contentBlocks={contentBlocks} forceLtr={forceLtr} />
       )}
     </div>
   );
@@ -406,7 +418,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
  * For agent/team tools, the tool_result is inlined into the agent card
  * and suppressed from rendering as a standalone block.
  */
-const ContentBlockList: React.FC<{ contentBlocks: ContentBlock[] }> = ({ contentBlocks }) => {
+const ContentBlockList: React.FC<{ contentBlocks: ContentBlock[]; forceLtr: boolean }> = ({ contentBlocks, forceLtr }) => {
   // Pre-compute: map agent tool_use ids -> their matching tool_result blocks
   const { pairMap, pairedResultIds } = useMemo(() => {
     const map = new Map<string, ContentBlock>();
@@ -429,15 +441,17 @@ const ContentBlockList: React.FC<{ contentBlocks: ContentBlock[] }> = ({ content
     () => contentBlocks.filter(b => b.type === 'text').map(b => (b as { text: string }).text).join(' '),
     [contentBlocks]
   );
+  const effectiveDir = resolveDir(blockText, forceLtr);
 
   return (
-    <div dir={detectRtl(blockText) ? 'rtl' : 'auto'}>
+    <div dir={effectiveDir}>
       {contentBlocks.map((block, index) => (
         <ContentBlockRenderer
           key={index}
           block={block}
           pairedResult={block.type === 'tool_use' && block.id ? pairMap.get(block.id) : undefined}
           pairedResultIds={pairedResultIds}
+          forceLtr={forceLtr}
         />
       ))}
     </div>
@@ -538,10 +552,11 @@ const ContentBlockRenderer: React.FC<{
   block: ContentBlock;
   pairedResult?: ContentBlock;
   pairedResultIds?: Set<string>;
-}> = ({ block, pairedResult, pairedResultIds }) => {
+  forceLtr?: boolean;
+}> = ({ block, pairedResult, pairedResultIds, forceLtr }) => {
   switch (block.type) {
     case 'text':
-      return <TextBlockRenderer text={block.text || ''} />;
+      return <TextBlockRenderer text={block.text || ''} forceLtr={forceLtr} />;
 
     case 'image':
       return <ImageBlockRenderer block={block} />;
@@ -582,7 +597,7 @@ const ImageBlockRenderer: React.FC<{ block: ContentBlock }> = ({ block }) => {
 };
 
 /** Renders text content, splitting out code blocks */
-const TextBlockRenderer: React.FC<{ text: string }> = ({ text }) => {
+const TextBlockRenderer: React.FC<{ text: string; forceLtr?: boolean }> = ({ text, forceLtr }) => {
   const segments = parseTextWithCodeBlocks(text);
 
   return (
@@ -595,7 +610,7 @@ const TextBlockRenderer: React.FC<{ text: string }> = ({ text }) => {
             language={segment.language}
           />
         ) : (
-          <MarkdownContent key={index} text={segment.content} />
+          <MarkdownContent key={index} text={segment.content} forceLtr={forceLtr} />
         )
       )}
     </>

@@ -102,7 +102,17 @@ All Markdown styles use VS Code CSS variables for automatic theme adaptation:
 
 ### RTL Support
 
-Message containers use `dir="auto"` (browser's first-strong-character algorithm) instead of the old any-Hebrew-char heuristic. MarkdownContent also applies `dir="auto"` to each block-level element (p, li, headings, td) so each paragraph independently detects its direction.
+Message containers use `dir="auto"` (browser's first-strong-character algorithm) instead of the old any-Hebrew-char heuristic. MarkdownContent applies a computed direction (via `resolveDir(text, forceLtr)`) to each block-level element (p, li, headings, td) so each paragraph independently detects its direction.
+
+#### Per-message LTR override
+
+Each message bubble has its own "LTR / Auto" toggle button (next to Copy / Translate, see `alignment-message-btn` in `global.css`). Clicking it adds the message's id to `messageForcedLtr: Set<string>` in the Zustand store and toggles the button label.
+
+- The flag is **per-message only**: it never affects other messages, the input box, or the StatusBar.
+- `MessageBubble.tsx` reads the flag via `useAppStore((s) => s.messageForcedLtr.has(message.id))` and prop-drills the boolean through `ContentBlockList → ContentBlockRenderer → TextBlockRenderer → MarkdownContent`.
+- `MarkdownContent.tsx` accepts `forceLtr?: boolean` and passes it to `resolveDir` for each block-level element.
+- `resolveDir(text, true)` → `'ltr'`; `resolveDir(text, false)` → `'rtl'` if Hebrew/Arabic chars present, else `'auto'`.
+- The Set is reset on session change (mirrors the existing `showingTranslation` Set pattern).
 
 When an element resolves to RTL:
 

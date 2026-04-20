@@ -55,6 +55,7 @@ export class TabManager {
   private readonly snapshotEntries = new Map<string, OpenTabSnapshotEntry>();
   private snapshotDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isRestoringSnapshot = false;
+  private isShuttingDown = false;
   private static readonly SNAPSHOT_DEBOUNCE_MS = 500;
   private static readonly MAX_RESTORE = 10;
 
@@ -351,16 +352,34 @@ export class TabManager {
   }
 
   /** Dispose all tabs (used during extension deactivation) */
-  closeAllTabs(): void {
-    // Flush any pending snapshot write before we tear everything down so
-    // that a graceful VS Code shutdown preserves the "what was open" record.
-    this.flushSnapshotSync();
+  async closeAllTabs(): Promise<void> {
+    // Set the shutdown guard FIRST so the disposal cascade (panel.onDidDispose
+    // → onClosed → handleTabClosed) cannot mutate snapshotEntries or schedule
+    // a new write that would race with — and overwrite — the final save below.
+    this.isShuttingDown = true;
+    if (this.snapshotDebounceTimer) {
+      clearTimeout(this.snapshotDebounceTimer);
+      this.snapshotDebounceTimer = null;
+    }
+
+    // Capture the snapshot BEFORE disposing any tabs so it reflects the
+    // currently-open set, not the post-disposal empty state.
+    const finalSnapshot = this.buildSnapshot();
+
     for (const tab of this.tabs.values()) {
       tab.dispose();
     }
     this.tabs.clear();
     this.activeTabId = null;
     this.statusBarItem.hide();
+
+    // Awaited so `deactivate()` can hold the extension host alive until the
+    // Memento write actually lands on disk.
+    try {
+      await this.snapshotStore.set(finalSnapshot);
+    } catch (err) {
+      this.log(`[OpenTabsSnapshot] Failed to persist on shutdown: ${err}`);
+    }
   }
 
   /** Post a message to the active tab's webview */
@@ -435,8 +454,12 @@ export class TabManager {
 
   private handleTabClosed(tabId: string): void {
     this.tabs.delete(tabId);
-    this.snapshotEntries.delete(tabId);
-    this.schedulePersistSnapshot();
+    // During shutdown, the final snapshot has already been captured. Skip
+    // mutation so disposal-order callbacks do not wipe the saved state.
+    if (!this.isShuttingDown) {
+      this.snapshotEntries.delete(tabId);
+      this.schedulePersistSnapshot();
+    }
     this.log(`Tab closed: ${tabId} (remaining: ${this.tabs.size})`);
 
     if (this.activeTabId === tabId) {
@@ -508,7 +531,7 @@ export class TabManager {
   }
 
   private schedulePersistSnapshot(): void {
-    if (this.isRestoringSnapshot) {
+    if (this.isRestoringSnapshot || this.isShuttingDown) {
       return;
     }
     if (this.snapshotDebounceTimer) {
@@ -535,21 +558,6 @@ export class TabManager {
       await this.snapshotStore.set(this.buildSnapshot());
     } catch (err) {
       this.log(`[OpenTabsSnapshot] Failed to persist: ${err}`);
-    }
-  }
-
-  /** Synchronous fire-and-forget flush used during deactivation. */
-  private flushSnapshotSync(): void {
-    if (this.snapshotDebounceTimer) {
-      clearTimeout(this.snapshotDebounceTimer);
-      this.snapshotDebounceTimer = null;
-    }
-    // Memento.update returns a Thenable; we can't await during deactivate,
-    // but VS Code keeps the event loop alive long enough to flush.
-    try {
-      void this.snapshotStore.set(this.buildSnapshot());
-    } catch (err) {
-      this.log(`[OpenTabsSnapshot] Failed to flush on deactivate: ${err}`);
     }
   }
 

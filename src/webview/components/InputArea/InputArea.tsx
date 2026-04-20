@@ -1615,7 +1615,7 @@ export const InputArea: React.FC = () => {
                 : "Ultrathink - boost reasoning power"
               }
             >
-              <span className="ut-default-icon">&#x1F9E0;</span>
+              <span className="ut-default-icon">&#x26A1;</span>
               {ultrathinkAnim && (
                 <div className={`ultrathink-anim ultrathink-anim-${ultrathinkAnim}`}>
                   {ultrathinkAnim === 'rocket' && <span className="ut-emoji">&#x1F680;</span>}

@@ -201,6 +201,8 @@ export interface AppState {
   translations: Record<string, string>;
   translatingMessageIds: Set<string>;
   showingTranslation: Set<string>;
+  /** Per-message forced LTR alignment override. Toggled from the bubble's "יישור לשמאל/לימין" button. */
+  messageForcedLtr: Set<string>;
   /** Maps message IDs to translation error messages (cleared on next attempt) */
   translationErrors: Record<string, string>;
   /** Maps user message IDs to the original (pre-translation) text the user typed */
@@ -561,6 +563,7 @@ export interface AppState {
   setTranslating: (messageId: string, translating: boolean) => void;
   setTranslationError: (messageId: string, error: string) => void;
   toggleTranslationView: (messageId: string) => void;
+  toggleMessageForcedLtr: (messageId: string) => void;
   setPendingOriginalText: (text: string | null) => void;
   setUserOriginalText: (messageId: string, text: string) => void;
   setSummaryModeEnabled: (enabled: boolean) => void;
@@ -838,6 +841,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   translations: {},
   translatingMessageIds: new Set(),
   showingTranslation: new Set(),
+  messageForcedLtr: new Set(),
   translationErrors: {},
   userOriginalTexts: {},
   pendingOriginalText: null,
@@ -1714,6 +1718,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { showingTranslation: newSet };
     }),
 
+  toggleMessageForcedLtr: (messageId) =>
+    set((state) => {
+      const newSet = new Set(state.messageForcedLtr);
+      if (newSet.has(messageId)) {
+        newSet.delete(messageId);
+      } else {
+        newSet.add(messageId);
+      }
+      return { messageForcedLtr: newSet };
+    }),
+
   setPendingOriginalText: (text) => set({ pendingOriginalText: text }),
 
   setUserOriginalText: (messageId, text) =>
@@ -2163,6 +2178,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       translations: {},
       translatingMessageIds: new Set(),
       showingTranslation: new Set(),
+      messageForcedLtr: new Set(),
       translationErrors: {},
       userOriginalTexts: {},
       pendingOriginalText: null,

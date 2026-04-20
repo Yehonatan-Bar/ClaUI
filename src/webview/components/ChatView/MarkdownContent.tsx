@@ -3,7 +3,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { FILE_PATH_REGEX, URL_REGEX } from './filePathLinks';
-import { detectRtl } from '../../hooks/useRtlDetection';
+import { resolveDir } from '../../hooks/useRtlDetection';
 
 // Configure marked options
 marked.setOptions({
@@ -160,9 +160,10 @@ function linkifyTextNodes(container: HTMLElement): void {
 
 interface MarkdownContentProps {
   text: string;
+  forceLtr?: boolean;
 }
 
-export const MarkdownContent: React.FC<MarkdownContentProps> = ({ text }) => {
+export const MarkdownContent: React.FC<MarkdownContentProps> = ({ text, forceLtr = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const sanitizedHtml = useMemo(() => {
@@ -192,7 +193,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ text }) => {
     // Per-paragraph bidi: detect RTL if any Hebrew/Arabic characters are present
     container.querySelectorAll('p, li, h1, h2, h3, h4, h5, h6, td, th').forEach((el) => {
       const text = el.textContent || '';
-      el.setAttribute('dir', detectRtl(text) ? 'rtl' : 'auto');
+      el.setAttribute('dir', resolveDir(text, forceLtr));
     });
 
     // Event delegation for clickable elements
@@ -231,7 +232,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ text }) => {
 
     container.addEventListener('click', handleClick);
     return () => container.removeEventListener('click', handleClick);
-  }, [sanitizedHtml]);
+  }, [sanitizedHtml, forceLtr]);
 
   return (
     <div

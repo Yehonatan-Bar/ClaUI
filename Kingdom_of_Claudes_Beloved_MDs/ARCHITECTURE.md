@@ -235,7 +235,13 @@ Error events (`type: 'error'`) are written to `store.lastError`, then rendered b
 
 ### RTL Detection (`hooks/useRtlDetection.ts`)
 
-Exports `detectRtl(text)` which checks for Hebrew (U+0590-U+05FF) and Arabic (U+0600-U+06FF) characters. Used only by InputArea for per-keystroke textarea direction. Message bubbles and streaming text use the browser's native `dir="auto"` (first-strong-character algorithm) instead, so a mostly-English message containing a few Hebrew words stays LTR. MarkdownContent applies `dir="auto"` to each block-level element (p, li, headings, td) for per-paragraph direction detection.
+Exports two helpers:
+- `detectRtl(text)` - returns `true` if the string contains Hebrew (U+0590-U+05FF) or Arabic (U+0600-U+06FF) characters.
+- `resolveDir(text, forceLtr)` - returns `'ltr' | 'rtl' | 'auto'`. Yields `'ltr'` when `forceLtr` is true, otherwise `'rtl'` if RTL content is detected, else `'auto'`.
+
+RTL handling is applied across the chat: `StreamingText` and `InputArea` use `detectRtl` directly. `MessageBubble`'s `ContentBlockList` and `MarkdownContent`'s per-paragraph loop call `resolveDir(text, forceLtr)` with a per-message `forceLtr` flag.
+
+**Per-message LTR override**: Each message bubble has a small "LTR / Auto" button (next to Copy / Translate). Clicking it toggles the message's id in the Zustand `messageForcedLtr: Set<string>`. Subscriptions use `s.messageForcedLtr.has(message.id)`, so only the affected bubble re-renders when the flag flips. The flag is **scoped to a single message** — it never affects other messages, the input box, or the StatusBar. The Set is cleared on session change.
 
 ### React Components
 

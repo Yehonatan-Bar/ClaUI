@@ -3077,6 +3077,7 @@ html, body, #root {
   font-size: 11px;
 }
 
+
 .text-settings-select {
   background: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
@@ -3821,6 +3822,39 @@ html, body, #root {
 .translate-message-btn.translation-error {
   color: var(--vscode-errorForeground, #f44);
   border-color: var(--vscode-errorForeground, #f44);
+}
+
+/* Per-message alignment toggle (LTR/Auto) */
+.alignment-message-btn {
+  float: right;
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 3px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  margin-right: 4px;
+}
+
+.message:hover .alignment-message-btn {
+  opacity: 1;
+}
+
+.alignment-message-btn.forced-ltr {
+  opacity: 1;
+  color: var(--vscode-textLink-foreground, #3794ff);
+  border-color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.alignment-message-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+  border-color: var(--vscode-focusBorder);
 }
 
 /* Edit message button and inline editing */
@@ -6478,54 +6512,33 @@ html, body, #root {
    SkillDocs First-Time Onboarding
    ============================================================ */
 
-@keyframes skilldocs-fab-glow {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(120, 200, 120, 0.7),
-                0 2px 8px rgba(0, 0, 0, 0.4);
-    transform: scale(1);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(120, 200, 120, 0),
-                0 4px 16px rgba(0, 0, 0, 0.5);
-    transform: scale(1.04);
-  }
-}
-
 .skilldocs-fab {
   position: fixed;
-  bottom: 44px;
-  left: 12px;
+  bottom: 8px;
+  left: 8px;
   z-index: 500;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 13px 7px 10px;
-  background: linear-gradient(135deg,
-    var(--vscode-button-background, #0e639c),
-    color-mix(in srgb, var(--vscode-button-background, #0e639c) 70%, #2ecc71 30%)
-  );
-  color: var(--vscode-button-foreground, #fff);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 20px;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  color: var(--vscode-descriptionForeground, #888);
+  border: none;
+  border-radius: 50%;
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  animation: skilldocs-fab-glow 2s ease-in-out infinite;
-  transition: opacity 0.15s;
+  opacity: 0.45;
+  transition: opacity 0.15s, color 0.15s;
 }
 
 .skilldocs-fab:hover {
-  opacity: 0.9;
-  animation-play-state: paused;
+  opacity: 1;
+  color: var(--vscode-foreground, #ccc);
 }
 
 .skilldocs-fab-icon {
-  font-size: 14px;
-  line-height: 1;
-}
-
-.skilldocs-fab-label {
+  font-size: 11px;
   line-height: 1;
 }
 

@@ -11,6 +11,15 @@ export function detectRtl(text: string): boolean {
 }
 
 /**
+ * Resolves the effective `dir` attribute value given a forceLtr override flag.
+ * When forceLtr is true, the text is left-aligned regardless of content.
+ */
+export function resolveDir(text: string, forceLtr: boolean): 'rtl' | 'ltr' | 'auto' {
+  if (forceLtr) return 'ltr';
+  return detectRtl(text) ? 'rtl' : 'auto';
+}
+
+/**
  * Heuristic: returns true if the text is predominantly Latin/ASCII
  * (i.e. already in English or a Latin-script language).
  * Checks whether non-Latin script characters make up less than 5% of the letters.

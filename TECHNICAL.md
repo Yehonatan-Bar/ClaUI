@@ -137,7 +137,7 @@ claude-code-mirror/
 |       +-- state/store.ts               #   Zustand state management, including snapshot-only assistant finalize fallback
 |       +-- hooks/
 |       |   +-- useClaudeStream.ts        #   postMessage event dispatcher
-|       |   +-- useRtlDetection.ts        #   detectRtl() helper for InputArea (messages use dir="auto")
+|       |   +-- useRtlDetection.ts        #   detectRtl() / resolveDir() - RTL auto-detection (per-message LTR override lives in Zustand messageForcedLtr Set)
 |       |   +-- useFileMention.ts         #   @ file mention trigger detection, debounced search, popup state
 |       |   +-- useStatusBarCollapse.ts  #   3-stage responsive layout hook for grouped StatusBar (full/compact/minimal) + progressive right-side collapse (clock/MCP/usage)
 |       |   +-- useOutsideClick.ts      #   Centralized outside-click manager for all dropdowns/popovers
@@ -371,7 +371,7 @@ claude-code-mirror/
 **Image Lightbox** - Full-screen overlay for viewing images at natural size. Double-clicking any image (pending input thumbnails or message bubble images) opens a dark overlay with the image centered at up to 90vw/90vh. Closes on backdrop click or Escape key. Portal-based component (`ImageLightbox`) mounted at App root, driven by `lightboxImageSrc` Zustand state field. CSS class `.image-lightbox-overlay` at z-index 9999.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/IMAGE_LIGHTBOX.md`
 
-**TextSettingsBar** - In-webview UI for adjusting chat text font size, font family, and typing personality theme. Supports Hebrew-friendly font presets and four rendering themes: Terminal Hacker, Retro, Zen, and Neo Zen. Settings are stored in Zustand and synced from VS Code configuration on startup and on change.
+**TextSettingsBar** - In-webview UI for adjusting chat text font size, font family, and typing personality theme. Supports Hebrew-friendly font presets and four rendering themes: Terminal Hacker, Retro, Zen, and Neo Zen. Settings are stored in Zustand and synced from VS Code configuration on startup and on change. (Per-message LTR alignment override is a separate per-message button on each MessageBubble — see `MARKDOWN_RENDERING.md`.)
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **ModelSelector** - Dropdown in the status bar for choosing the Claude model (Opus 4.7, Sonnet 4.6, Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default). Selection is persisted to VS Code settings (`claudeMirror.model`) and synced back to the webview on startup and on change. Changing the model takes effect immediately: the current session is stopped and resumed with the new model (live switch via `SessionTab.switchModel()`). Shows the currently active runtime model label when connected; `claudeModelDisplay.ts` maps IDs like `claude-opus-4-7` to `Opus 4.7` in the AI chip, message badges, and dashboard metadata.

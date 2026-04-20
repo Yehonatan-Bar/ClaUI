@@ -1,5 +1,37 @@
 # ClaUi - Changelog
 
+## v0.1.115 - 2026-04-20
+
+**Bug Fix: Restore Last Sessions snapshot wipe on shutdown**
+
+- Closing VS Code with one or more open ClaUi tabs sometimes left an empty `claudeMirror.openTabsSnapshot` on disk, so on the next workspace open the "Restore Last Sessions" feature found nothing to restore (log showed `[OpenTabsSnapshot] No entries to restore`)
+- Root cause: a fire-and-forget `flushSnapshotSync()` raced against the panel-disposal cascade. Each `WebviewPanel.onDidDispose` triggered `handleTabClosed`, which deleted the entry from `snapshotEntries` and scheduled a 500 ms debounced write — that timer then fired AFTER the good write and overwrote the snapshot with `entries: []`. `deactivate()` returned synchronously, so VS Code could kill the extension host before the good write was guaranteed to land
+- Fix: `TabManager` gained an `isShuttingDown` field. `closeAllTabs()` is now `async`: it sets the guard, cancels any pending debounce timer, captures `buildSnapshot()` BEFORE disposing tabs, disposes them, then `await`s `snapshotStore.set(captured)`. `handleTabClosed` and `schedulePersistSnapshot` short-circuit when shutting down (defense in depth)
+- `extension.ts deactivate()` is now `async` and `await`s `closeAllTabs()`, so VS Code holds the extension host alive until the Memento write actually lands on disk (per the documented `deactivate(): Thenable` contract)
+- Removed the now-unused `flushSnapshotSync` method
+
+**Bug Fix: Orphan-process cleanup PowerShell parsing error on Windows**
+
+- `[OrphanCleanup] Failed: ...` errors appeared on every extension activation on Windows. The PowerShell script wrapped via `powershell -Command "..."` contained literal double quotes (`"Name='node.exe'"`, `"killed:..."`) that collided with cmd.exe's quote handling, breaking script parsing
+- Fix: `orphanCleanup.ts` now passes the script via PowerShell's `-EncodedCommand` (base64 UTF-16LE), which sidesteps cmd.exe quoting entirely. The multi-line script body is preserved as-is — no more `.replace(/\n/g, '; ')` workaround
+
+**Feature: Per-message LTR alignment toggle**
+
+- Each message bubble now has a small "LTR / Auto" button next to Copy and Translate. Clicking it forces left-to-right alignment for that single message only — it does NOT affect other messages, the input area, or the StatusBar. The button is hidden at rest and fades in on bubble hover, matching the Translate-button pattern
+- New Zustand state `messageForcedLtr: Set<string>` and action `toggleMessageForcedLtr(messageId)` mirror the existing `showingTranslation` Set pattern. The Set is cleared on session change
+- `MessageBubble` subscribes via `s.messageForcedLtr.has(message.id)` so only the affected bubble re-renders when its own flag flips. The boolean is prop-drilled through `ContentBlockList → ContentBlockRenderer → TextBlockRenderer → MarkdownContent` to keep leaf renderers stateless
+- Removed the previous global alignment scope: `textSettings.forceLtr` was deleted from the store, the StatusBar `AlignmentToggle` button (`status-bar-alignment-toggle` CSS) was removed, the `useEffectiveDir` React hook was deleted, and `InputArea` / `StreamingText` reverted to plain `detectRtl(text)` for direction
+- New CSS class `.alignment-message-btn` (with `.forced-ltr` modifier when active) mirrors `.translate-message-btn`: float-right, opacity 0 at rest, opacity 1 on `.message:hover`, `--vscode-textLink-foreground` when active
+
+**Documentation**
+
+- Updated `Kingdom_of_Claudes_Beloved_MDs/SESSION_RESTORE.md` to describe the new capture-then-await shutdown flow and the `isShuttingDown` guard (replacing the obsolete "synchronous flush" description)
+- Updated `Kingdom_of_Claudes_Beloved_MDs/PROCESS_LIFECYCLE.md` to note the `-EncodedCommand` PowerShell invocation
+- Updated `Kingdom_of_Claudes_Beloved_MDs/MARKDOWN_RENDERING.md` and `ARCHITECTURE.md` to describe the per-message LTR override and the `messageForcedLtr` Set
+- Updated `TECHNICAL.md` to remove the old global alignment toggle reference from the TextSettingsBar entry
+
+---
+
 ## v0.1.113 - 2026-04-16
 
 **Improvement: Claude Opus 4.7 display support**

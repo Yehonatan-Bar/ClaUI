@@ -350,14 +350,14 @@ export const SkillGenOnboarding: React.FC = () => {
 
   return (
     <>
-      {/* Floating pulsing button */}
+      {/* Small, quiet icon button */}
       <button
         className="skilldocs-fab"
         onClick={() => setModalOpen(true)}
         title="SkillDocs — click to learn more"
+        aria-label="SkillDocs"
       >
         <span className="skilldocs-fab-icon">&#10024;</span>
-        <span className="skilldocs-fab-label">SkillDocs</span>
       </button>
 
       {/* Modal */}

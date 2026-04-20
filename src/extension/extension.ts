@@ -175,9 +175,11 @@ export function activate(context: vscode.ExtensionContext): void {
   log('Extension activated');
 }
 
-export function deactivate(): void {
+export async function deactivate(): Promise<void> {
   log('Extension deactivating...');
-  tabManager?.closeAllTabs();
+  // Returned promise: VS Code waits on it before killing the extension host,
+  // ensuring the open-tabs snapshot lands on disk before shutdown.
+  await tabManager?.closeAllTabs();
   globalFileLogger?.dispose();
   globalFileLogger = null;
 }

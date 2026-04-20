@@ -54,10 +54,12 @@ export const StreamingText: React.FC<StreamingTextProps> = ({ text }) => {
     );
   }, [displayText]);
 
+  const effectiveDir = detectRtl(text) ? 'rtl' : 'auto';
+
   return (
     <div
       className={`text-content streaming-text streaming-text-${typingTheme}`}
-      dir={detectRtl(text) ? 'rtl' : 'auto'}
+      dir={effectiveDir}
       style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
     >
       {renderedContent}

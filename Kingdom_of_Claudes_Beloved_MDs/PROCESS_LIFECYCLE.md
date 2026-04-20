@@ -48,6 +48,8 @@ This handles the case where VS Code crashes or the extension host dies without r
 
 **Timeout**: 10 seconds. Runs asynchronously, does not block activation.
 
+The script is passed to PowerShell via `-EncodedCommand` (base64 UTF-16LE) rather than inline `-Command "..."`. The script body contains its own double quotes (`"Name='node.exe'"`, `"killed:..."`) which would otherwise collide with cmd.exe's quote handling and break parsing.
+
 ## Normal Cleanup Flow
 
 ```

@@ -1,5 +1,7 @@
 # ClaUi
 
+> **To start a session, press `Ctrl+Shift+C`.**
+
 **The full IDE experience for Claude Code** -- multi-tab sessions, analytics dashboards, 65 achievements, dual AI providers, prompt enhancement, message translation, and deep customization, all inside VS Code.
 
 ClaUi transforms the Claude Code CLI into a rich, interactive workspace. Run parallel conversations in colored tabs, track your coding patterns with real-time analytics, earn badges for milestones, enhance prompts with AI before sending, translate responses into 10 languages, and compare achievements with friends on GitHub. Whether you use Claude or OpenAI Codex, ClaUi gives you the tools to work smarter.

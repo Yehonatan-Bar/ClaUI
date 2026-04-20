@@ -347,6 +347,10 @@ An `!` info button (`.skillgen-info-btn`) appears next to SkillDocs in both expa
 
 The Vitals settings panel includes a "Skill Generation" toggle for enabling/disabling SkillGen directly from the UI.
 
+### First-Time Onboarding (`SkillGenOnboarding.tsx`)
+
+A small, quiet sparkle icon (`✨`, 18x18, opacity 0.45) is anchored at `bottom:8px; left:8px` in Claude UI mode while `globalState['claui.skillGenOnboardingSeen']` is `false`. Hover raises opacity to 1. Clicking opens a 16-language modal (RTL for he/ar) explaining SkillDocs with **Enable** / **Skip** buttons. Either choice posts `skillGenOnboardingDecision` to the extension, which sets the persistent flag (and disables the feature on Skip) and re-broadcasts settings — the icon then unmounts permanently. CSS lives under `.skilldocs-fab` / `.skilldocs-modal-*` in `global.css`.
+
 ### SkillGenPanel
 
 Full overlay panel:

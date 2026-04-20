@@ -55,7 +55,7 @@ interface OpenTabsSnapshot {
 2. When the CLI emits the initial system event, `SessionTab` fires `callbacks.onSessionIdAssigned(tabId, sessionId)`. `TabManager.handleSessionIdAssigned` writes the id into the entry.
 3. When the tab name changes (auto-name from Haiku, user rename, restored name from SessionStore), `setTabName` fires `callbacks.onNameChanged(tabId, name)`. Default placeholder names (`ClaUi N`, `Codex N`, `Session N`) are skipped.
 4. On every write, focus, or close, `schedulePersistSnapshot()` runs a 500 ms debounce before flushing to `workspaceState`. Debouncing lets bursty edits coalesce while still surviving crashes better than a deactivate-only write.
-5. `closeAllTabs()` (called from `deactivate`) performs a synchronous flush.
+5. `closeAllTabs()` (called from `deactivate`) sets a `isShuttingDown` guard, cancels the debounce timer, captures the final snapshot **before** disposing tabs, then `await`s the Memento write. The guard prevents `panel.onDidDispose → onClosed → handleTabClosed` from mutating `snapshotEntries` (or scheduling a new write) once shutdown is in progress, so the captured-and-saved snapshot cannot be wiped to `[]` by the disposal cascade. `deactivate` itself is `async` and returns the promise, so VS Code holds the extension host alive until the disk write lands.
 
 ### Restoring on startup
 
