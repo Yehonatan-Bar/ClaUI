@@ -18,6 +18,7 @@ export interface OpenTabsSnapshot {
 }
 
 const STORAGE_KEY = 'claudeMirror.openTabsSnapshot';
+const RESTORE_IN_PROGRESS_KEY = 'claudeMirror.restoreInProgress';
 
 /**
  * Persists the set of open ClaUi tabs (sessionId + provider + metadata) in
@@ -43,5 +44,17 @@ export class OpenTabsSnapshotStore {
 
   async clear(): Promise<void> {
     await this.workspaceState.update(STORAGE_KEY, undefined);
+  }
+
+  // Crash-loop breaker: a sticky flag set before restore starts and cleared
+  // after restore finishes. If activation finds it still true, the previous
+  // run died mid-restore and auto-restore should be skipped to avoid looping
+  // through the same crash on every launch.
+  isRestoreInProgress(): boolean {
+    return this.workspaceState.get<boolean>(RESTORE_IN_PROGRESS_KEY, false);
+  }
+
+  async setRestoreInProgress(value: boolean): Promise<void> {
+    await this.workspaceState.update(RESTORE_IN_PROGRESS_KEY, value ? true : undefined);
   }
 }

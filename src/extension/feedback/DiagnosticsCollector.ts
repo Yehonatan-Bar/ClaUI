@@ -110,7 +110,7 @@ function getClaUiSettings(): string[] {
   const keys = [
     'cliPath', 'model', 'permissionMode', 'autoNameSessions',
     'restoreSessionsOnStartup',
-    'sessionVitals', 'adventureWidget', 'chatFontSize', 'typingTheme',
+    'sessionVitals', 'adventureWidget', 'weatherWidget', 'chatFontSize', 'typingTheme',
   ];
   return keys.map(k => `  ${k}: ${JSON.stringify(config.get(k))}`);
 }

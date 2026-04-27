@@ -447,6 +447,11 @@ export interface SetAdventureWidgetEnabledRequest {
   enabled: boolean;
 }
 
+export interface SetWeatherWidgetEnabledRequest {
+  type: 'setWeatherWidgetEnabled';
+  enabled: boolean;
+}
+
 export interface SetActivitySummaryEnabledRequest {
   type: 'setActivitySummaryEnabled';
   enabled: boolean;
@@ -807,6 +812,7 @@ export type WebviewToExtensionMessage =
   | SetVitalsEnabledRequest
   | SetDetailedDiffViewEnabledRequest
   | SetAdventureWidgetEnabledRequest
+  | SetWeatherWidgetEnabledRequest
   | SetActivitySummaryEnabledRequest
   | SetTranslationLanguageRequest
   | AdventureDebugLogMessage
@@ -1330,6 +1336,11 @@ export interface FileOldContentMessage {
 
 export interface AdventureWidgetSettingMessage {
   type: 'adventureWidgetSetting';
+  enabled: boolean;
+}
+
+export interface WeatherWidgetSettingMessage {
+  type: 'weatherWidgetSetting';
   enabled: boolean;
 }
 
@@ -1988,6 +1999,7 @@ export type ExtensionToWebviewMessage =
   | DetailedDiffViewSettingMessage
   | FileOldContentMessage
   | AdventureWidgetSettingMessage
+  | WeatherWidgetSettingMessage
   | ActivitySummarySettingMessage
   | AdventureBeatMessage
   | TurnSemanticsMessage

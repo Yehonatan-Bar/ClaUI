@@ -279,6 +279,17 @@ export class ClaudeProcessManager extends EventEmitter {
     return this.sessionId;
   }
 
+  /** Seed the session id for a resumed session before the CLI emits system/init.
+   *  In pipe mode the CLI emits init only after the first stdin message, so any
+   *  feature that needs the session id between resume and first turn (e.g.
+   *  edit-and-resend on a freshly restored tab) would otherwise see null. */
+  seedSessionId(id: string): void {
+    if (!this.sessionId) {
+      this.sessionId = id;
+      this.log(`Seeded session id from caller: ${id}`);
+    }
+  }
+
   /** Whether the last exit was triggered by a user cancel */
   get cancelledByUser(): boolean {
     return this._cancelledByUser;

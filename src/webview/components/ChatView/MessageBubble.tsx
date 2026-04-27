@@ -590,7 +590,7 @@ const ImageBlockRenderer: React.FC<{ block: ContentBlock }> = ({ block }) => {
       <img
         src={dataUri}
         alt="Attached image"
-        onDoubleClick={() => useAppStore.getState().setLightboxImageSrc(dataUri)}
+        onClick={() => useAppStore.getState().setLightboxImageSrc(dataUri)}
       />
     </div>
   );

@@ -30,6 +30,8 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
   const setDetailedDiffEnabled = useAppStore((s) => s.setDetailedDiffEnabled);
   const adventureEnabled = useAppStore((s) => s.adventureEnabled);
   const setAdventureEnabled = useAppStore((s) => s.setAdventureEnabled);
+  const weatherWidgetEnabled = useAppStore((s) => s.weatherWidgetEnabled);
+  const setWeatherWidgetEnabled = useAppStore((s) => s.setWeatherWidgetEnabled);
   const translationLanguage = useAppStore((s) => s.translationLanguage);
   const setTranslationLanguage = useAppStore((s) => s.setTranslationLanguage);
   const turnAnalysisEnabled = useAppStore((s) => s.turnAnalysisEnabled);
@@ -77,6 +79,12 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
     const next = !adventureEnabled;
     setAdventureEnabled(next);
     postToExtension({ type: 'setAdventureWidgetEnabled', enabled: next });
+  };
+
+  const handleWeatherWidgetToggle = () => {
+    const next = !weatherWidgetEnabled;
+    setWeatherWidgetEnabled(next);
+    postToExtension({ type: 'setWeatherWidgetEnabled', enabled: next });
   };
 
   const handleLanguageChange = (language: string) => {
@@ -342,6 +350,16 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
       </div>
 
       <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
+        <span data-tooltip="Floating weather icon showing the session's mood: clear sky for smooth runs, clouds/rain/storm for rising errors, rainbow on recovery, moon when idle.">Session Mood (Weather)</span>
+        <button
+          className={`vitals-info-toggle-btn ${weatherWidgetEnabled ? 'on' : 'off'}`}
+          onClick={handleWeatherWidgetToggle}
+        >
+          <span className="vitals-toggle-knob" />
+        </button>
+      </div>
+
+      <div className="vitals-info-toggle-row" style={{ marginBottom: 6 }}>
         <span data-tooltip="Analyze each Claude turn using AI to extract insights like intent, quality, and key decisions. Results appear in the turn details.">Semantic Analysis</span>
         <button
           className={`vitals-info-toggle-btn ${turnAnalysisEnabled ? 'on' : 'off'}`}
@@ -407,7 +425,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
       </div>
 
       <div className="vitals-info-toggle-row">
-        <span data-tooltip="Toggle the session vitals display: weather icon, timeline minimap, and intensity borders on assistant messages.">Show Vitals</span>
+        <span data-tooltip="Toggle the session vitals display: timeline minimap and intensity borders on assistant messages. The weather/mood icon has its own toggle above.">Show Vitals</span>
         <button
           className={`vitals-info-toggle-btn ${vitalsEnabled ? 'on' : 'off'}`}
           onClick={handleToggle}

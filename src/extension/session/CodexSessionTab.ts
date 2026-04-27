@@ -75,6 +75,14 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private deferredAutoSessionName: string | null = null;
   /** Fork initialization data (history snapshot + prompt text) for new forked tabs */
   private forkInitData: { promptText: string; messages: SerializedChatMessage[] } | null = null;
+  /** Lazy-resume state: when set, the Codex CLI has not been spawned yet
+   *  and will be started the first time the user focuses this tab after
+   *  TabManager arms the wake (post-restore). */
+  private pendingResumeSessionId: string | null = null;
+  /** True only after TabManager finishes the restore loop. Prevents the
+   *  view-state changes triggered by panel creation from waking lazy tabs
+   *  before the user has actually clicked them. */
+  private lazyWakeArmed: boolean = false;
   /** Background session for the "btw" side-conversation overlay */
   private btwSession: CodexBackgroundSession | null = null;
   private turnDiagSeq = 0;
@@ -662,6 +670,39 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.forkInitData = init;
   }
 
+  /** Mark this tab for lazy resume: the Codex CLI is NOT spawned now.
+   *  The tab title is restored from sessionStore so the user can identify it,
+   *  and the threadId is seeded so features that read tab.sessionId before
+   *  the spawn (e.g. snapshot persistence) still return the correct id.
+   *  The actual spawn happens the first time the user focuses this tab
+   *  after armLazyWake() is called. */
+  prepareForLazyResume(sessionId: string): void {
+    if (this.disposed) {
+      return;
+    }
+    this.pendingResumeSessionId = sessionId;
+    this.lazyWakeArmed = false;
+    this.threadId = sessionId;
+    this.restoreSessionName(sessionId);
+    this.log(
+      `[Codex Tab ${this.tabNumber}] Lazy-resume prepared for thread ${sessionId.slice(0, 8)}; CLI will spawn on first user focus.`,
+    );
+  }
+
+  /** TabManager calls this once the restore loop has finished creating all
+   *  panels. After this, the next view-state-active event from the user
+   *  triggers the deferred startSession({ resume }). */
+  armLazyWake(): void {
+    if (this.pendingResumeSessionId) {
+      this.lazyWakeArmed = true;
+    }
+  }
+
+  /** Whether this tab is in lazy-resume state (CLI not spawned yet). */
+  get isPendingLazyResume(): boolean {
+    return this.pendingResumeSessionId !== null;
+  }
+
   private restoreSessionName(sessionId: string): boolean {
     const existing = this.sessionStore.getSession(sessionId);
     if (!existing) {
@@ -949,6 +990,18 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         `[Codex Tab ${this.tabNumber}] ViewState changed: active=${e.webviewPanel.active} visible=${e.webviewPanel.visible}`,
       );
       if (e.webviewPanel.active) {
+        // Wake from lazy-resume on the first user focus after restore.
+        if (this.lazyWakeArmed && this.pendingResumeSessionId) {
+          const sid = this.pendingResumeSessionId;
+          this.pendingResumeSessionId = null;
+          this.lazyWakeArmed = false;
+          this.log(`[Codex Tab ${this.tabNumber}] Lazy-resume waking for thread ${sid.slice(0, 8)}`);
+          void this.startSession({ resume: sid }).catch((err) => {
+            this.log(
+              `[Codex Tab ${this.tabNumber}] Lazy-resume startSession failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          });
+        }
         this.callbacks.onFocused(this.id);
         this.postFocusInput('view-state active');
       }

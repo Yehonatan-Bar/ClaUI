@@ -3,16 +3,15 @@ import { useAppStore } from '../../state/store';
 import { WeatherWidget } from './WeatherWidget';
 
 /**
- * Container for weather widget.
- * Returns null when vitals are disabled.
- * Note: SessionTimeline is rendered separately in the chat-area-wrapper.
- * Note: AdventureWidget is rendered independently in App.tsx (not gated by vitalsEnabled).
+ * Renders the floating WeatherWidget when its independent toggle is on.
+ * SessionTimeline and intensity borders are gated by vitalsEnabled in App.tsx.
+ * AdventureWidget is rendered independently in App.tsx with its own flag.
  */
 export const VitalsContainer: React.FC = () => {
-  const vitalsEnabled = useAppStore((s) => s.vitalsEnabled);
+  const weatherWidgetEnabled = useAppStore((s) => s.weatherWidgetEnabled);
   const weather = useAppStore((s) => s.weather);
 
-  if (!vitalsEnabled) return null;
+  if (!weatherWidgetEnabled) return null;
 
   return <WeatherWidget weather={weather} />;
 };

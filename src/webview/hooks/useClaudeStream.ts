@@ -61,6 +61,7 @@ export function useClaudeStream(): void {
     setSessionRecap,
     setUltrathinkMode,
     setVitalsEnabled,
+    setWeatherWidgetEnabled,
     rebuildTurnHistoryFromMessages,
     setAdventureEnabled,
     addTurnRecord,
@@ -637,6 +638,10 @@ export function useClaudeStream(): void {
           setAdventureEnabled(msg.enabled);
           break;
 
+        case 'weatherWidgetSetting':
+          setWeatherWidgetEnabled(msg.enabled);
+          break;
+
         case 'activitySummarySetting':
           setActivitySummaryEnabled(msg.enabled);
           break;
@@ -956,6 +961,7 @@ export function useClaudeStream(): void {
     setSessionRecap,
     setUltrathinkMode,
     setVitalsEnabled,
+    setWeatherWidgetEnabled,
     rebuildTurnHistoryFromMessages,
     setAdventureEnabled,
     addTurnRecord,

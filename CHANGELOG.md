@@ -1,5 +1,55 @@
 # ClaUi - Changelog
 
+## v0.1.116 - 2026-04-27
+
+**Improvement: Lazy session restore on startup**
+
+- When `restoreSessionsOnStartup` reopens multiple tabs, only the originally-active tab eagerly spawns its CLI process. Every other restored tab creates its webview panel, restores its title, and seeds the session id, but the CLI process is **not** spawned until the user actually focuses that tab. Restoring 10 tabs no longer means launching 10 Claude/Codex CLIs at once
+- New `SessionTab.prepareForLazyResume(sessionId)` / `CodexSessionTab.prepareForLazyResume(sessionId)` set `pendingResumeSessionId`, seed the process manager with the id (so `tab.sessionId` is accurate before spawn), restore the tab name from `sessionStore`, and skip the CLI spawn
+- `TabManager.restoreFromSnapshot` decides per-entry whether to call `startSession({ resume })` (eager, only for `snapshot.activeSessionId`) or `prepareForLazyResume` (lazy, everything else); lazy tabs are collected and `armLazyWake()` is scheduled via `setTimeout(0)` so the synthetic view-state-active events fired during panel creation and the originally-active reveal cannot prematurely wake them
+- `panel.onDidChangeViewState` in both tab classes checks `lazyWakeArmed && pendingResumeSessionId` before calling `startSession({ resume })`; both flags are cleared synchronously before the await so re-entrant view-state events cannot double-trigger
+- Updated `Kingdom_of_Claudes_Beloved_MDs/SESSION_RESTORE.md` and the Session Restore entry in `TECHNICAL.md` to describe the lazy-spawn model
+
+**Feature: Crash-loop breaker for session restore**
+
+- Auto-restore could previously trigger a boot loop: if a restored session caused the extension host to crash, the next launch would re-restore the same session and crash again
+- New sticky `claudeMirror.restoreInProgress` Memento flag in `workspaceState`. `TabManager.restoreFromSnapshot` writes `true` before the restore loop and clears it in `finally`. If activation sees the flag still `true`, the previous run died mid-restore — auto-restore is skipped this launch and the user is shown a warning toast: `ClaUi did not finish restoring N sessions last time, possibly due to a crash. Auto-restore was skipped to avoid a loop.` with `Restore now` and `Skip` buttons
+- `Restore now` re-invokes `restoreFromSnapshot({ force: true })` to bypass the check; the flag is cleared either way so the next launch is allowed to auto-restore again
+- New `OpenTabsSnapshotStore.isRestoreInProgress()` / `setRestoreInProgress(value)` methods, backed by the new `RESTORE_IN_PROGRESS_KEY = 'claudeMirror.restoreInProgress'` Memento key
+
+**Improvement: Single-phase Claude fork**
+
+- The two-phase fork flow (spawn `--fork-session` to create the new session and exit, then spawn again with `--resume <new-id>` to start the interactive session) is replaced by a single-phase fork that matches `BackgroundSession.startFork`
+- The new tab spawns `claude --resume <parent-id> --fork-session` once, posts the parent's history to the webview via `forkInit`, and pre-fills the selected text in the input area. The CLI stays alive on the not-yet-forked session waiting for stdin. When the user presses Send, the CLI performs the fork inline and emits `system/init` with the new forked session id; `sessionStarted` is updated automatically and the conversation continues normally
+- Removed the `forkInProgress` field and the corresponding post-exit phase-2 spawn block from `SessionTab.wireProcessEvents`. Updated the Fork Conversation entry in `TECHNICAL.md`
+
+**Bug Fix: Edit-and-resend now works on restored tabs and refuses to drop context**
+
+- Edit-and-resend used to silently fall back to a fresh session when no session id was known yet — which dropped all prior conversation context. It also failed on freshly restored tabs because `processManager.currentSessionId` was `null` until the first turn fired (Claude CLI's pipe mode emits `system/init` only after the first stdin message)
+- `ClaudeProcessManager.seedSessionId(id)` lets callers pre-populate the session id between resume and first turn. `SessionTab.startSession({ resume })` and `prepareForLazyResume` both seed the id immediately, so restored tabs return the correct `sessionId` before the CLI emits init
+- `MessageHandler.editAndResend` no longer silently falls back to a fresh session: when no session id is available it surfaces an explicit error (`Cannot edit message: the session has not been initialised yet. Send a new message first, then try editing again.`) and clears `processBusy` instead of dropping context
+
+**Bug Fix: Checkpoint capture reliable in webpack production builds**
+
+- The Revert button on a user message could fail to appear because the demux's `blockStop` listener has been observed to silently not fire in webpack production builds (the same `EventEmitter` issue previously seen with the `result` event), so `captureBeforeContent` was never called for code-write tools
+- `MessageHandler.captureCheckpointForToolBlock(toolName, rawInput, source)` extracted as a public method (still called from the demux path). Added a parallel direct path: `SessionTab.wireProcessEvents` now observes raw `content_block_start` / `content_block_delta` / `content_block_stop` stream events itself, accumulates `input_json_delta` chunks, and calls `captureCheckpointForToolBlock` on `content_block_stop` for code-write tools
+- The two paths are idempotent — `CheckpointManager.captureBeforeContent` dedupes by absolute path — so a duplicate call from whichever path fires second is a no-op
+
+**Feature: Image lightbox markup tools**
+
+- The lightbox now opens on **single-click** of any image (pending input thumbnails or message bubble images), not double-click, matching the more common single-click-to-zoom pattern
+- Added a drawing toolbar above the image with three tools: **Pencil** (free draw), **Rect** (rectangle), and **Arrow** (line with arrowhead). A 5-color swatch picker (red / yellow / green / blue / white) sets the stroke color, and **Undo** / **Clear** revert the last shape or wipe all shapes
+- Drawing happens on a `<canvas>` overlay sized to the image's rendered dimensions; shape coordinates are stored as 0–1 ratios so they stay correctly positioned when the image is resized. A `ResizeObserver` keeps the canvas in sync with the image's actual layout size
+- Toolbar interactions stop click-propagation so they do not close the lightbox; the backdrop and Escape still close
+
+**Improvement: Error banner expand/collapse for long messages**
+
+- Long error messages no longer push the chat layout around: the error banner now clamps to 2 lines with a `Show more` / `Show less` toggle when the message would overflow
+- Expanded state allows up to `40vh` with internal scroll. Toggle visibility is driven by a runtime `scrollHeight > clientHeight` check on the message container so it appears only when needed
+- Banner layout reworked to a column with a dedicated actions row (`error-banner__actions`) so the toggle and dismiss buttons don't fight the message text for horizontal space; CLI-missing inline-button banners are unaffected
+
+---
+
 ## v0.1.115 - 2026-04-20
 
 **Bug Fix: Restore Last Sessions snapshot wipe on shutdown**

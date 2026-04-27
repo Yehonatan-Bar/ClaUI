@@ -227,6 +227,7 @@ export interface AppState {
 
   // Session Vitals
   vitalsEnabled: boolean;
+  weatherWidgetEnabled: boolean;
   turnHistory: TurnRecord[];
   turnByMessageId: Record<string, TurnRecord>;
   weather: WeatherState;
@@ -577,6 +578,7 @@ export interface AppState {
   addWriteOldContent: (toolUseId: string, filePath: string, oldContent: string) => void;
   setUltrathinkMode: (mode: 'off' | 'single' | 'locked') => void;
   setVitalsEnabled: (enabled: boolean) => void;
+  setWeatherWidgetEnabled: (enabled: boolean) => void;
   setCheckpointState: (state: CheckpointState) => void;
   setCheckpointResult: (result: AppState['checkpointResult']) => void;
   clearCheckpointResult: () => void;
@@ -855,6 +857,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   writeOldContentByToolId: {},
   ultrathinkMode: 'off' as 'off' | 'single' | 'locked',
   vitalsEnabled: false,
+  weatherWidgetEnabled: false,
   turnHistory: [],
   turnByMessageId: {},
   weather: { ...initialWeather },
@@ -1789,6 +1792,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
+  setWeatherWidgetEnabled: (enabled) =>
+    set((state) => {
+      if (!enabled || state.turnHistory.length > 0) {
+        return { weatherWidgetEnabled: enabled };
+      }
+      const rebuilt = deriveTurnHistoryFromMessages(state.messages);
+      return {
+        weatherWidgetEnabled: enabled,
+        turnHistory: rebuilt,
+        turnByMessageId: buildTurnByMessageId(rebuilt),
+        weather: calculateWeather(rebuilt),
+      };
+    }),
+
   setCheckpointState: (checkpointState) => set({ checkpointState }),
   setCheckpointResult: (checkpointResult) => set({ checkpointResult }),
   clearCheckpointResult: () => set({ checkpointResult: null }),
@@ -2190,6 +2207,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       writeOldContentByToolId: {},
       ultrathinkMode: state.ultrathinkMode,
       vitalsEnabled: state.vitalsEnabled,
+      weatherWidgetEnabled: state.weatherWidgetEnabled,
       adventureEnabled: state.adventureEnabled,
       adventureBeats: [],
       dashboardOpen: false,

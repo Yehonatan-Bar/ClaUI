@@ -1785,6 +1785,11 @@ export class MessageHandler {
           vscode.workspace.getConfiguration('claudeMirror').update('adventureWidget', msg.enabled, true);
           break;
 
+        case 'setWeatherWidgetEnabled':
+          this.log(`Setting weather widget to: ${msg.enabled}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('weatherWidget', msg.enabled, true);
+          break;
+
         case 'setActivitySummaryEnabled':
           this.log(`Setting activity summary to: ${msg.enabled}`);
           vscode.workspace.getConfiguration('claudeMirror').update('activitySummary', msg.enabled, true);
@@ -2372,17 +2377,27 @@ export class MessageHandler {
             // starting from scratch (which made Claude lose all prior context).
             const sessionToResume = this.processManager.currentSessionId;
             this.log(`Edit-and-resend: will resume session ${sessionToResume || '(none)'}`);
+            // Refuse to silently start a fresh session: that drops all prior
+            // context. The caller can still send a new message via the input
+            // area (which spawns a fresh session intentionally).
+            if (!sessionToResume) {
+              this.log('Edit-and-resend aborted: no session id known yet');
+              this.webview.postMessage({ type: 'processBusy', busy: false });
+              this.webview.postMessage({
+                type: 'error',
+                message: 'Cannot edit message: the session has not been initialised yet. Send a new message first, then try editing again.',
+              });
+              break;
+            }
             // Tell the exit handler not to send sessionEnded - we're restarting intentionally
             this.webview.setSuppressNextExit?.(true);
             this.processManager.stop();
             this.processManager
-              .start(sessionToResume
-                ? {
-                  resume: sessionToResume,
-                  skipReplay: true,
-                  cliPathOverride: this.getCliPathOverride(),
-                }
-                : { cliPathOverride: this.getCliPathOverride() })
+              .start({
+                resume: sessionToResume,
+                skipReplay: true,
+                cliPathOverride: this.getCliPathOverride(),
+              })
               .then(() => {
                 this.achievementService.onSessionStart(this.tabId);
                 this.log('Session resumed for edit-and-resend');
@@ -2850,6 +2865,8 @@ export class MessageHandler {
           this.sendActivitySummarySetting();
           // Send adventure widget setting
           this.sendAdventureWidgetSetting();
+          // Send weather widget setting
+          this.sendWeatherWidgetSetting();
           // Send usage widget setting and auto-fetch initial usage data
           this.sendUsageWidgetSetting();
           void this.fetchAndSendUsage();
@@ -3303,6 +3320,17 @@ export class MessageHandler {
     });
   }
 
+  /** Read weather widget setting from VS Code config and send to webview */
+  private sendWeatherWidgetSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const enabled = config.get<boolean>('weatherWidget', false);
+    this.log(`Sending weather widget setting: enabled=${enabled}`);
+    this.webview.postMessage({
+      type: 'weatherWidgetSetting',
+      enabled,
+    });
+  }
+
   /** Read usage widget setting from VS Code config and send to webview */
   private sendUsageWidgetSetting(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -3611,6 +3639,9 @@ export class MessageHandler {
       if (e.affectsConfiguration('claudeMirror.adventureWidget')) {
         this.sendAdventureWidgetSetting();
       }
+      if (e.affectsConfiguration('claudeMirror.weatherWidget')) {
+        this.sendWeatherWidgetSetting();
+      }
       if (e.affectsConfiguration('claudeMirror.activitySummary')) {
         this.sendActivitySummarySetting();
       }
@@ -3860,31 +3891,7 @@ export class MessageHandler {
             }
           }
           // Checkpoint: capture before-content for ALL code-write tools (unconditional)
-          this.log(`[CHECKPOINT-DEBUG] blockStop toolName="${toolName}" isWriteTool=${CODE_WRITE_TOOLS.includes(toolName)} hasManager=${!!this.checkpointManager}`);
-          if (CODE_WRITE_TOOLS.includes(toolName) && this.checkpointManager) {
-            // Extract file_path using regex first - rawInput may be truncated
-            // at 8000 chars (toolBlockContexts memory guard), causing JSON.parse
-            // to fail for Write tools with large file content. The file_path
-            // field always appears near the start of the JSON input.
-            let cpFilePath = '';
-            const fpMatch = rawInput.match(/"(?:file_path|notebook_path)"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-            if (fpMatch) {
-              // Unescape JSON string escapes (backslashes in Windows paths)
-              cpFilePath = fpMatch[1].replace(/\\(.)/g, '$1');
-            } else {
-              // Fallback: try full JSON parse (works when input is small enough)
-              try {
-                const parsed = JSON.parse(rawInput);
-                cpFilePath = parsed.file_path || parsed.notebook_path || '';
-              } catch (e) {
-                this.log(`[CHECKPOINT-DEBUG] Could not extract file_path from rawInput (${rawInput.length} chars): ${e}`);
-              }
-            }
-            this.log(`[CHECKPOINT-DEBUG] file_path="${cpFilePath}"`);
-            if (cpFilePath) {
-              this.checkpointManager.captureBeforeContent(cpFilePath, toolName);
-            }
-          }
+          this.captureCheckpointForToolBlock(toolName, rawInput, 'demux');
         }
         this.toolBlockIds.delete(data.blockIndex);
         this.toolBlockNames.delete(data.blockIndex);
@@ -4094,6 +4101,45 @@ export class MessageHandler {
         this.handleResultEvent(event, 'demux');
       }
     );
+  }
+
+  /**
+   * Capture the "before" content for a code-write tool at content_block_stop.
+   *
+   * Called from BOTH the demux 'blockStop' listener AND directly from
+   * SessionTab.wireProcessEvents on raw content_block_stop events. The demux
+   * listener has been observed to silently not fire in webpack production
+   * builds (same EventEmitter bug as 'result'); the direct path guarantees
+   * checkpoints are created so the Revert button can render.
+   *
+   * Idempotent: CheckpointManager.captureBeforeContent dedupes by absolute
+   * path, so a duplicate call from the other path is a no-op.
+   */
+  captureCheckpointForToolBlock(toolName: string, rawInput: string, source: string = 'unknown'): void {
+    if (!this.checkpointManager) return;
+    if (!CODE_WRITE_TOOLS.includes(toolName)) return;
+    // Extract file_path using regex first - rawInput may be truncated
+    // at 8000 chars (toolBlockContexts memory guard), causing JSON.parse
+    // to fail for Write tools with large file content. The file_path
+    // field always appears near the start of the JSON input.
+    let cpFilePath = '';
+    const fpMatch = rawInput.match(/"(?:file_path|notebook_path)"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if (fpMatch) {
+      // Unescape JSON string escapes (backslashes in Windows paths)
+      cpFilePath = fpMatch[1].replace(/\\(.)/g, '$1');
+    } else {
+      // Fallback: try full JSON parse (works when input is small enough)
+      try {
+        const parsed = JSON.parse(rawInput);
+        cpFilePath = parsed.file_path || parsed.notebook_path || '';
+      } catch (e) {
+        this.log(`[CHECKPOINT-DEBUG] (${source}) Could not extract file_path from rawInput (${rawInput.length} chars): ${e}`);
+      }
+    }
+    this.log(`[CHECKPOINT-DEBUG] (${source}) toolName="${toolName}" file_path="${cpFilePath}"`);
+    if (cpFilePath) {
+      this.checkpointManager.captureBeforeContent(cpFilePath, toolName);
+    }
   }
 
   /**

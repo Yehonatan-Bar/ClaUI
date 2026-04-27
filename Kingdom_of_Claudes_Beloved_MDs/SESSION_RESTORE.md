@@ -65,13 +65,33 @@ interface OpenTabsSnapshot {
 2. Filter entries: drop those without a `sessionId`, drop those whose `workspacePath` does not match the current workspace, de-duplicate by `sessionId`.
 3. Sort by the original `tabNumber` (colors cycle mod the palette, so ordering preserves the visual layout).
 4. Truncate to `MAX_RESTORE = 10` tabs; show an information toast if truncated.
-5. Inside `vscode.window.withProgress`, restore each entry **serially** (parallel CLI spawns race during handshake):
-   - `tabManager.createTabForProvider(entry.provider)` creates the tab in the expected ViewColumn.
+5. **Crash-loop check**: if the workspace flag `claudeMirror.restoreInProgress` is still `true` from a previous launch, the previous restore did not complete cleanly. The flag is cleared, auto-restore is skipped, and the user is shown a warning toast with a `Restore now` button that re-invokes `restoreFromSnapshot({ force: true })`.
+6. Set `restoreInProgress = true` for the duration of the loop (cleared in `finally`).
+7. Inside `vscode.window.withProgress`, restore each entry **serially**:
+   - `tabManager.createTabForProvider(entry.provider, restoreColumn)` creates the tab. `restoreColumn` is `undefined` for the first iteration; after the first tab is created, its actual `panel.viewColumn` (or `ViewColumn.Two` if not yet resolved) is captured and reused for every subsequent restore so all panels stack into a single editor column. Without this pin, each `Beside` call would treat the just-created panel as the active editor and split into a new column, scattering the restored tabs across the editor area.
    - For `remote`, the live `claudeMirror.happy.cliPath` setting wins over the snapshot value in case the CLI moved; snapshot value is the fallback.
-   - `await tab.startSession({ resume: entry.sessionId })` — this is the same code path as the `claudeMirror.resumeSession` command. Claude CLI gets `--resume <sessionId>`, Codex uses `codex exec resume <threadId>`.
+   - **If the entry matches `snapshot.activeSessionId`** → `await tab.startSession({ resume: entry.sessionId })` (eager spawn so the user lands on a working session).
+   - **Otherwise** → `tab.prepareForLazyResume(entry.sessionId)` (lazy: panel is created, tab name is restored, `sessionId` is seeded into the process manager, but the CLI process is **not** spawned). The tab is added to a `lazyTabs` collection.
    - Per-tab failures are caught, logged, and counted but do not abort the batch.
-6. If `snapshot.activeSessionId` maps to a restored tab, call `tab.reveal()` to re-focus it.
-7. Show a warning toast if any entries failed (stale JSONL, session deleted, etc.).
+8. If `snapshot.activeSessionId` maps to a restored tab, call `tab.reveal()` to re-focus it.
+9. After reveal, schedule `armLazyWake()` on every lazy tab via `setTimeout(0)` so any view-state-active events caused by panel creation and reveal have already flushed before user-driven focus is allowed to wake a lazy tab.
+10. Show a warning toast if any entries failed (stale JSONL, session deleted, etc.).
+
+### Lazy resume (per non-active tab)
+
+`SessionTab.prepareForLazyResume(sessionId)` and `CodexSessionTab.prepareForLazyResume(sessionId)`:
+- Set `pendingResumeSessionId = sessionId`, `lazyWakeArmed = false`.
+- Seed the underlying process manager / `threadId` so `tab.sessionId` returns the correct id even before the CLI spawns (this keeps snapshot persistence accurate).
+- Call the existing `restoreSessionName(sessionId)` so the tab title shows the right name immediately.
+- Do **not** spawn the CLI process or load conversation history.
+
+`armLazyWake()` flips `lazyWakeArmed = true` if a pending sessionId is set. It is called once by `TabManager.restoreFromSnapshot` after the restore loop and active-tab reveal have completed.
+
+The existing `panel.onDidChangeViewState` handler in both tab classes checks `lazyWakeArmed && pendingResumeSessionId` before calling `startSession({ resume })`. Both flags are cleared synchronously before the await so re-entrant view-state events cannot double-trigger.
+
+### Crash-loop breaker (per launch)
+
+`OpenTabsSnapshotStore.isRestoreInProgress()` and `setRestoreInProgress(value)` read/write the `claudeMirror.restoreInProgress` Memento key in `workspaceState`. The flag is sticky — written before the restore loop and cleared in the `finally`. If activation finds it still set, it means the previous extension host died mid-restore, so auto-restore is skipped this launch and the user is offered a one-click recovery via the warning toast's `Restore now` button.
 
 ### Interaction with first-install auto-open
 
@@ -120,4 +140,5 @@ The callbacks are optional so existing consumers of `SessionTabCallbacks` (outsi
 |----------|-------|---------|
 | `SNAPSHOT_DEBOUNCE_MS` | 500 | How long tab changes coalesce before writing the snapshot |
 | `MAX_RESTORE` | 10 | Hard cap on tabs restored per startup |
-| Storage key | `claudeMirror.openTabsSnapshot` | `workspaceState` Memento key |
+| `STORAGE_KEY` | `claudeMirror.openTabsSnapshot` | `workspaceState` Memento key for the snapshot |
+| `RESTORE_IN_PROGRESS_KEY` | `claudeMirror.restoreInProgress` | `workspaceState` Memento key for the crash-loop breaker flag |

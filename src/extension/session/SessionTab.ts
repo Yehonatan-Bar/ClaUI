@@ -91,8 +91,14 @@ export class SessionTab implements WebviewBridge {
   private readonly fileLogger: FileLogger | null = null;
   /** Fork initialization data (set before startSession when forking) */
   private forkInitData: { promptText: string; messages: SerializedChatMessage[] } | null = null;
-  /** When true, the process exit is from fork phase 1 (--fork-session) and phase 2 should auto-start */
-  private forkInProgress = false;
+  /** Lazy-resume state: when set, the CLI process has not been spawned yet
+   *  and will be started the first time the user focuses this tab after
+   *  TabManager arms the wake (post-restore). */
+  private pendingResumeSessionId: string | null = null;
+  /** True only after TabManager finishes the restore loop. Prevents the
+   *  view-state changes triggered by panel creation from waking lazy tabs
+   *  before the user has actually clicked them. */
+  private lazyWakeArmed: boolean = false;
   /** Tracks whether stderr indicates Claude CLI is not installed */
   private claudeCliMissingDetected = false;
   /** Tracks whether stderr indicates Happy CLI authentication is required */
@@ -460,6 +466,39 @@ export class SessionTab implements WebviewBridge {
     this.forkInitData = init;
   }
 
+  /** Mark this tab for lazy resume: the CLI process is NOT spawned now.
+   *  The tab title is restored from sessionStore so the user can identify it,
+   *  and the session id is seeded into the process manager so features that
+   *  read tab.sessionId before the spawn (e.g. snapshot persistence) still
+   *  return the correct id. The actual spawn happens the first time the user
+   *  focuses this tab after armLazyWake() is called. */
+  prepareForLazyResume(sessionId: string): void {
+    if (this.disposed) {
+      return;
+    }
+    this.pendingResumeSessionId = sessionId;
+    this.lazyWakeArmed = false;
+    this.processManager.seedSessionId(sessionId);
+    this.restoreSessionName(sessionId);
+    this.log(
+      `[Tab ${this.tabNumber}] Lazy-resume prepared for session ${sessionId.slice(0, 8)}; CLI will spawn on first user focus.`,
+    );
+  }
+
+  /** TabManager calls this once the restore loop has finished creating all
+   *  panels. After this, the next view-state-active event from the user
+   *  triggers the deferred startSession({ resume }). */
+  armLazyWake(): void {
+    if (this.pendingResumeSessionId) {
+      this.lazyWakeArmed = true;
+    }
+  }
+
+  /** Whether this tab is in lazy-resume state (CLI not spawned yet). */
+  get isPendingLazyResume(): boolean {
+    return this.pendingResumeSessionId !== null;
+  }
+
   /** Stage one-time handoff context to inject on the first user message in this tab. */
   setPendingHandoffPrompt(prompt: string): void {
     this.messageHandler.setPendingHandoffPrompt(prompt);
@@ -478,9 +517,6 @@ export class SessionTab implements WebviewBridge {
           ? 'SessionTab.startSession(fork)'
           : 'SessionTab.startSession',
     );
-    if (options?.fork) {
-      this.forkInProgress = true;
-    }
     this.claudeCliMissingDetected = false;
     this.happyAuthDetected = false;
     await this.processManager.start({
@@ -534,6 +570,10 @@ export class SessionTab implements WebviewBridge {
     const reader = new ConversationReader((msg) => tabLog(`[Tab ${this.tabNumber}] ${msg}`));
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const messages = reader.readSession(sessionId, workspacePath);
+
+    // Seed the process manager with the resumed id so features that need it
+    // before the CLI emits system/init (e.g. edit-and-resend) don't see null.
+    this.processManager.seedSessionId(sessionId);
 
     if (messages.length > 0) {
       this.log(`[Tab ${this.tabNumber}] Loaded ${messages.length} history messages for resumed session`);
@@ -934,6 +974,18 @@ export class SessionTab implements WebviewBridge {
         `[Tab ${this.tabNumber}] ViewState changed: active=${e.webviewPanel.active} visible=${e.webviewPanel.visible}`,
       );
       if (e.webviewPanel.active) {
+        // Wake from lazy-resume on the first user focus after restore.
+        if (this.lazyWakeArmed && this.pendingResumeSessionId) {
+          const sid = this.pendingResumeSessionId;
+          this.pendingResumeSessionId = null;
+          this.lazyWakeArmed = false;
+          this.log(`[Tab ${this.tabNumber}] Lazy-resume waking for session ${sid.slice(0, 8)}`);
+          void this.startSession({ resume: sid }).catch((err) => {
+            this.log(
+              `[Tab ${this.tabNumber}] Lazy-resume startSession failed: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          });
+        }
         this.callbacks.onFocused(this.id);
         this.postFocusInput('view-state active');
       }
@@ -973,6 +1025,15 @@ export class SessionTab implements WebviewBridge {
   }
 
   private wireProcessEvents(tabLog: (msg: string) => void): void {
+    // Per-message fallback tracking for checkpoint capture. The demux's
+    // 'blockStop' listener has been observed to silently not fire in
+    // webpack production builds (same EventEmitter bug as 'result'), so we
+    // observe content_block_* events directly here and trigger checkpoint
+    // capture at content_block_stop for code-write tools. Idempotent with
+    // the demux path -- CheckpointManager dedupes by absolute file path.
+    const cpToolNames = new Map<number, string>();
+    const cpToolInputs = new Map<number, string>();
+
     this.processManager.on('event', (event: CliOutputEvent) => {
       let detail = event.type;
       if ('subtype' in event) {
@@ -980,6 +1041,34 @@ export class SessionTab implements WebviewBridge {
       }
       if (event.type === 'stream_event') {
         const inner = (event as import('../types/stream-json').StreamEvent).event;
+        // Checkpoint fallback: track tool blocks from raw events
+        if (inner.type === 'message_start') {
+          cpToolNames.clear();
+          cpToolInputs.clear();
+        } else if (inner.type === 'content_block_start') {
+          const block = (inner as import('../types/stream-json').ContentBlockStart).content_block;
+          const idx = (inner as import('../types/stream-json').ContentBlockStart).index;
+          if (block.type === 'tool_use' && block.name) {
+            cpToolNames.set(idx, block.name);
+            cpToolInputs.set(idx, '');
+          }
+        } else if (inner.type === 'content_block_delta') {
+          const idx = (inner as import('../types/stream-json').ContentBlockDelta).index;
+          const delta = (inner as import('../types/stream-json').ContentBlockDelta).delta;
+          if (delta.type === 'input_json_delta' && cpToolNames.has(idx)) {
+            const prev = cpToolInputs.get(idx) || '';
+            cpToolInputs.set(idx, prev + (delta.partial_json || ''));
+          }
+        } else if (inner.type === 'content_block_stop') {
+          const idx = (inner as import('../types/stream-json').ContentBlockStop).index;
+          const toolName = cpToolNames.get(idx);
+          if (toolName) {
+            const rawInput = cpToolInputs.get(idx) || '';
+            this.messageHandler.captureCheckpointForToolBlock(toolName, rawInput, 'wireProcessEvents');
+          }
+          cpToolNames.delete(idx);
+          cpToolInputs.delete(idx);
+        }
         detail += ` -> ${inner.type}`;
         if ('index' in inner) {
           detail += ` [${inner.index}]`;
@@ -1056,49 +1145,6 @@ export class SessionTab implements WebviewBridge {
               tabLog(`Failed to auto-resume after cancel: ${err.message}`);
               this.postMessage({ type: 'sessionEnded', reason: 'completed' });
             });
-        }
-        return;
-      }
-
-      // Fork phase 1 complete: --fork-session created the new session and exited.
-      // Phase 2: resume the forked session as a normal interactive session.
-      if (this.forkInProgress) {
-        this.forkInProgress = false;
-        const forkedSessionId = this.processManager.currentSessionId;
-        if (forkedSessionId) {
-          tabLog(`Fork phase 1 complete, new session: ${forkedSessionId}. Starting phase 2...`);
-          this.processManager
-            .start({
-              resume: forkedSessionId,
-              skipReplay: true,
-              cliPathOverride: this.cliPathOverride ?? undefined,
-            })
-            .then(() => {
-              tabLog(`Fork phase 2: interactive session started for ${forkedSessionId}`);
-              this.postMessage({
-                type: 'sessionStarted',
-                sessionId: forkedSessionId,
-                model: this.currentModel || 'connecting...',
-                isResume: false,
-                provider: this.getProvider(),
-              });
-            })
-            .catch((err: unknown) => {
-              const errMsg = err instanceof Error ? err.message : String(err);
-              tabLog(`Fork phase 2 failed: ${errMsg}`);
-              this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
-              this.postMessage({
-                type: 'error',
-                message: `Fork failed: ${errMsg}`,
-              });
-            });
-        } else {
-          tabLog('Fork failed: no session ID captured from CLI');
-          this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
-          this.postMessage({
-            type: 'error',
-            message: 'Fork failed: could not determine the new session ID.',
-          });
         }
         return;
       }

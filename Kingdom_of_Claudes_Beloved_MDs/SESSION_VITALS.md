@@ -60,10 +60,10 @@ Colored left border on each assistant message bubble, reflecting the turn's cate
 - **Tooltip**: Hover text explains the category, tool count, width, and lists all 7 category colors including magenta for skill
 
 ### VitalsContainer
-Wrapper that conditionally renders WeatherWidget + AdventureWidget + CostHeatBar when vitals are enabled.
+Wrapper that renders WeatherWidget when its own toggle (`weatherWidgetEnabled`) is on. Independent of `vitalsEnabled`.
 
 - **File**: `src/webview/components/Vitals/VitalsContainer.tsx`
-- AdventureWidget additionally requires `adventureEnabled` to be true
+- AdventureWidget is rendered separately in `App.tsx`, gated by `adventureEnabled`
 
 ### VitalsInfoPanel
 Dropdown panel opened by clicking the gear settings button in the StatusBar. Shows explanations of all vitals components and toggle switches.
@@ -76,11 +76,12 @@ Dropdown panel opened by clicking the gear settings button in the StatusBar. Sho
   - **API Key**: Set/Clear explicit Anthropic API key (stored in OS keychain)
   - **Translate to**: Language selector for automatic response translation
   - **Adventure Widget**: Toggle + Reset position button
+  - **Session Mood (Weather)**: Independent toggle for the floating weather mood icon
   - **Semantic Analysis**: Toggle AI-powered turn analysis
   - **Analysis Model**: Choose Haiku/Sonnet/Opus for analysis
   - **Skill Generation**: Toggle automatic skill file generation
   - **Usage Widget**: Toggle floating cost/token widget + Reset position
-  - **Show Vitals**: Toggle the entire vitals display (weather, timeline, borders)
+  - **Show Vitals**: Toggle the timeline minimap + intensity borders (weather has its own toggle above)
 - **State**: Claude auth status is mirrored into Zustand (`claudeAuthLoggedIn`, `claudeAuthEmail`, `claudeAuthSubscriptionType`) via `claudeAuthStatus` postMessage
 - **Extension flow**: `MessageHandler` sends auth status on webview `ready` and on explicit refresh/logout
 - **Closes on**: clicking the close button or clicking outside the panel
@@ -149,12 +150,14 @@ export interface TurnRecord {
 }
 ```
 
-## Toggle
+## Toggles
 
-- **Setting**: `claudeMirror.sessionVitals` (boolean, default `false`)
-- **UI**: "Vitals" button in the StatusBar toggles vitals on/off; the adjacent gear button opens `VitalsInfoPanel` with explanations and settings
-- **Behavior**: Hides ALL vitals components (timeline, weather, cost bar, intensity borders) when disabled
-- **Sync**: Two-way sync between VS Code settings and webview (same pattern as other settings)
+Two independent settings now control the vitals surface:
+
+- **`claudeMirror.sessionVitals`** (boolean, default `false`) - controls the timeline minimap and the assistant-message intensity borders. Toggled by the "Vitals" StatusBar button or the **Show Vitals** row in `VitalsInfoPanel`.
+- **`claudeMirror.weatherWidget`** (boolean, default `false`) - controls only the floating weather mood icon. Toggled by the **Session Mood (Weather)** row in `VitalsInfoPanel`.
+
+Both settings sync two-way between VS Code config and the webview via `MessageHandler.sendVitalsSetting` and `MessageHandler.sendWeatherWidgetSetting`. The weather widget is no longer bundled with the rest of the vitals - users can keep the moon/storm icon visible without enabling the timeline, or vice versa.
 
 ## Key Files
 

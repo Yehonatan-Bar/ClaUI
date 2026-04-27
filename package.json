@@ -371,6 +371,11 @@
           "default": false,
           "description": "Show the Adventure Widget - a pixel-art dungeon crawler that visualizes Claude's tool activity as a roguelike adventure"
         },
+        "claudeMirror.weatherWidget": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the Weather Widget - a floating icon showing session 'mood' (clear, cloudy, stormy, rainbow, idle moon) based on recent error and cost patterns"
+        },
         "claudeMirror.analysisModel": {
           "type": "string",
           "default": "claude-haiku-4-5-20251001",

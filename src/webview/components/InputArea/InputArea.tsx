@@ -1427,7 +1427,7 @@ export const InputArea: React.FC = () => {
               <img
                 src={`data:${img.mediaType};base64,${img.base64}`}
                 alt={`Pasted image ${i + 1}`}
-                onDoubleClick={() => useAppStore.getState().setLightboxImageSrc(`data:${img.mediaType};base64,${img.base64}`)}
+                onClick={() => useAppStore.getState().setLightboxImageSrc(`data:${img.mediaType};base64,${img.base64}`)}
               />
               <button
                 className="pending-image-remove"

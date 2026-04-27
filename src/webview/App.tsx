@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 import { useClaudeStream } from './hooks/useClaudeStream';
 import { useAppStore } from './state/store';
 import { MessageList } from './components/ChatView/MessageList';
@@ -112,6 +112,25 @@ export const App: React.FC = () => {
     /command failed\s*\(exit\s*\d+\)/i.test(lastError) &&
     !isCodexCliMissingError &&
     !isClaudeCliMissingError;
+
+  const [errorExpanded, setErrorExpanded] = useState(false);
+  const [errorIsOverflowing, setErrorIsOverflowing] = useState(false);
+  const errorMessageRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setErrorExpanded(false);
+  }, [lastError]);
+
+  useEffect(() => {
+    if (!lastError || isClaudeCliMissingError || isCodexCliMissingError) {
+      setErrorIsOverflowing(false);
+      return;
+    }
+    const el = errorMessageRef.current;
+    if (!el) return;
+    // When collapsed, scrollHeight exceeds clientHeight if the 2-line clamp is active.
+    setErrorIsOverflowing(el.scrollHeight > el.clientHeight + 1);
+  }, [lastError, errorExpanded, isClaudeCliMissingError, isCodexCliMissingError]);
 
   const handleTimelineTurnClick = React.useCallback((messageId: string) => {
     const el = document.querySelector(`[data-message-id="${messageId}"]`);
@@ -288,19 +307,35 @@ export const App: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="error-banner">
-          <span>{lastError}</span>
-          <button
-            className="error-dismiss"
-            onClick={() => setError(null)}
-            data-tooltip="Dismiss"
+        <div className={`error-banner ${errorExpanded ? 'error-banner--expanded' : ''}`}>
+          <div
+            ref={errorMessageRef}
+            className={`error-banner__message ${errorExpanded ? 'error-banner__message--expanded' : ''}`}
           >
-            x
-          </button>
+            {lastError}
+          </div>
+          <div className="error-banner__actions">
+            {(errorIsOverflowing || errorExpanded) && (
+              <button
+                className="error-banner__toggle"
+                onClick={() => setErrorExpanded(e => !e)}
+              >
+                {errorExpanded ? 'Show less' : 'Show more'}
+              </button>
+            )}
+            <button
+              className="error-dismiss"
+              onClick={() => setError(null)}
+              data-tooltip="Dismiss"
+              aria-label="Dismiss"
+            >
+              x
+            </button>
+          </div>
         </div>
       ))}
 
-      {/* Vitals: weather widget + cost heat bar */}
+      {/* Weather widget: floating mood icon, toggled independently via gear settings */}
       <VitalsContainer />
       {/* Adventure widget: independent of vitals, toggled via gear settings */}
       {adventureEnabled && <AdventureWidget />}

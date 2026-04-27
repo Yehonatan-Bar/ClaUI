@@ -99,21 +99,23 @@ export class TabManager {
   }
 
   /** Create a new tab routed by provider */
-  createTabForProvider(provider: ProviderId): SessionTab | CodexSessionTab {
-    if (provider === 'codex') { return this.createCodexTab(); }
-    if (provider === 'remote') { return this.createRemoteTab(); }
-    return this.createClaudeTab();
+  createTabForProvider(provider: ProviderId, viewColumnOverride?: vscode.ViewColumn): SessionTab | CodexSessionTab {
+    if (provider === 'codex') { return this.createCodexTab(viewColumnOverride); }
+    if (provider === 'remote') { return this.createRemoteTab(viewColumnOverride); }
+    return this.createClaudeTab(viewColumnOverride);
   }
 
   /** Create a new Claude tab */
-  createClaudeTab(): SessionTab {
+  createClaudeTab(viewColumnOverride?: vscode.ViewColumn): SessionTab {
     const tabNumber = this.nextTabNumber++;
     const tabColor = TAB_COLORS[(tabNumber - 1) % TAB_COLORS.length];
 
     // First tab opens Beside the editor; subsequent tabs open in the same
     // column so they stack as switchable tabs instead of splitting further.
+    // During snapshot restoration the caller supplies viewColumnOverride so
+    // every restored panel lands in the same column — see restoreFromSnapshot.
     const existingTab = this.getActiveTab() ?? this.getAnyTab();
-    const viewColumn = existingTab?.viewColumn ?? vscode.ViewColumn.Beside;
+    const viewColumn = viewColumnOverride ?? existingTab?.viewColumn ?? vscode.ViewColumn.Beside;
 
     // Enable VS Code tab wrapping when multiple ClaUi tabs exist so tabs
     // wrap to a new row instead of overflowing with a horizontal scroll bar.
@@ -154,12 +156,12 @@ export class TabManager {
   }
 
   /** Create a new Codex tab */
-  createCodexTab(): CodexSessionTab {
+  createCodexTab(viewColumnOverride?: vscode.ViewColumn): CodexSessionTab {
     const tabNumber = this.nextTabNumber++;
     const tabColor = TAB_COLORS[(tabNumber - 1) % TAB_COLORS.length];
 
     const existingTab = this.getActiveTab() ?? this.getAnyTab();
-    const viewColumn = existingTab?.viewColumn ?? vscode.ViewColumn.Beside;
+    const viewColumn = viewColumnOverride ?? existingTab?.viewColumn ?? vscode.ViewColumn.Beside;
 
     // Enable VS Code tab wrapping when multiple ClaUi tabs exist.
     if (this.tabs.size >= 1) {
@@ -197,8 +199,8 @@ export class TabManager {
   }
 
   /** Create a new Happy tab (remote provider routed through SessionTab + CLI override) */
-  createRemoteTab(): SessionTab {
-    const tab = this.createClaudeTab();
+  createRemoteTab(viewColumnOverride?: vscode.ViewColumn): SessionTab {
+    const tab = this.createClaudeTab(viewColumnOverride);
     const happyCliPath = vscode.workspace
       .getConfiguration('claudeMirror')
       .get<string>('happy.cliPath', 'happy');
@@ -566,8 +568,20 @@ export class TabManager {
    * Returns the number of successfully restored tabs.
    *
    * Designed to be called during activate() after cleanupOrphanedProcesses.
+   *
+   * Behavior:
+   *  - Crash-loop breaker: if the previous activation set the
+   *    `restoreInProgress` flag and never cleared it, the prior restore
+   *    crashed. Auto-restore is skipped and the user is prompted with a
+   *    [Restore now] button. Pass `{ force: true }` to bypass the check
+   *    (used by the recovery prompt).
+   *  - Lazy resume: only the originally-active tab eagerly spawns its CLI.
+   *    All other restored tabs create their webview panel and are armed for
+   *    lazy-resume; their CLI process is spawned the first time the user
+   *    focuses the tab. This keeps memory and CPU low when many tabs are
+   *    restored but only a few are actively used.
    */
-  async restoreFromSnapshot(): Promise<number> {
+  async restoreFromSnapshot(options?: { force?: boolean }): Promise<number> {
     const snapshot = this.snapshotStore.get();
     if (snapshot.entries.length === 0) {
       this.log('[OpenTabsSnapshot] No entries to restore');
@@ -599,10 +613,42 @@ export class TabManager {
       return 0;
     }
 
-    this.log(`[OpenTabsSnapshot] Restoring ${entries.length} session(s)...`);
+    // Crash-loop breaker. If the previous activation set the in-progress
+    // flag and never cleared it, the previous restore crashed. Skip the
+    // automatic restore on this launch and let the user trigger it manually
+    // from the prompt. The flag is always cleared before returning so the
+    // next launch is allowed to auto-restore again.
+    if (!options?.force && this.snapshotStore.isRestoreInProgress()) {
+      await this.snapshotStore.setRestoreInProgress(false);
+      this.log(
+        `[OpenTabsSnapshot] Previous restore did not finish cleanly (${entries.length} pending); skipping auto-restore to break crash loop`,
+      );
+      void vscode.window
+        .showWarningMessage(
+          `ClaUi did not finish restoring ${entries.length} session${entries.length === 1 ? '' : 's'} last time, possibly due to a crash. Auto-restore was skipped to avoid a loop.`,
+          'Restore now',
+          'Skip',
+        )
+        .then((choice) => {
+          if (choice === 'Restore now') {
+            void this.restoreFromSnapshot({ force: true });
+          }
+        });
+      return 0;
+    }
+
+    this.log(
+      `[OpenTabsSnapshot] Restoring ${entries.length} session(s) (lazy mode; only active tab spawns CLI immediately)...`,
+    );
+    await this.snapshotStore.setRestoreInProgress(true);
     this.isRestoringSnapshot = true;
     let restored = 0;
     let failed = 0;
+    const lazyTabs: ManagedTab[] = [];
+    // Force every restored tab into the same editor column. The first tab
+    // resolves Beside to a real column; subsequent tabs reuse it explicitly
+    // so VS Code stacks them instead of splitting into new groups.
+    let restoreColumn: vscode.ViewColumn | undefined = undefined;
 
     try {
       await vscode.window.withProgress(
@@ -617,7 +663,13 @@ export class TabManager {
             const label = entry.customName || `${entry.provider} session ${entry.tabNumber}`;
             progress.report({ increment, message: label });
             try {
-              const tab = this.createTabForProvider(entry.provider);
+              const tab = this.createTabForProvider(entry.provider, restoreColumn);
+              if (restoreColumn === undefined) {
+                // VS Code may not have resolved panel.viewColumn synchronously;
+                // fall back to ViewColumn.Two so subsequent tabs still cluster.
+                restoreColumn = tab.viewColumn ?? vscode.ViewColumn.Two;
+                this.log(`[OpenTabsSnapshot] Pinning subsequent restored tabs to column ${restoreColumn}`);
+              }
 
               // For remote (Happy) tabs, prefer the live setting over the
               // snapshot value in case the user has since moved the CLI.
@@ -629,7 +681,18 @@ export class TabManager {
                 tab.setCliPathOverride(chosenPath);
               }
 
-              await tab.startSession({ resume: entry.sessionId });
+              const isActive =
+                !!snapshot.activeSessionId && entry.sessionId === snapshot.activeSessionId;
+
+              if (isActive) {
+                // Eager start so the user lands on a live, ready session.
+                await tab.startSession({ resume: entry.sessionId });
+              } else {
+                // Lazy: panel + UI ready, but the CLI process is deferred
+                // until the user actually focuses this tab.
+                tab.prepareForLazyResume(entry.sessionId);
+                lazyTabs.push(tab);
+              }
               restored++;
             } catch (err) {
               failed++;
@@ -642,6 +705,7 @@ export class TabManager {
       );
     } finally {
       this.isRestoringSnapshot = false;
+      await this.snapshotStore.setRestoreInProgress(false);
     }
 
     // Focus the originally-active session if it was restored.
@@ -653,6 +717,19 @@ export class TabManager {
         }
       }
     }
+
+    // Arm wake-on-focus AFTER all panels are created and the originally-
+    // active tab has been revealed. The view-state-active events that fire
+    // during panel creation and during reveal() would otherwise prematurely
+    // wake every lazy tab. Use a microtask to also let any synchronous
+    // view-state changes flush before we accept user-driven focus events.
+    setTimeout(() => {
+      for (const tab of lazyTabs) {
+        if (!tab.isDisposed) {
+          tab.armLazyWake();
+        }
+      }
+    }, 0);
 
     // Repopulate snapshotEntries with the newly-restored tabs so subsequent
     // edits (close, focus, name change) flow through the normal persistence
