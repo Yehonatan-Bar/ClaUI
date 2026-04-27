@@ -330,6 +330,13 @@ export class MessageHandler {
   /** Chat search service for cross-session content search */
   private chatSearchService: import('../session/ChatSearchService').ChatSearchService | null = null;
 
+  /** Memory sampler for the dashboard memory tab (shared instance, set after construction) */
+  private memorySampler: import('../process/ProcessMemorySampler').ProcessMemorySampler | null = null;
+  /** Active interval timer for streaming memory snapshots; null when streaming is off. */
+  private memoryStreamTimer: ReturnType<typeof setInterval> | null = null;
+  /** True while a memory sample is in-flight (avoid overlapping queries). */
+  private memorySampleInFlight = false;
+
   constructor(
     private readonly tabId: string,
     private readonly webview: WebviewBridge,
@@ -395,6 +402,7 @@ export class MessageHandler {
     this.resetTransientStateForHostLifecycle('handler dispose', {
       notifyWebview: false,
     });
+    this.stopMemoryStream();
   }
 
   /** Attach a SessionNamer for auto-generating tab titles */
@@ -515,6 +523,11 @@ export class MessageHandler {
   /** Provide Claude auth manager for login/logout/status actions */
   setAuthManager(manager: AuthManager): void {
     this.authManager = manager;
+  }
+
+  /** Provide the shared memory sampler (used by the dashboard memory tab). */
+  setMemorySampler(sampler: import('../process/ProcessMemorySampler').ProcessMemorySampler): void {
+    this.memorySampler = sampler;
   }
 
   /** True when no user message has been sent in the current session (i.e. session start) */
@@ -925,7 +938,11 @@ export class MessageHandler {
     this.postCheckpointState();
   }
 
-  private postUserMessage(content: ContentBlock[], isOptimistic = false): void {
+  private postUserMessage(
+    content: ContentBlock[],
+    isOptimistic = false,
+    source: 'input' | 'auto-prompt' = 'input',
+  ): void {
     const text = content
       .filter((b) => b.type === 'text')
       .map((b) => (b as any).text || '')
@@ -937,7 +954,21 @@ export class MessageHandler {
     if (isOptimistic) {
       this.lastPostedUserMsg = { text, time: Date.now() };
     }
-    this.webview.postMessage({ type: 'userMessage', content });
+    this.webview.postMessage({ type: 'userMessage', content, source });
+  }
+
+  /**
+   * Post CLI-injected synthetic content (skill body, sub-agent dispatch
+   * context, system reminders) to the webview. The CLI emits these as
+   * `type: "user"` envelopes with isMeta=true; they are NOT user input
+   * and must not be rendered as "YOU".
+   */
+  private postSyntheticToolContent(content: ContentBlock[], sourceToolUseID?: string): void {
+    this.webview.postMessage({
+      type: 'syntheticToolContent',
+      content,
+      sourceToolUseID,
+    });
   }
 
   /**
@@ -2802,6 +2833,11 @@ export class MessageHandler {
           break;
         }
 
+        case 'requestMemoryStream': {
+          this.handleMemoryStreamRequest(msg.enabled, msg.intervalMs);
+          break;
+        }
+
         case 'setUsageWidgetEnabled': {
           this.log(`Setting usage widget enabled: ${msg.enabled}`);
           vscode.workspace.getConfiguration('claudeMirror').update('usageWidget', msg.enabled, true);
@@ -3344,6 +3380,63 @@ export class MessageHandler {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const enabled = config.get<boolean>('restoreSessionsOnStartup', true);
     this.webview.postMessage({ type: 'restoreSessionsSetting', enabled });
+  }
+
+  /** Start or stop the per-tab memory streaming interval.
+   *  Called by the dashboard memory tab on mount/unmount. */
+  private handleMemoryStreamRequest(enabled: boolean, intervalMs?: number): void {
+    if (!enabled) {
+      this.stopMemoryStream();
+      return;
+    }
+    if (!this.memorySampler) {
+      this.webview.postMessage({
+        type: 'memoryStreamError',
+        error: 'Memory sampler is not available in this build.',
+      });
+      return;
+    }
+    const clamped = Math.min(10000, Math.max(1000, intervalMs ?? 2500));
+    this.startMemoryStream(clamped);
+  }
+
+  private startMemoryStream(intervalMs: number): void {
+    this.stopMemoryStream();
+    // Send one immediate sample so the chart is not blank for `intervalMs`.
+    void this.runMemorySample();
+    this.memoryStreamTimer = setInterval(() => { void this.runMemorySample(); }, intervalMs);
+    this.log(`[Memory] streaming started (interval=${intervalMs}ms)`);
+  }
+
+  private stopMemoryStream(): void {
+    if (this.memoryStreamTimer !== null) {
+      clearInterval(this.memoryStreamTimer);
+      this.memoryStreamTimer = null;
+      this.log('[Memory] streaming stopped');
+    }
+  }
+
+  private async runMemorySample(): Promise<void> {
+    if (!this.memorySampler || this.memorySampleInFlight) return;
+    this.memorySampleInFlight = true;
+    try {
+      const snap = await this.memorySampler.sample();
+      this.webview.postMessage({
+        type: 'memorySnapshot',
+        timestamp: snap.timestamp,
+        systemTotalBytes: snap.systemTotalBytes,
+        systemFreeBytes: snap.systemFreeBytes,
+        extensionHost: snap.extensionHost,
+        vscodeProcesses: snap.vscodeProcesses,
+        cliProcesses: snap.cliProcesses,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`[Memory] sample failed: ${message}`);
+      this.webview.postMessage({ type: 'memoryStreamError', error: message });
+    } finally {
+      this.memorySampleInFlight = false;
+    }
   }
 
   /** Fetch Claude usage data from CLI and send to the webview */
@@ -4081,16 +4174,31 @@ export class MessageHandler {
     this.demux.on(
       'userMessage',
       (event: UserMessage) => {
+        const content: ContentBlock[] = Array.isArray(event.message.content)
+          ? event.message.content
+          : [{ type: 'text', text: String(event.message.content) } as ContentBlock];
+
+        // CLI-injected synthetic content (skill body, sub-agent dispatch
+        // context, system reminders) arrives as a `type: "user"` envelope
+        // with isMeta=true. These are NOT real user prompts -- they are
+        // content surfaced as part of Claude's tool flow. Route them as
+        // synthetic assistant-side content so they never render as "YOU".
+        if (event.isMeta === true) {
+          // Strip tool_result blocks defensively (CLI sometimes mixes them
+          // in the same envelope); they have their own rendering path.
+          const visible = content.filter((b) => b.type !== 'tool_result');
+          if (visible.length > 0) {
+            this.postSyntheticToolContent(visible, event.sourceToolUseID);
+          }
+          return;
+        }
+
         // Capture user message text for TurnAnalyzer context
-        const userText = extractTextFromContent(event.message.content).slice(0, 600);
+        const userText = extractTextFromContent(content).slice(0, 600);
         this.lastUserMessageText = userText;
         this.recentUserMessages = [...this.recentUserMessages.slice(-4), userText];
         // Post to webview (postUserMessage deduplicates against the optimistic send)
-        this.postUserMessage(
-          Array.isArray(event.message.content)
-            ? event.message.content
-            : [{ type: 'text', text: String(event.message.content) } as ContentBlock]
-        );
+        this.postUserMessage(content);
       }
     );
 

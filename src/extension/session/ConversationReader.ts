@@ -84,11 +84,26 @@ export class ConversationReader {
         const userVisible = normalizedContent.filter(b => b.type !== 'tool_result');
         if (userVisible.length === 0) continue;
 
+        // CLI marks synthetic content (skill body, sub-agent dispatch, system
+        // reminders) with isMeta=true. These are NOT user input; render them
+        // as part of Claude's output flow so they never appear as "YOU".
+        const isMeta = entry.isMeta === true;
+        if (isMeta) {
+          messages.push({
+            id: `history-synthetic-${messages.length}`,
+            role: 'assistant',
+            content: userVisible,
+            timestamp: Date.now() - 1000000 + messages.length * 100,
+          });
+          continue;
+        }
+
         messages.push({
           id: `history-user-${messages.length}`,
           role: 'user',
           content: userVisible,
           timestamp: Date.now() - 1000000 + messages.length * 100,
+          source: 'input',
         });
       } else if (type === 'assistant') {
         const msg = entry.message as {

@@ -14,11 +14,12 @@ import { ProjectTokensTab } from './tabs/ProjectTokensTab';
 import { ProjectToolsTab } from './tabs/ProjectToolsTab';
 import { UsageTab } from './tabs/UsageTab';
 import { TokenRatioTab } from './tabs/TokenRatioTab';
+import { MemoryTab } from './tabs/MemoryTab';
 import { DASH_COLORS } from './dashboardUtils';
 
 type SessionTab = 'overview' | 'tokens' | 'tools' | 'timeline' | 'commands' | 'context' | 'usage';
 type ProjectTab = 'p-overview' | 'p-30-days' | 'p-sessions' | 'p-tokens' | 'p-tools';
-type UserTab = 'u-ratio';
+type UserTab = 'u-ratio' | 'u-memory';
 type DashboardTab = SessionTab | ProjectTab | UserTab;
 
 const SESSION_TABS: { key: SessionTab; label: string }[] = [
@@ -41,6 +42,7 @@ const PROJECT_TABS: { key: ProjectTab; label: string }[] = [
 
 const USER_TABS: { key: UserTab; label: string }[] = [
   { key: 'u-ratio', label: 'Token Ratio' },
+  { key: 'u-memory', label: 'Memory' },
 ];
 
 const modeToggleBase: React.CSSProperties = {
@@ -259,6 +261,7 @@ export const DashboardPanel: React.FC = () => {
         {mode === 'project' && activeTab === 'p-tools' && <ProjectToolsTab sessions={projectSessions} />}
         {/* User tabs */}
         {mode === 'user' && activeTab === 'u-ratio' && <TokenRatioTab />}
+        {mode === 'user' && activeTab === 'u-memory' && <MemoryTab />}
       </div>
     </div>
   );

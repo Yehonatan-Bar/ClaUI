@@ -17,6 +17,7 @@ export function useClaudeStream(): void {
     endSession,
     addUserMessage,
     addAssistantMessage,
+    addInjectedAssistantContent,
     handleMessageStart,
     appendStreamingText,
     startToolUse,
@@ -97,6 +98,8 @@ export function useClaudeStream(): void {
     setUsageData,
     setUsageLimitState,
     setUsageQueuedPromptState,
+    appendMemorySnapshot,
+    setMemoryStreamError,
     setTokenRatioData,
     setTeamState,
     setTeamActive,
@@ -282,8 +285,20 @@ export function useClaudeStream(): void {
             'type:', typeof msg.content,
             'value:', msg.content
           );
-          addUserMessage(msg.content);
+          addUserMessage(msg.content, msg.source ?? 'input');
           logState('after addUserMessage');
+          break;
+
+        case 'syntheticToolContent':
+          // CLI-injected synthetic content (skill body, sub-agent dispatch
+          // context, system reminder). Render as part of Claude's output
+          // flow, never as a "YOU" message.
+          console.log(`%c[STREAM] syntheticToolContent`, 'color: cyan; font-weight: bold',
+            'sourceToolUseID:', msg.sourceToolUseID,
+            'blocks:', Array.isArray(msg.content) ? msg.content.length : 0,
+          );
+          addInjectedAssistantContent(msg.content);
+          logState('after addInjectedAssistantContent');
           break;
 
         case 'toolUseStart':
@@ -500,6 +515,7 @@ export function useClaudeStream(): void {
               model: m.model,
               timestamp: m.timestamp,
               thinkingEffort: m.thinkingEffort,
+              source: m.source,
             }));
             useAppStore.setState({
               messages: hydratedMessages,
@@ -522,6 +538,7 @@ export function useClaudeStream(): void {
               model: m.model,
               timestamp: m.timestamp,
               thinkingEffort: m.thinkingEffort,
+              source: m.source,
             }));
             useAppStore.setState({
               messages: hydratedMessages,
@@ -769,6 +786,14 @@ export function useClaudeStream(): void {
           setUsageData(msg.stats, msg.fetchedAt, msg.error);
           break;
 
+        case 'memorySnapshot':
+          appendMemorySnapshot(msg);
+          break;
+
+        case 'memoryStreamError':
+          setMemoryStreamError(msg.error);
+          break;
+
         case 'usageLimitDetected':
           setUsageLimitState({
             active: msg.active,
@@ -919,6 +944,7 @@ export function useClaudeStream(): void {
     endSession,
     addUserMessage,
     addAssistantMessage,
+    addInjectedAssistantContent,
     handleMessageStart,
     appendStreamingText,
     startToolUse,
@@ -994,6 +1020,8 @@ export function useClaudeStream(): void {
     setUsageData,
     setUsageLimitState,
     setUsageQueuedPromptState,
+    appendMemorySnapshot,
+    setMemoryStreamError,
     setTokenRatioData,
     setTeamState,
     setTeamActive,

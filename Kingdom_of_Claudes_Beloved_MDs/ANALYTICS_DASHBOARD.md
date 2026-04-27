@@ -2,7 +2,7 @@
 
 ## Overview
 
-A full-screen overlay dashboard inside the chat webview with three modes: **Session** (current session analytics), **Project** (aggregated analytics across all past sessions in the workspace), and **User** (global user-level analytics shared across all workspaces). Project mode has 5 tabs: Overview, 30 Days, Sessions, Tokens, Tools. Opens from the StatusBar "Dashboard" button. A pill toggle in the header switches between modes (blue=Session, purple=Project, amber=User).
+A full-screen overlay dashboard inside the chat webview with three modes: **Session** (current session analytics), **Project** (aggregated analytics across all past sessions in the workspace), and **User** (global user-level analytics shared across all workspaces). Project mode has 5 tabs: Overview, 30 Days, Sessions, Tokens, Tools. User mode has 2 tabs: Token Ratio and Memory. Opens from the StatusBar "Dashboard" button. A pill toggle in the header switches between modes (blue=Session, purple=Project, amber=User).
 
 ## Architecture
 
@@ -29,7 +29,9 @@ A full-screen overlay dashboard inside the chat webview with three modes: **Sess
 - `src/webview/components/Dashboard/dashboardUtils.ts` - Colors, helpers, command categorization
 - `src/webview/components/Dashboard/charts/RechartsWrappers.tsx` - 6 Recharts components
 - `src/webview/components/Dashboard/charts/SemanticWidgets.tsx` - MoodTimeline, FrustrationAlert, BugRepeatTracker
-- `src/webview/components/Dashboard/tabs/` - Session tabs (7) + Project tabs (5) + User tabs (1)
+- `src/webview/components/Dashboard/tabs/` - Session tabs (7) + Project tabs (5) + User tabs (2)
+- `src/extension/process/ProcessMemorySampler.ts` - Shared sampler for the Memory tab; queries Windows process counters via PowerShell and walks descendant trees from per-tab CLI root PIDs
+- `src/webview/components/Dashboard/tabs/MemoryTab.tsx` - Memory tab UI (live RSS area chart, VS Code process category bars, per-tab CLI tree table)
 - `src/webview/components/Dashboard/tabs/Project30DaysTab.tsx` - Project mode 30-day filtered view wrapper (reuses ProjectOverviewTab)
 
 ## Session Mode (7 Tabs)
@@ -75,9 +77,9 @@ A full-screen overlay dashboard inside the chat webview with three modes: **Sess
 - Period tabs are fixed (`5 Hours`, `24 Hours`, `7 Days`, `14 Days`, `30 Days`, `2 Months`) and remain visible even when the API omits some buckets
 - Selecting a period with no returned bucket shows an explicit empty-state message instead of hiding the tab
 
-## User Mode (1 Tab)
+## User Mode (2 Tabs)
 
-User mode displays global user-level analytics shared across all workspaces (stored in VS Code `globalState`). The tab bar is hidden when only 1 tab exists.
+User mode displays global runtime data shared across all workspaces. The Token Ratio tab is backed by VS Code `globalState`; the Memory tab samples live process state on demand and is not persisted.
 
 ### Token Ratio
 - Correlates cost-weighted token consumption with usage percentage changes over time
@@ -95,6 +97,27 @@ User mode displays global user-level analytics shared across all workspaces (sto
 - Amber info banner when all samples are baselines, explaining that ratios appear after the next sample
 - "Resample Now" button: triggers immediate usage fetch and ratio computation without waiting for the automatic sampling interval
 - Shows "Waiting for data..." only when fewer than 2 turns have been tracked
+
+### Memory
+- Streams a process-memory snapshot every 2.5s while the tab is open; sampling stops on tab unmount and on `MessageHandler.dispose`
+- Stat cards: total VS Code RSS, Extension Host RSS (with V8 heap used/total), sum of ClaUi-spawned CLI process trees, system memory % used
+- Area chart over time: VS Code total, Extension Host, and ClaUi CLI trees (capped at the last 240 samples — about 10 minutes)
+- Horizontal bar chart at the current sample: VS Code processes grouped as Main, Extension Host, and other contextual VS Code processes
+- Per-tab CLI tree table: tab name, provider (claude/codex), root PID, descendant process count, summed working-set RSS
+- "Clear history" button discards the in-memory ring buffer for a clean reset
+
+#### Sampling pipeline
+1. `MemoryTab` posts `{type:'requestMemoryStream', enabled:true, intervalMs:2500}` on mount
+2. The active tab's MessageHandler (Claude or Codex) starts a `setInterval` that calls `ProcessMemorySampler.sample()`
+3. The sampler reads `process.memoryUsage()` for the Extension Host (free, instant) and runs one PowerShell `Get-Counter` process-counter query for PID, parent PID, and working set across active processes
+4. CLI roots come from `TabManager.enumerateCliProcesses()`, which walks `tabs.values()` and returns each tab's `cliPid` (newly exposed via getter on `ClaudeProcessManager` and `CodexExecProcessManager`)
+5. The sampler builds a parent->children map and walks descendants of each CLI root, summing `WorkingSetSize`
+6. VS Code processes are categorized by PID/parent relationship: the Extension Host is identified by PID match against `process.pid`, the root Code process is Main, and remaining Code children are grouped as contextual VS Code processes
+7. The snapshot is posted as `{type:'memorySnapshot', ...}`; the webview appends to `memorySnapshots[]` (capped at 240) via `appendMemorySnapshot`
+8. On unmount, `MemoryTab` posts `{type:'requestMemoryStream', enabled:false}` and the interval is cleared
+
+#### Important caveat
+VS Code runs all extensions in a **single shared Extension Host process**. The "Extension Host" line and category bar therefore include every active extension, not just ClaUi. The only memory that is precisely attributable to ClaUi is the CLI tree column — those are the cmd.exe / node.exe processes spawned for each ClaUi tab and their descendants.
 
 ## Project Mode (5 Tabs)
 

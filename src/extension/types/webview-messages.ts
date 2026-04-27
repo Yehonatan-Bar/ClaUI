@@ -678,6 +678,16 @@ export interface RequestUsageMessage {
   type: 'requestUsage';
 }
 
+// --- Memory dashboard (Webview -> Extension) ---
+
+export interface RequestMemoryStreamRequest {
+  type: 'requestMemoryStream';
+  /** True to start streaming; false to stop. */
+  enabled: boolean;
+  /** Sampling interval in ms. Clamped on the extension side. Default 2500. */
+  intervalMs?: number;
+}
+
 export interface SetUsageWidgetEnabledRequest {
   type: 'setUsageWidgetEnabled';
   enabled: boolean;
@@ -857,6 +867,7 @@ export type WebviewToExtensionMessage =
   | CodexConsultRequest
   | SetApiKeyRequest
   | RequestUsageMessage
+  | RequestMemoryStreamRequest
   | SetUsageWidgetEnabledRequest
   | SetRestoreSessionsEnabledRequest
   | GetTokenRatioDataRequest
@@ -956,6 +967,23 @@ export interface AssistantCompleteMessage {
 export interface UserMessageDisplay {
   type: 'userMessage';
   content: ContentBlock[];
+  // Origin of this user message. 'input' = typed by the user via the input box.
+  // 'auto-prompt' = injected by ClaUi (e.g. team idle, queued/scheduled prompt).
+  // Defaults to 'input' if absent. Only 'input' messages are eligible for
+  // Fork / Revert / prompt-navigation buttons.
+  source?: 'input' | 'auto-prompt';
+}
+
+/**
+ * Synthetic content emitted by the CLI as a `type: "user"` envelope with
+ * isMeta=true (e.g. skill body loaded into context, sub-agent dispatch
+ * context, system reminders). Rendered as part of Claude's output flow,
+ * never as a "YOU" message.
+ */
+export interface SyntheticToolContentMessage {
+  type: 'syntheticToolContent';
+  content: ContentBlock[];
+  sourceToolUseID?: string;
 }
 
 export interface ToolUseStartMessage {
@@ -1680,6 +1708,56 @@ export interface UsageDataMessage {
   error?: string;
 }
 
+// --- Memory dashboard (Extension -> Webview) ---
+
+export type MemoryProcessCategory =
+  | 'main'
+  | 'renderer'
+  | 'extensionHost'
+  | 'gpu'
+  | 'utility'
+  | 'crashpad'
+  | 'pty'
+  | 'other';
+
+export interface MemoryVsCodeProcess {
+  pid: number;
+  parentPid: number;
+  name: string;
+  rssBytes: number;
+  category: MemoryProcessCategory;
+}
+
+export interface MemoryCliProcess {
+  tabId: string;
+  tabName: string;
+  provider: 'claude' | 'codex';
+  rootPid: number;
+  treeRssBytes: number;
+  processCount: number;
+}
+
+export interface MemorySnapshotMessage {
+  type: 'memorySnapshot';
+  timestamp: number;
+  systemTotalBytes: number;
+  systemFreeBytes: number;
+  extensionHost: {
+    pid: number;
+    rssBytes: number;
+    heapUsedBytes: number;
+    heapTotalBytes: number;
+    externalBytes: number;
+  };
+  vscodeProcesses: MemoryVsCodeProcess[];
+  cliProcesses: MemoryCliProcess[];
+}
+
+export interface MemoryStreamErrorMessage {
+  type: 'memoryStreamError';
+  error: string;
+}
+
 export interface UsageWidgetSettingMessage {
   type: 'usageWidgetSetting';
   enabled: boolean;
@@ -1942,6 +2020,7 @@ export interface SerializedChatMessage {
   model?: string;
   timestamp: number;
   thinkingEffort?: string;
+  source?: 'input' | 'auto-prompt';
 }
 
 export type ExtensionToWebviewMessage =
@@ -1955,6 +2034,7 @@ export type ExtensionToWebviewMessage =
   | StreamingTextMessage
   | AssistantCompleteMessage
   | UserMessageDisplay
+  | SyntheticToolContentMessage
   | ToolUseStartMessage
   | ToolUseInputMessage
   | ToolResultMessage
@@ -2023,6 +2103,8 @@ export type ExtensionToWebviewMessage =
   | ApiKeySettingMessage
   | ClaudeAuthStatusMessage
   | UsageDataMessage
+  | MemorySnapshotMessage
+  | MemoryStreamErrorMessage
   | UsageWidgetSettingMessage
   | RestoreSessionsSettingMessage
   | TokenRatioDataMessage

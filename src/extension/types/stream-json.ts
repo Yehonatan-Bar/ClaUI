@@ -145,6 +145,12 @@ export interface UserMessage {
     content: ContentBlock[];
   };
   session_id: string;
+  // CLI marks synthetic user-role messages (skill body load, sub-agent dispatch
+  // context, system reminders) with isMeta=true. These are NOT real user prompts
+  // and must not be rendered as "YOU" in the UI.
+  isMeta?: boolean;
+  // For meta messages, identifies the originating assistant tool_use call.
+  sourceToolUseID?: string;
 }
 
 export interface ResultSuccess {

@@ -17,6 +17,7 @@ import { registerCommands } from './commands';
 import { registerDiscoverCommand } from './session/SessionDiscovery';
 import { ClaUiSidebarViewProvider } from './sidebar/ClaUiSidebarViewProvider';
 import { cleanupOrphanedProcesses } from './process/orphanCleanup';
+import { ProcessMemorySampler } from './process/ProcessMemorySampler';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -104,6 +105,12 @@ export function activate(context: vscode.ExtensionContext): void {
   skillUsageTracker.setLogger(log);
   skillGenService.setSkillUsageTracker(skillUsageTracker);
 
+  // Memory sampler shared across all tabs for the dashboard memory tab.
+  // Wired with a CLI-root provider after TabManager exists to avoid a
+  // circular constructor dependency.
+  const memorySampler = new ProcessMemorySampler();
+  memorySampler.setLogger(log);
+
   // Create the tab manager that owns all session tabs
   tabManager = new TabManager(
     context,
@@ -115,8 +122,10 @@ export function activate(context: vscode.ExtensionContext): void {
     enableFileLogging ? logDir : null,
     skillGenService,
     tokenRatioTracker,
-    skillUsageTracker
+    skillUsageTracker,
+    memorySampler
   );
+  memorySampler.setRootProvider(() => tabManager.enumerateCliProcesses());
 
   // Register commands routed through the tab manager
   registerCommands(context, tabManager, sessionStore, log, logDir);

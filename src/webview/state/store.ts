@@ -44,6 +44,12 @@ export interface ChatMessage {
   model?: string;
   timestamp: number;
   thinkingEffort?: string;
+  // Origin of user-role messages. 'input' = real prompt typed by the user via
+  // the input box. 'auto-prompt' = injected by ClaUi (e.g. team idle, queued
+  // prompt). Absent (treated as 'input') for assistant messages and pre-fix
+  // restored sessions. Only 'input' messages are eligible for Fork / Revert /
+  // prompt-navigation buttons.
+  source?: 'input' | 'auto-prompt';
 }
 
 export interface StreamingBlock {
@@ -355,6 +361,10 @@ export interface AppState {
   projectSessions: SessionSummary[];
   projectDashboardMode: 'session' | 'project' | 'user';
 
+  // Memory dashboard (rolling buffer of recent samples + last error)
+  memorySnapshots: import('../../extension/types/webview-messages').MemorySnapshotMessage[];
+  memoryStreamError: string | null;
+
   // Session activity timer (Claude active processing time only)
   sessionActivityStarted: boolean;
   sessionActivityElapsedMs: number;
@@ -480,8 +490,9 @@ export interface AppState {
   // Actions
   setSession: (sessionId: string, model: string) => void;
   endSession: (reason: string) => void;
-  addUserMessage: (content: string | ContentBlock[]) => void;
+  addUserMessage: (content: string | ContentBlock[], source?: 'input' | 'auto-prompt') => void;
   addAssistantMessage: (messageId: string, content: ContentBlock[], model: string, thinkingEffort?: string) => void;
+  addInjectedAssistantContent: (content: ContentBlock[]) => void;
 
   // Streaming lifecycle
   handleMessageStart: (messageId: string, model: string) => void;
@@ -636,6 +647,9 @@ export interface AppState {
   setMcpDiffPreview: (preview: McpConfigDiffPreview | null) => void;
   setProjectSessions: (sessions: SessionSummary[]) => void;
   setProjectDashboardMode: (mode: 'session' | 'project' | 'user') => void;
+  appendMemorySnapshot: (snapshot: import('../../extension/types/webview-messages').MemorySnapshotMessage) => void;
+  setMemoryStreamError: (error: string | null) => void;
+  clearMemoryHistory: () => void;
   setSkillGenSettings: (settings: { enabled: boolean; threshold: number; onboardingSeen: boolean }) => void;
   setSkillGenStatus: (status: { pendingDocs: number; threshold: number; runStatus: SkillGenRunStatus; progress: number; progressLabel: string; lastRun: SkillGenRunHistoryEntry | null; history: SkillGenRunHistoryEntry[] }) => void;
   setSkillGenProgress: (update: { runStatus: SkillGenRunStatus; progress: number; progressLabel: string }) => void;
@@ -922,6 +936,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   mcpDiffPreview: null,
   projectSessions: [],
   projectDashboardMode: 'session',
+  memorySnapshots: [],
+  memoryStreamError: null,
   sessionActivityStarted: false,
   sessionActivityElapsedMs: 0,
   sessionActivityRunningSinceMs: null,
@@ -1119,7 +1135,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
-  addUserMessage: (content) => {
+  addUserMessage: (content, source = 'input') => {
     // Normalize content: CLI may send a plain string instead of ContentBlock[]
     const normalizedContent: ContentBlock[] = typeof content === 'string'
       ? [{ type: 'text', text: content }]
@@ -1179,6 +1195,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             role: 'user' as const,
             content: userVisibleContent,
             timestamp: Date.now(),
+            source,
           },
         ],
       };
@@ -1189,6 +1206,33 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       return updates;
     });
+  },
+
+  /**
+   * Append CLI-injected synthetic content (skill body, sub-agent dispatch
+   * context, system reminders) as an assistant-role message. The CLI emits
+   * these as `type: "user"` envelopes with isMeta=true, but they are NOT
+   * user input -- they are content surfaced as part of Claude's tool flow.
+   * Stored as a discrete assistant message so it never collides with the
+   * streaming-message merge logic in addAssistantMessage.
+   */
+  addInjectedAssistantContent: (content) => {
+    const normalizedContent: ContentBlock[] = Array.isArray(content)
+      ? content
+      : [{ type: 'text', text: String(content) }];
+    if (normalizedContent.length === 0) return;
+    const messageId = `synthetic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    set((s) => ({
+      messages: [
+        ...s.messages,
+        {
+          id: messageId,
+          role: 'assistant' as const,
+          content: normalizedContent,
+          timestamp: Date.now(),
+        },
+      ],
+    }));
   },
 
   /**
@@ -2005,6 +2049,19 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setProjectDashboardMode: (mode) =>
     set({ projectDashboardMode: mode }),
+
+  appendMemorySnapshot: (snapshot) =>
+    set((s) => {
+      // Cap history at 240 samples (~10 minutes at 2.5s sampling).
+      const next = s.memorySnapshots.length >= 240
+        ? [...s.memorySnapshots.slice(-239), snapshot]
+        : [...s.memorySnapshots, snapshot];
+      return { memorySnapshots: next, memoryStreamError: null };
+    }),
+
+  setMemoryStreamError: (error) => set({ memoryStreamError: error }),
+
+  clearMemoryHistory: () => set({ memorySnapshots: [], memoryStreamError: null }),
 
   // Skill Generation actions
   setSkillGenSettings: (settings) =>

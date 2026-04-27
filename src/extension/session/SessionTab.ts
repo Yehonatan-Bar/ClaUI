@@ -142,7 +142,8 @@ export class SessionTab implements WebviewBridge {
     logDir: string | null,
     private readonly skillGenService?: SkillGenService,
     private readonly tokenRatioTracker?: TokenUsageRatioTracker,
-    private readonly skillUsageTracker?: import('../skillgen/SkillUsageTracker').SkillUsageTracker
+    private readonly skillUsageTracker?: import('../skillgen/SkillUsageTracker').SkillUsageTracker,
+    private readonly memorySampler?: import('../process/ProcessMemorySampler').ProcessMemorySampler
   ) {
     this.tabNumber = tabNumber;
     this.id = `tab-${tabNumber}`;
@@ -178,6 +179,9 @@ export class SessionTab implements WebviewBridge {
     }
     if (this.skillUsageTracker) {
       this.messageHandler.setSkillUsageTracker(this.skillUsageTracker);
+    }
+    if (this.memorySampler) {
+      this.messageHandler.setMemorySampler(this.memorySampler);
     }
 
     // Create per-tab file logger if file logging is enabled
@@ -634,6 +638,16 @@ export class SessionTab implements WebviewBridge {
   /** Whether the underlying CLI process is running */
   get isRunning(): boolean {
     return this.processManager.isRunning;
+  }
+
+  /** Display name shown on the tab; falls back to "Tab N" before naming. */
+  get displayName(): string {
+    return this.baseTitle || `Tab ${this.tabNumber}`;
+  }
+
+  /** PID of the spawned Claude CLI process for this tab, or undefined if not running. */
+  get cliPid(): number | undefined {
+    return this.processManager.pid;
   }
 
   /** The CLI session ID, if available */
@@ -1582,10 +1596,13 @@ export class SessionTab implements WebviewBridge {
 
     const autoPromptText = 'All team agents have completed their work and are now idle. Please check the inbox messages, review the results, and provide a summary report.';
 
-    // Show the auto-prompt in the UI so the user sees what happened
+    // Show the auto-prompt in the UI so the user sees what happened.
+    // Marked source='auto-prompt' so it stays out of Fork / Revert /
+    // prompt-navigation actions (those are reserved for true input-box prompts).
     this.postMessage({
       type: 'userMessage',
       content: [{ type: 'text', text: autoPromptText }],
+      source: 'auto-prompt',
     });
 
     // Send to Claude Code process

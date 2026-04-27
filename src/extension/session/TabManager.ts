@@ -21,6 +21,7 @@ import {
   type OpenTabSnapshotEntry,
   type OpenTabsSnapshot,
 } from './OpenTabsSnapshot';
+import type { ProcessMemorySampler } from '../process/ProcessMemorySampler';
 
 /** Distinct colors for tab header bars, cycling through the palette */
 const TAB_COLORS = [
@@ -69,7 +70,8 @@ export class TabManager {
     private readonly logDir: string | null,
     private readonly skillGenService?: SkillGenService,
     private readonly tokenRatioTracker?: TokenUsageRatioTracker,
-    private readonly skillUsageTracker?: SkillUsageTracker
+    private readonly skillUsageTracker?: SkillUsageTracker,
+    private readonly memorySampler?: ProcessMemorySampler
   ) {
     // Single shared status bar item across all tabs
     this.statusBarItem = vscode.window.createStatusBarItem(
@@ -145,7 +147,8 @@ export class TabManager {
       this.logDir,
       this.skillGenService,
       this.tokenRatioTracker,
-      this.skillUsageTracker
+      this.skillUsageTracker,
+      this.memorySampler
     );
 
     this.tabs.set(tab.id, tab);
@@ -188,7 +191,8 @@ export class TabManager {
       this.promptHistoryStore,
       this.achievementService,
       this.logDir,
-      this.skillGenService
+      this.skillGenService,
+      this.memorySampler
     );
 
     this.tabs.set(tab.id, tab);
@@ -392,6 +396,23 @@ export class TabManager {
   /** Total number of open tabs */
   get tabCount(): number {
     return this.tabs.size;
+  }
+
+  /** Enumerate active CLI processes across all open tabs.
+   *  Returns one entry per tab with a running CLI process (Claude shell wrapper or
+   *  Codex exec). Used by the memory dashboard to attribute process-tree memory
+   *  back to a specific tab. Tabs with no active CLI process are excluded. */
+  enumerateCliProcesses(): Array<{ tabId: string; tabName: string; provider: 'claude' | 'codex'; rootPid: number }> {
+    const out: Array<{ tabId: string; tabName: string; provider: 'claude' | 'codex'; rootPid: number }> = [];
+    for (const tab of this.tabs.values()) {
+      if (tab.isDisposed) continue;
+      const pid = (tab as { cliPid?: number }).cliPid;
+      if (typeof pid !== 'number' || pid <= 0) continue;
+      const provider: 'claude' | 'codex' = tab instanceof CodexSessionTab ? 'codex' : 'claude';
+      const tabName = (tab as { displayName?: string }).displayName ?? `Tab ${tab.tabNumber}`;
+      out.push({ tabId: tab.id, tabName, provider, rootPid: pid });
+    }
+    return out;
   }
 
   // --- Internal helpers ---

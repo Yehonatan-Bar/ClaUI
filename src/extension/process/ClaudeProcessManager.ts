@@ -279,6 +279,12 @@ export class ClaudeProcessManager extends EventEmitter {
     return this.sessionId;
   }
 
+  /** PID of the spawned shell wrapper for the CLI, or undefined when not running.
+   *  Used by the memory dashboard to enumerate active CLI process trees. */
+  get pid(): number | undefined {
+    return this.process?.pid;
+  }
+
   /** Seed the session id for a resumed session before the CLI emits system/init.
    *  In pipe mode the CLI emits init only after the first stdin message, so any
    *  feature that needs the session id between resume and first turn (e.g.

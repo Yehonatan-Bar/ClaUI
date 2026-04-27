@@ -123,6 +123,14 @@ export class CodexMessageHandler {
   private scheduledPrompt: { text: string; images?: WebviewImageData[] } | null = null;
   private scheduledPromptAtMs: number | null = null;
   private scheduledPromptTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Memory sampler for the dashboard memory tab (shared instance, set after construction) */
+  private memorySampler: import('../process/ProcessMemorySampler').ProcessMemorySampler | null = null;
+  private memoryStreamTimer: ReturnType<typeof setInterval> | null = null;
+  private memorySampleInFlight = false;
+
+  setMemorySampler(sampler: import('../process/ProcessMemorySampler').ProcessMemorySampler): void {
+    this.memorySampler = sampler;
+  }
 
   /** Set extension metadata for bug reports */
   setExtensionMeta(version: string, logDir: string): void {
@@ -205,6 +213,58 @@ export class CodexMessageHandler {
     this.resetTransientStateForHostLifecycle('handler dispose', {
       notifyWebview: false,
     });
+    this.stopMemoryStream();
+  }
+
+  /** Start or stop the per-tab memory streaming interval (dashboard memory tab). */
+  private handleMemoryStreamRequest(enabled: boolean, intervalMs?: number): void {
+    if (!enabled) {
+      this.stopMemoryStream();
+      return;
+    }
+    if (!this.memorySampler) {
+      this.webview.postMessage({
+        type: 'memoryStreamError',
+        error: 'Memory sampler is not available in this build.',
+      });
+      return;
+    }
+    const clamped = Math.min(10000, Math.max(1000, intervalMs ?? 2500));
+    this.stopMemoryStream();
+    void this.runMemorySample();
+    this.memoryStreamTimer = setInterval(() => { void this.runMemorySample(); }, clamped);
+    this.log(`[Memory] streaming started (interval=${clamped}ms)`);
+  }
+
+  private stopMemoryStream(): void {
+    if (this.memoryStreamTimer !== null) {
+      clearInterval(this.memoryStreamTimer);
+      this.memoryStreamTimer = null;
+      this.log('[Memory] streaming stopped');
+    }
+  }
+
+  private async runMemorySample(): Promise<void> {
+    if (!this.memorySampler || this.memorySampleInFlight) return;
+    this.memorySampleInFlight = true;
+    try {
+      const snap = await this.memorySampler.sample();
+      this.webview.postMessage({
+        type: 'memorySnapshot',
+        timestamp: snap.timestamp,
+        systemTotalBytes: snap.systemTotalBytes,
+        systemFreeBytes: snap.systemFreeBytes,
+        extensionHost: snap.extensionHost,
+        vscodeProcesses: snap.vscodeProcesses,
+        cliProcesses: snap.cliProcesses,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`[Memory] sample failed: ${message}`);
+      this.webview.postMessage({ type: 'memoryStreamError', error: message });
+    } finally {
+      this.memorySampleInFlight = false;
+    }
   }
 
   /**
@@ -443,6 +503,11 @@ export class CodexMessageHandler {
             });
           }
           break;
+
+        case 'requestMemoryStream': {
+          this.handleMemoryStreamRequest(msg.enabled, msg.intervalMs);
+          break;
+        }
 
         case 'setApiKey': {
           if (!this.secrets) {

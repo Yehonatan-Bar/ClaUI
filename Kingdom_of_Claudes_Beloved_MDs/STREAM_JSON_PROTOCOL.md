@@ -192,7 +192,9 @@ Complete assistant message (emitted after all streaming events for that turn).
 
 ### user
 
-Replayed user message (when `--replay-user-messages` is used).
+Replayed user message (when `--replay-user-messages` is used). Two variants share this envelope:
+
+**(1) Real user input** echoed back from stdin:
 
 ```json
 {
@@ -206,6 +208,23 @@ Replayed user message (when `--replay-user-messages` is used).
   "session_id": "abc-123"
 }
 ```
+
+**(2) Synthetic / meta** — content the CLI injects on Claude's behalf (skill body loaded by `Skill` tool, sub-agent dispatch context, system reminders). Marked with `isMeta: true` and (typically) a `sourceToolUseID` pointing back to the originating assistant `tool_use` block. ClaUi routes these to the assistant flow (never as "YOU"):
+
+```json
+{
+  "type": "user",
+  "message": {
+    "role": "user",
+    "content": [{ "type": "text", "text": "Base directory for this skill: ..." }]
+  },
+  "isMeta": true,
+  "sourceToolUseID": "toolu_014vXJwZ...",
+  "session_id": "abc-123"
+}
+```
+
+Tool results also arrive via this envelope (`isMeta: false`, content is `tool_result` blocks); ClaUi strips those before adding any chat message.
 
 ### result (success)
 

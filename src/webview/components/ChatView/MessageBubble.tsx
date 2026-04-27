@@ -42,16 +42,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   const textContent = extractTextContent(contentBlocks);
   const providerCapabilities = useAppStore((s) => s.providerCapabilities);
 
+  // Only true input-box prompts are eligible for prompt-specific actions
+  // (Edit, Fork, Revert, prompt navigation). Auto-prompts injected by ClaUi
+  // (e.g. team idle) display as "YOU" but must not be treated as real prompts.
+  const isInputPrompt = isUser && (message.source ?? 'input') === 'input';
+
   // Only text-only user messages are editable (not images)
-  const hasOnlyText = isUser && contentBlocks.every((b) => b.type === 'text');
+  const hasOnlyText = isInputPrompt && contentBlocks.every((b) => b.type === 'text');
   const canEdit = hasOnlyText && !isBusy && !!onEditAndResend;
-  const canFork = isUser && hasOnlyText && !!onFork && providerCapabilities.supportsFork;
+  const canFork = isInputPrompt && hasOnlyText && !!onFork && providerCapabilities.supportsFork;
 
   // Checkpoint revert/redo state
   const checkpointState = useAppStore((s) => s.checkpointState);
   const allMessages = useAppStore((s) => s.messages);
   const checkpointTurnIndex = useMemo(() => {
-    if (!isUser || !checkpointState) return null;
+    if (!isInputPrompt || !checkpointState) return null;
     const myIdx = allMessages.findIndex(m => m.id === message.id);
     if (myIdx < 0) return null;
     // Find the boundary: next user message or end of array
@@ -83,7 +88,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
     return cp !== undefined && cp.turnIndex >= checkpointState.revertedToIndex;
   }, [checkpointState, checkpointTurnIndex, isUser, message.id]);
 
-  const canRedo = isUser && isInRevertedRange && !isBusy && checkpointTurnIndex !== null;
+  const canRedo = isInputPrompt && isInRevertedRange && !isBusy && checkpointTurnIndex !== null;
 
   // Translation state from store
   const translations = useAppStore((s) => s.translations);

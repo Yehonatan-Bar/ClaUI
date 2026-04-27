@@ -197,7 +197,10 @@ export const InputArea: React.FC = () => {
   // --- Prompt navigation (scroll chat to prev/next user message) ---
   const promptNavIndexRef = useRef<number | null>(null);
   const userMessages = useMemo(
-    () => messages.filter((m) => m.role === 'user'),
+    // Navigation jumps only between true input-box prompts. Auto-prompts (e.g.
+    // ClaUi-generated team-idle messages) display as "YOU" but are not real
+    // prompts the user typed, so they are excluded from prompt navigation.
+    () => messages.filter((m) => m.role === 'user' && (m.source ?? 'input') === 'input'),
     [messages]
   );
 

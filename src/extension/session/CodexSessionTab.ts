@@ -128,7 +128,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     private readonly promptHistoryStore: PromptHistoryStore,
     private readonly achievementService: AchievementService,
     logDir: string | null,
-    private readonly skillGenService?: SkillGenService
+    private readonly skillGenService?: SkillGenService,
+    private readonly memorySampler?: import('../process/ProcessMemorySampler').ProcessMemorySampler
   ) {
     this.tabNumber = tabNumber;
     this.id = `tab-${tabNumber}`;
@@ -149,6 +150,9 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       String((context.extension.packageJSON as { version?: unknown } | undefined)?.version ?? '0.0.0'),
       logDir || '',
     );
+    if (this.memorySampler) {
+      this.messageHandler.setMemorySampler(this.memorySampler);
+    }
 
     if (logDir) {
       this.fileLogger = new FileLogger(logDir, `codex-session-${tabNumber}`);
@@ -637,6 +641,16 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
   get sessionId(): string | null {
     return this.threadId;
+  }
+
+  /** Display name shown on the tab; falls back to "Codex N" before naming. */
+  get displayName(): string {
+    return this.baseTitle || `Codex ${this.tabNumber}`;
+  }
+
+  /** PID of the spawned codex exec process for this tab, or undefined when no turn is running. */
+  get cliPid(): number | undefined {
+    return this.processManager.pid;
   }
 
   get isVisible(): boolean {

@@ -191,6 +191,12 @@ export class CodexExecProcessManager extends EventEmitter {
     return this._cancelledByUser;
   }
 
+  /** PID of the active codex exec process, or undefined when no turn is running.
+   *  Used by the memory dashboard to enumerate active CLI process trees. */
+  get pid(): number | undefined {
+    return this.process?.pid;
+  }
+
   private buildArgs(opts: {
     threadId?: string;
     cwd?: string;
