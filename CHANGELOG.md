@@ -1,5 +1,43 @@
 # ClaUi - Changelog
 
+## v0.1.119 - 2026-04-28
+
+**Feature: Smart Search — agentic cross-provider session search**
+
+- New tab kind that delegates "find a past session" to a real Claude Code or Codex agent. The user types free-form questions; the agent ripgreps over `~/.claude/projects/` and `~/.codex/sessions/`, reads the most promising hits, and returns result cards with an "Open session" button that opens the chosen session in a fresh ClaUi chat tab
+- Entry point lives in the **StatusBar -> Tools** dropdown under a new "Smart Search" group with two header rows ("Smart Search - Claude" / "Smart Search - Codex") and per-model rows (Opus 4.7, Sonnet 4.6, Haiku 4.5; GPT-5, GPT-5 Pro). Click dispatches `openSmartSearch` to the active tab; both `MessageHandler` and `CodexMessageHandler` forward to the new VS Code command `claudeMirror.smartSearch.open`
+- `TabManager.createSmartSearchTab` allocates a normal `SessionTab` / `CodexSessionTab` but calls a new `configureSearchMode({...})` method first. This bakes in the `SMART_SEARCH_PROMPT` (built by `SmartSearchPrompt.ts`, branches on whether Bash is allowed), a read-only allow-list (`Read,Glob,Grep`, plus `Bash` when `claudeMirror.smartSearch.allowBash` is true), and `cwd=$HOME` so the agent can see both Claude and Codex history roots
+- Search-mode flags reach the CLIs: `ClaudeProcessManager.start` emits `--append-system-prompt <text> --allowedTools "..."` (the presence of `allowedTools` forces the read-only branch and skips `--permission-mode bypassPermissions`). `CodexExecProcessManager.runTurn` emits `-c instructions=<TOML-escaped-prompt>` and forces `--sandbox read-only` on every turn; the user prompt is written to stdin unchanged so the system prompt does not pollute the transcript
+- Search tabs are visually distinct: slot color overridden to magenta (`#FF00C8`); the webview routes `tabKind === 'search'` to a dedicated `SmartSearchView` (header + MessageList + minimal input) with a `SearchEmptyState` example-query nudge
+- Result cards emit `[[OPEN_SESSION:<sessionId>:<provider>]]` tokens. `MarkdownContent.tsx` runs a regex pass after DOMPurify to replace each token with an `.open-session-btn` element; clicks post `openSessionFromSearch` which routes to `claudeMirror.resumeSession` with an explicit `providerHint` so sessions discovered on disk (not in `SessionStore`) still open with the correct provider
+- Snapshot persistence: `OpenTabSnapshotEntry` carries `tabKind` and `searchModel`. `buildSnapshot` keeps search tabs even without a sessionId (Codex search tabs only get a stable threadId after the first turn), and `restoreFromSnapshot` calls `configureSearchMode` + `startSession({ cwd: $HOME })` for those entries — never `resume` (clean re-init, no transcript replay)
+- New settings: `claudeMirror.smartSearch.defaultModel` (default `claude-sonnet-4-6`, used when the command is invoked without a model arg) and `claudeMirror.smartSearch.allowBash` (default `true`)
+- New detail doc: `Kingdom_of_Claudes_Beloved_MDs/SMART_SEARCH.md`
+
+**Feature: Tab Folders & sub-folders (Sessions sidebar TreeView)**
+
+- New Activity Bar TreeView (`claudeMirror.sessionsTree`) under the **ClaUi** view container that organizes session tabs into nestable folders. VS Code's native editor tab strip cannot be nested, so folders surface in the sidebar alongside the existing launcher
+- Folder records (`TabGroup`: `id`, `parentId?`, `label`, `color`, `order`, `createdAt`) are stored in `workspaceState` under `claudeMirror.tabGroups` via the new `TabGroupStore`. Tab membership rides on `OpenTabSnapshotEntry` via two new optional fields: `groupId?` and `orderInGroup?`. Both stores are scoped per workspace, so folders never bleed between projects
+- `TabGroupStore` provides Memento-backed CRUD (`createGroup`, `renameGroup`, `setGroupColor`, `moveGroup`, `deleteGroup`, `reorderWithinParent`) plus an `onDidChange` event. `moveGroup` walks the proposed parent chain before mutating and throws on cycle
+- Native tab icons re-skin with the folder color: every `SessionTab` / `CodexSessionTab` exposes `applyTabColor(color)`; `TabManager.applyEffectiveTabIcon` re-runs SVG circle generation when a tab moves into/out of a folder, when a folder's color changes (the `TabGroupStore.onDidChange` listener fans out to every assigned tab), and when a tab is restored from snapshot
+- New commands wired into the Sessions view: `claudeMirror.groups.create`, `claudeMirror.groups.createSubfolder`, `claudeMirror.groups.rename`, `claudeMirror.groups.changeColor`, `claudeMirror.groups.delete`, `claudeMirror.tabs.moveToGroup`, `claudeMirror.tabs.removeFromGroup`, `claudeMirror.tabs.focus`. Right-click menus filter via `viewItem == tabGroup` / `viewItem == tabLeaf`; all handlers accept a tree node from the menu **or** fall back to a QuickPick when launched from the Command Palette
+- Folder deletion is opt-in destructive: a three-way QuickPick lets the user cascade-close all child tabs, reparent them to the grandparent, or cancel
+- Restore behavior: `TabManager.restoreFromSnapshot` rebuilds `snapshotEntries` after the restore loop and copies `groupId` / `orderInGroup` from the original snapshot entry by sessionId, so folder assignments survive workspace close/open. Group records themselves persist independently in `workspaceState`
+- New setting `claudeMirror.tabs.indicateGroupOnTitle` (default `false`): when a tab belongs to a folder, prefix its native tab title with a colored bar character — useful when tab icons are not visible
+- New detail doc: `Kingdom_of_Claudes_Beloved_MDs/TAB_GROUPS.md`
+
+**Feature: End-of-Session AI summary (tree tooltip)**
+
+- Every session now gets a 1-3 sentence AI summary generated when its CLI process exits, shown on hover in the new Sessions TreeView tab leaves. Independent of `claudeMirror.activitySummary`
+- New `SessionSummarizer.ts` pipeline: reads the Claude transcript from `~/.claude/projects/<encoded-cwd>/<sessionId>.jsonl` via `ConversationReader` (Codex transcripts pass through `fallbackMessages`), skips sessions with fewer than 2 user messages, truncates to ~4000 chars (~30% head + tail-weighted), and prompts: *"Summarize this session in 1-3 sentences for a hover preview. Focus on the topic and outcome. Match the user's language."*
+- Two-rung fallback: primary attempt spawns `claude -p --model <claudeMirror.analysisModel>` (default Haiku 4.5) with a 35s timeout; on non-zero exit, timeout, or empty stdout, falls back to `codex exec --json --sandbox read-only -c model_reasoning_effort=low` (45s timeout). Output is sanitized (strip wrapping quotes/backticks, 600-char cap) and stored on `SessionMetadata` as `summary`, `summaryGeneratedAt`, `summaryProvider` (`'haiku'` | `'codex'`)
+- Triggered fire-and-forget from `SessionTab.maybeRunSummarizer(reason)` on the process-exit path — both successful exit and crash branches; the stop-button path routes through `processManager.stop()` -> exit event so it is covered automatically. A per-tab `summarizerRan` boolean guards against double-fire
+- Display: `TabGroupsTreeProvider.buildTabTooltip()` builds a `vscode.MarkdownString` showing the tab name + provider/session-id meta + horizontal rule + summary text + relative-time hint (`generated 5m ago`); placeholder `_Summary will appear after the session ends._` until generated. Refresh fans out via `SessionTab` -> `callbacks.onSummaryGenerated(sessionId)` -> `TabManager.notifySummaryChanged()` -> tree refresh
+- New setting `claudeMirror.sessionEndSummary` (default `true`)
+- New detail doc: `Kingdom_of_Claudes_Beloved_MDs/SESSION_SUMMARY.md`
+
+---
+
 ## v0.1.116 - 2026-04-27
 
 **Improvement: Lazy session restore on startup**
