@@ -339,8 +339,12 @@ export function registerCommands(
       vscode.window.showInformationMessage('Context compaction requested.');
     }),
 
-    // Resume an existing session in a NEW tab
-    vscode.commands.registerCommand('claudeMirror.resumeSession', async (passedSessionId?: string) => {
+    // Resume an existing session in a NEW tab.
+    // Optional providerHint: caller (e.g. Smart Search "Open session" button)
+    // can pass a provider when the session is on disk but not in SessionStore.
+    vscode.commands.registerCommand(
+      'claudeMirror.resumeSession',
+      async (passedSessionId?: string, providerHint?: ProviderId) => {
       const sessionId = passedSessionId || await vscode.window.showInputBox({
         prompt: 'Enter session ID to resume',
         placeHolder: 'session-id',
@@ -348,7 +352,7 @@ export function registerCommands(
 
       if (sessionId) {
         const stored = sessionStore.getSession(sessionId);
-        const provider = stored?.provider ?? getConfiguredProvider();
+        const provider = stored?.provider ?? providerHint ?? getConfiguredProvider();
         const tab = tabManager.createTabForProvider(provider);
         try {
           await tab.startSession({ resume: sessionId });
@@ -360,6 +364,26 @@ export function registerCommands(
         }
       }
     }),
+
+    // Open a new Smart Search tab. The argument carries provider+model picked
+    // by the user from the Tools dropdown; falls back to the configured default
+    // model when invoked from the command palette without arguments.
+    vscode.commands.registerCommand(
+      'claudeMirror.smartSearch.open',
+      async (args?: { provider?: 'claude' | 'codex'; model?: string }) => {
+        const config = vscode.workspace.getConfiguration('claudeMirror');
+        const defaultModel = config.get<string>('smartSearch.defaultModel', 'claude-sonnet-4-6');
+        const provider: 'claude' | 'codex' = args?.provider ?? 'claude';
+        const model = args?.model ?? defaultModel;
+        try {
+          await tabManager.createSmartSearchTab({ provider, model });
+          log(`Smart Search tab opened: provider=${provider} model=${model}`);
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          vscode.window.showErrorMessage(`Failed to open Smart Search tab: ${errorMessage}`);
+        }
+      }
+    ),
 
     // Show conversation history in a QuickPick
     vscode.commands.registerCommand('claudeMirror.showHistory', async () => {

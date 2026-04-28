@@ -559,6 +559,73 @@ export const StatusBar: React.FC<{
           Consult Codex
         </button>
       )}
+      <div className="status-bar-group-dropdown-separator" />
+      <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" style={{ fontWeight: 600, opacity: 0.7 }}>
+        Smart Search - Claude
+      </div>
+      <button
+        className="status-bar-group-dropdown-item"
+        onClick={() => {
+          closeAllGroups();
+          postToExtension({ type: 'openSmartSearch', provider: 'claude', model: 'claude-opus-4-7' });
+        }}
+        data-tooltip="Search past sessions using Claude Opus 4.7"
+      >
+        Opus 4.7
+      </button>
+      <button
+        className="status-bar-group-dropdown-item"
+        onClick={() => {
+          closeAllGroups();
+          postToExtension({ type: 'openSmartSearch', provider: 'claude', model: 'claude-sonnet-4-6' });
+        }}
+        data-tooltip="Search past sessions using Claude Sonnet 4.6"
+      >
+        Sonnet 4.6
+      </button>
+      <button
+        className="status-bar-group-dropdown-item"
+        onClick={() => {
+          closeAllGroups();
+          postToExtension({ type: 'openSmartSearch', provider: 'claude', model: 'claude-haiku-4-5-20251001' });
+        }}
+        data-tooltip="Search past sessions using Claude Haiku 4.5"
+      >
+        Haiku 4.5
+      </button>
+      <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" style={{ fontWeight: 600, opacity: 0.7 }}>
+        Smart Search - Codex
+      </div>
+      <button
+        className="status-bar-group-dropdown-item"
+        onClick={() => {
+          closeAllGroups();
+          postToExtension({ type: 'openSmartSearch', provider: 'codex', model: 'gpt-5.4' });
+        }}
+        data-tooltip="Search past sessions using GPT-5.4"
+      >
+        GPT-5.4
+      </button>
+      <button
+        className="status-bar-group-dropdown-item"
+        onClick={() => {
+          closeAllGroups();
+          postToExtension({ type: 'openSmartSearch', provider: 'codex', model: 'gpt-5.3-codex' });
+        }}
+        data-tooltip="Search past sessions using GPT-5.3-Codex"
+      >
+        GPT-5.3-Codex
+      </button>
+      <button
+        className="status-bar-group-dropdown-item"
+        onClick={() => {
+          closeAllGroups();
+          postToExtension({ type: 'openSmartSearch', provider: 'codex', model: 'gpt-5.1-codex-max' });
+        }}
+        data-tooltip="Search past sessions using GPT-5.1-Codex-Max"
+      >
+        GPT-5.1-Codex-Max
+      </button>
       <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={babelFishRef}>
         <button
           className={`status-bar-babelfish-icon-btn ${babelFishEnabled ? 'active' : ''}`}

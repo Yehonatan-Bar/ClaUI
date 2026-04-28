@@ -78,6 +78,10 @@ export interface WebviewBridge {
   sendBtwMessage?(text: string): void;
   /** Close the active btw session */
   closeBtwSession?(): void;
+  /** Trigger end-of-session summarization on demand (e.g. from the stop button).
+   *  The handler captures the current sessionId synchronously so this can be called
+   *  immediately before processManager.stop() resets it. Fire-and-forget. */
+  requestEndOfSessionSummary?(reason: 'completed' | 'crashed' | 'stopped'): void;
 }
 
 /**
@@ -1519,6 +1523,9 @@ export class MessageHandler {
           this.clearUsageLimitState('stopSession', { notifyWebview: true, clearQueuedPrompt: true });
           this.clearScheduledPromptState(true);
           this.clearPendingHandoffPrompt();
+          // Trigger summarizer BEFORE stop() — processManager.stop() resets currentSessionId,
+          // so the exit handler that follows would skip summarization. Fire-and-forget.
+          this.webview.requestEndOfSessionSummary?.('stopped');
           this.processManager.stop();
           this.achievementService.onSessionEnd(this.tabId);
           this.webview.postMessage({
@@ -1652,6 +1659,37 @@ export class MessageHandler {
               this.log(`Failed to save provider setting "${msg.provider}": ${message}`);
               this.webview.postMessage({ type: 'error', message: `Failed to save provider setting: ${message}` });
             });
+          break;
+
+        case 'openSmartSearch':
+          this.log(`Open Smart Search requested: provider=${msg.provider} model=${msg.model}`);
+          void vscode.commands.executeCommand('claudeMirror.smartSearch.open', {
+            provider: msg.provider,
+            model: msg.model,
+          }).then(
+            () => undefined,
+            (err: unknown) => {
+              const message = err instanceof Error ? err.message : String(err);
+              this.log(`Failed to open Smart Search tab: ${message}`);
+              this.webview.postMessage({ type: 'error', message: `Failed to open Smart Search: ${message}` });
+            }
+          );
+          break;
+
+        case 'openSessionFromSearch':
+          this.log(`Open session from search: id=${msg.sessionId} provider=${msg.provider}`);
+          void vscode.commands.executeCommand(
+            'claudeMirror.resumeSession',
+            msg.sessionId,
+            msg.provider,
+          ).then(
+            () => undefined,
+            (err: unknown) => {
+              const message = err instanceof Error ? err.message : String(err);
+              this.log(`Failed to open session ${msg.sessionId}: ${message}`);
+              this.webview.postMessage({ type: 'error', message: `Failed to open session: ${message}` });
+            }
+          );
           break;
 
         case 'openProviderTab':
@@ -4174,6 +4212,14 @@ export class MessageHandler {
     this.demux.on(
       'userMessage',
       (event: UserMessage) => {
+        // Subagent (Task/Agent) child events arrive on the parent stream with
+        // parent_tool_use_id set. The first such event is the prompt the parent
+        // passed via tool_use.input.prompt, which is already rendered inside
+        // AgentSpawnBlock. Drop it here so it does not double-render as "YOU".
+        if (event.parent_tool_use_id) {
+          return;
+        }
+
         const content: ContentBlock[] = Array.isArray(event.message.content)
           ? event.message.content
           : [{ type: 'text', text: String(event.message.content) } as ContentBlock];

@@ -8,6 +8,20 @@ import type { CodexExecJsonEvent } from '../types/codex-exec-json';
 import { buildSanitizedEnv } from './envUtils';
 import { killProcessTree } from './killTree';
 
+/**
+ * Encode a JS string as a TOML basic string literal: a double-quoted form
+ * with backslash escapes (\\, \", \r, \n, \t). Used for building Codex CLI
+ * `-c key=value` overrides where the value is parsed as a TOML expression.
+ */
+function toTomlBasicString(s: string): string {
+  return '"' + s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/\t/g, '\\t') + '"';
+}
+
 export interface CodexRunTurnOptions {
   prompt: string;
   threadId?: string;
@@ -15,6 +29,13 @@ export interface CodexRunTurnOptions {
   model?: string;
   permissionMode?: 'full-access' | 'supervised';
   imagePaths?: string[];
+  /** Smart Search: forces --sandbox read-only regardless of permissionMode. */
+  forceReadOnlySandbox?: boolean;
+  /** Smart Search: prepend this text to the prompt as a synthetic system block.
+   *  Codex CLI does not have an --append-system-prompt flag; instead, the agent's
+   *  first user turn carries an embedded "## SYSTEM" preamble that the model
+   *  treats as instructions for the rest of the conversation. */
+  appendSystemPrompt?: string;
 }
 
 export interface CodexProcessExitInfo {
@@ -78,6 +99,8 @@ export class CodexExecProcessManager extends EventEmitter {
       reasoningEffort: selectedReasoningEffort || undefined,
       permissionMode,
       imagePaths: options.imagePaths,
+      forceReadOnlySandbox: options.forceReadOnlySandbox,
+      appendSystemPrompt: options.appendSystemPrompt,
     });
 
     this._cancelledByUser = false;
@@ -204,8 +227,15 @@ export class CodexExecProcessManager extends EventEmitter {
     reasoningEffort?: string;
     permissionMode?: 'full-access' | 'supervised';
     imagePaths?: string[];
+    forceReadOnlySandbox?: boolean;
+    appendSystemPrompt?: string;
   }): string[] {
-    const permissionArgs = this.buildPermissionArgs(opts.permissionMode ?? 'full-access');
+    const permissionArgs = opts.forceReadOnlySandbox
+      ? ['--sandbox', 'read-only']
+      : this.buildPermissionArgs(opts.permissionMode ?? 'full-access');
+    const instructionsArgs = opts.appendSystemPrompt
+      ? ['-c', `instructions=${toTomlBasicString(opts.appendSystemPrompt)}`]
+      : [];
     if (opts.threadId) {
       const args = ['exec', ...permissionArgs, 'resume', '--json'];
       if (opts.model) {
@@ -214,6 +244,7 @@ export class CodexExecProcessManager extends EventEmitter {
       if (opts.reasoningEffort) {
         args.push('-c', `model_reasoning_effort=${opts.reasoningEffort}`);
       }
+      args.push(...instructionsArgs);
       for (const imagePath of opts.imagePaths ?? []) {
         args.push('--image', imagePath);
       }
@@ -231,6 +262,7 @@ export class CodexExecProcessManager extends EventEmitter {
     if (opts.reasoningEffort) {
       args.push('-c', `model_reasoning_effort=${opts.reasoningEffort}`);
     }
+    args.push(...instructionsArgs);
     for (const imagePath of opts.imagePaths ?? []) {
       args.push('--image', imagePath);
     }

@@ -613,6 +613,37 @@ export class CodexMessageHandler {
             });
           break;
 
+        case 'openSmartSearch':
+          this.log(`Open Smart Search requested (Codex handler): provider=${msg.provider} model=${msg.model}`);
+          void vscode.commands.executeCommand('claudeMirror.smartSearch.open', {
+            provider: msg.provider,
+            model: msg.model,
+          }).then(
+            () => undefined,
+            (err: unknown) => {
+              const message = err instanceof Error ? err.message : String(err);
+              this.log(`Failed to open Smart Search tab (Codex handler): ${message}`);
+              this.webview.postMessage({ type: 'error', message: `Failed to open Smart Search: ${message}` });
+            }
+          );
+          break;
+
+        case 'openSessionFromSearch':
+          this.log(`Open session from search (Codex handler): id=${msg.sessionId} provider=${msg.provider}`);
+          void vscode.commands.executeCommand(
+            'claudeMirror.resumeSession',
+            msg.sessionId,
+            msg.provider,
+          ).then(
+            () => undefined,
+            (err: unknown) => {
+              const message = err instanceof Error ? err.message : String(err);
+              this.log(`Failed to open session ${msg.sessionId} (Codex handler): ${message}`);
+              this.webview.postMessage({ type: 'error', message: `Failed to open session: ${message}` });
+            }
+          );
+          break;
+
         case 'openProviderTab':
           this.log(`Open provider tab requested: "${msg.provider}" (Codex handler)`);
           void vscode.workspace.getConfiguration('claudeMirror').update('provider', msg.provider, true)

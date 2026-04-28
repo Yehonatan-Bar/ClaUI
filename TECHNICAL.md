@@ -46,8 +46,12 @@ claude-code-mirror/
 |   +-- claui-activity.svg               # Activity Bar icon for the ClaUi sidebar container
 +-- src/
 |   +-- extension/                        # Extension host code (Node.js context)
-|   |   +-- extension.ts                  #   Activation, creates TabManager
+|   |   +-- extension.ts                  #   Activation, creates TabManager + TabGroupStore + TreeView
 |   |   +-- commands.ts                   #   VS Code command handlers (routes via TabManager)
+|   |   +-- commands/
+|   |   |   +-- tabGroupCommands.ts       #   Folder/sub-folder + tab-move commands for the Sessions TreeView
+|   |   +-- views/
+|   |   |   +-- TabGroupsTreeProvider.ts  #   Sidebar TreeView (folders + tabs + summary tooltips)
 |   |   +-- sidebar/
 |   |   |   +-- ClaUiSidebarViewProvider.ts #   Activity Bar sidebar launcher (WebviewViewProvider)
 |   |   +-- process/
@@ -75,8 +79,10 @@ claude-code-mirror/
 |   |   |   +-- AdventureInterpreter.ts  #   Converts TurnRecords to AdventureBeats (dungeon crawler)
 |   |   |   +-- MessageTranslator.ts      #   Translates assistant messages to Hebrew via Sonnet CLI call
 |   |   |   +-- FileLogger.ts             #   Per-session file logging with rotation and rename
-|   |   |   +-- SessionStore.ts           #   Persists session metadata in globalState
-|   |   |   +-- OpenTabsSnapshot.ts       #   Persists list of open tabs per-workspace for restore-on-startup
+|   |   |   +-- SessionStore.ts           #   Persists session metadata in globalState (incl. end-of-session summary)
+|   |   |   +-- SessionSummarizer.ts      #   End-of-session summary via Haiku (Codex low-reasoning fallback)
+|   |   |   +-- TabGroupStore.ts          #   Memento-backed CRUD for tab folders/sub-folders (workspaceState)
+|   |   |   +-- OpenTabsSnapshot.ts       #   Persists list of open tabs per-workspace for restore-on-startup (now also groupId/orderInGroup)
 |   |   |   +-- ProjectAnalyticsStore.ts  #   Persists SessionSummary in workspaceState (per-project)
 |   |   |   +-- ConversationReader.ts     #   Reads conversation history from Claude's session JSONL files
 |   |   |   +-- PromptHistoryStore.ts     #   Persists prompt history (project + global scope)
@@ -299,8 +305,17 @@ claude-code-mirror/
 **TabManager** - Manages all SessionTab instances. Tracks the active (focused) tab, provides create/close/closeAll methods, shares a single status bar item, assigns distinct colors from an 8-color palette, and groups tabs in the same editor column. Owns the open-tabs snapshot: listens to `onSessionIdAssigned` / `onNameChanged` / focus / close callbacks, writes a debounced per-workspace snapshot to `workspaceState`, and exposes `restoreFromSnapshot()` for startup restoration.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**Session Restore on Startup** - Optional feature (setting `claudeMirror.restoreSessionsOnStartup`, default true). When enabled, automatically reopens all ClaUi tabs (Claude / Codex / Happy) that were open when VS Code last closed. Snapshot is stored per-workspace in `workspaceState`, capped at 10 tabs, and restored serially with a progress notification. Only the originally-active tab eagerly spawns its CLI process; the rest are restored as **lazy panels** that spawn their CLI on first user focus, keeping memory and CPU low when many tabs are restored but only a few are actively used. A sticky `restoreInProgress` flag in `workspaceState` acts as a **crash-loop breaker**: if a previous restore did not finish cleanly, auto-restore is skipped and a `Restore now` button is offered.
+**Session Restore on Startup** - Optional feature (setting `claudeMirror.restoreSessionsOnStartup`, default true). When enabled, automatically reopens all ClaUi tabs (Claude / Codex / Happy) that were open when VS Code last closed. Snapshot is stored per-workspace in `workspaceState`, capped at 10 tabs, and restored serially with a progress notification. Only the originally-active tab eagerly spawns its CLI process; the rest are restored as **lazy panels** that spawn their CLI on first user focus, keeping memory and CPU low when many tabs are restored but only a few are actively used. A sticky `restoreInProgress` flag in `workspaceState` acts as a **crash-loop breaker**: if a previous restore did not finish cleanly, auto-restore is skipped and a `Restore now` button is offered. Smart Search tabs are restored fresh (no resume): the snapshot keeps `tabKind='search'` + `searchModel`, and the restore branch calls `configureSearchMode` + `startSession({ cwd: $HOME })` instead of the resume path.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_RESTORE.md`
+
+**Smart Search** - New tab kind ("Smart Search") that delegates "find a past session" to a real Claude or Codex agent, spawned with a baked-in system prompt and a read-only tool allow-list. Opened from `StatusBar -> Tools -> Smart Search` (Claude/Opus 4.7, Sonnet 4.6, Haiku 4.5; Codex/GPT-5, GPT-5 Pro). Search-mode flags reach the CLIs via `SessionTab.configureSearchMode` (Claude path: `--allowedTools "Read,Glob,Grep,Bash"` + `--append-system-prompt`) and `CodexSessionTab.configureSearchMode` (Codex path: `--sandbox read-only` + system preamble prepended to every turn). The agent ripgreps over `~/.claude/projects/` and `~/.codex/sessions/` and emits `[[OPEN_SESSION:<id>:<provider>]]` tokens that `MarkdownContent.tsx` transforms into `Open session ->` buttons. Click dispatches `openSessionFromSearch`, which routes through `claudeMirror.resumeSession` with an explicit provider hint so disk-resident sessions resume on the correct provider. Search tabs use a magenta slot color (`#FF00C8`).
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/SMART_SEARCH.md`
+
+**Tab Folders / Sub-folders** - Sidebar TreeView (`claudeMirror.sessionsTree`) inside the ClaUi Activity Bar that organizes session tabs into nestable folders. Folders live in `TabGroupStore` (`workspaceState`, key `claudeMirror.tabGroups`); tab membership rides on `OpenTabSnapshotEntry.groupId/orderInGroup`. Right-click commands cover create/rename/recolor/delete (with cascade-vs-reparent prompt) and move/remove tabs. When a tab joins a folder its native VS Code tab icon recolors to the folder's color via each tab's `applyTabColor()`. Folder assignments survive restore-on-startup.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/TAB_GROUPS.md`
+
+**End-of-Session Summary** - On every session-end (completed, crashed, or stopped), `SessionTab.maybeRunSummarizer()` fires `SessionSummarizer` to generate a 1-3 sentence recap via Haiku (`claude -p --model <analysisModel>`, 35s timeout) with a Codex `exec --json -c model_reasoning_effort=low` fallback (45s). The summary, generated-at timestamp, and source are persisted on `SessionMetadata` and shown on hover in the Sessions TreeView (Markdown tooltip with relative time). Skipped when fewer than 2 user messages. Toggle: `claudeMirror.sessionEndSummary` (default true). Independent of `claudeMirror.activitySummary`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_SUMMARY.md`
 
 **ClaUiSidebarViewProvider** - Provides the Activity Bar sidebar launcher view (`claui.sidebarLauncher`) and forwards button clicks from the sidebar webview to existing extension commands (start session, history, discovery, logs). This gives ClaUi a dedicated left-side VS Code icon without moving the main chat UI into the sidebar.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ACTIVITY_BAR_LAUNCHER.md`
@@ -551,6 +566,10 @@ claude-code-mirror/
 | `claudeMirror.teams.enabled` | `true` | Enable Agent Teams detection and visualization |
 | `claudeMirror.teams.autoOpenPanel` | `true` | Auto-open team panel when a team is detected |
 | `claudeMirror.teams.pollIntervalMs` | `2000` | Polling interval for team file watching (ms) |
+| `claudeMirror.sessionEndSummary` | `true` | Generate a 1-3 sentence summary at the end of every session (Haiku, with Codex low-reasoning fallback). Stored on the session and shown on hover in the Sessions TreeView. |
+| `claudeMirror.tabs.indicateGroupOnTitle` | `false` | When a tab belongs to a folder, also prefix its native tab title with a colored bar character (opt-in). |
+| `claudeMirror.smartSearch.defaultModel` | `"claude-sonnet-4-6"` | Default model used when `claudeMirror.smartSearch.open` is invoked from the command palette without a `model` argument. |
+| `claudeMirror.smartSearch.allowBash` | `true` | Allow the Smart Search agent to use Bash (ripgrep). Disable to restrict the agent to Read + Glob + Grep only. |
 
 ---
 

@@ -17,6 +17,10 @@ export interface SessionMetadata {
   handoffTargetProvider?: ProviderId;
   handoffArtifactPath?: string;
   handoffCompletedAt?: string;
+  /** End-of-session AI-generated summary (1-3 sentences) shown on hover. */
+  summary?: string;
+  summaryGeneratedAt?: number;
+  summaryProvider?: 'haiku' | 'codex';
 }
 
 type StoredSessionMetadata = Omit<SessionMetadata, 'provider'> & {

@@ -151,6 +151,10 @@ export interface UserMessage {
   isMeta?: boolean;
   // For meta messages, identifies the originating assistant tool_use call.
   sourceToolUseID?: string;
+  // Set when this user-envelope originated INSIDE a Task/Agent subagent (its
+  // first user message is the prompt the parent passed via tool_use.input.prompt,
+  // already rendered inside AgentSpawnBlock). Must not be rendered as "YOU".
+  parent_tool_use_id?: string;
 }
 
 export interface ResultSuccess {

@@ -177,6 +177,18 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ text, forceLtr
         return `<span class="ultrathink-glow ut-glow-v${v}">ultrathink</span>`;
       }
     );
+    // Smart Search result cards: replace [[OPEN_SESSION:<id>:<provider>]]
+    // tokens with a clickable span the SmartSearchView click handler
+    // forwards to the extension. We inject AFTER DOMPurify so we don't
+    // need to allowlist <button>; <span class=...> is already allowed.
+    html = html.replace(
+      /\[\[OPEN_SESSION:([^:\]]+):(claude|codex|remote)\]\]/g,
+      (_match, id: string, prov: string) => {
+        const safeId = String(id).replace(/[^a-zA-Z0-9_\-.]/g, '');
+        const safeProv = (prov === 'claude' || prov === 'codex' || prov === 'remote') ? prov : 'claude';
+        return `<span class="open-session-btn" role="button" tabindex="0" data-session-id="${safeId}" data-provider="${safeProv}" title="Open this session in a new ClaUi tab">Open session &rarr;</span>`;
+      }
+    );
     return html;
   }, [text]);
 
@@ -199,6 +211,23 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ text, forceLtr
     // Event delegation for clickable elements
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
+
+      // Smart Search result-card "Open session" button
+      const openSessionBtn = target.closest('.open-session-btn') as HTMLElement | null;
+      if (openSessionBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const sessionId = openSessionBtn.dataset.sessionId || '';
+        const provider = openSessionBtn.dataset.provider || 'claude';
+        if (sessionId) {
+          postToExtension({
+            type: 'openSessionFromSearch',
+            sessionId,
+            provider: provider as 'claude' | 'codex' | 'remote',
+          });
+        }
+        return;
+      }
 
       // Markdown links
       const mdLink = target.closest('a.md-link') as HTMLAnchorElement | null;

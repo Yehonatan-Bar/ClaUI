@@ -6,6 +6,7 @@ import { ClaudeProcessManager } from '../process/ClaudeProcessManager';
 import { StreamDemux } from '../process/StreamDemux';
 import { ControlProtocol } from '../process/ControlProtocol';
 import { SessionNamer } from './SessionNamer';
+import { SessionSummarizer } from './SessionSummarizer';
 import { MessageTranslator } from './MessageTranslator';
 import { ActivitySummarizer } from './ActivitySummarizer';
 import { VisualProgressProcessor } from './VisualProgressProcessor';
@@ -48,6 +49,8 @@ export interface SessionTabCallbacks {
   onSessionIdAssigned?: (tabId: string, sessionId: string) => void;
   /** Fired whenever the tab's display name changes (auto-named, restored, or user-renamed). */
   onNameChanged?: (tabId: string, name: string) => void;
+  /** Fired after the end-of-session summarizer writes a new summary for this session. */
+  onSummaryGenerated?: (sessionId: string) => void;
 }
 
 /**
@@ -73,6 +76,13 @@ export class SessionTab implements WebviewBridge {
   private sessionStartedAt = '';
   /** Guard to prevent saving project analytics twice (e.g. dispose + exit handler) */
   private analyticsSaved = false;
+  /** True only after a summary has been successfully saved — blocks further attempts. */
+  private summarizerRan = false;
+  /** Concurrency guard so multiple triggers (stop -> exit -> dispose) don't race. */
+  private summarizerInFlight = false;
+  /** Most-recent CLI session id seen on this tab. Survives processManager.stop(),
+   *  which resets `processManager.currentSessionId`, so the stop path can still summarize. */
+  private lastKnownSessionId: string | null = null;
   /** First line of the user's first prompt (persisted to session history) */
   private firstPrompt = '';
   /** When true, the next process exit should NOT send sessionEnded (edit-and-resend restart) */
@@ -126,6 +136,14 @@ export class SessionTab implements WebviewBridge {
   private assistantReplyWaiters: Array<(ok: boolean) => void> = [];
   /** Background session for the "btw" side-conversation overlay */
   private btwSession: BackgroundSession | null = null;
+  /** Smart Search: tab kind (default 'chat'). When 'search', spawn flags are altered. */
+  private kind: 'chat' | 'search' = 'chat';
+  /** Smart Search: appended to the agent system prompt at spawn time. */
+  private appendSystemPrompt: string | null = null;
+  /** Smart Search: read-only allowed-tools list (e.g. ['Read','Glob','Grep','Bash']). */
+  private allowedTools: string[] | null = null;
+  /** Smart Search: cwd override (so transcripts under $HOME are reachable). */
+  private cwdOverride: string | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -319,7 +337,7 @@ export class SessionTab implements WebviewBridge {
     }
     const outbound =
       msg.type === 'sessionStarted'
-        ? { ...msg, provider: this.getProvider() }
+        ? { ...msg, provider: this.getProvider(), tabKind: this.kind }
         : msg;
     // Intercept processBusy messages to update the tab title indicator
     if (outbound.type === 'processBusy') {
@@ -512,8 +530,28 @@ export class SessionTab implements WebviewBridge {
     this.cliPathOverride = pathOrNull;
   }
 
+  /** Tab kind ('chat' default, 'search' for Smart Search tabs). */
+  getTabKind(): 'chat' | 'search' {
+    return this.kind;
+  }
+
+  /** Configure this tab as a Smart Search tab. Must be called BEFORE startSession.
+   *  The flags are forwarded to ClaudeProcessManager.start() each spawn. */
+  configureSearchMode(opts: {
+    appendSystemPrompt: string;
+    allowedTools: string[];
+    cwdOverride: string;
+  }): void {
+    this.kind = 'search';
+    this.appendSystemPrompt = opts.appendSystemPrompt;
+    this.allowedTools = [...opts.allowedTools];
+    this.cwdOverride = opts.cwdOverride;
+    // Distinct title so search tabs are easy to spot in the VS Code tab bar.
+    this.setTabName(`Search ${this.tabNumber}`);
+  }
+
   /** Start a new CLI session in this tab (Claude by default, Happy when overridden) */
-  async startSession(options?: { resume?: string; fork?: boolean; cwd?: string }): Promise<void> {
+  async startSession(options?: { resume?: string; fork?: boolean; cwd?: string; model?: string }): Promise<void> {
     this.messageHandler.resetTransientStateForHostLifecycle(
       options?.resume
         ? 'SessionTab.startSession(resume)'
@@ -523,9 +561,13 @@ export class SessionTab implements WebviewBridge {
     );
     this.claudeCliMissingDetected = false;
     this.happyAuthDetected = false;
+    const effectiveCwd = options?.cwd ?? this.cwdOverride ?? undefined;
     await this.processManager.start({
       ...(options ?? {}),
+      cwd: effectiveCwd,
       cliPathOverride: this.cliPathOverride ?? undefined,
+      appendSystemPrompt: this.appendSystemPrompt ?? undefined,
+      allowedTools: this.allowedTools ?? undefined,
     });
     this.achievementService.onSessionStart(this.id);
     this.postMessage({
@@ -534,6 +576,7 @@ export class SessionTab implements WebviewBridge {
       model: 'connecting...',
       isResume: !!options?.resume,
       provider: this.getProvider(),
+      tabKind: this.kind,
     });
 
     // If this is a fork, send the conversation history and prompt text
@@ -677,8 +720,15 @@ export class SessionTab implements WebviewBridge {
       this.teamWatcher.dispose();
       this.teamWatcher = null;
     }
-    // Save analytics BEFORE stopping the process to ensure data is persisted
+    // Save analytics BEFORE stopping the process to ensure data is persisted.
+    // Same idea for the end-of-session summary: capture the sessionId before
+    // processManager.stop() resets it. Fire-and-forget; the saveSession call
+    // inside the summarizer is async but the summary write does not need to
+    // block the dispose path.
     this.saveProjectAnalytics();
+    void this.maybeRunSummarizer('completed').catch((err) =>
+      this.log(`[Summarizer] dispose-branch failure: ${err instanceof Error ? err.message : String(err)}`),
+    );
     this.achievementService.onSessionEnd(this.id);
     this.achievementService.unregisterTab(this.id);
     this.skillGenService?.unregisterTab(this.id);
@@ -844,15 +894,19 @@ export class SessionTab implements WebviewBridge {
     }
   }
 
-  /** Persist session metadata to the session store, preserving existing fields */
+  /** Persist session metadata to the session store, preserving existing fields (incl. summary). */
   private persistSessionMetadata(name?: string): void {
     const sid = this.processManager.currentSessionId;
     if (!sid) {
       return;
     }
-    // Load existing metadata to preserve fields not being explicitly overridden
+    this.lastKnownSessionId = sid;
+    // Spread existing first so unrelated fields (e.g. summary, summaryGeneratedAt,
+    // summaryProvider, handoff metadata) survive routine metadata updates from
+    // rename/resume/turn-completed.
     const existing = this.sessionStore.getSession(sid);
     void this.sessionStore.saveSession({
+      ...(existing ?? {}),
       sessionId: sid,
       name: name || existing?.name || `Session ${this.tabNumber}`,
       model: this.currentModel,
@@ -930,6 +984,12 @@ export class SessionTab implements WebviewBridge {
       by: 'tab',
       to: 'last',
     });
+  }
+
+  /** Re-color the native tab icon. Called by TabManager when this tab joins/leaves a folder. */
+  applyTabColor(color: string): void {
+    if (this.disposed) return;
+    this.setTabIcon(color);
   }
 
   /** Generate a colored SVG circle and set it as the panel's tab icon */
@@ -1171,6 +1231,9 @@ export class SessionTab implements WebviewBridge {
         this.saveProjectAnalytics();
         this.achievementService.onSessionCrash(this.id);
         this.achievementService.onSessionEnd(this.id);
+        void this.maybeRunSummarizer('crashed').catch((err) =>
+          tabLog(`[Summarizer] crash-branch failure: ${err instanceof Error ? err.message : String(err)}`),
+        );
 
         // Claude CLI not installed - send informative error instead of generic crash
         if (this.claudeCliMissingDetected) {
@@ -1233,6 +1296,9 @@ export class SessionTab implements WebviewBridge {
         tabLog('Process completed normally');
         this.saveProjectAnalytics();
         this.achievementService.onSessionEnd(this.id);
+        void this.maybeRunSummarizer('completed').catch((err) =>
+          tabLog(`[Summarizer] completed-branch failure: ${err instanceof Error ? err.message : String(err)}`),
+        );
         this.postMessage({ type: 'sessionEnded', reason: 'completed' });
       }
     });
@@ -1352,6 +1418,80 @@ export class SessionTab implements WebviewBridge {
       return 'Happy Coder CLI not found. Install Happy Coder CLI or set "claudeMirror.happy.cliPath" to the correct executable path.';
     }
     return 'Claude CLI not found. Install Claude Code CLI by running: npm install -g @anthropic-ai/claude-code';
+  }
+
+  /**
+   * Public hook for the stop-button path (`MessageHandler.stopSession`).
+   * Captures the current sessionId synchronously *before* `processManager.stop()` resets it,
+   * then runs the summarizer fire-and-forget against that captured id.
+   */
+  requestEndOfSessionSummary(reason: 'completed' | 'crashed' | 'stopped'): void {
+    const sid = this.processManager.currentSessionId ?? this.lastKnownSessionId;
+    if (sid) {
+      this.lastKnownSessionId = sid;
+    }
+    void this.maybeRunSummarizer(reason, sid).catch((err) =>
+      this.log(`[Summarizer] requestEndOfSessionSummary failed: ${err instanceof Error ? err.message : String(err)}`),
+    );
+  }
+
+  /**
+   * Generate a 1-3 sentence summary of this session and persist it on the SessionMetadata.
+   * Fire-and-forget: failures are logged but do not impact the exit path. The success
+   * flag (`summarizerRan`) is only set AFTER a summary is saved, so transient JSONL-flush
+   * races (where the file isn't ready at exit time) are retryable on the next trigger.
+   */
+  private async maybeRunSummarizer(
+    reason: 'completed' | 'crashed' | 'stopped',
+    capturedSessionId?: string | null,
+  ): Promise<void> {
+    if (this.summarizerRan || this.summarizerInFlight) {
+      return;
+    }
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    if (!config.get<boolean>('sessionEndSummary', true)) {
+      return;
+    }
+    const sid = capturedSessionId ?? this.processManager.currentSessionId ?? this.lastKnownSessionId;
+    if (!sid) {
+      this.log(`[Summarizer] Skipped (no sessionId yet, reason=${reason})`);
+      return;
+    }
+    this.summarizerInFlight = true;
+    this.log(`[Summarizer] Triggered (reason=${reason}, session=${sid.slice(0, 8)})`);
+
+    try {
+      const summarizer = new SessionSummarizer();
+      summarizer.setLogger(this.log);
+      const result = await summarizer.summarizeSession({
+        sessionId: sid,
+        provider: 'claude',
+        cliPathOverride: this.cliPathOverride ?? undefined,
+        workspacePath: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+      });
+      if (!result) {
+        this.log('[Summarizer] No summary produced (transient — flag stays unset for retry)');
+        return;
+      }
+      const existing = this.sessionStore.getSession(sid);
+      if (!existing) {
+        this.log('[Summarizer] No SessionMetadata to attach summary to');
+        return;
+      }
+      await this.sessionStore.saveSession({
+        ...existing,
+        summary: result.text,
+        summaryGeneratedAt: Date.now(),
+        summaryProvider: result.source,
+      });
+      this.summarizerRan = true;
+      this.callbacks.onSummaryGenerated?.(sid);
+      this.log(`[Summarizer] Saved (${result.source}, ${result.text.length} chars)`);
+    } catch (err) {
+      this.log(`[Summarizer] Failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      this.summarizerInFlight = false;
+    }
   }
 
   /** Build and persist a SessionSummary from accumulated TurnRecords */

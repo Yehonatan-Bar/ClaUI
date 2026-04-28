@@ -162,7 +162,7 @@ export function useClaudeStream(): void {
       switch (msg.type) {
         case 'sessionStarted':
           setProvider(msg.provider ?? 'claude');
-          setSession(msg.sessionId, msg.model);
+          setSession(msg.sessionId, msg.model, msg.tabKind ?? 'chat');
           if (msg.isResume) {
             setResuming(true);
           }

@@ -10,6 +10,7 @@ import { buildWebviewHtml } from '../webview/WebviewProvider';
 import { CodexConversationReader } from './CodexConversationReader';
 import { CodexBackgroundSession } from './CodexBackgroundSession';
 import { CodexSessionNamer } from './CodexSessionNamer';
+import { SessionSummarizer } from './SessionSummarizer';
 import { MessageTranslator } from './MessageTranslator';
 import { FileLogger } from './FileLogger';
 import type { WebviewBridge } from '../webview/MessageHandler';
@@ -64,6 +65,17 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private sessionStartedAt = '';
   private analyticsSaved = false;
   private firstPrompt = '';
+  /** Most recent user/assistant text pairs, for the end-of-session summarizer.
+   *  Codex CLI does not write the JSONL Claude does, so we buffer transcript in-memory
+   *  (capped) and feed it to SessionSummarizer as `fallbackMessages`. */
+  private transcriptBuffer: SerializedChatMessage[] = [];
+  private static readonly TRANSCRIPT_BUFFER_MAX = 50;
+  /** True only after a summary has been successfully saved — blocks further attempts. */
+  private summarizerRan = false;
+  /** Concurrency guard so multiple triggers (stop -> dispose) don't race. */
+  private summarizerInFlight = false;
+  /** Thread id retained across stop() so the summarizer can still attach to SessionMetadata. */
+  private lastKnownThreadId: string | null = null;
   private turnAuthFailureDetected = false;
   private turnCliMissingDetected = false;
   private turnStructuredErrorDetected = false;
@@ -114,6 +126,14 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private lastFocusInputPostAt = 0;
   private static readonly FOCUS_INPUT_THROTTLE_MS = 250;
   private static readonly WINDOW_FOCUS_INPUT_DELAY_MS = 180;
+  /** Smart Search: tab kind (default 'chat'). When 'search', spawn flags are altered. */
+  private kind: 'chat' | 'search' = 'chat';
+  /** Smart Search: appended to the agent system prompt at runTurn time (each turn). */
+  private appendSystemPrompt: string | null = null;
+  /** Smart Search: when true, force --sandbox read-only on every turn. */
+  private forceReadOnlySandbox: boolean = false;
+  /** Smart Search: cwd override (so transcripts under $HOME are reachable). */
+  private cwdOverride: string | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -203,17 +223,24 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     if (this.disposed) {
       return;
     }
-    if (msg.type === 'assistantMessage') {
+    // Tag every sessionStarted with the current tabKind so the webview can
+    // branch into Smart Search view on receipt.
+    const outbound: ExtensionToWebviewMessage =
+      msg.type === 'sessionStarted'
+        ? { ...msg, provider: 'codex', tabKind: this.kind }
+        : msg;
+    if (outbound.type === 'assistantMessage') {
       this.resolveAssistantReplyWaiters(true);
+      this.recordTranscript('assistant', (outbound as { message?: { content?: unknown } }).message?.content);
     }
-    if (msg.type === 'processBusy') {
-      this.setBusy(msg.busy);
+    if (outbound.type === 'processBusy') {
+      this.setBusy(outbound.busy);
     }
     if (!this.isWebviewReady) {
-      this.pendingMessages.push(msg);
+      this.pendingMessages.push(outbound);
       return;
     }
-    this.enqueueWebviewPost(msg);
+    this.enqueueWebviewPost(outbound);
   }
 
   onMessage(callback: (msg: WebviewToExtensionMessage) => void): void {
@@ -242,6 +269,32 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.messageHandler.setPendingHandoffPrompt(prompt);
   }
 
+  /** Tab kind ('chat' default, 'search' for Smart Search tabs). */
+  getTabKind(): 'chat' | 'search' {
+    return this.kind;
+  }
+
+  /** Configure this tab as a Smart Search tab. Must be called BEFORE startSession.
+   *  Codex spawns one process per turn, so the flags are re-applied on every
+   *  runTurn() call from sendTurn(). */
+  configureSearchMode(opts: {
+    appendSystemPrompt: string;
+    cwdOverride: string;
+    model?: string;
+  }): void {
+    this.kind = 'search';
+    this.appendSystemPrompt = opts.appendSystemPrompt;
+    this.forceReadOnlySandbox = true;
+    this.cwdOverride = opts.cwdOverride;
+    if (opts.model) {
+      // Set the per-tab model directly so sendTurn picks it up without
+      // mutating the user's persisted codex.model setting.
+      this.currentModel = opts.model;
+    }
+    // Distinct title so search tabs are easy to spot in the VS Code tab bar.
+    this.setTabName(`Search ${this.tabNumber}`);
+  }
+
   async startSession(options?: { resume?: string; fork?: boolean; cwd?: string }): Promise<void> {
     this.messageHandler.resetTransientStateForHostLifecycle(
       options?.resume
@@ -254,6 +307,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
     this.sessionCwd =
       options?.cwd ||
+      this.cwdOverride ||
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
       this.sessionCwd;
     this.sessionActive = true;
@@ -547,6 +601,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         this.firstPrompt = firstLine;
       }
     }
+    this.recordTranscript('user', text);
 
     this.currentModel = this.getCurrentModel();
     this.triggerSessionNaming(text);
@@ -572,6 +627,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         cwd: this.sessionCwd,
         model: this.currentModel || undefined,
         imagePaths: tempImages?.paths,
+        appendSystemPrompt: this.appendSystemPrompt ?? undefined,
+        forceReadOnlySandbox: this.forceReadOnlySandbox || undefined,
       });
     } catch (err) {
       if (cleanupOnce) {
@@ -671,6 +728,13 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.windowStateSubscription?.dispose();
     this.windowStateSubscription = null;
     this.saveProjectAnalytics();
+    // Codex sessions don't have a single "session ended" CLI event (turns spawn their
+    // own short-lived processes), so dispose is the natural end-of-life trigger for
+    // the summarizer. Fire-and-forget — the in-memory transcript buffer + threadId
+    // outlive the tab object long enough for the async save to complete.
+    void this.maybeRunSummarizer('completed').catch((err) =>
+      this.log(`[Codex Tab ${this.tabNumber}] [Summarizer] dispose-branch failure: ${err instanceof Error ? err.message : String(err)}`),
+    );
     this.closeBtwSession();
     this.processManager.stop();
     this.achievementService.onSessionEnd(this.id);
@@ -758,13 +822,123 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     }
   }
 
+  /** Append one user/assistant message to the in-memory transcript buffer (capped). */
+  private recordTranscript(role: 'user' | 'assistant', content: unknown): void {
+    let blocks: ContentBlock[] = [];
+    if (typeof content === 'string') {
+      blocks = [{ type: 'text', text: content }];
+    } else if (Array.isArray(content)) {
+      blocks = content as ContentBlock[];
+    } else {
+      return;
+    }
+    const entry: SerializedChatMessage = {
+      id: `codex-buf-${Date.now()}-${this.transcriptBuffer.length}`,
+      role,
+      content: blocks,
+      timestamp: Date.now(),
+    };
+    this.transcriptBuffer.push(entry);
+    if (this.transcriptBuffer.length > CodexSessionTab.TRANSCRIPT_BUFFER_MAX) {
+      // Drop the oldest entries; keep the head (first user message) by always
+      // preserving the very first entry, which the summarizer relies on.
+      const head = this.transcriptBuffer[0];
+      const tail = this.transcriptBuffer.slice(-CodexSessionTab.TRANSCRIPT_BUFFER_MAX + 1);
+      this.transcriptBuffer = head.role === 'user' ? [head, ...tail] : tail;
+    }
+  }
+
+  /**
+   * Public hook for the stop-button path. Captures the current threadId synchronously
+   * so the summarizer can run even after `processManager.stop()` would clear runtime state.
+   */
+  requestEndOfSessionSummary(reason: 'completed' | 'crashed' | 'stopped'): void {
+    const tid = this.threadId ?? this.lastKnownThreadId;
+    if (tid) {
+      this.lastKnownThreadId = tid;
+    }
+    void this.maybeRunSummarizer(reason, tid).catch((err) =>
+      this.log(`[Codex Tab ${this.tabNumber}] [Summarizer] requestEndOfSessionSummary failed: ${err instanceof Error ? err.message : String(err)}`),
+    );
+  }
+
+  /**
+   * Generate an end-of-session summary for this Codex tab and persist it on the
+   * SessionMetadata. Codex CLI does not write JSONL, so we feed the in-memory
+   * `transcriptBuffer` to `SessionSummarizer` as `fallbackMessages`. Idempotent —
+   * `summarizerRan` is set only after a successful save so transient failures
+   * (no thread id yet, summarizer pipeline returned null) remain retryable.
+   */
+  private async maybeRunSummarizer(
+    reason: 'completed' | 'crashed' | 'stopped',
+    capturedThreadId?: string | null,
+  ): Promise<void> {
+    if (this.summarizerRan || this.summarizerInFlight) {
+      return;
+    }
+    if (!vscode.workspace.getConfiguration('claudeMirror').get<boolean>('sessionEndSummary', true)) {
+      return;
+    }
+    const tid = capturedThreadId ?? this.threadId ?? this.lastKnownThreadId;
+    if (!tid) {
+      this.log(`[Codex Tab ${this.tabNumber}] [Summarizer] Skipped (no threadId, reason=${reason})`);
+      return;
+    }
+    if (this.transcriptBuffer.length === 0) {
+      this.log(`[Codex Tab ${this.tabNumber}] [Summarizer] Skipped (empty buffer, reason=${reason})`);
+      return;
+    }
+    this.summarizerInFlight = true;
+    this.log(
+      `[Codex Tab ${this.tabNumber}] [Summarizer] Triggered (reason=${reason}, thread=${tid.slice(0, 8)}, buffered=${this.transcriptBuffer.length})`,
+    );
+    try {
+      const summarizer = new SessionSummarizer();
+      summarizer.setLogger(this.log);
+      const result = await summarizer.summarizeSession({
+        sessionId: tid,
+        provider: 'codex',
+        fallbackMessages: this.transcriptBuffer.slice(),
+        workspacePath: this.sessionCwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+      });
+      if (!result) {
+        this.log(`[Codex Tab ${this.tabNumber}] [Summarizer] No summary produced`);
+        return;
+      }
+      const existing = this.sessionStore.getSession(tid);
+      if (!existing) {
+        this.log(`[Codex Tab ${this.tabNumber}] [Summarizer] No SessionMetadata to attach summary to`);
+        return;
+      }
+      await this.sessionStore.saveSession({
+        ...existing,
+        summary: result.text,
+        summaryGeneratedAt: Date.now(),
+        summaryProvider: result.source,
+      });
+      this.summarizerRan = true;
+      this.callbacks.onSummaryGenerated?.(tid);
+      this.log(`[Codex Tab ${this.tabNumber}] [Summarizer] Saved (${result.source}, ${result.text.length} chars)`);
+    } catch (err) {
+      this.log(
+        `[Codex Tab ${this.tabNumber}] [Summarizer] Failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      this.summarizerInFlight = false;
+    }
+  }
+
   private persistSessionMetadata(name?: string): void {
     if (!this.threadId) {
       return;
     }
+    this.lastKnownThreadId = this.threadId;
 
+    // Spread existing first so unrelated fields (summary, summaryGeneratedAt,
+    // summaryProvider, handoff metadata, …) survive routine metadata updates.
     const existing = this.sessionStore.getSession(this.threadId);
     void this.sessionStore.saveSession({
+      ...(existing ?? {}),
       sessionId: this.threadId,
       name: name || existing?.name || this.baseTitle || `Codex ${this.tabNumber}`,
       model: this.currentModel || existing?.model || 'Codex (default)',
@@ -1709,6 +1883,12 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       by: 'tab',
       to: 'last',
     });
+  }
+
+  /** Re-color the native tab icon. Called by TabManager when this tab joins/leaves a folder. */
+  applyTabColor(color: string): void {
+    if (this.disposed) return;
+    this.setTabIcon(color);
   }
 
   private setTabIcon(color: string): void {

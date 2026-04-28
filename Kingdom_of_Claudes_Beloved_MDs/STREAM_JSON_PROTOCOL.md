@@ -226,6 +226,20 @@ Replayed user message (when `--replay-user-messages` is used). Two variants shar
 
 Tool results also arrive via this envelope (`isMeta: false`, content is `tool_result` blocks); ClaUi strips those before adding any chat message.
 
+**(3) Subagent origin** — when Claude invokes the Task / Agent tool, the spawned subagent's first user message (which is the `prompt` the parent passed via `tool_use.input.prompt`) is re-emitted on the parent stream tagged with `parent_tool_use_id`. The same prompt is already rendered inside `AgentSpawnBlock` for the parent's `tool_use`, so ClaUi drops these envelopes outright at `MessageHandler` (early-return before the `isMeta` branch) — otherwise they double-render as "YOU":
+
+```json
+{
+  "type": "user",
+  "message": {
+    "role": "user",
+    "content": [{ "type": "text", "text": "<the prompt the parent passed to the Agent tool>" }]
+  },
+  "parent_tool_use_id": "toolu_01parentTaskCall...",
+  "session_id": "abc-123"
+}
+```
+
 ### result (success)
 
 Emitted when a turn completes successfully.

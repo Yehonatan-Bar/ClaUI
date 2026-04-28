@@ -54,6 +54,11 @@
           "type": "webview",
           "id": "claui.sidebarLauncher",
           "name": "ClaUi"
+        },
+        {
+          "id": "claudeMirror.sessionsTree",
+          "name": "Sessions",
+          "contextualTitle": "ClaUi Sessions"
         }
       ]
     },
@@ -133,6 +138,43 @@
       {
         "command": "claudeMirror.carryCodexToClaudeCode",
         "title": "ClaUi: Carry Codex Session to Claude Code"
+      },
+      {
+        "command": "claudeMirror.tabs.focus",
+        "title": "ClaUi: Focus Tab"
+      },
+      {
+        "command": "claudeMirror.groups.create",
+        "title": "ClaUi: New Folder",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "claudeMirror.groups.createSubfolder",
+        "title": "ClaUi: New Sub-folder"
+      },
+      {
+        "command": "claudeMirror.groups.rename",
+        "title": "ClaUi: Rename Folder"
+      },
+      {
+        "command": "claudeMirror.groups.changeColor",
+        "title": "ClaUi: Change Folder Color"
+      },
+      {
+        "command": "claudeMirror.groups.delete",
+        "title": "ClaUi: Delete Folder"
+      },
+      {
+        "command": "claudeMirror.tabs.moveToGroup",
+        "title": "ClaUi: Move Tab to Folder"
+      },
+      {
+        "command": "claudeMirror.tabs.removeFromGroup",
+        "title": "ClaUi: Remove Tab from Folder"
+      },
+      {
+        "command": "claudeMirror.smartSearch.open",
+        "title": "ClaUi: Open Smart Search"
       }
     ],
     "configuration": {
@@ -172,6 +214,16 @@
           "type": "boolean",
           "default": true,
           "description": "Persist handoff artifacts (JSON + Markdown) under ClaUi managed logs for debugging and replay."
+        },
+        "claudeMirror.smartSearch.defaultModel": {
+          "type": "string",
+          "default": "claude-sonnet-4-6",
+          "description": "Default model used when opening a Smart Search tab without picking one explicitly. Use a Claude model id for Claude search, or a Codex model id for Codex search."
+        },
+        "claudeMirror.smartSearch.allowBash": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow the Smart Search agent to run Bash (ripgrep). Disable to restrict the agent to Read + Glob + Grep only."
         },
         "claudeMirror.codex.cliPath": {
           "type": "string",
@@ -590,6 +642,16 @@
           "minimum": 500,
           "maximum": 10000,
           "description": "Polling interval in milliseconds for team file changes (Windows fallback)"
+        },
+        "claudeMirror.sessionEndSummary": {
+          "type": "boolean",
+          "default": true,
+          "description": "Generate a 1-3 sentence summary at the end of every session (Haiku, with Codex low-reasoning fallback). Stored on the session and shown on hover. Independent of activitySummary."
+        },
+        "claudeMirror.tabs.indicateGroupOnTitle": {
+          "type": "boolean",
+          "default": false,
+          "description": "When a tab belongs to a folder, prefix its native tab title with a colored bar character. Useful when tab icons are not visible."
         }
       }
     },
@@ -696,11 +758,59 @@
         },
         {
           "command": "claudeMirror.switchProviderWithContext"
+        },
+        {
+          "command": "claudeMirror.tabs.focus",
+          "when": "false"
         }
       ],
       "issue/reporter": [
         {
           "command": "claudeMirror.sendFeedback"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "claudeMirror.groups.create",
+          "when": "view == claudeMirror.sessionsTree",
+          "group": "navigation@1"
+        },
+        {
+          "command": "claudeMirror.startSession",
+          "when": "view == claudeMirror.sessionsTree",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "claudeMirror.groups.createSubfolder",
+          "when": "view == claudeMirror.sessionsTree && viewItem == tabGroup",
+          "group": "1_modify@1"
+        },
+        {
+          "command": "claudeMirror.groups.rename",
+          "when": "view == claudeMirror.sessionsTree && viewItem == tabGroup",
+          "group": "1_modify@2"
+        },
+        {
+          "command": "claudeMirror.groups.changeColor",
+          "when": "view == claudeMirror.sessionsTree && viewItem == tabGroup",
+          "group": "1_modify@3"
+        },
+        {
+          "command": "claudeMirror.groups.delete",
+          "when": "view == claudeMirror.sessionsTree && viewItem == tabGroup",
+          "group": "9_destructive@1"
+        },
+        {
+          "command": "claudeMirror.tabs.moveToGroup",
+          "when": "view == claudeMirror.sessionsTree && viewItem == tabLeaf",
+          "group": "1_modify@1"
+        },
+        {
+          "command": "claudeMirror.tabs.removeFromGroup",
+          "when": "view == claudeMirror.sessionsTree && viewItem == tabLeaf",
+          "group": "1_modify@2"
         }
       ]
     }

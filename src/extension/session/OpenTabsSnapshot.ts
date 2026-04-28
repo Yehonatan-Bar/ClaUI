@@ -9,6 +9,14 @@ export interface OpenTabSnapshotEntry {
   cliPathOverride?: string;
   workspacePath?: string;
   savedAt: string;
+  /** Folder this tab belongs to (TabGroupStore id). Undefined = top-level. */
+  groupId?: string;
+  /** Sibling order within its parent (group or top-level). */
+  orderInGroup?: number;
+  /** Tab kind: 'chat' is the default; 'search' is a Smart Search tab. */
+  tabKind?: 'chat' | 'search';
+  /** Model selected for a Smart Search tab (used to re-spawn the agent on restore). */
+  searchModel?: string;
 }
 
 export interface OpenTabsSnapshot {

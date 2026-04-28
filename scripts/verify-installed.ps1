@@ -27,7 +27,24 @@ $requiredManifestEntries = @(
   "claudeMirror.carryCodexToClaudeCode",
   "ctrl+alt+shift+c",
   "explorer/context",
-  "editor/context"
+  "editor/context",
+  # Tab folders + Sessions TreeView (Phase A)
+  "claudeMirror.sessionsTree",
+  "claudeMirror.groups.create",
+  "claudeMirror.groups.createSubfolder",
+  "claudeMirror.groups.rename",
+  "claudeMirror.groups.changeColor",
+  "claudeMirror.groups.delete",
+  "claudeMirror.tabs.moveToGroup",
+  "claudeMirror.tabs.removeFromGroup",
+  "claudeMirror.tabs.focus",
+  "view/item/context",
+  # End-of-session summary (Phase B)
+  "claudeMirror.sessionEndSummary",
+  # Smart Search
+  "claudeMirror.smartSearch.open",
+  "claudeMirror.smartSearch.defaultModel",
+  "claudeMirror.smartSearch.allowBash"
 )
 
 foreach ($entry in $requiredManifestEntries) {
@@ -38,7 +55,20 @@ foreach ($entry in $requiredManifestEntries) {
 
 $requiredBundleSymbols = @(
   "sendFilePathToChat",
-  "carryCodexToClaudeCode"
+  "carryCodexToClaudeCode",
+  # Phase A: tab folder commands + tree view (string literals survive minification)
+  "claudeMirror.sessionsTree",
+  "claudeMirror.groups.create",
+  "claudeMirror.tabs.focus",
+  "claudeMirror.tabGroups",
+  # Phase B: end-of-session summarizer (setting name + WebviewBridge hook name)
+  "sessionEndSummary",
+  "requestEndOfSessionSummary",
+  # Smart Search: command + the configureSearchMode entry point + the
+  # OPEN_SESSION token the agent emits in result cards.
+  "claudeMirror.smartSearch.open",
+  "configureSearchMode",
+  "OPEN_SESSION"
 )
 
 foreach ($symbol in $requiredBundleSymbols) {

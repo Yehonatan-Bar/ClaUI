@@ -16,6 +16,12 @@ export interface ProcessStartOptions {
   /** When true, omit --replay-user-messages so a resumed session does not
    *  re-emit old messages to the webview (used by edit-and-resend). */
   skipReplay?: boolean;
+  /** Smart Search: appended to the agent's system prompt via --append-system-prompt. */
+  appendSystemPrompt?: string;
+  /** Smart Search: comma-separated list passed via --allowedTools.
+   *  When set, takes precedence over the supervised-mode default list and
+   *  forces the supervised branch (no bypassPermissions). */
+  allowedTools?: string[];
 }
 
 export interface ProcessExitInfo {
@@ -77,15 +83,24 @@ export class ClaudeProcessManager extends EventEmitter {
       args.push('--replay-user-messages');
     }
 
-    // Full Access: bypass all permission checks so tools run without approval
-    // Supervised: restrict to read-only tools via --allowedTools
-    if (permissionMode === 'full-access') {
+    // Smart Search: explicit allowedTools list overrides permission-mode handling.
+    // Forces the supervised branch (no bypassPermissions) so the agent stays read-only.
+    if (options?.allowedTools && options.allowedTools.length > 0) {
+      args.push('--allowedTools', options.allowedTools.join(','));
+    } else if (permissionMode === 'full-access') {
+      // Full Access: bypass all permission checks so tools run without approval
       args.push('--permission-mode', 'bypassPermissions');
     } else if (permissionMode === 'supervised') {
+      // Supervised: restrict to read-only tools via --allowedTools
       args.push(
         '--allowedTools',
         'Read,Grep,Glob,LS,Task,WebFetch,WebSearch,TodoRead,TodoWrite,AskUserQuestion,ExitPlanMode'
       );
+    }
+
+    // Smart Search: append the search-agent system prompt.
+    if (options?.appendSystemPrompt) {
+      args.push('--append-system-prompt', options.appendSystemPrompt);
     }
 
     // Add model flag if specified (from config or explicit option)

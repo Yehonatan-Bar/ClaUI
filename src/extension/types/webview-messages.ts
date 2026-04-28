@@ -246,6 +246,20 @@ export interface OpenProviderTabRequest {
   provider: ProviderId;
 }
 
+export interface OpenSmartSearchRequest {
+  type: 'openSmartSearch';
+  /** 'claude' or 'codex' — Smart Search runs the picked agent in a search-only tab. */
+  provider: 'claude' | 'codex';
+  /** Model id (Claude model id or Codex model id). Empty string = use default. */
+  model: string;
+}
+
+export interface OpenSessionFromSearchRequest {
+  type: 'openSessionFromSearch';
+  sessionId: string;
+  provider: ProviderId;
+}
+
 export interface SwitchProviderWithContextRequest {
   type: 'switchProviderWithContext';
   targetProvider: 'claude' | 'codex';
@@ -788,6 +802,8 @@ export type WebviewToExtensionMessage =
   | SetModelRequest
   | SetProviderRequest
   | OpenProviderTabRequest
+  | OpenSmartSearchRequest
+  | OpenSessionFromSearchRequest
   | SwitchProviderWithContextRequest
   | McpRefreshRequest
   | McpOpenConfigRequest
@@ -942,6 +958,8 @@ export interface SessionStartedMessage {
   model: string;
   isResume?: boolean;
   provider?: ProviderId;
+  /** 'chat' (default) or 'search' for Smart Search tabs. */
+  tabKind?: 'chat' | 'search';
 }
 
 export interface SessionEndedMessage {

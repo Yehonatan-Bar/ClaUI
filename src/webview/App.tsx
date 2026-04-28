@@ -30,13 +30,36 @@ import { deriveTurnHistoryFromMessages } from './utils/turnVitals';
 import { GlobalTooltip } from './components/Tooltip/GlobalTooltip';
 import { ImageLightbox } from './components/ImageLightbox';
 import { ChatSearchBar } from './components/ChatView/ChatSearchBar';
+import { SmartSearchView } from './components/SmartSearch/SmartSearchView';
 
 const SESSION_SUMMARY_IDLE_MS = 60 * 60 * 1000;
 const SESSION_SUMMARY_DEFER_MS = 3 * 60 * 60 * 1000;
 
+/**
+ * Top-level App is a thin dispatcher: it calls the stream hook ONCE and
+ * routes by tabKind. Each branch mounts its own component, so the heavy
+ * chat-mode hooks live inside `<ChatAppContent/>` and never execute when
+ * we are in a Smart Search tab. Keeping a fixed two-hook prelude here
+ * (useClaudeStream + useAppStore selector) prevents the Rules of Hooks
+ * violation that would otherwise fire when tabKind transitions from
+ * 'chat' to 'search' after the first render.
+ */
 export const App: React.FC = () => {
   useClaudeStream();
+  const tabKind = useAppStore((s) => s.tabKind);
+  if (tabKind === 'search') {
+    return (
+      <>
+        <GlobalTooltip />
+        <ImageLightbox />
+        <SmartSearchView />
+      </>
+    );
+  }
+  return <ChatAppContent />;
+};
 
+const ChatAppContent: React.FC = () => {
   const {
     isConnected,
     isBusy,

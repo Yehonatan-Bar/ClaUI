@@ -118,6 +118,8 @@ export interface AppState {
   // Session
   sessionId: string | null;
   provider: ProviderId | null;
+  /** 'chat' (default) or 'search' for Smart Search tabs. Drives App.tsx routing. */
+  tabKind: 'chat' | 'search';
   model: string | null;
   selectedProvider: ProviderId;
   providerCapabilities: ProviderCapabilities;
@@ -488,7 +490,8 @@ export interface AppState {
   setLightboxImageSrc: (src: string | null) => void;
 
   // Actions
-  setSession: (sessionId: string, model: string) => void;
+  setSession: (sessionId: string, model: string, tabKind?: 'chat' | 'search') => void;
+  setTabKind: (kind: 'chat' | 'search') => void;
   endSession: (reason: string) => void;
   addUserMessage: (content: string | ContentBlock[], source?: 'input' | 'auto-prompt') => void;
   addAssistantMessage: (messageId: string, content: ContentBlock[], model: string, thinkingEffort?: string) => void;
@@ -811,6 +814,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Initial state
   sessionId: null,
   provider: 'claude',
+  tabKind: 'chat',
   model: null,
   selectedProvider: 'claude',
   providerCapabilities: { ...DEFAULT_PROVIDER_CAPABILITIES },
@@ -1062,7 +1066,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setLightboxImageSrc: (src) => set({ lightboxImageSrc: src }),
 
   // Actions
-  setSession: (sessionId, model) =>
+  setSession: (sessionId, model, tabKind) =>
     set((state) => {
       const isPendingToRealTransition =
         state.sessionId === 'pending' &&
@@ -1076,6 +1080,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       return {
         sessionId,
         model,
+        ...(tabKind ? { tabKind } : {}),
         isConnected: true,
         lastError: null,
         sessionRecap: null,
@@ -1091,6 +1096,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           : {}),
       };
     }),
+
+  setTabKind: (kind) => set({ tabKind: kind }),
 
   endSession: (_reason) =>
     set((state) => {

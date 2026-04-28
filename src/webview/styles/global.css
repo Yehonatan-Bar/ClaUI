@@ -9008,3 +9008,183 @@ html, body, #root {
   background: color-mix(in srgb, var(--vscode-editor-findMatchBackground, #515c6a) 15%, transparent) !important;
   border-radius: 4px;
 }
+
+/* ===== Smart Search view ===== */
+
+.smart-search-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  background: var(--vscode-editor-background, #1e1e1e);
+  color: var(--vscode-editor-foreground, #d4d4d4);
+}
+
+.smart-search-header {
+  padding: 12px 18px 10px;
+  border-bottom: 1px solid var(--vscode-panel-border, #3c3c3c);
+  background: linear-gradient(90deg, rgba(255, 0, 200, 0.08), transparent);
+}
+
+.smart-search-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.smart-search-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.smart-search-meta {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.smart-search-subtitle {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-top: 4px;
+}
+
+.smart-search-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.smart-search-empty-state {
+  padding: 36px 24px;
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.smart-search-empty-title {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.smart-search-empty-subtitle {
+  font-size: 13px;
+  opacity: 0.75;
+  margin-bottom: 18px;
+}
+
+.smart-search-empty-subtitle code {
+  background: var(--vscode-textCodeBlock-background, #2a2a2a);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.smart-search-empty-tryline {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-bottom: 8px;
+}
+
+.smart-search-empty-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.smart-search-example-btn {
+  background: transparent;
+  color: var(--vscode-textLink-foreground, #4a9fd9);
+  border: 1px dashed var(--vscode-panel-border, #3c3c3c);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+
+.smart-search-example-btn:hover {
+  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.04));
+  border-style: solid;
+}
+
+.smart-search-input {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--vscode-panel-border, #3c3c3c);
+}
+
+.smart-search-textarea {
+  flex: 1;
+  min-height: 44px;
+  max-height: 220px;
+  padding: 8px 10px;
+  font-family: var(--vscode-font-family, system-ui);
+  font-size: 13px;
+  background: var(--vscode-input-background, #2a2a2a);
+  color: var(--vscode-input-foreground, #d4d4d4);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  resize: none;
+}
+
+.smart-search-textarea:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.smart-search-send-btn {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
+  border: none;
+  padding: 0 18px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+  align-self: flex-end;
+  height: 32px;
+}
+
+.smart-search-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.smart-search-send-btn:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+/* Smart Search "Open session" result-card button (rendered inside MarkdownContent) */
+.open-session-btn {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--vscode-button-secondaryForeground, #ffffff);
+  border: 1px solid var(--vscode-panel-border, #3c3c3c);
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.open-session-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground, #45494e);
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.open-session-btn:focus {
+  outline: 2px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: 1px;
+}

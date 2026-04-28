@@ -14,10 +14,13 @@ import { installSkillFiles, injectClaudeMdInstructions } from './skillgen/SrPtdB
 import { TokenUsageRatioTracker } from './session/TokenUsageRatioTracker';
 import { SkillUsageTracker } from './skillgen/SkillUsageTracker';
 import { registerCommands } from './commands';
+import { registerTabGroupCommands } from './commands/tabGroupCommands';
 import { registerDiscoverCommand } from './session/SessionDiscovery';
 import { ClaUiSidebarViewProvider } from './sidebar/ClaUiSidebarViewProvider';
 import { cleanupOrphanedProcesses } from './process/orphanCleanup';
 import { ProcessMemorySampler } from './process/ProcessMemorySampler';
+import { TabGroupStore } from './session/TabGroupStore';
+import { TabGroupsTreeProvider } from './views/TabGroupsTreeProvider';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -111,6 +114,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const memorySampler = new ProcessMemorySampler();
   memorySampler.setLogger(log);
 
+  // Tab folder/sub-folder store (per-workspace).
+  const tabGroupStore = new TabGroupStore(context.workspaceState);
+
   // Create the tab manager that owns all session tabs
   tabManager = new TabManager(
     context,
@@ -123,7 +129,8 @@ export function activate(context: vscode.ExtensionContext): void {
     skillGenService,
     tokenRatioTracker,
     skillUsageTracker,
-    memorySampler
+    memorySampler,
+    tabGroupStore
   );
   memorySampler.setRootProvider(() => tabManager.enumerateCliProcesses());
 
@@ -136,6 +143,24 @@ export function activate(context: vscode.ExtensionContext): void {
       new ClaUiSidebarViewProvider(context, log)
     )
   );
+
+  // Sessions TreeView (folders + tabs). Listens to TabManager + TabGroupStore changes.
+  const treeIconStorageDir = path.join(context.globalStorageUri.fsPath, 'tab-group-icons');
+  const tabGroupsTreeProvider = new TabGroupsTreeProvider(
+    tabManager,
+    tabGroupStore,
+    sessionStore,
+    treeIconStorageDir
+  );
+  const sessionsTreeView = vscode.window.createTreeView('claudeMirror.sessionsTree', {
+    treeDataProvider: tabGroupsTreeProvider,
+    showCollapseAll: true,
+  });
+  context.subscriptions.push(sessionsTreeView);
+  context.subscriptions.push(tabManager.onTreeStateChanged(() => tabGroupsTreeProvider.refresh()));
+
+  // Tab folder + tab focus commands
+  registerTabGroupCommands(context, tabManager, tabGroupStore, log);
 
   // Permanent launcher status bar item (always visible)
   const launcherItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
