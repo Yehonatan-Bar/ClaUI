@@ -235,6 +235,70 @@ export function registerTabGroupCommands(
         tabId = picked.tabId;
       }
       await tabManager.moveTabToGroup(tabId, null);
+    }),
+
+    // Editor-tab right-click entry: move the currently active ClaUi tab to a folder.
+    // The `editor/title/context` menu fires on whichever tab the user right-clicks;
+    // VS Code activates that tab before opening the menu, so getActiveTab() points
+    // at the right thing by the time the handler runs.
+    vscode.commands.registerCommand('claudeMirror.tabs.moveActiveToGroup', async () => {
+      const active = tabManager.getActiveTab();
+      if (!active) {
+        vscode.window.showWarningMessage('No active ClaUi tab.');
+        return;
+      }
+      const group = await pickFolder(tabGroupStore, `Move "${(active as { displayName?: string }).displayName ?? 'tab'}" to which folder?`);
+      if (group === undefined) return;
+      await tabManager.moveTabToGroup(active.id, group ? group.id : null);
+      log(`[TabGroups] moveActiveToGroup tab=${active.id} -> group=${group ? group.id : '(top)'}`);
+    }),
+
+    // Editor-tab right-click entry: lift the active ClaUi tab back to top level.
+    vscode.commands.registerCommand('claudeMirror.tabs.removeActiveFromGroup', async () => {
+      const active = tabManager.getActiveTab();
+      if (!active) {
+        vscode.window.showWarningMessage('No active ClaUi tab.');
+        return;
+      }
+      const currentGroupId = tabManager.getTabGroup(active.id);
+      if (!currentGroupId) {
+        vscode.window.showInformationMessage('This tab is already at the top level.');
+        return;
+      }
+      await tabManager.moveTabToGroup(active.id, null);
+      log(`[TabGroups] removeActiveFromGroup tab=${active.id}`);
+    }),
+
+    // Sessions view title-bar gear: opens a menu for tab-layout settings.
+    // Currently exposes the horizontal/vertical toggle; designed to host
+    // future view-level settings without re-cluttering the title bar.
+    vscode.commands.registerCommand('claudeMirror.tabs.openLayoutMenu', async () => {
+      const config = vscode.workspace.getConfiguration('claudeMirror.tabs');
+      const current = config.get<'horizontal' | 'vertical'>('layout', 'horizontal');
+      type LayoutItem = vscode.QuickPickItem & { value: 'horizontal' | 'vertical' };
+      const items: LayoutItem[] = [
+        {
+          label: `${current === 'horizontal' ? '$(check)' : '$(blank)'} Horizontal layout`,
+          description: 'All tabs in a single editor group (one row of native tabs)',
+          value: 'horizontal',
+        },
+        {
+          label: `${current === 'vertical' ? '$(check)' : '$(blank)'} Vertical layout`,
+          description: 'Tabs distributed across stacked editor groups (up to 4 rows)',
+          value: 'vertical',
+        },
+      ];
+      const picked = await vscode.window.showQuickPick<LayoutItem>(items, {
+        placeHolder: 'Choose how ClaUi tabs are arranged in the editor area',
+        title: 'ClaUi: Tab Layout',
+        ignoreFocusOut: true,
+      });
+      if (!picked || picked.value === current) {
+        return;
+      }
+      await config.update('layout', picked.value, vscode.ConfigurationTarget.Global);
+      await tabManager.applyTabLayout(picked.value);
+      log(`[TabLayout] Switched to "${picked.value}" via title-bar gear`);
     })
   );
 }

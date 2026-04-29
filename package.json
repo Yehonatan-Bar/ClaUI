@@ -173,8 +173,21 @@
         "title": "ClaUi: Remove Tab from Folder"
       },
       {
+        "command": "claudeMirror.tabs.moveActiveToGroup",
+        "title": "ClaUi: Move This Tab to Folder"
+      },
+      {
+        "command": "claudeMirror.tabs.removeActiveFromGroup",
+        "title": "ClaUi: Remove This Tab from Folder"
+      },
+      {
         "command": "claudeMirror.smartSearch.open",
         "title": "ClaUi: Open Smart Search"
+      },
+      {
+        "command": "claudeMirror.tabs.openLayoutMenu",
+        "title": "ClaUi: Tab Layout Settings",
+        "icon": "$(gear)"
       }
     ],
     "configuration": {
@@ -652,6 +665,19 @@
           "type": "boolean",
           "default": false,
           "description": "When a tab belongs to a folder, prefix its native tab title with a colored bar character. Useful when tab icons are not visible."
+        },
+        "claudeMirror.tabs.layout": {
+          "type": "string",
+          "default": "horizontal",
+          "enum": [
+            "horizontal",
+            "vertical"
+          ],
+          "enumDescriptions": [
+            "Horizontal: all ClaUi tabs share one editor group (single row of tabs)",
+            "Vertical: ClaUi tabs are distributed across editor groups stacked top-to-bottom (up to 4 rows)"
+          ],
+          "description": "How ClaUi tabs are arranged in the editor area. Toggle from the Sessions view title bar (gear icon)."
         }
       }
     },
@@ -762,6 +788,9 @@
         {
           "command": "claudeMirror.tabs.focus",
           "when": "false"
+        },
+        {
+          "command": "claudeMirror.tabs.openLayoutMenu"
         }
       ],
       "issue/reporter": [
@@ -779,6 +808,23 @@
           "command": "claudeMirror.startSession",
           "when": "view == claudeMirror.sessionsTree",
           "group": "navigation@2"
+        },
+        {
+          "command": "claudeMirror.tabs.openLayoutMenu",
+          "when": "view == claudeMirror.sessionsTree",
+          "group": "navigation@9"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "claudeMirror.tabs.moveActiveToGroup",
+          "when": "activeWebviewPanelId == 'claudeMirror.chat'",
+          "group": "1_claui@1"
+        },
+        {
+          "command": "claudeMirror.tabs.removeActiveFromGroup",
+          "when": "activeWebviewPanelId == 'claudeMirror.chat'",
+          "group": "1_claui@2"
         }
       ],
       "view/item/context": [

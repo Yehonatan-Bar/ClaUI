@@ -51,6 +51,10 @@ export interface SessionTabCallbacks {
   onNameChanged?: (tabId: string, name: string) => void;
   /** Fired after the end-of-session summarizer writes a new summary for this session. */
   onSummaryGenerated?: (sessionId: string) => void;
+  /** Fired when the per-tab provider/cliPathOverride changes at runtime
+   *  (e.g. auto-fallback from Happy to Claude when the Happy CLI is missing).
+   *  TabManager uses this to update the persisted snapshot entry. */
+  onProviderChanged?: (tabId: string, provider: ProviderId, cliPathOverride: string | null) => void;
 }
 
 /**
@@ -656,13 +660,19 @@ export class SessionTab implements WebviewBridge {
     this.control.compact(instructions);
   }
 
-  /** Reveal (focus) this tab's panel in its current column */
-  reveal(): void {
+  /** Reveal (focus) this tab's panel. When `viewColumn` is supplied, the panel
+   *  is moved to that column (used by TabManager.applyTabLayout to redistribute
+   *  panels between horizontal and vertical arrangements). */
+  reveal(viewColumn?: vscode.ViewColumn, preserveFocus?: boolean): void {
     if (this.disposed) {
       return;
     }
     try {
-      this.panel.reveal();
+      if (viewColumn === undefined) {
+        this.panel.reveal();
+      } else {
+        this.panel.reveal(viewColumn, preserveFocus);
+      }
     } catch {
       this.disposed = true;
     }
@@ -1235,15 +1245,23 @@ export class SessionTab implements WebviewBridge {
           tabLog(`[Summarizer] crash-branch failure: ${err instanceof Error ? err.message : String(err)}`),
         );
 
-        // Claude CLI not installed - send informative error instead of generic crash
+        // Claude or Happy CLI not installed.
+        // For Happy: auto-fall back to Claude in this same tab so a missing
+        // optional provider never blocks the user.
+        // For Claude: surface install guidance (no fallback target available).
         if (this.claudeCliMissingDetected) {
+          this.claudeCliMissingDetected = false;
+          if (this.isHappyCliSession()) {
+            this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+            this.fallbackFromHappyToClaude('exit-handler');
+            return;
+          }
           tabLog('Claude CLI not found - showing install guidance');
           this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
           this.postMessage({
             type: 'error',
             message: this.getCliMissingMessage(),
           });
-          this.claudeCliMissingDetected = false;
           return;
         }
 
@@ -1341,6 +1359,12 @@ export class SessionTab implements WebviewBridge {
         this.claudeCliMissingDetected = true;
       }
       if (this.claudeCliMissingDetected) {
+        this.claudeCliMissingDetected = false;
+        if (this.isHappyCliSession()) {
+          this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+          this.fallbackFromHappyToClaude('error-handler');
+          return;
+        }
         tabLog('Claude CLI not found - showing install guidance');
         this.postMessage({
           type: 'error',
@@ -1418,6 +1442,35 @@ export class SessionTab implements WebviewBridge {
       return 'Happy Coder CLI not found. Install Happy Coder CLI or set "claudeMirror.happy.cliPath" to the correct executable path.';
     }
     return 'Claude CLI not found. Install Claude Code CLI by running: npm install -g @anthropic-ai/claude-code';
+  }
+
+  /** Auto-fallback from Happy to Claude when the Happy CLI is missing on this
+   *  machine. We clear the per-tab override, notify TabManager so the snapshot
+   *  entry no longer marks this tab as remote, surface a non-modal toast, and
+   *  spin up a fresh Claude session in the same tab so the user is never
+   *  blocked by an uninstalled optional provider. */
+  private fallbackFromHappyToClaude(reason: string): void {
+    this.log(`[Tab ${this.tabNumber}] Happy CLI not found - falling back to Claude (${reason})`);
+    this.cliPathOverride = null;
+    this.callbacks.onProviderChanged?.(this.id, 'claude', null);
+    void vscode.window
+      .showInformationMessage(
+        'Happy Coder CLI not found. Switched to Claude Code for this session. Install Happy Coder to use it.',
+        'Configure Happy CLI Path'
+      )
+      .then((choice) => {
+        if (choice === 'Configure Happy CLI Path') {
+          void vscode.commands.executeCommand(
+            'workbench.action.openSettings',
+            'claudeMirror.happy.cliPath'
+          );
+        }
+      });
+    void this.startSession().catch((err) => {
+      this.log(
+        `[Tab ${this.tabNumber}] Auto-fallback startSession failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+    });
   }
 
   /**

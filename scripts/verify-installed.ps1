@@ -38,7 +38,10 @@ $requiredManifestEntries = @(
   "claudeMirror.tabs.moveToGroup",
   "claudeMirror.tabs.removeFromGroup",
   "claudeMirror.tabs.focus",
+  "claudeMirror.tabs.moveActiveToGroup",
+  "claudeMirror.tabs.removeActiveFromGroup",
   "view/item/context",
+  "editor/title/context",
   # End-of-session summary (Phase B)
   "claudeMirror.sessionEndSummary",
   # Smart Search

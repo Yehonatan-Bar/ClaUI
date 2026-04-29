@@ -675,10 +675,14 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.postMessage({ type: 'error', message: 'Compact is not supported in Codex MVP yet.' });
   }
 
-  reveal(): void {
+  reveal(viewColumn?: vscode.ViewColumn, preserveFocus?: boolean): void {
     if (this.disposed) return;
     try {
-      this.panel.reveal();
+      if (viewColumn === undefined) {
+        this.panel.reveal();
+      } else {
+        this.panel.reveal(viewColumn, preserveFocus);
+      }
     } catch {
       this.disposed = true;
     }

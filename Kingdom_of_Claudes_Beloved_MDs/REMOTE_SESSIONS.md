@@ -49,6 +49,19 @@ Non-fatal stderr notices such as `Using Claude Code vX.Y.Z from npm` are intenti
 
 ---
 
+## Auto-fallback when Happy CLI is not installed
+
+If a remote tab tries to spawn `happy` and the executable is missing from PATH (detected via stderr "is not recognized" / "command not found" or ENOENT on the spawn `error` event), `SessionTab.fallbackFromHappyToClaude(reason)` runs:
+
+1. Clears `cliPathOverride` on the tab so subsequent spawns use the regular `claude` CLI
+2. Fires the `onProviderChanged(tabId, 'claude', null)` callback so `TabManager.handleProviderChanged` rewrites the persisted snapshot entry to `provider: 'claude'` (the tab does not re-spawn as remote on the next workspace load)
+3. Surfaces a non-modal information toast: *"Happy Coder CLI not found. Switched to Claude Code for this session. Install Happy Coder to use it."* with a `Configure Happy CLI Path` button that opens the relevant setting
+4. Calls `startSession()` to spin up a fresh Claude session in the same tab — no resume, since the prior Happy session id is not Claude-compatible
+
+The fallback path runs from both the process `exit` handler and the `error` handler, so synchronous ENOENT and async stderr-driven detection both lead to the same recovery. The Claude-missing path is unchanged: there is no fallback target, so install guidance is shown.
+
+---
+
 ## Cross-Device Session Resume
 
 Happy Coder enables continuing a local session on mobile and returning back. ClaUi supports this via the standard session resume flow:
