@@ -1,5 +1,32 @@
 # ClaUi - Changelog
 
+## v0.1.123 - 2026-05-03
+
+**Fix: Silent crash resume — break the stale-resume-target loop**
+
+- New `resumeTargetMissingDetected` flag set when stderr matches `No conversation found with session ID:`. The exit-handler classifier now declines silent resume in this case (the same way `claudeCliMissingDetected` and the Happy auth path already work) so the tab does not loop forever respawning against a session id that no longer exists on disk
+- Highest-priority branch in the exit handler: when `resumeTargetMissingDetected` is true, we surface a single clean error toast (`Could not resume session <prefix>: no conversation file found on disk`) and stop. No silent retry, no Restart prompt — restarting would just fail again with the same broken id
+- `escalateToVisibleCrash` is now idempotent (early-returns when the tab is already de-armed and the queue is empty), and locks silent resume out for the rest of the cycle by setting `silentResumeAttempts = maxAttempts`. A clean turn (`result/success`) resets attempts back to 0 so a future legitimate crash gets the full retry budget again
+- For the `fresh-session` reason, the Restart prompt is suppressed entirely (the on-disk JSONL is missing, so a Restart would just fail). The user gets one clear sentence about the broken session and what to do
+- Reset of `resumeTargetMissingDetected` happens in `startSession` (alongside the existing CLI-missing/auth resets) and at the top of `beginSilentResume`, so a stale flag from a prior spawn cannot poison the next attempt
+
+## v0.1.122 - 2026-05-03
+
+**Feature: Silent crash resume**
+
+- When a CLI subprocess (Claude or Codex) exits with a non-zero code, the legacy "process exited - Restart?" toast and `sessionEnded` UI no longer fire. The tab stays visually intact (history visible, input enabled) and is armed for a transparent respawn
+- On the next user-sent message (or on Claude tab focus), the extension silently respawns the CLI with `--resume <sessionId>` (Claude) / `--resume <threadId>` (Codex) using `skipReplay`, flushes any queued prompts in arrival order, and streams responses normally. Typical perceived latency: 2-5 s on the first turn after the crash
+- Mid-stream crash UX: the partial assistant bubble is finalized with a muted `(message ended unexpectedly)` footer rendered via the new `ChatMessage.interrupted` flag; subsequent assistant output renders as a fresh bubble below it
+- Subtle "(reconnecting...)" hint appears in the input area only after a configurable delay (default 4 s) so brief resumes feel snappy
+- Failure paths (`timeout`, `spawn-error`, `exit-while-spawning`, `cap-exhausted`, `fresh-session`) escalate cleanly to the visible Restart UX, restoring the user's typed text via a new `messageDeferred -> messageDeferredFailed -> silent-resume-restore-input` handoff so no input is lost
+- Resume-with-fresh-session branch handles missing/corrupt JSONL: the new conversation continues with a single non-modal "could not restore previous conversation; starting fresh" toast instead of dumping the user back to a Restart prompt
+- Per-tab `silentResumeAttempts` cap prevents crash loops; default 2 consecutive silent attempts before falling through to the visible UX. Counter resets on a clean turn (Claude `result` event / Codex `turnCompleted`)
+- Codex parity: spawn-per-turn is naturally compatible — the next `sendTurn` already passes `--resume <threadId>`, so Codex parity is mostly suppressing the "process exited with code N" error toast and finalizing any partial bubble. Cap, telemetry, and reset behavior match Claude
+- New configuration: `claudeMirror.silentCrashResume.enabled` (default `true`), `.maxAttempts` (1-5, default 2), `.timeoutMs` (3000-60000, default 15000), `.reconnectingHintDelayMs` (1000-30000, default 4000). Reads happen lazily so changes take effect on the next crash
+- Telemetry tagged `[SilentResume]` in `Output -> ClaUi` and per-tab files: `armed`, `spawning`, `start() resolved`, `resumed`, `resumed-with-fresh-session`, `timeout`, `spawn-error`, `failed reason=...`, `cap-exhausted`, plus a STATUS_BREAKPOINT (`0x80000003` / exit code `2147483651`) recurrence note
+- New webview message variants: `interruptedAssistantMessage`, `messageDeferred`, `messageDeferredDelivered`, `messageDeferredFailed`, `silentResumeStatus`. New `WebviewBridge` hooks: `isSilentResumeArmed?`, `enqueueSilentResume?`
+- New detail doc: `Kingdom_of_Claudes_Beloved_MDs/SILENT_CRASH_RESUME.md`
+
 ## v0.1.119 - 2026-04-28
 
 **Feature: Smart Search — agentic cross-provider session search**

@@ -50,6 +50,9 @@ export interface ChatMessage {
   // restored sessions. Only 'input' messages are eligible for Fork / Revert /
   // prompt-navigation buttons.
   source?: 'input' | 'auto-prompt';
+  // Silent crash resume: assistant turn was cut off mid-stream by a CLI crash.
+  // Renders a muted "(message ended unexpectedly)" footer in the bubble.
+  interrupted?: boolean;
 }
 
 export interface StreamingBlock {
@@ -142,6 +145,13 @@ export interface AppState {
 
   // Last assistant snapshot (authoritative content from the server)
   lastAssistantSnapshot: AssistantSnapshot | null;
+
+  // Silent crash resume: ids of user prompts queued for delivery while the CLI
+  // is being silently respawned. Used to correlate Delivered/Failed events back
+  // to the optimistic chat bubble.
+  deferredMessages: Record<string, { text: string; addedAt: number }>;
+  // Silent crash resume: when true, the input area shows a subtle "(reconnecting...)" hint.
+  silentResumeActive: boolean;
 
   // Cost
   cost: CostInfo;
@@ -523,6 +533,13 @@ export interface AppState {
   finalizeStreamingMessage: () => void;
   clearStreaming: () => void;
 
+  // Silent crash resume
+  markStreamingMessageInterrupted: (messageId: string | null) => void;
+  recordDeferredMessage: (id: string, text: string) => void;
+  clearDeferredMessage: (id: string) => void;
+  failDeferredMessage: (id: string, text: string, reason: string) => void;
+  setSilentResumeActive: (active: boolean) => void;
+
   setBusy: (busy: boolean) => void;
   setHandoffProgress: (progress: {
     stage: HandoffStage;
@@ -833,6 +850,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   streamingMessageId: null,
   streamingBlocks: [],
   lastAssistantSnapshot: null,
+  deferredMessages: {},
+  silentResumeActive: false,
   cost: { ...initialCost },
   lastError: null,
   textSettings: { ...defaultTextSettings },
@@ -1466,6 +1485,104 @@ export const useAppStore = create<AppState>((set, get) => ({
       // sessionSkills intentionally NOT reset here - pills persist across turns
     });
   },
+
+  /**
+   * Silent crash resume: assistant turn was cut off mid-stream by a CLI crash.
+   * Finalize whatever streaming bubble exists for `messageId` (if any) and mark
+   * it `interrupted` so the bubble renders a muted "(message ended unexpectedly)" footer.
+   *
+   * Falls back to finalizing whatever is currently streaming if `messageId` is null
+   * (defensive — the extension occasionally lacks the id when message_start was never seen).
+   */
+  markStreamingMessageInterrupted: (messageId) => {
+    const state = get();
+    const targetId = messageId ?? state.streamingMessageId;
+    if (!targetId) {
+      // No streaming in progress and no id provided — nothing to do.
+      return;
+    }
+
+    // Finalize the streaming bubble first so the partial content lands in messages[].
+    if (state.streamingMessageId === targetId) {
+      get().finalizeStreamingMessage();
+    }
+
+    // Mark the now-finalized bubble (or a pre-existing one) as interrupted.
+    set((s) => ({
+      messages: s.messages.map((m) =>
+        m.id === targetId && m.role === 'assistant' ? { ...m, interrupted: true } : m,
+      ),
+      // Make sure no streaming spinner remains.
+      streamingMessageId: s.streamingMessageId === targetId ? null : s.streamingMessageId,
+      streamingBlocks: s.streamingMessageId === targetId ? [] : s.streamingBlocks,
+      lastAssistantSnapshot:
+        s.lastAssistantSnapshot?.messageId === targetId ? null : s.lastAssistantSnapshot,
+      isBusy: false,
+    }));
+  },
+
+  /** Silent crash resume: record a deferred user prompt awaiting delivery. */
+  recordDeferredMessage: (id, text) =>
+    set((s) => ({
+      deferredMessages: { ...s.deferredMessages, [id]: { text, addedAt: Date.now() } },
+    })),
+
+  /** Silent crash resume: deferred prompt was successfully delivered to the resumed CLI. */
+  clearDeferredMessage: (id) =>
+    set((s) => {
+      if (!(id in s.deferredMessages)) return {};
+      const next = { ...s.deferredMessages };
+      delete next[id];
+      return { deferredMessages: next };
+    }),
+
+  /** Silent crash resume: deferred prompt could not be delivered. Drop the optimistic
+   *  user bubble (if still findable by text) and let the input area pick up the
+   *  text via a window event. */
+  failDeferredMessage: (id, text, _reason) => {
+    set((s) => {
+      const next = { ...s.deferredMessages };
+      delete next[id];
+      // Remove the most recent matching user message (added in the last 30s) so
+      // the user's input is not duplicated when they re-send.
+      const cutoff = Date.now() - 30_000;
+      const idx = (() => {
+        for (let i = s.messages.length - 1; i >= 0; i--) {
+          const m = s.messages[i];
+          if (m.role !== 'user') continue;
+          if (m.timestamp < cutoff) break;
+          const blockText =
+            (m.content || [])
+              .filter((b: ContentBlock) => b.type === 'text')
+              .map((b) => (b as { type: 'text'; text: string }).text)
+              .join('\n')
+              .trim();
+          if (blockText === text.trim()) return i;
+        }
+        return -1;
+      })();
+      if (idx === -1) {
+        return { deferredMessages: next, silentResumeActive: false };
+      }
+      const updated = [...s.messages];
+      updated.splice(idx, 1);
+      return {
+        deferredMessages: next,
+        messages: updated,
+        silentResumeActive: false,
+      };
+    });
+    // Hand the text back to the input area via a window event (keeps the
+    // InputArea component decoupled from this action).
+    try {
+      window.dispatchEvent(new CustomEvent('silent-resume-restore-input', { detail: text }));
+    } catch {
+      /* non-DOM environment (tests) */
+    }
+  },
+
+  /** Silent crash resume: toggle the "(reconnecting...)" hint in the input area. */
+  setSilentResumeActive: (active) => set({ silentResumeActive: active }),
 
   setBusy: (busy) =>
     set((state) => {

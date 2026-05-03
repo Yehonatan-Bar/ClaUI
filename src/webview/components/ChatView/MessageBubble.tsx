@@ -414,6 +414,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
       ) : (
         <ContentBlockList contentBlocks={contentBlocks} forceLtr={forceLtr} />
       )}
+      {!isUser && message.interrupted && (
+        <div
+          className="message-interrupted-footer"
+          style={{
+            marginTop: 6,
+            fontSize: '0.85em',
+            fontStyle: 'italic',
+            color: 'var(--vscode-descriptionForeground)',
+            opacity: 0.85,
+          }}
+        >
+          (message ended unexpectedly)
+        </div>
+      )}
     </div>
   );
 };

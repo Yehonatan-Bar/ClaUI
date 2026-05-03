@@ -128,6 +128,7 @@ export const InputArea: React.FC = () => {
     sessionSkills,
     handoffStage,
     handoffTargetProvider,
+    silentResumeActive,
   } = useAppStore();
   const fileMention = useFileMention(textareaRef);
 
@@ -1086,6 +1087,30 @@ export const InputArea: React.FC = () => {
     return () => window.removeEventListener('prompt-history-select', handler);
   }, [undoMgr]);
 
+  // Silent crash resume: restore the user's typed text after a failed deferred send.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const restored = (e as CustomEvent<string>).detail;
+      if (typeof restored !== 'string' || restored.length === 0) return;
+      // Only restore if the input is currently empty so we don't clobber a fresh draft.
+      setText((current) => {
+        if (current.trim().length > 0) return current;
+        undoMgr.push(restored, restored.length);
+        requestAnimationFrame(() => {
+          const el = textareaRef.current;
+          if (el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+            el.focus();
+          }
+        });
+        return restored;
+      });
+    };
+    window.addEventListener('silent-resume-restore-input', handler);
+    return () => window.removeEventListener('silent-resume-restore-input', handler);
+  }, [undoMgr]);
+
   // Listen for fork-set-input events (from App.tsx fork completion logic)
   useEffect(() => {
     const handler = (e: Event) => {
@@ -1354,6 +1379,20 @@ export const InputArea: React.FC = () => {
       {inputLockedByHandoff && (
         <div className="handoff-lock-banner">
           Switching provider{handoffTargetProvider ? ` -> ${handoffTargetProvider}` : ''}... {handoffStage.replace(/_/g, ' ')}
+        </div>
+      )}
+      {silentResumeActive && (
+        <div
+          className="silent-resume-hint"
+          style={{
+            padding: '4px 10px',
+            fontSize: '0.85em',
+            fontStyle: 'italic',
+            color: 'var(--vscode-descriptionForeground)',
+            opacity: 0.85,
+          }}
+        >
+          (reconnecting...)
         </div>
       )}
       {/* Context usage bar: thin line at the top of the input area, visible when contextWidgetVisible is on */}

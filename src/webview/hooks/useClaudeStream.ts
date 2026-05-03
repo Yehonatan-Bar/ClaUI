@@ -118,6 +118,11 @@ export function useClaudeStream(): void {
     handleBtwMessageStop,
     handleBtwResult,
     clearBtwSession,
+    markStreamingMessageInterrupted,
+    recordDeferredMessage,
+    clearDeferredMessage,
+    failDeferredMessage,
+    setSilentResumeActive,
   } = useAppStore();
 
   useEffect(() => {
@@ -172,6 +177,26 @@ export function useClaudeStream(): void {
         case 'sessionEnded':
           endSession(msg.reason);
           logState('after sessionEnded');
+          break;
+
+        case 'interruptedAssistantMessage':
+          markStreamingMessageInterrupted(msg.messageId);
+          break;
+
+        case 'messageDeferred':
+          recordDeferredMessage(msg.id, msg.text);
+          break;
+
+        case 'messageDeferredDelivered':
+          clearDeferredMessage(msg.id);
+          break;
+
+        case 'messageDeferredFailed':
+          failDeferredMessage(msg.id, msg.text, msg.reason);
+          break;
+
+        case 'silentResumeStatus':
+          setSilentResumeActive(msg.active);
           break;
 
         case 'toggleMcpPanel':

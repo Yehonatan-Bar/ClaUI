@@ -2,7 +2,7 @@
   "name": "claude-code-mirror",
   "displayName": "ClaUi",
   "description": "The full IDE experience for Claude Code - multi-tab sessions, analytics, achievements, dual providers, prompt enhancement, and deep customization",
-  "version": "0.1.121",
+  "version": "0.1.123",
   "publisher": "JhonBar",
   "icon": "images/icon.png",
   "engines": {
@@ -278,6 +278,32 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically restart process on crash"
+        },
+        "claudeMirror.silentCrashResume.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "When the CLI subprocess crashes unexpectedly, hide the Restart prompt and silently resume the session on the next user message."
+        },
+        "claudeMirror.silentCrashResume.maxAttempts": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Maximum consecutive silent resume attempts per tab before falling back to the visible Restart prompt."
+        },
+        "claudeMirror.silentCrashResume.timeoutMs": {
+          "type": "number",
+          "default": 15000,
+          "minimum": 3000,
+          "maximum": 60000,
+          "description": "How long to wait for the resumed CLI to send system/init before falling back to the visible crash UX (milliseconds)."
+        },
+        "claudeMirror.silentCrashResume.reconnectingHintDelayMs": {
+          "type": "number",
+          "default": 4000,
+          "minimum": 1000,
+          "maximum": 30000,
+          "description": "Delay before showing a subtle '(reconnecting...)' hint in the input area while the silent resume is in progress (milliseconds)."
         },
         "claudeMirror.chatFontSize": {
           "type": "number",

@@ -95,6 +95,13 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
    *  view-state changes triggered by panel creation from waking lazy tabs
    *  before the user has actually clicked them. */
   private lazyWakeArmed: boolean = false;
+  /** Silent crash resume: consecutive crash count without a clean turn in between.
+   *  Codex is spawn-per-turn, so the next user send naturally retries with
+   *  --resume <threadId>; the only user-visible effect is suppressing the
+   *  "process exited with code N" error toast and finalizing any partial bubble. */
+  private silentResumeAttempts = 0;
+  /** Silent crash resume: true between a suppressed crash and the next clean turn. */
+  private silentResumeArmedFlag = false;
   /** Background session for the "btw" side-conversation overlay */
   private btwSession: CodexBackgroundSession | null = null;
   private turnDiagSeq = 0;
@@ -1324,6 +1331,48 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
           this.resetTurnFailureCapture();
           return;
         }
+
+        // ===== Silent crash resume classifier (Codex) =====
+        // Codex is spawn-per-turn, so the next user send naturally retries with
+        // --resume <threadId>. We just need to suppress the "process exited with
+        // code N" toast and finalize any in-flight assistant bubble so the tab
+        // looks normal until the user types again.
+        const silentCfg = vscode.workspace.getConfiguration('claudeMirror');
+        const silentEnabled = silentCfg.get<boolean>('silentCrashResume.enabled', true);
+        const maxAttempts = Math.max(
+          1,
+          Math.min(5, silentCfg.get<number>('silentCrashResume.maxAttempts', 2)),
+        );
+        const eligibleForSilent =
+          silentEnabled &&
+          !!this.threadId &&
+          this.silentResumeAttempts < maxAttempts;
+
+        if (eligibleForSilent) {
+          this.silentResumeAttempts++;
+          this.silentResumeArmedFlag = true;
+          tabLog(
+            `[SilentResume] armed code=${info.code} thread=${this.threadId?.slice(0, 8)} ` +
+              `attempts=${this.silentResumeAttempts}/${maxAttempts}`,
+          );
+          if (info.code === 2147483651) {
+            tabLog('[SilentResume] note: STATUS_BREAKPOINT exit observed (recurrence tracked).');
+          }
+          // Finalize any partial assistant bubble; webview falls back to whatever is currently streaming.
+          this.postMessage({ type: 'interruptedAssistantMessage', messageId: null });
+          this.resetTurnFailureCapture();
+          return;
+        }
+
+        if (silentEnabled && this.silentResumeAttempts >= maxAttempts) {
+          tabLog(
+            `[SilentResume] cap-exhausted thread=${this.threadId?.slice(0, 8)} ` +
+              `attempts=${this.silentResumeAttempts}/${maxAttempts}`,
+          );
+          this.silentResumeAttempts = 0;
+          this.silentResumeArmedFlag = false;
+        }
+
         if (!this.turnStructuredErrorDetected && this.turnFailureText.length === 0) {
           this.postMessage({
             type: 'error',
@@ -1826,6 +1875,15 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
     this.demux.on('turnCompleted', () => {
       this.persistSessionMetadata();
+      // Silent-resume: a clean turn means the resume worked; clear the budget for next time.
+      if (this.silentResumeAttempts > 0 || this.silentResumeArmedFlag) {
+        this.log(
+          `[Codex Tab ${this.tabNumber}] [SilentResume] turn-completed; clearing armed state ` +
+            `(was attempts=${this.silentResumeAttempts}).`,
+        );
+        this.silentResumeAttempts = 0;
+        this.silentResumeArmedFlag = false;
+      }
     });
   }
 

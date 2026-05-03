@@ -992,6 +992,41 @@ export interface UserMessageDisplay {
   source?: 'input' | 'auto-prompt';
 }
 
+/** Silent crash resume: assistant turn was cut off mid-stream by a crash. */
+export interface InterruptedAssistantMessageMessage {
+  type: 'interruptedAssistantMessage';
+  /** Streaming message id to finalize and mark as interrupted. May be null if no streaming was in progress. */
+  messageId: string | null;
+}
+
+/** Silent crash resume: a user-typed prompt was queued while the CLI is being respawned. */
+export interface MessageDeferredMessage {
+  type: 'messageDeferred';
+  /** Stable id used to correlate deferred -> delivered/failed. */
+  id: string;
+  text: string;
+}
+
+/** Silent crash resume: a previously-deferred prompt was successfully sent to the resumed CLI. */
+export interface MessageDeferredDeliveredMessage {
+  type: 'messageDeferredDelivered';
+  id: string;
+}
+
+/** Silent crash resume: the deferred prompt could not be delivered; restore text to input. */
+export interface MessageDeferredFailedMessage {
+  type: 'messageDeferredFailed';
+  id: string;
+  text: string;
+  reason: 'timeout' | 'spawn-error' | 'exit-while-spawning' | 'cap-exhausted' | 'fresh-session';
+}
+
+/** Silent crash resume: lightweight banner state ("(reconnecting...)") shown only after a delay. */
+export interface SilentResumeStatusMessage {
+  type: 'silentResumeStatus';
+  active: boolean;
+}
+
 /**
  * Synthetic content emitted by the CLI as a `type: "user"` envelope with
  * isMeta=true (e.g. skill body loaded into context, sub-agent dispatch
@@ -2152,4 +2187,9 @@ export type ExtensionToWebviewMessage =
   | BtwSessionEndedMessage
   | ChatSearchProjectResultMessage
   | CheckpointStateMessage
-  | CheckpointResultMessage;
+  | CheckpointResultMessage
+  | InterruptedAssistantMessageMessage
+  | MessageDeferredMessage
+  | MessageDeferredDeliveredMessage
+  | MessageDeferredFailedMessage
+  | SilentResumeStatusMessage;

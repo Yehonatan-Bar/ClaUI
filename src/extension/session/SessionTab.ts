@@ -117,6 +117,30 @@ export class SessionTab implements WebviewBridge {
   private claudeCliMissingDetected = false;
   /** Tracks whether stderr indicates Happy CLI authentication is required */
   private happyAuthDetected = false;
+  /** Tracks whether the CLI rejected our --resume target ("No conversation found
+   *  with session ID: ..."). When true the silent-resume classifier MUST decline
+   *  so we do not loop forever on a stale session id. Cleared on each spawn. */
+  private resumeTargetMissingDetected = false;
+  /** Silent crash resume: armed state distinguishes a mid-session crash recovery
+   *  from boot-time lazy resume. While armed, the next user send (or focus) silently
+   *  respawns the CLI with --resume <sid> and flushes the queued message(s). */
+  private silentResumeArmedFlag = false;
+  /** Silent crash resume: consecutive attempt count (cap = config.maxAttempts). */
+  private silentResumeAttempts = 0;
+  /** Silent crash resume: messages queued while a silent respawn is in flight. */
+  private silentResumeQueue: Array<{ id: string; text: string; ts: number }> = [];
+  /** Silent crash resume: true between beginSilentResume() and flush/escalation. */
+  private silentResumeInFlight = false;
+  /** Silent crash resume: timer that escalates to visible UX if system/init never arrives. */
+  private silentResumeTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Silent crash resume: timer for the subtle "(reconnecting...)" hint. */
+  private silentResumeHintTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Streaming message id observed since the most recent message_start (cleared on result). */
+  private currentStreamingMessageId: string | null = null;
+  /** True between message_start and result; informs whether a crash interrupted streaming. */
+  private currentlyStreaming = false;
+  /** Monotonic counter for deferred-message ids. */
+  private deferredIdSeq = 0;
   /** Agent Teams support */
   private teamWatcher: TeamWatcher | null = null;
   private teamDetector = new TeamDetector();
@@ -525,6 +549,325 @@ export class SessionTab implements WebviewBridge {
     return this.pendingResumeSessionId !== null;
   }
 
+  // ====== Silent crash resume API ======
+
+  /** Read silent-crash-resume configuration (lazily so it can be toggled at runtime). */
+  private getSilentResumeConfig(): {
+    enabled: boolean;
+    maxAttempts: number;
+    timeoutMs: number;
+    hintDelayMs: number;
+  } {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    return {
+      enabled: config.get<boolean>('silentCrashResume.enabled', true),
+      maxAttempts: Math.max(
+        1,
+        Math.min(5, config.get<number>('silentCrashResume.maxAttempts', 2)),
+      ),
+      timeoutMs: Math.max(
+        3000,
+        Math.min(60000, config.get<number>('silentCrashResume.timeoutMs', 15000)),
+      ),
+      hintDelayMs: Math.max(
+        1000,
+        Math.min(30000, config.get<number>('silentCrashResume.reconnectingHintDelayMs', 4000)),
+      ),
+    };
+  }
+
+  /** True iff this tab is armed for a silent resume on next user send/focus. */
+  isSilentResumeArmed(): boolean {
+    return (
+      this.silentResumeArmedFlag &&
+      this.pendingResumeSessionId !== null &&
+      !this.processManager.isRunning
+    );
+  }
+
+  /** Allocate a deferred-message id, queue the text, and kick off the silent respawn.
+   *  Returns the id so the caller can correlate `messageDeferred` ↔ delivered/failed. */
+  enqueueSilentResume(text: string): { id: string } {
+    const id = `def-${++this.deferredIdSeq}-${Date.now().toString(36)}`;
+    this.silentResumeQueue.push({ id, text, ts: Date.now() });
+    void this.beginSilentResume();
+    return { id };
+  }
+
+  /** Eligibility classifier + suppress visible UX + arm for next-send respawn. */
+  private armSilentResume(
+    sessionId: string,
+    exitCode: number | null,
+    tabLog: (msg: string) => void,
+  ): void {
+    const cfg = this.getSilentResumeConfig();
+    // Save analytics defensively in case the silent resume itself fails later.
+    this.saveProjectAnalytics();
+    this.silentResumeAttempts++;
+    tabLog(
+      `[SilentResume] armed code=${exitCode} session=${sessionId.slice(0, 8)} ` +
+        `attempts=${this.silentResumeAttempts}/${cfg.maxAttempts}`,
+    );
+    if (exitCode === 2147483651) {
+      // STATUS_BREAKPOINT (0x80000003) — flagged for monitoring; behavior unchanged.
+      tabLog('[SilentResume] note: STATUS_BREAKPOINT exit observed (recurrence tracked).');
+    }
+
+    this.silentResumeArmedFlag = true;
+    this.pendingResumeSessionId = sessionId;
+    this.processManager.seedSessionId(sessionId);
+
+    // Finalize any in-progress assistant bubble so the user is not left looking at a spinner.
+    if (this.currentlyStreaming) {
+      this.postMessage({
+        type: 'interruptedAssistantMessage',
+        messageId: this.currentStreamingMessageId,
+      });
+    }
+    this.currentlyStreaming = false;
+    this.currentStreamingMessageId = null;
+
+    // Clear busy state so the user can type immediately.
+    this.postMessage({ type: 'processBusy', busy: false });
+    // Deliberately NOT posting sessionEnded or any error toast.
+  }
+
+  /** Idempotently begin the silent resume: spawn CLI with --resume + skipReplay. */
+  private async beginSilentResume(): Promise<void> {
+    if (this.disposed) return;
+    if (!this.silentResumeArmedFlag) return;
+    if (this.silentResumeInFlight) return; // already spawning; queue will flush when ready
+    if (!this.pendingResumeSessionId) return;
+    if (this.processManager.isRunning) {
+      // Process is somehow alive (race with focus + send) — just flush.
+      this.flushSilentResumeQueue();
+      return;
+    }
+
+    const cfg = this.getSilentResumeConfig();
+    const sid = this.pendingResumeSessionId;
+    this.silentResumeInFlight = true;
+    // Clear any stale "stale resume target" flag carried over from a prior spawn.
+    this.resumeTargetMissingDetected = false;
+    const startTs = Date.now();
+
+    this.log(
+      `[Tab ${this.tabNumber}] [SilentResume] spawning session=${sid.slice(0, 8)} ` +
+        `queuedMessages=${this.silentResumeQueue.length}`,
+    );
+
+    // Schedule a subtle "(reconnecting...)" hint after a small delay so brief resumes feel snappy.
+    this.clearSilentResumeTimers();
+    this.silentResumeHintTimer = setTimeout(() => {
+      if (this.silentResumeInFlight && !this.disposed) {
+        this.postMessage({ type: 'silentResumeStatus', active: true });
+      }
+    }, cfg.hintDelayMs);
+
+    // Hard timeout: if system/init never arrives, escalate.
+    this.silentResumeTimer = setTimeout(() => {
+      if (this.silentResumeInFlight) {
+        this.log(
+          `[Tab ${this.tabNumber}] [SilentResume] timeout session=${sid.slice(0, 8)} ` +
+            `after ${cfg.timeoutMs}ms`,
+        );
+        this.escalateToVisibleCrash('timeout');
+      }
+    }, cfg.timeoutMs);
+
+    try {
+      await this.processManager.start({
+        resume: sid,
+        skipReplay: true,
+        cliPathOverride: this.cliPathOverride ?? undefined,
+        appendSystemPrompt: this.appendSystemPrompt ?? undefined,
+        allowedTools: this.allowedTools ?? undefined,
+      });
+      this.log(
+        `[Tab ${this.tabNumber}] [SilentResume] start() resolved in ${Date.now() - startTs}ms; ` +
+          `awaiting system/init`,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.log(`[Tab ${this.tabNumber}] [SilentResume] spawn error: ${msg}`);
+      this.escalateToVisibleCrash('spawn-error');
+    }
+  }
+
+  /** Called by the event listener when the resumed CLI emits its first system/init. */
+  private handleSilentResumeReady(newSessionId: string, tabLog: (msg: string) => void): void {
+    if (!this.silentResumeInFlight) return;
+    const expected = this.pendingResumeSessionId;
+    const startupMs = this.silentResumeTimer ? '(under timeout)' : '(timer cleared)';
+    this.clearSilentResumeTimers();
+    this.silentResumeInFlight = false;
+    this.silentResumeArmedFlag = false;
+    this.pendingResumeSessionId = null;
+
+    if (expected && newSessionId !== expected) {
+      // CLI started a fresh session (JSONL missing / corrupt). Warn the user once.
+      tabLog(
+        `[SilentResume] resumed-with-fresh-session expected=${expected.slice(0, 8)} ` +
+          `got=${newSessionId.slice(0, 8)} ${startupMs}`,
+      );
+      try {
+        vscode.window.showWarningMessage(
+          `ClaUi ${this.tabNumber}: could not restore previous conversation; starting fresh.`,
+        );
+      } catch {
+        /* test harness or non-VS Code environment */
+      }
+    } else {
+      tabLog(
+        `[SilentResume] resumed session=${newSessionId.slice(0, 8)} ` +
+          `queuedMessages=${this.silentResumeQueue.length} ${startupMs}`,
+      );
+    }
+
+    // Hide the "(reconnecting...)" hint if it was shown.
+    this.postMessage({ type: 'silentResumeStatus', active: false });
+
+    // Reset the attempts counter on success so a future crash gets the full budget again.
+    this.silentResumeAttempts = 0;
+    this.flushSilentResumeQueue();
+  }
+
+  /** Flush all queued messages through the (newly spawned) CLI in arrival order. */
+  private flushSilentResumeQueue(): void {
+    if (this.silentResumeQueue.length === 0) return;
+    const queue = this.silentResumeQueue.splice(0, this.silentResumeQueue.length);
+    for (const item of queue) {
+      try {
+        this.control.sendText(item.text);
+        this.postMessage({ type: 'messageDeferredDelivered', id: item.id });
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        this.log(
+          `[Tab ${this.tabNumber}] [SilentResume] flush error for id=${item.id}: ${reason}`,
+        );
+        this.postMessage({
+          type: 'messageDeferredFailed',
+          id: item.id,
+          text: item.text,
+          reason: 'spawn-error',
+        });
+      }
+    }
+    // Once we've flushed, the user is effectively in a normal turn — busy until the result.
+    this.postMessage({ type: 'processBusy', busy: true });
+  }
+
+  /** Bail to the visible crash UX after a silent-resume failure. Idempotent — repeated
+   *  calls within the same crash cycle are no-ops. */
+  private escalateToVisibleCrash(
+    reason: 'timeout' | 'spawn-error' | 'exit-while-spawning' | 'cap-exhausted' | 'fresh-session',
+  ): void {
+    // Idempotency guard: if we already escalated (and nothing has re-armed since),
+    // ignore subsequent calls. Avoids duplicate Restart toasts when both the
+    // result/error path and the exit path try to escalate.
+    if (!this.silentResumeArmedFlag && !this.silentResumeInFlight && this.silentResumeQueue.length === 0) {
+      return;
+    }
+
+    const sid = this.pendingResumeSessionId;
+    this.log(
+      `[Tab ${this.tabNumber}] [SilentResume] failed reason=${reason} ` +
+        `session=${sid?.slice(0, 8) ?? 'null'}`,
+    );
+
+    // Restore any queued messages to the input area (most recent wins; earlier are dropped
+    // since the input field can only hold one draft — log the discards so we don't lose audit).
+    const queue = this.silentResumeQueue.splice(0, this.silentResumeQueue.length);
+    for (const item of queue) {
+      this.postMessage({
+        type: 'messageDeferredFailed',
+        id: item.id,
+        text: item.text,
+        reason,
+      });
+    }
+
+    this.clearSilentResumeTimers();
+    this.silentResumeInFlight = false;
+    this.silentResumeArmedFlag = false;
+    // Hide reconnecting hint.
+    this.postMessage({ type: 'silentResumeStatus', active: false });
+
+    // Lock silent resume out for this tab until a clean turn happens. Without
+    // this, an exit fired AFTER escalation could re-engage the classifier and
+    // we'd loop back into another silent attempt with the same broken sid.
+    const cfg = this.getSilentResumeConfig();
+    this.silentResumeAttempts = Math.max(this.silentResumeAttempts, cfg.maxAttempts);
+
+    // Make sure any half-spawned process is torn down so the visible Restart prompt
+    // can spawn cleanly.
+    try {
+      this.processManager.stop();
+    } catch {
+      /* idempotent */
+    }
+
+    // Surface the visible crash UX (mirrors the existing path in the exit handler).
+    this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+    const detail = (() => {
+      switch (reason) {
+        case 'timeout':
+          return 'Could not reconnect within the configured timeout.';
+        case 'spawn-error':
+          return 'Failed to launch the CLI. Verify the executable is on PATH.';
+        case 'exit-while-spawning':
+          return 'The CLI exited before it finished starting.';
+        case 'cap-exhausted':
+          return 'The session keeps crashing. Please review the Output -> ClaUi log.';
+        case 'fresh-session':
+          return 'Could not restore the previous conversation: no conversation file found on disk. Start a fresh session to continue.';
+      }
+    })();
+    this.postMessage({
+      type: 'error',
+      message: `Tab ${this.tabNumber}: ${detail} Check "ClaUi" output channel for details.`,
+    });
+
+    // Restart prompt only makes sense when the session id is potentially recoverable.
+    // For 'fresh-session' the id is broken on disk — restarting would just fail again.
+    if (sid && reason !== 'fresh-session') {
+      vscode.window
+        .showWarningMessage(
+          `ClaUi ${this.tabNumber}: silent reconnect failed (${reason}). Restart?`,
+          'Restart',
+          'Show Log',
+          'Cancel',
+        )
+        .then(async (choice) => {
+          if (choice === 'Restart') {
+            try {
+              await this.processManager.start({
+                resume: sid,
+                cliPathOverride: this.cliPathOverride ?? undefined,
+              });
+            } catch {
+              vscode.window.showErrorMessage(
+                `Tab ${this.tabNumber}: Failed to restart Claude session.`,
+              );
+            }
+          } else if (choice === 'Show Log') {
+            vscode.commands.executeCommand('workbench.action.output.toggleOutput');
+          }
+        });
+    }
+  }
+
+  private clearSilentResumeTimers(): void {
+    if (this.silentResumeTimer) {
+      clearTimeout(this.silentResumeTimer);
+      this.silentResumeTimer = null;
+    }
+    if (this.silentResumeHintTimer) {
+      clearTimeout(this.silentResumeHintTimer);
+      this.silentResumeHintTimer = null;
+    }
+  }
+
   /** Stage one-time handoff context to inject on the first user message in this tab. */
   setPendingHandoffPrompt(prompt: string): void {
     this.messageHandler.setPendingHandoffPrompt(prompt);
@@ -565,6 +908,7 @@ export class SessionTab implements WebviewBridge {
     );
     this.claudeCliMissingDetected = false;
     this.happyAuthDetected = false;
+    this.resumeTargetMissingDetected = false;
     const effectiveCwd = options?.cwd ?? this.cwdOverride ?? undefined;
     await this.processManager.start({
       ...(options ?? {}),
@@ -1058,8 +1402,17 @@ export class SessionTab implements WebviewBridge {
         `[Tab ${this.tabNumber}] ViewState changed: active=${e.webviewPanel.active} visible=${e.webviewPanel.visible}`,
       );
       if (e.webviewPanel.active) {
-        // Wake from lazy-resume on the first user focus after restore.
-        if (this.lazyWakeArmed && this.pendingResumeSessionId) {
+        // Wake silently for a mid-session crash recovery — different state path
+        // from boot lazy-resume; this keeps history intact and may flush queued
+        // messages once the resumed CLI sends system/init.
+        if (this.silentResumeArmedFlag && this.pendingResumeSessionId) {
+          this.log(
+            `[Tab ${this.tabNumber}] [SilentResume] waking on focus session=` +
+              `${this.pendingResumeSessionId.slice(0, 8)}`,
+          );
+          void this.beginSilentResume();
+        } else if (this.lazyWakeArmed && this.pendingResumeSessionId) {
+          // Boot-time lazy resume (post-restore): existing path, full startSession.
           const sid = this.pendingResumeSessionId;
           this.pendingResumeSessionId = null;
           this.lazyWakeArmed = false;
@@ -1092,6 +1445,11 @@ export class SessionTab implements WebviewBridge {
         this.stopThinkingAnimation();
         this.resolveAssistantReplyWaiters(false);
         this.clearFocusInputTimer();
+        // Drop any in-flight silent-resume state (timers, queue) before tearing down.
+        this.clearSilentResumeTimers();
+        this.silentResumeQueue = [];
+        this.silentResumeInFlight = false;
+        this.silentResumeArmedFlag = false;
         this.windowStateSubscription?.dispose();
         this.windowStateSubscription = null;
         // Save analytics BEFORE stopping the process to ensure data is persisted
@@ -1125,6 +1483,16 @@ export class SessionTab implements WebviewBridge {
       }
       if (event.type === 'stream_event') {
         const inner = (event as import('../types/stream-json').StreamEvent).event;
+        // Silent-resume: track streaming state so a mid-stream crash can finalize the bubble.
+        if (inner.type === 'message_start') {
+          const ms = inner as import('../types/stream-json').MessageStart;
+          this.currentlyStreaming = true;
+          this.currentStreamingMessageId = ms.message?.id ?? null;
+        } else if (inner.type === 'message_stop') {
+          this.currentlyStreaming = false;
+        }
+        // Silent-resume: a system/init event during in-flight resume signals a successful spawn.
+        // (handled at the top-level event branch below; this is the stream-event case)
         // Checkpoint fallback: track tool blocks from raw events
         if (inner.type === 'message_start') {
           cpToolNames.clear();
@@ -1181,12 +1549,30 @@ export class SessionTab implements WebviewBridge {
       // Diagnostic: log raw result event
       if (event.type === 'result') {
         tabLog(`[DIAG] result raw: ${JSON.stringify(event).slice(0, 500)}`);
+        // Silent-resume: a turn completed cleanly; clear streaming markers.
+        this.currentlyStreaming = false;
+        this.currentStreamingMessageId = null;
+        const resultEvent = event as ResultSuccess | ResultError;
+        // Silent-resume: a *successful* turn means the session is healthy again;
+        // reset the consecutive-crash budget so a future legitimate crash gets
+        // the full retry quota.
+        if (resultEvent.subtype === 'success' && this.silentResumeAttempts > 0) {
+          tabLog(
+            `[SilentResume] clean turn observed; resetting attempts ` +
+              `(was ${this.silentResumeAttempts}).`,
+          );
+          this.silentResumeAttempts = 0;
+        }
         // Direct bypass: call MessageHandler.handleResultEvent directly.
         // The demux.on('result') listener has been observed to silently not fire
         // in webpack production builds despite being registered. This direct path
         // guarantees turnComplete events are emitted. A dedup guard in
         // handleResultEvent prevents double-processing if the demux path also fires.
-        this.messageHandler.handleResultEvent(event as ResultSuccess | ResultError, 'wireProcessEvents');
+        this.messageHandler.handleResultEvent(resultEvent, 'wireProcessEvents');
+      }
+      // Silent-resume: detect successful resume spawn via system/init.
+      if (event.type === 'system' && event.subtype === 'init' && this.silentResumeInFlight) {
+        this.handleSilentResumeReady(event.session_id, tabLog);
       }
       // Diagnostic: log raw assistant message usage
       if (event.type === 'assistant') {
@@ -1238,6 +1624,69 @@ export class SessionTab implements WebviewBridge {
       const currentSessionId = this.processManager.currentSessionId;
 
       if (info.code !== 0 && info.code !== null) {
+        // ===== Silent crash resume classifier =====
+        const silentCfg = this.getSilentResumeConfig();
+
+        // Highest priority: stale --resume target. The CLI cannot recover by
+        // retrying with the same id, so neither silent resume NOR the legacy
+        // Restart prompt makes sense. Surface a single clear error and stop.
+        if (this.resumeTargetMissingDetected) {
+          tabLog(
+            `[SilentResume] declining: --resume target missing on disk ` +
+              `(silentResumeInFlight=${this.silentResumeInFlight})`,
+          );
+          this.resumeTargetMissingDetected = false;
+          if (this.silentResumeInFlight) {
+            // Drain any queued user prompts back to the input area, post UX,
+            // tear down half-spawned process. Use 'fresh-session' reason so
+            // escalate() picks the right toast text and skips the Restart prompt.
+            this.escalateToVisibleCrash('fresh-session');
+          } else {
+            this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+            this.postMessage({
+              type: 'error',
+              message:
+                `Tab ${this.tabNumber}: Could not resume session ` +
+                `${currentSessionId?.slice(0, 8) ?? '(unknown)'}: ` +
+                `no conversation file found on disk. Start a fresh session to continue.`,
+            });
+          }
+          // Lock silent resume out for this tab until a clean turn happens.
+          this.silentResumeAttempts = silentCfg.maxAttempts;
+          return;
+        }
+
+        // Next: a silent resume was in flight and the resumed CLI exited before
+        // sending system/init (a real "spawn-failed-after-arm" case).
+        if (this.silentResumeInFlight) {
+          tabLog(`[SilentResume] resumed CLI exited before system/init (code=${info.code})`);
+          this.escalateToVisibleCrash('exit-while-spawning');
+          return;
+        }
+
+        const eligibleForSilent =
+          silentCfg.enabled &&
+          !this.claudeCliMissingDetected &&
+          !(this.happyAuthDetected && this.isHappyCliSession()) &&
+          !this.resumeTargetMissingDetected &&
+          !!currentSessionId &&
+          this.silentResumeAttempts < silentCfg.maxAttempts;
+
+        if (eligibleForSilent && currentSessionId) {
+          this.armSilentResume(currentSessionId, info.code, tabLog);
+          return;
+        }
+
+        // Not eligible (or feature disabled / cap exhausted): fall through to visible UX.
+        if (silentCfg.enabled && this.silentResumeAttempts >= silentCfg.maxAttempts) {
+          tabLog(
+            `[SilentResume] cap-exhausted session=${currentSessionId} ` +
+              `attempts=${this.silentResumeAttempts}/${silentCfg.maxAttempts}`,
+          );
+          // Reset so future tabs/sessions don't inherit a stuck cap.
+          this.silentResumeAttempts = 0;
+        }
+
         this.saveProjectAnalytics();
         this.achievementService.onSessionCrash(this.id);
         this.achievementService.onSessionEnd(this.id);
@@ -1339,6 +1788,17 @@ export class SessionTab implements WebviewBridge {
         // Don't forward raw stderr - the exit handler will send a better message
         return;
       }
+      // Detect a stale --resume target (session id no longer exists on disk).
+      // Without this, the silent-resume classifier would re-arm with the same
+      // bad id and loop until the cap kicks in.
+      if (this.isLikelyResumeTargetMissing(normalized)) {
+        this.resumeTargetMissingDetected = true;
+        tabLog('Detected stale --resume target from stderr; silent resume disabled for this exit');
+        // Forward as-is so the user can see what is wrong; the exit handler will
+        // also surface a clearer toast and skip the silent-resume path.
+        this.postMessage({ type: 'error', message: normalized || trimmed });
+        return;
+      }
       if (this.isHappyCliSession() && this.isLikelyHappyAuthIssue(normalized)) {
         this.happyAuthDetected = true;
         tabLog('Detected Happy auth requirement from stderr');
@@ -1390,6 +1850,13 @@ export class SessionTab implements WebviewBridge {
       this.postMessage({ type: 'error', message: `Process error: ${err.message}` });
       this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
     });
+  }
+
+  /** Check if stderr text indicates the CLI rejected our --resume target.
+   *  Example: "No conversation found with session ID: <uuid>". */
+  private isLikelyResumeTargetMissing(text: string): boolean {
+    const normalized = this.stripAnsi(text);
+    return /no conversation found with session id/i.test(normalized);
   }
 
   /** Check if stderr/error text indicates Claude CLI is not installed or not in PATH */

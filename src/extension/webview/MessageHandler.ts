@@ -82,6 +82,13 @@ export interface WebviewBridge {
    *  The handler captures the current sessionId synchronously so this can be called
    *  immediately before processManager.stop() resets it. Fire-and-forget. */
   requestEndOfSessionSummary?(reason: 'completed' | 'crashed' | 'stopped'): void;
+  /** Silent crash resume: true iff this tab is armed for a transparent CLI respawn
+   *  on the next user send/focus. */
+  isSilentResumeArmed?(): boolean;
+  /** Silent crash resume: queue text for delivery once the resumed CLI is ready
+   *  and trigger the respawn (idempotent). Returns the deferred-message id so
+   *  callers can correlate `messageDeferred` -> delivered/failed. */
+  enqueueSilentResume?(text: string): { id: string };
 }
 
 /**
@@ -1349,6 +1356,19 @@ export class MessageHandler {
         case 'sendMessage':
           if (this.usageLimitActive && this.getActiveProvider() === 'claude') {
             this.queuePromptUntilUsageReset(msg.text);
+            break;
+          }
+          // Silent crash resume: if the tab is armed (CLI crashed but UX was
+          // suppressed), defer the message and trigger a transparent respawn.
+          if (this.webview.isSilentResumeArmed?.()) {
+            const { id: deferredId } = this.webview.enqueueSilentResume!(msg.text);
+            this.log(`[SilentResume] sendMessage queued; deferredId=${deferredId}`);
+            this.achievementService.onUserPrompt(this.tabId, msg.text);
+            this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock], true);
+            this.webview.postMessage({ type: 'messageDeferred', id: deferredId, text: msg.text });
+            this.webview.postMessage({ type: 'processBusy', busy: true });
+            this.triggerSessionNaming(msg.text);
+            void this.promptHistoryStore.addPrompt(msg.text);
             break;
           }
           this.log(`Sending user message: "${msg.text.slice(0, 80)}..."`);
