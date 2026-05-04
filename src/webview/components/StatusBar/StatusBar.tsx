@@ -47,6 +47,8 @@ export const StatusBar: React.FC<{
     setAchievementPanelOpen,
     vitalsEnabled,
     setVitalsEnabled,
+    tabLayout,
+    setTabLayout,
     toggleDashboard,
     sessionActivityStarted,
     sessionActivityElapsedMs,
@@ -239,6 +241,12 @@ export const StatusBar: React.FC<{
     const next = !vitalsEnabled;
     setVitalsEnabled(next);
     postToExtension({ type: 'setVitalsEnabled', enabled: next });
+  };
+
+  const handleSelectTabLayout = (layout: 'horizontal' | 'vertical') => {
+    if (layout === tabLayout) return;
+    setTabLayout(layout);
+    postToExtension({ type: 'setTabLayout', layout });
   };
 
   const handleUsageClick = () => {
@@ -503,6 +511,9 @@ export const StatusBar: React.FC<{
       <button className="status-bar-group-dropdown-item" onClick={toggleDashboard} data-tooltip="Analytics Dashboard">
         Dashboard
       </button>
+      <button className="status-bar-group-dropdown-item" onClick={() => useAppStore.getState().setWorkstreamMapOpen(true)} data-tooltip="Workstream Map">
+        Workstream Map
+      </button>
       {teamActive && (
         <button className="status-bar-group-dropdown-item" onClick={() => useAppStore.getState().setTeamPanelOpen(true)} data-tooltip="Agent Teams Panel">
           Teams
@@ -724,6 +735,30 @@ export const StatusBar: React.FC<{
           </button>
         </div>
         {vitalsInfoOpen && <VitalsInfoPanel onClose={() => setVitalsInfoOpen(false)} />}
+      </div>
+      <div className="status-bar-group-dropdown-separator" />
+      <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+        <div className="status-bar-tab-layout-row">
+          <span className="status-bar-tab-layout-label">Tab layout</span>
+          <div className="status-bar-tab-layout-controls" role="group" aria-label="Tab layout">
+            <button
+              className={`status-bar-tab-layout-btn ${tabLayout === 'horizontal' ? 'active' : ''}`}
+              onClick={() => handleSelectTabLayout('horizontal')}
+              data-tooltip="All ClaUi tabs share one editor group (single row)"
+              aria-pressed={tabLayout === 'horizontal'}
+            >
+              Horizontal
+            </button>
+            <button
+              className={`status-bar-tab-layout-btn ${tabLayout === 'vertical' ? 'active' : ''}`}
+              onClick={() => handleSelectTabLayout('vertical')}
+              data-tooltip="Show a vertical ClaUi tab rail inside the chat panel"
+              aria-pressed={tabLayout === 'vertical'}
+            >
+              Vertical
+            </button>
+          </div>
+        </div>
       </div>
     </>
   );

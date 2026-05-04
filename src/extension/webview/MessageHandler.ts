@@ -343,6 +343,10 @@ export class MessageHandler {
 
   /** Memory sampler for the dashboard memory tab (shared instance, set after construction) */
   private memorySampler: import('../process/ProcessMemorySampler').ProcessMemorySampler | null = null;
+  /** Workstream map manager (shared instance, set after construction) */
+  private workstreamManager: import('../workstream/WorkstreamManager').WorkstreamManager | null = null;
+  /** Session store for accessing session metadata (needed by workstream classification) */
+  private sessionStore: import('../session/SessionStore').SessionStore | null = null;
   /** Active interval timer for streaming memory snapshots; null when streaming is off. */
   private memoryStreamTimer: ReturnType<typeof setInterval> | null = null;
   /** True while a memory sample is in-flight (avoid overlapping queries). */
@@ -541,6 +545,16 @@ export class MessageHandler {
     this.memorySampler = sampler;
   }
 
+  /** Provide the shared WorkstreamManager (used by the workstream map feature). */
+  setWorkstreamManager(manager: import('../workstream/WorkstreamManager').WorkstreamManager): void {
+    this.workstreamManager = manager;
+  }
+
+  /** Provide the SessionStore for accessing session metadata. */
+  setSessionStore(store: import('../session/SessionStore').SessionStore): void {
+    this.sessionStore = store;
+  }
+
   /** True when no user message has been sent in the current session (i.e. session start) */
   get isAtSessionStart(): boolean {
     return !this.firstMessageSent;
@@ -569,6 +583,11 @@ export class MessageHandler {
   private getClaudeCliPath(): string {
     const configured = vscode.workspace.getConfiguration('claudeMirror').get<string>('cliPath', 'claude');
     return (configured || 'claude').trim() || 'claude';
+  }
+
+  private getWorkstreamProjectId(): string {
+    const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    return wsFolder ?? 'default';
   }
 
   private quoteTerminalArg(value: string): string {
@@ -1854,6 +1873,21 @@ export class MessageHandler {
           vscode.workspace.getConfiguration('claudeMirror').update('sessionVitals', msg.enabled, true);
           break;
 
+        case 'setTabLayout':
+          this.log(`Setting tab layout to: "${msg.layout}"`);
+          vscode.workspace
+            .getConfiguration('claudeMirror.tabs')
+            .update('layout', msg.layout, vscode.ConfigurationTarget.Global);
+          break;
+
+        case 'focusTab':
+          void vscode.commands.executeCommand('claudeMirror.tabs.focus', msg.tabId);
+          break;
+
+        case 'requestTabList':
+          void vscode.commands.executeCommand('claudeMirror.tabs.refreshList');
+          break;
+
         case 'setDetailedDiffViewEnabled':
           this.log(`Setting detailed diff view to: ${msg.enabled}`);
           vscode.workspace.getConfiguration('claudeMirror').update('detailedDiffView', msg.enabled, true);
@@ -2234,6 +2268,116 @@ export class MessageHandler {
           if (teamActions4) {
             teamActions4.shutdownAgent(msg.agentName);
           }
+          break;
+        }
+
+        // ----- Workstream Map -----
+        case 'workstreamMapOpen':
+          this.log('[WorkstreamMap] Map opened');
+          if (this.workstreamManager) {
+            const wsProjectId = this.getWorkstreamProjectId();
+            void this.workstreamManager.markMapOpened(wsProjectId);
+          }
+          break;
+
+        case 'workstreamMapRequestData': {
+          this.log(`[WorkstreamMap] Data requested (workstreamManager=${!!this.workstreamManager})`);
+          if (!this.workstreamManager) {
+            this.log('[WorkstreamMap] workstreamManager is null - no data to send');
+            break;
+          }
+          const wsProjectId2 = this.getWorkstreamProjectId();
+          const mapData = this.workstreamManager.getProjectMapState(wsProjectId2);
+          if (mapData) {
+            this.webview.postMessage({ type: 'workstreamMapData', data: mapData });
+          }
+          void this.workstreamManager.buildResumeState(wsProjectId2).then(resumeState => {
+            if (resumeState) {
+              this.webview.postMessage({ type: 'workstreamMapResumeState', resumeState });
+            }
+          });
+          break;
+        }
+
+        case 'workstreamMapReclassify': {
+          this.log(`[WorkstreamMap] Reclassify requested (force=${msg.force ?? false}) workstreamManager=${!!this.workstreamManager} analyticsStore=${!!this.projectAnalyticsStore}`);
+          if (!this.workstreamManager) {
+            this.log('[WorkstreamMap] ERROR: workstreamManager is null - cannot classify');
+            this.webview.postMessage({ type: 'workstreamMapError', message: 'Workstream manager not available. Try reloading VS Code.' });
+            break;
+          }
+          if (!this.projectAnalyticsStore) {
+            this.log('[WorkstreamMap] ERROR: projectAnalyticsStore is null');
+            this.webview.postMessage({ type: 'workstreamMapError', message: 'Analytics store not available.' });
+            break;
+          }
+          const wsProjectId3 = this.getWorkstreamProjectId();
+          const summaries = this.projectAnalyticsStore.getSummaries();
+          this.log(`[WorkstreamMap] Found ${summaries.length} session summaries for classification`);
+          const metadataMap = new Map<string, import('../session/SessionStore').SessionMetadata>();
+          if (this.sessionStore) {
+            for (const s of this.sessionStore.getSessions()) {
+              metadataMap.set(s.sessionId, s);
+            }
+            this.log(`[WorkstreamMap] Found ${metadataMap.size} session metadata entries`);
+          }
+          this.webview.postMessage({ type: 'workstreamMapClassifying', progress: 0, phase: 'Starting classification...' });
+          this.workstreamManager.onProgress((progress, phase) => {
+            this.webview.postMessage({ type: 'workstreamMapClassifying', progress, phase });
+          });
+          void this.workstreamManager.classifyProject(wsProjectId3, summaries, metadataMap, { force: msg.force })
+            .then(state => {
+              this.log(`[WorkstreamMap] Classification complete: ${state.workstreams.length} workstreams, ${state.stations.length} stations`);
+              this.webview.postMessage({ type: 'workstreamMapData', data: state });
+            })
+            .catch(err => {
+              this.log(`[WorkstreamMap] Classification failed: ${err instanceof Error ? err.message : String(err)}`);
+              this.webview.postMessage({ type: 'workstreamMapError', message: err instanceof Error ? err.message : String(err) });
+            });
+          break;
+        }
+
+        case 'workstreamMapApplyEdit': {
+          this.log(`[WorkstreamMap] Apply edit: ${msg.edit.type}`);
+          if (!this.workstreamManager) { break; }
+          const wsProjectId4 = this.getWorkstreamProjectId();
+          void this.workstreamManager.applyUserEdit(wsProjectId4, msg.edit).then(state => {
+            if (state) {
+              this.webview.postMessage({ type: 'workstreamMapData', data: state });
+            }
+          });
+          break;
+        }
+
+        case 'workstreamMapNaturalLanguageEdit': {
+          this.log(`[WorkstreamMap] NL edit: "${msg.text.slice(0, 60)}..."`);
+          if (!this.workstreamManager) { break; }
+          const wsProjectId5 = this.getWorkstreamProjectId();
+          void this.workstreamManager.applyNaturalLanguageEdit(msg.text, msg.context, wsProjectId5).then(result => {
+            if (result) {
+              this.webview.postMessage({ type: 'workstreamMapData', data: result.state });
+            }
+          }).catch(err => {
+            this.log(`[WorkstreamMap] NL edit failed: ${err instanceof Error ? err.message : String(err)}`);
+            this.webview.postMessage({ type: 'workstreamMapError', message: err instanceof Error ? err.message : String(err) });
+          });
+          break;
+        }
+
+        case 'workstreamMapOpenSession':
+          this.log(`[WorkstreamMap] Open session: ${msg.sessionId}`);
+          void vscode.commands.executeCommand('claudeMirror.resumeSession', msg.sessionId);
+          break;
+
+        case 'workstreamMapDismissResumeView':
+          this.log('[WorkstreamMap] Resume view dismissed');
+          break;
+
+        case 'workstreamMapSaveSnapshot': {
+          this.log('[WorkstreamMap] Save snapshot requested');
+          if (!this.workstreamManager) { break; }
+          const wsProjectId6 = this.getWorkstreamProjectId();
+          void this.workstreamManager.markMapOpened(wsProjectId6);
           break;
         }
 
@@ -2949,6 +3093,8 @@ export class MessageHandler {
           this.sendUltrathinkModeSetting();
           // Send session vitals setting
           this.sendVitalsSetting();
+          // Send tab layout setting (mirrors claudeMirror.tabs.layout)
+          this.sendTabLayoutSetting();
           // Send summary mode setting
           this.sendSummaryModeSetting();
           // Send Visual Progress Mode setting
@@ -3365,6 +3511,15 @@ export class MessageHandler {
     });
   }
 
+  /** Read tab-layout setting from VS Code config and send to webview */
+  private sendTabLayoutSetting(): void {
+    const layout = vscode.workspace
+      .getConfiguration('claudeMirror.tabs')
+      .get<'horizontal' | 'vertical'>('layout', 'horizontal');
+    this.log(`Sending tab layout setting: layout="${layout}"`);
+    this.webview.postMessage({ type: 'tabLayoutSetting', layout });
+  }
+
   /** Read summary mode setting from VS Code config and send to webview */
   private sendSummaryModeSetting(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -3777,6 +3932,9 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.sessionVitals')) {
         this.sendVitalsSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.tabs.layout')) {
+        this.sendTabLayoutSetting();
       }
       if (e.affectsConfiguration('claudeMirror.summaryMode')) {
         this.sendSummaryModeSetting();

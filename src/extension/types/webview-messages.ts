@@ -451,6 +451,20 @@ export interface SetVitalsEnabledRequest {
   enabled: boolean;
 }
 
+export interface SetTabLayoutRequest {
+  type: 'setTabLayout';
+  layout: 'horizontal' | 'vertical';
+}
+
+export interface FocusTabRequest {
+  type: 'focusTab';
+  tabId: string;
+}
+
+export interface RequestTabListRequest {
+  type: 'requestTabList';
+}
+
 export interface SetDetailedDiffViewEnabledRequest {
   type: 'setDetailedDiffViewEnabled';
   enabled: boolean;
@@ -836,6 +850,9 @@ export type WebviewToExtensionMessage =
   | SetAchievementsEnabledRequest
   | GetAchievementsSnapshotRequest
   | SetVitalsEnabledRequest
+  | SetTabLayoutRequest
+  | FocusTabRequest
+  | RequestTabListRequest
   | SetDetailedDiffViewEnabledRequest
   | SetAdventureWidgetEnabledRequest
   | SetWeatherWidgetEnabledRequest
@@ -909,7 +926,15 @@ export type WebviewToExtensionMessage =
   | ChatSearchProjectRequest
   | ChatSearchResumeSessionRequest
   | CheckpointRevertRequest
-  | CheckpointRedoRequest;
+  | CheckpointRedoRequest
+  | WorkstreamMapOpenRequest
+  | WorkstreamMapRequestDataRequest
+  | WorkstreamMapReclassifyRequest
+  | WorkstreamMapApplyEditRequest
+  | WorkstreamMapNaturalLanguageEditRequest
+  | WorkstreamMapOpenSessionRequest
+  | WorkstreamMapDismissResumeViewRequest
+  | WorkstreamMapSaveSnapshotRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -1402,6 +1427,28 @@ export interface VitalsSettingMessage {
   enabled: boolean;
 }
 
+export interface TabLayoutSettingMessage {
+  type: 'tabLayoutSetting';
+  layout: 'horizontal' | 'vertical';
+}
+
+export interface WebviewTabSummary {
+  id: string;
+  tabNumber: number;
+  displayName: string;
+  provider: ProviderId;
+  sessionId: string | null;
+  groupId?: string;
+  orderInGroup?: number;
+  slotColor: string;
+}
+
+export interface TabListMessage {
+  type: 'tabList';
+  tabs: WebviewTabSummary[];
+  activeTabId: string | null;
+}
+
 export interface DetailedDiffViewSettingMessage {
   type: 'detailedDiffViewSetting';
   enabled: boolean;
@@ -1576,6 +1623,16 @@ export interface SessionSummary {
   avgCostPerTurn: number;
   avgDurationMs: number;
   errorRate: number;
+
+  // Workstream enrichment fields (populated by FileTracker + SessionBackfiller)
+  filesModified?: string[];
+  filesRead?: string[];
+  gitBranch?: string;
+  gitCommit?: string;
+  firstPrompt?: string;
+  summary?: string;
+  taskType?: string;
+  outcome?: 'completed' | 'failed' | 'partial' | 'unknown';
 }
 
 export interface ProjectAnalyticsDataMessage {
@@ -2129,6 +2186,8 @@ export type ExtensionToWebviewMessage =
   | SessionRecapMessage
   | TurnCompleteMessage
   | VitalsSettingMessage
+  | TabLayoutSettingMessage
+  | TabListMessage
   | DetailedDiffViewSettingMessage
   | FileOldContentMessage
   | AdventureWidgetSettingMessage
@@ -2192,4 +2251,78 @@ export type ExtensionToWebviewMessage =
   | MessageDeferredMessage
   | MessageDeferredDeliveredMessage
   | MessageDeferredFailedMessage
-  | SilentResumeStatusMessage;
+  | SilentResumeStatusMessage
+  | WorkstreamMapDataMessage
+  | WorkstreamMapClassifyingMessage
+  | WorkstreamMapErrorMessage
+  | WorkstreamMapResumeStateMessage
+  | ToggleWorkstreamMapMessage;
+
+// --- Workstream Map (Extension -> Webview) ---
+
+import type { ProjectMapState, ResumeState, UserEdit, MapInteractionContext } from './workstreamTypes';
+
+export interface WorkstreamMapDataMessage {
+  type: 'workstreamMapData';
+  data: ProjectMapState;
+}
+
+export interface WorkstreamMapClassifyingMessage {
+  type: 'workstreamMapClassifying';
+  progress: number;
+  phase: string;
+}
+
+export interface WorkstreamMapErrorMessage {
+  type: 'workstreamMapError';
+  message: string;
+}
+
+export interface WorkstreamMapResumeStateMessage {
+  type: 'workstreamMapResumeState';
+  resumeState: ResumeState;
+}
+
+export interface ToggleWorkstreamMapMessage {
+  type: 'toggleWorkstreamMap';
+  open?: boolean;
+}
+
+// --- Workstream Map (Webview -> Extension) ---
+
+export interface WorkstreamMapOpenRequest {
+  type: 'workstreamMapOpen';
+}
+
+export interface WorkstreamMapRequestDataRequest {
+  type: 'workstreamMapRequestData';
+}
+
+export interface WorkstreamMapReclassifyRequest {
+  type: 'workstreamMapReclassify';
+  force?: boolean;
+}
+
+export interface WorkstreamMapApplyEditRequest {
+  type: 'workstreamMapApplyEdit';
+  edit: UserEdit;
+}
+
+export interface WorkstreamMapNaturalLanguageEditRequest {
+  type: 'workstreamMapNaturalLanguageEdit';
+  text: string;
+  context: MapInteractionContext;
+}
+
+export interface WorkstreamMapOpenSessionRequest {
+  type: 'workstreamMapOpenSession';
+  sessionId: string;
+}
+
+export interface WorkstreamMapDismissResumeViewRequest {
+  type: 'workstreamMapDismissResumeView';
+}
+
+export interface WorkstreamMapSaveSnapshotRequest {
+  type: 'workstreamMapSaveSnapshot';
+}

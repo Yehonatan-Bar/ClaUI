@@ -71,6 +71,9 @@ export class TabManager {
   private readonly handoffLocks = new Set<string>();
   private readonly handoffLastByTab = new Map<string, number>();
 
+  /** Shared workstream manager, injected after construction to avoid circular dependency */
+  workstreamManager: import('../workstream/WorkstreamManager').WorkstreamManager | null = null;
+
   private readonly snapshotStore: OpenTabsSnapshotStore;
   private readonly snapshotEntries = new Map<string, OpenTabSnapshotEntry>();
   private snapshotDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -78,9 +81,7 @@ export class TabManager {
   private isShuttingDown = false;
   private static readonly SNAPSHOT_DEBOUNCE_MS = 500;
   private static readonly MAX_RESTORE = 10;
-  /** VS Code editor groups can be stacked into at most a few rows; cap so we
-   *  never request a layout the editor area can't represent. */
-  private static readonly MAX_VERTICAL_ROWS = 4;
+  private static readonly LAYOUT_SETTLE_MS = 75;
 
   /** Fires whenever the tree state (tabs, group assignments, summaries) changes — UI listens for refresh. */
   private readonly treeChangeEmitter = new vscode.EventEmitter<void>();
@@ -130,8 +131,23 @@ export class TabManager {
         // When group colors change, update icons on every tab assigned to that group.
         this.refreshAllTabIcons();
         this.treeChangeEmitter.fire();
+        this.broadcastTabsState();
       });
     }
+
+    // Re-arrange existing tabs whenever the user flips the layout setting from
+    // anywhere (Sessions title-bar gear, Settings UI, or the in-tab View toggle).
+    context.subscriptions.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (!e.affectsConfiguration('claudeMirror.tabs.layout')) {
+          return;
+        }
+        const mode = this.getTabLayout();
+        void this.applyTabLayout(mode).catch((err) => {
+          this.log(`[TabLayout] auto-apply failed: ${err instanceof Error ? err.message : String(err)}`);
+        });
+      })
+    );
   }
 
   /** Public accessors for the TreeView. */
@@ -158,6 +174,19 @@ export class TabManager {
     return out;
   }
 
+  broadcastTabsState(): void {
+    const msg: ExtensionToWebviewMessage = {
+      type: 'tabList',
+      tabs: this.listTabs(),
+      activeTabId: this.activeTabId,
+    };
+    for (const tab of this.tabs.values()) {
+      if (!tab.isDisposed) {
+        tab.postMessage(msg);
+      }
+    }
+  }
+
   /** Move (or remove) a tab to/from a folder. Triggers tree refresh and icon recolor. */
   async moveTabToGroup(tabId: string, groupId: string | null, orderInGroup?: number): Promise<void> {
     const entry = this.snapshotEntries.get(tabId);
@@ -173,6 +202,7 @@ export class TabManager {
     this.applyEffectiveTabIcon(tabId);
     this.schedulePersistSnapshot();
     this.treeChangeEmitter.fire();
+    this.broadcastTabsState();
   }
 
   /** The folder a tab belongs to, if any. */
@@ -188,7 +218,12 @@ export class TabManager {
 
   focusTab(tabId: string): void {
     const tab = this.getTabById(tabId);
-    tab?.reveal();
+    if (!tab) {
+      return;
+    }
+    this.activeTabId = tabId;
+    tab.reveal();
+    this.broadcastTabsState();
   }
 
   /** When a tab joins/leaves a group, or a group recolor happens, re-skin native tab icon. */
@@ -229,11 +264,9 @@ export class TabManager {
     const tabNumber = this.nextTabNumber++;
     const tabColor = TAB_COLORS[(tabNumber - 1) % TAB_COLORS.length];
 
-    // Pick a column based on the user's tab layout preference. In horizontal
-    // mode all tabs cluster in the same column (single row of native tabs);
-    // in vertical mode tabs are spread across columns 1..MAX_VERTICAL_ROWS.
-    // restoreFromSnapshot supplies viewColumnOverride to control placement
-    // explicitly during bulk restore.
+    // The panel lands near the active tab. In vertical mode a post-create pass
+    // collapses stale editor rows and refreshes the in-webview tab rail.
+    // restoreFromSnapshot supplies viewColumnOverride during bulk restore.
     const viewColumn = viewColumnOverride ?? this.resolveViewColumnForNewTab();
 
     // Enable VS Code tab wrapping when multiple ClaUi tabs exist so tabs
@@ -274,8 +307,13 @@ export class TabManager {
     this.tabs.set(tab.id, tab);
     this.tabSlotColors.set(tab.id, tabColor);
     this.activeTabId = tab.id;
+    if (this.workstreamManager) {
+      tab.setWorkstreamManager(this.workstreamManager);
+    }
+    tab.setSessionStore(this.sessionStore);
     this.seedSnapshotEntry(tab);
     this.treeChangeEmitter.fire();
+    this.broadcastTabsState();
     this.log(`Tab created: ${tab.id} color=${tabColor} column=${viewColumn} (total: ${this.tabs.size})`);
     this.maybeApplyVerticalLayoutAfterCreate();
     return tab;
@@ -325,6 +363,7 @@ export class TabManager {
     this.activeTabId = tab.id;
     this.seedSnapshotEntry(tab);
     this.treeChangeEmitter.fire();
+    this.broadcastTabsState();
     this.log(`Codex tab created: ${tab.id} color=${tabColor} column=${viewColumn} (total: ${this.tabs.size})`);
     this.maybeApplyVerticalLayoutAfterCreate();
     return tab;
@@ -656,96 +695,87 @@ export class TabManager {
       .get<'horizontal' | 'vertical'>('layout', 'horizontal');
   }
 
-  /** Pick the editor column for a freshly-created tab based on the current
-   *  layout setting. Horizontal: cluster in the active tab's column. Vertical:
-   *  pick the least-populated column in 1..MAX_VERTICAL_ROWS so panels spread
-   *  across rows after applyVerticalEditorLayout runs. */
+  /** Pick the initial editor column for a freshly-created tab. Vertical mode
+   *  keeps one editor group and renders the tab list inside the webview. */
   private resolveViewColumnForNewTab(): vscode.ViewColumn {
-    if (this.getTabLayout() === 'horizontal') {
-      const existing = this.getActiveTab() ?? this.getAnyTab();
-      return existing?.viewColumn ?? vscode.ViewColumn.Beside;
-    }
-    const live = Array.from(this.tabs.values()).filter((t) => !t.isDisposed);
-    if (live.length === 0) {
-      return vscode.ViewColumn.Beside;
-    }
-    const target = Math.min(live.length + 1, TabManager.MAX_VERTICAL_ROWS);
-    const counts = new Map<number, number>();
-    for (let c = 1; c <= target; c++) counts.set(c, 0);
-    for (const t of live) {
-      const col = typeof t.viewColumn === 'number' ? t.viewColumn : 0;
-      if (col >= 1 && col <= target) counts.set(col, (counts.get(col) ?? 0) + 1);
-    }
-    let bestCol = 1;
-    let bestCount = Infinity;
-    for (let c = 1; c <= target; c++) {
-      const n = counts.get(c) ?? 0;
-      if (n < bestCount) {
-        bestCount = n;
-        bestCol = c;
-      }
-    }
-    return bestCol as vscode.ViewColumn;
+    const existing = this.getActiveTab() ?? this.getAnyTab();
+    return existing?.viewColumn ?? vscode.ViewColumn.Beside;
   }
 
-  /** After a new panel lands in vertical mode, re-orient the editor area into
-   *  stacked rows. VS Code defaults new editor groups to side-by-side, so
-   *  without this nudge the panels would appear as columns instead of rows. */
   private maybeApplyVerticalLayoutAfterCreate(): void {
     if (this.isRestoringSnapshot || this.getTabLayout() !== 'vertical') {
       return;
     }
-    void this.applyVerticalEditorLayout();
+    void this.applyTabLayout('vertical').catch((err) => {
+      this.log(`[TabLayout] post-create vertical layout failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
   }
 
-  private async applyVerticalEditorLayout(): Promise<void> {
-    const numGroups = vscode.window.tabGroups.all.length;
-    if (numGroups < 2) {
-      return;
-    }
+  private delay(ms: number): Promise<void> {
+    return new Promise<void>((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async joinAllEditorGroups(): Promise<void> {
     try {
-      await vscode.commands.executeCommand('vscode.setEditorLayout', {
-        // EditorGroupOrientation: 0 = HORIZONTAL (columns), 1 = VERTICAL (rows).
-        orientation: 1,
-        groups: Array.from({ length: numGroups }, () => ({})),
-      });
+      await vscode.commands.executeCommand('workbench.action.joinAllGroups');
     } catch (err) {
-      this.log(`[TabLayout] setEditorLayout failed: ${err instanceof Error ? err.message : String(err)}`);
+      this.log(`[TabLayout] joinAllGroups failed: ${err instanceof Error ? err.message : String(err)}`);
     }
+    await this.delay(TabManager.LAYOUT_SETTLE_MS);
   }
 
-  /** Reorganize all open ClaUi tabs to match the requested arrangement.
-   *  Horizontal: move every panel into one shared editor group.
-   *  Vertical: round-robin tabs across 1..min(N, MAX_VERTICAL_ROWS) groups
-   *            and switch the editor area to rows orientation. */
   async applyTabLayout(mode: 'horizontal' | 'vertical'): Promise<void> {
     const live = Array.from(this.tabs.values()).filter((t) => !t.isDisposed);
+    this.log(`[TabLayout] applyTabLayout invoked: mode=${mode} liveCount=${live.length}`);
     if (live.length === 0) {
       return;
     }
+    const activeBeforeLayout = this.getActiveTab();
 
-    if (mode === 'horizontal') {
-      const targetColumn =
-        this.getActiveTab()?.viewColumn ?? live[0].viewColumn ?? vscode.ViewColumn.One;
-      for (const tab of live) {
-        if (tab.viewColumn !== targetColumn) {
-          tab.reveal(targetColumn, true);
-        }
-      }
-      this.log(`[TabLayout] Applied horizontal layout: ${live.length} tab(s) collapsed into column ${targetColumn}`);
+    if (live.length > 0) {
+      // Merge all editor groups into one — handles stacked-row leftovers
+      // where multiple groups share the same viewColumn.
+      try {
+        await this.joinAllEditorGroups();
+      } catch { /* best-effort */ }
+      this.log(`[TabLayout] Collapsed ${live.length} tab(s) into single group for ${mode} mode`);
+    }
+
+    await this.closeEmptyEditorGroups();
+
+    if (mode === 'vertical') {
+      this.log(`[TabLayout] Applied vertical tab rail layout: ${live.length} tab(s) in one editor group`);
+    } else {
+      this.log(`[TabLayout] Applied horizontal layout: ${live.length} tab(s) in one editor group`);
+    }
+
+    if (activeBeforeLayout && !activeBeforeLayout.isDisposed) {
+      activeBeforeLayout.reveal(undefined, false);
+    }
+    this.broadcastTabsState();
+  }
+
+  /** Sweep the editor area for empty editor groups left behind by previous
+   *  layout passes or manual split cleanup. */
+  private async closeEmptyEditorGroups(): Promise<void> {
+    await new Promise<void>((resolve) => setTimeout(resolve, 150));
+    const all = vscode.window.tabGroups.all;
+    const empties = all.filter((g) => g.tabs.length === 0);
+    if (empties.length === 0) {
       return;
     }
-
-    const numCols = Math.min(live.length, TabManager.MAX_VERTICAL_ROWS);
-    const sorted = [...live].sort((a, b) => a.tabNumber - b.tabNumber);
-    for (let i = 0; i < sorted.length; i++) {
-      const targetCol = ((i % numCols) + 1) as vscode.ViewColumn;
-      if (sorted[i].viewColumn !== targetCol) {
-        sorted[i].reveal(targetCol, true);
-      }
+    if (empties.length >= all.length) {
+      // Closing every group at once would leave VS Code with no editor
+      // groups; skip to be safe.
+      this.log('[TabLayout] All editor groups are empty; skipping cleanup to preserve at least one');
+      return;
     }
-    await this.applyVerticalEditorLayout();
-    this.log(`[TabLayout] Applied vertical layout: ${live.length} tab(s) across ${numCols} row(s)`);
+    this.log(`[TabLayout] Closing ${empties.length} empty editor group(s)`);
+    try {
+      await vscode.window.tabGroups.close(empties);
+    } catch (err) {
+      this.log(`[TabLayout] closeEmptyEditorGroups failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   private wrapHandoffTargetRuntime(tab: ManagedTab): HandoffTargetRuntime {
@@ -822,12 +852,14 @@ export class TabManager {
       this.statusBarItem.hide();
     }
     this.treeChangeEmitter.fire();
+    this.broadcastTabsState();
   }
 
   private handleTabFocused(tabId: string): void {
     this.activeTabId = tabId;
     this.schedulePersistSnapshot();
     this.log(`Tab focused: ${tabId}`);
+    this.broadcastTabsState();
   }
 
   // --- Open-tabs snapshot (restore-on-startup feature) ---
@@ -877,6 +909,7 @@ export class TabManager {
     this.schedulePersistSnapshot();
     this.applyEffectiveTabIcon(tabId);
     this.treeChangeEmitter.fire();
+    this.broadcastTabsState();
   }
 
   private handleNameChanged(tabId: string, name: string): void {
@@ -890,6 +923,7 @@ export class TabManager {
       entry.customName = name;
       entry.savedAt = new Date().toISOString();
       this.schedulePersistSnapshot();
+      this.broadcastTabsState();
     }
   }
 
@@ -1021,15 +1055,11 @@ export class TabManager {
     let restored = 0;
     let failed = 0;
     const lazyTabs: ManagedTab[] = [];
-    // Horizontal layout: pin every restored tab into the same editor column.
-    // The first tab resolves Beside to a real column; subsequent tabs reuse it
-    // explicitly so VS Code stacks them as native tabs.
-    // Vertical layout: round-robin restored tabs across columns 1..MAX so the
-    // post-restore setEditorLayout call stacks them as rows.
+    // Pin every restored tab into the same editor column while panels are
+    // being recreated. If vertical mode is active, a post-restore pass
+    // collapses stale editor rows and refreshes the in-webview tab rail.
     const isVerticalRestore = this.getTabLayout() === 'vertical';
     let restoreColumn: vscode.ViewColumn | undefined = undefined;
-    let verticalIndex = 0;
-    const verticalCols = Math.min(entries.length, TabManager.MAX_VERTICAL_ROWS);
 
     try {
       await vscode.window.withProgress(
@@ -1044,12 +1074,8 @@ export class TabManager {
             const label = entry.customName || `${entry.provider} session ${entry.tabNumber}`;
             progress.report({ increment, message: label });
             try {
-              const columnForThisTab = isVerticalRestore
-                ? (((verticalIndex % verticalCols) + 1) as vscode.ViewColumn)
-                : restoreColumn;
-              if (isVerticalRestore) verticalIndex++;
-              const tab = this.createTabForProvider(entry.provider, columnForThisTab);
-              if (!isVerticalRestore && restoreColumn === undefined) {
+              const tab = this.createTabForProvider(entry.provider, restoreColumn);
+              if (restoreColumn === undefined) {
                 // VS Code may not have resolved panel.viewColumn synchronously;
                 // fall back to ViewColumn.Two so subsequent tabs still cluster.
                 restoreColumn = tab.viewColumn ?? vscode.ViewColumn.Two;
@@ -1122,10 +1148,8 @@ export class TabManager {
       await this.snapshotStore.setRestoreInProgress(false);
     }
 
-    // After every restored panel landed in its assigned column, switch the
-    // editor area to rows orientation so vertical layout actually appears.
     if (isVerticalRestore) {
-      await this.applyVerticalEditorLayout();
+      await this.applyTabLayout('vertical');
     }
 
     // Focus the originally-active session if it was restored.
@@ -1193,6 +1217,7 @@ export class TabManager {
     }
     void this.persistSnapshotNow();
     this.treeChangeEmitter.fire();
+    this.broadcastTabsState();
 
     if (truncated) {
       void vscode.window.showInformationMessage(

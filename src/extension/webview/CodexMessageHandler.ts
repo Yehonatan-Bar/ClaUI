@@ -697,6 +697,21 @@ export class CodexMessageHandler {
           void vscode.workspace.getConfiguration('claudeMirror').update('typingTheme', msg.theme, true);
           break;
 
+        case 'setTabLayout':
+          this.log(`Setting tab layout to: "${msg.layout}" (Codex handler)`);
+          void vscode.workspace
+            .getConfiguration('claudeMirror.tabs')
+            .update('layout', msg.layout, vscode.ConfigurationTarget.Global);
+          break;
+
+        case 'focusTab':
+          void vscode.commands.executeCommand('claudeMirror.tabs.focus', msg.tabId);
+          break;
+
+        case 'requestTabList':
+          void vscode.commands.executeCommand('claudeMirror.tabs.refreshList');
+          break;
+
         case 'uiDebugLog': {
           let payloadText = '';
           if (msg.payload) {
@@ -1157,6 +1172,9 @@ export class CodexMessageHandler {
       if (e.affectsConfiguration('claudeMirror.codex.reasoningEffort')) {
         this.sendCodexReasoningEffortSetting();
       }
+      if (e.affectsConfiguration('claudeMirror.tabs.layout')) {
+        this.sendTabLayoutSetting();
+      }
     });
   }
 
@@ -1170,8 +1188,17 @@ export class CodexMessageHandler {
     this.sendCodexModelSetting();
     this.sendCodexModelOptions();
     this.sendCodexReasoningEffortSetting();
+    this.sendTabLayoutSetting();
     this.postScheduledMessageState();
     void this.sendApiKeySetting();
+  }
+
+  private sendTabLayoutSetting(): void {
+    const layout = vscode.workspace
+      .getConfiguration('claudeMirror.tabs')
+      .get<'horizontal' | 'vertical'>('layout', 'horizontal');
+    this.log(`Sending tab layout setting (Codex handler): layout="${layout}"`);
+    this.webview.postMessage({ type: 'tabLayoutSetting', layout });
   }
 
   private sendTextSettings(): void {

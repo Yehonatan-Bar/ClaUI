@@ -59,6 +59,10 @@ export function registerTabGroupCommands(
       tabManager.focusTab(tabId);
     }),
 
+    vscode.commands.registerCommand('claudeMirror.tabs.refreshList', () => {
+      tabManager.broadcastTabsState();
+    }),
+
     // Create a top-level folder
     vscode.commands.registerCommand('claudeMirror.groups.create', async () => {
       const label = await vscode.window.showInputBox({
@@ -284,7 +288,7 @@ export function registerTabGroupCommands(
         },
         {
           label: `${current === 'vertical' ? '$(check)' : '$(blank)'} Vertical layout`,
-          description: 'Tabs distributed across stacked editor groups (up to 4 rows)',
+          description: 'One editor group with an in-chat vertical tab rail',
           value: 'vertical',
         },
       ];
@@ -297,7 +301,6 @@ export function registerTabGroupCommands(
         return;
       }
       await config.update('layout', picked.value, vscode.ConfigurationTarget.Global);
-      await tabManager.applyTabLayout(picked.value);
       log(`[TabLayout] Switched to "${picked.value}" via title-bar gear`);
     })
   );

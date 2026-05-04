@@ -24,6 +24,7 @@ import { BugReportPanel } from './components/BugReport';
 import { McpPanel } from './components/McpPanel';
 import { CodexConsultPanel } from './components/InputArea/CodexConsultPanel';
 import { TeamPanel, TeamStatusWidget } from './components/Teams';
+import { WorkstreamMapView } from './components/WorkstreamMap/WorkstreamMapView';
 import { postToExtension } from './hooks/useClaudeStream';
 import { detectRtl } from './hooks/useRtlDetection';
 import { deriveTurnHistoryFromMessages } from './utils/turnVitals';
@@ -34,6 +35,51 @@ import { SmartSearchView } from './components/SmartSearch/SmartSearchView';
 
 const SESSION_SUMMARY_IDLE_MS = 60 * 60 * 1000;
 const SESSION_SUMMARY_DEFER_MS = 3 * 60 * 60 * 1000;
+
+const VerticalTabRail: React.FC = () => {
+  const tabs = useAppStore((s) => s.openTabs);
+  const activeTabId = useAppStore((s) => s.activeTabId);
+  const sortedTabs = useMemo(
+    () => [...tabs].sort((a, b) => (a.orderInGroup ?? a.tabNumber) - (b.orderInGroup ?? b.tabNumber)),
+    [tabs]
+  );
+
+  if (sortedTabs.length <= 1) {
+    return null;
+  }
+
+  return (
+    <nav className="vertical-tab-rail" aria-label="ClaUi tabs">
+      <div className="vertical-tab-rail-list">
+        {sortedTabs.map((tab) => {
+          const isActive = tab.id === activeTabId;
+          const providerLabel =
+            tab.provider === 'codex' ? 'Codex' : tab.provider === 'remote' ? 'Happy' : 'Claude';
+          return (
+            <button
+              key={tab.id}
+              className={`vertical-tab-item ${isActive ? 'active' : ''}`}
+              onClick={() => {
+                if (!isActive) {
+                  postToExtension({ type: 'focusTab', tabId: tab.id });
+                }
+              }}
+              style={{ '--tab-color': tab.slotColor } as React.CSSProperties}
+              title={`${providerLabel}: ${tab.displayName}`}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              <span className="vertical-tab-color" aria-hidden="true" />
+              <span className="vertical-tab-title">{tab.displayName}</span>
+              <span className="vertical-tab-provider" aria-hidden="true">
+                {tab.provider === 'codex' ? 'X' : tab.provider === 'remote' ? 'H' : 'C'}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+};
 
 /**
  * Top-level App is a thin dispatcher: it calls the stream hook ONCE and
@@ -96,11 +142,14 @@ const ChatAppContent: React.FC = () => {
     bugReportPanelOpen,
     teamActive,
     teamPanelOpen,
+    workstreamMapOpen,
     currentThinkingEffort,
     chatSearchOpen,
     activitySummaryDismissed,
     setActivitySummaryDismissed,
     activitySummaryEnabled,
+    tabLayout,
+    openTabs,
   } = useAppStore();
   const forkInit = useAppStore((s) => s.forkInit);
   const [showDisablePermanently, setShowDisablePermanently] = useState(false);
@@ -213,8 +262,11 @@ const ChatAppContent: React.FC = () => {
     '--chat-font-family': textSettings.fontFamily || undefined,
   } as React.CSSProperties), [textSettings.fontSize, textSettings.fontFamily]);
 
+  const showVerticalTabRail = tabLayout === 'vertical' && openTabs.length > 1;
+
   return (
-    <div className={`app-container theme-${typingTheme}`} style={containerStyle}>
+    <div className={`app-container theme-${typingTheme} ${showVerticalTabRail ? 'app-container--vertical-tabs' : ''}`} style={containerStyle}>
+      {showVerticalTabRail && <VerticalTabRail />}
       {/* Prompt history panel overlay */}
       {promptHistoryPanelOpen && <PromptHistoryPanel />}
       {achievementsEnabled && achievementPanelOpen && <AchievementPanel />}
@@ -225,6 +277,7 @@ const ChatAppContent: React.FC = () => {
       {skillGenPanelOpen && <SkillGenPanel />}
       {bugReportPanelOpen && <BugReportPanel />}
       {teamPanelOpen && <TeamPanel />}
+      {workstreamMapOpen && <WorkstreamMapView />}
 
       {/* Error banner / setup guidance */}
       {lastError && (isClaudeCliMissingError ? (

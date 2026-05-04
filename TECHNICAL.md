@@ -135,9 +135,23 @@ claude-code-mirror/
 |   |   |   +-- AchievementService.ts     #   Lifecycle bridge, streaks, tiers, AI insight wiring, GitHub auto-sync
 |   |   |   +-- AchievementInsightAnalyzer.ts #  Sonnet CLI spawn for session analysis (once/day)
 |   |   |   +-- GitHubSyncService.ts     #   GitHub PAT auth (SecretStorage), Gist CRUD, friend lookup, badge generation, auto-reconnect
+|   |   +-- workstream/
+|   |   |   +-- WorkstreamManager.ts      #   Main orchestrator: classification pipeline, user edits, resume state
+|   |   |   +-- WorkstreamStore.ts        #   Persistence layer (workspaceState) with schema migration + cap limits
+|   |   |   +-- WorkstreamSnapshotStore.ts #  Snapshot capture/diff for Resume View
+|   |   |   +-- WorkstreamClassifier.ts   #   Heuristic pre-clustering + Sonnet classification
+|   |   |   +-- StationExtractor.ts       #   Sonnet-based station extraction (1-5 per session)
+|   |   |   +-- CurrentStateSynthesizer.ts #  Project + per-workstream current state via Sonnet
+|   |   |   +-- ResumeStateBuilder.ts     #   Builds resume state by comparing snapshots
+|   |   |   +-- PlanRealityAnalyzer.ts    #   Plan vs actual work comparison via Sonnet
+|   |   |   +-- WorkstreamNLEditor.ts     #   Natural language map editing (pattern + Sonnet fallback)
+|   |   |   +-- WorkstreamImportanceScorer.ts #  Composite importance/attention scoring
+|   |   |   +-- SessionBackfiller.ts      #   Enriches existing sessions with workstream fields
+|   |   |   +-- FileTracker.ts            #   Captures file/git signals from tool events
 |   |   +-- types/
 |   |       +-- stream-json.ts            #   CLI protocol type definitions
 |   |       +-- webview-messages.ts       #   postMessage contract
+|   |       +-- workstreamTypes.ts        #   Workstream map data model (enums, interfaces, constants)
 |   +-- webview/                          # React webview code (browser context)
 |       +-- index.tsx                     #   React entry point
 |       +-- App.tsx                       #   Main app with welcome/chat/status (StatusBar extracted to components/StatusBar/)
@@ -252,6 +266,24 @@ claude-code-mirror/
 |       |   |   +-- McpQuickAdd.tsx      #   Recommended templates + custom transport launchers
 |       |   |   +-- McpDebugTab.tsx      #   Paths, diagnostics, and copyable MCP commands
 |       |   |   +-- index.ts             #   Barrel export
+|       |   +-- WorkstreamMap/
+|       |   |   +-- WorkstreamMapView.tsx    #   Top-level container (loading/error/empty states)
+|       |   |   +-- ProjectMapView.tsx       #   Main SVG canvas (layout, lines, stations, overlays)
+|       |   |   +-- WorkstreamLine.tsx       #   SVG workstream line with hit area, label, status badge
+|       |   |   +-- StationNode.tsx          #   SVG station shapes (circle/diamond/square/triangle/star)
+|       |   |   +-- CurrentStateLayer.tsx    #   Resume point markers, blocker highlights, glow animations
+|       |   |   +-- ResumeViewLayer.tsx      #   Change summary banner, new workstream/station highlights
+|       |   |   +-- MapHeader.tsx            #   Summary chips (Active/Blocked/Done counts)
+|       |   |   +-- MapControls.tsx          #   Toggle buttons (Current State, Plan, Resolve, filters)
+|       |   |   +-- MapLegend.tsx            #   Line colors, textures, station shapes legend
+|       |   |   +-- MapTooltip.tsx           #   Floating detail tooltip on hover
+|       |   |   +-- WorkstreamDetailPanel.tsx #  Side panel with workstream metadata + stations
+|       |   |   +-- StationDetailView.tsx    #   Side panel with station detail + evidence
+|       |   |   +-- ResolveToolbar.tsx       #   Action buttons (Rename, Complete, Abandon, Pin)
+|       |   |   +-- NLCommandBar.tsx         #   Natural language map editing input
+|       |   |   +-- layout.ts               #   Deterministic lane-based SVG layout algorithm
+|       |   |   +-- visualEncoding.ts        #   Status colors, shapes, sizes, line styles
+|       |   |   +-- animations.ts            #   CSS keyframe definitions
 |       |   +-- TextSettingsBar/
 |       |       +-- TextSettingsBar.tsx   #   Font size/family/theme controls
 |       +-- styles/
@@ -293,6 +325,7 @@ claude-code-mirror/
     +-- USAGE_LIMIT_DEFERRED_SEND.md      #   Implemented usage-limit queue and deferred auto-send flow
     +-- USAGE_LIMIT_DEFERRED_SEND_PLAN.md #   Archived execution plan
     +-- SKILL_GENERATION.md             #   Auto skill generation from SR-PTD docs
+    +-- WORKSTREAM_MAP.md               #   Workstream map feature (classification, visualization, editing)
 ```
 
 ---
@@ -313,6 +346,9 @@ claude-code-mirror/
 
 **Tab Folders / Sub-folders** - Sidebar TreeView (`claudeMirror.sessionsTree`) inside the ClaUi Activity Bar that organizes session tabs into nestable folders. Folders live in `TabGroupStore` (`workspaceState`, key `claudeMirror.tabGroups`); tab membership rides on `OpenTabSnapshotEntry.groupId/orderInGroup`. Right-click commands cover create/rename/recolor/delete (with cascade-vs-reparent prompt) and move/remove tabs. When a tab joins a folder its native VS Code tab icon recolors to the folder's color via each tab's `applyTabColor()`. Folder assignments survive restore-on-startup.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/TAB_GROUPS.md`
+
+**Tab Layout (Horizontal / Vertical)** - Setting `claudeMirror.tabs.layout` controls how ClaUi session tabs are navigated. Horizontal (default) keeps VS Code's native editor tab strip as the main navigator. Vertical collapses stale editor splits into one full-height editor group and renders an in-webview vertical tab rail backed by `TabManager.broadcastTabsState()`, `tabList` messages, and `focusTab` requests. Three entry points: bottom-toolbar **View -> Tab layout** segmented control (`StatusBar.tsx`), Sessions title-bar gear (`claudeMirror.tabs.openLayoutMenu` QuickPick), and the Settings UI. `TabManager` registers an `onDidChangeConfiguration` listener that auto-calls `applyTabLayout()` so all three entry points apply the same behavior. The layout toggle does not open or close the VS Code sidebar.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/TAB_LAYOUT.md`
 
 **End-of-Session Summary** - On every session-end (completed, crashed, or stopped), `SessionTab.maybeRunSummarizer()` fires `SessionSummarizer` to generate a 1-3 sentence recap via Haiku (`claude -p --model <analysisModel>`, 35s timeout) with a Codex `exec --json -c model_reasoning_effort=low` fallback (45s). The summary, generated-at timestamp, and source are persisted on `SessionMetadata` and shown on hover in the Sessions TreeView (Markdown tooltip with relative time). Skipped when fewer than 2 user messages. Toggle: `claudeMirror.sessionEndSummary` (default true). Independent of `claudeMirror.activitySummary`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_SUMMARY.md`
@@ -512,6 +548,9 @@ claude-code-mirror/
 
 **Happy Provider (remote)** -- Integration with Happy Coder, an external remote AI coding relay that enables cross-device Claude Code sessions (local-to-mobile and back). ClaUi's role is a thin CLI-swap layer: the internal provider id remains `'remote'`, and the implementation reuses the standard `SessionTab` + `ClaudeProcessManager` pipeline, only swapping the executable path to Happy CLI via `ProcessStartOptions.cliPathOverride`. All remote/mobile capabilities are handled by the external Happy CLI and its relay server, not by ClaUi. Auth flow uses QR code / device auth via `happy auth` in a VS Code terminal (`claudeMirror.authenticateHappy`), and `SessionTab` detects auth-required stderr patterns to show targeted guidance.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/REMOTE_SESSIONS.md`
+
+**Workstream Map** -- Subway-map style visualization that groups sessions into logical workstreams (coherent threads of work with a goal, status, and history). AI-powered classification pipeline: heuristic pre-clustering (git branch grouping, file overlap Jaccard scoring, temporal proximity) followed by Sonnet classification and station extraction. Stations represent meaningful events within sessions (milestones, decisions, blockers, discoveries). SVG-based deterministic lane layout with visual encodings: line colors for status (active=blue, blocked=red, completed=green), line textures (solid/dashed for confidence), station shapes (circle/diamond/square/triangle for type). Layers: Current State (resume point markers, blocker highlights), Resume View (change summary after inactivity), Plan Overlay, and Resolve Mode (rename, mark complete/abandoned, pin, NL editing). Backend services: `WorkstreamManager` (orchestrator), `WorkstreamStore` (persistence), `WorkstreamClassifier`, `StationExtractor`, `CurrentStateSynthesizer`, `ResumeStateBuilder`, `PlanRealityAnalyzer`, `WorkstreamNLEditor`, `WorkstreamImportanceScorer`, `WorkstreamSnapshotStore`. Frontend: `WorkstreamMapView`, `ProjectMapView`, `WorkstreamLine`, `StationNode`, overlay layers, detail panels, `ResolveToolbar`, `NLCommandBar`. Command: `claudeMirror.openWorkstreamMap`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP.md`
 
 ---
 

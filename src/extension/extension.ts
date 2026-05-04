@@ -21,6 +21,7 @@ import { cleanupOrphanedProcesses } from './process/orphanCleanup';
 import { ProcessMemorySampler } from './process/ProcessMemorySampler';
 import { TabGroupStore } from './session/TabGroupStore';
 import { TabGroupsTreeProvider } from './views/TabGroupsTreeProvider';
+import { WorkstreamManager } from './workstream/WorkstreamManager';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -117,6 +118,17 @@ export function activate(context: vscode.ExtensionContext): void {
   // Tab folder/sub-folder store (per-workspace).
   const tabGroupStore = new TabGroupStore(context.workspaceState);
 
+  // Create workstream map manager (per-workspace)
+  const workstreamManager = new WorkstreamManager(
+    context.workspaceState,
+    outputChannel,
+    () => {
+      const cfg = vscode.workspace.getConfiguration('claudeMirror');
+      return cfg.get<string>('cliPath', 'claude');
+    },
+    () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd(),
+  );
+
   // Create the tab manager that owns all session tabs
   tabManager = new TabManager(
     context,
@@ -137,6 +149,19 @@ export function activate(context: vscode.ExtensionContext): void {
   // Register commands routed through the tab manager
   registerCommands(context, tabManager, sessionStore, log, logDir);
   registerDiscoverCommand(context, tabManager, log);
+
+  // Register workstream map command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('claudeMirror.openWorkstreamMap', () => {
+      const tab = tabManager.getOrCreateTab();
+      tab.reveal();
+      tab.postMessage({ type: 'toggleWorkstreamMap', open: true });
+      log('Opening Workstream Map');
+    })
+  );
+
+  // Expose workstreamManager to TabManager for message handler access
+  tabManager.workstreamManager = workstreamManager;
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       ClaUiSidebarViewProvider.viewType,

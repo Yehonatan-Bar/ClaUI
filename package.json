@@ -2,7 +2,7 @@
   "name": "claude-code-mirror",
   "displayName": "ClaUi",
   "description": "The full IDE experience for Claude Code - multi-tab sessions, analytics, achievements, dual providers, prompt enhancement, and deep customization",
-  "version": "0.1.124",
+  "version": "0.1.131",
   "publisher": "JhonBar",
   "icon": "images/icon.png",
   "engines": {
@@ -138,6 +138,10 @@
       {
         "command": "claudeMirror.carryCodexToClaudeCode",
         "title": "ClaUi: Carry Codex Session to Claude Code"
+      },
+      {
+        "command": "claudeMirror.openWorkstreamMap",
+        "title": "ClaUi: Open Workstream Map"
       },
       {
         "command": "claudeMirror.tabs.focus",
@@ -701,9 +705,9 @@
           ],
           "enumDescriptions": [
             "Horizontal: all ClaUi tabs share one editor group (single row of tabs)",
-            "Vertical: ClaUi tabs are distributed across editor groups stacked top-to-bottom (up to 4 rows)"
+            "Vertical: ClaUi tabs stay in one editor group and use an in-webview vertical tab rail"
           ],
-          "description": "How ClaUi tabs are arranged in the editor area. Toggle from the Sessions view title bar (gear icon)."
+          "description": "How ClaUi tabs are navigated. Toggle from the in-tab View menu or the Sessions view title bar (gear icon)."
         }
       }
     },

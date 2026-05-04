@@ -13,6 +13,7 @@ import type {
   ProviderCapabilities,
   ProviderId,
   TypingTheme,
+  WebviewTabSummary,
 } from '../../extension/types/webview-messages';
 import type {
   AchievementAwardPayload,
@@ -242,6 +243,11 @@ export interface AppState {
   detailedDiffEnabled: boolean;
   /** Maps toolUseId -> { filePath, oldContent } for pre-write file captures */
   writeOldContentByToolId: Record<string, { filePath: string; oldContent: string }>;
+
+  // Tab arrangement (mirrors claudeMirror.tabs.layout)
+  tabLayout: 'horizontal' | 'vertical';
+  openTabs: WebviewTabSummary[];
+  activeTabId: string | null;
 
   // Session Vitals
   vitalsEnabled: boolean;
@@ -495,6 +501,40 @@ export interface AppState {
   chatSearchProjectLoading: boolean;
   chatSearchProjectRequestId: number;
 
+  // Workstream Map
+  workstreamMapOpen: boolean;
+  workstreamMapZoom: 'project' | 'workstream' | 'station_detail';
+  workstreamMapData: import('../../extension/types/workstreamTypes').ProjectMapState | null;
+  focusedWorkstreamId: string | null;
+  selectedStationId: string | null;
+  currentStateLayerEnabled: boolean;
+  resumeViewEnabled: boolean;
+  planOverlayEnabled: boolean;
+  resolveModeEnabled: boolean;
+  workstreamMapFilters: import('../../extension/types/workstreamTypes').WorkstreamMapFilter;
+  hoveredEntityId: string | null;
+  workstreamMapClassifying: boolean;
+  workstreamMapClassifyProgress: number;
+  workstreamMapClassifyPhase: string;
+  workstreamMapError: string | null;
+  workstreamResumeState: import('../../extension/types/workstreamTypes').ResumeState | null;
+
+  // Workstream Map Actions
+  setWorkstreamMapOpen: (open: boolean) => void;
+  setWorkstreamMapZoom: (zoom: 'project' | 'workstream' | 'station_detail') => void;
+  setWorkstreamMapData: (data: import('../../extension/types/workstreamTypes').ProjectMapState | null) => void;
+  setFocusedWorkstreamId: (id: string | null) => void;
+  setSelectedStationId: (id: string | null) => void;
+  setCurrentStateLayerEnabled: (enabled: boolean) => void;
+  setResumeViewEnabled: (enabled: boolean) => void;
+  setPlanOverlayEnabled: (enabled: boolean) => void;
+  setResolveModeEnabled: (enabled: boolean) => void;
+  setWorkstreamMapFilters: (filters: Partial<import('../../extension/types/workstreamTypes').WorkstreamMapFilter>) => void;
+  setHoveredEntityId: (id: string | null) => void;
+  setWorkstreamMapClassifying: (classifying: boolean, progress?: number, phase?: string) => void;
+  setWorkstreamMapError: (error: string | null) => void;
+  setWorkstreamResumeState: (state: import('../../extension/types/workstreamTypes').ResumeState | null) => void;
+
   // Image Lightbox
   lightboxImageSrc: string | null;
   setLightboxImageSrc: (src: string | null) => void;
@@ -609,6 +649,8 @@ export interface AppState {
   addWriteOldContent: (toolUseId: string, filePath: string, oldContent: string) => void;
   setUltrathinkMode: (mode: 'off' | 'single' | 'locked') => void;
   setVitalsEnabled: (enabled: boolean) => void;
+  setTabLayout: (layout: 'horizontal' | 'vertical') => void;
+  setOpenTabs: (tabs: WebviewTabSummary[], activeTabId: string | null) => void;
   setWeatherWidgetEnabled: (enabled: boolean) => void;
   setCheckpointState: (state: CheckpointState) => void;
   setCheckpointResult: (result: AppState['checkpointResult']) => void;
@@ -893,6 +935,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   detailedDiffEnabled: false,
   writeOldContentByToolId: {},
   ultrathinkMode: 'off' as 'off' | 'single' | 'locked',
+  tabLayout: 'horizontal' as 'horizontal' | 'vertical',
+  openTabs: [],
+  activeTabId: null,
   vitalsEnabled: false,
   weatherWidgetEnabled: false,
   turnHistory: [],
@@ -1079,6 +1124,61 @@ export const useAppStore = create<AppState>((set, get) => ({
   chatSearchProjectResults: [],
   chatSearchProjectLoading: false,
   chatSearchProjectRequestId: 0,
+
+  // Workstream Map
+  workstreamMapOpen: false,
+  workstreamMapZoom: 'project' as 'project' | 'workstream' | 'station_detail',
+  workstreamMapData: null,
+  focusedWorkstreamId: null,
+  selectedStationId: null,
+  currentStateLayerEnabled: true,
+  resumeViewEnabled: false,
+  planOverlayEnabled: false,
+  resolveModeEnabled: false,
+  workstreamMapFilters: {
+    statuses: [],
+    types: [],
+    showInactive: false,
+    showLowConfidence: false,
+    showLowImportanceStations: false,
+  },
+  hoveredEntityId: null,
+  workstreamMapClassifying: false,
+  workstreamMapClassifyProgress: 0,
+  workstreamMapClassifyPhase: '',
+  workstreamMapError: null,
+  workstreamResumeState: null,
+
+  setWorkstreamMapOpen: (open) => set({ workstreamMapOpen: open }),
+  setWorkstreamMapZoom: (zoom) => set({ workstreamMapZoom: zoom }),
+  setWorkstreamMapData: (data) => set({ workstreamMapData: data }),
+  setFocusedWorkstreamId: (id) => set({
+    focusedWorkstreamId: id,
+    workstreamMapZoom: id ? 'workstream' : 'project',
+    selectedStationId: null,
+  }),
+  setSelectedStationId: (id) => set({
+    selectedStationId: id,
+    workstreamMapZoom: id ? 'station_detail' : get().focusedWorkstreamId ? 'workstream' : 'project',
+  }),
+  setCurrentStateLayerEnabled: (enabled) => set({ currentStateLayerEnabled: enabled }),
+  setResumeViewEnabled: (enabled) => set({ resumeViewEnabled: enabled }),
+  setPlanOverlayEnabled: (enabled) => set({ planOverlayEnabled: enabled }),
+  setResolveModeEnabled: (enabled) => set({ resolveModeEnabled: enabled }),
+  setWorkstreamMapFilters: (filters) => set((state) => ({
+    workstreamMapFilters: { ...state.workstreamMapFilters, ...filters },
+  })),
+  setHoveredEntityId: (id) => set({ hoveredEntityId: id }),
+  setWorkstreamMapClassifying: (classifying, progress, phase) => set({
+    workstreamMapClassifying: classifying,
+    workstreamMapClassifyProgress: progress ?? 0,
+    workstreamMapClassifyPhase: phase ?? '',
+  }),
+  setWorkstreamMapError: (error) => set({ workstreamMapError: error }),
+  setWorkstreamResumeState: (resumeState) => set({
+    workstreamResumeState: resumeState,
+    resumeViewEnabled: !!resumeState,
+  }),
 
   // Image Lightbox
   lightboxImageSrc: null,
@@ -1945,6 +2045,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
 
   setUltrathinkMode: (mode) => set({ ultrathinkMode: mode }),
+
+  setTabLayout: (layout) => set({ tabLayout: layout }),
+  setOpenTabs: (tabs, activeTabId) => set({ openTabs: tabs, activeTabId }),
 
   setVitalsEnabled: (enabled) =>
     set((state) => {

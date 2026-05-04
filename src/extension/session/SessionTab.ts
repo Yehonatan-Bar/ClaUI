@@ -2292,6 +2292,16 @@ export class SessionTab implements WebviewBridge {
     return this.teamActions;
   }
 
+  /** Inject the shared WorkstreamManager (forwarded to MessageHandler) */
+  setWorkstreamManager(manager: import('../workstream/WorkstreamManager').WorkstreamManager): void {
+    this.messageHandler.setWorkstreamManager(manager);
+  }
+
+  /** Inject the SessionStore (forwarded to MessageHandler for workstream classification) */
+  setSessionStore(store: import('../session/SessionStore').SessionStore): void {
+    this.messageHandler.setSessionStore(store);
+  }
+
   /** Get the active team name */
   getActiveTeamName(): string | null {
     return this.activeTeamName;

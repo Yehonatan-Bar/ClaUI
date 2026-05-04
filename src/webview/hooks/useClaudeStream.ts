@@ -62,6 +62,8 @@ export function useClaudeStream(): void {
     setSessionRecap,
     setUltrathinkMode,
     setVitalsEnabled,
+    setTabLayout,
+    setOpenTabs,
     setWeatherWidgetEnabled,
     rebuildTurnHistoryFromMessages,
     setAdventureEnabled,
@@ -123,6 +125,11 @@ export function useClaudeStream(): void {
     clearDeferredMessage,
     failDeferredMessage,
     setSilentResumeActive,
+    setWorkstreamMapData,
+    setWorkstreamMapClassifying,
+    setWorkstreamMapError,
+    setWorkstreamResumeState,
+    setWorkstreamMapOpen,
   } = useAppStore();
 
   useEffect(() => {
@@ -197,6 +204,30 @@ export function useClaudeStream(): void {
 
         case 'silentResumeStatus':
           setSilentResumeActive(msg.active);
+          break;
+
+        case 'workstreamMapData':
+          setWorkstreamMapData(msg.data);
+          setWorkstreamMapOpen(true);
+          setWorkstreamMapClassifying(false);
+          setWorkstreamMapError(null);
+          break;
+
+        case 'workstreamMapClassifying':
+          setWorkstreamMapClassifying(msg.progress < 1, msg.progress, msg.phase);
+          break;
+
+        case 'workstreamMapError':
+          setWorkstreamMapError(msg.message);
+          setWorkstreamMapClassifying(false);
+          break;
+
+        case 'workstreamMapResumeState':
+          setWorkstreamResumeState(msg.resumeState);
+          break;
+
+        case 'toggleWorkstreamMap':
+          setWorkstreamMapOpen(msg.open ?? !useAppStore.getState().workstreamMapOpen);
           break;
 
         case 'toggleMcpPanel':
@@ -654,6 +685,14 @@ export function useClaudeStream(): void {
           setVitalsEnabled(msg.enabled);
           break;
 
+        case 'tabLayoutSetting':
+          setTabLayout(msg.layout);
+          break;
+
+        case 'tabList':
+          setOpenTabs(msg.tabs, msg.activeTabId);
+          break;
+
         case 'detailedDiffViewSetting':
           setDetailedDiffEnabled(msg.enabled);
           break;
@@ -959,6 +998,7 @@ export function useClaudeStream(): void {
 
     // Tell the extension we are ready
     vscodeApi?.postMessage({ type: 'ready' });
+    vscodeApi?.postMessage({ type: 'requestTabList' });
 
     return () => {
       window.removeEventListener('message', handleMessage);
@@ -1012,6 +1052,8 @@ export function useClaudeStream(): void {
     setSessionRecap,
     setUltrathinkMode,
     setVitalsEnabled,
+    setTabLayout,
+    setOpenTabs,
     setWeatherWidgetEnabled,
     rebuildTurnHistoryFromMessages,
     setAdventureEnabled,
@@ -1062,6 +1104,11 @@ export function useClaudeStream(): void {
     handleBtwMessageStop,
     handleBtwResult,
     clearBtwSession,
+    setWorkstreamMapData,
+    setWorkstreamMapClassifying,
+    setWorkstreamMapError,
+    setWorkstreamResumeState,
+    setWorkstreamMapOpen,
   ]);
 }
 

@@ -45,6 +45,24 @@ export class TabGroupsTreeProvider implements vscode.TreeDataProvider<TabGroupTr
     }
   }
 
+  /**
+   * Materialize a colored-dot SVG once per `(tabNumber, color)`. The dot mirrors
+   * the tab's slot/group color so the sidebar list looks like the user's mental
+   * model of "colored tabs stacked vertically" instead of generic theme icons.
+   */
+  private tabDotIconPath(tab: TabSummary): vscode.Uri | undefined {
+    try {
+      fs.mkdirSync(this.storageDir, { recursive: true });
+      const colorSafe = tab.slotColor.replace(/[^A-Fa-f0-9]/g, '');
+      const iconPath = path.join(this.storageDir, `tab-dot-${tab.tabNumber}-${colorSafe}.svg`);
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" fill="${tab.slotColor}"/></svg>`;
+      fs.writeFileSync(iconPath, svg, 'utf-8');
+      return vscode.Uri.file(iconPath);
+    } catch {
+      return undefined;
+    }
+  }
+
   refresh(): void {
     this.emitter.fire();
   }
@@ -70,7 +88,11 @@ export class TabGroupsTreeProvider implements vscode.TreeDataProvider<TabGroupTr
     const item = new vscode.TreeItem(node.tab.displayName, vscode.TreeItemCollapsibleState.None);
     item.contextValue = 'tabLeaf';
     item.id = `tab:${node.tab.id}`;
-    item.iconPath = new vscode.ThemeIcon(
+    // Use a tinted circle in the tab's slot/group color so the sidebar looks
+    // like a list of colored tabs (matches the editor-tab strip color), with
+    // the per-provider ThemeIcon as a fallback only if SVG generation fails.
+    const dot = this.tabDotIconPath(node.tab);
+    item.iconPath = dot ?? new vscode.ThemeIcon(
       node.tab.provider === 'codex' ? 'rocket' : 'comment-discussion'
     );
     item.description = node.tab.provider === 'claude' ? undefined : node.tab.provider;
