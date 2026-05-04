@@ -347,6 +347,8 @@ export class MessageHandler {
   private workstreamManager: import('../workstream/WorkstreamManager').WorkstreamManager | null = null;
   /** Session store for accessing session metadata (needed by workstream classification) */
   private sessionStore: import('../session/SessionStore').SessionStore | null = null;
+  /** Returns session IDs for all currently open tabs (injected by TabManager via SessionTab) */
+  private openTabSessionIdsGetter: (() => string[]) | null = null;
   /** Active interval timer for streaming memory snapshots; null when streaming is off. */
   private memoryStreamTimer: ReturnType<typeof setInterval> | null = null;
   /** True while a memory sample is in-flight (avoid overlapping queries). */
@@ -553,6 +555,11 @@ export class MessageHandler {
   /** Provide the SessionStore for accessing session metadata. */
   setSessionStore(store: import('../session/SessionStore').SessionStore): void {
     this.sessionStore = store;
+  }
+
+  /** Provide a getter for open tab session IDs (used to scope workstream classification). */
+  setOpenTabSessionIdsGetter(getter: () => string[]): void {
+    this.openTabSessionIdsGetter = getter;
   }
 
   /** True when no user message has been sent in the current session (i.e. session start) */
@@ -2312,14 +2319,24 @@ export class MessageHandler {
             break;
           }
           const wsProjectId3 = this.getWorkstreamProjectId();
-          const summaries = this.projectAnalyticsStore.getSummaries();
-          this.log(`[WorkstreamMap] Found ${summaries.length} session summaries for classification`);
+          const allSummaries = this.projectAnalyticsStore.getSummaries();
+
+          // Scope: only sessions with open tabs OR from the last 3 days
+          const openTabIds = new Set(this.openTabSessionIdsGetter?.() ?? []);
+          const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+          const summaries = allSummaries.filter(s => {
+            if (openTabIds.has(s.sessionId)) return true;
+            const ts = s.endedAt ?? s.startedAt;
+            if (ts && new Date(ts).getTime() > threeDaysAgo) return true;
+            return false;
+          });
+          this.log(`[WorkstreamMap] Scoped ${allSummaries.length} total summaries -> ${summaries.length} (openTabs=${openTabIds.size}, recentCutoff=3d)`);
+
           const metadataMap = new Map<string, import('../session/SessionStore').SessionMetadata>();
           if (this.sessionStore) {
             for (const s of this.sessionStore.getSessions()) {
               metadataMap.set(s.sessionId, s);
             }
-            this.log(`[WorkstreamMap] Found ${metadataMap.size} session metadata entries`);
           }
           this.webview.postMessage({ type: 'workstreamMapClassifying', progress: 0, phase: 'Starting classification...' });
           this.workstreamManager.onProgress((progress, phase) => {

@@ -8,6 +8,8 @@ import type {
 const MAX_STATIONS_PER_SESSION = 5;
 
 export class StationExtractor {
+  constructor(private readonly log: (msg: string) => void = () => {}) {}
+
   async extractStations(
     session: EnrichedSessionData,
     workstream: Workstream,
@@ -26,18 +28,22 @@ export class StationExtractor {
   ): Promise<Map<string, StationExtractionOutput>> {
     const results = new Map<string, StationExtractionOutput>();
 
-    // Process sequentially to avoid overwhelming the CLI
+    this.log(`[StationExtractor] extractBatch: ${sessions.length} sessions, ${workstreams.size} workstreams`);
     for (const session of sessions) {
       const ws = [...workstreams.values()].find(w => w.sessionIds.includes(session.sessionId));
-      if (!ws) { continue; }
+      if (!ws) {
+        this.log(`[StationExtractor] Session ${session.sessionId.slice(0, 8)} has no matching workstream, skipping`);
+        continue;
+      }
 
       try {
+        this.log(`[StationExtractor] Extracting session ${session.sessionId.slice(0, 8)} (ws="${ws.label}")`);
         const output = await this.extractStations(session, ws, cliPath, workspacePath);
-        // Cap stations per session
         output.stations = output.stations.slice(0, MAX_STATIONS_PER_SESSION);
+        this.log(`[StationExtractor] Session ${session.sessionId.slice(0, 8)}: ${output.stations.length} stations extracted`);
         results.set(session.sessionId, output);
-      } catch {
-        // Log and continue - don't fail the whole batch
+      } catch (err) {
+        this.log(`[StationExtractor] Session ${session.sessionId.slice(0, 8)} FAILED: ${err instanceof Error ? err.message : String(err)}`);
         results.set(session.sessionId, { stations: [] });
       }
     }
@@ -93,43 +99,85 @@ Respond with ONLY valid JSON:
 
   private async callSonnet(prompt: string, cliPath: string, workspacePath: string): Promise<StationExtractionOutput> {
     return new Promise((resolve, reject) => {
-      const args = ['-p', prompt, '--output-format', 'json', '-m', 'sonnet'];
+      const args = ['-p', '--output-format', 'json', '--model', 'claude-sonnet-4-6'];
+      this.log(`[StationExtractor] Spawning CLI: path="${cliPath}", promptLen=${prompt.length}, cwd="${workspacePath}"`);
+
       const proc = spawn(cliPath, args, {
         cwd: workspacePath,
         shell: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env },
-        timeout: 45000,
       });
 
       let stdout = '';
       let stderr = '';
+      let settled = false;
+
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          proc.kill();
+          this.log(`[StationExtractor] TIMEOUT after 45s`);
+          reject(new Error('Station extraction timed out after 45s'));
+        }
+      }, 45_000);
 
       proc.stdout?.on('data', (data: Buffer) => { stdout += data.toString(); });
       proc.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
 
       proc.on('close', (code) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        this.log(`[StationExtractor] Process closed: exitCode=${code}, stdoutLen=${stdout.length}, stderrLen=${stderr.length}`);
+        if (stderr.length > 0) {
+          this.log(`[StationExtractor] stderr: ${stderr.slice(-300)}`);
+        }
         if (code !== 0) {
           reject(new Error(`Station extraction failed (exit ${code}): ${stderr}`));
           return;
         }
         try {
-          const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+          let textToSearch = stdout;
+          try {
+            const envelope = JSON.parse(stdout);
+            if (envelope?.result && typeof envelope.result === 'string') {
+              textToSearch = envelope.result;
+              this.log(`[StationExtractor] Unwrapped CLI envelope, result length=${textToSearch.length}`);
+            }
+          } catch { /* not an envelope */ }
+
+          const jsonMatch = textToSearch.match(/\{[\s\S]*\}/);
           if (!jsonMatch) {
+            this.log(`[StationExtractor] No JSON in text`);
             resolve({ stations: [] });
             return;
           }
           const parsed = JSON.parse(jsonMatch[0]) as StationExtractionOutput;
           if (!parsed.stations || !Array.isArray(parsed.stations)) {
+            this.log(`[StationExtractor] No stations array in parsed JSON`);
             resolve({ stations: [] });
             return;
           }
+          this.log(`[StationExtractor] Parsed OK: ${parsed.stations.length} stations`);
           resolve(parsed);
-        } catch {
+        } catch (e) {
+          this.log(`[StationExtractor] JSON parse error: ${e}`);
           resolve({ stations: [] });
         }
       });
 
-      proc.on('error', reject);
+      proc.on('error', (err) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          this.log(`[StationExtractor] Process error: ${err.message}`);
+          reject(err);
+        }
+      });
+
+      proc.stdin?.write(prompt, 'utf-8');
+      proc.stdin?.end();
     });
   }
 }

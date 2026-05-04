@@ -107,7 +107,7 @@ Respond with ONLY valid JSON:
     workspacePath: string,
   ): Promise<PlanReality> {
     return new Promise((resolve, reject) => {
-      const args = ['-p', prompt, '--output-format', 'json', '-m', 'sonnet'];
+      const args = ['-p', prompt, '--output-format', 'json', '--model', 'claude-sonnet-4-6'];
       const proc = spawn(cliPath, args, {
         cwd: workspacePath,
         shell: true,
@@ -127,7 +127,15 @@ Respond with ONLY valid JSON:
           return;
         }
         try {
-          const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+          let textToSearch = stdout;
+          try {
+            const envelope = JSON.parse(stdout);
+            if (envelope?.result && typeof envelope.result === 'string') {
+              textToSearch = envelope.result;
+            }
+          } catch { /* not an envelope */ }
+
+          const jsonMatch = textToSearch.match(/\{[\s\S]*\}/);
           if (!jsonMatch) {
             reject(new Error('No JSON in plan analysis output'));
             return;

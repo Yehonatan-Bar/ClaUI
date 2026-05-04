@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../../state/store';
 import { MapHeader } from './MapHeader';
 import { MapControls } from './MapControls';
@@ -8,7 +8,34 @@ import { WorkstreamDetailPanel } from './WorkstreamDetailPanel';
 import { StationDetailView } from './StationDetailView';
 import { ResolveToolbar } from './ResolveToolbar';
 import { NLCommandBar } from './NLCommandBar';
+import { ConfidenceReviewPanel } from './ConfidenceReviewPanel';
 import { postToExtension } from '../../hooks/useClaudeStream';
+
+const CloseButton: React.FC = () => (
+  <button
+    onClick={() => useAppStore.getState().setWorkstreamMapOpen(false)}
+    title="Close Workstream Map"
+    style={{
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      background: 'transparent',
+      border: 'none',
+      color: 'var(--vscode-foreground, #CBD5E1)',
+      cursor: 'pointer',
+      fontSize: 18,
+      lineHeight: 1,
+      padding: '2px 6px',
+      borderRadius: 4,
+      opacity: 0.7,
+      zIndex: 10,
+    }}
+    onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+    onMouseLeave={e => (e.currentTarget.style.opacity = '0.7')}
+  >
+    X
+  </button>
+);
 
 export const WorkstreamMapView: React.FC = () => {
   const mapData = useAppStore(s => s.workstreamMapData);
@@ -20,6 +47,7 @@ export const WorkstreamMapView: React.FC = () => {
   const selectedStationId = useAppStore(s => s.selectedStationId);
   const resolveModeEnabled = useAppStore(s => s.resolveModeEnabled);
   const zoom = useAppStore(s => s.workstreamMapZoom);
+  const [showConfidencePanel, setShowConfidencePanel] = useState(true);
 
   useEffect(() => {
     postToExtension({ type: 'workstreamMapRequestData' });
@@ -28,16 +56,20 @@ export const WorkstreamMapView: React.FC = () => {
   if (error) {
     return (
       <div style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        height: '100%',
+        backgroundColor: 'var(--vscode-editor-background, rgba(13, 17, 23, 0.97))',
         fontFamily: 'var(--vscode-font-family)',
         color: '#F87171',
         fontSize: 13,
         gap: 8,
       }}>
+        <CloseButton />
         <div>Error loading workstream map</div>
         <div style={{ fontSize: 11, color: '#94A3B8' }}>{error}</div>
         <button
@@ -62,16 +94,20 @@ export const WorkstreamMapView: React.FC = () => {
   if (!mapData && !isClassifying) {
     return (
       <div style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        height: '100%',
+        backgroundColor: 'var(--vscode-editor-background, rgba(13, 17, 23, 0.97))',
         fontFamily: 'var(--vscode-font-family)',
         color: '#94A3B8',
         fontSize: 13,
         gap: 12,
       }}>
+        <CloseButton />
         <div style={{ fontWeight: 600, fontSize: 16, color: '#CBD5E1' }}>Workstream Map</div>
         <div>No workstream data yet. Start a classification to build the map.</div>
         <button
@@ -95,15 +131,19 @@ export const WorkstreamMapView: React.FC = () => {
   if (isClassifying && !mapData) {
     return (
       <div style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        height: '100%',
+        backgroundColor: 'var(--vscode-editor-background, rgba(13, 17, 23, 0.97))',
         fontFamily: 'var(--vscode-font-family)',
         color: '#CBD5E1',
         gap: 12,
       }}>
+        <CloseButton />
         <div style={{ fontWeight: 600, fontSize: 16 }}>Building Workstream Map...</div>
         <div style={{
           width: 200,
@@ -135,11 +175,14 @@ export const WorkstreamMapView: React.FC = () => {
 
   return (
     <div style={{
+      position: 'fixed',
+      inset: 0,
+      zIndex: 1000,
       display: 'flex',
       flexDirection: 'column',
-      height: '100%',
-      background: 'var(--vscode-editor-background)',
+      backgroundColor: 'var(--vscode-editor-background, rgba(13, 17, 23, 0.97))',
     }}>
+      <CloseButton />
       {/* Header with summary chips */}
       <MapHeader
         state={mapData}
@@ -168,6 +211,14 @@ export const WorkstreamMapView: React.FC = () => {
       {/* Resolve toolbar and NL command bar */}
       {resolveModeEnabled && <ResolveToolbar />}
       {resolveModeEnabled && <NLCommandBar />}
+
+      {/* Confidence review panel */}
+      {showConfidencePanel && mapData && (
+        <ConfidenceReviewPanel
+          state={mapData}
+          onClose={() => setShowConfidencePanel(false)}
+        />
+      )}
 
       {/* Legend */}
       <MapLegend />

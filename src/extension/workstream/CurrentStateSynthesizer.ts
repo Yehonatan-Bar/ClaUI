@@ -15,6 +15,8 @@ export interface CurrentStateSynthesisResult {
 }
 
 export class CurrentStateSynthesizer {
+  constructor(private readonly log: (msg: string) => void = () => {}) {}
+
   async synthesize(
     state: ProjectMapState,
     cliPath: string,
@@ -24,8 +26,11 @@ export class CurrentStateSynthesizer {
       ws => ws.status === 'active' || ws.status === 'blocked' || ws.status === 'uncertain'
     );
 
+    this.log(`[Synthesizer] synthesize: ${activeWorkstreams.length} active workstreams, ${state.stations.length} stations`);
     const prompt = this.buildSynthesisPrompt(activeWorkstreams, state.stations, state);
+    this.log(`[Synthesizer] Prompt built: ${prompt.length} chars`);
     const result = await this.callSonnet(prompt, cliPath, workspacePath);
+    this.log(`[Synthesizer] Result: ${result.workstreamStates.size} workstream states synthesized`);
 
     return result;
   }
@@ -117,27 +122,55 @@ Respond with ONLY valid JSON:
     workspacePath: string,
   ): Promise<CurrentStateSynthesisResult> {
     return new Promise((resolve, reject) => {
-      const args = ['-p', prompt, '--output-format', 'json', '-m', 'sonnet'];
+      const args = ['-p', '--output-format', 'json', '--model', 'claude-sonnet-4-6'];
+      this.log(`[Synthesizer] Spawning CLI: path="${cliPath}", promptLen=${prompt.length}, cwd="${workspacePath}"`);
+
       const proc = spawn(cliPath, args, {
         cwd: workspacePath,
         shell: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env },
-        timeout: 60000,
       });
 
       let stdout = '';
       let stderr = '';
+      let settled = false;
+
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          proc.kill();
+          this.log(`[Synthesizer] TIMEOUT after 60s`);
+          reject(new Error('Synthesis timed out after 60s'));
+        }
+      }, 60_000);
 
       proc.stdout?.on('data', (data: Buffer) => { stdout += data.toString(); });
       proc.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
 
       proc.on('close', (code) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        this.log(`[Synthesizer] Process closed: exitCode=${code}, stdoutLen=${stdout.length}, stderrLen=${stderr.length}`);
+        if (stderr.length > 0) {
+          this.log(`[Synthesizer] stderr: ${stderr.slice(-300)}`);
+        }
         if (code !== 0) {
           reject(new Error(`Current state synthesis failed (exit ${code}): ${stderr}`));
           return;
         }
         try {
-          const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+          let textToSearch = stdout;
+          try {
+            const envelope = JSON.parse(stdout);
+            if (envelope?.result && typeof envelope.result === 'string') {
+              textToSearch = envelope.result;
+              this.log(`[Synthesizer] Unwrapped CLI envelope, result length=${textToSearch.length}`);
+            }
+          } catch { /* not an envelope */ }
+
+          const jsonMatch = textToSearch.match(/\{[\s\S]*\}/);
           if (!jsonMatch) {
             reject(new Error('No JSON in synthesis output'));
             return;
@@ -195,7 +228,17 @@ Respond with ONLY valid JSON:
         }
       });
 
-      proc.on('error', reject);
+      proc.on('error', (err) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          this.log(`[Synthesizer] Process error: ${err.message}`);
+          reject(err);
+        }
+      });
+
+      proc.stdin?.write(prompt, 'utf-8');
+      proc.stdin?.end();
     });
   }
 }

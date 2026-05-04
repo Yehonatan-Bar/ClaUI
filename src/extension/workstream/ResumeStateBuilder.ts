@@ -147,24 +147,38 @@ Recommended resume: ${state.currentState.recommendedNextAction ?? 'none'}
 Respond with ONLY the summary text, no JSON.`;
 
     return new Promise((resolve) => {
-      const args = ['-p', prompt, '--output-format', 'text', '-m', 'sonnet'];
+      const args = ['-p', '--output-format', 'text', '--model', 'claude-sonnet-4-6'];
       const proc = spawn(cliPath, args, {
         cwd: workspacePath,
         shell: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env },
-        timeout: 30000,
       });
 
       let stdout = '';
+      const timer = setTimeout(() => { proc.kill(); }, 30_000);
+
       proc.stdout?.on('data', (data: Buffer) => { stdout += data.toString(); });
 
       proc.on('close', () => {
-        resolve(stdout.trim() || this.buildLocalSummary(resume, state));
+        clearTimeout(timer);
+        let text = stdout.trim();
+        try {
+          const envelope = JSON.parse(text);
+          if (envelope?.result && typeof envelope.result === 'string') {
+            text = envelope.result.trim();
+          }
+        } catch { /* not an envelope */ }
+        resolve(text || this.buildLocalSummary(resume, state));
       });
 
       proc.on('error', () => {
+        clearTimeout(timer);
         resolve(this.buildLocalSummary(resume, state));
       });
+
+      proc.stdin?.write(prompt, 'utf-8');
+      proc.stdin?.end();
     });
   }
 }

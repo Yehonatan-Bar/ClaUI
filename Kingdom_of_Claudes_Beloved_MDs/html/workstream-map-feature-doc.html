@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaUi - Workstream Map - Feature Documentation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap');
+
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-card: #1c2128;
+    --bg-card-hover: #21262d;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6e7681;
+    --blue: #58a6ff;
+    --green: #3fb950;
+    --purple: #bc8cff;
+    --orange: #f0883e;
+    --amber: #e3b341;
+    --red: #f85149;
+    --cyan: #56d4dd;
+    --pink: #f778ba;
+    --gradient-hero: linear-gradient(135deg, #1a1f36 0%, #0d1117 50%, #161b22 100%);
+    --shadow-lg: 0 16px 48px rgba(0,0,0,0.4);
+    --shadow-card: 0 4px 12px rgba(0,0,0,0.3);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Heebo', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.8;
+    min-height: 100vh;
+  }
+
+  .hero {
+    background: var(--gradient-hero);
+    padding: 80px 40px 60px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .hero h1 {
+    font-size: 2.8em;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--blue), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 16px;
+  }
+
+  .hero .subtitle {
+    font-size: 1.2em;
+    color: var(--text-secondary);
+    max-width: 700px;
+    margin: 0 auto;
+  }
+
+  .hero .badge {
+    display: inline-block;
+    margin-top: 20px;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+    border: 1px solid var(--green);
+    color: var(--green);
+    background: rgba(63, 185, 80, 0.1);
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  .section {
+    margin-bottom: 48px;
+  }
+
+  .section h2 {
+    font-size: 1.6em;
+    font-weight: 700;
+    color: var(--blue);
+    margin-bottom: 20px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .section h3 {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: var(--cyan);
+    margin-top: 24px;
+    margin-bottom: 12px;
+  }
+
+  .section p {
+    margin-bottom: 14px;
+    color: var(--text-primary);
+    font-size: 1.02em;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-card);
+  }
+
+  .card-title {
+    font-weight: 700;
+    font-size: 1.1em;
+    margin-bottom: 8px;
+  }
+
+  .card-desc {
+    color: var(--text-secondary);
+    font-size: 0.95em;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 768px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 2em; }
+  }
+
+  .color-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .status-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.95em;
+  }
+
+  .status-table th, .status-table td {
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    text-align: right;
+  }
+
+  .status-table th {
+    background: var(--bg-secondary);
+    color: var(--blue);
+    font-weight: 600;
+  }
+
+  .status-table td {
+    color: var(--text-primary);
+  }
+
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .flow-number {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1em;
+  }
+
+  .flow-content {
+    flex: 1;
+  }
+
+  .flow-content strong {
+    color: var(--cyan);
+  }
+
+  .highlight-box {
+    background: rgba(88, 166, 255, 0.08);
+    border: 1px solid rgba(88, 166, 255, 0.2);
+    border-radius: var(--radius-sm);
+    padding: 16px 20px;
+    margin: 16px 0;
+  }
+
+  .highlight-box.green {
+    background: rgba(63, 185, 80, 0.08);
+    border-color: rgba(63, 185, 80, 0.2);
+  }
+
+  .highlight-box.amber {
+    background: rgba(227, 179, 65, 0.08);
+    border-color: rgba(227, 179, 65, 0.2);
+  }
+
+  ul {
+    padding-right: 24px;
+    margin-bottom: 14px;
+  }
+
+  ul li {
+    margin-bottom: 6px;
+    color: var(--text-primary);
+  }
+
+  .subway-diagram {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    margin: 24px 0;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .subway-diagram svg {
+    max-width: 100%;
+  }
+
+  .toc {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 40px;
+  }
+
+  .toc h3 {
+    color: var(--blue);
+    margin-bottom: 16px;
+    margin-top: 0;
+  }
+
+  .toc a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    display: block;
+    padding: 4px 0;
+    font-size: 0.95em;
+  }
+
+  .toc a:hover {
+    color: var(--blue);
+  }
+
+  .arch-row {
+    display: flex;
+    gap: 24px;
+    align-items: stretch;
+    margin: 24px 0;
+  }
+
+  .arch-box {
+    flex: 1;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    text-align: center;
+  }
+
+  .arch-box .label {
+    font-weight: 700;
+    color: var(--cyan);
+    margin-bottom: 8px;
+  }
+
+  .arch-box .items {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .arrow-between {
+    display: flex;
+    align-items: center;
+    font-size: 1.5em;
+    color: var(--blue);
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Workstream Map</h1>
+  <div class="subtitle">
+    מפת מטרו ויזואלית שמקבצת את כל הסשנים של ClaUi לזרמי עבודה לוגיים --
+    מציגה מבנה, התקדמות, ומליצה על הצעד הבא
+  </div>
+  <div class="badge">ClaUi v0.1.132</div>
+</div>
+
+<div class="container">
+
+  <!-- TOC -->
+  <div class="toc">
+    <h3>תוכן עניינים</h3>
+    <a href="#what">1. מה זה Workstream Map?</a>
+    <a href="#concepts">2. מושגי יסוד</a>
+    <a href="#how-it-works">3. איך זה עובד?</a>
+    <a href="#visual">4. הקידוד הויזואלי</a>
+    <a href="#layers">5. שכבות תצוגה</a>
+    <a href="#editing">6. עריכה ושליטה</a>
+    <a href="#access">7. איך לגשת</a>
+    <a href="#architecture">8. ארכיטקטורה</a>
+    <a href="#pipeline">9. צינור הסיווג (Classification Pipeline)</a>
+    <a href="#data-model">10. מודל הנתונים</a>
+    <a href="#messages">11. פרוטוקול הודעות</a>
+    <a href="#files">12. מפת קבצים</a>
+    <a href="#ai-models">13. שימוש במודלים</a>
+    <a href="#persistence">14. אחסון ושמירה</a>
+    <a href="#limitations">15. מגבלות ידועות</a>
+  </div>
+
+  <!-- 1. What is it -->
+  <div class="section" id="what">
+    <h2>1. מה זה Workstream Map?</h2>
+    <p>
+      Workstream Map הוא כלי ויזואלי שמציג את כל העבודה שנעשתה ב-ClaUi בפורמט של מפת מטרו.
+      במקום לראות רשימת סשנים מנותקים, המפה מקבצת אותם <strong>לזרמי עבודה</strong> (workstreams)
+      -- קווים לוגיים שמייצגים משימה, פיצ'ר, באג, או כל יחידת עבודה קוהרנטית.
+    </p>
+    <p>
+      כל קו במפה הוא workstream. על כל קו יש <strong>תחנות</strong> (stations) -- אירועים משמעותיים
+      כמו אבני דרך, החלטות, חסימות, או תגליות. המפה עוזרת להבין:
+    </p>
+    <ul>
+      <li>על מה עבדתי? (מבט על)</li>
+      <li>מה הסטטוס של כל זרם עבודה? (פעיל, חסום, הושלם)</li>
+      <li>מאיפה כדאי להמשיך? (המלצת resume)</li>
+      <li>מה קרה מאז הפעם האחרונה שפתחתי את הפרויקט? (Resume View)</li>
+    </ul>
+  </div>
+
+  <!-- 2. Concepts -->
+  <div class="section" id="concepts">
+    <h2>2. מושגי יסוד</h2>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Workstream (זרם עבודה)</div>
+        <div class="card-desc">
+          קו אחד במפת המטרו. מייצג יחידת עבודה לוגית -- למשל "פיתוח פיצ'ר X" או "תיקון באג Y".
+          יכול לכלול סשן אחד או עשרות. לכל workstream יש סטטוס, סוג, ודירוג חשיבות.
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Station (תחנה)</div>
+        <div class="card-desc">
+          נקודה על הקו שמייצגת אירוע משמעותי בתוך סשן -- אבן דרך, החלטה, חסימה, תגלית,
+          שגיאה, מיזוג, או פריסה. לכל סשן יכולות להיות 1-5 תחנות.
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Current State (מצב נוכחי)</div>
+        <div class="card-desc">
+          סינתזה של AI שמתארת את המצב הנוכחי של הפרויקט -- מה פעיל, מה חסום,
+          ומה הצעד הבא המומלץ. מתעדכן בכל סיווג.
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Resume State (מצב חזרה)</div>
+        <div class="card-desc">
+          כשחוזרים לפרויקט אחרי יום או יותר, המפה מציגה סיכום של מה השתנה --
+          workstreams חדשים, שינויים, וממליצה מאיפה להמשיך.
+        </div>
+      </div>
+    </div>
+
+    <h3>סוגי Workstream</h3>
+    <table class="status-table">
+      <tr><th>סוג</th><th>תיאור</th></tr>
+      <tr><td>Feature</td><td>פיתוח פיצ'ר חדש</td></tr>
+      <tr><td>Bugfix</td><td>תיקון באגים</td></tr>
+      <tr><td>Refactor</td><td>שיפור קוד קיים</td></tr>
+      <tr><td>Research</td><td>חקירה או מחקר</td></tr>
+      <tr><td>Maintenance</td><td>תחזוקה שוטפת</td></tr>
+      <tr><td>Infrastructure</td><td>שינויי תשתית</td></tr>
+    </table>
+
+    <h3>סטטוסים</h3>
+    <table class="status-table">
+      <tr><th>סטטוס</th><th>צבע</th><th>משמעות</th></tr>
+      <tr><td>Active</td><td><span class="color-dot" style="background:#4A9EFF"></span> כחול</td><td>עבודה פעילה</td></tr>
+      <tr><td>Blocked</td><td><span class="color-dot" style="background:#F87171"></span> אדום</td><td>חסום -- דורש טיפול</td></tr>
+      <tr><td>Completed</td><td><span class="color-dot" style="background:#4ADE80"></span> ירוק</td><td>הושלם בהצלחה</td></tr>
+      <tr><td>Uncertain</td><td><span class="color-dot" style="background:#FACC15"></span> ענבר</td><td>לא ברור -- דרוש סיווג ידני</td></tr>
+      <tr><td>Abandoned</td><td><span class="color-dot" style="background:#64748B"></span> אפור</td><td>ננטש</td></tr>
+    </table>
+  </div>
+
+  <!-- 3. How it works -->
+  <div class="section" id="how-it-works">
+    <h2>3. איך זה עובד?</h2>
+    <p>המפה נבנית בתהליך אוטומטי של סיווג שמנתח את כל הסשנים בפרויקט:</p>
+
+    <div class="flow-step">
+      <div class="flow-number">1</div>
+      <div class="flow-content">
+        <strong>העשרה (Enrichment)</strong> -- לכל סשן מוסיפים מידע: אילו קבצים שונו/נקראו,
+        באיזה branch עבדו, מה היה ה-prompt הראשון, מה הייתה התוצאה.
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-number">2</div>
+      <div class="flow-content">
+        <strong>קיבוץ מקדים (Pre-clustering)</strong> -- אלגוריתם מקומי שמקבץ סשנים
+        לפי branch משותף, חפיפת קבצים, וקרבה זמנית. לא דורש AI.
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-number">3</div>
+      <div class="flow-content">
+        <strong>סיווג AI (Classification)</strong> -- Sonnet מקבל את האשכולות המקדימים
+        ומסווג אותם לזרמי עבודה לוגיים. הוא מחליט על שמות, סוגים, וסטטוסים.
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-number">4</div>
+      <div class="flow-content">
+        <strong>חילוץ תחנות (Station Extraction)</strong> -- Sonnet מנתח כל סשן
+        ומחלץ 1-5 תחנות משמעותיות (אבני דרך, החלטות, חסימות).
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-number">5</div>
+      <div class="flow-content">
+        <strong>סינתזה (Synthesis)</strong> -- Sonnet מסנתז את המצב הנוכחי של הפרויקט:
+        מה פעיל, מה חסום, מה הצעד הבא. גם ברמת הפרויקט וגם לכל workstream.
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-number">6</div>
+      <div class="flow-content">
+        <strong>דירוג (Scoring)</strong> -- אלגוריתם מקומי שמדרג כל workstream ותחנה
+        לפי חשיבות (פעילות אחרונה, נפח, חסימות, הצמדות ידניות).
+      </div>
+    </div>
+
+    <div class="highlight-box">
+      הסיווג מוגבל ל-5 דקות מינימום בין הרצות מלאות כדי למנוע עומס מיותר.
+      עריכות ידניות של המשתמש מוגנות ולא נדרסות על ידי ה-AI.
+    </div>
+  </div>
+
+  <!-- 4. Visual Encoding -->
+  <div class="section" id="visual">
+    <h2>4. הקידוד הויזואלי</h2>
+    <p>המפה משתמשת בקידוד ויזואלי עקבי כדי להעביר מידע בלי טקסט:</p>
+
+    <div class="subway-diagram">
+      <svg width="600" height="200" viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+        <!-- Active line -->
+        <path d="M 50 40 C 150 40, 200 40, 300 40 C 400 40, 450 40, 550 40" stroke="#4A9EFF" stroke-width="4" fill="none"/>
+        <text x="30" y="44" fill="#4A9EFF" font-size="11" text-anchor="end" font-family="Heebo">Active</text>
+        <circle cx="150" cy="40" r="6" fill="#4A9EFF"/>
+        <circle cx="300" cy="40" r="8" fill="#4A9EFF"/>
+        <circle cx="450" cy="40" r="6" fill="#4A9EFF"/>
+
+        <!-- Blocked line -->
+        <path d="M 50 90 C 150 90, 200 90, 300 90 C 400 90, 450 90, 550 90" stroke="#F87171" stroke-width="4" fill="none"/>
+        <text x="30" y="94" fill="#F87171" font-size="11" text-anchor="end" font-family="Heebo">Blocked</text>
+        <circle cx="200" cy="90" r="6" fill="#F87171"/>
+        <rect x="344" y="84" width="12" height="12" fill="#F87171" transform="rotate(45 350 90)"/>
+
+        <!-- Completed line -->
+        <path d="M 50 140 C 150 140, 200 140, 300 140 C 400 140, 450 140, 550 140" stroke="#4ADE80" stroke-width="4" fill="none"/>
+        <text x="30" y="144" fill="#4ADE80" font-size="11" text-anchor="end" font-family="Heebo">Done</text>
+        <circle cx="180" cy="140" r="6" fill="#4ADE80"/>
+        <circle cx="350" cy="140" r="6" fill="#4ADE80"/>
+        <circle cx="500" cy="140" r="8" fill="#4ADE80"/>
+
+        <!-- Uncertain line (dashed) -->
+        <path d="M 50 190 C 150 190, 200 190, 300 190 C 400 190, 450 190, 550 190" stroke="#FACC15" stroke-width="3" fill="none" stroke-dasharray="8,6"/>
+        <text x="30" y="194" fill="#FACC15" font-size="11" text-anchor="end" font-family="Heebo">Uncertain</text>
+        <polygon points="250,183 256,190 250,197 244,190" fill="#FACC15"/>
+      </svg>
+    </div>
+
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-title">צבע הקו</div>
+        <div class="card-desc">מייצג את הסטטוס: כחול=פעיל, אדום=חסום, ירוק=הושלם, ענבר=לא ברור, אפור=ננטש</div>
+      </div>
+      <div class="card">
+        <div class="card-title">מרקם הקו</div>
+        <div class="card-desc">קו רציף = ביטחון גבוה (>=70%). קו מקוקו = ביטחון נמוך. ככל שה-AI פחות בטוח בסיווג, הקו מקוקו יותר</div>
+      </div>
+      <div class="card">
+        <div class="card-title">צורת התחנה</div>
+        <div class="card-desc">
+          עיגול = אבן דרך,
+          יהלום = החלטה,
+          ריבוע = חסימה,
+          משולש = תגלית,
+          X = שגיאה
+        </div>
+      </div>
+    </div>
+
+    <h3>גודל תחנה</h3>
+    <p>תחנות גדולות יותר = חשובות יותר. הגודל נקבע לפי ניקוד חשיבות שמשלב פעילות אחרונה, מורכבות, ומספר קבצים.</p>
+
+    <h3>אפקט זוהר (Glow)</h3>
+    <p>תחנות ו-workstreams שדורשים תשומת לב מקבלים אפקט זוהר פועם -- כחול לפעילות אחרונה, אדום לחסימות, ענבר לאי-ודאות.</p>
+  </div>
+
+  <!-- 5. Layers -->
+  <div class="section" id="layers">
+    <h2>5. שכבות תצוגה</h2>
+
+    <div class="card">
+      <div class="card-title">Current State Layer (שכבת מצב נוכחי)</div>
+      <div class="card-desc">
+        <p>מופעלת כברירת מחדל. מציגה:</p>
+        <ul>
+          <li>סמן "RESUME HERE" פועם על התחנה שממנה כדאי להמשיך</li>
+          <li>תחנה אחרונה מוגדלת על workstreams פעילים</li>
+          <li>סמני תשומת לב על חסימות</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Resume View Layer (שכבת חזרה)</div>
+      <div class="card-desc">
+        <p>מופיעה אוטומטית כשחוזרים לפרויקט אחרי 24 שעות. מציגה:</p>
+        <ul>
+          <li>באנר עם סיכום שינויים ("3 workstreams חדשים, 2 השתנו")</li>
+          <li>workstreams חדשים מסומנים בזוהר ירוק</li>
+          <li>תחנות חדשות מסומנות בעיגול ירוק</li>
+          <li>כפתור "Dismiss" לסגירת השכבה</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Plan Overlay (שכבת תוכניות)</div>
+      <div class="card-desc">
+        משווה בין תוכניות שנכתבו (מסשנים של תכנון או קבצי Markdown) לבין העבודה שבוצעה בפועל.
+        מזהה שלבים שהושלמו, שלבים שנותרו, וסטיות מהתוכנית.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Resolve Mode (מצב עריכה)</div>
+      <div class="card-desc">
+        מצב אינטראקטיבי לעריכת המפה. מופעל מכפתור "Resolve" בסרגל הכלים.
+        מאפשר שינוי שם, סימון כהושלם/ננטש, הצמדה, הסתרת תחנות, ועריכה בשפה טבעית.
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Editing -->
+  <div class="section" id="editing">
+    <h2>6. עריכה ושליטה</h2>
+
+    <h3>עריכה ישירה (Resolve Mode)</h3>
+    <p>
+      כשמצב Resolve מופעל, סרגל כלים מופיע עם כפתורי פעולה:
+    </p>
+    <ul>
+      <li><strong>Rename</strong> -- שינוי שם של workstream</li>
+      <li><strong>Mark Complete</strong> -- סימון כהושלם</li>
+      <li><strong>Mark Abandoned</strong> -- סימון כננטש</li>
+      <li><strong>Pin/Unpin</strong> -- הצמדה (מונע הסתרה אוטומטית או ארכיון)</li>
+      <li><strong>Hide Station</strong> -- הסתרת תחנה לא רלוונטית</li>
+    </ul>
+
+    <h3>עריכה בשפה טבעית (NL Command Bar)</h3>
+    <p>
+      שורת פקודה שמאפשרת לתאר שינויים בשפה טבעית, למשל:
+    </p>
+    <div class="highlight-box">
+      "merge these two lines"<br>
+      "mark as complete"<br>
+      "hide inactive streams"<br>
+      "rename to Authentication Refactor"
+    </div>
+    <p>
+      המערכת מנסה קודם להתאים את הפקודה לתבנית ידועה. אם לא מצליחה -- פונה ל-Sonnet
+      לפירוש סמנטי. פעולות עם ביטחון נמוך (מתחת ל-75%) דורשות אישור.
+    </p>
+
+    <div class="highlight-box green">
+      <strong>הגנה על עריכות משתמש:</strong> כל שינוי ידני נשמר כ-UserEdit ומוגן מפני דריסה
+      על ידי ה-AI. סיווג מחדש לא ימחק או ישנה עריכות ידניות.
+    </div>
+  </div>
+
+  <!-- 7. Access -->
+  <div class="section" id="access">
+    <h2>7. איך לגשת</h2>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">מסרגל הכלים</div>
+        <div class="card-desc">
+          StatusBar -> dropdown "Session" -> "Workstream Map"
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">מ-Command Palette</div>
+        <div class="card-desc">
+          Ctrl+Shift+P -> "ClaUi: Open Workstream Map"
+        </div>
+      </div>
+    </div>
+
+    <h3>דרישות</h3>
+    <ul>
+      <li>צריך לפחות כמה סשנים שהושלמו (נשמרים ב-Project Analytics)</li>
+      <li>גישה ל-Claude CLI -- הסיווג משתמש ב-Sonnet</li>
+      <li>תהליך הסיווג לוקח 30 שניות עד כמה דקות (תלוי במספר הסשנים)</li>
+    </ul>
+  </div>
+
+  <!-- 8. Architecture -->
+  <div class="section" id="architecture">
+    <h2>8. ארכיטקטורה</h2>
+    <p>
+      הפיצ'ר בנוי משני צדדים -- שירותי Backend בצד ה-Extension Host (Node.js)
+      ורכיבי Frontend בצד ה-Webview (React):
+    </p>
+
+    <div class="arch-row">
+      <div class="arch-box">
+        <div class="label">Extension Host</div>
+        <div class="items">
+          WorkstreamManager<br>
+          WorkstreamClassifier<br>
+          StationExtractor<br>
+          CurrentStateSynthesizer<br>
+          ResumeStateBuilder<br>
+          PlanRealityAnalyzer<br>
+          WorkstreamNLEditor<br>
+          WorkstreamStore<br>
+          WorkstreamSnapshotStore
+        </div>
+      </div>
+      <div class="arrow-between">&harr;</div>
+      <div class="arch-box">
+        <div class="label">Webview (React)</div>
+        <div class="items">
+          WorkstreamMapView<br>
+          ProjectMapView (SVG)<br>
+          WorkstreamLine<br>
+          StationNode<br>
+          CurrentStateLayer<br>
+          ResumeViewLayer<br>
+          MapHeader / Controls<br>
+          Detail Panels<br>
+          ResolveToolbar + NLCommandBar
+        </div>
+      </div>
+    </div>
+
+    <p>
+      התקשורת בין שני הצדדים מתבצעת דרך פרוטוקול postMessage של VS Code.
+      המצב של ה-UI מנוהל ב-Zustand store. ה-MessageHandler בצד ה-Extension
+      מטפל בכל 8 סוגי ההודעות ומפנה ל-WorkstreamManager.
+    </p>
+
+    <h3>זרימת הנתונים</h3>
+    <div class="flow-step">
+      <div class="flow-number">1</div>
+      <div class="flow-content">משתמש פותח את המפה -> Webview שולח <strong>workstreamMapRequestData</strong></div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-number">2</div>
+      <div class="flow-content">Extension מחזיר נתונים קיימים -> Webview מציג את המפה</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-number">3</div>
+      <div class="flow-content">משתמש לוחץ "Classify" -> Webview שולח <strong>workstreamMapReclassify</strong></div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-number">4</div>
+      <div class="flow-content">Extension מריץ את צינור הסיווג -> שולח עדכוני התקדמות -> שולח תוצאה סופית</div>
+    </div>
+  </div>
+
+  <!-- 9. Pipeline -->
+  <div class="section" id="pipeline">
+    <h2>9. צינור הסיווג (Classification Pipeline)</h2>
+
+    <table class="status-table">
+      <tr><th>שלב</th><th>רכיב</th><th>מודל</th><th>תיאור</th></tr>
+      <tr><td>1. העשרה</td><td>SessionBackfiller</td><td>מקומי</td><td>מוסיף רשימת קבצים, git, prompt ראשון, סוג משימה</td></tr>
+      <tr><td>2. קיבוץ מקדים</td><td>WorkstreamClassifier</td><td>מקומי</td><td>קיבוץ לפי branch, חפיפת קבצים (Jaccard), קרבה זמנית</td></tr>
+      <tr><td>3. סיווג</td><td>WorkstreamClassifier</td><td>Sonnet</td><td>סיווג סמנטי של אשכולות ל-workstreams</td></tr>
+      <tr><td>4. תחנות</td><td>StationExtractor</td><td>Sonnet</td><td>חילוץ 1-5 תחנות לכל סשן</td></tr>
+      <tr><td>5. סינתזה</td><td>CurrentStateSynthesizer</td><td>Sonnet</td><td>מצב נוכחי + המלצת המשך</td></tr>
+      <tr><td>6. דירוג</td><td>WorkstreamImportanceScorer</td><td>מקומי</td><td>ציון חשיבות/תשומת לב</td></tr>
+      <tr><td>7. שמירה</td><td>WorkstreamStore</td><td>--</td><td>שמירה ב-workspaceState + snapshot</td></tr>
+    </table>
+
+    <div class="highlight-box amber">
+      <strong>מגבלת זמן:</strong> סיווג מלא מוגבל ל-5 דקות מינימום בין הרצות.
+      סיווג אינקרמנטלי (לסשן בודד חדש) אפשרי בכל זמן.
+    </div>
+  </div>
+
+  <!-- 10. Data Model -->
+  <div class="section" id="data-model">
+    <h2>10. מודל הנתונים</h2>
+
+    <h3>ProjectMapState (מצב מפה)</h3>
+    <p>המבנה הראשי שנשמר ב-workspaceState. מכיל:</p>
+    <ul>
+      <li><strong>workstreams[]</strong> -- כל זרמי העבודה</li>
+      <li><strong>stations[]</strong> -- כל התחנות</li>
+      <li><strong>splits[] / merges[]</strong> -- פיצולים ומיזוגים בין workstreams</li>
+      <li><strong>currentState</strong> -- סינתזת מצב ברמת הפרויקט</li>
+      <li><strong>userEdits[]</strong> -- עריכות ידניות מוגנות</li>
+      <li><strong>schemaVersion</strong> -- גרסת סכמה (למיגרציה)</li>
+    </ul>
+
+    <h3>Workstream</h3>
+    <ul>
+      <li>id, name, label, type, status</li>
+      <li>sessionIds[] -- סשנים ששייכים לזרם</li>
+      <li>visual -- מצב רנדור (lane, color, collapsed, pinned)</li>
+      <li>currentState -- סיכום, חסימות, פעולה הבאה</li>
+      <li>metrics -- מספר סשנים, עלות, משך, קבצים</li>
+      <li>confidence -- רמת ביטחון בסיווג (0-1)</li>
+    </ul>
+
+    <h3>Station</h3>
+    <ul>
+      <li>id, label, description, type, status</li>
+      <li>sessionId -- הסשן שבו התרחשה</li>
+      <li>workstreamId -- ה-workstream ההורה</li>
+      <li>visibleInProjectMap -- האם מוצגת (לפי חשיבות)</li>
+      <li>evidence[] -- הוכחות תומכות</li>
+    </ul>
+  </div>
+
+  <!-- 11. Messages -->
+  <div class="section" id="messages">
+    <h2>11. פרוטוקול הודעות</h2>
+
+    <h3>Webview -> Extension</h3>
+    <table class="status-table">
+      <tr><th>הודעה</th><th>מטרה</th></tr>
+      <tr><td>workstreamMapOpen</td><td>המפה נפתחה</td></tr>
+      <tr><td>workstreamMapRequestData</td><td>בקשת נתוני מפה</td></tr>
+      <tr><td>workstreamMapReclassify</td><td>הפעלת סיווג (מחדש)</td></tr>
+      <tr><td>workstreamMapApplyEdit</td><td>החלת עריכה ידנית</td></tr>
+      <tr><td>workstreamMapNaturalLanguageEdit</td><td>עריכה בשפה טבעית</td></tr>
+      <tr><td>workstreamMapOpenSession</td><td>ניווט לסשן</td></tr>
+      <tr><td>workstreamMapDismissResumeView</td><td>סגירת Resume View</td></tr>
+      <tr><td>workstreamMapSaveSnapshot</td><td>שמירת snapshot</td></tr>
+    </table>
+
+    <h3>Extension -> Webview</h3>
+    <table class="status-table">
+      <tr><th>הודעה</th><th>מטרה</th></tr>
+      <tr><td>workstreamMapData</td><td>נתוני מפה מלאים</td></tr>
+      <tr><td>workstreamMapClassifying</td><td>עדכון התקדמות סיווג</td></tr>
+      <tr><td>workstreamMapError</td><td>הודעת שגיאה</td></tr>
+      <tr><td>workstreamMapResumeState</td><td>מצב חזרה</td></tr>
+      <tr><td>toggleWorkstreamMap</td><td>פתיחה/סגירה של המפה</td></tr>
+    </table>
+  </div>
+
+  <!-- 12. Files -->
+  <div class="section" id="files">
+    <h2>12. מפת קבצים</h2>
+
+    <h3>שירותי Extension</h3>
+    <table class="status-table">
+      <tr><th>קובץ</th><th>תפקיד</th></tr>
+      <tr><td>WorkstreamManager.ts</td><td>מתזמר ראשי -- מפעיל את כל השירותים ומנהל את הצינור</td></tr>
+      <tr><td>WorkstreamStore.ts</td><td>שכבת שמירה (workspaceState) עם מיגרציה ומגבלות קיבולת</td></tr>
+      <tr><td>WorkstreamSnapshotStore.ts</td><td>צילום מצב והשוואה (SHA-256, עד 20 snapshots)</td></tr>
+      <tr><td>WorkstreamClassifier.ts</td><td>קיבוץ היוריסטי + סיווג Sonnet</td></tr>
+      <tr><td>StationExtractor.ts</td><td>חילוץ תחנות באמצעות Sonnet (1-5 לסשן)</td></tr>
+      <tr><td>CurrentStateSynthesizer.ts</td><td>סינתזת מצב נוכחי (פרויקט + workstream)</td></tr>
+      <tr><td>ResumeStateBuilder.ts</td><td>בניית מצב חזרה (השוואה ל-snapshot, סף 24 שעות)</td></tr>
+      <tr><td>PlanRealityAnalyzer.ts</td><td>השוואת תוכנית מול ביצוע</td></tr>
+      <tr><td>WorkstreamNLEditor.ts</td><td>עריכה בשפה טבעית (תבניות + Sonnet)</td></tr>
+      <tr><td>WorkstreamImportanceScorer.ts</td><td>דירוג חשיבות משוקלל</td></tr>
+      <tr><td>SessionBackfiller.ts</td><td>העשרת סשנים בנתוני קבצים/git</td></tr>
+      <tr><td>FileTracker.ts</td><td>מעקב אחרי קבצים שנקראו/שונו מתוך אירועי כלים</td></tr>
+    </table>
+
+    <h3>רכיבי Webview</h3>
+    <table class="status-table">
+      <tr><th>קובץ</th><th>תפקיד</th></tr>
+      <tr><td>WorkstreamMapView.tsx</td><td>מיכל עליון (מצבי טעינה/שגיאה/ריק)</td></tr>
+      <tr><td>ProjectMapView.tsx</td><td>קנבס SVG ראשי עם כל השכבות</td></tr>
+      <tr><td>WorkstreamLine.tsx</td><td>קו workstream עם אזור לחיצה, תווית, תגית סטטוס</td></tr>
+      <tr><td>StationNode.tsx</td><td>צורות תחנה (עיגול/יהלום/ריבוע/משולש)</td></tr>
+      <tr><td>CurrentStateLayer.tsx</td><td>שכבת מצב נוכחי (סמני resume, חסימות, זוהר)</td></tr>
+      <tr><td>ResumeViewLayer.tsx</td><td>שכבת חזרה (באנר שינויים, הדגשות ירוקות)</td></tr>
+      <tr><td>MapHeader/Controls/Legend</td><td>כותרת, בקרות, ומקרא</td></tr>
+      <tr><td>Detail Panels</td><td>פאנלים צידיים לפרטי workstream/station</td></tr>
+      <tr><td>ResolveToolbar + NLCommandBar</td><td>כלי עריכה ושורת פקודות</td></tr>
+      <tr><td>layout.ts</td><td>אלגוריתם פריסה דטרמיניסטי (lanes)</td></tr>
+      <tr><td>visualEncoding.ts</td><td>מיפוי סטטוסים לצבעים, צורות, גדלים</td></tr>
+    </table>
+  </div>
+
+  <!-- 13. AI Models -->
+  <div class="section" id="ai-models">
+    <h2>13. שימוש במודלים</h2>
+
+    <table class="status-table">
+      <tr><th>משימה</th><th>מודל</th><th>סיבה</th></tr>
+      <tr><td>סיווג workstreams</td><td>Sonnet</td><td>דורש הבנה סמנטית עמוקה</td></tr>
+      <tr><td>חילוץ תחנות</td><td>Sonnet</td><td>ניתוח תוכן סשן ומציאת אירועים</td></tr>
+      <tr><td>סינתזת מצב נוכחי</td><td>Sonnet</td><td>סיכום ברמה גבוהה + המלצות</td></tr>
+      <tr><td>סיכום חזרה</td><td>Sonnet (fallback: מקומי)</td><td>רק כששינויים מורכבים</td></tr>
+      <tr><td>השוואת תוכניות</td><td>Sonnet</td><td>ניתוח דומיות בין שלבים</td></tr>
+      <tr><td>עריכה בשפה טבעית</td><td>תבנית מקומית, Sonnet כ-fallback</td><td>חיסכון בעלויות</td></tr>
+      <tr><td>דירוג חשיבות</td><td>מקומי (היוריסטיקה)</td><td>חישוב מהיר, בלי עלויות</td></tr>
+      <tr><td>קיבוץ מקדים</td><td>מקומי (היוריסטיקה)</td><td>חישוב מהיר, בלי עלויות</td></tr>
+    </table>
+  </div>
+
+  <!-- 14. Persistence -->
+  <div class="section" id="persistence">
+    <h2>14. אחסון ושמירה</h2>
+
+    <table class="status-table">
+      <tr><th>נתון</th><th>מפתח</th><th>אחסון</th></tr>
+      <tr><td>מצב מפה נוכחי</td><td>workstreamMap.current.{projectId}</td><td>workspaceState</td></tr>
+      <tr><td>ארכיון</td><td>workstreamMap.archived.{projectId}</td><td>workspaceState</td></tr>
+      <tr><td>Snapshots</td><td>workstreamMap.snapshots.{projectId}</td><td>workspaceState</td></tr>
+    </table>
+
+    <h3>מגבלות קיבולת</h3>
+    <ul>
+      <li>עד 50 workstreams לפרויקט</li>
+      <li>עד 500 תחנות לפרויקט</li>
+      <li>עד 20 snapshots</li>
+      <li>ארכיון אוטומטי של workstreams שהושלמו אחרי 90 יום (לא חל על חסומים או מוצמדים)</li>
+    </ul>
+
+    <h3>מיגרציה</h3>
+    <p>גרסת סכמה נוכחית: 1. המערכת תומכת במיגרציה אוטומטית כשגרסת הסכמה משתנה.</p>
+  </div>
+
+  <!-- 15. Limitations -->
+  <div class="section" id="limitations">
+    <h2>15. מגבלות ידועות</h2>
+    <ul>
+      <li>סיווג ראשוני דורש גישה ל-Claude CLI עם Sonnet -- לא עובד offline</li>
+      <li>עם מעט סשנים (פחות מ-3-4), ייתכן שהסיווג יהיה שטוח</li>
+      <li>ב-production build (webpack --mode production), הודעות console.log מוסרות -- אם צריך debugging, להשתמש ב-development mode</li>
+      <li>SVG layout תומך בעד 7 lanes מקביליים -- workstreams נוספים מתכווצים או מוסתרים</li>
+      <li>המפה היא ברמת workspace בודד -- אין תצוגה חוצת-פרויקטים (עתידי)</li>
+    </ul>
+  </div>
+
+</div>
+
+</body>
+</html>

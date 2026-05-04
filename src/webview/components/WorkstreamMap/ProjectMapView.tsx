@@ -4,6 +4,8 @@ import { computeLayout } from './layout';
 import { pulseKeyframes } from './animations';
 import { WorkstreamLine } from './WorkstreamLine';
 import { StationNode } from './StationNode';
+import { SplitJunction } from './SplitJunction';
+import { MergeJunction } from './MergeJunction';
 import { CurrentStateLayer } from './CurrentStateLayer';
 import { ResumeViewLayer } from './ResumeViewLayer';
 import { MapTooltip } from './MapTooltip';
@@ -91,6 +93,33 @@ export const ProjectMapView: React.FC<ProjectMapViewProps> = ({ state }) => {
               labelPosition={layout.labelPositions[ws.id] ?? { x: 0, y: 0 }}
             />
           ))}
+
+        {/* Split and merge junctions */}
+        {state.splits.map(split => {
+          const pos = layout.junctionPositions[split.id];
+          if (!pos) { return null; }
+          return (
+            <SplitJunction
+              key={`split-${split.id}`}
+              split={split}
+              x={pos.x}
+              y={pos.y}
+            />
+          );
+        })}
+
+        {state.merges.map(merge => {
+          const pos = layout.junctionPositions[merge.id];
+          if (!pos) { return null; }
+          return (
+            <MergeJunction
+              key={`merge-${merge.id}`}
+              merge={merge}
+              x={pos.x}
+              y={pos.y}
+            />
+          );
+        })}
 
         {/* Station nodes */}
         {visibleStations.map(station => {

@@ -267,10 +267,13 @@ claude-code-mirror/
 |       |   |   +-- McpDebugTab.tsx      #   Paths, diagnostics, and copyable MCP commands
 |       |   |   +-- index.ts             #   Barrel export
 |       |   +-- WorkstreamMap/
-|       |   |   +-- WorkstreamMapView.tsx    #   Top-level container (loading/error/empty states)
-|       |   |   +-- ProjectMapView.tsx       #   Main SVG canvas (layout, lines, stations, overlays)
+|       |   |   +-- WorkstreamMapView.tsx    #   Top-level container (loading/error/empty states, close button)
+|       |   |   +-- ProjectMapView.tsx       #   Main SVG canvas (layout, lines, stations, splits/merges, overlays)
 |       |   |   +-- WorkstreamLine.tsx       #   SVG workstream line with hit area, label, status badge
 |       |   |   +-- StationNode.tsx          #   SVG station shapes (circle/diamond/square/triangle/star)
+|       |   |   +-- SplitJunction.tsx        #   SVG split visualization (circle + diverging arrows) with confidence indicator
+|       |   |   +-- MergeJunction.tsx        #   SVG merge visualization (circle + converging arrows) with confidence indicator
+|       |   |   +-- PlanOverlayLine.tsx      #   Thin muted plan route overlay with step markers and status colors
 |       |   |   +-- CurrentStateLayer.tsx    #   Resume point markers, blocker highlights, glow animations
 |       |   |   +-- ResumeViewLayer.tsx      #   Change summary banner, new workstream/station highlights
 |       |   |   +-- MapHeader.tsx            #   Summary chips (Active/Blocked/Done counts)
@@ -278,7 +281,9 @@ claude-code-mirror/
 |       |   |   +-- MapLegend.tsx            #   Line colors, textures, station shapes legend
 |       |   |   +-- MapTooltip.tsx           #   Floating detail tooltip on hover
 |       |   |   +-- WorkstreamDetailPanel.tsx #  Side panel with workstream metadata + stations
+|       |   |   +-- WorkstreamFocusView.tsx  #   Workstream-focused detail view with metrics, events, related workstreams
 |       |   |   +-- StationDetailView.tsx    #   Side panel with station detail + evidence
+|       |   |   +-- ConfidenceReviewPanel.tsx #  Floating panel for low-confidence workstream review and reclassification
 |       |   |   +-- ResolveToolbar.tsx       #   Action buttons (Rename, Complete, Abandon, Pin)
 |       |   |   +-- NLCommandBar.tsx         #   Natural language map editing input
 |       |   |   +-- layout.ts               #   Deterministic lane-based SVG layout algorithm
@@ -549,8 +554,9 @@ claude-code-mirror/
 **Happy Provider (remote)** -- Integration with Happy Coder, an external remote AI coding relay that enables cross-device Claude Code sessions (local-to-mobile and back). ClaUi's role is a thin CLI-swap layer: the internal provider id remains `'remote'`, and the implementation reuses the standard `SessionTab` + `ClaudeProcessManager` pipeline, only swapping the executable path to Happy CLI via `ProcessStartOptions.cliPathOverride`. All remote/mobile capabilities are handled by the external Happy CLI and its relay server, not by ClaUi. Auth flow uses QR code / device auth via `happy auth` in a VS Code terminal (`claudeMirror.authenticateHappy`), and `SessionTab` detects auth-required stderr patterns to show targeted guidance.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/REMOTE_SESSIONS.md`
 
-**Workstream Map** -- Subway-map style visualization that groups sessions into logical workstreams (coherent threads of work with a goal, status, and history). AI-powered classification pipeline: heuristic pre-clustering (git branch grouping, file overlap Jaccard scoring, temporal proximity) followed by Sonnet classification and station extraction. Stations represent meaningful events within sessions (milestones, decisions, blockers, discoveries). SVG-based deterministic lane layout with visual encodings: line colors for status (active=blue, blocked=red, completed=green), line textures (solid/dashed for confidence), station shapes (circle/diamond/square/triangle for type). Layers: Current State (resume point markers, blocker highlights), Resume View (change summary after inactivity), Plan Overlay, and Resolve Mode (rename, mark complete/abandoned, pin, NL editing). Backend services: `WorkstreamManager` (orchestrator), `WorkstreamStore` (persistence), `WorkstreamClassifier`, `StationExtractor`, `CurrentStateSynthesizer`, `ResumeStateBuilder`, `PlanRealityAnalyzer`, `WorkstreamNLEditor`, `WorkstreamImportanceScorer`, `WorkstreamSnapshotStore`. Frontend: `WorkstreamMapView`, `ProjectMapView`, `WorkstreamLine`, `StationNode`, overlay layers, detail panels, `ResolveToolbar`, `NLCommandBar`. Command: `claudeMirror.openWorkstreamMap`.
+**Workstream Map** -- Subway-map style visualization that groups sessions into logical workstreams (coherent threads of work with a goal, status, and history). AI-powered classification pipeline: scoped to open-tab sessions + last 3 days, heuristic pre-clustering (git branch, file overlap Jaccard, temporal proximity), then Sonnet classification via stdin-piped CLI call. Stations represent meaningful events (milestones, decisions, blockers, discoveries). SVG deterministic lane layout with visual encodings for status, confidence, type. Layers: Current State, Resume View, Plan Overlay, Resolve Mode. Backend: `WorkstreamManager` orchestrator + 11 service classes. Frontend: 14 React/SVG components. Command: `claudeMirror.openWorkstreamMap`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP.md`
+> Plans: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP_PLAN_REWRITE.md` (full spec), `WORKSTREAM_MAP_PLAN.md` (original)
 
 ---
 

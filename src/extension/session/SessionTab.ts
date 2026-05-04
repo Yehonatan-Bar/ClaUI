@@ -2302,6 +2302,11 @@ export class SessionTab implements WebviewBridge {
     this.messageHandler.setSessionStore(store);
   }
 
+  /** Inject a getter for open tab session IDs (forwarded to MessageHandler for workstream scope). */
+  setOpenTabSessionIdsGetter(getter: () => string[]): void {
+    this.messageHandler.setOpenTabSessionIdsGetter(getter);
+  }
+
   /** Get the active team name */
   getActiveTeamName(): string | null {
     return this.activeTeamName;

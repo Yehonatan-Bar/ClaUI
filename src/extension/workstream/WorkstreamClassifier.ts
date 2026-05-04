@@ -15,6 +15,8 @@ export class WorkstreamClassifier {
   private lastFullRunAt = 0;
   private lastInputHash = '';
 
+  constructor(private readonly log: (msg: string) => void = () => {}) {}
+
   async classify(
     sessions: EnrichedSessionData[],
     existingState: ProjectMapState | null,
@@ -22,21 +24,28 @@ export class WorkstreamClassifier {
     cliPath: string,
     workspacePath: string,
   ): Promise<ClassificationOutput> {
+    this.log(`[Classifier] classify() called: sessions=${sessions.length}, force=${options.force}, existingWorkstreams=${existingState?.workstreams.length ?? 0}`);
+
     if (!options.force && !this.shouldRun(sessions)) {
+      this.log(`[Classifier] Debounced: lastRunAge=${Date.now() - this.lastFullRunAt}ms, hashMatch=${this.computeInputHash(sessions) === this.lastInputHash}`);
       throw new Error('Classification debounced - not enough time since last run');
     }
 
     const protectedEdits = existingState?.userEdits.filter(e => e.protectedFromAiOverwrite) ?? [];
     const protectedSessionAssignments = this.buildProtectedAssignments(protectedEdits, existingState);
+    this.log(`[Classifier] Protected assignments: ${protectedSessionAssignments.size}`);
 
     const clusters = this.heuristicPreCluster(sessions);
+    this.log(`[Classifier] Pre-clusters: ${clusters.length} (sessions: ${clusters.map(c => c.sessionIds.length).join(',')})`);
 
     const prompt = this.buildClassificationPrompt(sessions, clusters, existingState, protectedSessionAssignments);
+    this.log(`[Classifier] Prompt built: ${prompt.length} chars`);
 
     const result = await this.callSonnet(prompt, cliPath, workspacePath);
     this.lastFullRunAt = Date.now();
     this.lastInputHash = this.computeInputHash(sessions);
 
+    this.log(`[Classifier] Result: ${result.workstreams.length} workstreams, ${result.splits?.length ?? 0} splits, ${result.merges?.length ?? 0} merges`);
     return result;
   }
 
@@ -281,43 +290,90 @@ Respond with ONLY valid JSON matching this schema:
 
   private async callSonnet(prompt: string, cliPath: string, workspacePath: string): Promise<ClassificationOutput> {
     return new Promise((resolve, reject) => {
-      const args = ['-p', prompt, '--output-format', 'json', '-m', 'sonnet'];
+      const args = ['-p', '--output-format', 'json', '--model', 'claude-sonnet-4-6'];
+      this.log(`[Classifier] Spawning CLI: path="${cliPath}", args=[${args.join(', ')}], cwd="${workspacePath}", promptLen=${prompt.length}`);
+
       const proc = spawn(cliPath, args, {
         cwd: workspacePath,
         shell: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env },
-        timeout: 60000,
       });
 
       let stdout = '';
       let stderr = '';
+      let settled = false;
+
+      this.log(`[Classifier] Process spawned, pid=${proc.pid ?? 'unknown'}`);
+
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          proc.kill();
+          this.log(`[Classifier] TIMEOUT after 90s, killing process`);
+          reject(new Error('Classification timed out after 90s'));
+        }
+      }, 90_000);
 
       proc.stdout?.on('data', (data: Buffer) => { stdout += data.toString(); });
       proc.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
 
       proc.on('close', (code) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        this.log(`[Classifier] Process closed: exitCode=${code}, stdoutLen=${stdout.length}, stderrLen=${stderr.length}`);
+        if (stderr.length > 0) {
+          this.log(`[Classifier] stderr: ${stderr.slice(-500)}`);
+        }
         if (code !== 0) {
-          reject(new Error(`Sonnet classification failed (exit ${code}): ${stderr}`));
+          reject(new Error(`Sonnet classification failed (exit ${code}): ${stderr.slice(-500)}`));
           return;
         }
+        this.log(`[Classifier] stdout first 300 chars: ${stdout.slice(0, 300)}`);
         try {
-          const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+          let textToSearch = stdout;
+          try {
+            const envelope = JSON.parse(stdout);
+            if (envelope?.result && typeof envelope.result === 'string') {
+              textToSearch = envelope.result;
+              this.log(`[Classifier] Unwrapped CLI envelope, result length=${textToSearch.length}`);
+            }
+          } catch { /* not an envelope, use stdout directly */ }
+
+          const jsonMatch = textToSearch.match(/\{[\s\S]*\}/);
           if (!jsonMatch) {
-            reject(new Error('No JSON found in classification output'));
+            this.log(`[Classifier] No JSON found in text (length=${textToSearch.length})`);
+            reject(new Error(`No JSON found in classification output (text length=${textToSearch.length}, first 200 chars: ${textToSearch.slice(0, 200)})`));
             return;
           }
+          this.log(`[Classifier] JSON extracted: ${jsonMatch[0].length} chars`);
           const parsed = JSON.parse(jsonMatch[0]) as ClassificationOutput;
           if (!parsed.workstreams || !Array.isArray(parsed.workstreams)) {
+            this.log(`[Classifier] Parsed JSON has no workstreams array`);
             reject(new Error('Invalid classification output: missing workstreams array'));
             return;
           }
+          this.log(`[Classifier] Parsed OK: ${parsed.workstreams.length} workstreams`);
           resolve(parsed);
         } catch (e) {
+          this.log(`[Classifier] JSON parse error: ${e}`);
           reject(new Error(`Failed to parse classification JSON: ${e}`));
         }
       });
 
-      proc.on('error', reject);
+      proc.on('error', (err) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          this.log(`[Classifier] Process error: ${err.message}`);
+          reject(err);
+        }
+      });
+
+      proc.stdin?.write(prompt, 'utf-8');
+      proc.stdin?.end();
+      this.log(`[Classifier] Prompt written to stdin and closed`);
     });
   }
 }

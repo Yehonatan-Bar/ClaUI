@@ -174,6 +174,12 @@ export class TabManager {
     return out;
   }
 
+  getOpenTabSessionIds(): string[] {
+    return this.listTabs()
+      .map(t => t.sessionId)
+      .filter((id): id is string => id !== null);
+  }
+
   broadcastTabsState(): void {
     const msg: ExtensionToWebviewMessage = {
       type: 'tabList',
@@ -311,6 +317,7 @@ export class TabManager {
       tab.setWorkstreamManager(this.workstreamManager);
     }
     tab.setSessionStore(this.sessionStore);
+    tab.setOpenTabSessionIdsGetter(() => this.getOpenTabSessionIds());
     this.seedSnapshotEntry(tab);
     this.treeChangeEmitter.fire();
     this.broadcastTabsState();

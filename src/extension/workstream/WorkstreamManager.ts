@@ -49,11 +49,12 @@ export class WorkstreamManager {
     private readonly getCliPath: () => string,
     private readonly getWorkspacePath: () => string,
   ) {
+    const logFn = (msg: string) => this.log.appendLine(`[WorkstreamMap] ${msg}`);
     this.store = new WorkstreamStore(workspaceState);
     this.snapshotStore = new WorkstreamSnapshotStore(workspaceState);
-    this.classifier = new WorkstreamClassifier();
-    this.stationExtractor = new StationExtractor();
-    this.currentStateSynthesizer = new CurrentStateSynthesizer();
+    this.classifier = new WorkstreamClassifier(logFn);
+    this.stationExtractor = new StationExtractor(logFn);
+    this.currentStateSynthesizer = new CurrentStateSynthesizer(logFn);
     this.resumeStateBuilder = new ResumeStateBuilder(this.snapshotStore);
     this.planAnalyzer = new PlanRealityAnalyzer();
     this.nlEditor = new WorkstreamNLEditor();
@@ -79,11 +80,22 @@ export class WorkstreamManager {
     const workspacePath = this.getWorkspacePath();
     const existingState = this.store.getProjectMapState(projectId);
 
+    this.log.appendLine(`[WorkstreamMap] classifyProject START: projectId="${projectId}", cliPath="${cliPath}", workspacePath="${workspacePath}"`);
+    this.log.appendLine(`[WorkstreamMap] Input: ${sessionSummaries.length} summaries, ${sessionMetadataMap.size} metadata entries, existingState=${!!existingState}`);
+
     this.reportProgress(0.05, 'Enriching session data...');
 
     // Phase 1: Enrich sessions
     const enrichedSessions = this.backfiller.enrichMultiple(sessionSummaries, sessionMetadataMap);
     const adequateSessions = enrichedSessions.filter(s => this.backfiller.isAdequatelyEnriched(s));
+
+    this.log.appendLine(`[WorkstreamMap] Enrichment: ${enrichedSessions.length} enriched, ${adequateSessions.length} adequate`);
+    if (adequateSessions.length < enrichedSessions.length) {
+      const rejected = enrichedSessions.filter(s => !this.backfiller.isAdequatelyEnriched(s));
+      for (const r of rejected.slice(0, 5)) {
+        this.log.appendLine(`[WorkstreamMap]   Rejected session ${r.sessionId.slice(0, 8)}: firstPrompt=${!!r.firstPrompt}, summary=${!!r.summary}, startedAt=${!!r.startedAt}`);
+      }
+    }
 
     if (adequateSessions.length === 0) {
       this.log.appendLine('[WorkstreamMap] No adequately enriched sessions for classification');
@@ -99,9 +111,14 @@ export class WorkstreamManager {
         adequateSessions, existingState, { ...options, force: options.force ?? !existingState }, cliPath, workspacePath
       );
     } catch (e) {
-      this.log.appendLine(`[WorkstreamMap] Classification failed: ${e}`);
+      this.log.appendLine(`[WorkstreamMap] Classification FAILED: ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
       if (existingState) { return existingState; }
       return this.createEmptyState(projectId, workspacePath);
+    }
+
+    this.log.appendLine(`[WorkstreamMap] Classification output: ${classificationOutput.workstreams.length} workstreams`);
+    for (const cw of classificationOutput.workstreams) {
+      this.log.appendLine(`[WorkstreamMap]   ws="${cw.label}" type=${cw.type} status=${cw.status} sessions=${cw.sessionIds.length} confidence=${cw.confidence}`);
     }
 
     this.reportProgress(0.40, 'Building workstream model...');
