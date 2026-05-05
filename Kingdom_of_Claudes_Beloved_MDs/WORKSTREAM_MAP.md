@@ -381,8 +381,8 @@ MapHeader, MapControls, and MapLegend use glassmorphism: `backdrop-filter: blur(
 ### Webview Components (`src/webview/components/WorkstreamMap/`)
 | File | Role |
 |------|------|
-| `WorkstreamMapView.tsx` | Top-level container. Handles loading/error/empty/portfolio states with AnimatePresence transitions |
-| `UserPortfolioView.tsx` | Cross-project portfolio view with health summary, resume recommendation banner, and stacked full project maps |
+| `WorkstreamMapView.tsx` | Top-level container. Handles loading/error/empty/portfolio states with AnimatePresence transitions. Empty state keeps the current project actionable and can link to All Projects when portfolio data exists |
+| `UserPortfolioView.tsx` | Cross-project portfolio view with health summary, resume recommendation banner, Current Project escape hatch for unclassified workspaces, and stacked full project maps |
 | `PortfolioProjectMap.tsx` | Full cached `ProjectMapState` renderer for each portfolio project; shows all workstream lanes with a simple `P01`/`P02` project separator and per-project badges |
 | `ProjectCard.tsx` | Legacy compact project card: name, health border, workstream badges, mini subway lines, hover tooltip, live-updating relative timestamps (60s interval via `useLiveRelativeTime` hook) |
 | `ProjectMapView.tsx` | SVG canvas with pan/zoom, dot grid background, minimap, all layers composed |
@@ -411,9 +411,9 @@ MapHeader, MapControls, and MapLegend use glassmorphism: `backdrop-filter: blur(
 | File | Role |
 |------|------|
 | `extension.ts` | Creates `WorkstreamManager` and `UserPortfolioManager`, registers `claudeMirror.openWorkstreamMap` and `claudeMirror.openWorkstreamPortfolio` commands, injects into `TabManager` |
-| `TabManager.ts` | Forwards `workstreamManager`, `sessionStore`, and `openTabSessionIdsGetter` to each new `SessionTab` |
-| `SessionTab.ts` | Forwards all three to `MessageHandler` via setter methods |
-| `MessageHandler.ts` | Handles all 10 webview message types (8 project + 2 portfolio), applies session scoping filter |
+| `TabManager.ts` | Forwards `workstreamManager`, `sessionStore`, and `openTabSessionIdsGetter` to each new `SessionTab` and `CodexSessionTab` |
+| `SessionTab.ts` / `CodexSessionTab.ts` | Forward all three to their webview handlers via setter methods |
+| `MessageHandler.ts` / `CodexMessageHandler.ts` | Handle all 10 workstream webview message types (8 project + 2 portfolio), apply the same session scoping filter, and keep Claude/Codex tabs on the same map data path |
 | `store.ts` (webview Zustand) | State slice for map UI state |
 | `useClaudeStream.ts` | Dispatches extension-to-webview messages to Zustand store |
 | `App.tsx` | Renders `WorkstreamMapView` when `workstreamMapOpen` is true |
@@ -431,8 +431,10 @@ UI entry points:
 - Map Controls toolbar "Import Folder" button (`MapControls.tsx`)
 - "Build Map" button in empty state (`WorkstreamMapView.tsx`)
 - "Import Folder" button in empty state (`WorkstreamMapView.tsx`)
+- "All Projects" button in empty state when portfolio data exists (`WorkstreamMapView.tsx`)
 - "Retry" button in error state (`WorkstreamMapView.tsx`)
 - "All Projects" button in `MapHeader.tsx` (shown when portfolio has 2+ projects)
+- "Current Project" button in `UserPortfolioView.tsx` when the current workspace has no portfolio entry yet
 - "All Projects" / "Back" button in `MapControls.tsx` (navigates between project map and portfolio)
 
 ---
@@ -489,8 +491,10 @@ Computed in priority order (first match wins):
 
 ### Navigation
 - Portfolio data is fetched alongside map data on every map open (`WorkstreamMapView` useEffect).
-- If portfolio data arrives with 2+ projects, the current zoom is `'project'`, and no prior portfolio data was loaded (first load only), auto-opens portfolio view.
-- "All Projects" button appears in `MapHeader` when the portfolio has 2+ projects.
+- If portfolio data arrives with 2+ projects, the current zoom is `'project'`, no prior portfolio data was loaded (first load only), and the current workspace already has map data or a portfolio entry, auto-opens portfolio view.
+- New/unclassified current workspaces stay on the Project Map empty state so the user can build or import data for the current project instead of being trapped in cross-project history.
+- "All Projects" button appears in `MapHeader` when the portfolio has 2+ projects, and in the Project Map empty state when portfolio data exists.
+- "Current Project" appears in the portfolio header when the current workspace is not yet in the portfolio; it returns to the live Project Map empty state.
 - Clicking the resume recommendation banner navigates to the recommended project.
 - The portfolio body renders every project as a full cached map snapshot, not a compact top-workstreams card. Each project section is separated by a simple `P01`/`P02` identifier, project name, health/status badges, and path/activity metadata.
 - Portfolio map snapshots use the same deterministic lane layout as `ProjectMapView`, but override the lane cap and collapsed state so all project workstreams are visible in the user-level overview.

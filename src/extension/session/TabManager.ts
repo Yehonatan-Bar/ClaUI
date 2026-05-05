@@ -368,6 +368,11 @@ export class TabManager {
     this.tabs.set(tab.id, tab);
     this.tabSlotColors.set(tab.id, tabColor);
     this.activeTabId = tab.id;
+    if (this.workstreamManager) {
+      tab.setWorkstreamManager(this.workstreamManager);
+    }
+    tab.setSessionStore(this.sessionStore);
+    tab.setOpenTabSessionIdsGetter(() => this.getOpenTabSessionIds());
     this.seedSnapshotEntry(tab);
     this.treeChangeEmitter.fire();
     this.broadcastTabsState();

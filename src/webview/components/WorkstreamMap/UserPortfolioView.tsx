@@ -16,6 +16,11 @@ export const UserPortfolioView: React.FC = () => {
     postToExtension({ type: 'workstreamPortfolioRequestData' });
   }, []);
 
+  const hasCurrentWorkspaceProject = useMemo(() => {
+    if (!portfolioData || !currentWorkspacePath) { return false; }
+    return portfolioData.projects.some(project => isCurrentWorkspacePath(project.projectPath, currentWorkspacePath));
+  }, [portfolioData, currentWorkspacePath]);
+
   const handleNavigateToCurrentProject = () => {
     useAppStore.getState().setCachedViewProject(null);
     setZoom('project');
@@ -75,7 +80,11 @@ export const UserPortfolioView: React.FC = () => {
       fontFamily: 'var(--vscode-font-family)',
     }}>
       {/* Portfolio Header */}
-      <PortfolioHeader portfolio={portfolioData} />
+      <PortfolioHeader
+        portfolio={portfolioData}
+        showCurrentProjectAction={!!currentWorkspacePath && !hasCurrentWorkspaceProject}
+        onCurrentProject={handleNavigateToCurrentProject}
+      />
 
       {/* Resume recommendation banner */}
       {portfolioData.crossProjectResume && (
@@ -109,7 +118,11 @@ export const UserPortfolioView: React.FC = () => {
   );
 };
 
-const PortfolioHeader: React.FC<{ portfolio: UserPortfolioState }> = ({ portfolio }) => {
+const PortfolioHeader: React.FC<{
+  portfolio: UserPortfolioState;
+  showCurrentProjectAction: boolean;
+  onCurrentProject: () => void;
+}> = ({ portfolio, showCurrentProjectAction, onCurrentProject }) => {
   const totalProjects = portfolio.projects.length;
   const totalWorkstreams = portfolio.projects.reduce((sum, project) => sum + project.totalWorkstreams, 0);
   const activeProjects = portfolio.projects.filter(p => p.activeWorkstreams > 0).length;
@@ -138,23 +151,45 @@ const PortfolioHeader: React.FC<{ portfolio: UserPortfolioState }> = ({ portfoli
         {blockedProjects > 0 && <HealthSummaryChip label={`${blockedProjects} blocked`} color="#F87171" />}
       </div>
 
-      <motion.button
-        onClick={() => postToExtension({ type: 'workstreamPortfolioRequestData' })}
-        style={{
-          background: 'rgba(51, 65, 85, 0.5)',
-          color: '#94A3B8',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: 5,
-          padding: '3px 10px',
-          cursor: 'pointer',
-          fontSize: 10,
-          fontFamily: 'inherit',
-        }}
-        whileHover={{ scale: 1.05, color: '#CBD5E1' }}
-        whileTap={{ scale: 0.95 }}
-      >
-        Refresh
-      </motion.button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        {showCurrentProjectAction && (
+          <motion.button
+            onClick={onCurrentProject}
+            style={{
+              background: 'rgba(74, 158, 255, 0.14)',
+              color: '#9ecbff',
+              border: '1px solid rgba(74, 158, 255, 0.28)',
+              borderRadius: 5,
+              padding: '3px 10px',
+              cursor: 'pointer',
+              fontSize: 10,
+              fontFamily: 'inherit',
+              fontWeight: 600,
+            }}
+            whileHover={{ scale: 1.05, color: '#cfe8ff' }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Current Project
+          </motion.button>
+        )}
+        <motion.button
+          onClick={() => postToExtension({ type: 'workstreamPortfolioRequestData' })}
+          style={{
+            background: 'rgba(51, 65, 85, 0.5)',
+            color: '#94A3B8',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: 5,
+            padding: '3px 10px',
+            cursor: 'pointer',
+            fontSize: 10,
+            fontFamily: 'inherit',
+          }}
+          whileHover={{ scale: 1.05, color: '#CBD5E1' }}
+          whileTap={{ scale: 0.95 }}
+        >
+          Refresh
+        </motion.button>
+      </div>
     </div>
   );
 };

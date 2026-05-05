@@ -14,6 +14,19 @@
 - The override is applied to both first-turn `codex exec` and follow-up `codex exec resume` runs.
 - Empty/default mode passes no service-tier override, preserving the user's Codex CLI/config defaults.
 
+## 2026-05-05 - Codex Workstream Map parity
+
+- `TabManager` now forwards the shared `WorkstreamManager`, `SessionStore`, and open-tab session getter to new `CodexSessionTab` instances, matching the Claude tab wiring.
+- `CodexSessionTab` forwards those dependencies to `CodexMessageHandler`.
+- `CodexMessageHandler` now handles the Workstream Map and Portfolio message protocol:
+  - cached map data requests
+  - reclassification/build requests
+  - user edits and natural-language edits
+  - external folder import
+  - resume state requests
+  - cross-project portfolio load/open-project navigation
+- Result: opening Workstream Map from a Codex tab uses the same project map data path as Claude tabs instead of showing an inert overlay.
+
 ## 2026-04-09 - Codex scheduled messages support
 
 - Wired `scheduleMessage` / `cancelScheduledMessage` into `CodexMessageHandler`.

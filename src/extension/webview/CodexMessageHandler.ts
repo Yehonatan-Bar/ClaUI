@@ -126,11 +126,32 @@ export class CodexMessageHandler {
   private scheduledPromptTimer: ReturnType<typeof setTimeout> | null = null;
   /** Memory sampler for the dashboard memory tab (shared instance, set after construction) */
   private memorySampler: import('../process/ProcessMemorySampler').ProcessMemorySampler | null = null;
+  /** Workstream map manager (shared instance, set after construction) */
+  private workstreamManager: import('../workstream/WorkstreamManager').WorkstreamManager | null = null;
+  /** Session metadata store used by workstream classification. */
+  private sessionStore: import('../session/SessionStore').SessionStore | null = null;
+  /** Returns session IDs for all currently open tabs. */
+  private openTabSessionIdsGetter: (() => string[]) | null = null;
   private memoryStreamTimer: ReturnType<typeof setInterval> | null = null;
   private memorySampleInFlight = false;
 
   setMemorySampler(sampler: import('../process/ProcessMemorySampler').ProcessMemorySampler): void {
     this.memorySampler = sampler;
+  }
+
+  /** Provide the shared WorkstreamManager (used by the workstream map feature). */
+  setWorkstreamManager(manager: import('../workstream/WorkstreamManager').WorkstreamManager): void {
+    this.workstreamManager = manager;
+  }
+
+  /** Provide the SessionStore for accessing session metadata. */
+  setSessionStore(store: import('../session/SessionStore').SessionStore): void {
+    this.sessionStore = store;
+  }
+
+  /** Provide a getter for open tab session IDs (used to scope workstream classification). */
+  setOpenTabSessionIdsGetter(getter: () => string[]): void {
+    this.openTabSessionIdsGetter = getter;
   }
 
   /** Set extension metadata for bug reports */
@@ -1016,6 +1037,173 @@ export class CodexMessageHandler {
           this.handleChatSearchResumeSession(msg.sessionId);
           break;
 
+        // ----- Workstream Map -----
+        case 'workstreamMapOpen':
+          this.log('[WorkstreamMap][Codex] Map opened');
+          if (this.workstreamManager) {
+            const projectId = this.getWorkstreamProjectId();
+            void this.workstreamManager.markMapOpened(projectId);
+          }
+          break;
+
+        case 'workstreamMapRequestData': {
+          this.log(`[WorkstreamMap][Codex] Data requested (workstreamManager=${!!this.workstreamManager})`);
+          if (!this.workstreamManager) {
+            this.log('[WorkstreamMap][Codex] workstreamManager is null - no data to send');
+            break;
+          }
+
+          const projectId = this.getWorkstreamProjectId();
+          const mapData = this.workstreamManager.getProjectMapState(projectId);
+          if (mapData) {
+            this.webview.postMessage({ type: 'workstreamMapData', data: mapData });
+            const pm = this.workstreamManager.getPortfolioManager();
+            if (pm) {
+              this.log(`[WorkstreamPortfolio][Codex] Backfill publish for projectId="${projectId}", projectLabel="${mapData.projectLabel}"`);
+              void pm.publishProjectSummary(projectId, mapData)
+                .then(() => this.log('[WorkstreamPortfolio][Codex] Backfill publish succeeded'))
+                .catch(err => this.log(`[WorkstreamPortfolio][Codex] Backfill publish failed: ${err}`));
+            }
+          }
+
+          void this.workstreamManager.buildResumeState(projectId).then(resumeState => {
+            if (resumeState) {
+              this.webview.postMessage({ type: 'workstreamMapResumeState', resumeState });
+            }
+          });
+          break;
+        }
+
+        case 'workstreamMapReclassify': {
+          this.log(`[WorkstreamMap][Codex] Reclassify requested (force=${msg.force ?? false}) workstreamManager=${!!this.workstreamManager} analyticsStore=${!!this.projectAnalyticsStore}`);
+          if (!this.workstreamManager) {
+            this.webview.postMessage({ type: 'workstreamMapError', message: 'Workstream manager not available. Try reloading VS Code.' });
+            break;
+          }
+          if (!this.projectAnalyticsStore) {
+            this.webview.postMessage({ type: 'workstreamMapError', message: 'Analytics store not available.' });
+            break;
+          }
+
+          const projectId = this.getWorkstreamProjectId();
+          const allSummaries = this.projectAnalyticsStore.getSummaries();
+          const openTabIds = new Set(this.openTabSessionIdsGetter?.() ?? []);
+          const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+          const summaries = allSummaries.filter(s => {
+            if (openTabIds.has(s.sessionId)) { return true; }
+            const ts = s.endedAt ?? s.startedAt;
+            return !!ts && new Date(ts).getTime() > threeDaysAgo;
+          });
+          this.log(`[WorkstreamMap][Codex] Scoped ${allSummaries.length} total summaries -> ${summaries.length} (openTabs=${openTabIds.size}, recentCutoff=3d)`);
+
+          const metadataMap = new Map<string, import('../session/SessionStore').SessionMetadata>();
+          if (this.sessionStore) {
+            for (const session of this.sessionStore.getSessions()) {
+              metadataMap.set(session.sessionId, session);
+            }
+          }
+
+          this.webview.postMessage({ type: 'workstreamMapClassifying', progress: 0, phase: 'Starting classification...' });
+          this.workstreamManager.onProgress((progress, phase) => {
+            this.webview.postMessage({ type: 'workstreamMapClassifying', progress, phase });
+          });
+          void this.workstreamManager.classifyProject(projectId, summaries, metadataMap, { force: msg.force })
+            .then(state => {
+              this.log(`[WorkstreamMap][Codex] Classification complete: ${state.workstreams.length} workstreams, ${state.stations.length} stations`);
+              this.webview.postMessage({ type: 'workstreamMapData', data: state });
+            })
+            .catch(err => {
+              this.log(`[WorkstreamMap][Codex] Classification failed: ${err instanceof Error ? err.message : String(err)}`);
+              this.webview.postMessage({ type: 'workstreamMapError', message: err instanceof Error ? err.message : String(err) });
+            });
+          break;
+        }
+
+        case 'workstreamMapApplyEdit': {
+          this.log(`[WorkstreamMap][Codex] Apply edit: ${msg.edit.type}`);
+          if (!this.workstreamManager) { break; }
+          const projectId = this.getWorkstreamProjectId();
+          void this.workstreamManager.applyUserEdit(projectId, msg.edit).then(state => {
+            if (state) {
+              this.webview.postMessage({ type: 'workstreamMapData', data: state });
+            }
+          });
+          break;
+        }
+
+        case 'workstreamMapNaturalLanguageEdit': {
+          this.log(`[WorkstreamMap][Codex] NL edit: "${msg.text.slice(0, 60)}..."`);
+          if (!this.workstreamManager) { break; }
+          const projectId = this.getWorkstreamProjectId();
+          void this.workstreamManager.applyNaturalLanguageEdit(msg.text, msg.context, projectId)
+            .then(result => {
+              if (result) {
+                this.webview.postMessage({ type: 'workstreamMapData', data: result.state });
+              }
+            })
+            .catch(err => {
+              this.log(`[WorkstreamMap][Codex] NL edit failed: ${err instanceof Error ? err.message : String(err)}`);
+              this.webview.postMessage({ type: 'workstreamMapError', message: err instanceof Error ? err.message : String(err) });
+            });
+          break;
+        }
+
+        case 'workstreamMapOpenSession':
+          this.log(`[WorkstreamMap][Codex] Open session: ${msg.sessionId}`);
+          void vscode.commands.executeCommand('claudeMirror.resumeSession', msg.sessionId);
+          break;
+
+        case 'workstreamMapDismissResumeView':
+          this.log('[WorkstreamMap][Codex] Resume view dismissed');
+          break;
+
+        case 'workstreamMapSaveSnapshot': {
+          this.log('[WorkstreamMap][Codex] Save snapshot requested');
+          if (!this.workstreamManager) { break; }
+          const projectId = this.getWorkstreamProjectId();
+          void this.workstreamManager.markMapOpened(projectId);
+          break;
+        }
+
+        case 'workstreamMapImportExternalFolder': {
+          void this.handleWorkstreamExternalFolderImport(msg.folderPath).catch(err => {
+            const message = err instanceof Error ? err.message : String(err);
+            this.log(`[WorkstreamMap][Codex] External folder import failed: ${message}`);
+            this.webview.postMessage({ type: 'workstreamMapError', message });
+          });
+          break;
+        }
+
+        // ----- Workstream Portfolio -----
+        case 'workstreamPortfolioRequestData': {
+          this.log('[WorkstreamPortfolio][Codex] Data requested');
+          const pm = this.workstreamManager?.getPortfolioManager();
+          if (!pm) {
+            this.log('[WorkstreamPortfolio][Codex] Portfolio manager not available');
+            break;
+          }
+          void pm.getPortfolioState().then(portfolioState => {
+            const currentWorkspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+            this.log(`[WorkstreamPortfolio][Codex] Sending ${portfolioState.projects.length} projects. Names: [${portfolioState.projects.map(p => p.projectName).join(', ')}]. currentWorkspacePath="${currentWorkspacePath}"`);
+            this.webview.postMessage({ type: 'workstreamPortfolioData', data: portfolioState, currentWorkspacePath });
+          }).catch(err => {
+            this.log(`[WorkstreamPortfolio][Codex] Failed to get portfolio: ${err instanceof Error ? err.message : String(err)}`);
+          });
+          break;
+        }
+
+        case 'workstreamPortfolioOpenProject': {
+          const projectPath = msg.projectPath;
+          this.log(`[WorkstreamPortfolio][Codex] Open project: ${projectPath}`);
+          const currentWorkspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+          if (currentWorkspace && this.sameWorkspacePath(projectPath, currentWorkspace)) {
+            this.webview.postMessage({ type: 'workstreamPortfolioNavigateToProject' });
+          } else {
+            void vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(projectPath), false);
+          }
+          break;
+        }
+
         default:
           // Keep Codex handler permissive; ignore unrelated UI messages in Stage 2.
           break;
@@ -1371,6 +1559,88 @@ export class CodexMessageHandler {
       .catch(() => {
         this.webview.postMessage({ type: 'projectAnalyticsData', sessions: [] });
       });
+  }
+
+  private getWorkstreamProjectId(): string {
+    const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    return wsFolder ?? 'default';
+  }
+
+  private async promptForExternalWorkFolderPath(requestedPath?: string): Promise<string | undefined> {
+    const initial = requestedPath?.trim();
+    if (initial) {
+      return this.normalizeUserEnteredPath(initial);
+    }
+
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const value = await vscode.window.showInputBox({
+      prompt: 'Enter a folder path to import as an external workstream',
+      placeHolder: workspacePath ? path.join(workspacePath, 'docs') : 'C:\\path\\to\\external-work-folder',
+      ignoreFocusOut: true,
+      validateInput: (input) => {
+        const normalized = this.normalizeUserEnteredPath(input);
+        if (!normalized) { return 'Folder path is required'; }
+        if (!fs.existsSync(normalized)) { return 'Folder does not exist'; }
+        try {
+          if (!fs.statSync(normalized).isDirectory()) { return 'Path must be a folder'; }
+        } catch {
+          return 'Unable to read folder';
+        }
+        return undefined;
+      },
+    });
+
+    return value ? this.normalizeUserEnteredPath(value) : undefined;
+  }
+
+  private normalizeUserEnteredPath(value: string): string {
+    let normalized = value.trim();
+    if ((normalized.startsWith('"') && normalized.endsWith('"')) || (normalized.startsWith("'") && normalized.endsWith("'"))) {
+      normalized = normalized.slice(1, -1);
+    }
+    if (normalized === '~') {
+      normalized = process.env.USERPROFILE || process.env.HOME || normalized;
+    } else if (normalized.startsWith('~/') || normalized.startsWith('~\\')) {
+      const home = process.env.USERPROFILE || process.env.HOME;
+      if (home) {
+        normalized = path.join(home, normalized.slice(2));
+      }
+    }
+    return path.resolve(normalized);
+  }
+
+  private async handleWorkstreamExternalFolderImport(requestedPath?: string): Promise<void> {
+    this.log(`[WorkstreamMap][Codex] External folder import requested path="${requestedPath ?? ''}" workstreamManager=${!!this.workstreamManager}`);
+    if (!this.workstreamManager) {
+      this.webview.postMessage({ type: 'workstreamMapError', message: 'Workstream manager not available. Try reloading VS Code.' });
+      return;
+    }
+
+    const folderPath = await this.promptForExternalWorkFolderPath(requestedPath);
+    if (!folderPath) {
+      this.log('[WorkstreamMap][Codex] External folder import canceled');
+      return;
+    }
+
+    const projectId = this.getWorkstreamProjectId();
+    this.webview.postMessage({ type: 'workstreamMapClassifying', progress: 0, phase: 'Starting external folder import...' });
+    this.workstreamManager.onProgress((progress, phase) => {
+      this.webview.postMessage({ type: 'workstreamMapClassifying', progress, phase });
+    });
+
+    const state = await this.workstreamManager.ingestExternalFolder(projectId, folderPath);
+    this.webview.postMessage({ type: 'workstreamMapData', data: state });
+    const pm = this.workstreamManager.getPortfolioManager();
+    if (pm) {
+      const portfolioState = await pm.getPortfolioState();
+      const currentWorkspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+      this.webview.postMessage({ type: 'workstreamPortfolioData', data: portfolioState, currentWorkspacePath });
+    }
+    void vscode.window.showInformationMessage(`Imported external work folder: ${path.basename(folderPath)}`);
+  }
+
+  private sameWorkspacePath(a: string, b: string): boolean {
+    return a.replace(/\\/g, '/').toLowerCase() === b.replace(/\\/g, '/').toLowerCase();
   }
 
   private parseOpenFileTarget(rawPath: string): { filePath: string; line?: number; col?: number } | null {

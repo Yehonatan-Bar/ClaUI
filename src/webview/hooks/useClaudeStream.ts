@@ -233,8 +233,18 @@ export function useClaudeStream(): void {
 
         case 'workstreamPortfolioData': {
           const store = useAppStore.getState();
+          const normalizePath = (value: string) => value.replace(/\\/g, '/').toLowerCase();
+          const currentWorkspacePath = msg.currentWorkspacePath ?? '';
+          const currentWorkspaceInPortfolio = !!currentWorkspacePath && msg.data.projects.some(project =>
+            normalizePath(project.projectPath) === normalizePath(currentWorkspacePath)
+          );
           store.setUserPortfolioData(msg.data, msg.currentWorkspacePath);
-          if (msg.data.projects.length > 1 && store.workstreamMapZoom === 'project' && !store.userPortfolioData) {
+          if (
+            msg.data.projects.length > 1 &&
+            store.workstreamMapZoom === 'project' &&
+            !store.userPortfolioData &&
+            (store.workstreamMapData || currentWorkspaceInPortfolio)
+          ) {
             store.setWorkstreamMapZoom('portfolio');
           }
           break;

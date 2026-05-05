@@ -75,6 +75,7 @@ export const WorkstreamMapView: React.FC = () => {
   const resolveModeEnabled = useAppStore(s => s.resolveModeEnabled);
   const zoom = useAppStore(s => s.workstreamMapZoom);
   const cachedViewProject = useAppStore(s => s.cachedViewProject);
+  const portfolioData = useAppStore(s => s.userPortfolioData);
   const [showConfidencePanel, setShowConfidencePanel] = useState(true);
 
   useEffect(() => {
@@ -233,6 +234,29 @@ export const WorkstreamMapView: React.FC = () => {
             >
               Import Folder
             </motion.button>
+            {portfolioData && portfolioData.projects.length > 0 && (
+              <motion.button
+                onClick={() => {
+                  useAppStore.getState().setWorkstreamMapZoom('portfolio');
+                  postToExtension({ type: 'workstreamPortfolioRequestData' });
+                }}
+                style={{
+                  background: 'rgba(74, 158, 255, 0.1)',
+                  color: '#9ecbff',
+                  border: '1px solid rgba(74, 158, 255, 0.22)',
+                  borderRadius: 8,
+                  padding: '8px 18px',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+                whileHover={{ scale: 1.04, boxShadow: '0 0 18px rgba(74, 158, 255, 0.22)' }}
+                whileTap={{ scale: 0.96 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              >
+                All Projects
+              </motion.button>
+            )}
           </motion.div>
 
         /* Loading state */

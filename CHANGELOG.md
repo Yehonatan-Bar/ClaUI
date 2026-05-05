@@ -1,5 +1,55 @@
 # ClaUi - Changelog
 
+## v0.1.137 - 2026-05-05
+
+**Feature: Workstream Map — AI-powered subway-map project visualization**
+
+- New "Workstream Map" view that groups sessions into logical workstreams (coherent threads of work with a goal, status, and history) and renders them as a subway-map style SVG visualization
+- AI-powered classification pipeline: scopes sessions to open tabs + last 3 days, performs heuristic pre-clustering (git branch, file overlap Jaccard > 0.3, temporal proximity), then classifies via Sonnet CLI call piped through stdin
+- Stations represent meaningful events within sessions (milestones, decisions, blockers, code changes, failures) — extracted 1-5 per session via Sonnet in batches
+- Deterministic lane-based SVG layout with framer-motion animations: path draw-in, flowing particles on active/blocked workstreams, spring-based zoom transitions, CSS station entrance animations
+- Visual encodings: line color by status, dashed for low confidence, shape by station type (circle/diamond/square/triangle/star/lock/X), size by importance, glow states for attention/recent/resolved
+- Four composable layers: Current State (resume markers, blocker highlights), Resume View (change summary after 24h inactivity), Plan Overlay (planned vs actual steps), Resolve Mode (interactive editing)
+- Resolve mode supports renaming, status changes, session reassignment, pin/unpin, and natural language commands via `WorkstreamNLEditor` (pattern matching + Sonnet fallback)
+- Pan/zoom with drag, mouse wheel, double-click reset, and minimap
+- Importance/attention scoring via weighted composite heuristics (recency, volume, blockers)
+- Snapshot capture with SHA-256 dedup (max 20 snapshots per project)
+- Backend: `WorkstreamManager` orchestrator + 13 service classes (WorkstreamClassifier, StationExtractor, CurrentStateSynthesizer, ResumeStateBuilder, PlanRealityAnalyzer, WorkstreamNLEditor, WorkstreamImportanceScorer, SessionBackfiller, FileTracker, WorkstreamStore, WorkstreamSnapshotStore, UserPortfolioStore, UserPortfolioManager)
+- Frontend: 21 React/SVG components in `WorkstreamMap/` directory
+- Commands: `claudeMirror.openWorkstreamMap`, `claudeMirror.openWorkstreamPortfolio`
+- New detail doc: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP.md`
+- Full spec: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP_PLAN_REWRITE.md`
+
+**Feature: User Portfolio View — cross-project workstream display**
+
+- Top-level portfolio view that shows all projects across workspaces in one place, answering "which project should I open?" before the user even opens a workspace
+- Data persisted in VS Code `globalState` (shared across all workspaces) via `UserPortfolioStore`. Key: `workstreamMap.portfolio`, max 30 projects, auto-prune after 180 days based on `lastClassifiedAt`
+- Project health scoring computed in priority order: blocked (has blocked workstreams) > stale (no activity 21+ days) > needs_attention (uncertain workstreams or 7-21 days inactive) > healthy (fallback)
+- Cross-project resume algorithm: filters to 30-day activity, prioritizes blocked > active > recent, picks top workstream within winning project
+- `ProjectCard` component: health-colored border, workstream status badges, mini subway SVG lines, live-updating relative timestamps (60-second interval via `useLiveRelativeTime` hook), hover tooltip with full details
+- Cached map view: clicking a non-current-workspace project card shows its cached `ProjectMapState` as a read-only map snapshot with `CachedMapBanner` displaying stale date and "Open Workspace" action
+- Missing/deleted project cards are grayed out with "(not found)" label and disabled click
+- Auto-open: on first portfolio data load, if 2+ projects exist and no prior portfolio data was loaded, automatically zooms to portfolio view
+- "All Projects" button in `MapHeader` (visible when portfolio has 2+ projects) and Back button in `MapControls` for portfolio navigation
+- Clickable resume recommendation banner navigates to the recommended project
+- Backfill mechanism: every map data request auto-publishes to portfolio, so projects classified before the feature existed get portfolio entries on next map view
+- Path validation via `fs.existsSync()` on portfolio data serve (not on store write)
+- `currentWorkspacePath` sent from extension to webview via postMessage for accurate current-workspace detection
+- Zoom levels: `'portfolio' | 'project' | 'workstream' | 'station_detail'`
+
+**Feature: Codex Fast Mode**
+
+- Codex sessions now expose a "Speed" selector in the AI chip (status bar), with options "Default" and "Fast"
+- When "Fast" is selected, `CodexExecProcessManager` appends `-c service_tier="fast" -c features.fast_mode=true` to all Codex CLI spawns (first turns, resumed turns, and BTW background turns)
+- New VS Code setting: `claudeMirror.codex.serviceTier` (type `"" | "fast"`, default `""`)
+- Setting is persisted globally and synced to the webview via `codexServiceTierSetting` message on init and on change
+- Auxiliary one-shot Codex calls (auto session naming, end-of-session summarizer fallback) are unaffected
+- New UI component: `CodexServiceTierSelector.tsx` (rendered inside `AIChip` only for Codex tabs)
+- New message types: `setCodexServiceTier` (webview -> extension), `codexServiceTierSetting` (extension -> webview)
+- New detail doc: `Kingdom_of_Claudes_Beloved_MDs/CODEX_FAST_MODE.md`
+
+---
+
 ## v0.1.123 - 2026-05-03
 
 **Fix: Silent crash resume — break the stale-resume-target loop**

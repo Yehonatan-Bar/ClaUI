@@ -276,6 +276,21 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.messageHandler.setPendingHandoffPrompt(prompt);
   }
 
+  /** Inject the shared WorkstreamManager (forwarded to CodexMessageHandler). */
+  setWorkstreamManager(manager: import('../workstream/WorkstreamManager').WorkstreamManager): void {
+    this.messageHandler.setWorkstreamManager(manager);
+  }
+
+  /** Inject the SessionStore (forwarded to CodexMessageHandler for workstream classification). */
+  setSessionStore(store: import('../session/SessionStore').SessionStore): void {
+    this.messageHandler.setSessionStore(store);
+  }
+
+  /** Inject a getter for open tab session IDs (forwarded to CodexMessageHandler for workstream scope). */
+  setOpenTabSessionIdsGetter(getter: () => string[]): void {
+    this.messageHandler.setOpenTabSessionIdsGetter(getter);
+  }
+
   /** Tab kind ('chat' default, 'search' for Smart Search tabs). */
   getTabKind(): 'chat' | 'search' {
     return this.kind;
