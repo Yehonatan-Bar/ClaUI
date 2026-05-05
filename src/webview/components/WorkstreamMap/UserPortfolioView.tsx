@@ -17,6 +17,7 @@ export const UserPortfolioView: React.FC = () => {
   }, []);
 
   const handleNavigateToCurrentProject = () => {
+    useAppStore.getState().setCachedViewProject(null);
     setZoom('project');
     postToExtension({ type: 'workstreamMapRequestData' });
   };

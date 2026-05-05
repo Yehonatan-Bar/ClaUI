@@ -9,8 +9,6 @@ Subway-map style visualization that groups sessions into logical workstreams -- 
 | Document | Purpose |
 |----------|---------|
 | `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP_PLAN_REWRITE.md` | Full product specification and development plan (English, 51KB). Detailed principles, subway-map metaphor, success criteria, all 10 implementation phases |
-| `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP_PLAN.md` | Original development plan draft (English, 28KB). Architecture overview and phase breakdown |
-| `Kingdom_of_Claudes_Beloved_MDs/workstream_map_rewritten_plan.md` | Hebrew product/development plan for stakeholder reference |
 | `Kingdom_of_Claudes_Beloved_MDs/html/workstream-map-feature-doc.html` | Visual HTML feature documentation (Hebrew, dark-themed, formatted for presentation) |
 
 ---

@@ -1157,7 +1157,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   workstreamMapError: null,
   workstreamResumeState: null,
 
-  setWorkstreamMapOpen: (open) => set({ workstreamMapOpen: open }),
+  setWorkstreamMapOpen: (open) => set(open ? { workstreamMapOpen: true } : { workstreamMapOpen: false, cachedViewProject: null }),
   setWorkstreamMapZoom: (zoom) => set({ workstreamMapZoom: zoom }),
   setWorkstreamMapData: (data) => set({ workstreamMapData: data }),
   setUserPortfolioData: (data, currentWorkspacePath) => set((state) => ({

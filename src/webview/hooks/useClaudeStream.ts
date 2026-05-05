@@ -240,6 +240,7 @@ export function useClaudeStream(): void {
         }
 
         case 'workstreamPortfolioNavigateToProject':
+          useAppStore.getState().setCachedViewProject(null);
           useAppStore.getState().setWorkstreamMapZoom('project');
           break;
 
