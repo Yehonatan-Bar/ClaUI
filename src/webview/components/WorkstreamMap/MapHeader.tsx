@@ -1,5 +1,7 @@
 import React from 'react';
 import type { ProjectMapState } from '../../../extension/types/workstreamTypes';
+import { useAppStore } from '../../state/store';
+import { postToExtension } from '../../hooks/useClaudeStream';
 
 interface MapHeaderProps {
   state: ProjectMapState;
@@ -13,6 +15,14 @@ export const MapHeader: React.FC<MapHeaderProps> = ({ state, isClassifying, clas
   const blockedCount = state.workstreams.filter(ws => ws.status === 'blocked').length;
   const completedCount = state.workstreams.filter(ws => ws.status === 'completed').length;
   const uncertainCount = state.workstreams.filter(ws => ws.status === 'uncertain').length;
+  const portfolioData = useAppStore(s => s.userPortfolioData);
+  const setZoom = useAppStore(s => s.setWorkstreamMapZoom);
+  const hasMultipleProjects = portfolioData && portfolioData.projects.length > 1;
+
+  const handleOpenPortfolio = () => {
+    setZoom('portfolio');
+    postToExtension({ type: 'workstreamPortfolioRequestData' });
+  };
 
   return (
     <div style={{
@@ -30,6 +40,25 @@ export const MapHeader: React.FC<MapHeaderProps> = ({ state, isClassifying, clas
       letterSpacing: '0.01em',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {hasMultipleProjects && (
+          <button
+            onClick={handleOpenPortfolio}
+            style={{
+              background: 'rgba(51, 65, 85, 0.5)',
+              color: '#94A3B8',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: 5,
+              padding: '2px 8px',
+              cursor: 'pointer',
+              fontSize: 10,
+              fontFamily: 'inherit',
+              transition: 'all 0.15s ease',
+            }}
+            title="View all projects"
+          >
+            All Projects
+          </button>
+        )}
         <span style={{ fontWeight: 600, fontSize: 13 }}>
           {state.projectLabel}
         </span>

@@ -934,7 +934,9 @@ export type WebviewToExtensionMessage =
   | WorkstreamMapNaturalLanguageEditRequest
   | WorkstreamMapOpenSessionRequest
   | WorkstreamMapDismissResumeViewRequest
-  | WorkstreamMapSaveSnapshotRequest;
+  | WorkstreamMapSaveSnapshotRequest
+  | WorkstreamPortfolioRequestDataRequest
+  | WorkstreamPortfolioOpenProjectRequest;
 
 export interface WebviewImageData {
   base64: string;
@@ -2256,11 +2258,14 @@ export type ExtensionToWebviewMessage =
   | WorkstreamMapClassifyingMessage
   | WorkstreamMapErrorMessage
   | WorkstreamMapResumeStateMessage
-  | ToggleWorkstreamMapMessage;
+  | ToggleWorkstreamMapMessage
+  | WorkstreamPortfolioDataMessage
+  | WorkstreamPortfolioNavigateToProjectMessage
+  | ToggleWorkstreamPortfolioMessage;
 
 // --- Workstream Map (Extension -> Webview) ---
 
-import type { ProjectMapState, ResumeState, UserEdit, MapInteractionContext } from './workstreamTypes';
+import type { ProjectMapState, ResumeState, UserEdit, MapInteractionContext, UserPortfolioState } from './workstreamTypes';
 
 export interface WorkstreamMapDataMessage {
   type: 'workstreamMapData';
@@ -2325,4 +2330,32 @@ export interface WorkstreamMapDismissResumeViewRequest {
 
 export interface WorkstreamMapSaveSnapshotRequest {
   type: 'workstreamMapSaveSnapshot';
+}
+
+// --- Workstream Portfolio (Extension -> Webview) ---
+
+export interface WorkstreamPortfolioDataMessage {
+  type: 'workstreamPortfolioData';
+  data: UserPortfolioState;
+  currentWorkspacePath: string;
+}
+
+export interface WorkstreamPortfolioNavigateToProjectMessage {
+  type: 'workstreamPortfolioNavigateToProject';
+}
+
+export interface ToggleWorkstreamPortfolioMessage {
+  type: 'toggleWorkstreamPortfolio';
+  open?: boolean;
+}
+
+// --- Workstream Portfolio (Webview -> Extension) ---
+
+export interface WorkstreamPortfolioRequestDataRequest {
+  type: 'workstreamPortfolioRequestData';
+}
+
+export interface WorkstreamPortfolioOpenProjectRequest {
+  type: 'workstreamPortfolioOpenProject';
+  projectPath: string;
 }

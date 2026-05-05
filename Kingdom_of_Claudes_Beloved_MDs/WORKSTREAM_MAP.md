@@ -21,14 +21,17 @@ Subway-map style visualization that groups sessions into logical workstreams -- 
 Extension Host (Node.js)                         Webview (React/Browser)
 +------------------------------+                 +---------------------------+
 | WorkstreamManager            |  postMessage    | WorkstreamMapView         |
-|  +-- WorkstreamClassifier    | <------------>  |  +-- ProjectMapView (SVG) |
-|  +-- StationExtractor        |                 |  +-- Detail panels        |
-|  +-- CurrentStateSynthesizer |                 |  +-- ResolveToolbar       |
-|  +-- ResumeStateBuilder      |                 |  +-- NLCommandBar         |
-|  +-- PlanRealityAnalyzer     |                 +---------------------------+
+|  +-- WorkstreamClassifier    | <------------>  |  +-- UserPortfolioView    |
+|  +-- StationExtractor        |                 |  +-- ProjectMapView (SVG) |
+|  +-- CurrentStateSynthesizer |                 |  +-- Detail panels        |
+|  +-- ResumeStateBuilder      |                 |  +-- ResolveToolbar       |
+|  +-- PlanRealityAnalyzer     |                 |  +-- NLCommandBar         |
+|                              |                 +---------------------------+
 |  +-- WorkstreamNLEditor      |
 |  +-- WorkstreamStore         |
 |  +-- WorkstreamSnapshotStore |
+|  +-- UserPortfolioStore (g)  |  (g) uses globalState
+|  +-- UserPortfolioManager(g) |      for cross-project data
 +------------------------------+
 ```
 
@@ -37,6 +40,8 @@ Extension Host (Node.js)                         Webview (React/Browser)
 ```
 extension.ts
   -> creates WorkstreamManager
+  -> creates UserPortfolioManager (with context.globalState)
+  -> sets workstreamManager.setPortfolioManager(portfolioManager)
   -> sets tabManager.workstreamManager = workstreamManager
 
 TabManager.createTab()
@@ -308,6 +313,8 @@ MapHeader, MapControls, and MapLegend use glassmorphism: `backdrop-filter: blur(
 | `workstreamMapOpenSession` | Navigate to a session |
 | `workstreamMapDismissResumeView` | Dismiss resume overlay |
 | `workstreamMapSaveSnapshot` | Capture a snapshot |
+| `workstreamPortfolioRequestData` | Request cross-project portfolio state |
+| `workstreamPortfolioOpenProject` | Navigate to a project (opens workspace if different) |
 
 ### Extension -> Webview
 | Message | Purpose |
@@ -317,6 +324,9 @@ MapHeader, MapControls, and MapLegend use glassmorphism: `backdrop-filter: blur(
 | `workstreamMapError` | Error message string |
 | `workstreamMapResumeState` | Resume state for returning users |
 | `toggleWorkstreamMap` | Open/close the map panel |
+| `workstreamPortfolioData` | Cross-project portfolio state |
+| `workstreamPortfolioNavigateToProject` | Signal to navigate from portfolio to current project map |
+| `toggleWorkstreamPortfolio` | Open the portfolio view |
 
 ---
 
@@ -337,14 +347,18 @@ MapHeader, MapControls, and MapLegend use glassmorphism: `backdrop-filter: blur(
 | `WorkstreamImportanceScorer.ts` | Weighted composite scoring (recency, volume, blockers) |
 | `SessionBackfiller.ts` | Enriches session summaries with metadata (files, git, prompts) |
 | `FileTracker.ts` | Tracks file reads/writes from tool events |
+| `UserPortfolioStore.ts` | globalState persistence for cross-project portfolio data (max 30 projects, 180-day auto-prune) |
+| `UserPortfolioManager.ts` | Orchestrates portfolio: builds project summaries, computes cross-project resume recommendation, health scoring |
 
 ### Types (`src/extension/types/`)
-- `workstreamTypes.ts` -- All enums, interfaces, constants (`Workstream`, `Station`, `ProjectMapState`, `EnrichedSessionData`, `ClassificationOutput`, `UserEdit`, etc.)
+- `workstreamTypes.ts` -- All enums, interfaces, constants (`Workstream`, `Station`, `ProjectMapState`, `EnrichedSessionData`, `ClassificationOutput`, `UserEdit`, `UserPortfolioState`, `ProjectSummaryEntry`, `CrossProjectResumeRecommendation`, etc.)
 
 ### Webview Components (`src/webview/components/WorkstreamMap/`)
 | File | Role |
 |------|------|
-| `WorkstreamMapView.tsx` | Top-level container. Handles loading/error/empty states with AnimatePresence transitions |
+| `WorkstreamMapView.tsx` | Top-level container. Handles loading/error/empty/portfolio states with AnimatePresence transitions |
+| `UserPortfolioView.tsx` | Cross-project portfolio view with project cards, health summary, and resume recommendation banner |
+| `ProjectCard.tsx` | Individual project card: name, health border, workstream badges, mini subway lines, hover tooltip |
 | `ProjectMapView.tsx` | SVG canvas with pan/zoom, dot grid background, minimap, all layers composed |
 | `WorkstreamLine.tsx` | SVG path for one workstream with draw animation, neon glow, particle flow, two-line label |
 | `StationNode.tsx` | SVG shape for one station with CSS entrance animation, workstream color ring, two-line label |
@@ -370,24 +384,28 @@ MapHeader, MapControls, and MapLegend use glassmorphism: `backdrop-filter: blur(
 ### Integration Points
 | File | Role |
 |------|------|
-| `extension.ts` | Creates `WorkstreamManager`, registers `claudeMirror.openWorkstreamMap` command, injects into `TabManager` |
+| `extension.ts` | Creates `WorkstreamManager` and `UserPortfolioManager`, registers `claudeMirror.openWorkstreamMap` and `claudeMirror.openWorkstreamPortfolio` commands, injects into `TabManager` |
 | `TabManager.ts` | Forwards `workstreamManager`, `sessionStore`, and `openTabSessionIdsGetter` to each new `SessionTab` |
 | `SessionTab.ts` | Forwards all three to `MessageHandler` via setter methods |
-| `MessageHandler.ts` | Handles all 8 webview message types, applies session scoping filter |
+| `MessageHandler.ts` | Handles all 10 webview message types (8 project + 2 portfolio), applies session scoping filter |
 | `store.ts` (webview Zustand) | State slice for map UI state |
 | `useClaudeStream.ts` | Dispatches extension-to-webview messages to Zustand store |
 | `App.tsx` | Renders `WorkstreamMapView` when `workstreamMapOpen` is true |
 
 ---
 
-## Command
+## Commands
 
 `claudeMirror.openWorkstreamMap` -- Opens the active tab and toggles the workstream map view.
+
+`claudeMirror.openWorkstreamPortfolio` -- Opens the active tab and shows the cross-project portfolio view.
 
 UI entry points:
 - Map Controls toolbar "Reclassify" button (`MapControls.tsx`)
 - "Build Map" button in empty state (`WorkstreamMapView.tsx`)
 - "Retry" button in error state (`WorkstreamMapView.tsx`)
+- "All Projects" button in `MapHeader.tsx` (shown when portfolio has 2+ projects)
+- "All Projects" / "Back" button in `MapControls.tsx` (navigates between project map and portfolio)
 
 ---
 
@@ -411,6 +429,50 @@ All manual changes (rename, status change, session reassignment) are stored as `
 
 ---
 
+## User Portfolio (Cross-Project)
+
+The User Portfolio provides a top-level view across all projects. It answers "which project should I open?" before the user even opens a workspace.
+
+### Data Architecture
+- Portfolio data is stored in `globalState` (shared across all workspaces) via `UserPortfolioStore`.
+- Key: `workstreamMap.portfolio`. Max 30 projects, auto-prune after 180 days of inactivity.
+- Each classification run (`WorkstreamManager.classifyProject()`) automatically publishes a `ProjectSummaryEntry` (including `cachedMapState`) to the portfolio.
+- The portfolio view reads all `ProjectSummaryEntry` records from `globalState`.
+- The `workstreamPortfolioData` message includes `currentWorkspacePath` from the extension for accurate current-workspace detection.
+- On portfolio data load, `pathExists` is validated for each project via `fs.existsSync()` -- missing projects are grayed out and unclickable.
+
+### Cross-Project Resume Algorithm
+1. Filter to projects with activity in the last 30 days
+2. Prioritize projects with blocked workstreams
+3. Then prioritize projects with active workstreams and recent activity
+4. Within a project, use the top workstream
+5. Tie-break by last activity timestamp
+
+### Project Health
+| Health | Criteria |
+|--------|----------|
+| `healthy` | All workstreams active or completed, no blockers, activity within 7 days |
+| `needs_attention` | Has uncertain workstreams, or activity between 7 and 21 days ago |
+| `blocked` | Has one or more blocked workstreams |
+| `stale` | No activity in 21+ days |
+
+### Navigation
+- Portfolio data is fetched alongside map data on every map open (`WorkstreamMapView` useEffect).
+- If portfolio data arrives with 2+ projects and the user hasn't navigated yet, auto-opens portfolio view.
+- "All Projects" button appears in `MapHeader` when the portfolio has 2+ projects.
+- Clicking the resume recommendation banner navigates to the recommended project.
+- Clicking a current-workspace project card navigates to its live Project Map.
+- Clicking a different-workspace project card with cached map data shows its cached snapshot with a stale-data banner ("Cached snapshot from [date]") and an "Open Workspace" button.
+- Clicking a different-workspace project card without cached data opens that workspace folder via `vscode.openFolder`.
+- The cached map view renders `ProjectMapView` with cached `ProjectMapState` in read-only mode (no reclassify/resolve controls). `CachedMapBanner` provides "Back" and "Open Workspace" actions.
+- Missing/deleted project cards are grayed out with "(not found)" label and are not clickable.
+- Back button from Project Map returns to portfolio when the user entered from there.
+
+### Zoom Levels
+`'portfolio' | 'project' | 'workstream' | 'station_detail'`
+
+---
+
 ## Persistence
 
 | Key Pattern | Content |
@@ -419,7 +481,10 @@ All manual changes (rename, status change, session reassignment) are stored as `
 | `workstreamMap.archived.{projectId}` | Archived workstreams |
 | `workstreamMap.snapshots.{projectId}` | SHA-256 snapshot history (max 20) |
 
-- Storage: VS Code `workspaceState` (per-workspace)
+| `workstreamMap.portfolio` | Cross-project portfolio (`UserPortfolioState`) |
+
+- Project map storage: VS Code `workspaceState` (per-workspace)
+- Portfolio storage: VS Code `globalState` (cross-workspace)
 - Schema version: `1` (with migration support)
 - Auto-archive: completed workstreams after 90 days (never if blocked or pinned)
 - Cap limits: 50 workstreams, 500 stations per project

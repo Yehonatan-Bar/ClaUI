@@ -135,15 +135,16 @@ Default threshold:
 
 ### Primary views
 
-The feature has five visual states:
+The feature has six visual states:
 
+* User Portfolio (cross-project overview)
 * Project Map
 * Workstream Focus
 * Station Detail
 * Plan Overlay
 * Resolve Mode
 
-Multi Project Dots View is a separate later view. The current project view must be complete before cross project navigation is built.
+User Portfolio is the top-level view showing all projects. It is built after the single-project experience is complete.
 
 ### Project Map
 
@@ -216,6 +217,98 @@ Examples:
 * Mark this line as completed.
 * This station is not important. Hide it from the map.
 * Reclassify this workstream as infrastructure.
+
+### User Portfolio View
+
+The User Portfolio is the top-level view that shows all projects the user has worked on across all VS Code workspaces.
+
+#### Purpose
+
+A developer works across multiple projects. When they sit down to code, the first question is often not "what was I doing in this project?" but "which project should I open?" The portfolio answers:
+
+* Which projects have active work?
+* Which project has blockers that need attention?
+* Which project has stale work I should resume?
+* What is the overall shape of my work across projects?
+* Where should I pick up next?
+
+#### Visual metaphor
+
+Continuing the subway theme, the portfolio is the **transit system overview** showing all lines (projects) in the user's network. Each project is represented as a simplified card with miniature workstream lines, status indicators, and activity signals.
+
+#### Data architecture
+
+Workstream data is stored per-workspace in `workspaceState`, so cross-project data is not directly accessible from another workspace. The solution is a **publish model**:
+
+* When a project classifies its workstreams, the `WorkstreamManager` publishes a `ProjectSummaryEntry` to `globalState`.
+* Each project self-reports its status on every classification run.
+* The portfolio view reads all `ProjectSummaryEntry` records from `globalState`.
+* Stale projects naturally appear stale based on their `lastActivityAt`.
+* `SessionStore` already uses `globalState` and stores `workspacePath` on each session, providing additional cross-project session counts.
+
+This means the portfolio always shows the last-known state of each project, regardless of which workspace is currently open. Only the current workspace has live data; other projects show their last classification snapshot.
+
+#### UI layout
+
+```
++------------------------------------------------------+
+|  Your Projects                      [Refresh]   [X]  |
+|------------------------------------------------------|
+|  > Resume: project-a > Fix auth middleware            |
+|------------------------------------------------------|
+|                                                       |
+|  +--------------------------------------------------+|
+|  | * claude-code-mirror     3 active  1 blocked      ||
+|  |   --*--*--*--            Session Crash Fix        ||
+|  |   --*--*--               Workstream Map Feature   ||
+|  |   --*--                               2 days ago  ||
+|  +--------------------------------------------------+|
+|                                                       |
+|  +--------------------------------------------------+|
+|  | * food-safety-app        2 active  0 blocked      ||
+|  |   --*--*--*--*--         PDF Pipeline Rewrite     ||
+|  |   --*--                               5 days ago  ||
+|  +--------------------------------------------------+|
+|                                                       |
+|  +--------------------------------------------------+|
+|  | o milgam-dashboard       0 active  0 blocked      ||
+|  |   --*--*--                           2 weeks ago  ||
+|  +--------------------------------------------------+|
+|                                                       |
++------------------------------------------------------+
+```
+
+Each project card shows:
+
+* Project name derived from workspace folder name
+* Activity indicator: filled dot for recent activity, outlined for stale
+* Workstream count badges: active, blocked, completed
+* Mini subway lines: simplified colored horizontal lines with station dots for the top workstreams (max 3)
+* Top workstream labels
+* Last activity timestamp as relative time
+* Health glow: green border for healthy, yellow for needs attention, red for blocked, gray for stale
+
+#### Navigation
+
+Clicking a project card:
+
+* If the project is the current workspace, it opens the Project Map with live data
+* If the project is a different workspace, it shows the cached project map snapshot with a banner indicating the data may be stale, and offers an "Open Workspace" action
+
+#### Cross-project resume recommendation
+
+The portfolio header shows the single best cross-project recommendation:
+
+* Computed by comparing all `ProjectSummaryEntry` records
+* Factors: recency, active blockers resolved, stale active workstreams, importance scores
+* Uses local heuristics only (no AI call) to determine which project and workstream to resume
+* Example: "Resume: food-safety-app > PDF Pipeline Rewrite"
+
+#### Portfolio entry point
+
+* The map header shows a "All Projects" button when the portfolio has more than one project
+* The Back button from Project Map returns to portfolio if the user entered from there
+* A new command `claudeMirror.openWorkstreamPortfolio` opens the portfolio directly
 
 ## Visual System
 
@@ -724,6 +817,66 @@ export interface ResumeState {
 }
 ```
 
+### User portfolio state
+
+```typescript
+export interface UserPortfolioState {
+  projects: ProjectSummaryEntry[];
+  crossProjectResume: CrossProjectResumeRecommendation | null;
+  lastUpdatedAt: string;
+}
+
+export interface ProjectSummaryEntry {
+  projectId: string;
+  projectPath: string;
+  projectName: string;
+
+  lastActivityAt: string;
+  lastClassifiedAt: string;
+  lastOpenedAt: string;
+
+  activeWorkstreams: number;
+  blockedWorkstreams: number;
+  completedWorkstreams: number;
+  uncertainWorkstreams: number;
+  totalWorkstreams: number;
+
+  topWorkstreams: ProjectWorkstreamSummary[];
+
+  overallHealth: 'healthy' | 'needs_attention' | 'blocked' | 'stale';
+  healthReasons: string[];
+
+  totalSessions: number;
+  recentSessions: number;
+
+  currentStateSummary: string;
+  recommendedNextAction: string;
+  openBlockerCount: number;
+
+  cachedMapState?: ProjectMapState;
+}
+
+export interface ProjectWorkstreamSummary {
+  id: string;
+  label: string;
+  status: WorkstreamStatus;
+  confidence: number;
+  lastActivityAt: string;
+  phase: string;
+  colorToken: string;
+  stationCount: number;
+}
+
+export interface CrossProjectResumeRecommendation {
+  projectId: string;
+  projectName: string;
+  workstreamId: string;
+  workstreamLabel: string;
+  reason: string;
+  confidence: number;
+}
+```
+
 ### Supporting types
 
 ```typescript
@@ -856,7 +1009,63 @@ FileTracker.ts
 SessionBackfiller.ts
 WorkstreamImportanceScorer.ts
 WorkstreamSnapshotStore.ts
+UserPortfolioStore.ts
+UserPortfolioManager.ts
 ```
+
+### UserPortfolioStore
+
+Persistence layer for cross-project data.
+
+Storage:
+
+* Use `globalState` (not workspaceState) so data is shared across all workspaces.
+* Key: `workstreamMap.portfolio`
+* Maximum projects: 30
+* Auto-remove projects not classified in the last 180 days.
+* Write queue to avoid race conditions.
+
+### UserPortfolioManager
+
+Orchestrator for the portfolio view.
+
+Responsibilities:
+
+* Build `UserPortfolioState` from stored `ProjectSummaryEntry` records.
+* Compute cross-project resume recommendation using local heuristics.
+* Publish project summary after each classification run.
+* Compute project health from workstream counts and recency.
+* Enrich with session counts from `SessionStore` (which already has `workspacePath`).
+
+Public methods:
+
+```typescript
+class UserPortfolioManager {
+  getPortfolioState(): Promise<UserPortfolioState>;
+  publishProjectSummary(projectId: string, mapState: ProjectMapState): Promise<void>;
+  computeCrossProjectResume(): CrossProjectResumeRecommendation | null;
+  removeProject(projectId: string): Promise<void>;
+}
+```
+
+Integration hook:
+
+After `WorkstreamManager.classifyProject()` saves the classified state, call `UserPortfolioManager.publishProjectSummary()` to update the global portfolio entry. This happens automatically on every classification, keeping the portfolio fresh.
+
+Health computation rules:
+
+* `healthy`: all workstreams are active or completed, no blockers, activity within 7 days
+* `needs_attention`: has uncertain workstreams or low confidence, or activity between 7 and 21 days ago
+* `blocked`: has one or more blocked workstreams
+* `stale`: no activity in 21 or more days
+
+Cross-project resume algorithm:
+
+1. Filter to projects with activity in the last 30 days
+2. Prioritize projects with blocked workstreams whose blockers were recently resolved
+3. Then prioritize projects with active workstreams and recent activity
+4. Within a project, use the project's own `recommendedResumeWorkstreamId`
+5. Tie-break by last activity timestamp
 
 ### WorkstreamManager
 
@@ -1325,6 +1534,8 @@ Components:
 
 ```typescript
 WorkstreamMapView.tsx
+UserPortfolioView.tsx
+ProjectCard.tsx
 ProjectMapView.tsx
 WorkstreamFocusView.tsx
 StationDetailView.tsx
@@ -1349,6 +1560,37 @@ visualEncoding.ts
 animations.ts
 ```
 
+### UserPortfolioView
+
+The top-level cross-project view.
+
+Renders a scrollable list of `ProjectCard` components sorted by last activity.
+
+Shows a cross-project resume recommendation banner at the top when available.
+
+Shows project health summary: total projects, active projects, projects with blockers.
+
+Entry animation: cards fade-slide in staggered from top to bottom.
+
+### ProjectCard
+
+Displays one project summary.
+
+Content:
+
+* Project name with activity indicator dot (filled if recent, outlined if stale)
+* Workstream count badges: active (blue), blocked (red), completed (green)
+* Mini subway lines: up to 3 simplified horizontal colored lines with station dots
+* Top workstream labels (max 2, one line each)
+* Last activity timestamp as relative time
+* Health indicator: colored left border (green, yellow, red, or gray)
+
+Interaction:
+
+* Hover: slight lift with shadow
+* Click: navigates to that project's Project Map
+* If the project is not the current workspace, show a small external-link icon
+
 ### Webview state
 
 Add to the Zustand store:
@@ -1356,8 +1598,9 @@ Add to the Zustand store:
 ```typescript
 interface WorkstreamMapSlice {
   workstreamMapOpen: boolean;
-  workstreamMapZoom: 'project' | 'workstream' | 'station_detail';
+  workstreamMapZoom: 'portfolio' | 'project' | 'workstream' | 'station_detail';
   workstreamMapData: ProjectMapState | null;
+  userPortfolioData: UserPortfolioState | null;
   focusedWorkstreamId: string | null;
   selectedStationId: string | null;
   currentStateLayerEnabled: boolean;
@@ -1392,6 +1635,7 @@ Add extension to webview messages:
 { type: 'workstreamMapClassifying'; progress: number; phase: string }
 { type: 'workstreamMapError'; message: string }
 { type: 'workstreamMapResumeState'; resumeState: ResumeState }
+{ type: 'workstreamPortfolioData'; data: UserPortfolioState }
 ```
 
 Add webview to extension messages:
@@ -1405,6 +1649,8 @@ Add webview to extension messages:
 { type: 'workstreamMapOpenSession'; sessionId: string }
 { type: 'workstreamMapDismissResumeView' }
 { type: 'workstreamMapSaveSnapshot' }
+{ type: 'workstreamPortfolioRequestData' }
+{ type: 'workstreamPortfolioOpenProject'; projectPath: string }
 ```
 
 ## Layout Algorithm
@@ -1816,27 +2062,84 @@ Estimated effort:
 
 * 6 to 8 days
 
-### Phase 10: Multi Project Dots View
+### Phase 10: User Portfolio View (Cross-Project)
 
-Goal: add top level project overview after single project map is proven.
+Goal: add a top-level cross-project view so the user can see all their projects at a glance and decide where to resume.
+
+#### Phase 10a: Portfolio Data Foundation
 
 Tasks:
 
-* Add ProjectDot model.
-* Discover projects across known workspaces.
-* Compute project level status.
-* Render vertical project dots.
-* Zoom from dot to Project Map.
+* Define `UserPortfolioState`, `ProjectSummaryEntry`, `ProjectWorkstreamSummary`, and `CrossProjectResumeRecommendation` types in `workstreamTypes.ts`.
+* Create `UserPortfolioStore.ts` using `context.globalState` with key `workstreamMap.portfolio`.
+* Add write queue, max 30 projects, auto-prune projects not classified in 180 days.
+* Create `UserPortfolioManager.ts` with methods: `getPortfolioState()`, `publishProjectSummary()`, `computeCrossProjectResume()`, `removeProject()`.
+* Hook `publishProjectSummary()` into `WorkstreamManager.classifyProject()` so every classification automatically updates the portfolio.
+* Extract project name from workspace folder path (last segment).
+* Compute project health from workstream status counts and recency.
+* Implement cross-project resume recommendation algorithm using local heuristics.
+* Enrich session counts from `SessionStore` (uses `globalState`, has `workspacePath` field).
 
 Exit criteria:
 
-* User can see multiple projects as vertical dots.
-* Dot size, color, glow, and pulse reflect status and attention.
-* Clicking a project opens its Project Map.
+* After classifying workstreams in two different workspaces, `UserPortfolioStore` contains two `ProjectSummaryEntry` records accessible from either workspace.
+* Cross-project resume recommendation identifies the most logical project and workstream to resume.
+* Portfolio data survives VS Code restarts.
 
 Estimated effort:
 
-* 4 to 6 days
+* 3 to 4 days
+
+#### Phase 10b: Portfolio Webview
+
+Tasks:
+
+* Add `'portfolio'` to the zoom level type: `'portfolio' | 'project' | 'workstream' | 'station_detail'`.
+* Add `userPortfolioData: UserPortfolioState | null` to the Zustand store.
+* Add `workstreamPortfolioData` and `workstreamPortfolioRequestData` to the message protocol.
+* Add `workstreamPortfolioOpenProject` message for navigating to a project.
+* Create `UserPortfolioView.tsx`: scrollable list of project cards with cross-project resume banner.
+* Create `ProjectCard.tsx`: project name, activity indicator, workstream count badges, mini subway lines (max 3 colored lines with dots), top workstream labels, relative timestamp, health border.
+* Add "All Projects" button to `MapHeader.tsx` when portfolio has more than one project.
+* Add Back navigation from Project Map to Portfolio when entered from portfolio.
+* Handle navigation to non-current workspace projects: show cached map state with stale-data banner and "Open Workspace" action.
+* Apply glassmorphism and entrance animations consistent with the rest of the map.
+
+Exit criteria:
+
+* User can see all previously classified projects in a clean card layout.
+* Clicking a current-workspace project opens its live Project Map.
+* Clicking a different-workspace project shows its cached state with a stale-data notice.
+* Cross-project resume recommendation is visible and clickable.
+* Portfolio opens within 1 second (data is pre-cached in globalState).
+
+Estimated effort:
+
+* 5 to 7 days
+
+#### Phase 10c: Portfolio Intelligence
+
+Tasks:
+
+* Add `claudeMirror.openWorkstreamPortfolio` command to `package.json`.
+* Auto-open portfolio instead of project map when the user opens the map for the first time and multiple projects exist.
+* Show portfolio health summary: total projects, active projects, projects with blockers.
+* Add project card hover tooltip with current state summary and recommended next action.
+* Add relative time badges that update live (e.g., "2 days ago", "just now").
+* Add empty state for portfolio with "Classify your first project" prompt.
+* Handle edge case: project folder was moved or deleted (show grayed out card with "Project not found" status).
+
+Exit criteria:
+
+* Portfolio provides a complete cross-project overview within 2 seconds of scanning.
+* The user can answer "which project should I work on?" from the portfolio view.
+* Empty, single-project, and multi-project states are all handled gracefully.
+
+Estimated effort:
+
+* 2 to 3 days
+
+Total Phase 10 effort: 10 to 14 days
 
 ## Recommended Build Order
 
@@ -1852,18 +2155,23 @@ Build in this order:
 * Phase 7: Focus and Detail Views
 * Phase 8: Plan Overlay
 * Phase 9: Resolve Mode
-* Phase 10: Multi Project Dots View
+* Phase 10a: Portfolio Data Foundation
+* Phase 10b: Portfolio Webview
+* Phase 10c: Portfolio Intelligence
 
 Reasoning:
 
 * The map cannot be useful without accurate data.
 * The visualization cannot be useful without Current State.
 * Resolve Mode is valuable after classification and visualization exist.
-* Multi project view should not delay the single project experience.
+* The portfolio view should not delay the single project experience.
+* Phase 10a can begin as soon as Phase 5 is complete since it only touches extension code.
+* Phase 10b depends on Phase 6 for visual conventions and component patterns.
+* Phase 10c adds polish after the portfolio is functional.
 
 Total estimated effort:
 
-* 42 to 59 developer days
+* 48 to 67 developer days
 
 ## Integration Points
 
@@ -1880,12 +2188,16 @@ Existing integration targets:
 * commands.ts
 * package.json
 
-New command:
+New commands:
 
 ```json
 {
   "command": "claudeMirror.openWorkstreamMap",
   "title": "Open Workstream Map"
+},
+{
+  "command": "claudeMirror.openWorkstreamPortfolio",
+  "title": "Open Workstream Portfolio"
 }
 ```
 
@@ -1984,6 +2296,17 @@ Mitigation:
 * Incremental updates.
 * Capped extraction.
 * Haiku only for safe lightweight tasks.
+
+### Risk: Portfolio data becomes stale or misleading
+
+Mitigation:
+
+* Each project self-publishes on every classification run. No manual sync required.
+* Show relative timestamps on every project card so staleness is immediately visible.
+* Gray out projects with no activity in 21 or more days.
+* Show "Last classified X days ago" on non-current workspace projects.
+* Never show stale portfolio data as current fact. Always indicate data age.
+* Auto-prune projects not classified in 180 days.
 
 ### Risk: Natural language edits damage the map
 
@@ -2107,6 +2430,21 @@ Pass condition:
 
 * The correction persists across reclassification.
 
+### Scenario: Cross-project orientation
+
+Given a developer who works on three projects, when they open the portfolio view, it should show:
+
+* All three projects as cards with clear health indicators
+* Which project has blockers or needs attention
+* Which project and workstream to resume
+* Last activity time for each project
+* Mini subway lines showing the shape of each project's workstreams
+
+Pass condition:
+
+* The user can decide which project to work on within 3 seconds of scanning the portfolio.
+* Clicking a project navigates to its Project Map.
+
 ### Scenario: Large project
 
 Given a project with many sessions, the Project Map should remain readable.
@@ -2150,12 +2488,14 @@ The MVP must include:
 
 The MVP may exclude:
 
-* Multi Project Dots View
+* User Portfolio View (cross-project overview, Phase 10)
 * Advanced drag gestures
 * Complex force layout
 * Real time per turn classification
 * Deep Git history visualization
 * Full issue tracker integration
+
+The User Portfolio View is planned for the release immediately following MVP. Its data foundation (publishing project summaries to globalState) should be added during Phase 5 to start collecting cross-project data early, even if the UI is built later.
 
 ## Developer Checklist
 
@@ -2175,6 +2515,9 @@ Before implementation is considered complete, verify:
 * The user can jump from map to source session.
 * The user can correct the map quickly.
 * The feature answers where am I, what is blocked, and what changed.
+* Portfolio publishes project summaries to globalState on every classification.
+* Portfolio shows all projects with health indicators and cross-project resume.
+* Portfolio data age is always visible to prevent stale-data confusion.
 
 ## Final Product Definition
 
@@ -2185,3 +2528,5 @@ It transforms raw sessions into structured workstreams, highlights the current s
 The correct mental model is not a dashboard.
 
 The correct mental model is a cognitive map of the project.
+
+At the user level, the Portfolio extends this mental model across all projects: it is a cognitive map of the developer's entire work landscape, answering not just "where am I in this project?" but "which project should I open right now?"

@@ -109,6 +109,52 @@ export async function injectClaudeMdInstructions(
   }
 }
 
+/**
+ * Removes previously-injected SR-PTD instructions from the project CLAUDE.md.
+ * Called when skillGen.enabled is false so Claude stops generating documentation.
+ */
+export async function removeClaudeMdInstructions(
+  log: (msg: string) => void
+): Promise<void> {
+  try {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      return;
+    }
+
+    const workspaceRoot = workspaceFolders[0].uri.fsPath;
+    const claudeMdPath = path.join(workspaceRoot, 'CLAUDE.md');
+    const MARKER_START = '# MANDATORY: Post-Task Documentation (SR-PTD)';
+    const MARKER_END = 'Update the existing SR-PTD document instead of creating a new one.';
+
+    if (!fs.existsSync(claudeMdPath)) {
+      return;
+    }
+
+    const content = fs.readFileSync(claudeMdPath, 'utf-8');
+    if (!content.includes(MARKER_START)) {
+      return;
+    }
+
+    const startIdx = content.lastIndexOf('---', content.indexOf(MARKER_START));
+    const endIdx = content.indexOf('---', content.indexOf(MARKER_END));
+
+    if (startIdx === -1 || endIdx === -1) {
+      return;
+    }
+
+    const before = content.substring(0, startIdx).trimEnd();
+    const after = content.substring(endIdx + 3).trimStart();
+    const cleaned = after ? before + '\n\n' + after : before;
+
+    fs.writeFileSync(claudeMdPath, cleaned + '\n', 'utf-8');
+    log('[SrPtdBootstrap] Removed SR-PTD instructions from CLAUDE.md (skillGen disabled)');
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log(`[SrPtdBootstrap] Failed to remove CLAUDE.md instructions: ${msg}`);
+  }
+}
+
 function buildInjectionTemplate(docsDirectory: string): string {
   return `---
 

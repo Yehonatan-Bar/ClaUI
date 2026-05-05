@@ -27,6 +27,7 @@ import { PlanRealityAnalyzer } from './PlanRealityAnalyzer';
 import { WorkstreamNLEditor } from './WorkstreamNLEditor';
 import { WorkstreamImportanceScorer } from './WorkstreamImportanceScorer';
 import { SessionBackfiller } from './SessionBackfiller';
+import { UserPortfolioManager } from './UserPortfolioManager';
 import { WORKSTREAM_STATUS_COLORS } from '../types/workstreamTypes';
 
 export class WorkstreamManager {
@@ -40,6 +41,7 @@ export class WorkstreamManager {
   private readonly nlEditor: WorkstreamNLEditor;
   private readonly scorer: WorkstreamImportanceScorer;
   private readonly backfiller: SessionBackfiller;
+  private portfolioManager: UserPortfolioManager | null = null;
 
   private progressCallback?: (progress: number, phase: string) => void;
 
@@ -60,6 +62,14 @@ export class WorkstreamManager {
     this.nlEditor = new WorkstreamNLEditor();
     this.scorer = new WorkstreamImportanceScorer();
     this.backfiller = new SessionBackfiller();
+  }
+
+  setPortfolioManager(manager: UserPortfolioManager): void {
+    this.portfolioManager = manager;
+  }
+
+  getPortfolioManager(): UserPortfolioManager | null {
+    return this.portfolioManager;
   }
 
   onProgress(callback: (progress: number, phase: string) => void): void {
@@ -287,6 +297,16 @@ export class WorkstreamManager {
 
     // Capture snapshot for future resume comparison
     await this.snapshotStore.captureSnapshot(finalState);
+
+    // Publish project summary to cross-project portfolio
+    if (this.portfolioManager) {
+      try {
+        await this.portfolioManager.publishProjectSummary(projectId, finalState);
+        this.log.appendLine(`[WorkstreamMap] Published project summary to portfolio`);
+      } catch (e) {
+        this.log.appendLine(`[WorkstreamMap] Portfolio publish failed: ${e}`);
+      }
+    }
 
     this.reportProgress(1.0, 'Complete');
     return finalState;

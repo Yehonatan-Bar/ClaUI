@@ -230,6 +230,24 @@ export function useClaudeStream(): void {
           setWorkstreamMapOpen(msg.open ?? !useAppStore.getState().workstreamMapOpen);
           break;
 
+        case 'workstreamPortfolioData': {
+          const store = useAppStore.getState();
+          store.setUserPortfolioData(msg.data, msg.currentWorkspacePath);
+          if (msg.data.projects.length > 1 && store.workstreamMapZoom === 'project' && !store.userPortfolioData) {
+            store.setWorkstreamMapZoom('portfolio');
+          }
+          break;
+        }
+
+        case 'workstreamPortfolioNavigateToProject':
+          useAppStore.getState().setWorkstreamMapZoom('project');
+          break;
+
+        case 'toggleWorkstreamPortfolio':
+          setWorkstreamMapOpen(true);
+          useAppStore.getState().setWorkstreamMapZoom('portfolio');
+          break;
+
         case 'toggleMcpPanel':
           setMcpPanelOpen(msg.open ?? !useAppStore.getState().mcpPanelOpen);
           if (msg.tab) {

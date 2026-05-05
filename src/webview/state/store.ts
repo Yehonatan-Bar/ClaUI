@@ -503,8 +503,11 @@ export interface AppState {
 
   // Workstream Map
   workstreamMapOpen: boolean;
-  workstreamMapZoom: 'project' | 'workstream' | 'station_detail';
+  workstreamMapZoom: 'portfolio' | 'project' | 'workstream' | 'station_detail';
   workstreamMapData: import('../../extension/types/workstreamTypes').ProjectMapState | null;
+  userPortfolioData: import('../../extension/types/workstreamTypes').UserPortfolioState | null;
+  portfolioCurrentWorkspacePath: string;
+  cachedViewProject: import('../../extension/types/workstreamTypes').ProjectSummaryEntry | null;
   focusedWorkstreamId: string | null;
   selectedStationId: string | null;
   currentStateLayerEnabled: boolean;
@@ -521,8 +524,10 @@ export interface AppState {
 
   // Workstream Map Actions
   setWorkstreamMapOpen: (open: boolean) => void;
-  setWorkstreamMapZoom: (zoom: 'project' | 'workstream' | 'station_detail') => void;
+  setWorkstreamMapZoom: (zoom: 'portfolio' | 'project' | 'workstream' | 'station_detail') => void;
   setWorkstreamMapData: (data: import('../../extension/types/workstreamTypes').ProjectMapState | null) => void;
+  setUserPortfolioData: (data: import('../../extension/types/workstreamTypes').UserPortfolioState | null, currentWorkspacePath?: string) => void;
+  setCachedViewProject: (project: import('../../extension/types/workstreamTypes').ProjectSummaryEntry | null) => void;
   setFocusedWorkstreamId: (id: string | null) => void;
   setSelectedStationId: (id: string | null) => void;
   setCurrentStateLayerEnabled: (enabled: boolean) => void;
@@ -1127,8 +1132,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Workstream Map
   workstreamMapOpen: false,
-  workstreamMapZoom: 'project' as 'project' | 'workstream' | 'station_detail',
+  workstreamMapZoom: 'project' as 'portfolio' | 'project' | 'workstream' | 'station_detail',
   workstreamMapData: null,
+  userPortfolioData: null,
+  portfolioCurrentWorkspacePath: '',
+  cachedViewProject: null,
   focusedWorkstreamId: null,
   selectedStationId: null,
   currentStateLayerEnabled: true,
@@ -1152,15 +1160,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   setWorkstreamMapOpen: (open) => set({ workstreamMapOpen: open }),
   setWorkstreamMapZoom: (zoom) => set({ workstreamMapZoom: zoom }),
   setWorkstreamMapData: (data) => set({ workstreamMapData: data }),
+  setUserPortfolioData: (data, currentWorkspacePath) => set((state) => ({
+    userPortfolioData: data,
+    portfolioCurrentWorkspacePath: currentWorkspacePath ?? state.portfolioCurrentWorkspacePath,
+  })),
+  setCachedViewProject: (project) => set({ cachedViewProject: project }),
   setFocusedWorkstreamId: (id) => set({
     focusedWorkstreamId: id,
     workstreamMapZoom: id ? 'workstream' : 'project',
     selectedStationId: null,
   }),
-  setSelectedStationId: (id) => set({
+  setSelectedStationId: (id) => set((state) => ({
     selectedStationId: id,
-    workstreamMapZoom: id ? 'station_detail' : get().focusedWorkstreamId ? 'workstream' : 'project',
-  }),
+    workstreamMapZoom: id ? 'station_detail' : state.focusedWorkstreamId ? 'workstream' : 'project',
+  })),
   setCurrentStateLayerEnabled: (enabled) => set({ currentStateLayerEnabled: enabled }),
   setResumeViewEnabled: (enabled) => set({ resumeViewEnabled: enabled }),
   setPlanOverlayEnabled: (enabled) => set({ planOverlayEnabled: enabled }),

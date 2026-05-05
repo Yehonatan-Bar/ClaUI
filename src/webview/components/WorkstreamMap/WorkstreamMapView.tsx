@@ -10,7 +10,9 @@ import { StationDetailView } from './StationDetailView';
 import { ResolveToolbar } from './ResolveToolbar';
 import { NLCommandBar } from './NLCommandBar';
 import { ConfidenceReviewPanel } from './ConfidenceReviewPanel';
+import { UserPortfolioView } from './UserPortfolioView';
 import { postToExtension } from '../../hooks/useClaudeStream';
+import type { ProjectSummaryEntry } from '../../../extension/types/workstreamTypes';
 
 const pageEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -72,10 +74,12 @@ export const WorkstreamMapView: React.FC = () => {
   const selectedStationId = useAppStore(s => s.selectedStationId);
   const resolveModeEnabled = useAppStore(s => s.resolveModeEnabled);
   const zoom = useAppStore(s => s.workstreamMapZoom);
+  const cachedViewProject = useAppStore(s => s.cachedViewProject);
   const [showConfidencePanel, setShowConfidencePanel] = useState(true);
 
   useEffect(() => {
     postToExtension({ type: 'workstreamMapRequestData' });
+    postToExtension({ type: 'workstreamPortfolioRequestData' });
   }, []);
 
   const focusedWorkstream = mapData && focusedWorkstreamId
@@ -136,6 +140,44 @@ export const WorkstreamMapView: React.FC = () => {
             >
               Retry Classification
             </motion.button>
+          </motion.div>
+
+        /* Portfolio view (must be before empty/loading checks - portfolio doesn't need mapData) */
+        ) : zoom === 'portfolio' ? (
+          <motion.div
+            key="portfolio"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+            style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+          >
+            <UserPortfolioView />
+          </motion.div>
+
+        /* Cached map view (viewing another project's snapshot) */
+        ) : cachedViewProject && cachedViewProject.cachedMapState ? (
+          <motion.div
+            key="cached-map"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+            style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+          >
+            <CachedMapBanner project={cachedViewProject} />
+            <MapHeader
+              state={cachedViewProject.cachedMapState}
+              isClassifying={false}
+              classifyProgress={0}
+              classifyPhase=""
+            />
+
+            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+              <ProjectMapView state={cachedViewProject.cachedMapState} />
+            </div>
+
+            <MapLegend />
           </motion.div>
 
         /* Empty state */
@@ -268,5 +310,89 @@ export const WorkstreamMapView: React.FC = () => {
         ) : null}
       </AnimatePresence>
     </div>
+  );
+};
+
+function formatCachedDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = Date.now();
+  const diffMs = now - d.getTime();
+  const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  if (diffDays < 1) { return 'today'; }
+  if (diffDays === 1) { return 'yesterday'; }
+  if (diffDays < 7) { return `${diffDays} days ago`; }
+  return d.toLocaleDateString();
+}
+
+const CachedMapBanner: React.FC<{ project: ProjectSummaryEntry }> = ({ project }) => {
+  const setCachedViewProject = useAppStore(s => s.setCachedViewProject);
+  const setZoom = useAppStore(s => s.setWorkstreamMapZoom);
+
+  const handleBack = () => {
+    setCachedViewProject(null);
+    setZoom('portfolio');
+    postToExtension({ type: 'workstreamPortfolioRequestData' });
+  };
+
+  const handleOpenWorkspace = () => {
+    setCachedViewProject(null);
+    postToExtension({ type: 'workstreamPortfolioOpenProject', projectPath: project.projectPath });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '8px 16px',
+        background: 'linear-gradient(90deg, rgba(250, 204, 21, 0.1), rgba(250, 204, 21, 0.04))',
+        borderBottom: '1px solid rgba(250, 204, 21, 0.2)',
+        fontSize: 11,
+        fontFamily: 'var(--vscode-font-family)',
+        color: '#FACC15',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button
+          onClick={handleBack}
+          style={{
+            background: 'rgba(51, 65, 85, 0.5)',
+            color: '#94A3B8',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: 5,
+            padding: '2px 8px',
+            cursor: 'pointer',
+            fontSize: 10,
+            fontFamily: 'inherit',
+          }}
+        >
+          Back
+        </button>
+        <span style={{ fontWeight: 600 }}>{project.projectName}</span>
+        <span style={{ color: '#94A3B8' }}>
+          Cached snapshot from {formatCachedDate(project.lastClassifiedAt)}
+        </span>
+      </div>
+      <button
+        onClick={handleOpenWorkspace}
+        style={{
+          background: 'linear-gradient(135deg, #4A9EFF, #7C3AED)',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 6,
+          padding: '4px 14px',
+          cursor: 'pointer',
+          fontSize: 11,
+          fontWeight: 600,
+          fontFamily: 'inherit',
+        }}
+      >
+        Open Workspace
+      </button>
+    </motion.div>
   );
 };

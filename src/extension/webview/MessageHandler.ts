@@ -2398,6 +2398,35 @@ export class MessageHandler {
           break;
         }
 
+        // ----- Workstream Portfolio -----
+        case 'workstreamPortfolioRequestData': {
+          this.log('[WorkstreamPortfolio] Data requested');
+          const pm = this.workstreamManager?.getPortfolioManager();
+          if (!pm) {
+            this.log('[WorkstreamPortfolio] Portfolio manager not available');
+            break;
+          }
+          void pm.getPortfolioState().then(portfolioState => {
+            const currentWorkspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+            this.webview.postMessage({ type: 'workstreamPortfolioData', data: portfolioState, currentWorkspacePath });
+          }).catch(err => {
+            this.log(`[WorkstreamPortfolio] Failed to get portfolio: ${err instanceof Error ? err.message : String(err)}`);
+          });
+          break;
+        }
+
+        case 'workstreamPortfolioOpenProject': {
+          const projectPath = (msg as { type: string; projectPath: string }).projectPath;
+          this.log(`[WorkstreamPortfolio] Open project: ${projectPath}`);
+          const currentWorkspace = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+          if (currentWorkspace && projectPath.replace(/\\/g, '/').toLowerCase() === currentWorkspace.replace(/\\/g, '/').toLowerCase()) {
+            this.webview.postMessage({ type: 'workstreamPortfolioNavigateToProject' });
+          } else {
+            void vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(projectPath), false);
+          }
+          break;
+        }
+
         case 'planApprovalResponse':
           this.log(`Plan approval response: action=${msg.action} toolName=${msg.toolName || '(none)'} pendingTool=${this.pendingApprovalTool || '(none)'}`);
           this.logApprovalState('planApprovalResponse-entry');

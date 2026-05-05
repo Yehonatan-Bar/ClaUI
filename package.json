@@ -144,6 +144,10 @@
         "title": "ClaUi: Open Workstream Map"
       },
       {
+        "command": "claudeMirror.openWorkstreamPortfolio",
+        "title": "ClaUi: Open Workstream Portfolio"
+      },
+      {
         "command": "claudeMirror.tabs.focus",
         "title": "ClaUi: Focus Tab"
       },

@@ -10,7 +10,7 @@ import { AchievementService } from './achievements/AchievementService';
 import { AchievementInsightAnalyzer } from './achievements/AchievementInsightAnalyzer';
 import { GitHubSyncService } from './achievements/GitHubSyncService';
 import { SkillGenService } from './skillgen/SkillGenService';
-import { installSkillFiles, injectClaudeMdInstructions } from './skillgen/SrPtdBootstrap';
+import { installSkillFiles, injectClaudeMdInstructions, removeClaudeMdInstructions } from './skillgen/SrPtdBootstrap';
 import { TokenUsageRatioTracker } from './session/TokenUsageRatioTracker';
 import { SkillUsageTracker } from './skillgen/SkillUsageTracker';
 import { registerCommands } from './commands';
@@ -22,6 +22,7 @@ import { ProcessMemorySampler } from './process/ProcessMemorySampler';
 import { TabGroupStore } from './session/TabGroupStore';
 import { TabGroupsTreeProvider } from './views/TabGroupsTreeProvider';
 import { WorkstreamManager } from './workstream/WorkstreamManager';
+import { UserPortfolioManager } from './workstream/UserPortfolioManager';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -90,14 +91,18 @@ export function activate(context: vscode.ExtensionContext): void {
     });
   }
 
-  // Auto-install SR-PTD skill and inject CLAUDE.md instructions
-  void installSkillFiles(context.extensionPath, log);
-  if (config.get<boolean>('srPtdAutoInject', true)) {
-    const docsDir = skillGenConfig.get<string>(
-      'skillGen.docsDirectory',
-      'C:\\projects\\Skills\\Dev_doc_for_skills'
-    );
-    void injectClaudeMdInstructions(docsDir, log);
+  // Auto-install SR-PTD skill and inject CLAUDE.md instructions (only when skillGen is enabled)
+  if (skillGenConfig.get<boolean>('skillGen.enabled', true)) {
+    void installSkillFiles(context.extensionPath, log);
+    if (config.get<boolean>('srPtdAutoInject', true)) {
+      const docsDir = skillGenConfig.get<string>(
+        'skillGen.docsDirectory',
+        'C:\\projects\\Skills\\Dev_doc_for_skills'
+      );
+      void injectClaudeMdInstructions(docsDir, log);
+    }
+  } else {
+    void removeClaudeMdInstructions(log);
   }
 
   // Create global token-usage ratio tracker (shared across all tabs)
@@ -129,6 +134,10 @@ export function activate(context: vscode.ExtensionContext): void {
     () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd(),
   );
 
+  // Create user portfolio manager (cross-project, uses globalState)
+  const portfolioManager = new UserPortfolioManager(context.globalState);
+  workstreamManager.setPortfolioManager(portfolioManager);
+
   // Create the tab manager that owns all session tabs
   tabManager = new TabManager(
     context,
@@ -157,6 +166,16 @@ export function activate(context: vscode.ExtensionContext): void {
       tab.reveal();
       tab.postMessage({ type: 'toggleWorkstreamMap', open: true });
       log('Opening Workstream Map');
+    })
+  );
+
+  // Register portfolio command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('claudeMirror.openWorkstreamPortfolio', () => {
+      const tab = tabManager.getOrCreateTab();
+      tab.reveal();
+      tab.postMessage({ type: 'toggleWorkstreamPortfolio', open: true });
+      log('Opening Workstream Portfolio');
     })
   );
 

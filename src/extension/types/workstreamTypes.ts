@@ -530,4 +530,65 @@ export const STATION_TYPE_SHAPES: Record<StationType, string> = {
   plan_step: 'outlined-circle',
 };
 
+// --- User Portfolio (cross-project) ---
+
+export type ProjectHealth = 'healthy' | 'needs_attention' | 'blocked' | 'stale';
+
+export interface ProjectWorkstreamSummary {
+  id: string;
+  label: string;
+  status: WorkstreamStatus;
+  confidence: number;
+  lastActivityAt: string;
+  phase: string;
+  colorToken: string;
+  stationCount: number;
+}
+
+export interface ProjectSummaryEntry {
+  projectId: string;
+  projectPath: string;
+  projectName: string;
+
+  lastActivityAt: string;
+  lastClassifiedAt: string;
+  lastOpenedAt: string;
+
+  activeWorkstreams: number;
+  blockedWorkstreams: number;
+  completedWorkstreams: number;
+  uncertainWorkstreams: number;
+  totalWorkstreams: number;
+
+  topWorkstreams: ProjectWorkstreamSummary[];
+
+  overallHealth: ProjectHealth;
+  healthReasons: string[];
+
+  totalSessions: number;
+  recentSessions: number;
+
+  currentStateSummary: string;
+  recommendedNextAction: string;
+  openBlockerCount: number;
+
+  cachedMapState?: ProjectMapState;
+  pathExists?: boolean;
+}
+
+export interface CrossProjectResumeRecommendation {
+  projectId: string;
+  projectName: string;
+  workstreamId: string;
+  workstreamLabel: string;
+  reason: string;
+  confidence: number;
+}
+
+export interface UserPortfolioState {
+  projects: ProjectSummaryEntry[];
+  crossProjectResume: CrossProjectResumeRecommendation | null;
+  lastUpdatedAt: string;
+}
+
 export const CURRENT_SCHEMA_VERSION = 1;

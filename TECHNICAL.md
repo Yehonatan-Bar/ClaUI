@@ -148,6 +148,8 @@ claude-code-mirror/
 |   |   |   +-- WorkstreamImportanceScorer.ts #  Composite importance/attention scoring
 |   |   |   +-- SessionBackfiller.ts      #   Enriches existing sessions with workstream fields
 |   |   |   +-- FileTracker.ts            #   Captures file/git signals from tool events
+|   |   |   +-- UserPortfolioStore.ts     #   Cross-project portfolio persistence (globalState, max 30 projects)
+|   |   |   +-- UserPortfolioManager.ts   #   Portfolio orchestrator: health scoring, resume algorithm, path validation
 |   |   +-- types/
 |   |       +-- stream-json.ts            #   CLI protocol type definitions
 |   |       +-- webview-messages.ts       #   postMessage contract
@@ -286,6 +288,8 @@ claude-code-mirror/
 |       |   |   +-- ConfidenceReviewPanel.tsx #  Floating panel for low-confidence workstream review and reclassification
 |       |   |   +-- ResolveToolbar.tsx       #   Action buttons (Rename, Complete, Abandon, Pin)
 |       |   |   +-- NLCommandBar.tsx         #   Natural language map editing input
+|       |   |   +-- UserPortfolioView.tsx    #   Cross-project portfolio view (header, resume banner, card list)
+|       |   |   +-- ProjectCard.tsx          #   Individual project card (health border, subway lines, hover tooltip)
 |       |   |   +-- layout.ts               #   Deterministic lane-based SVG layout algorithm
 |       |   |   +-- visualEncoding.ts        #   Status colors, shapes, sizes, line styles
 |       |   |   +-- animations.ts            #   CSS keyframe definitions
@@ -554,9 +558,9 @@ claude-code-mirror/
 **Happy Provider (remote)** -- Integration with Happy Coder, an external remote AI coding relay that enables cross-device Claude Code sessions (local-to-mobile and back). ClaUi's role is a thin CLI-swap layer: the internal provider id remains `'remote'`, and the implementation reuses the standard `SessionTab` + `ClaudeProcessManager` pipeline, only swapping the executable path to Happy CLI via `ProcessStartOptions.cliPathOverride`. All remote/mobile capabilities are handled by the external Happy CLI and its relay server, not by ClaUi. Auth flow uses QR code / device auth via `happy auth` in a VS Code terminal (`claudeMirror.authenticateHappy`), and `SessionTab` detects auth-required stderr patterns to show targeted guidance.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/REMOTE_SESSIONS.md`
 
-**Workstream Map** -- Subway-map style visualization that groups sessions into logical workstreams (coherent threads of work with a goal, status, and history). AI-powered classification pipeline: scoped to open-tab sessions + last 3 days, heuristic pre-clustering (git branch, file overlap Jaccard, temporal proximity), then Sonnet classification via stdin-piped CLI call. Stations represent meaningful events (milestones, decisions, blockers, discoveries). SVG deterministic lane layout with visual encodings for status, confidence, type. Layers: Current State, Resume View, Plan Overlay, Resolve Mode. Backend: `WorkstreamManager` orchestrator + 11 service classes. Frontend: 14 React/SVG components. Command: `claudeMirror.openWorkstreamMap`.
+**Workstream Map** -- Subway-map style visualization that groups sessions into logical workstreams (coherent threads of work with a goal, status, and history). AI-powered classification pipeline: scoped to open-tab sessions + last 3 days, heuristic pre-clustering (git branch, file overlap Jaccard, temporal proximity), then Sonnet classification via stdin-piped CLI call. Stations represent meaningful events (milestones, decisions, blockers, discoveries). SVG deterministic lane layout with visual encodings for status, confidence, type. Layers: Current State, Resume View, Plan Overlay, Resolve Mode. Backend: `WorkstreamManager` orchestrator + 13 service classes. Frontend: 16 React/SVG components. Includes **User Portfolio View** (cross-project): `UserPortfolioManager` + `UserPortfolioStore` use `globalState` for cross-workspace persistence; project health scoring (healthy/needs_attention/blocked/stale), cross-project resume recommendations, path validation for deleted projects. Commands: `claudeMirror.openWorkstreamMap`, `claudeMirror.openWorkstreamPortfolio`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP.md`
-> Plans: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP_PLAN_REWRITE.md` (full spec), `WORKSTREAM_MAP_PLAN.md` (original)
+> Plans: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP_PLAN_REWRITE.md` (full spec)
 
 ---
 

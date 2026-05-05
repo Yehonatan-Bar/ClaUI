@@ -16,11 +16,20 @@ export const MapControls: React.FC = () => {
   const setFocused = useAppStore(s => s.setFocusedWorkstreamId);
   const setSelected = useAppStore(s => s.setSelectedStationId);
 
+  const portfolioData = useAppStore(s => s.userPortfolioData);
+  const cachedViewProject = useAppStore(s => s.cachedViewProject);
+  const setCachedViewProject = useAppStore(s => s.setCachedViewProject);
+  const enteredFromPortfolio = portfolioData && portfolioData.projects.length > 1;
+
   const handleBack = () => {
     if (zoom === 'station_detail') {
       setSelected(null);
     } else if (zoom === 'workstream') {
       setFocused(null);
+    } else if (zoom === 'project' && (enteredFromPortfolio || cachedViewProject)) {
+      if (cachedViewProject) { setCachedViewProject(null); }
+      setZoom('portfolio');
+      postToExtension({ type: 'workstreamPortfolioRequestData' });
     }
   };
 
@@ -41,9 +50,9 @@ export const MapControls: React.FC = () => {
       fontSize: 11,
       fontFamily: 'var(--vscode-font-family)',
     }}>
-      {zoom !== 'project' && (
+      {(zoom !== 'project' || enteredFromPortfolio || cachedViewProject) && zoom !== 'portfolio' && (
         <button onClick={handleBack} style={btnStyle}>
-          Back
+          {zoom === 'project' && (enteredFromPortfolio || cachedViewProject) ? 'All Projects' : 'Back'}
         </button>
       )}
 
