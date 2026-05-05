@@ -136,7 +136,7 @@ export class WorkstreamManager {
       const ws: Workstream = {
         id: wsId,
         projectId,
-        label: cw.label,
+        label: cw.label.replace(/\bultrathink\b\s*/gi, '').trim(),
         goal: cw.goal,
         type: cw.type,
         status: cw.status,

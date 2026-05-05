@@ -7,9 +7,11 @@ import type {
   WorkstreamStatus,
 } from '../../../extension/types/workstreamTypes';
 
-const LANE_HEIGHT = 60;
-const STATION_SPACING_X = 120;
-const PADDING = { top: 80, right: 40, bottom: 40, left: 60 };
+const LANE_HEIGHT = 90;
+const STATION_SPACING_X = 140;
+const LABEL_AREA_WIDTH = 200;
+const LINE_START_X = 220;
+const PADDING = { top: 70, right: 80, bottom: 60, left: 16 };
 const MAX_VISIBLE_LANES = 7;
 
 const STATUS_PRIORITY: Record<WorkstreamStatus, number> = {
@@ -39,9 +41,8 @@ export function computeLayout(state: ProjectMapState): MapLayout {
       .filter(s => s.workstreamId === ws.id && s.visibleInProjectMap)
       .sort((a, b) => a.order - b.order);
 
-    // Build path
     const points: Array<{ x: number; y: number }> = [];
-    const startX = PADDING.left;
+    const startX = LINE_START_X;
 
     if (wsStations.length === 0) {
       const endX = startX + STATION_SPACING_X;
@@ -49,16 +50,15 @@ export function computeLayout(state: ProjectMapState): MapLayout {
       maxX = Math.max(maxX, endX);
     } else {
       wsStations.forEach((station, stationIdx) => {
-        const x = PADDING.left + (stationIdx + 1) * STATION_SPACING_X;
+        const x = LINE_START_X + (stationIdx + 1) * STATION_SPACING_X;
         points.push({ x, y });
         stationPositions[station.id] = { x, y };
-        labelPositions[station.id] = { x, y: y - 20 };
+        labelPositions[station.id] = { x, y: y - 22 };
         maxX = Math.max(maxX, x);
       });
     }
 
-    // Add workstream label position
-    labelPositions[ws.id] = { x: PADDING.left - 10, y };
+    labelPositions[ws.id] = { x: PADDING.left, y };
 
     // Generate SVG path
     const pathD = generateSmoothPath(points, startX, y);

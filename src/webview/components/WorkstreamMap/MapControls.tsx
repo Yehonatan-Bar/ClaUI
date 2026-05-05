@@ -33,9 +33,11 @@ export const MapControls: React.FC = () => {
       display: 'flex',
       alignItems: 'center',
       gap: 6,
-      padding: '4px 12px',
-      borderBottom: '1px solid var(--vscode-panel-border, #1E293B)',
-      background: 'var(--vscode-editor-background)',
+      padding: '5px 16px',
+      borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+      background: 'rgba(15, 23, 42, 0.5)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
       fontSize: 11,
       fontFamily: 'var(--vscode-font-family)',
     }}>
@@ -82,14 +84,16 @@ export const MapControls: React.FC = () => {
 };
 
 const btnStyle: React.CSSProperties = {
-  background: 'var(--vscode-button-secondaryBackground, #334155)',
+  background: 'rgba(51, 65, 85, 0.5)',
   color: 'var(--vscode-button-secondaryForeground, #CBD5E1)',
-  border: '1px solid var(--vscode-panel-border, #475569)',
-  borderRadius: 4,
-  padding: '2px 8px',
+  border: '1px solid rgba(255, 255, 255, 0.08)',
+  borderRadius: 5,
+  padding: '3px 10px',
   cursor: 'pointer',
   fontSize: 10,
   fontFamily: 'inherit',
+  transition: 'all 0.2s ease',
+  letterSpacing: '0.01em',
 };
 
 const ToggleBtn: React.FC<{ label: string; active: boolean; onToggle: () => void }> = ({ label, active, onToggle }) => (

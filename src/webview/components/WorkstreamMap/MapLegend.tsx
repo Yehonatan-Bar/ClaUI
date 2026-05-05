@@ -5,12 +5,16 @@ export const MapLegend: React.FC = () => (
   <div style={{
     display: 'flex',
     gap: 12,
-    padding: '4px 12px',
-    borderTop: '1px solid var(--vscode-panel-border, #1E293B)',
+    padding: '6px 16px',
+    borderTop: '1px solid rgba(255, 255, 255, 0.04)',
+    background: 'rgba(15, 23, 42, 0.5)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
     fontSize: 10,
     fontFamily: 'var(--vscode-font-family)',
     color: '#64748B',
     flexWrap: 'wrap',
+    letterSpacing: '0.01em',
   }}>
     {/* Line colors */}
     {Object.entries(STATUS_COLORS).map(([status, color]) => (

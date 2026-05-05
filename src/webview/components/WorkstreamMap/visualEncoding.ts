@@ -44,9 +44,9 @@ export function getStationShape(type: StationType): string {
 
 export function getStationSize(size: StationVisualState['size']): number {
   switch (size) {
-    case 'large': return 14;
-    case 'medium': return 10;
-    case 'small': return 6;
+    case 'large': return 20;
+    case 'medium': return 14;
+    case 'small': return 10;
   }
 }
 

@@ -330,6 +330,13 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       this.restoreSessionName(options.resume);
       this.loadAndSendConversationHistory(options.resume);
       this.persistSessionMetadata();
+    } else if (isFork && options?.resume) {
+      // For forks, inherit the parent session's name (without overwriting
+      // fork-specific metadata like sessionStartedAt).
+      const parentSession = this.sessionStore.getSession(options.resume);
+      if (parentSession?.name && !parentSession.name.startsWith('Session ')) {
+        this.setTabName(parentSession.name);
+      }
     }
 
     this.postMessage({
@@ -977,6 +984,14 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
     if (this.sessionNamingRequested) {
       this.log(`[Codex Tab ${this.tabNumber}] [SessionNaming] SKIPPED: naming already requested`);
+      return;
+    }
+
+    // If the session already has a custom name (e.g. restored from store after
+    // resume/fork), skip auto-naming so we don't overwrite it.
+    if (this.baseTitle && !/^(ClaUi|Codex|Session|Search) \d+$/.test(this.baseTitle)) {
+      this.log(`[Codex Tab ${this.tabNumber}] [SessionNaming] SKIPPED: session already has a custom name "${this.baseTitle}"`);
+      this.sessionNamingRequested = true;
       return;
     }
 

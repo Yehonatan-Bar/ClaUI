@@ -938,11 +938,14 @@ export class SessionTab implements WebviewBridge {
       this.forkInitData = null;
     }
 
-    // If resuming (not forking), restore session name and load conversation
-    // history immediately. The CLI in pipe mode doesn't emit system/init or
-    // replay messages until user sends input, so we read from disk instead.
-    if (options?.resume && !options?.fork) {
+    // Restore the session name for both resume and fork so the tab keeps its
+    // existing title and auto-naming doesn't overwrite it.
+    if (options?.resume) {
       this.restoreSessionName(options.resume);
+    }
+
+    // Load conversation history only for resume (fork sends its own via forkInit).
+    if (options?.resume && !options?.fork) {
       this.loadAndSendConversationHistory(options.resume);
     }
   }

@@ -5525,6 +5525,15 @@ export class MessageHandler {
       return;
     }
 
+    // If the session already has a custom name (e.g. restored from store after
+    // resume/fork), skip auto-naming so we don't overwrite it.
+    const currentName = this.getSessionName?.();
+    if (currentName && !/^(ClaUi|Session|Search|Codex) \d+$/.test(currentName)) {
+      this.log(`[SessionNaming] SKIPPED: session already has a custom name "${currentName}"`);
+      this.firstMessageSent = true;
+      return;
+    }
+
     if (!this.sessionNamer) {
       this.log('[SessionNaming] SKIPPED: no sessionNamer attached');
       return;

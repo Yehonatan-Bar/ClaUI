@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '../../state/store';
 import { MapHeader } from './MapHeader';
 import { MapControls } from './MapControls';
@@ -11,30 +12,54 @@ import { NLCommandBar } from './NLCommandBar';
 import { ConfidenceReviewPanel } from './ConfidenceReviewPanel';
 import { postToExtension } from '../../hooks/useClaudeStream';
 
+const pageEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+const pageTransition = {
+  initial: { opacity: 0, scale: 0.97 },
+  animate: { opacity: 1, scale: 1 },
+  exit: { opacity: 0, scale: 0.98 },
+  transition: { duration: 0.4, ease: pageEase },
+};
+
 const CloseButton: React.FC = () => (
-  <button
+  <motion.button
     onClick={() => useAppStore.getState().setWorkstreamMapOpen(false)}
     title="Close Workstream Map"
     style={{
       position: 'absolute',
       top: 8,
       right: 8,
-      background: 'transparent',
-      border: 'none',
+      background: 'rgba(255, 255, 255, 0.06)',
+      border: '1px solid rgba(255, 255, 255, 0.08)',
       color: 'var(--vscode-foreground, #CBD5E1)',
       cursor: 'pointer',
-      fontSize: 18,
+      fontSize: 14,
       lineHeight: 1,
-      padding: '2px 6px',
-      borderRadius: 4,
+      padding: '4px 8px',
+      borderRadius: 6,
       opacity: 0.7,
       zIndex: 10,
+      backdropFilter: 'blur(8px)',
     }}
-    onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-    onMouseLeave={e => (e.currentTarget.style.opacity = '0.7')}
+    whileHover={{ opacity: 1, scale: 1.1 }}
+    whileTap={{ scale: 0.9 }}
+    transition={{ type: 'spring', stiffness: 400, damping: 25 }}
   >
     X
-  </button>
+  </motion.button>
+);
+
+const MapIcon: React.FC = () => (
+  <svg width={48} height={48} viewBox="0 0 48 48" style={{ marginBottom: 12, opacity: 0.4 }}>
+    <line x1={8} y1={16} x2={40} y2={16} stroke="#4A9EFF" strokeWidth={2} strokeLinecap="round" />
+    <line x1={8} y1={24} x2={40} y2={24} stroke="#4ADE80" strokeWidth={2} strokeLinecap="round" />
+    <line x1={8} y1={32} x2={40} y2={32} stroke="#FACC15" strokeWidth={2} strokeLinecap="round" />
+    <circle cx={16} cy={16} r={3} fill="#4A9EFF" />
+    <circle cx={30} cy={16} r={3} fill="#4A9EFF" />
+    <circle cx={22} cy={24} r={3} fill="#4ADE80" />
+    <circle cx={36} cy={24} r={3} fill="#4ADE80" />
+    <circle cx={24} cy={32} r={3} fill="#FACC15" />
+  </svg>
 );
 
 export const WorkstreamMapView: React.FC = () => {
@@ -53,125 +78,24 @@ export const WorkstreamMapView: React.FC = () => {
     postToExtension({ type: 'workstreamMapRequestData' });
   }, []);
 
-  if (error) {
-    return (
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'var(--vscode-editor-background, rgba(13, 17, 23, 0.97))',
-        fontFamily: 'var(--vscode-font-family)',
-        color: '#F87171',
-        fontSize: 13,
-        gap: 8,
-      }}>
-        <CloseButton />
-        <div>Error loading workstream map</div>
-        <div style={{ fontSize: 11, color: '#94A3B8' }}>{error}</div>
-        <button
-          onClick={() => postToExtension({ type: 'workstreamMapReclassify', force: true })}
-          style={{
-            marginTop: 8,
-            background: 'var(--vscode-button-background, #4A9EFF)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 4,
-            padding: '6px 16px',
-            cursor: 'pointer',
-            fontSize: 12,
-          }}
-        >
-          Retry Classification
-        </button>
-      </div>
-    );
-  }
-
-  if (!mapData && !isClassifying) {
-    return (
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'var(--vscode-editor-background, rgba(13, 17, 23, 0.97))',
-        fontFamily: 'var(--vscode-font-family)',
-        color: '#94A3B8',
-        fontSize: 13,
-        gap: 12,
-      }}>
-        <CloseButton />
-        <div style={{ fontWeight: 600, fontSize: 16, color: '#CBD5E1' }}>Workstream Map</div>
-        <div>No workstream data yet. Start a classification to build the map.</div>
-        <button
-          onClick={() => postToExtension({ type: 'workstreamMapReclassify', force: true })}
-          style={{
-            background: 'var(--vscode-button-background, #4A9EFF)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 4,
-            padding: '8px 20px',
-            cursor: 'pointer',
-            fontSize: 12,
-          }}
-        >
-          Classify Project
-        </button>
-      </div>
-    );
-  }
-
-  if (isClassifying && !mapData) {
-    return (
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'var(--vscode-editor-background, rgba(13, 17, 23, 0.97))',
-        fontFamily: 'var(--vscode-font-family)',
-        color: '#CBD5E1',
-        gap: 12,
-      }}>
-        <CloseButton />
-        <div style={{ fontWeight: 600, fontSize: 16 }}>Building Workstream Map...</div>
-        <div style={{
-          width: 200,
-          height: 6,
-          background: '#1E293B',
-          borderRadius: 3,
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            width: `${classifyProgress * 100}%`,
-            height: '100%',
-            background: '#4A9EFF',
-            transition: 'width 300ms',
-          }} />
-        </div>
-        <div style={{ fontSize: 12, color: '#64748B' }}>{classifyPhase}</div>
-      </div>
-    );
-  }
-
-  if (!mapData) { return null; }
-
-  const focusedWorkstream = focusedWorkstreamId
+  const focusedWorkstream = mapData && focusedWorkstreamId
     ? mapData.workstreams.find(ws => ws.id === focusedWorkstreamId)
     : null;
-  const selectedStation = selectedStationId
+  const selectedStation = mapData && selectedStationId
     ? mapData.stations.find(s => s.id === selectedStationId)
     : null;
+
+  const overlayBase: React.CSSProperties = {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 1000,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'var(--vscode-editor-background, rgba(13, 17, 23, 0.97))',
+    fontFamily: 'var(--vscode-font-family)',
+  };
 
   return (
     <div style={{
@@ -183,45 +107,166 @@ export const WorkstreamMapView: React.FC = () => {
       backgroundColor: 'var(--vscode-editor-background, rgba(13, 17, 23, 0.97))',
     }}>
       <CloseButton />
-      {/* Header with summary chips */}
-      <MapHeader
-        state={mapData}
-        isClassifying={isClassifying}
-        classifyProgress={classifyProgress}
-        classifyPhase={classifyPhase}
-      />
 
-      {/* Controls bar */}
-      <MapControls />
+      <AnimatePresence mode="wait">
+        {/* Error state */}
+        {error ? (
+          <motion.div
+            key="error"
+            {...pageTransition}
+            style={{ ...overlayBase, color: '#F87171', fontSize: 13, gap: 8 }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Error loading workstream map</div>
+            <div style={{ fontSize: 11, color: '#94A3B8', maxWidth: 400, textAlign: 'center' }}>{error}</div>
+            <motion.button
+              onClick={() => postToExtension({ type: 'workstreamMapReclassify', force: true })}
+              style={{
+                marginTop: 12,
+                background: 'linear-gradient(135deg, #F87171, #DC2626)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                padding: '8px 20px',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+              whileHover={{ scale: 1.05, boxShadow: '0 0 20px rgba(248, 113, 113, 0.3)' }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Retry Classification
+            </motion.button>
+          </motion.div>
 
-      {/* Main content area */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* Map SVG */}
-        <ProjectMapView state={mapData} />
+        /* Empty state */
+        ) : !mapData && !isClassifying ? (
+          <motion.div
+            key="empty"
+            {...pageTransition}
+            style={{ ...overlayBase, color: '#94A3B8', fontSize: 13, gap: 12 }}
+          >
+            <MapIcon />
+            <div style={{ fontWeight: 600, fontSize: 16, color: '#CBD5E1', letterSpacing: '0.02em' }}>
+              Workstream Map
+            </div>
+            <div style={{ color: '#64748B', fontSize: 12 }}>
+              No workstream data yet. Build a map to visualize your project.
+            </div>
+            <motion.button
+              onClick={() => postToExtension({ type: 'workstreamMapReclassify', force: true })}
+              style={{
+                marginTop: 8,
+                background: 'linear-gradient(135deg, #4A9EFF, #7C3AED)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                padding: '10px 24px',
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: 600,
+                letterSpacing: '0.02em',
+              }}
+              whileHover={{ scale: 1.05, boxShadow: '0 0 24px rgba(74, 158, 255, 0.4)' }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            >
+              Build Workstream Map
+            </motion.button>
+          </motion.div>
 
-        {/* Side panel - workstream detail or station detail */}
-        {zoom === 'station_detail' && selectedStation && (
-          <StationDetailView station={selectedStation} state={mapData} />
-        )}
-        {zoom === 'workstream' && focusedWorkstream && !selectedStation && (
-          <WorkstreamDetailPanel workstream={focusedWorkstream} state={mapData} />
-        )}
-      </div>
+        /* Loading state */
+        ) : isClassifying && !mapData ? (
+          <motion.div
+            key="loading"
+            {...pageTransition}
+            style={{ ...overlayBase, color: '#CBD5E1', gap: 16 }}
+          >
+            <div style={{ position: 'relative', width: 100, height: 100 }}>
+              <svg width={100} height={100} viewBox="0 0 100 100">
+                <defs>
+                  <filter id="loading-glow">
+                    <feGaussianBlur stdDeviation="3" />
+                  </filter>
+                </defs>
+                {/* Background ring */}
+                <circle cx={50} cy={50} r={38} fill="none" stroke="rgba(30, 41, 59, 0.8)" strokeWidth={3} />
+                {/* Progress ring */}
+                <motion.circle
+                  cx={50} cy={50} r={38} fill="none" stroke="#4A9EFF" strokeWidth={3}
+                  strokeLinecap="round"
+                  pathLength={1}
+                  style={{ rotate: -90, transformOrigin: 'center' }}
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: classifyProgress }}
+                  transition={{ pathLength: { duration: 0.5, ease: 'easeOut' } }}
+                />
+                {/* Spinning glow dot */}
+                <motion.circle
+                  cx={50} cy={12} r={4} fill="#4A9EFF" opacity={0.3}
+                  filter="url(#loading-glow)"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                  style={{ transformOrigin: '50px 50px' }}
+                />
+              </svg>
+              <div style={{
+                position: 'absolute', inset: 0, display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+                fontSize: 18, fontWeight: 700, color: '#4A9EFF',
+                fontFamily: 'var(--vscode-font-family)',
+              }}>
+                {Math.round(classifyProgress * 100)}%
+              </div>
+            </div>
+            <div style={{ fontWeight: 600, fontSize: 16, letterSpacing: '0.02em' }}>
+              Building Workstream Map
+            </div>
+            <div style={{ fontSize: 12, color: '#64748B' }}>{classifyPhase}</div>
+          </motion.div>
 
-      {/* Resolve toolbar and NL command bar */}
-      {resolveModeEnabled && <ResolveToolbar />}
-      {resolveModeEnabled && <NLCommandBar />}
+        /* Map state */
+        ) : mapData ? (
+          <motion.div
+            key="map"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+            style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+          >
+            <MapHeader
+              state={mapData}
+              isClassifying={isClassifying}
+              classifyProgress={classifyProgress}
+              classifyPhase={classifyPhase}
+            />
+            <MapControls />
 
-      {/* Confidence review panel */}
-      {showConfidencePanel && mapData && (
-        <ConfidenceReviewPanel
-          state={mapData}
-          onClose={() => setShowConfidencePanel(false)}
-        />
-      )}
+            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+              <ProjectMapView state={mapData} />
 
-      {/* Legend */}
-      <MapLegend />
+              {zoom === 'station_detail' && selectedStation && (
+                <StationDetailView station={selectedStation} state={mapData} />
+              )}
+              {zoom === 'workstream' && focusedWorkstream && !selectedStation && (
+                <WorkstreamDetailPanel workstream={focusedWorkstream} state={mapData} />
+              )}
+            </div>
+
+            {resolveModeEnabled && <ResolveToolbar />}
+            {resolveModeEnabled && <NLCommandBar />}
+
+            {showConfidencePanel && (
+              <ConfidenceReviewPanel
+                state={mapData}
+                onClose={() => setShowConfidencePanel(false)}
+              />
+            )}
+
+            <MapLegend />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 };

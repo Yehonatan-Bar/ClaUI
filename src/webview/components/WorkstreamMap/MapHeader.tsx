@@ -19,12 +19,15 @@ export const MapHeader: React.FC<MapHeaderProps> = ({ state, isClassifying, clas
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '8px 12px',
-      borderBottom: '1px solid var(--vscode-panel-border, #334155)',
-      background: 'var(--vscode-editor-background)',
+      padding: '10px 16px',
+      borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+      background: 'rgba(15, 23, 42, 0.6)',
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
       fontFamily: 'var(--vscode-font-family)',
       fontSize: 12,
       color: 'var(--vscode-foreground, #CBD5E1)',
+      letterSpacing: '0.01em',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ fontWeight: 600, fontSize: 13 }}>

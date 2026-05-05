@@ -239,6 +239,7 @@ Rules:
 - Do not split one coherent bug investigation into many lines unless the goal actually diverged
 - Respect all protected user assignments exactly
 - Sessions that don't clearly belong anywhere should go into an "Uncertain Work" workstream
+- Never include "ultrathink" in workstream labels - it is a thinking activation keyword, not part of the actual work content. Strip it from any user prompt text before deriving labels
 - Return confidence scores (0-1) and reasons
 - Identify possible splits and merges between workstreams
 - Identify stale or abandoned work
