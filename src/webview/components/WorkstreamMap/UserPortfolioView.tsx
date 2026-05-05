@@ -2,7 +2,7 @@ import React, { useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
-import { ProjectCard } from './ProjectCard';
+import { PortfolioProjectMap } from './PortfolioProjectMap';
 import type { UserPortfolioState, ProjectSummaryEntry } from '../../../extension/types/workstreamTypes';
 
 const pageEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -82,20 +82,19 @@ export const UserPortfolioView: React.FC = () => {
         <ResumeBanner recommendation={portfolioData.crossProjectResume} onNavigate={handleResumeNavigate} />
       )}
 
-      {/* Project cards */}
+      {/* Full project maps */}
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '12px 20px 20px',
+        padding: '0 0 20px',
         display: 'flex',
         flexDirection: 'column',
-        gap: 10,
       }}>
         <AnimatePresence mode="popLayout">
           {portfolioData.projects
             .sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime())
             .map((project, index) => (
-              <ProjectCard
+              <PortfolioProjectMap
                 key={project.projectId}
                 project={project}
                 isCurrentWorkspace={isCurrentWorkspacePath(project.projectPath, currentWorkspacePath)}
@@ -112,6 +111,7 @@ export const UserPortfolioView: React.FC = () => {
 
 const PortfolioHeader: React.FC<{ portfolio: UserPortfolioState }> = ({ portfolio }) => {
   const totalProjects = portfolio.projects.length;
+  const totalWorkstreams = portfolio.projects.reduce((sum, project) => sum + project.totalWorkstreams, 0);
   const activeProjects = portfolio.projects.filter(p => p.activeWorkstreams > 0).length;
   const blockedProjects = portfolio.projects.filter(p => p.blockedWorkstreams > 0).length;
 
@@ -120,17 +120,20 @@ const PortfolioHeader: React.FC<{ portfolio: UserPortfolioState }> = ({ portfoli
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      gap: 8,
       padding: '12px 20px',
       borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
       background: 'rgba(15, 23, 42, 0.6)',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--vscode-foreground, #E2E8F0)' }}>
-          Your Projects
+          All Workstreams
         </span>
         <HealthSummaryChip label={`${totalProjects} total`} color="#94A3B8" />
+        <HealthSummaryChip label={`${totalWorkstreams} streams`} color="#94A3B8" />
         {activeProjects > 0 && <HealthSummaryChip label={`${activeProjects} active`} color="#4A9EFF" />}
         {blockedProjects > 0 && <HealthSummaryChip label={`${blockedProjects} blocked`} color="#F87171" />}
       </div>

@@ -3,6 +3,7 @@ import type { ContentBlock } from '../../extension/types/stream-json';
 import type {
   BugReportContext,
   CodexReasoningEffort,
+  CodexServiceTier,
   HandoffStage,
   McpConfigDiffPreview,
   McpConfigPaths,
@@ -129,6 +130,7 @@ export interface AppState {
   providerCapabilities: ProviderCapabilities;
   selectedModel: string;  // model chosen by user for next session
   selectedCodexReasoningEffort: CodexReasoningEffort;
+  selectedCodexServiceTier: CodexServiceTier;
   codexModelOptions: CodexModelOption[];
   isConnected: boolean;
   isBusy: boolean;
@@ -608,6 +610,7 @@ export interface AppState {
   setResuming: (resuming: boolean) => void;
   setSelectedModel: (model: string) => void;
   setSelectedCodexReasoningEffort: (effort: CodexReasoningEffort) => void;
+  setSelectedCodexServiceTier: (serviceTier: CodexServiceTier) => void;
   setCodexModelOptions: (options: CodexModelOption[]) => void;
   setPendingApproval: (approval: { toolName: string; planText: string } | null) => void;
   truncateFromMessage: (messageId: string) => void;
@@ -884,6 +887,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   providerCapabilities: { ...DEFAULT_PROVIDER_CAPABILITIES },
   selectedModel: '',
   selectedCodexReasoningEffort: '',
+  selectedCodexServiceTier: '',
   codexModelOptions: [],
   isConnected: false,
   isBusy: false,
@@ -1797,6 +1801,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSelectedModel: (model) => set({ selectedModel: model }),
 
   setSelectedCodexReasoningEffort: (effort) => set({ selectedCodexReasoningEffort: effort }),
+
+  setSelectedCodexServiceTier: (serviceTier) => set({ selectedCodexServiceTier: serviceTier }),
 
   setCodexModelOptions: (options) => set({ codexModelOptions: options }),
 

@@ -34,7 +34,14 @@ export const WorkstreamDetailPanel: React.FC<WorkstreamDetailPanelProps> = ({ wo
         <Row label="Status" value={workstream.status} />
         <Row label="Type" value={workstream.type} />
         <Row label="Phase" value={workstream.currentState.phase} />
-        <Row label="Sessions" value={String(workstream.sessionIds.length)} />
+        {workstream.source === 'external_folder' ? (
+          <>
+            <Row label="Source" value="External folder" />
+            <Row label="Documents" value={String(workstream.sourceDocumentCount ?? workstream.sourceFilePaths?.length ?? 0)} />
+          </>
+        ) : (
+          <Row label="Sessions" value={String(workstream.sessionIds.length)} />
+        )}
         <Row label="Confidence" value={`${Math.round(workstream.confidence * 100)}%`} />
         {workstream.userPinned && <Row label="Pinned" value="Yes" />}
       </div>
@@ -86,26 +93,44 @@ export const WorkstreamDetailPanel: React.FC<WorkstreamDetailPanelProps> = ({ wo
       </div>
 
       {/* Sessions */}
-      <div style={sectionStyle}>
-        <SectionTitle title="Sessions" />
-        {workstream.sessionIds.map(sid => (
-          <div
-            key={sid}
-            style={{
-              padding: '4px 0',
-              borderBottom: '1px solid #1E293B',
-              cursor: 'pointer',
-              color: '#4A9EFF',
-              fontSize: 11,
-            }}
-            onClick={() => postToExtension({ type: 'workstreamMapOpenSession', sessionId: sid })}
-          >
-            {sid.slice(0, 12)}...
-          </div>
-        ))}
-      </div>
+      {workstream.sessionIds.length > 0 && (
+        <div style={sectionStyle}>
+          <SectionTitle title="Sessions" />
+          {workstream.sessionIds.map(sid => (
+            <div
+              key={sid}
+              style={{
+                padding: '4px 0',
+                borderBottom: '1px solid #1E293B',
+                cursor: 'pointer',
+                color: '#4A9EFF',
+                fontSize: 11,
+              }}
+              onClick={() => postToExtension({ type: 'workstreamMapOpenSession', sessionId: sid })}
+            >
+              {sid.slice(0, 12)}...
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Files */}
+      {workstream.source === 'external_folder' && workstream.sourceFilePaths && workstream.sourceFilePaths.length > 0 && (
+        <div style={sectionStyle}>
+          <SectionTitle title={`Source Documents (${workstream.sourceFilePaths.length})`} />
+          {workstream.sourceFilePaths.slice(0, 12).map(f => (
+            <div key={f} style={{ fontSize: 10, color: '#64748B', padding: '1px 0' }} title={f}>
+              {shortFilePath(f)}
+            </div>
+          ))}
+          {workstream.sourceFilePaths.length > 12 && (
+            <div style={{ fontSize: 10, color: '#475569' }}>
+              +{workstream.sourceFilePaths.length - 12} more
+            </div>
+          )}
+        </div>
+      )}
+
       {workstream.metrics.filesModified.length > 0 && (
         <div style={sectionStyle}>
           <SectionTitle title={`Files Modified (${workstream.metrics.filesModified.length})`} />
@@ -161,3 +186,7 @@ const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     <span>{value}</span>
   </div>
 );
+
+function shortFilePath(filePath: string): string {
+  return filePath.replace(/\\/g, '/').split('/').slice(-3).join('/');
+}

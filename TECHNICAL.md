@@ -148,6 +148,7 @@ claude-code-mirror/
 |   |   |   +-- WorkstreamImportanceScorer.ts #  Composite importance/attention scoring
 |   |   |   +-- SessionBackfiller.ts      #   Enriches existing sessions with workstream fields
 |   |   |   +-- FileTracker.ts            #   Captures file/git signals from tool events
+|   |   |   +-- ExternalWorkFolderIngestor.ts # Explicit folder import for external docs as workstreams
 |   |   |   +-- UserPortfolioStore.ts     #   Cross-project portfolio persistence (globalState, max 30 projects)
 |   |   |   +-- UserPortfolioManager.ts   #   Portfolio orchestrator: health scoring, resume algorithm, path validation
 |   |   +-- types/
@@ -188,7 +189,10 @@ claude-code-mirror/
 |       |   |   +-- GitPushPanel.tsx      #   Config panel for git push (status, ask Claude to configure)
 |       |   |   +-- CodexConsultPanel.tsx #   Input panel for Codex GPT expert consultation
 |       |   +-- ModelSelector/
-|       |   |   +-- ModelSelector.tsx          #   Model dropdown (Sonnet/Opus/Haiku)
+|       |   |   +-- ModelSelector.tsx          #   Claude model dropdown (Sonnet/Opus/Haiku)
+|       |   |   +-- CodexModelSelector.tsx     #   Codex model dropdown (dynamic cache + fallback options)
+|       |   |   +-- CodexReasoningEffortSelector.tsx # Codex reasoning effort dropdown
+|       |   |   +-- CodexServiceTierSelector.tsx # Codex Speed dropdown (Default / Fast)
 |       |   +-- PermissionModeSelector/
 |       |   |   +-- PermissionModeSelector.tsx #   Full Access / Supervised mode toggle
 |       |   +-- Vitals/
@@ -269,7 +273,7 @@ claude-code-mirror/
 |       |   |   +-- McpDebugTab.tsx      #   Paths, diagnostics, and copyable MCP commands
 |       |   |   +-- index.ts             #   Barrel export
 |       |   +-- WorkstreamMap/
-|       |   |   +-- WorkstreamMapView.tsx    #   Top-level container (loading/error/empty states, close button)
+|       |   |   +-- WorkstreamMapView.tsx    #   Top-level container (error/portfolio/cached-view/empty/loading/map states)
 |       |   |   +-- ProjectMapView.tsx       #   Main SVG canvas (layout, lines, stations, splits/merges, overlays)
 |       |   |   +-- WorkstreamLine.tsx       #   SVG workstream line with hit area, label, status badge
 |       |   |   +-- StationNode.tsx          #   SVG station shapes (circle/diamond/square/triangle/star)
@@ -288,8 +292,9 @@ claude-code-mirror/
 |       |   |   +-- ConfidenceReviewPanel.tsx #  Floating panel for low-confidence workstream review and reclassification
 |       |   |   +-- ResolveToolbar.tsx       #   Action buttons (Rename, Complete, Abandon, Pin)
 |       |   |   +-- NLCommandBar.tsx         #   Natural language map editing input
-|       |   |   +-- UserPortfolioView.tsx    #   Cross-project portfolio view (header, resume banner, card list)
-|       |   |   +-- ProjectCard.tsx          #   Individual project card (health border, subway lines, hover tooltip)
+|       |   |   +-- UserPortfolioView.tsx    #   Cross-project portfolio view (header, resume banner, stacked full project maps)
+|       |   |   +-- PortfolioProjectMap.tsx  #   Full cached map renderer for each portfolio project
+|       |   |   +-- ProjectCard.tsx          #   Legacy compact project card (health border, subway lines, hover tooltip)
 |       |   |   +-- layout.ts               #   Deterministic lane-based SVG layout algorithm
 |       |   |   +-- visualEncoding.ts        #   Status colors, shapes, sizes, line styles
 |       |   |   +-- animations.ts            #   CSS keyframe definitions
@@ -316,6 +321,7 @@ claude-code-mirror/
     +-- ACTIVITY_SUMMARIZER.md            #   Periodic activity summary via Haiku
     +-- ADVENTURE_WIDGET.md              #   Pixel-art dungeon crawler session visualizer
     +-- CLAUDE_AUTH_LOGIN_LOGOUT.md      #   Claude CLI account login/logout/status integration
+    +-- CODEX_FAST_MODE.md              #   Codex Fast mode selector + CLI service tier override
     +-- DRAG_AND_DROP_CHALLENGE.md        #   Why drag-and-drop is blocked, workarounds
     +-- DOUBLE_CLICK_FOCUS_FIX_2026-03.md #   Focus hardening for click reliability + rollback guide
     +-- FILE_LOGGER.md                    #   File-based logging with rotation and rename
@@ -392,7 +398,7 @@ claude-code-mirror/
 **MessageHandler** - Bidirectional bridge translating webview postMessages into CLI commands and StreamDemux events into webview messages. Accepts a `WebviewBridge` interface (implemented by SessionTab). Uses optional bridge hooks (`getCliPathOverride`, `getProvider`) so webview-triggered start/restart flows keep the tab's runtime routing (including Happy CLI override) and report the correct provider in `sessionStarted`. Triggers auto-naming on first user message. Detects plan approval pauses (ExitPlanMode/AskUserQuestion) and forwards approval responses.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**CodexMessageHandler** - Codex-specific webview/runtime bridge for `codex exec --json` sessions. Maps `CodexExecDemux` events into existing webview message types (including synthesized `messageStart`/`streamingText`/`messageStop` around complete Codex `agent_message` items), handles Codex settings/history/image sends, and serializes live turn message emission order. Additional hardening exists in the Codex tab and webview layers: `CodexSessionTab` serializes actual `panel.webview.postMessage(...)` deliveries by awaiting the VS Code Thenable in a FIFO queue, adds a turn-complete exit watchdog (force-stop if process lingers after `turn.completed`), recovers idle-but-running stale turns before starting a new one, and now supports approved mid-turn steering by cancelling the active turn before dispatching the new one. `CodexMessageHandler` keeps `processBusy` aligned with runtime state on send failures via `session.isTurnRunning()` and enforces a Codex-specific steer gate (`Stop`/`Steer`) when a turn is still active. It also assigns a fresh UI message ID for each Codex assistant message (instead of reusing raw `agent_message.id`, which can repeat across turns like `item_1`) to prevent long-session reply overwrite in the webview store. `useClaudeStream` also applies a Codex-only fallback that immediately upserts complete `assistantMessage` payloads so replies remain visible even if finalize/clear events arrive out of order. Focus behavior in Codex tabs is hardened in the same way as Claude tabs: no `panel.reveal()` on window-focus, delayed/throttled `focusInput`, and explicit schedule/suppress/post logs.
+**CodexMessageHandler** - Codex-specific webview/runtime bridge for `codex exec --json` sessions. Maps `CodexExecDemux` events into existing webview message types (including synthesized `messageStart`/`streamingText`/`messageStop` around complete Codex `agent_message` items), handles Codex settings/history/image sends, syncs Codex model/reasoning/service-tier settings, and serializes live turn message emission order. Additional hardening exists in the Codex tab and webview layers: `CodexSessionTab` serializes actual `panel.webview.postMessage(...)` deliveries by awaiting the VS Code Thenable in a FIFO queue, adds a turn-complete exit watchdog (force-stop if process lingers after `turn.completed`), recovers idle-but-running stale turns before starting a new one, and now supports approved mid-turn steering by cancelling the active turn before dispatching the new one. `CodexMessageHandler` keeps `processBusy` aligned with runtime state on send failures via `session.isTurnRunning()` and enforces a Codex-specific steer gate (`Stop`/`Steer`) when a turn is still active. It also assigns a fresh UI message ID for each Codex assistant message (instead of reusing raw `agent_message.id`, which can repeat across turns like `item_1`) to prevent long-session reply overwrite in the webview store. `useClaudeStream` also applies a Codex-only fallback that immediately upserts complete `assistantMessage` payloads so replies remain visible even if finalize/clear events arrive out of order. Focus behavior in Codex tabs is hardened in the same way as Claude tabs: no `panel.reveal()` on window-focus, delayed/throttled `focusInput`, and explicit schedule/suppress/post logs.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_INTEGRATION_PROGRESS.md`
 
 **SessionNamer** - Spawns a one-shot `claude -p` process using Haiku to generate a 1-3 word tab name from the user's first message. Matches the language of the message (Hebrew/English). 10-second timeout, sanitized output, all errors silently logged.
@@ -439,8 +445,9 @@ claude-code-mirror/
 **TextSettingsBar** - In-webview UI for adjusting chat text font size, font family, and typing personality theme. Supports Hebrew-friendly font presets and four rendering themes: Terminal Hacker, Retro, Zen, and Neo Zen. Settings are stored in Zustand and synced from VS Code configuration on startup and on change. (Per-message LTR alignment override is a separate per-message button on each MessageBubble — see `MARKDOWN_RENDERING.md`.)
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**ModelSelector** - Dropdown in the status bar for choosing the Claude model (Opus 4.7, Sonnet 4.6, Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default). Selection is persisted to VS Code settings (`claudeMirror.model`) and synced back to the webview on startup and on change. Changing the model takes effect immediately: the current session is stopped and resumed with the new model (live switch via `SessionTab.switchModel()`). Shows the currently active runtime model label when connected; `claudeModelDisplay.ts` maps IDs like `claude-opus-4-7` to `Opus 4.7` in the AI chip, message badges, and dashboard metadata.
+**ModelSelector / Codex Selectors** - Dropdowns in the AI chip for choosing provider-specific model behavior. Claude uses `ModelSelector` for Opus/Sonnet/Haiku/CLI default and live-switches via `SessionTab.switchModel()`. Codex uses `CodexModelSelector`, `CodexReasoningEffortSelector`, and `CodexServiceTierSelector`; values persist to `claudeMirror.codex.model`, `claudeMirror.codex.reasoningEffort`, and `claudeMirror.codex.serviceTier`, then apply on the next `codex exec` turn. The Codex Speed selector passes Fast mode as `-c service_tier="fast" -c features.fast_mode=true` when selected. Shows the currently active runtime model label when connected; `claudeModelDisplay.ts` maps IDs like `claude-opus-4-7` to `Opus 4.7` in the AI chip, message badges, and dashboard metadata.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_FAST_MODE.md`
 
 **PermissionModeSelector** - Dropdown in the status bar for choosing between "Full Access" and "Supervised" modes. Selection is persisted to VS Code settings (`claudeMirror.permissionMode`). In the Claude path, "Full Access" passes `--permission-mode bypassPermissions` and "Supervised" passes `--allowedTools` (read-only tool set). In the Codex path, "Full Access" passes `--dangerously-bypass-approvals-and-sandbox` and "Supervised" passes `--sandbox read-only`. Changes take effect on the next process/session start (Claude) or next turn spawn (Codex).
 
@@ -558,7 +565,7 @@ claude-code-mirror/
 **Happy Provider (remote)** -- Integration with Happy Coder, an external remote AI coding relay that enables cross-device Claude Code sessions (local-to-mobile and back). ClaUi's role is a thin CLI-swap layer: the internal provider id remains `'remote'`, and the implementation reuses the standard `SessionTab` + `ClaudeProcessManager` pipeline, only swapping the executable path to Happy CLI via `ProcessStartOptions.cliPathOverride`. All remote/mobile capabilities are handled by the external Happy CLI and its relay server, not by ClaUi. Auth flow uses QR code / device auth via `happy auth` in a VS Code terminal (`claudeMirror.authenticateHappy`), and `SessionTab` detects auth-required stderr patterns to show targeted guidance.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/REMOTE_SESSIONS.md`
 
-**Workstream Map** -- Subway-map style visualization that groups sessions into logical workstreams (coherent threads of work with a goal, status, and history). AI-powered classification pipeline: scoped to open-tab sessions + last 3 days, heuristic pre-clustering (git branch, file overlap Jaccard, temporal proximity), then Sonnet classification via stdin-piped CLI call. Stations represent meaningful events (milestones, decisions, blockers, discoveries). SVG deterministic lane layout with visual encodings for status, confidence, type. Layers: Current State, Resume View, Plan Overlay, Resolve Mode. Backend: `WorkstreamManager` orchestrator + 13 service classes. Frontend: 16 React/SVG components. Includes **User Portfolio View** (cross-project): `UserPortfolioManager` + `UserPortfolioStore` use `globalState` for cross-workspace persistence; project health scoring (healthy/needs_attention/blocked/stale), cross-project resume recommendations, path validation for deleted projects. Commands: `claudeMirror.openWorkstreamMap`, `claudeMirror.openWorkstreamPortfolio`.
+**Workstream Map** -- Subway-map style visualization that groups sessions into logical workstreams (coherent threads of work with a goal, status, and history). AI-powered classification pipeline: scoped to open-tab sessions + last 3 days, heuristic pre-clustering (git branch, file overlap Jaccard, temporal proximity), then Sonnet classification via stdin-piped CLI call. Explicit external folder import lets the user enter a folder path and digest supported documents (`md/txt/json/yaml/html/xml/docx`, capped) into a dashed `external_folder` workstream with source-file evidence; normal reclassification preserves those imported workstreams. Stations represent meaningful events (milestones, decisions, blockers, discoveries). SVG deterministic lane layout with visual encodings for status, confidence, type. Layers: Current State, Resume View, Plan Overlay, Resolve Mode. Backend: `WorkstreamManager` orchestrator + 14 service classes. Frontend includes `UserPortfolioView`, `PortfolioProjectMap`, `ProjectMapView`, and shared SVG primitives. Includes **User Portfolio View** (cross-project): `UserPortfolioManager` + `UserPortfolioStore` use `globalState` for cross-workspace persistence; project health scoring (healthy/needs_attention/blocked/stale), cross-project resume recommendations, path validation for deleted projects, and a stacked full-map overview that renders every cached project workstream with simple project separators. Commands: `claudeMirror.openWorkstreamMap`, `claudeMirror.openWorkstreamPortfolio`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP.md`
 > Plans: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP_PLAN_REWRITE.md` (full spec)
 
@@ -1132,6 +1139,39 @@ Under `src/extension/session/`:
 ### Detail Doc
 
 - `Kingdom_of_Claudes_Beloved_MDs/btw_bug.md`
+
+---
+
+## 2026-05-05 - Codex Fast Mode Support
+
+### Updated Components
+
+- `src/webview/components/ModelSelector/CodexServiceTierSelector.tsx`
+  - New Codex `Speed` dropdown with `Default` and `Fast`.
+- `src/webview/components/StatusBar/AIChip.tsx`
+  - Renders the Speed selector in Codex tabs beside model and reasoning controls.
+- `src/extension/webview/CodexMessageHandler.ts`
+  - Syncs `setCodexServiceTier` / `codexServiceTierSetting`.
+- `src/extension/process/CodexExecProcessManager.ts`
+  - Adds `-c service_tier="fast" -c features.fast_mode=true` to Codex turns when enabled.
+
+### Manifest/Settings Delta
+
+New setting in `package.json`:
+
+- `claudeMirror.codex.serviceTier`
+  - Values: `"" | "fast"`
+  - Empty value leaves Codex CLI/config defaults untouched.
+
+### Runtime Notes
+
+- Fast mode is applied to both `codex exec` first turns and `codex exec resume` follow-up turns.
+- Codex BTW background turns inherit the setting because they use `CodexExecProcessManager`.
+- Auxiliary one-shot Codex calls such as auto-naming and summary fallback keep their explicit low/medium reasoning behavior and do not inherit Fast mode.
+
+### Detail Doc
+
+- `Kingdom_of_Claudes_Beloved_MDs/CODEX_FAST_MODE.md`
 
 ---
 

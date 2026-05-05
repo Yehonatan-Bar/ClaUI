@@ -15,6 +15,7 @@ export type HandoffStage =
   | 'completed'
   | 'failed';
 export type CodexReasoningEffort = '' | 'none' | 'low' | 'medium' | 'high' | 'xhigh';
+export type CodexServiceTier = '' | 'fast';
 export interface CodexModelOption {
   label: string;
   value: string;
@@ -314,6 +315,11 @@ export interface McpRestartSessionRequest {
 export interface SetCodexReasoningEffortRequest {
   type: 'setCodexReasoningEffort';
   effort: CodexReasoningEffort;
+}
+
+export interface SetCodexServiceTierRequest {
+  type: 'setCodexServiceTier';
+  serviceTier: CodexServiceTier;
 }
 
 export interface SetTypingThemeRequest {
@@ -829,6 +835,7 @@ export type WebviewToExtensionMessage =
   | McpImportDesktopRequest
   | McpRestartSessionRequest
   | SetCodexReasoningEffortRequest
+  | SetCodexServiceTierRequest
   | SetTypingThemeRequest
   | ShowHistoryRequest
   | OpenPlanDocsRequest
@@ -935,6 +942,7 @@ export type WebviewToExtensionMessage =
   | WorkstreamMapOpenSessionRequest
   | WorkstreamMapDismissResumeViewRequest
   | WorkstreamMapSaveSnapshotRequest
+  | WorkstreamMapImportExternalFolderRequest
   | WorkstreamPortfolioRequestDataRequest
   | WorkstreamPortfolioOpenProjectRequest;
 
@@ -1191,6 +1199,11 @@ export interface HandoffProgressMessage {
 export interface CodexReasoningEffortSettingMessage {
   type: 'codexReasoningEffortSetting';
   effort: CodexReasoningEffort;
+}
+
+export interface CodexServiceTierSettingMessage {
+  type: 'codexServiceTierSetting';
+  serviceTier: CodexServiceTier;
 }
 
 export interface CodexModelOptionsMessage {
@@ -2167,6 +2180,7 @@ export type ExtensionToWebviewMessage =
   | ProviderCapabilitiesMessage
   | HandoffProgressMessage
   | CodexReasoningEffortSettingMessage
+  | CodexServiceTierSettingMessage
   | CodexModelOptionsMessage
   | PlanApprovalRequiredMessage
   | PlanApprovalDismissedMessage
@@ -2330,6 +2344,11 @@ export interface WorkstreamMapDismissResumeViewRequest {
 
 export interface WorkstreamMapSaveSnapshotRequest {
   type: 'workstreamMapSaveSnapshot';
+}
+
+export interface WorkstreamMapImportExternalFolderRequest {
+  type: 'workstreamMapImportExternalFolder';
+  folderPath?: string;
 }
 
 // --- Workstream Portfolio (Extension -> Webview) ---

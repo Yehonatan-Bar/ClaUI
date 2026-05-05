@@ -28,6 +28,7 @@ import { WorkstreamNLEditor } from './WorkstreamNLEditor';
 import { WorkstreamImportanceScorer } from './WorkstreamImportanceScorer';
 import { SessionBackfiller } from './SessionBackfiller';
 import { UserPortfolioManager } from './UserPortfolioManager';
+import { ExternalWorkFolderIngestor } from './ExternalWorkFolderIngestor';
 import { WORKSTREAM_STATUS_COLORS } from '../types/workstreamTypes';
 
 export class WorkstreamManager {
@@ -41,6 +42,7 @@ export class WorkstreamManager {
   private readonly nlEditor: WorkstreamNLEditor;
   private readonly scorer: WorkstreamImportanceScorer;
   private readonly backfiller: SessionBackfiller;
+  private readonly externalIngestor: ExternalWorkFolderIngestor;
   private portfolioManager: UserPortfolioManager | null = null;
 
   private progressCallback?: (progress: number, phase: string) => void;
@@ -62,6 +64,7 @@ export class WorkstreamManager {
     this.nlEditor = new WorkstreamNLEditor();
     this.scorer = new WorkstreamImportanceScorer();
     this.backfiller = new SessionBackfiller();
+    this.externalIngestor = new ExternalWorkFolderIngestor(logFn);
   }
 
   setPortfolioManager(manager: UserPortfolioManager): void {
@@ -254,6 +257,19 @@ export class WorkstreamManager {
       this.log.appendLine(`[WorkstreamMap] Station extraction failed: ${e}`);
     }
 
+    const externalWorkstreams = existingState?.workstreams.filter(ws => ws.source === 'external_folder') ?? [];
+    const externalWorkstreamIds = new Set(externalWorkstreams.map(ws => ws.id));
+    const externalStations = existingState?.stations.filter(station => externalWorkstreamIds.has(station.workstreamId)) ?? [];
+    const preservedExternalWorkstreams = externalWorkstreams.map((ws, idx) => ({
+      ...ws,
+      order: workstreams.length + idx,
+    }));
+    if (preservedExternalWorkstreams.length > 0) {
+      this.log.appendLine(`[WorkstreamMap] Preserving ${preservedExternalWorkstreams.length} external-folder workstreams across reclassification`);
+    }
+    const allWorkstreams = [...workstreams, ...preservedExternalWorkstreams];
+    const allStations = [...stations, ...externalStations];
+
     this.reportProgress(0.75, 'Synthesizing current state...');
 
     // Build preliminary state for current state synthesis
@@ -261,8 +277,8 @@ export class WorkstreamManager {
       projectId,
       projectLabel: this.deriveProjectLabel(workspacePath),
       workspacePath,
-      workstreams,
-      stations,
+      workstreams: allWorkstreams,
+      stations: allStations,
       splits: existingState?.splits ?? [],
       merges: existingState?.merges ?? [],
       currentState: existingState?.currentState ?? this.emptyProjectCurrentState(now),
@@ -343,6 +359,182 @@ export class WorkstreamManager {
 
     // If no match, mark for full reclassification on next map open
     this.log.appendLine(`[WorkstreamMap] Session ${enriched.sessionId} needs full classification`);
+  }
+
+  async ingestExternalFolder(projectId: string, folderPath: string): Promise<ProjectMapState> {
+    const cliPath = this.getCliPath();
+    const workspacePath = this.getWorkspacePath();
+
+    this.log.appendLine(`[WorkstreamMap] ingestExternalFolder START: projectId="${projectId}", folderPath="${folderPath}"`);
+    this.reportProgress(0.05, 'Reading external work folder...');
+
+    const digest = await this.externalIngestor.ingest(folderPath, cliPath, workspacePath);
+
+    this.reportProgress(0.65, 'Adding external workstream...');
+
+    const now = new Date().toISOString();
+    const existingState = this.store.getProjectMapState(projectId);
+    const state = existingState ?? this.createEmptyState(projectId, workspacePath);
+    const normalizedFolder = this.normalizePathForCompare(digest.folderPath);
+    const existingWorkstream = state.workstreams.find(ws =>
+      ws.source === 'external_folder' &&
+      ws.sourceFolderPath &&
+      this.normalizePathForCompare(ws.sourceFolderPath) === normalizedFolder
+    );
+    const workstreamId = existingWorkstream?.id ?? crypto.randomUUID();
+    const sourceFilePaths = digest.documents.map(doc => doc.absolutePath);
+    const relativeToAbsolute = new Map(digest.documents.map(doc => [doc.relativePath, doc.absolutePath]));
+
+    const retainedStations = state.stations.filter(station => station.workstreamId !== workstreamId);
+    const importedStations: Station[] = digest.stations.map((station, idx) => {
+      const absoluteSourcePaths = station.sourceFilePaths
+        .map(filePath => relativeToAbsolute.get(filePath) ?? filePath)
+        .map(filePath => filePath.replace(/\\/g, '/'));
+      const stationId = crypto.randomUUID();
+
+      return {
+        id: stationId,
+        projectId,
+        workstreamId,
+        type: station.type,
+        status: station.status,
+        label: station.label,
+        description: station.description,
+        whyItMatters: station.whyItMatters,
+        sourceFilePaths: absoluteSourcePaths,
+        order: retainedStations.length + idx,
+        timestamp: this.latestDate(
+          station.sourceFilePaths
+            .map(filePath => digest.documents.find(doc => doc.relativePath === filePath)?.modifiedAt)
+            .filter(Boolean) as string[]
+        ) ?? now,
+        importanceScore: station.importanceScore,
+        attentionScore: station.attentionScore,
+        visibleInProjectMap: this.scorer.shouldShowInProjectMap({
+          importanceScore: station.importanceScore,
+          type: station.type,
+        } as Station),
+        confidence: station.confidence,
+        evidence: station.evidenceText
+          ? [{
+              kind: 'external_document',
+              text: station.evidenceText,
+              filePath: absoluteSourcePaths[0],
+            }]
+          : [],
+        visual: {
+          size: station.importanceScore > 0.7 ? 'large' : station.importanceScore > 0.4 ? 'medium' : 'small',
+          glow: station.attentionScore > 0.5 ? 'attention' : 'none',
+          labelVisible: station.importanceScore > 0.6,
+        },
+      };
+    });
+
+    const blockers = digest.currentState.blockers.map(blocker => ({
+      id: crypto.randomUUID(),
+      label: blocker.label,
+      description: blocker.description,
+      severity: blocker.severity,
+      createdAt: now,
+    }));
+    const pendingDecisions = digest.currentState.pendingDecisions.map(decision => ({
+      id: crypto.randomUUID(),
+      label: decision.label,
+      options: decision.options,
+      createdAt: now,
+    }));
+
+    const importedWorkstream: Workstream = {
+      id: workstreamId,
+      projectId,
+      label: digest.label,
+      goal: digest.goal,
+      type: digest.type,
+      status: digest.status,
+      sessionIds: [],
+      source: 'external_folder',
+      sourceFolderPath: digest.folderPath,
+      sourceFilePaths,
+      sourceImportedAt: now,
+      sourceDocumentCount: digest.documents.length,
+      sourceTotalBytes: digest.totalBytes,
+      relatedWorkstreamIds: existingWorkstream?.relatedWorkstreamIds ?? [],
+      parentWorkstreamId: existingWorkstream?.parentWorkstreamId,
+      childWorkstreamIds: existingWorkstream?.childWorkstreamIds ?? [],
+      mergedIntoWorkstreamId: existingWorkstream?.mergedIntoWorkstreamId,
+      confidence: digest.confidence,
+      confidenceReasons: digest.confidenceReasons.length > 0
+        ? digest.confidenceReasons
+        : [`Imported ${digest.documents.length} external document${digest.documents.length === 1 ? '' : 's'}`],
+      autoGenerated: true,
+      userPinned: existingWorkstream?.userPinned ?? false,
+      importanceScore: 0,
+      attentionScore: 0,
+      currentState: {
+        phase: digest.currentState.phase,
+        summary: digest.currentState.summary,
+        lastMeaningfulProgress: digest.currentState.lastMeaningfulProgress,
+        nextLikelyAction: digest.currentState.nextLikelyAction,
+        openQuestions: digest.currentState.openQuestions,
+        blockers,
+        pendingDecisions,
+        evidenceSessionIds: [],
+        evidenceStationIds: importedStations.map(station => station.id),
+        generatedBy: 'sonnet',
+        generatedAt: now,
+      },
+      startedAt: this.earliestDate(digest.documents.map(doc => doc.modifiedAt)) ?? now,
+      lastActivityAt: this.latestDate(digest.documents.map(doc => doc.modifiedAt)) ?? now,
+      completedAt: digest.status === 'completed' ? now : undefined,
+      lastViewedAt: existingWorkstream?.lastViewedAt,
+      planId: existingWorkstream?.planId,
+      planReality: existingWorkstream?.planReality,
+      metrics: {
+        totalSessions: 0,
+        totalTurns: 0,
+        totalCostUsd: 0,
+        filesModified: [],
+        filesRead: sourceFilePaths,
+        failureCount: importedStations.filter(station => station.status === 'failed').length,
+        blockerCount: blockers.length + importedStations.filter(station => station.type === 'blocker').length,
+        decisionCount: pendingDecisions.length + importedStations.filter(station => station.type === 'decision').length,
+      },
+      visual: {
+        ...this.computeVisualState(digest.status, digest.confidence, 0.6, existingWorkstream?.order ?? state.workstreams.length, existingWorkstream),
+        texture: 'dashed',
+      },
+      order: existingWorkstream?.order ?? state.workstreams.length,
+    };
+
+    importedWorkstream.importanceScore = this.scorer.scoreWorkstream(importedWorkstream);
+    importedWorkstream.attentionScore = this.scorer.scoreAttention(importedWorkstream);
+    importedWorkstream.visual.thickness = importedWorkstream.importanceScore > 0.7 ? 3 : importedWorkstream.importanceScore > 0.4 ? 2 : 1;
+    importedWorkstream.visual.needsAttention = importedWorkstream.status === 'blocked' || importedWorkstream.currentState.blockers.length > 0;
+
+    state.workstreams = [
+      ...state.workstreams.filter(ws => ws.id !== workstreamId),
+      importedWorkstream,
+    ];
+    state.stations = [...retainedStations, ...importedStations];
+    state.lastClassifiedAt = now;
+    this.refreshProjectCurrentStateFromWorkstreams(state, importedWorkstream, now);
+
+    const finalState = this.store.enforceCapLimits(state);
+    await this.store.saveProjectMapState(finalState);
+    await this.snapshotStore.captureSnapshot(finalState);
+
+    if (this.portfolioManager) {
+      try {
+        await this.portfolioManager.publishProjectSummary(projectId, finalState);
+        this.log.appendLine('[WorkstreamMap] Published external work summary to portfolio');
+      } catch (e) {
+        this.log.appendLine(`[WorkstreamMap] Portfolio publish after external ingest failed: ${e}`);
+      }
+    }
+
+    this.reportProgress(1.0, 'External work imported');
+    this.log.appendLine(`[WorkstreamMap] ingestExternalFolder COMPLETE: ws="${importedWorkstream.label}", docs=${digest.documents.length}, stations=${importedStations.length}`);
+    return finalState;
   }
 
   async applyUserEdit(projectId: string, edit: UserEdit): Promise<ProjectMapState | null> {
@@ -513,6 +705,41 @@ export class WorkstreamManager {
     };
   }
 
+  private refreshProjectCurrentStateFromWorkstreams(
+    state: ProjectMapState,
+    latestWorkstream: Workstream,
+    now: string,
+  ): void {
+    state.currentState.activeWorkstreamIds = state.workstreams
+      .filter(ws => ws.status === 'active')
+      .map(ws => ws.id);
+    state.currentState.blockedWorkstreamIds = state.workstreams
+      .filter(ws => ws.status === 'blocked' || ws.currentState.blockers.some(blocker => !blocker.resolvedAt))
+      .map(ws => ws.id);
+    state.currentState.completedWorkstreamIds = state.workstreams
+      .filter(ws => ws.status === 'completed')
+      .map(ws => ws.id);
+    state.currentState.uncertainWorkstreamIds = state.workstreams
+      .filter(ws => ws.status === 'uncertain' || ws.confidence < 0.5)
+      .map(ws => ws.id);
+
+    state.currentState.blockers = state.workstreams.flatMap(ws => ws.currentState.blockers.filter(blocker => !blocker.resolvedAt));
+    state.currentState.openQuestions = [
+      ...new Set(state.workstreams.flatMap(ws => ws.currentState.openQuestions)),
+    ].slice(0, 12);
+
+    const recommended = this.scorer.recommendResumeWorkstream(state.workstreams);
+    state.currentState.recommendedResumeWorkstreamId = recommended ?? latestWorkstream.id;
+    state.currentState.recommendedNextAction = latestWorkstream.currentState.nextLikelyAction || state.currentState.recommendedNextAction;
+
+    if (!state.currentState.summary || state.currentState.summary === 'No workstreams classified yet.') {
+      state.currentState.summary = latestWorkstream.currentState.summary;
+    }
+
+    state.currentState.generatedAt = now;
+    state.currentState.generatedBy = 'local_heuristic';
+  }
+
   private emptyProjectCurrentState(now: string): ProjectCurrentState {
     return {
       summary: 'No workstreams classified yet.',
@@ -540,6 +767,10 @@ export class WorkstreamManager {
   private latestDate(dates: string[]): string | undefined {
     if (dates.length === 0) { return undefined; }
     return dates.sort().reverse()[0];
+  }
+
+  private normalizePathForCompare(filePath: string): string {
+    return filePath.replace(/\\/g, '/').toLowerCase();
   }
 
   private reportProgress(progress: number, phase: string): void {

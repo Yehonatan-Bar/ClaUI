@@ -39,6 +39,7 @@ export function useClaudeStream(): void {
     setProviderCapabilities,
     setSelectedModel,
     setSelectedCodexReasoningEffort,
+    setSelectedCodexServiceTier,
     setCodexModelOptions,
     setResuming,
     setPendingApproval,
@@ -481,6 +482,10 @@ export function useClaudeStream(): void {
 
         case 'codexReasoningEffortSetting':
           setSelectedCodexReasoningEffort(msg.effort);
+          break;
+
+        case 'codexServiceTierSetting':
+          setSelectedCodexServiceTier(msg.serviceTier);
           break;
 
         case 'codexModelOptions':
@@ -1048,6 +1053,7 @@ export function useClaudeStream(): void {
     setProviderCapabilities,
     setSelectedModel,
     setSelectedCodexReasoningEffort,
+    setSelectedCodexServiceTier,
     setCodexModelOptions,
     setResuming,
     setPendingApproval,

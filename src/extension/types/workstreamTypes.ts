@@ -56,6 +56,10 @@ export type ModelTier =
   | 'haiku'
   | 'local_heuristic';
 
+export type WorkstreamSource =
+  | 'session'
+  | 'external_folder';
+
 // --- Supporting types ---
 
 export interface WorkstreamBlocker {
@@ -159,6 +163,12 @@ export interface Workstream {
   status: WorkstreamStatus;
 
   sessionIds: string[];
+  source?: WorkstreamSource;
+  sourceFolderPath?: string;
+  sourceFilePaths?: string[];
+  sourceImportedAt?: string;
+  sourceDocumentCount?: number;
+  sourceTotalBytes?: number;
   relatedWorkstreamIds: string[];
   parentWorkstreamId?: string;
   childWorkstreamIds: string[];
@@ -192,8 +202,8 @@ export interface Workstream {
 // --- Station ---
 
 export interface StationEvidence {
-  kind: 'session_summary' | 'tool_use' | 'file_change' | 'test_result' | 'user_message' | 'assistant_message';
-  sessionId: string;
+  kind: 'session_summary' | 'tool_use' | 'file_change' | 'test_result' | 'user_message' | 'assistant_message' | 'external_document';
+  sessionId?: string;
   turnIndex?: number;
   text?: string;
   filePath?: string;

@@ -15,6 +15,7 @@ export const MapControls: React.FC = () => {
   const setZoom = useAppStore(s => s.setWorkstreamMapZoom);
   const setFocused = useAppStore(s => s.setFocusedWorkstreamId);
   const setSelected = useAppStore(s => s.setSelectedStationId);
+  const isClassifying = useAppStore(s => s.workstreamMapClassifying);
 
   const portfolioData = useAppStore(s => s.userPortfolioData);
   const cachedViewProject = useAppStore(s => s.cachedViewProject);
@@ -35,6 +36,10 @@ export const MapControls: React.FC = () => {
 
   const handleReclassify = () => {
     postToExtension({ type: 'workstreamMapReclassify', force: true });
+  };
+
+  const handleImportExternalFolder = () => {
+    postToExtension({ type: 'workstreamMapImportExternalFolder' });
   };
 
   return (
@@ -85,7 +90,11 @@ export const MapControls: React.FC = () => {
         onToggle={() => setFilters({ showLowConfidence: !filters.showLowConfidence })}
       />
 
-      <button onClick={handleReclassify} style={btnStyle}>
+      <button onClick={handleImportExternalFolder} disabled={isClassifying} style={isClassifying ? disabledBtnStyle : btnStyle}>
+        Import Folder
+      </button>
+
+      <button onClick={handleReclassify} disabled={isClassifying} style={isClassifying ? disabledBtnStyle : btnStyle}>
         Reclassify
       </button>
     </div>
@@ -103,6 +112,12 @@ const btnStyle: React.CSSProperties = {
   fontFamily: 'inherit',
   transition: 'all 0.2s ease',
   letterSpacing: '0.01em',
+};
+
+const disabledBtnStyle: React.CSSProperties = {
+  ...btnStyle,
+  opacity: 0.45,
+  cursor: 'not-allowed',
 };
 
 const ToggleBtn: React.FC<{ label: string; active: boolean; onToggle: () => void }> = ({ label, active, onToggle }) => (

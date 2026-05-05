@@ -23,7 +23,7 @@ export const MapTooltip: React.FC<MapTooltipProps> = ({ state, layout }) => {
         <div style={{ color: '#94A3B8', fontSize: 10, marginBottom: 4 }}>{ws.goal}</div>
         <div style={{ display: 'flex', gap: 8, fontSize: 10, color: '#64748B' }}>
           <span>Status: <span style={{ color: '#CBD5E1' }}>{ws.status}</span></span>
-          <span>Sessions: <span style={{ color: '#CBD5E1' }}>{ws.sessionIds.length}</span></span>
+          <span>{ws.source === 'external_folder' ? 'Docs' : 'Sessions'}: <span style={{ color: '#CBD5E1' }}>{ws.source === 'external_folder' ? (ws.sourceDocumentCount ?? ws.sourceFilePaths?.length ?? 0) : ws.sessionIds.length}</span></span>
           <span>Confidence: <span style={{ color: '#CBD5E1' }}>{Math.round(ws.confidence * 100)}%</span></span>
         </div>
         {ws.currentState.phase !== 'unknown' && (

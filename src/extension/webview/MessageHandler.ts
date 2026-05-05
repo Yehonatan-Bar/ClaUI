@@ -597,6 +597,78 @@ export class MessageHandler {
     return wsFolder ?? 'default';
   }
 
+  private async promptForExternalWorkFolderPath(requestedPath?: string): Promise<string | undefined> {
+    const initial = requestedPath?.trim();
+    if (initial) {
+      return this.normalizeUserEnteredPath(initial);
+    }
+
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const value = await vscode.window.showInputBox({
+      prompt: 'Enter a folder path to import as an external workstream',
+      placeHolder: workspacePath ? path.join(workspacePath, 'docs') : 'C:\\path\\to\\external-work-folder',
+      ignoreFocusOut: true,
+      validateInput: (input) => {
+        const normalized = this.normalizeUserEnteredPath(input);
+        if (!normalized) { return 'Folder path is required'; }
+        if (!fs.existsSync(normalized)) { return 'Folder does not exist'; }
+        try {
+          if (!fs.statSync(normalized).isDirectory()) { return 'Path must be a folder'; }
+        } catch (err) {
+          return err instanceof Error ? err.message : String(err);
+        }
+        return undefined;
+      },
+    });
+
+    return value ? this.normalizeUserEnteredPath(value) : undefined;
+  }
+
+  private normalizeUserEnteredPath(value: string): string {
+    let normalized = value.trim();
+    if ((normalized.startsWith('"') && normalized.endsWith('"')) || (normalized.startsWith("'") && normalized.endsWith("'"))) {
+      normalized = normalized.slice(1, -1);
+    }
+    if (normalized === '~') {
+      normalized = process.env.USERPROFILE || process.env.HOME || normalized;
+    } else if (normalized.startsWith('~/') || normalized.startsWith('~\\')) {
+      const home = process.env.USERPROFILE || process.env.HOME;
+      if (home) {
+        normalized = path.join(home, normalized.slice(2));
+      }
+    }
+    return path.resolve(normalized);
+  }
+
+  private async handleWorkstreamExternalFolderImport(requestedPath?: string): Promise<void> {
+    this.log(`[WorkstreamMap] External folder import requested path="${requestedPath ?? ''}" workstreamManager=${!!this.workstreamManager}`);
+    if (!this.workstreamManager) {
+      this.webview.postMessage({ type: 'workstreamMapError', message: 'Workstream manager not available. Try reloading VS Code.' });
+      return;
+    }
+
+    const folderPath = await this.promptForExternalWorkFolderPath(requestedPath);
+    if (!folderPath) {
+      this.log('[WorkstreamMap] External folder import canceled');
+      return;
+    }
+
+    const projectId = this.getWorkstreamProjectId();
+    this.webview.postMessage({ type: 'workstreamMapClassifying', progress: 0, phase: 'Starting external folder import...' });
+    this.workstreamManager.onProgress((progress, phase) => {
+      this.webview.postMessage({ type: 'workstreamMapClassifying', progress, phase });
+    });
+
+    const state = await this.workstreamManager.ingestExternalFolder(projectId, folderPath);
+    this.webview.postMessage({ type: 'workstreamMapData', data: state });
+    if (this.workstreamManager.getPortfolioManager()) {
+      const portfolioState = await this.workstreamManager.getPortfolioManager()!.getPortfolioState();
+      const currentWorkspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+      this.webview.postMessage({ type: 'workstreamPortfolioData', data: portfolioState, currentWorkspacePath });
+    }
+    void vscode.window.showInformationMessage(`Imported external work folder: ${path.basename(folderPath)}`);
+  }
+
   private quoteTerminalArg(value: string): string {
     if (!value || !/[\s"]/u.test(value)) {
       return value;
@@ -2297,6 +2369,17 @@ export class MessageHandler {
           const mapData = this.workstreamManager.getProjectMapState(wsProjectId2);
           if (mapData) {
             this.webview.postMessage({ type: 'workstreamMapData', data: mapData });
+            const pm = this.workstreamManager.getPortfolioManager();
+            if (pm) {
+              this.log(`[WorkstreamPortfolio] Backfill publish for projectId="${wsProjectId2}", projectLabel="${mapData.projectLabel}"`);
+              void pm.publishProjectSummary(wsProjectId2, mapData).then(() => {
+                this.log(`[WorkstreamPortfolio] Backfill publish succeeded`);
+              }).catch(err => {
+                this.log(`[WorkstreamPortfolio] Backfill publish failed: ${err}`);
+              });
+            } else {
+              this.log(`[WorkstreamPortfolio] No portfolio manager available for backfill`);
+            }
           }
           void this.workstreamManager.buildResumeState(wsProjectId2).then(resumeState => {
             if (resumeState) {
@@ -2398,6 +2481,15 @@ export class MessageHandler {
           break;
         }
 
+        case 'workstreamMapImportExternalFolder': {
+          void this.handleWorkstreamExternalFolderImport(msg.folderPath).catch(err => {
+            const message = err instanceof Error ? err.message : String(err);
+            this.log(`[WorkstreamMap] External folder import failed: ${message}`);
+            this.webview.postMessage({ type: 'workstreamMapError', message });
+          });
+          break;
+        }
+
         // ----- Workstream Portfolio -----
         case 'workstreamPortfolioRequestData': {
           this.log('[WorkstreamPortfolio] Data requested');
@@ -2408,6 +2500,7 @@ export class MessageHandler {
           }
           void pm.getPortfolioState().then(portfolioState => {
             const currentWorkspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+            this.log(`[WorkstreamPortfolio] Sending ${portfolioState.projects.length} projects. Names: [${portfolioState.projects.map(p => p.projectName).join(', ')}]. currentWorkspacePath="${currentWorkspacePath}"`);
             this.webview.postMessage({ type: 'workstreamPortfolioData', data: portfolioState, currentWorkspacePath });
           }).catch(err => {
             this.log(`[WorkstreamPortfolio] Failed to get portfolio: ${err instanceof Error ? err.message : String(err)}`);

@@ -214,6 +214,25 @@ export const WorkstreamMapView: React.FC = () => {
             >
               Build Workstream Map
             </motion.button>
+            <motion.button
+              onClick={() => postToExtension({ type: 'workstreamMapImportExternalFolder' })}
+              style={{
+                background: 'rgba(51, 65, 85, 0.55)',
+                color: '#CBD5E1',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: 8,
+                padding: '9px 20px',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                letterSpacing: '0.02em',
+              }}
+              whileHover={{ scale: 1.04, boxShadow: '0 0 18px rgba(148, 163, 184, 0.2)' }}
+              whileTap={{ scale: 0.96 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            >
+              Import Folder
+            </motion.button>
           </motion.div>
 
         /* Loading state */

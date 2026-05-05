@@ -58,6 +58,7 @@ A comprehensive catalog of every feature and capability in the ClaUi VS Code ext
 - **Model selector** - Dropdown in the status bar for choosing: Opus 4.7, Sonnet 4.6, Sonnet 4.5, Opus 4.6, Haiku 4.5, or CLI default. Persisted to VS Code settings and synced on startup. Changing the model takes effect immediately -- the current session is stopped and resumed with the new model (live switch). Runtime IDs such as `claude-opus-4-7` are shown as friendly labels in the AI chip, message badges, and dashboard metadata.
 - **Dual provider support** - Switch between Claude and Codex (OpenAI GPT) providers
 - **Provider selector** - "Codex" quick-switch button and "Provider" dropdown (Claude / Codex) in the status bar. Selection is persisted
+- **Codex speed selector** - Codex tabs include a `Speed` dropdown in the AI chip (`Default` / `Fast`). `Fast` forwards Codex Fast mode to new `codex exec` turns with higher credit use on supported models
 - **Codex integration** - Full runtime support via `codex exec --json`:
   - First turn via `codex exec --json ... -`
   - Follow-up turns via `codex exec resume --json <threadId> -`

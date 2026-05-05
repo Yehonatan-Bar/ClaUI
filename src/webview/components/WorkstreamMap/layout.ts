@@ -14,6 +14,11 @@ const LINE_START_X = 220;
 const PADDING = { top: 70, right: 80, bottom: 60, left: 16 };
 const MAX_VISIBLE_LANES = 7;
 
+interface ComputeLayoutOptions {
+  maxVisibleLanes?: number;
+  includeCollapsed?: boolean;
+}
+
 const STATUS_PRIORITY: Record<WorkstreamStatus, number> = {
   blocked: 0,
   active: 1,
@@ -24,9 +29,12 @@ const STATUS_PRIORITY: Record<WorkstreamStatus, number> = {
   abandoned: 6,
 };
 
-export function computeLayout(state: ProjectMapState): MapLayout {
+export function computeLayout(state: ProjectMapState, options: ComputeLayoutOptions = {}): MapLayout {
   const workstreams = sortWorkstreams(state.workstreams);
-  const visibleWorkstreams = workstreams.filter(ws => !ws.visual.collapsed).slice(0, MAX_VISIBLE_LANES);
+  const maxVisibleLanes = options.maxVisibleLanes ?? MAX_VISIBLE_LANES;
+  const visibleWorkstreams = workstreams
+    .filter(ws => options.includeCollapsed || !ws.visual.collapsed)
+    .slice(0, maxVisibleLanes);
 
   const workstreamPaths: Record<string, SvgPathDefinition> = {};
   const stationPositions: Record<string, { x: number; y: number }> = {};

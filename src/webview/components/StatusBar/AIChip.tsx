@@ -3,6 +3,7 @@ import { useAppStore } from '../../state/store';
 import { ModelSelector } from '../ModelSelector/ModelSelector';
 import { CodexModelSelector } from '../ModelSelector/CodexModelSelector';
 import { CodexReasoningEffortSelector } from '../ModelSelector/CodexReasoningEffortSelector';
+import { CodexServiceTierSelector } from '../ModelSelector/CodexServiceTierSelector';
 import { PermissionModeSelector } from '../PermissionModeSelector/PermissionModeSelector';
 import type { ProviderId } from '../../../extension/types/webview-messages';
 import { postToExtension } from '../../hooks/useClaudeStream';
@@ -61,6 +62,7 @@ export const AIChip: React.FC<AIChipProps> = ({ isOpen, onToggle, displayMode = 
   const isCodexUi = provider === 'codex' || !providerCapabilities.supportsPermissionModeSelector;
   const modelSelectorElement = isCodexUi ? <CodexModelSelector /> : <ModelSelector />;
   const codexReasoningSelectorElement = isCodexUi ? <CodexReasoningEffortSelector /> : null;
+  const codexServiceTierSelectorElement = isCodexUi ? <CodexServiceTierSelector /> : null;
   const permissionSelectorElement = providerCapabilities.supportsPermissionModeSelector
     ? <PermissionModeSelector />
     : null;
@@ -155,6 +157,11 @@ export const AIChip: React.FC<AIChipProps> = ({ isOpen, onToggle, displayMode = 
           {codexReasoningSelectorElement && (
             <div className="ai-chip-dropdown-control">
               {codexReasoningSelectorElement}
+            </div>
+          )}
+          {codexServiceTierSelectorElement && (
+            <div className="ai-chip-dropdown-control">
+              {codexServiceTierSelectorElement}
             </div>
           )}
           {permissionSelectorElement && (

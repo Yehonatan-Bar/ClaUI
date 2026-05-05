@@ -1,5 +1,19 @@
 # Codex Integration Progress
 
+## 2026-05-05 - Codex Fast Mode support
+
+- Added a Codex `Speed` selector in the AI chip via `CodexServiceTierSelector`.
+- New VS Code setting:
+  - `claudeMirror.codex.serviceTier` (`'' | fast`)
+- Codex webview handler now syncs this setting to/from the webview:
+  - `setCodexServiceTier`
+  - `codexServiceTierSetting`
+- `CodexExecProcessManager` now forwards Fast mode to Codex CLI turns using:
+  - `-c service_tier="fast"`
+  - `-c features.fast_mode=true`
+- The override is applied to both first-turn `codex exec` and follow-up `codex exec resume` runs.
+- Empty/default mode passes no service-tier override, preserving the user's Codex CLI/config defaults.
+
 ## 2026-04-09 - Codex scheduled messages support
 
 - Wired `scheduleMessage` / `cancelScheduledMessage` into `CodexMessageHandler`.

@@ -84,6 +84,7 @@ export class CodexExecProcessManager extends EventEmitter {
     const rawModel = options.model ?? config.get<string>('codex.model', '');
     const selectedModel = rawModel && !rawModel.includes('(') ? rawModel : '';
     const selectedReasoningEffort = config.get<string>('codex.reasoningEffort', '').trim();
+    const selectedServiceTier = config.get<string>('codex.serviceTier', '').trim();
     const permissionMode =
       options.permissionMode ??
       (config.get<string>('permissionMode', 'full-access') as 'full-access' | 'supervised');
@@ -97,6 +98,7 @@ export class CodexExecProcessManager extends EventEmitter {
       cwd,
       model: selectedModel,
       reasoningEffort: selectedReasoningEffort || undefined,
+      serviceTier: selectedServiceTier === 'fast' ? 'fast' : undefined,
       permissionMode,
       imagePaths: options.imagePaths,
       forceReadOnlySandbox: options.forceReadOnlySandbox,
@@ -110,7 +112,7 @@ export class CodexExecProcessManager extends EventEmitter {
     this.activeRunStartedAt = Date.now();
 
     this.log(
-      `Codex turn #${this.activeRunId}: promptLen=${options.prompt.length} resume=${options.threadId ? 'yes' : 'no'} permission=${permissionMode} images=${options.imagePaths?.length ?? 0}`
+      `Codex turn #${this.activeRunId}: promptLen=${options.prompt.length} resume=${options.threadId ? 'yes' : 'no'} permission=${permissionMode} speed=${selectedServiceTier || 'default'} images=${options.imagePaths?.length ?? 0}`
     );
     this.log(`Spawning Codex: ${cliPath} ${args.join(' ')}`);
     this.log(`CWD: ${cwd || '(none)'}`);
@@ -225,6 +227,7 @@ export class CodexExecProcessManager extends EventEmitter {
     cwd?: string;
     model?: string;
     reasoningEffort?: string;
+    serviceTier?: 'fast';
     permissionMode?: 'full-access' | 'supervised';
     imagePaths?: string[];
     forceReadOnlySandbox?: boolean;
@@ -236,6 +239,9 @@ export class CodexExecProcessManager extends EventEmitter {
     const instructionsArgs = opts.appendSystemPrompt
       ? ['-c', `instructions=${toTomlBasicString(opts.appendSystemPrompt)}`]
       : [];
+    const serviceTierArgs = opts.serviceTier === 'fast'
+      ? ['-c', `service_tier=${toTomlBasicString('fast')}`, '-c', 'features.fast_mode=true']
+      : [];
     if (opts.threadId) {
       const args = ['exec', ...permissionArgs, 'resume', '--json'];
       if (opts.model) {
@@ -244,6 +250,7 @@ export class CodexExecProcessManager extends EventEmitter {
       if (opts.reasoningEffort) {
         args.push('-c', `model_reasoning_effort=${opts.reasoningEffort}`);
       }
+      args.push(...serviceTierArgs);
       args.push(...instructionsArgs);
       for (const imagePath of opts.imagePaths ?? []) {
         args.push('--image', imagePath);
@@ -262,6 +269,7 @@ export class CodexExecProcessManager extends EventEmitter {
     if (opts.reasoningEffort) {
       args.push('-c', `model_reasoning_effort=${opts.reasoningEffort}`);
     }
+    args.push(...serviceTierArgs);
     args.push(...instructionsArgs);
     for (const imagePath of opts.imagePaths ?? []) {
       args.push('--image', imagePath);

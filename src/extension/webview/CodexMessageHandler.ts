@@ -14,6 +14,7 @@ import { MessageTranslator } from '../session/MessageTranslator';
 import { BugReportService } from '../feedback/BugReportService';
 import type {
   CodexReasoningEffort,
+  CodexServiceTier,
   CodexModelOption,
   ExtensionToWebviewMessage,
   ProviderCapabilities,
@@ -693,6 +694,12 @@ export class CodexMessageHandler {
           this.webview.postMessage({ type: 'codexReasoningEffortSetting', effort: msg.effort });
           break;
 
+        case 'setCodexServiceTier':
+          this.log(`Setting Codex service tier to: "${msg.serviceTier || '(default)'}"`);
+          void vscode.workspace.getConfiguration('claudeMirror').update('codex.serviceTier', msg.serviceTier, true);
+          this.webview.postMessage({ type: 'codexServiceTierSetting', serviceTier: msg.serviceTier });
+          break;
+
         case 'setTypingTheme':
           void vscode.workspace.getConfiguration('claudeMirror').update('typingTheme', msg.theme, true);
           break;
@@ -1172,6 +1179,9 @@ export class CodexMessageHandler {
       if (e.affectsConfiguration('claudeMirror.codex.reasoningEffort')) {
         this.sendCodexReasoningEffortSetting();
       }
+      if (e.affectsConfiguration('claudeMirror.codex.serviceTier')) {
+        this.sendCodexServiceTierSetting();
+      }
       if (e.affectsConfiguration('claudeMirror.tabs.layout')) {
         this.sendTabLayoutSetting();
       }
@@ -1188,6 +1198,7 @@ export class CodexMessageHandler {
     this.sendCodexModelSetting();
     this.sendCodexModelOptions();
     this.sendCodexReasoningEffortSetting();
+    this.sendCodexServiceTierSetting();
     this.sendTabLayoutSetting();
     this.postScheduledMessageState();
     void this.sendApiKeySetting();
@@ -1275,6 +1286,15 @@ export class CodexMessageHandler {
     this.webview.postMessage({
       type: 'codexReasoningEffortSetting',
       effort,
+    });
+  }
+
+  private sendCodexServiceTierSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const serviceTier = config.get<CodexServiceTier>('codex.serviceTier', '');
+    this.webview.postMessage({
+      type: 'codexServiceTierSetting',
+      serviceTier,
     });
   }
 

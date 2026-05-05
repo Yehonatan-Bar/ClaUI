@@ -277,6 +277,19 @@
           ],
           "description": "Codex reasoning effort for new turns. Leave empty to use the CLI/config default."
         },
+        "claudeMirror.codex.serviceTier": {
+          "type": "string",
+          "default": "",
+          "enum": [
+            "",
+            "fast"
+          ],
+          "enumDescriptions": [
+            "Use Codex CLI/config default service tier",
+            "Fast mode: higher speed on supported models with higher credit consumption"
+          ],
+          "description": "Codex service tier for new turns. Choose Fast to pass service_tier=\"fast\" to Codex CLI; leave empty to use the CLI/config default."
+        },
         "claudeMirror.useCtrlEnterToSend": {
           "type": "boolean",
           "default": true,
