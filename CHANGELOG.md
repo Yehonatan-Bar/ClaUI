@@ -1,5 +1,19 @@
 # ClaUi - Changelog
 
+## v0.1.138 - 2026-05-06
+
+**Feature: Image lightbox copy to clipboard**
+
+- Added a **Copy** button to the lightbox drawing toolbar that copies the image (with any pencil/rect/arrow annotations baked in) to the OS clipboard as a PNG
+- Right-clicking anywhere on the lightbox stage opens a custom context menu with a "Copy image" action (replacing VS Code's native context menu, which cannot copy images from webviews)
+- Copy renders the image and all shape overlays onto an off-screen canvas at the image's natural resolution, converts to a PNG blob, and writes it via `navigator.clipboard.write` with `ClipboardItem`
+- Shape coordinates are stored as 0-1 ratios, so the exported image faithfully reproduces annotations at full resolution regardless of the displayed size
+- A brief toast notification ("Copied" / "Copy failed") slides in at the bottom of the overlay and auto-fades after 1.5 seconds
+- Escape key dismisses the context menu first (if open) before closing the lightbox itself
+- New CSS: `.image-lightbox-ctx-backdrop`, `.image-lightbox-ctx-menu`, `.image-lightbox-ctx-item`, `.image-lightbox-toast` with fade animation
+
+---
+
 ## v0.1.137 - 2026-05-05
 
 **Feature: Workstream Map — AI-powered subway-map project visualization**

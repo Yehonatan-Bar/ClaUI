@@ -154,20 +154,106 @@ export const ImageLightbox: React.FC = () => {
   const [color, setColor] = useState<string>(COLORS[0]);
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+  const toastTimerRef = useRef<number | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 1500);
+  }, []);
+
+  // Render the image plus all shapes onto an off-screen canvas at natural
+  // resolution and copy the result as a PNG blob to the system clipboard.
+  const copyImageWithShapes = useCallback(async (): Promise<boolean> => {
+    const img = imgRef.current;
+    if (!img || !img.complete) return false;
+    const w = img.naturalWidth || img.offsetWidth;
+    const h = img.naturalHeight || img.offsetHeight;
+    if (!w || !h) return false;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+
+    try {
+      ctx.drawImage(img, 0, 0, w, h);
+    } catch {
+      return false;
+    }
+
+    ctx.lineWidth = STROKE_WIDTH;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const s of shapes) {
+      ctx.strokeStyle = s.color;
+      ctx.fillStyle = s.color;
+      if (s.type === 'pencil') {
+        if (s.points.length === 0) continue;
+        ctx.beginPath();
+        const [x0, y0] = s.points[0];
+        ctx.moveTo(x0 * w, y0 * h);
+        for (let i = 1; i < s.points.length; i++) {
+          const [x, y] = s.points[i];
+          ctx.lineTo(x * w, y * h);
+        }
+        ctx.stroke();
+      } else if (s.type === 'rect') {
+        ctx.strokeRect(s.x1 * w, s.y1 * h, (s.x2 - s.x1) * w, (s.y2 - s.y1) * h);
+      } else {
+        drawArrow(ctx, s.x1 * w, s.y1 * h, s.x2 * w, s.y2 * h);
+      }
+    }
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((b) => resolve(b), 'image/png');
+    });
+    if (!blob) return false;
+
+    try {
+      const ClipboardItemCtor = (window as unknown as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+      if (!ClipboardItemCtor || !navigator.clipboard?.write) return false;
+      await navigator.clipboard.write([new ClipboardItemCtor({ 'image/png': blob })]);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [shapes]);
+
+  const handleCopy = useCallback(async () => {
+    setCtxMenu(null);
+    const ok = await copyImageWithShapes();
+    showToast(ok ? 'Copied' : 'Copy failed');
+  }, [copyImageWithShapes, showToast]);
 
   useEffect(() => {
     if (!lightboxImageSrc) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
+      if (e.key !== 'Escape') return;
+      if (ctxMenu) {
+        setCtxMenu(null);
+      } else {
+        close();
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [lightboxImageSrc, close]);
+  }, [lightboxImageSrc, close, ctxMenu]);
 
   useEffect(() => {
     setSize(null);
     setShapes([]);
+    setCtxMenu(null);
+    setToast(null);
     if (!lightboxImageSrc) return;
     const img = imgRef.current;
     if (!img) return;
@@ -236,6 +322,13 @@ export const ImageLightbox: React.FC = () => {
         ))}
         <span className="divider" />
         <button
+          onClick={handleCopy}
+          title="Copy image (with annotations) to clipboard"
+        >
+          Copy
+        </button>
+        <span className="divider" />
+        <button
           onClick={undo}
           disabled={shapes.length === 0}
           title="Undo last shape"
@@ -253,6 +346,11 @@ export const ImageLightbox: React.FC = () => {
       <div
         className="image-lightbox-stage"
         onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setCtxMenu({ x: e.clientX, y: e.clientY });
+        }}
       >
         <img
           ref={imgRef}
@@ -271,6 +369,33 @@ export const ImageLightbox: React.FC = () => {
           />
         )}
       </div>
+      {ctxMenu && (
+        <div
+          className="image-lightbox-ctx-backdrop"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            setCtxMenu(null);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setCtxMenu({ x: e.clientX, y: e.clientY });
+          }}
+        >
+          <div
+            className="image-lightbox-ctx-menu"
+            style={{ left: ctxMenu.x, top: ctxMenu.y }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button className="image-lightbox-ctx-item" onClick={handleCopy}>
+              Copy image
+            </button>
+          </div>
+        </div>
+      )}
+      {toast && <div className="image-lightbox-toast">{toast}</div>}
     </div>,
     document.body,
   );
