@@ -48,7 +48,7 @@ export const MPInputArea: React.FC = () => {
     }
   }, [handleSend]);
 
-  const handleAutocompleteSelect = useCallback((value: string) => {
+  const handleAutocompleteAccept = useCallback((value: string) => {
     setText(value);
     textareaRef.current?.focus();
   }, []);
@@ -68,7 +68,8 @@ export const MPInputArea: React.FC = () => {
         <div className="mp-input-wrapper">
           <ParticipantAutocomplete
             inputValue={text}
-            onSelect={handleAutocompleteSelect}
+            onAccept={handleAutocompleteAccept}
+            anchorRef={textareaRef as React.RefObject<HTMLElement | null>}
           />
           <textarea
             ref={textareaRef}
