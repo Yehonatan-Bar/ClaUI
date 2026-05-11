@@ -32,6 +32,7 @@ import { GlobalTooltip } from './components/Tooltip/GlobalTooltip';
 import { ImageLightbox } from './components/ImageLightbox';
 import { ChatSearchBar } from './components/ChatView/ChatSearchBar';
 import { SmartSearchView } from './components/SmartSearch/SmartSearchView';
+import { MPSessionView } from './components/MultiParticipant';
 
 const SESSION_SUMMARY_IDLE_MS = 60 * 60 * 1000;
 const SESSION_SUMMARY_DEFER_MS = 3 * 60 * 60 * 1000;
@@ -101,6 +102,9 @@ export const App: React.FC = () => {
         <SmartSearchView />
       </>
     );
+  }
+  if (tabKind === 'multiparticipant') {
+    return <MPSessionView />;
   }
   return <ChatAppContent />;
 };

@@ -47,10 +47,17 @@ export function activate(context: vscode.ExtensionContext): void {
   const logDir = customLogDir || path.join(context.globalStorageUri.fsPath, 'logs', 'ClaUiLogs');
 
   if (enableFileLogging) {
-    globalFileLogger = new FileLogger(logDir, 'extension');
+    try {
+      globalFileLogger = new FileLogger(logDir, 'extension');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      outputChannel.appendLine(`[WARN] File logging disabled - failed to create logger: ${msg}`);
+    }
   }
 
   log('Extension activating...');
+
+  try {
 
   // Create session store for conversation history persistence
   const sessionStore = new SessionStore(context.globalState);
@@ -251,6 +258,20 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   log('Extension activated');
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log(`ACTIVATION FAILED: ${msg}`);
+    vscode.window.showErrorMessage(
+      `ClaUi failed to activate: ${msg}. Check Output > ClaUi for details.`
+    );
+    context.subscriptions.push(
+      vscode.commands.registerCommand('claudeMirror.startSession', () => {
+        vscode.window.showErrorMessage(
+          `ClaUi failed to activate: ${msg}. Try reloading the window (Ctrl+Shift+P > Reload Window).`
+        );
+      })
+    );
+  }
 }
 
 export async function deactivate(): Promise<void> {

@@ -64,6 +64,10 @@
     },
     "commands": [
       {
+        "command": "claudeMirror.joinMultiParticipantSession",
+        "title": "ClaUi: Join Multi-Participant Session"
+      },
+      {
         "command": "claudeMirror.startSession",
         "title": "ClaUi: Start New Session"
       },
@@ -245,6 +249,11 @@
           "type": "boolean",
           "default": true,
           "description": "Allow the Smart Search agent to run Bash (ripgrep). Disable to restrict the agent to Read + Glob + Grep only."
+        },
+        "claudeMirror.multiParticipant.serverUrl": {
+          "type": "string",
+          "default": "ws://localhost:9120",
+          "description": "WebSocket URL of the multi-participant coordination server"
         },
         "claudeMirror.codex.cliPath": {
           "type": "string",
@@ -932,6 +941,7 @@
     "webpack-cli": "^5.1.0"
   },
   "dependencies": {
+    "@types/ws": "^8.18.1",
     "adm-zip": "^0.5.16",
     "dompurify": "^3.3.1",
     "framer-motion": "^12.38.0",
@@ -939,6 +949,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "recharts": "^3.7.0",
+    "ws": "^8.20.0",
     "zustand": "^4.5.0"
   }
 }

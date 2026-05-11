@@ -131,6 +131,22 @@ export function useClaudeStream(): void {
     setWorkstreamMapError,
     setWorkstreamResumeState,
     setWorkstreamMapOpen,
+    // Multi-Participant
+    setMpConnectionStatus,
+    setMpSession,
+    addMpMessage,
+    setMpParticipants,
+    updateMpParticipant,
+    removeMpParticipant,
+    setMpDeliveryStatus,
+    appendMpStreamingText,
+    addMpApprovalEvent,
+    resolveMpApproval,
+    setMpFileConflict,
+    setMpTypingState,
+    setMpJoinError,
+    setMpRenameError,
+    clearMpState,
   } = useAppStore();
 
   useEffect(() => {
@@ -1025,6 +1041,87 @@ export function useClaudeStream(): void {
         case 'chatSearchProjectResults':
           useAppStore.getState().setChatSearchProjectResults(msg.results, msg.requestId);
           break;
+
+        // --- Multi-Participant ---
+        case 'mpConnectionStatus':
+          setMpConnectionStatus(msg.status, msg.message);
+          break;
+
+        case 'mpSessionState':
+          setMpSession(
+            msg.session,
+            msg.participants,
+            msg.transcript,
+            msg.myHumanId,
+            msg.myAgentId,
+            msg.approvals,
+            msg.typingStates,
+            msg.fileConflicts,
+          );
+          break;
+
+        case 'mpNewMessage':
+          addMpMessage(msg.message);
+          break;
+
+        case 'mpParticipants':
+          setMpParticipants(msg.participants);
+          break;
+
+        case 'mpDeliveryStatus':
+          setMpDeliveryStatus(
+            msg.deliveryId,
+            msg.agentParticipantId,
+            msg.agentDisplayName,
+            msg.status,
+            msg.errorText,
+            msg.interruptedByDeliveryId,
+          );
+          break;
+
+        case 'mpAgentStreamingText':
+          appendMpStreamingText(msg.deliveryId, msg.text, msg.accumulatedText);
+          break;
+
+        case 'mpParticipantActivity':
+          setMpTypingState(msg.activity);
+          break;
+
+        case 'mpAgentToAgentApproval':
+          addMpApprovalEvent(msg.approval);
+          break;
+
+        case 'mpA2aPendingApproval':
+          addMpApprovalEvent(msg.approval);
+          break;
+
+        case 'mpApprovalResolved':
+          resolveMpApproval(msg.approval.eventId, msg.decision.type, msg.decidedByParticipantId);
+          break;
+
+        case 'mpGuardStop':
+          addMpApprovalEvent(msg.approval);
+          break;
+
+        case 'mpFileConflictWarning':
+          setMpFileConflict(msg.warning);
+          break;
+
+        case 'mpParticipantRenamed':
+          updateMpParticipant(msg.participant.participantId, msg.participant);
+          break;
+
+        case 'mpRenameRejected':
+          setMpRenameError(msg.reason);
+          break;
+
+        case 'mpError':
+          setMpJoinError(msg.message);
+          break;
+
+        case 'mpJoinRejected':
+          setMpJoinError(msg.reason);
+          break;
       }
     }
 
@@ -1144,6 +1241,22 @@ export function useClaudeStream(): void {
     setWorkstreamMapError,
     setWorkstreamResumeState,
     setWorkstreamMapOpen,
+    // Multi-Participant
+    setMpConnectionStatus,
+    setMpSession,
+    addMpMessage,
+    setMpParticipants,
+    updateMpParticipant,
+    removeMpParticipant,
+    setMpDeliveryStatus,
+    appendMpStreamingText,
+    addMpApprovalEvent,
+    resolveMpApproval,
+    setMpFileConflict,
+    setMpTypingState,
+    setMpJoinError,
+    setMpRenameError,
+    clearMpState,
   ]);
 }
 

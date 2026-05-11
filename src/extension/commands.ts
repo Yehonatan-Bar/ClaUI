@@ -6,6 +6,7 @@ import type { TabManager } from './session/TabManager';
 import type { SessionStore } from './session/SessionStore';
 import type { ProviderId, SerializedChatMessage } from './types/webview-messages';
 import { openHtmlPreviewPanel } from './webview/HtmlPreviewPanel';
+import { MultiParticipantSessionTab } from './multiparticipant/MultiParticipantSessionTab';
 
 function collectUrisFromArgs(args: unknown[]): vscode.Uri[] {
   const uris: vscode.Uri[] = [];
@@ -812,5 +813,64 @@ export function registerCommands(
         log(`Sent ${paths.length} path(s) to chat input from Explorer command`);
       }
     )
+  );
+
+  // -- Multi-Participant Session (Phase 0 Spike) --
+
+  let mpTabCounter = 0;
+  context.subscriptions.push(
+    vscode.commands.registerCommand('claudeMirror.joinMultiParticipantSession', async () => {
+      const config = vscode.workspace.getConfiguration('claudeMirror');
+      const defaultUrl = config.get<string>('multiParticipant.serverUrl', 'ws://localhost:9120');
+
+      const serverUrl = await vscode.window.showInputBox({
+        prompt: 'Coordination server URL',
+        value: defaultUrl,
+        placeHolder: 'ws://localhost:9120',
+        ignoreFocusOut: true,
+      });
+      if (!serverUrl) return;
+
+      const humanName = await vscode.window.showInputBox({
+        prompt: 'Your display name',
+        placeHolder: 'Alice',
+        ignoreFocusOut: true,
+      });
+      if (!humanName) return;
+
+      const agentName = await vscode.window.showInputBox({
+        prompt: 'Your agent\'s display name',
+        placeHolder: 'Claude',
+        ignoreFocusOut: true,
+      });
+      if (!agentName) return;
+
+      const providerPick = await vscode.window.showQuickPick(
+        [
+          { label: 'Claude', provider: 'claude' as const },
+          { label: 'Codex', provider: 'codex' as const },
+        ],
+        { placeHolder: 'Select agent provider', ignoreFocusOut: true }
+      );
+      if (!providerPick) return;
+
+      mpTabCounter++;
+      const tabId = `mp-${Date.now()}-${mpTabCounter}`;
+      const mpTab = new MultiParticipantSessionTab(
+        tabId,
+        mpTabCounter,
+        serverUrl,
+        providerPick.provider,
+        context,
+        {
+          onClosed: (id) => log(`MP tab closed: ${id}`),
+          onFocused: (id) => log(`MP tab focused: ${id}`),
+        },
+        log,
+      );
+
+      await mpTab.connect(humanName, agentName, providerPick.provider);
+      log(`Multi-participant tab created: ${tabId} -> ${serverUrl}`);
+    })
   );
 }

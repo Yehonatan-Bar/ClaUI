@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>שילוב JFrog Boost בתוך ClaUi</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #101418;
+      color: #eef3f7;
+      line-height: 1.75;
+    }
+
+    a {
+      color: #79c0ff;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .page {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 36px 22px 56px;
+    }
+
+    header {
+      padding: 28px 0 34px;
+      border-bottom: 1px solid #2b343d;
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 10px;
+      border: 1px solid #46616f;
+      border-radius: 8px;
+      color: #b6d7e4;
+      background: #162027;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 18px 0 10px;
+      font-size: clamp(30px, 4vw, 46px);
+      line-height: 1.18;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 820px;
+      color: #b9c5cd;
+      font-size: 18px;
+      margin: 0;
+    }
+
+    .meta {
+      margin-top: 18px;
+      color: #8da0aa;
+      font-size: 13px;
+    }
+
+    section {
+      padding: 34px 0;
+      border-bottom: 1px solid #242c33;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 25px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 14px;
+    }
+
+    .lead {
+      max-width: 900px;
+      color: #cbd6dc;
+      font-size: 17px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .panel {
+      background: #151b21;
+      border: 1px solid #2c3740;
+      border-radius: 8px;
+      padding: 18px;
+    }
+
+    .panel strong {
+      color: #ffffff;
+    }
+
+    .muted {
+      color: #9fb0ba;
+    }
+
+    .success {
+      color: #8ee39f;
+    }
+
+    .warn {
+      color: #ffd38a;
+    }
+
+    .danger {
+      color: #ffb4a9;
+    }
+
+    .status-row {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 13px 0;
+      border-top: 1px solid #263039;
+    }
+
+    .status-row:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      justify-content: center;
+      min-width: 116px;
+      padding: 5px 9px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      border: 1px solid #40515b;
+      background: #101820;
+      color: #dce8ee;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .step {
+      position: relative;
+      background: #141b21;
+      border: 1px solid #2d3841;
+      border-radius: 8px;
+      padding: 16px 14px;
+      min-height: 138px;
+    }
+
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #1f6feb;
+      color: #fff;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .callout {
+      margin-top: 18px;
+      border: 1px solid #3f5d4a;
+      background: #142018;
+      border-radius: 8px;
+      padding: 16px 18px;
+      color: #d8f5dd;
+    }
+
+    .callout.warn {
+      border-color: #6d5a30;
+      background: #221c11;
+      color: #ffe5ad;
+    }
+
+    .table {
+      border: 1px solid #2c3740;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 18px;
+    }
+
+    .table-row {
+      display: grid;
+      grid-template-columns: 220px 1fr 1fr;
+      border-top: 1px solid #2c3740;
+    }
+
+    .table-row:first-child {
+      border-top: 0;
+    }
+
+    .table-cell {
+      padding: 13px 15px;
+      border-left: 1px solid #2c3740;
+      color: #cbd6dc;
+    }
+
+    .table-cell:last-child {
+      border-left: 0;
+    }
+
+    .table-head {
+      background: #18222a;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    ul {
+      margin: 10px 0 0;
+      padding: 0 22px 0 0;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    .small {
+      font-size: 13px;
+      color: #91a2ac;
+    }
+
+    .source-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .source {
+      border: 1px solid #2c3740;
+      border-radius: 8px;
+      padding: 13px;
+      background: #141a20;
+      font-size: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .grid,
+      .grid.two,
+      .flow,
+      .source-list {
+        grid-template-columns: 1fr;
+      }
+
+      .table-row {
+        grid-template-columns: 1fr;
+      }
+
+      .table-cell {
+        border-left: 0;
+        border-top: 1px solid #2c3740;
+      }
+
+      .table-cell:first-child {
+        border-top: 0;
+      }
+
+      .status-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div class="kicker">מסמך חוויית משתמש - ClaUi + JFrog Boost</div>
+      <h1>איך Boost ישתלב בתוך ClaUi</h1>
+      <p class="subtitle">
+        הצעה למצב עבודה שאפשר להדליק ולכבות מתוך התוסף, כך שהסוכנים ימשיכו לעבוד רגיל,
+        אבל פלטי פקודות רועשים יעברו דרך Boost ויחזרו לסוכן בצורה קצרה, ממוקדת ושימושית יותר.
+      </p>
+      <div class="meta">נכתב לאחר בדיקת Boost ואת נקודות השילוב הקיימות ב-ClaUi. נכון ל-11 במאי 2026.</div>
+    </header>
+
+    <section>
+      <h2>הרעיון בקצרה</h2>
+      <p class="lead">
+        Boost הוא שכבת עזר לפקודות שהסוכן מריץ. במקום שהסוכן יקבל אלפי שורות של התקנות,
+        בדיקות, לוגים או דוחות CI, Boost משאיר את המידע שצריך לקבלת החלטה ומצמצם את הרעש.
+        המשתמש לא אמור לשנות את אופן העבודה שלו: הוא כותב בקשה ל-Claude או Codex כרגיל,
+        ו-ClaUi דואג שהסשן החדש ירוץ עם Boost כאשר המתג פעיל.
+      </p>
+      <div class="grid">
+        <div class="panel">
+          <h3>פחות רעש לסוכן</h3>
+          <p class="muted">פלטים ארוכים של בדיקות, בנייה, Docker, Git ו-CI מתקצרים לפני שהם תופסים מקום בהקשר של הסוכן.</p>
+        </div>
+        <div class="panel">
+          <h3>אותה עבודה למשתמש</h3>
+          <p class="muted">אין צורך לזכור להוסיף מילה לפני כל פקודה. ההפעלה נעשית מהתוסף, במתג ברור.</p>
+        </div>
+        <div class="panel">
+          <h3>מדידה והבנה</h3>
+          <p class="muted">אחרי כמה הרצות אפשר להראות למשתמש כמה רעש נחסך, אילו פקודות כבדות חוזרות, ואיפה הסוכן מתעכב.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>איפה המשתמש יראה את זה</h2>
+      <p class="lead">
+        Boost צריך להרגיש כמו יכולת של הסוכן, לא כמו מסך הגדרות נסתר. לכן המקום הטבעי הוא ליד בחירת הספק,
+        המודל, הרשאות ומהירות Codex.
+      </p>
+      <div class="grid two">
+        <div class="panel">
+          <h3>בתוך ה-AI Chip</h3>
+          <p class="muted">
+            בתפריט שנפתח מתוך כפתור ה-AI יופיע אזור בשם <strong>Boost</strong> עם מתג:
+            כבוי, פעיל לסשנים חדשים, או דורש התקנה. זה המקום שבו המשתמש כבר מחליט איך הסוכן ירוץ.
+          </p>
+        </div>
+        <div class="panel">
+          <h3>בתפריט Tools</h3>
+          <p class="muted">
+            בתפריט הכלים יופיעו פעולות משלימות: התקנה, בדיקת סטטוס, פתיחת דוח חיסכון, ואיפוס/כיבוי.
+            אלה פעולות תחזוקה, לא משהו שצריך לבלוט כל הזמן.
+          </p>
+        </div>
+      </div>
+      <div class="callout">
+        בזמן שסשן רץ עם Boost, ליד פלטי פקודות יופיע סימון קטן "Boost active".
+        אם Boost לא פעיל, לא יוצג סימון כדי לא להעמיס על הצ'אט.
+      </div>
+    </section>
+
+    <section>
+      <h2>מצבי המתג</h2>
+      <div class="status-row">
+        <div><span class="status-pill">Off</span></div>
+        <div>
+          <strong>מצב ברירת המחדל.</strong>
+          ClaUi מפעיל Claude או Codex בדיוק כפי שהוא עושה היום. אין שינוי בפלטים, אין התקנה ואין telemetry נוסף.
+        </div>
+      </div>
+      <div class="status-row">
+        <div><span class="status-pill">Setup needed</span></div>
+        <div>
+          <strong>Boost לא מוכן עדיין.</strong>
+          המשתמש רואה כפתור "Set up Boost" והסבר קצר מה יקרה: הורדה או בחירת קובץ Boost, אישור תנאי JFrog,
+          ואתחול עבור Claude, Codex או שניהם.
+        </div>
+      </div>
+      <div class="status-row">
+        <div><span class="status-pill">On</span></div>
+        <div>
+          <strong>Boost פעיל לסשנים חדשים.</strong>
+          סשנים חדשים של Claude/Codex ירוצו עם שכבת Boost. סשן שכבר רץ לא משתנה באמצע כדי לא לשבור עבודה קיימת.
+        </div>
+      </div>
+      <div class="status-row">
+        <div><span class="status-pill">Paused</span></div>
+        <div>
+          <strong>Boost מותקן אבל לא משמש כרגע.</strong>
+          מתאים למי שרוצה להשוות התנהגות, לבדוק באג, או לעבוד בלי סינון פלט בפרויקט מסוים.
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>תהליך ההפעלה הראשון</h2>
+      <p class="lead">
+        ההפעלה צריכה להיות קצרה, שקופה, ולא מפחידה. המשתמש צריך להבין מה מותקן, מה נשלח החוצה,
+        ומה קורה לסשנים קיימים.
+      </p>
+      <div class="flow">
+        <div class="step">
+          <div class="step-number">1</div>
+          <h3>בדיקת זמינות</h3>
+          <p class="muted">ClaUi בודק אם Boost כבר קיים במחשב ואם אפשר להריץ אותו.</p>
+        </div>
+        <div class="step">
+          <div class="step-number">2</div>
+          <h3>התקנה או בחירה</h3>
+          <p class="muted">אם הוא חסר, מוצעת התקנה אוטומטית או בחירת קובץ Boost ידנית.</p>
+        </div>
+        <div class="step">
+          <div class="step-number">3</div>
+          <h3>אישור ברור</h3>
+          <p class="muted">מוצג הסבר קצר על JFrog Boost, Beta Agreement, ונתוני שימוש.</p>
+        </div>
+        <div class="step">
+          <div class="step-number">4</div>
+          <h3>בחירת סוכנים</h3>
+          <p class="muted">המשתמש בוחר להפעיל עבור Claude, Codex או שניהם.</p>
+        </div>
+        <div class="step">
+          <div class="step-number">5</div>
+          <h3>סשן חדש</h3>
+          <p class="muted">ClaUi מציע לפתוח סשן חדש שבו Boost פעיל, בלי להפריע לסשן הנוכחי.</p>
+        </div>
+      </div>
+      <div class="callout warn">
+        הערה חשובה ל-Windows: פקודת ההתקנה שמופיעה באתר מתאימה ל-Linux/macOS.
+        ל-Windows יש נכס release ייעודי, ולכן ClaUi צריך להציע הורדה ישירה ומבוקרת או בחירת קובץ קיימת.
+      </div>
+    </section>
+
+    <section>
+      <h2>איך זה יעבוד בזמן שימוש</h2>
+      <div class="table">
+        <div class="table-row table-head">
+          <div class="table-cell">רגע בחוויה</div>
+          <div class="table-cell">מה המשתמש עושה</div>
+          <div class="table-cell">מה ClaUi עושה מאחורי הקלעים</div>
+        </div>
+        <div class="table-row">
+          <div class="table-cell">פתיחת סשן חדש</div>
+          <div class="table-cell">המשתמש בוחר Claude או Codex וכותב משימה רגילה.</div>
+          <div class="table-cell">ClaUi בודק אם Boost פעיל עבור הספק הזה ומפעיל את הסשן במסלול המתאים.</div>
+        </div>
+        <div class="table-row">
+          <div class="table-cell">הרצת פקודה</div>
+          <div class="table-cell">הסוכן מריץ בדיקות, build, Git, Docker או פקודה אחרת.</div>
+          <div class="table-cell">Boost מסנן פלט רועש ומשאיר שגיאות, סיכומים, ספירות ורמזים להמשך.</div>
+        </div>
+        <div class="table-row">
+          <div class="table-cell">קריאת התוצאה</div>
+          <div class="table-cell">המשתמש רואה בצ'אט פלט קצר יותר ותג קטן שמסמן שהפלט עבר Boost.</div>
+          <div class="table-cell">ClaUi מציג את מה שהסוכן קיבל, בלי להעמיס על הצ'אט עם כל השורות שנחסכו.</div>
+        </div>
+        <div class="table-row">
+          <div class="table-cell">בעיה או חשד לסינון יתר</div>
+          <div class="table-cell">המשתמש מכבה Boost לסשן הבא או מריץ בדיקה מחדש בלי Boost.</div>
+          <div class="table-cell">ClaUi שומר על דרך חזרה פשוטה ולא מסתיר שהפלט עבר שכבת קיצור.</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>מה המשתמש יצטרך לעשות</h2>
+      <ul>
+        <li>לאשר פעם אחת שהוא רוצה להשתמש ב-JFrog Boost.</li>
+        <li>לאשר או לבצע התקנה, אם Boost לא קיים במחשב.</li>
+        <li>לבחור אם Boost יחול על Claude, Codex או שניהם.</li>
+        <li>לפתוח סשן חדש כדי שהשינוי ייכנס לתוקף.</li>
+        <li>בארגונים רגישים: לבדוק מול מדיניות החברה אם מותר להשתמש בכלי Beta חיצוני עם telemetry.</li>
+      </ul>
+      <p class="small">
+        המשתמש לא צריך ללמוד פקודות Boost בשביל העבודה היומיומית. הדוחות והאבחון יהיו זמינים רק למי שרוצה להעמיק.
+      </p>
+    </section>
+
+    <section>
+      <h2>פרטיות ואמון</h2>
+      <p class="lead">
+        זה החלק הכי חשוב לחוויית המשתמש. Boost הוא כלי חיצוני של JFrog ובשלב Beta.
+        ClaUi צריך להציג זאת בצורה גלויה, בלי להסתיר מאחורי כפתור קטן.
+      </p>
+      <div class="grid two">
+        <div class="panel">
+          <h3>מה נסביר לפני ההפעלה</h3>
+          <p class="muted">
+            Boost אוסף מדדי שימוש ו-tracing מסונן. לפי מסמכי האבטחה שלו, לוגים גולמיים ותוכן קבצים לא אמורים להישלח,
+            וסודות אמורים לעבור הסתרה. עדיין מדובר בכלי חיצוני, ולכן ההפעלה תהיה opt-in בלבד.
+          </p>
+        </div>
+        <div class="panel">
+          <h3>מה לא נעשה</h3>
+          <p class="muted">
+            לא נפעיל Boost בשקט, לא נשנה hooks גלובליים בלי אישור, ולא נגרום למשתמש לחשוב שהכיבוי ב-ClaUi בהכרח מכבה התקנות Boost שהוא ביצע ידנית מחוץ לתוסף.
+          </p>
+        </div>
+      </div>
+      <div class="callout warn">
+        ניסוח מומלץ בדיאלוג ההפעלה: "Boost הוא שירות חיצוני של JFrog. הפעלתו עשויה להוסיף telemetry מסונן.
+        יש להפעיל רק אם זה מתאים למדיניות הפרויקט או הארגון."
+      </div>
+    </section>
+
+    <section>
+      <h2>דוחות וערך אחרי ההפעלה</h2>
+      <p class="lead">
+        אחרי ש-Boost רץ כמה פעמים, ClaUi יכול להפוך את הנתונים שלו לחלק טבעי מה-Dashboard וה-Vitals.
+      </p>
+      <div class="grid">
+        <div class="panel">
+          <h3>חיסכון רעש</h3>
+          <p class="muted">כמה פלט נחסך בפקודות האחרונות, ואילו פקודות היו הכי רועשות.</p>
+        </div>
+        <div class="panel">
+          <h3>פקודות איטיות</h3>
+          <p class="muted">זיהוי פקודות build/test/install שחוזרות וגוזלות זמן.</p>
+        </div>
+        <div class="panel">
+          <h3>בדיקות לא יציבות</h3>
+          <p class="muted">אם Boost מזהה בדיקות שנכשלות ועוברות לסירוגין, ClaUi יכול להבליט אותן לסוכן ולמשתמש.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>התנהגות במקרי קצה</h2>
+      <div class="grid two">
+        <div class="panel">
+          <h3>Boost לא מותקן</h3>
+          <p class="muted">המתג מראה "Setup needed" והסשנים ממשיכים לעבוד רגיל בלי Boost.</p>
+        </div>
+        <div class="panel">
+          <h3>המשתמש מכבה באמצע עבודה</h3>
+          <p class="muted">השינוי יחול בסשן הבא. ClaUi יציע "Restart session with Boost off" רק אם המשתמש מבקש זאת.</p>
+        </div>
+        <div class="panel">
+          <h3>פקודה לא נתמכת</h3>
+          <p class="muted">Boost עדיין יכול להעביר פלט עם קיצור כללי, אבל ClaUi לא יבטיח חיסכון כמו בכלים הנתמכים.</p>
+        </div>
+        <div class="panel">
+          <h3>סביבה ארגונית</h3>
+          <p class="muted">הפיצ'ר נשאר כבוי כברירת מחדל, עם אפשרות למדיניות Workspace שמסתירה או נועלת אותו.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>המלצת מוצר</h2>
+      <p class="lead">
+        לשלב את Boost בשלבים. קודם להוסיף מתג, בדיקת התקנה, סטטוס ודיאלוג פרטיות.
+        אחר כך לחבר דוחות חיסכון ל-Dashboard. רק לאחר שימוש אמיתי להחליט אם צריך שליטה עדינה יותר לפי פרויקט, ספק או סוג פקודה.
+      </p>
+      <div class="callout">
+        ברירת המחדל הנכונה: כבוי. ההבטחה הנכונה: "סשנים חדשים יהיו שקטים ויעילים יותר".
+        לא להבטיח שיפור בכל פקודה ולא להבטיח אפס סיכון בסינון פלט.
+      </div>
+    </section>
+
+    <section>
+      <h2>מקורות שנבדקו</h2>
+      <p class="muted">
+        המקורות הבאים שימשו להבנת Boost, יכולותיו, התקנה, פקודות נתמכות, telemetry ומצב releases.
+      </p>
+      <div class="source-list">
+        <div class="source"><a href="https://boost.jfrog.com/" target="_blank" rel="noreferrer">אתר JFrog Boost</a></div>
+        <div class="source"><a href="https://boost.jfrog.com/docs/en/quickstart/" target="_blank" rel="noreferrer">Quickstart</a></div>
+        <div class="source"><a href="https://boost.jfrog.com/docs/en/commands/" target="_blank" rel="noreferrer">Supported Commands</a></div>
+        <div class="source"><a href="https://boost.jfrog.com/docs/en/features/token-reduction/" target="_blank" rel="noreferrer">Token Savings</a></div>
+        <div class="source"><a href="https://boost.jfrog.com/docs/en/observability-platforms/" target="_blank" rel="noreferrer">Observability Platforms</a></div>
+        <div class="source"><a href="https://github.com/jfrog/boost" target="_blank" rel="noreferrer">GitHub Repository</a></div>
+        <div class="source"><a href="https://github.com/jfrog/boost/releases/latest" target="_blank" rel="noreferrer">Latest Release</a></div>
+        <div class="source"><a href="https://raw.githubusercontent.com/jfrog/boost/main/SECURITY.md" target="_blank" rel="noreferrer">Security Policy</a></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

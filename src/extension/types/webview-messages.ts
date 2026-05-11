@@ -3,6 +3,19 @@
  */
 
 import type { ContentBlock } from './stream-json';
+import type {
+  MPAgentProvider,
+  MPApprovalDecisionPayload,
+  MPApprovalEvent,
+  MPDeliveryStatus,
+  MPFileConflictWarning,
+  MPMessage,
+  MPParticipant,
+  MPParticipantActivityState,
+  MPRenameEvent,
+  MPSession,
+  MPTypingState,
+} from '../multiparticipant/MultiParticipantProtocol';
 
 export type TypingTheme = 'terminal-hacker' | 'retro' | 'zen' | 'neo-zen';
 export type ProviderId = 'claude' | 'codex' | 'remote';
@@ -804,6 +817,52 @@ export interface BugReportContext {
   metadataText?: string;
 }
 
+// --- Multi-Participant (Webview -> Extension) ---
+
+export interface MpJoinSessionRequest {
+  type: 'mpJoinSession';
+  serverUrl?: string;
+  humanName: string;
+  agentName: string;
+  agentProvider: MPAgentProvider;
+}
+
+export interface MpLeaveSessionRequest {
+  type: 'mpLeaveSession';
+}
+
+export interface MpSendMessageRequest {
+  type: 'mpSendMessage';
+  rawBody: string;
+}
+
+export interface MpTypingIndicatorRequest {
+  type: 'mpTypingIndicator';
+  state: Extract<MPParticipantActivityState, 'idle' | 'typing'>;
+}
+
+export interface MpApprovalDecisionRequest {
+  type: 'mpApprovalDecision';
+  eventId: string;
+  decision: MPApprovalDecisionPayload;
+}
+
+export interface MpRenameParticipantRequest {
+  type: 'mpRenameParticipant';
+  participantId: string;
+  newDisplayName: string;
+}
+
+export interface MpCancelAgentRequest {
+  type: 'mpCancelAgent';
+  deliveryId: string;
+  agentParticipantId?: string;
+}
+
+export interface MpStopA2ARequest {
+  type: 'mpStopA2A';
+}
+
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
@@ -919,6 +978,14 @@ export type WebviewToExtensionMessage =
   | BugReportSubmitRequest
   | BugReportGetPreviewRequest
   | BugReportCloseRequest
+  | MpJoinSessionRequest
+  | MpLeaveSessionRequest
+  | MpSendMessageRequest
+  | MpTypingIndicatorRequest
+  | MpApprovalDecisionRequest
+  | MpRenameParticipantRequest
+  | MpCancelAgentRequest
+  | MpStopA2ARequest
   | TeamPanelOpenRequest
   | TeamSendMessageRequest
   | TeamCreateTaskRequest
@@ -993,8 +1060,8 @@ export interface SessionStartedMessage {
   model: string;
   isResume?: boolean;
   provider?: ProviderId;
-  /** 'chat' (default) or 'search' for Smart Search tabs. */
-  tabKind?: 'chat' | 'search';
+  /** 'chat' (default), 'search' for Smart Search tabs, or 'multiparticipant'. */
+  tabKind?: 'chat' | 'search' | 'multiparticipant';
 }
 
 export interface SessionEndedMessage {
@@ -2148,6 +2215,120 @@ export interface SerializedChatMessage {
   source?: 'input' | 'auto-prompt';
 }
 
+// --- Multi-Participant (Extension -> Webview) ---
+
+export interface MpConnectionStatusMessage {
+  type: 'mpConnectionStatus';
+  status: 'connecting' | 'connected' | 'disconnected' | 'error';
+  message?: string;
+}
+
+export interface MpSessionStateMessage {
+  type: 'mpSessionState';
+  session: MPSession | null;
+  participants: MPParticipant[];
+  transcript: MPMessage[];
+  myHumanId: string | null;
+  myAgentId: string | null;
+  approvals?: MPApprovalEvent[];
+  typingStates?: MPTypingState[];
+  fileConflicts?: MPFileConflictWarning[];
+}
+
+export interface MpNewMessageMessage {
+  type: 'mpNewMessage';
+  message: MPMessage;
+}
+
+export interface MpParticipantsMessage {
+  type: 'mpParticipants';
+  participants: MPParticipant[];
+}
+
+export interface MpDeliveryStatusMessage {
+  type: 'mpDeliveryStatus';
+  deliveryId: string;
+  agentParticipantId: string;
+  agentDisplayName: string;
+  status: MPDeliveryStatus;
+  errorText?: string;
+  interruptedByDeliveryId?: string;
+}
+
+export interface MpAgentStreamingTextMessage {
+  type: 'mpAgentStreamingText';
+  deliveryId: string;
+  agentParticipantId: string;
+  text: string;
+  accumulatedText?: string;
+}
+
+export interface MpParticipantActivityMessage {
+  type: 'mpParticipantActivity';
+  activity: MPTypingState;
+}
+
+export interface MpAgentToAgentApprovalMessage {
+  type: 'mpAgentToAgentApproval';
+  approval: MPApprovalEvent;
+  pendingMessage: MPMessage;
+  sourceAgent: MPParticipant;
+  targetAgent: MPParticipant;
+}
+
+export interface MpA2aPendingApprovalMessage {
+  type: 'mpA2aPendingApproval';
+  approval: MPApprovalEvent;
+  pendingMessageId: string;
+  sourceAgentId: string;
+  targetAgentId: string;
+}
+
+export interface MpApprovalResolvedMessage {
+  type: 'mpApprovalResolved';
+  approval: MPApprovalEvent;
+  decision: MPApprovalDecisionPayload;
+  decidedByParticipantId: string | null;
+  deliveryId?: string | null;
+  deniedReason?: string;
+}
+
+export interface MpGuardStopMessage {
+  type: 'mpGuardStop';
+  approval: MPApprovalEvent;
+  reason: string;
+  lastMessages: MPMessage[];
+}
+
+export interface MpFileConflictWarningMessage {
+  type: 'mpFileConflictWarning';
+  warning: MPFileConflictWarning;
+}
+
+export interface MpParticipantRenamedMessage {
+  type: 'mpParticipantRenamed';
+  event: MPRenameEvent;
+  participant: MPParticipant;
+}
+
+export interface MpRenameRejectedMessage {
+  type: 'mpRenameRejected';
+  participantId: string;
+  requestedDisplayName: string;
+  reason: string;
+}
+
+export interface MpErrorMessage {
+  type: 'mpError';
+  code: string;
+  message: string;
+}
+
+export interface MpJoinRejectedMessage {
+  type: 'mpJoinRejected';
+  reason: string;
+}
+
 export type ExtensionToWebviewMessage =
   | McpInventoryMessage
   | McpCatalogMessage
@@ -2268,6 +2449,22 @@ export type ExtensionToWebviewMessage =
   | MessageDeferredDeliveredMessage
   | MessageDeferredFailedMessage
   | SilentResumeStatusMessage
+  | MpConnectionStatusMessage
+  | MpSessionStateMessage
+  | MpNewMessageMessage
+  | MpParticipantsMessage
+  | MpDeliveryStatusMessage
+  | MpAgentStreamingTextMessage
+  | MpParticipantActivityMessage
+  | MpAgentToAgentApprovalMessage
+  | MpA2aPendingApprovalMessage
+  | MpApprovalResolvedMessage
+  | MpGuardStopMessage
+  | MpFileConflictWarningMessage
+  | MpParticipantRenamedMessage
+  | MpRenameRejectedMessage
+  | MpErrorMessage
+  | MpJoinRejectedMessage
   | WorkstreamMapDataMessage
   | WorkstreamMapClassifyingMessage
   | WorkstreamMapErrorMessage

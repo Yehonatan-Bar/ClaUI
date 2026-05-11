@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Participant Agent Session - Summary</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+      line-height: 1.7;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 2rem;
+      color: #16213e;
+      border-bottom: 3px solid #0f3460;
+      padding-bottom: 12px;
+      margin-bottom: 30px;
+    }
+
+    h2 {
+      font-size: 1.4rem;
+      color: #0f3460;
+      margin-top: 36px;
+      margin-bottom: 14px;
+      padding-right: 12px;
+      border-right: 4px solid #e94560;
+    }
+
+    h3 {
+      font-size: 1.15rem;
+      color: #16213e;
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin-bottom: 14px;
+      text-align: justify;
+    }
+
+    .highlight-box {
+      background: #fff;
+      border: 1px solid #dde;
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin: 18px 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+
+    .highlight-box.blue {
+      border-right: 5px solid #0f3460;
+    }
+
+    .highlight-box.red {
+      border-right: 5px solid #e94560;
+    }
+
+    .highlight-box.green {
+      border-right: 5px solid #28a745;
+    }
+
+    .highlight-box.orange {
+      border-right: 5px solid #e67e22;
+    }
+
+    ul {
+      padding-right: 24px;
+      margin-bottom: 14px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    th {
+      background: #0f3460;
+      color: #fff;
+      padding: 12px 16px;
+      text-align: right;
+      font-weight: 600;
+    }
+
+    td {
+      padding: 10px 16px;
+      border-bottom: 1px solid #eee;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) { background: #f8f9fb; }
+
+    .phase-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 18px 0;
+    }
+
+    .phase-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 18px 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+      border-top: 4px solid #0f3460;
+    }
+
+    .phase-card h4 {
+      color: #0f3460;
+      font-size: 1.05rem;
+      margin-bottom: 8px;
+    }
+
+    .phase-card ul {
+      font-size: 0.95rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .badge-low { background: #d4edda; color: #155724; }
+    .badge-med { background: #fff3cd; color: #856404; }
+    .badge-high { background: #f8d7da; color: #721c24; }
+
+    .diagram {
+      background: #1a1a2e;
+      color: #a8e6cf;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.85rem;
+      padding: 20px;
+      border-radius: 10px;
+      direction: ltr;
+      text-align: left;
+      overflow-x: auto;
+      margin: 16px 0;
+      line-height: 1.5;
+    }
+
+    .footer {
+      margin-top: 48px;
+      padding-top: 16px;
+      border-top: 1px solid #ddd;
+      color: #888;
+      font-size: 0.85rem;
+      text-align: center;
+    }
+
+    @media (max-width: 700px) {
+      .phase-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <h1>Multi-Participant Agent Session - Plan</h1>
+
+    <p>
+      תוכנית לפיצ'ר חדש שמאפשר לכמה מתכנתים ולכמה סוכני קוד (כמו Claude Code ו-Codex)
+      לעבוד יחד באותה שיחה, בזמן אמת. כל אדם רואה את כל השיחה. סוכן מקבל משימה רק כאשר
+      פונים אליו באופן מפורש.
+    </p>
+
+    <h2>מה המוצר עושה?</h2>
+
+    <div class="highlight-box blue">
+      <p>
+        <strong>סשן משותף</strong> שבו 3-6 משתתפים (בני אדם + הסוכנים שלהם) מנהלים שיחת עבודה אחת.
+        כל אדם מביא את הסוכן שלו. כל מה שנכתב בשיחה נראה לכולם.
+        כדי לפנות למישהו, פשוט כותבים את שמו או את האות הראשונה של שמו בתחילת ההודעה.
+      </p>
+      <p>
+        <strong>דוגמה:</strong> אליס כותבת "ק: תבדוק את הפונקציה" - וסוכן הקוד "קלוד" שלה מקבל את המשימה.
+        בוב כותב "ד: תעשה review" - וסוכן הקוד "דן" שלו מתחיל לעבוד. כולם רואים את הכל.
+      </p>
+    </div>
+
+    <h2>ארכיטקטורה כללית</h2>
+
+    <div class="diagram">
+                     Coordination Server (Hub)
+                     +---------------------------+
+                     | Canonical Transcript       |
+                     | Routing Engine             |
+                     | Participant Registry       |
+                     | Agent Loop Control         |
+                     +------------+--------------+
+                                  |
+                 +----------------+----------------+
+                 | WebSocket      | WebSocket      | WebSocket
+                 |                |                |
+        +--------+------+  +-----+--------+  +---+-----------+
+        | ClaUi (Alice) |  | ClaUi (Bob)  |  | ClaUi (Carol) |
+        |   + Agent     |  |   + Agent    |  |   + Agent     |
+        +---------------+  +--------------+  +----------------+
+    </div>
+
+    <div class="highlight-box green">
+      <h3>עקרון מפתח</h3>
+      <p>
+        <strong>השרת מנתב, הלקוח מבצע.</strong>
+        השרת לעולם לא מדבר ישירות עם סוכני הקוד. הוא רק אומר לתוסף המקומי של כל משתמש
+        "שלח את ההוראה הזו לסוכן שלך". התוסף משתמש ביכולות הקיימות שלו בדיוק כמו היום - בלי שינוי.
+      </p>
+    </div>
+
+    <h2>איך עובד הניתוב?</h2>
+
+    <div class="highlight-box blue">
+      <p>כשמישהו שולח הודעה, השרת בודק את תחילת ההודעה:</p>
+      <ul>
+        <li><strong>שם מלא</strong> - "קלוד תבדוק את הקובץ" -> מנותב לסוכן "קלוד"</li>
+        <li><strong>אות אחת</strong> - "ק: תבדוק את הקובץ" -> מנותב למשתתף שהאות הראשונה שלו היא ק'</li>
+        <li><strong>בלי פתיח</strong> - "יש בעיה בקוד" -> כולם רואים, אף סוכן לא מופעל</li>
+      </ul>
+      <p>
+        <strong>הכלל:</strong> סוכן מקבל prompt רק כשפונים אליו במפורש. אין ניחושים, אין "אולי הוא רצה לפנות לסוכן".
+        הניתוב הוא דטרמיניסטי לחלוטין.
+      </p>
+    </div>
+
+    <h2>בחירת שמות</h2>
+
+    <p>
+      כל משתתף בוחר שם לעצמו ושם לסוכן שלו. השרת מוודא ש:
+    </p>
+    <ul>
+      <li>אין שני שמות זהים</li>
+      <li>אין שני משתתפים עם אותה אות ראשונה</li>
+      <li>שמות יכולים להיות בעברית, אנגלית, או כל שפה</li>
+      <li>אפשר לשנות שם תוך כדי הסשן (אם השם החדש פנוי)</li>
+    </ul>
+
+    <h2>מה הסוכן יודע?</h2>
+
+    <div class="highlight-box blue">
+      <p>
+        הסוכנים לא מקבלים את כל השיחה בכל פעם. הם מקבלים רק את מה שהם לא ראו מאז הפעם האחרונה שהם עבדו,
+        בתוספת ההוראה החדשה שממוענת אליהם. זה חוסך כסף (פחות טוקנים) ומונע בלבול.
+      </p>
+      <p>
+        כשסוכן מופעל בפעם הראשונה בסשן, הוא מקבל הקשר מינימלי: פתיחת הסשן, 5 הודעות אחרונות, רשימת משתתפים, והמשימה.
+      </p>
+    </div>
+
+    <h2>הגנה מפני לולאות בין סוכנים</h2>
+
+    <div class="highlight-box red">
+      <p>
+        סוכנים יכולים לפנות אחד לשני (למשל, סוכן אחד מבקש מסוכן אחר לבדוק את הקוד שלו).
+        אבל בלי הגנה, הם עלולים להיכנס ללולאה אינסופית של שיחות ביניהם.
+      </p>
+      <h3>שלוש רמות הגנה:</h3>
+      <ul>
+        <li><strong>ברירת מחדל ("שאל")</strong> - לפני כל הודעה בין סוכנים, השרת עוצר ומבקש אישור מבן אדם</li>
+        <li><strong>תקציב מספרי</strong> - המשתמש מאשר N הודעות בין סוכנים. אחרי N, עוצר שוב</li>
+        <li><strong>"תמיד" עם שומר</strong> - סוכנים עובדים חופשי, אבל כל 20 הודעות מופעל מודל שומר שבודק האם יש התקדמות אמיתית. אם הוא מזהה לולאה - עוצר</li>
+      </ul>
+      <p>
+        בנוסף, תמיד יש כפתור עצירה ידני. ויש גם מצב "כפה המשך" למשתמשים מנוסים שמוכנים לקחת אחריות.
+      </p>
+    </div>
+
+    <h2>עבודה משותפת על קבצים</h2>
+
+    <div class="highlight-box orange">
+      <p>
+        כשכמה סוכנים עובדים על אותם קבצים, יש סיכון להתנגשויות. המערכת מטפלת בזה ב-3 רמות:
+      </p>
+      <ul>
+        <li><strong>ברירת מחדל: אזהרות</strong> - המערכת עוקבת אחרי איזה קבצים כל סוכן משנה, ומזהירה כשיש חפיפה</li>
+        <li><strong>אופציונלי: הפרדה עם Git</strong> - כל סוכן עובד על ענף נפרד, והמשתמש ממזג</li>
+        <li><strong>מצב בטוח: תכנון בלבד</strong> - סוכנים מתארים שינויים אבל לא מבצעים אותם. בני אדם מיישמים</li>
+      </ul>
+    </div>
+
+    <h2>מה רואים בזמן אמת?</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>מצב</th>
+          <th>מה מוצג</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>אדם מקליד</td><td>אינדיקטור "מקליד..." ליד שמו</td></tr>
+        <tr><td>סוכן חושב</td><td>אינדיקטור "חושב..." - קיבל משימה, עדיין לא התחיל לענות</td></tr>
+        <tr><td>סוכן כותב</td><td>טקסט זורם בזמן אמת, כמו צ'אט רגיל</td></tr>
+        <tr><td>ממתין לאישור</td><td>הודעה ברורה שסוכן רוצה לפנות לסוכן אחר, וצריך אישור</td></tr>
+        <tr><td>משתתף מנותק</td><td>סימון "לא מחובר" ליד שמו</td></tr>
+      </tbody>
+    </table>
+
+    <h2>הצטרפות, ניתוק, וחזרה</h2>
+
+    <ul>
+      <li><strong>הצטרפות באמצע:</strong> משתתף חדש מצטרף, רואה את כל ההיסטוריה, בוחר שם, והסוכן שלו מתחיל "ריק" עד שמישהו פונה אליו</li>
+      <li><strong>ניתוק:</strong> מי שמתנתק מסומן כלא מחובר. כשחוזר, רואה את כל מה שפספס</li>
+      <li><strong>סוכן לא זמין:</strong> הודעות שממוענות אליו נשמרות. כשהוא חוזר ומקבל משימה חדשה, הוא מקבל את כל מה שפספס כהקשר</li>
+    </ul>
+
+    <h2>שלבי פיתוח</h2>
+
+    <div class="phase-grid">
+      <div class="phase-card">
+        <h4>שלב 1: תשתית</h4>
+        <ul>
+          <li>שרת תיאום עם WebSocket</li>
+          <li>מודל נתונים (סשן, משתתפים, הודעות)</li>
+          <li>מנוע ניתוב הודעות</li>
+          <li>שמירת שיחה לקובץ</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <h4>שלב 2: חיבור סוכנים</h4>
+        <ul>
+          <li>גשר בין השרת לסוכן המקומי</li>
+          <li>בניית הקשר (רק מה שהסוכן לא ראה)</li>
+          <li>תבנית הוראות לסוכן</li>
+          <li>העברת תגובות לכל המשתתפים</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <h4>שלב 3: ממשק משתמש</h4>
+        <ul>
+          <li>תצוגת הודעות מרובת משתתפים</li>
+          <li>רשימת משתתפים עם סטטוס</li>
+          <li>אינדיקטורים של הקלדה/חשיבה/כתיבה</li>
+          <li>דיאלוג הצטרפות ובחירת שמות</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <h4>שלב 4: שיח בין סוכנים</h4>
+        <ul>
+          <li>זיהוי ושליטה בשיח סוכן-לסוכן</li>
+          <li>ממשק אישור/דחייה</li>
+          <li>ספירת תקציב ומנגנון שומר</li>
+          <li>כפתור עצירה ידני</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <h4>שלב 5: בטיחות קבצים</h4>
+        <ul>
+          <li>מעקב אחרי שינויים בקבצים</li>
+          <li>זיהוי חפיפות והתרעה</li>
+          <li>הפרדה אופציונלית עם Git</li>
+          <li>מצב "תכנון בלבד"</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <h4>שלב 6: ליטוש</h4>
+        <ul>
+          <li>התחברות מחדש אחרי ניתוק</li>
+          <li>התאוששות משגיאות</li>
+          <li>ביצועים ואופטימיזציה</li>
+          <li>בדיקות מקיפות</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>סיכונים עיקריים</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>סיכון</th>
+          <th>רמה</th>
+          <th>פתרון</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>השרת הוא נקודת כשל בודדה</td>
+          <td><span class="badge badge-med">בינוני</span></td>
+          <td>שמירה לקובץ לשחזור, התחברות מחדש אוטומטית</td>
+        </tr>
+        <tr>
+          <td>לולאה אינסופית בין סוכנים</td>
+          <td><span class="badge badge-high">גבוה</span></td>
+          <td>3 רמות הגנה: אישור, תקציב, שומר אוטומטי</td>
+        </tr>
+        <tr>
+          <td>התנגשות בעריכת קבצים</td>
+          <td><span class="badge badge-med">בינוני</span></td>
+          <td>אזהרות בזמן אמת, הפרדת Git אופציונלית, מצב בטוח</td>
+        </tr>
+        <tr>
+          <td>בלבול סוכן (מבצע הוראות ישנות)</td>
+          <td><span class="badge badge-low">נמוך</span></td>
+          <td>מבנה הוראות ברור עם הפרדה בין הקשר למשימה נוכחית</td>
+        </tr>
+        <tr>
+          <td>מציאת שמות עם אותיות ראשונות שונות (6 משתתפים)</td>
+          <td><span class="badge badge-low">נמוך</span></td>
+          <td>הגבלה ל-3-6 משתתפים, הודעות שגיאה ברורות, אפשרות שינוי שם</td>
+        </tr>
+        <tr>
+          <td>השהייה ברשת</td>
+          <td><span class="badge badge-low">נמוך</span></td>
+          <td>תצוגה מקומית מיידית, סטרימינג עם מינימום חציצה</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>מה לא משתנה?</h2>
+
+    <div class="highlight-box green">
+      <p>
+        <strong>הליבה של התוסף לא נפגעת.</strong>
+        כל מה שקשור לתקשורת עם סוכני הקוד (הפעלה, שליחת הוראות, קבלת תשובות, סטרימינג) -
+        נשאר בדיוק כמו שהוא היום. השכבה החדשה יושבת מעל, ומנתבת הודעות בין משתתפים.
+        אף קובץ ליבה קיים לא מצריך שינוי.
+      </p>
+    </div>
+
+    <div class="footer">
+      Multi-Participant Agent Session - Execution Plan | ClaUi Extension
+    </div>
+
+  </div>
+</body>
+</html>

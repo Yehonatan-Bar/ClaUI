@@ -33,6 +33,16 @@ import type {
   UsageStat,
   CheckpointState,
 } from '../../extension/types/webview-messages';
+import type {
+  MPSession,
+  MPParticipant,
+  MPMessage,
+  MPDeliveryStatus,
+  MPApprovalEvent,
+  MPTypingState,
+  MPFileConflictWarning,
+  MPApprovalDecisionType,
+} from '../../extension/multiparticipant/MultiParticipantProtocol';
 import type { AdventureBeat } from '../components/Vitals/adventure/types';
 import { deriveTurnHistoryFromMessages } from '../utils/turnVitals';
 import type { AchievementLang } from '../components/Achievements/achievementI18n';
@@ -123,8 +133,8 @@ export interface AppState {
   // Session
   sessionId: string | null;
   provider: ProviderId | null;
-  /** 'chat' (default) or 'search' for Smart Search tabs. Drives App.tsx routing. */
-  tabKind: 'chat' | 'search';
+  /** Drives App.tsx routing: chat, search, or multiparticipant. */
+  tabKind: 'chat' | 'search' | 'multiparticipant';
   model: string | null;
   selectedProvider: ProviderId;
   providerCapabilities: ProviderCapabilities;
@@ -547,8 +557,8 @@ export interface AppState {
   setLightboxImageSrc: (src: string | null) => void;
 
   // Actions
-  setSession: (sessionId: string, model: string, tabKind?: 'chat' | 'search') => void;
-  setTabKind: (kind: 'chat' | 'search') => void;
+  setSession: (sessionId: string, model: string, tabKind?: 'chat' | 'search' | 'multiparticipant') => void;
+  setTabKind: (kind: 'chat' | 'search' | 'multiparticipant') => void;
   endSession: (reason: string) => void;
   addUserMessage: (content: string | ContentBlock[], source?: 'input' | 'auto-prompt') => void;
   addAssistantMessage: (messageId: string, content: ContentBlock[], model: string, thinkingEffort?: string) => void;
@@ -734,6 +744,46 @@ export interface AppState {
   setChatSearchProjectResults: (results: import('../../extension/types/webview-messages').ChatSearchProjectResult[], requestId: number) => void;
   setChatSearchProjectLoading: (loading: boolean) => void;
   clearChatSearch: () => void;
+
+  // Multi-Participant state
+  mpConnectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error' | null;
+  mpConnectionMessage: string | null;
+  mpSession: MPSession | null;
+  mpParticipants: MPParticipant[];
+  mpMessages: MPMessage[];
+  mpMyHumanId: string | null;
+  mpMyAgentId: string | null;
+  mpApprovals: MPApprovalEvent[];
+  mpTypingStates: MPTypingState[];
+  mpFileConflicts: MPFileConflictWarning[];
+  mpStreamingTexts: Record<string, string>;
+  mpDeliveryStatuses: Record<string, { status: MPDeliveryStatus; agentParticipantId: string; agentDisplayName: string; errorText?: string; interruptedByDeliveryId?: string }>;
+  mpJoinDialogOpen: boolean;
+  mpJoinError: string | null;
+  mpRenameError: string | null;
+  mpDismissedConflictIds: Set<string>;
+  mpGuardStop: { reason: string; lastMessages: Array<{ participantId: string; preview: string }>; resolved: boolean } | null;
+
+  // Multi-Participant actions
+  setMpConnectionStatus: (status: AppState['mpConnectionStatus'], message?: string | null) => void;
+  setMpSession: (session: MPSession | null, participants: MPParticipant[], transcript: MPMessage[], myHumanId: string | null, myAgentId: string | null, approvals?: MPApprovalEvent[], typingStates?: MPTypingState[], fileConflicts?: MPFileConflictWarning[]) => void;
+  addMpMessage: (message: MPMessage) => void;
+  setMpParticipants: (participants: MPParticipant[]) => void;
+  updateMpParticipant: (participantId: string, updates: Partial<MPParticipant>) => void;
+  removeMpParticipant: (participantId: string) => void;
+  setMpDeliveryStatus: (deliveryId: string, agentParticipantId: string, agentDisplayName: string, status: MPDeliveryStatus, errorText?: string, interruptedByDeliveryId?: string) => void;
+  appendMpStreamingText: (deliveryId: string, text: string, accumulatedText?: string) => void;
+  addMpApprovalEvent: (approval: MPApprovalEvent) => void;
+  resolveMpApproval: (eventId: string, decision: MPApprovalDecisionType, decidedByParticipantId: string | null) => void;
+  setMpFileConflict: (warning: MPFileConflictWarning) => void;
+  dismissMpConflict: (conflictId: string) => void;
+  setMpTypingState: (activity: MPTypingState) => void;
+  setMpJoinDialogOpen: (open: boolean) => void;
+  setMpJoinError: (error: string | null) => void;
+  setMpRenameError: (error: string | null) => void;
+  setMpGuardStop: (reason: string, lastMessages: Array<{ participantId: string; preview: string }>) => void;
+  resolveMpGuardStop: () => void;
+  clearMpState: () => void;
 
   reset: () => void;
 }
@@ -2447,6 +2497,143 @@ export const useAppStore = create<AppState>((set, get) => ({
       chatSearchProjectRequestId: 0,
     }),
 
+  // Multi-Participant
+  mpConnectionStatus: null,
+  mpConnectionMessage: null,
+  mpSession: null,
+  mpParticipants: [],
+  mpMessages: [],
+  mpMyHumanId: null,
+  mpMyAgentId: null,
+  mpApprovals: [],
+  mpTypingStates: [],
+  mpFileConflicts: [],
+  mpStreamingTexts: {},
+  mpDeliveryStatuses: {},
+  mpJoinDialogOpen: false,
+  mpJoinError: null,
+  mpRenameError: null,
+  mpDismissedConflictIds: new Set<string>(),
+  mpGuardStop: null,
+
+  setMpConnectionStatus: (status, message) => set({
+    mpConnectionStatus: status,
+    mpConnectionMessage: message ?? null,
+  }),
+
+  setMpSession: (session, participants, transcript, myHumanId, myAgentId, approvals, typingStates, fileConflicts) => set({
+    mpSession: session,
+    mpParticipants: participants,
+    mpMessages: transcript,
+    mpMyHumanId: myHumanId,
+    mpMyAgentId: myAgentId,
+    mpApprovals: approvals ?? [],
+    mpTypingStates: typingStates ?? [],
+    mpFileConflicts: fileConflicts ?? [],
+    mpStreamingTexts: {},
+    mpDeliveryStatuses: {},
+    mpJoinDialogOpen: false,
+    mpJoinError: null,
+  }),
+
+  addMpMessage: (message) => set((state) => ({
+    mpMessages: [...state.mpMessages, message],
+  })),
+
+  setMpParticipants: (participants) => set({ mpParticipants: participants }),
+
+  updateMpParticipant: (participantId, updates) => set((state) => ({
+    mpParticipants: state.mpParticipants.map((p) =>
+      p.participantId === participantId ? { ...p, ...updates } : p
+    ),
+  })),
+
+  removeMpParticipant: (participantId) => set((state) => ({
+    mpParticipants: state.mpParticipants.filter((p) => p.participantId !== participantId),
+  })),
+
+  setMpDeliveryStatus: (deliveryId, agentParticipantId, agentDisplayName, status, errorText, interruptedByDeliveryId) => set((state) => ({
+    mpDeliveryStatuses: {
+      ...state.mpDeliveryStatuses,
+      [deliveryId]: { status, agentParticipantId, agentDisplayName, errorText, interruptedByDeliveryId },
+    },
+  })),
+
+  appendMpStreamingText: (deliveryId, text, accumulatedText) => set((state) => ({
+    mpStreamingTexts: {
+      ...state.mpStreamingTexts,
+      [deliveryId]: accumulatedText ?? ((state.mpStreamingTexts[deliveryId] ?? '') + text),
+    },
+  })),
+
+  addMpApprovalEvent: (approval) => set((state) => ({
+    mpApprovals: [...state.mpApprovals, approval],
+  })),
+
+  resolveMpApproval: (eventId, decision, decidedByParticipantId) => set((state) => ({
+    mpApprovals: state.mpApprovals.map((a) =>
+      a.eventId === eventId
+        ? { ...a, decision, decidedByParticipantId, decidedAt: new Date().toISOString() }
+        : a
+    ),
+  })),
+
+  setMpFileConflict: (warning) => set((state) => {
+    const existing = state.mpFileConflicts.findIndex((c) => c.conflictId === warning.conflictId);
+    if (existing >= 0) {
+      const updated = [...state.mpFileConflicts];
+      updated[existing] = warning;
+      return { mpFileConflicts: updated };
+    }
+    return { mpFileConflicts: [...state.mpFileConflicts, warning] };
+  }),
+
+  dismissMpConflict: (conflictId) => set((state) => ({
+    mpDismissedConflictIds: new Set([...state.mpDismissedConflictIds, conflictId]),
+  })),
+
+  setMpTypingState: (activity) => set((state) => {
+    const existing = state.mpTypingStates.findIndex((t) => t.participantId === activity.participantId);
+    if (existing >= 0) {
+      const updated = [...state.mpTypingStates];
+      updated[existing] = activity;
+      return { mpTypingStates: updated };
+    }
+    return { mpTypingStates: [...state.mpTypingStates, activity] };
+  }),
+
+  setMpJoinDialogOpen: (open) => set({ mpJoinDialogOpen: open, mpJoinError: null }),
+  setMpJoinError: (error) => set({ mpJoinError: error }),
+  setMpRenameError: (error) => set({ mpRenameError: error }),
+
+  setMpGuardStop: (reason, lastMessages) => set({
+    mpGuardStop: { reason, lastMessages, resolved: false },
+  }),
+
+  resolveMpGuardStop: () => set((state) => ({
+    mpGuardStop: state.mpGuardStop ? { ...state.mpGuardStop, resolved: true } : null,
+  })),
+
+  clearMpState: () => set({
+    mpConnectionStatus: null,
+    mpConnectionMessage: null,
+    mpSession: null,
+    mpParticipants: [],
+    mpMessages: [],
+    mpMyHumanId: null,
+    mpMyAgentId: null,
+    mpApprovals: [],
+    mpTypingStates: [],
+    mpFileConflicts: [],
+    mpStreamingTexts: {},
+    mpDeliveryStatuses: {},
+    mpJoinDialogOpen: false,
+    mpJoinError: null,
+    mpRenameError: null,
+    mpDismissedConflictIds: new Set<string>(),
+    mpGuardStop: null,
+  }),
+
   reset: () =>
     set((state) => ({
       sessionId: null,
@@ -2588,5 +2775,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       chatSearchProjectResults: [],
       chatSearchProjectLoading: false,
       chatSearchProjectRequestId: 0,
+      // Multi-Participant: clear on session reset
+      mpConnectionStatus: null,
+      mpConnectionMessage: null,
+      mpSession: null,
+      mpParticipants: [],
+      mpMessages: [],
+      mpMyHumanId: null,
+      mpMyAgentId: null,
+      mpApprovals: [],
+      mpTypingStates: [],
+      mpFileConflicts: [],
+      mpStreamingTexts: {},
+      mpDeliveryStatuses: {},
+      mpJoinDialogOpen: false,
+      mpJoinError: null,
+      mpRenameError: null,
+      mpDismissedConflictIds: new Set<string>(),
+      mpGuardStop: null,
     })),
 }));

@@ -95,6 +95,13 @@ claude-code-mirror/
 |   |   |   +-- ChatSearchService.ts      #   Cross-session text search via raw JSONL string matching
 |   |   |   +-- CheckpointManager.ts      #   Per-session file change checkpoint for revert/redo
 |   |   |   +-- SessionFork.ts            #   Phase 3 stub (rewind)
+|   |   +-- multiparticipant/              #   Multi-participant shared session (Phase 0-2, Tracks A-D)
+|   |   |   +-- MultiParticipantProtocol.ts #  Client-server WebSocket message types, including A2A/typing/file/rename contracts
+|   |   |   +-- MultiParticipantClient.ts  #   WebSocket client connecting to coordination server
+|   |   |   +-- FileChangeTracker.ts       #   Tracks agent file changes via tool-use events (Claude) and snapshot diffs (Codex)
+|   |   |   +-- HeadlessAgentRunner.ts     #   Drives local Claude/Codex agent without a webview, integrates FileChangeTracker
+|   |   |   +-- AgentBridge.ts             #   Connects server deliverPrompt/cancelAgent commands to local agent, reports file changes
+|   |   |   +-- MultiParticipantSessionTab.ts # Shared UI tab with activity indicators, approval banners, conflict warnings
 |   |   +-- terminal/                     #   Phase 2 stubs
 |   |   +-- feedback/
 |   |   |   +-- FormspreeService.ts      #   Formspree.io feedback submission (text + file attachments)
@@ -154,7 +161,7 @@ claude-code-mirror/
 |   |   |   +-- UserPortfolioManager.ts   #   Portfolio orchestrator: health scoring, resume algorithm, path validation
 |   |   +-- types/
 |   |       +-- stream-json.ts            #   CLI protocol type definitions
-|   |       +-- webview-messages.ts       #   postMessage contract
+|   |       +-- webview-messages.ts       #   postMessage contract, including future multi-participant React `mp*` messages
 |   |       +-- workstreamTypes.ts        #   Workstream map data model (enums, interfaces, constants)
 |   +-- webview/                          # React webview code (browser context)
 |       +-- index.tsx                     #   React entry point
@@ -255,6 +262,13 @@ claude-code-mirror/
 |       |   |   +-- TeamStatusWidget.tsx    #   Draggable floating widget with progress bar
 |       |   |   +-- teamColors.ts           #   Color constants for agents, statuses, tasks
 |       |   |   +-- index.ts               #   Barrel exports
+|       |   +-- MultiParticipant/            #   Phase 2 Track D: MP session React components
+|       |   |   +-- ParticipantList.tsx      #   Sidebar: status dot, kind badge, provider icon, route key, typing indicator
+|       |   |   +-- JoinDialog.tsx           #   Modal form: human name, agent name, provider selector, server URL
+|       |   |   +-- ConflictWarning.tsx      #   Dismissable banner for file conflict warnings
+|       |   |   +-- MpMessageBubble.tsx      #   MP message renderer: colored author badge, delivery status, streaming text
+|       |   |   +-- mpColors.ts             #   Deterministic color assignment from participantId hash
+|       |   |   +-- index.ts               #   Barrel exports
 |       |   +-- ContextWidget/
 |       |   |   +-- ContextUsageWidget.tsx  #   Thin draggable context strip (blue-first gradient + hover tooltip hit-zone)
 |       |   +-- StatusBar/
@@ -316,6 +330,14 @@ claude-code-mirror/
 |   |   +-- quick-template.md             #   Quick capture template
 |   +-- references/
 |       +-- example-completed.md          #   Worked example
++-- server/                               # Multi-participant coordination server (standalone Node.js)
+|   +-- src/
+|   |   +-- index.ts                      #   Entry point, starts WebSocket server
+|   |   +-- CoordinationServer.ts         #   WebSocket server, session/participant/delivery management
+|   |   +-- Router.ts                     #   Name validation, routeKey extraction, message routing
+|   |   +-- types.ts                      #   Shared data model and WebSocket protocol types
+|   +-- package.json                      #   Server dependencies (ws, uuid)
+|   +-- tsconfig.json
 +-- Kingdom_of_Claudes_Beloved_MDs/       # Detailed component documentation
     +-- API_KEY_MANAGEMENT.md             #   Environment sanitization & API key management
     +-- ARCHITECTURE.md                   #   Data flow and component interaction
@@ -371,6 +393,9 @@ claude-code-mirror/
 
 **Silent Crash Resume** - Suppresses the legacy "process exited - Restart?" toast / `sessionEnded` UI on a non-zero CLI exit when an eligibility classifier passes. The tab is armed with the existing `pendingResumeSessionId`; on the next user message (or panel focus, for Claude), the extension transparently respawns the CLI with `--resume <sessionId>` (Claude) / `--resume <threadId>` (Codex), flushes any queued prompts, and streams responses normally. Mid-stream interruptions finalize the partial assistant bubble with a muted "(message ended unexpectedly)" footer (`ChatMessage.interrupted`). Failure paths (timeout, spawn-error, exit-while-spawning, fresh-session, cap-exhausted) escalate to the visible Restart UX and restore the user's typed text via a `messageDeferredFailed -> silent-resume-restore-input` handoff. Configurable via `claudeMirror.silentCrashResume.enabled` (default true), `.maxAttempts` (default 2), `.timeoutMs` (default 15000), `.reconnectingHintDelayMs` (default 4000). Telemetry under `[SilentResume]` tags in `Output -> ClaUi`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SILENT_CRASH_RESUME.md`
+
+**Multi-Participant Session (Phase 0-2, Tracks A-D)** - Shared coding sessions where multiple humans and agents participate through a coordination server. The server routes messages by name/routeKey prefix, builds delta context for agents, manages delivery lifecycles, A2A loop protection (LoopController + GuardService), rename handling, typing relay, and JSONL persistence. Each ClaUi instance connects via WebSocket, runs a headless local agent (Claude or Codex), and routes human input through the server. `FileChangeTracker` detects agent file modifications via tool-use events (Claude) or filesystem snapshot diffs (Codex) and reports them to the server for conflict detection. `MultiParticipantSessionTab` renders activity indicators, A2A approval banners, guard stop banners, and file conflict warnings. Phase 2 Track D provides the React Zustand store slice and MP UI components (not yet integrated with extension host).
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/MULTI_PARTICIPANT.md`
 
 **ClaUiSidebarViewProvider** - Provides the Activity Bar sidebar launcher view (`claui.sidebarLauncher`) and forwards button clicks from the sidebar webview to existing extension commands (start session, history, discovery, logs). This gives ClaUi a dedicated left-side VS Code icon without moving the main chat UI into the sidebar.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ACTIVITY_BAR_LAUNCHER.md`
@@ -563,6 +588,9 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 
 **Chat Search** -- Search bar for finding text across chat messages. Two scopes: Session (instant client-side filtering of loaded messages with match navigation and message highlighting) and Project (extension-side raw string search across JSONL session files with 300ms debounce, cancellation, max 50 results). Activated via StatusBar > Session > Search or `Ctrl+Shift+F`. Backend: `ChatSearchService`. Frontend: `ChatSearchBar`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CHAT_SEARCH.md`
+
+**Remote Server & Data Capture** -- Technical reference for two future capabilities: (1) sending/receiving/displaying text from a remote server by swapping `ClaudeProcessManager` for a `RemoteProcessManager` (WebSocket/SSE), and (2) capturing all data flowing through the extension via a `TranscriptRecorder` class tapping into `wireProcessEvents()`. Documents all interception points, wire protocol requirements, storage options, and the exact seams where the architecture supports extension.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/REMOTE_SERVER_AND_DATA_CAPTURE.md`
 
 **Happy Provider (remote)** -- Integration with Happy Coder, an external remote AI coding relay that enables cross-device Claude Code sessions (local-to-mobile and back). ClaUi's role is a thin CLI-swap layer: the internal provider id remains `'remote'`, and the implementation reuses the standard `SessionTab` + `ClaudeProcessManager` pipeline, only swapping the executable path to Happy CLI via `ProcessStartOptions.cliPathOverride`. All remote/mobile capabilities are handled by the external Happy CLI and its relay server, not by ClaUi. Auth flow uses QR code / device auth via `happy auth` in a VS Code terminal (`claudeMirror.authenticateHappy`), and `SessionTab` detects auth-required stderr patterns to show targeted guidance.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/REMOTE_SESSIONS.md`
@@ -1174,6 +1202,98 @@ New setting in `package.json`:
 ### Detail Doc
 
 - `Kingdom_of_Claudes_Beloved_MDs/CODEX_FAST_MODE.md`
+
+---
+
+## 2026-05-11 - Multi-Participant Phase 1 Protocol Foundation
+
+### Updated Components
+
+- `server/src/types.ts`
+  - Added A2A approval/guard protocol messages, typing/activity messages, workspace file change/conflict contracts, rename events, `AgentLoopControlState`, `ApprovalEvent`, and `TypingState`.
+  - Extended session/delivery policy fields with `agentMode`, `allowRemoteSteer`, `AgentBusyPolicy`, and `notDeliveredReason`.
+- `src/extension/multiparticipant/MultiParticipantProtocol.ts`
+  - Mirrored the server WebSocket contracts with `MP*` client-side types.
+- `src/extension/types/webview-messages.ts`
+  - Added future React multi-participant `mp*` postMessage contracts for session state, participants, messages, delivery state, streaming, A2A approvals, guard stops, activity, rename, conflicts, and join/errors.
+- `src/extension/multiparticipant/AgentBridge.ts` and `HeadlessAgentRunner.ts`
+  - Use the shared multi-participant busy-policy type so the expanded protocol compiles.
+- `server/src/CoordinationServer.ts`
+  - Initializes the new required session and delivery policy fields while preserving existing Phase 0 runtime behavior.
+
+### Runtime Notes
+
+- This phase is type-only. The new protocol shapes compile and are documented, but runtime behavior for A2A gates, typing relay, rename handling, file conflict warnings, and the React multi-participant UI remains in later phases.
+- No manifest commands, menus, keybindings, or settings changed in this phase.
+
+---
+
+## 2026-05-11 - Multi-Participant Phase 2 Track D (Webview Store + React Components)
+
+### New Files
+
+- `src/webview/components/MultiParticipant/ParticipantList.tsx` -- Sidebar component showing all session participants with status dots, kind badges (H/A), provider icons (C/X), route key labels, typing indicators
+- `src/webview/components/MultiParticipant/JoinDialog.tsx` -- Modal join form with human name, agent name, provider selector, server URL input. Client-side validation (non-empty, max 32 chars) and server error display
+- `src/webview/components/MultiParticipant/ConflictWarning.tsx` -- Dismissable banner for file conflict warnings showing conflicting file paths and agents
+- `src/webview/components/MultiParticipant/MpMessageBubble.tsx` -- MP-specific message renderer with deterministic author color from participantId hash, kind badge, delivery status dots, streaming text overlay, RTL support
+- `src/webview/components/MultiParticipant/mpColors.ts` -- 12-color palette with `hashParticipantColor()` for deterministic participant-to-color mapping
+- `src/webview/components/MultiParticipant/index.ts` -- Barrel exports
+
+### Updated Files
+
+- `src/webview/state/store.ts`
+  - Added MP state slice: `mpConnectionStatus`, `mpSession`, `mpParticipants`, `mpMessages`, `mpMyHumanId`, `mpMyAgentId`, `mpApprovals`, `mpTypingStates`, `mpFileConflicts`, `mpStreamingTexts`, `mpDeliveryStatuses`, `mpJoinDialogOpen`, `mpJoinError`, `mpRenameError`, `mpDismissedConflictIds`
+  - Added all MP actions: `setMpConnectionStatus`, `setMpSession`, `addMpMessage`, `setMpParticipants`, `updateMpParticipant`, `removeMpParticipant`, `setMpDeliveryStatus`, `appendMpStreamingText`, `addMpApprovalEvent`, `resolveMpApproval`, `setMpFileConflict`, `dismissMpConflict`, `setMpTypingState`, `setMpJoinDialogOpen`, `setMpJoinError`, `setMpRenameError`, `clearMpState`
+  - All MP state is cleared in `reset()`
+- `src/webview/hooks/useClaudeStream.ts`
+  - Added dispatch handlers for all 16 `mp*` ExtensionToWebview message types mapping to corresponding store actions
+
+### Runtime Notes
+
+- Track D is webview-only. Components can be tested with mock data via the Zustand store without a running server or WebSocket connection.
+- No manifest commands, menus, keybindings, or settings changed in this track.
+- Phase 4 will integrate these components into App.tsx via a `tabKind: 'multiParticipant'` discriminator.
+
+### Detail Doc
+
+- `Kingdom_of_Claudes_Beloved_MDs/MULTI_PARTICIPANT.md`
+
+---
+
+## 2026-05-11 - Multi-Participant Phase 2 Tracks A-C (Server + Extension Host)
+
+### New Files
+
+- `server/src/LoopController.ts` -- A2A loop protection state machine with ask/budget/always/force modes, budget counting, approval event lifecycle, guard-check triggering
+- `server/src/GuardService.ts` -- One-shot LLM call to detect unproductive A2A loops (Anthropic API, 10s timeout, fail-safe STOP)
+- `server/src/SessionPersistence.ts` -- Append-only JSONL persistence per session with replay-on-startup
+- `src/extension/multiparticipant/FileChangeTracker.ts` -- Dual-strategy file change detection: Claude tool-use event interception (Edit/MultiEdit/Write/NotebookEdit) and Codex filesystem snapshot mtime diffing with command heuristic parsing
+
+### Updated Files
+
+- `src/extension/multiparticipant/HeadlessAgentRunner.ts`
+  - Creates FileChangeTracker with workspace root, attaches to Claude StreamDemux and Codex CodexExecDemux
+  - Calls `startTurn`/`finishTurn` lifecycle, takes snapshot before Codex turns, diffs after completion
+  - New event: `fileChanges` in `HeadlessAgentRunnerEvents`
+- `src/extension/multiparticipant/AgentBridge.ts`
+  - Handles `cancelAgent` server messages with agent participant filtering
+  - Forwards `fileChanges` from runner as `fileChangeReport` to server with workspace metadata
+- `src/extension/multiparticipant/MultiParticipantSessionTab.ts`
+  - New server message handlers: `participantRenamed`, `participantActivity`, `agentToAgentApproval`, `fileConflictWarning`, `guardStop`, `approvalResolved`
+  - New webview message handlers: `approvalDecision`, `dismissConflict`
+  - Tracks `activityStates`, `pendingApprovals`, `activeConflicts` in state
+  - Inline HTML webview: activity indicators, notification banners (approval/guard/conflict/info), A2A approval action buttons (Deny/Allow 5/Always/Force)
+- `server/src/CoordinationServer.ts`
+  - Integrates LoopController, GuardService, SessionPersistence; handles typing relay, rename, JSONL write-through
+
+### Runtime Notes
+
+- Tracks A and B are server-side. Track C adds extension host behavior (file tracking, cancel, and UI notifications).
+- No manifest commands, menus, keybindings, or settings changed.
+
+### Detail Doc
+
+- `Kingdom_of_Claudes_Beloved_MDs/MULTI_PARTICIPANT.md`
 
 ---
 
