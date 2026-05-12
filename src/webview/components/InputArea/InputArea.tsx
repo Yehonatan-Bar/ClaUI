@@ -129,6 +129,9 @@ export const InputArea: React.FC = () => {
     handoffStage,
     handoffTargetProvider,
     silentResumeActive,
+    goalActive,
+    goalObjective,
+    setGoalActive,
   } = useAppStore();
   const fileMention = useFileMention(textareaRef);
 
@@ -979,6 +982,13 @@ export const InputArea: React.FC = () => {
     postToExtension({ type: 'clearSession' });
   }, []);
 
+  const handleClearGoal = useCallback(() => {
+    if (!isConnected) return;
+    postToExtension({ type: 'sendMessage', text: '/goal clear' });
+    setGoalActive(false, '');
+    postToExtension({ type: 'setGoalState', active: false, objective: '' } as any);
+  }, [isConnected, setGoalActive]);
+
   const persistUltrathinkMode = useCallback((mode: 'off' | 'single' | 'locked') => {
     setUltrathinkMode(mode);
     postToExtension({ type: 'setUltrathinkMode', mode } as any);
@@ -1589,6 +1599,23 @@ export const InputArea: React.FC = () => {
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {goalActive && (
+        <div className="goal-active-banner">
+          <span className="goal-active-label">Goal:</span>
+          <span className="goal-active-text" data-tooltip={goalObjective}>
+            {goalObjective.length > 80 ? goalObjective.slice(0, 77) + '...' : goalObjective}
+          </span>
+          <button
+            className="goal-clear-btn"
+            onClick={handleClearGoal}
+            disabled={!isConnected}
+            data-tooltip="Clear goal (/goal clear)"
+          >
+            x
+          </button>
         </div>
       )}
 

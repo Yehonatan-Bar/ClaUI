@@ -999,6 +999,7 @@ export type WebviewToExtensionMessage =
   | SetSummaryModeEnabledRequest
   | SetVpmEnabledRequest
   | SetUltrathinkModeRequest
+  | SetGoalStateRequest
   | StartBtwSessionRequest
   | SendBtwMessageRequest
   | CloseBtwSessionRequest
@@ -1598,6 +1599,13 @@ export interface SetUltrathinkModeRequest {
   mode: 'off' | 'single' | 'locked';
 }
 
+/** Webview -> Extension: persist goal state at project level */
+export interface SetGoalStateRequest {
+  type: 'setGoalState';
+  active: boolean;
+  objective: string;
+}
+
 /** Extension -> Webview: send Visual Progress Mode setting */
 export interface VpmSettingMessage {
   type: 'vpmSetting';
@@ -1637,6 +1645,13 @@ export interface SummaryModeSettingMessage {
 export interface UltrathinkModeSettingMessage {
   type: 'ultrathinkModeSetting';
   mode: 'off' | 'single' | 'locked';
+}
+
+/** Extension -> Webview: send goal state (project-level) */
+export interface GoalStateSettingMessage {
+  type: 'goalStateSetting';
+  active: boolean;
+  objective: string;
 }
 
 /** Extension -> Webview: tell the webview to focus the input textarea */
@@ -2461,6 +2476,7 @@ export type ExtensionToWebviewMessage =
   | VisualProgressCardMessage
   | VisualProgressCardUpdateMessage
   | UltrathinkModeSettingMessage
+  | GoalStateSettingMessage
   | FocusInputMessage
   | BtwSessionStartedMessage
   | BtwUserMessageMessage

@@ -37,6 +37,9 @@ export const StatusBar: React.FC<{
   const [usagePopoverOpen, setUsagePopoverOpen] = React.useState(false);
   const [usageLoading, setUsageLoading] = React.useState(false);
   const usageRef = React.useRef<HTMLDivElement>(null);
+  const [goalOpen, setGoalOpen] = React.useState(false);
+  const [goalInputText, setGoalInputText] = React.useState('');
+  const goalRef = React.useRef<HTMLDivElement>(null);
   const {
     gitPushSettings,
     gitPushRunning,
@@ -85,6 +88,9 @@ export const StatusBar: React.FC<{
     mcpLastError,
     setMcpPanelOpen,
     setMcpSelectedTab,
+    goalActive,
+    goalObjective,
+    setGoalActive,
   } = useAppStore();
 
   const { barRef, layoutMode, hideClockFromBar, hideMcpFromBar, hideUsageFromBar } = useStatusBarCollapse();
@@ -115,6 +121,7 @@ export const StatusBar: React.FC<{
   useOutsideClick('statusbar-vitals', vitalsInfoRef, vitalsInfoOpen, () => setVitalsInfoOpen(false));
   useOutsideClick('statusbar-babelfish', babelFishRef, babelFishOpen, () => setBabelFishOpen(false));
   useOutsideClick('statusbar-usage', usageRef, usagePopoverOpen, () => setUsagePopoverOpen(false));
+  useOutsideClick('statusbar-goal', goalRef, goalOpen, () => setGoalOpen(false));
 
   // Close all group dropdowns when layout mode changes
   useEffect(() => {
@@ -219,6 +226,33 @@ export const StatusBar: React.FC<{
   const handleFeedbackAction = (action: 'bug' | 'feature' | 'email' | 'fullBugReport') => {
     postToExtension({ type: 'feedbackAction', action });
   };
+
+  const handleSetGoal = React.useCallback(() => {
+    const trimmed = goalInputText.trim();
+    if (!trimmed || !isConnected) return;
+    postToExtension({ type: 'sendMessage', text: `/goal ${trimmed}` });
+    setGoalActive(true, trimmed);
+    postToExtension({ type: 'setGoalState', active: true, objective: trimmed } as any);
+    setGoalInputText('');
+    setGoalOpen(false);
+    closeAllGroups();
+  }, [goalInputText, isConnected, setGoalActive, closeAllGroups]);
+
+  const handleClearGoal = React.useCallback(() => {
+    if (!isConnected) return;
+    postToExtension({ type: 'sendMessage', text: '/goal clear' });
+    setGoalActive(false, '');
+    postToExtension({ type: 'setGoalState', active: false, objective: '' } as any);
+    setGoalOpen(false);
+    closeAllGroups();
+  }, [isConnected, setGoalActive, closeAllGroups]);
+
+  const handleCheckGoalStatus = React.useCallback(() => {
+    if (!isConnected) return;
+    postToExtension({ type: 'sendMessage', text: '/goal' });
+    setGoalOpen(false);
+    closeAllGroups();
+  }, [isConnected, closeAllGroups]);
 
   const handleGitPush = () => {
     if (!gitPushSettings?.enabled) {
@@ -574,6 +608,60 @@ export const StatusBar: React.FC<{
           Consult Codex
         </button>
       )}
+      <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={goalRef}>
+        <button
+          className={`status-bar-goal-btn${goalActive ? ' active' : ''}`}
+          onClick={() => setGoalOpen((prev) => !prev)}
+          disabled={!isConnected}
+          data-tooltip={goalActive ? `Goal active: ${goalObjective.slice(0, 40)}` : 'Set autonomous goal'}
+        >
+          Goal{goalActive ? ' (Active)' : ''}
+        </button>
+        {goalOpen && (
+          <div className="goal-popover">
+            {goalActive ? (
+              <>
+                <div className="goal-popover-header">Active Goal</div>
+                <div className="goal-popover-objective">{goalObjective}</div>
+                <div className="goal-popover-actions">
+                  <button className="goal-popover-check" onClick={handleCheckGoalStatus} disabled={!isConnected}>
+                    Check Status
+                  </button>
+                  <button className="goal-popover-clear" onClick={handleClearGoal} disabled={!isConnected}>
+                    Clear Goal
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="goal-popover-header">Set Goal</div>
+                <p className="goal-popover-desc">Define an objective and completion condition. The AI will work autonomously until the goal is met.</p>
+                <textarea
+                  className="goal-popover-input"
+                  placeholder="Describe the objective and completion condition..."
+                  value={goalInputText}
+                  onChange={(e) => setGoalInputText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      handleSetGoal();
+                    }
+                  }}
+                  rows={4}
+                  autoFocus
+                />
+                <button
+                  className="goal-popover-submit"
+                  onClick={handleSetGoal}
+                  disabled={!goalInputText.trim() || !isConnected}
+                >
+                  Set Goal (Ctrl+Enter)
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
       <div className="status-bar-group-dropdown-separator" />
       <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" style={{ fontWeight: 600, opacity: 0.7 }}>
         Smart Search - Claude

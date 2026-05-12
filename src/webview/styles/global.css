@@ -1091,6 +1091,182 @@ html, body, #root {
   100% { opacity: 0; width: 0; }
 }
 
+/* ── Goal Button (StatusBar Tools dropdown) ── */
+.status-bar-goal-btn {
+  background: none;
+  border: none;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  width: 100%;
+  text-align: left;
+}
+.status-bar-goal-btn:hover:not(:disabled) {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+.status-bar-goal-btn.active {
+  color: #3fb950;
+  font-weight: 600;
+}
+.status-bar-goal-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Goal Popover ── */
+.goal-popover {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  min-width: 280px;
+  max-width: 360px;
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 6px;
+  padding: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+}
+.goal-popover-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+  margin-bottom: 8px;
+}
+.goal-popover-desc {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+.goal-popover-objective {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  padding: 6px 8px;
+  background: var(--vscode-input-background, #3c3c3c);
+  border-radius: 4px;
+  margin-bottom: 8px;
+  word-break: break-word;
+  max-height: 100px;
+  overflow-y: auto;
+  line-height: 1.4;
+}
+.goal-popover-input {
+  width: 100%;
+  font-size: 12px;
+  padding: 6px 8px;
+  background: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #cccccc);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  resize: vertical;
+  margin-bottom: 8px;
+  font-family: inherit;
+  box-sizing: border-box;
+  line-height: 1.4;
+}
+.goal-popover-input:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder);
+}
+.goal-popover-submit {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 12px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.goal-popover-submit:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+}
+.goal-popover-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.goal-popover-actions {
+  display: flex;
+  gap: 6px;
+}
+.goal-popover-check,
+.goal-popover-clear {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid var(--vscode-button-border, transparent);
+}
+.goal-popover-check {
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+}
+.goal-popover-check:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground, #45494e);
+}
+.goal-popover-clear {
+  background: transparent;
+  color: #f85149;
+  border-color: #f85149;
+}
+.goal-popover-clear:hover:not(:disabled) {
+  background: rgba(248, 81, 73, 0.1);
+}
+.goal-popover-check:disabled,
+.goal-popover-clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Goal Active Banner (above InputArea) ── */
+.goal-active-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: rgba(63, 185, 80, 0.08);
+  border: 1px solid rgba(63, 185, 80, 0.2);
+  border-radius: 4px;
+  margin-bottom: 4px;
+  color: var(--vscode-foreground);
+}
+.goal-active-label {
+  font-weight: 600;
+  color: #3fb950;
+  flex-shrink: 0;
+}
+.goal-active-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-descriptionForeground);
+}
+.goal-clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+.goal-clear-btn:hover:not(:disabled) {
+  opacity: 1;
+  color: #f85149;
+}
+.goal-clear-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 /* ── Ultrathink Glow: Animated rainbow text in chat messages ── */
 /* Base glow styles shared by all variants */
 .ultrathink-glow {

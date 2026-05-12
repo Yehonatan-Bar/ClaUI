@@ -186,7 +186,7 @@
     <div class="flow-diagram">
       <div class="flow-step">
         <span class="step-num">1</span>
-        <span class="step-text"><strong>לחיצה על כפתור Goal</strong> -- כפתור מטרה בסרגל הכלים (ליד כפתור Ultrathink)</span>
+        <span class="step-text"><strong>פתיחת תפריט Tools</strong> -- בשורת הסטטוס למטה, לחיצה על "Tools" ובחירת "Goal"</span>
       </div>
       <div class="flow-arrow">v</div>
       <div class="flow-step">
@@ -246,18 +246,18 @@
         <th>תיאור</th>
       </tr>
       <tr>
-        <td><strong>כפתור Goal</strong></td>
-        <td>סרגל הכלים (ליד Ultrathink)</td>
-        <td>כפתור מטרה שזוהר בירוק כשיעד פעיל</td>
+        <td><strong>פריט Goal בתפריט Tools</strong></td>
+        <td>שורת סטטוס > Tools</td>
+        <td>פריט בתפריט שמציג "(Active)" כשיעד פעיל</td>
       </tr>
       <tr>
         <td><strong>חלונית הגדרת יעד</strong></td>
-        <td>מעל הכפתור (Popover)</td>
+        <td>נפתחת מתוך פריט Goal</td>
         <td>שדה טקסט + כפתור "Set Goal"</td>
       </tr>
       <tr>
         <td><strong>חלונית יעד פעיל</strong></td>
-        <td>מעל הכפתור (Popover)</td>
+        <td>נפתחת מתוך פריט Goal</td>
         <td>מציג את היעד + "Check Status" + "Clear Goal"</td>
       </tr>
       <tr>
@@ -276,8 +276,8 @@
       </tr>
       <tr>
         <td>מיקום הכפתור</td>
-        <td>ליד Ultrathink</td>
-        <td>זה האזור שבו נמצאים כלים שמשנים את אופן העבודה</td>
+        <td>תפריט Tools בשורת הסטטוס</td>
+        <td>תפריט Tools הוא המקום הטבעי לכלים שמשנים את אופן העבודה</td>
       </tr>
       <tr>
         <td>הזנת טקסט</td>
@@ -325,8 +325,12 @@
           <td><span class="badge badge-yellow">עדכון</span> שמירה + שחזור</td>
         </tr>
         <tr>
+          <td>שורת סטטוס (StatusBar)</td>
+          <td><span class="badge badge-blue">הוספה</span> פריט Goal + חלונית בתפריט Tools</td>
+        </tr>
+        <tr>
           <td>אזור קלט (InputArea)</td>
-          <td><span class="badge badge-blue">הוספה</span> כפתור + חלונית + באנר</td>
+          <td><span class="badge badge-blue">הוספה</span> באנר יעד פעיל</td>
         </tr>
         <tr>
           <td>עיצוב (CSS)</td>
@@ -352,7 +356,7 @@
       <h3>סיכום</h3>
       <p>
         פיצ'ר Goal מוסיף ל-ClaUi את היכולת לנהל משימות ארוכות באופן אוטונומי.
-        המימוש קל יחסית (7 קבצים, שינויים מבוססי דפוס קיים) כי שני ספקי ה-AI כבר
+        המימוש קל יחסית (8 קבצים, שינויים מבוססי דפוס קיים) כי שני ספקי ה-AI כבר
         תומכים בפקודת <code>/goal</code> -- ClaUi רק מספק ממשק גרפי נוח ושמירת מצב.
       </p>
       <p>

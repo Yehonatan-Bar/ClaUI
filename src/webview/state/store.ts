@@ -285,6 +285,10 @@ export interface AppState {
   // Persisted via workspaceState at project level.
   ultrathinkMode: 'off' | 'single' | 'locked';
 
+  // Goal mode: autonomous objective tracking. Persisted via workspaceState.
+  goalActive: boolean;
+  goalObjective: string;
+
   // Restore-sessions-on-startup toggle (mirrors claudeMirror.restoreSessionsOnStartup)
   restoreSessionsEnabled: boolean;
 
@@ -666,6 +670,7 @@ export interface AppState {
   setDetailedDiffEnabled: (enabled: boolean) => void;
   addWriteOldContent: (toolUseId: string, filePath: string, oldContent: string) => void;
   setUltrathinkMode: (mode: 'off' | 'single' | 'locked') => void;
+  setGoalActive: (active: boolean, objective: string) => void;
   setVitalsEnabled: (enabled: boolean) => void;
   setTabLayout: (layout: 'horizontal' | 'vertical') => void;
   setOpenTabs: (tabs: WebviewTabSummary[], activeTabId: string | null) => void;
@@ -1006,6 +1011,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   detailedDiffEnabled: false,
   writeOldContentByToolId: {},
   ultrathinkMode: 'off' as 'off' | 'single' | 'locked',
+  goalActive: false,
+  goalObjective: '',
   tabLayout: 'horizontal' as 'horizontal' | 'vertical',
   openTabs: [],
   activeTabId: null,
@@ -2127,6 +2134,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setUltrathinkMode: (mode) => set({ ultrathinkMode: mode }),
 
+  setGoalActive: (active, objective) => set({ goalActive: active, goalObjective: objective }),
+
   setTabLayout: (layout) => set({ tabLayout: layout }),
   setOpenTabs: (tabs, activeTabId) => set({ openTabs: tabs, activeTabId }),
 
@@ -2722,6 +2731,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       detailedDiffEnabled: state.detailedDiffEnabled,
       writeOldContentByToolId: {},
       ultrathinkMode: state.ultrathinkMode,
+      goalActive: state.goalActive,
+      goalObjective: state.goalObjective,
       vitalsEnabled: state.vitalsEnabled,
       weatherWidgetEnabled: state.weatherWidgetEnabled,
       adventureEnabled: state.adventureEnabled,

@@ -725,6 +725,10 @@ export class CodexMessageHandler {
           void vscode.workspace.getConfiguration('claudeMirror').update('typingTheme', msg.theme, true);
           break;
 
+        case 'setGoalState':
+          this.log(`Goal state update (Codex): active=${msg.active}`);
+          break;
+
         case 'setTabLayout':
           this.log(`Setting tab layout to: "${msg.layout}" (Codex handler)`);
           void vscode.workspace

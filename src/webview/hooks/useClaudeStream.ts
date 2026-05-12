@@ -752,6 +752,10 @@ export function useClaudeStream(): void {
           setUltrathinkMode(msg.mode);
           break;
 
+        case 'goalStateSetting':
+          useAppStore.getState().setGoalActive(msg.active, msg.objective);
+          break;
+
         case 'vitalsSetting':
           setVitalsEnabled(msg.enabled);
           break;
