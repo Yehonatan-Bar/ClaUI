@@ -26,6 +26,7 @@ import {
 } from './OpenTabsSnapshot';
 import type { ProcessMemorySampler } from '../process/ProcessMemorySampler';
 import type { TabGroupStore } from './TabGroupStore';
+import { MultiParticipantSessionTab } from '../multiparticipant/MultiParticipantSessionTab';
 
 /** Distinct colors for tab header bars, cycling through the palette */
 const TAB_COLORS = [
@@ -44,7 +45,7 @@ const SMART_SEARCH_COLOR = '#FF00C8';
 
 const HANDOFF_COOLDOWN_MS = 4_000;
 
-type ManagedTab = SessionTab | CodexSessionTab;
+type ManagedTab = SessionTab | CodexSessionTab | MultiParticipantSessionTab;
 
 export interface TabSummary {
   id: string;
@@ -73,6 +74,9 @@ export class TabManager {
 
   /** Shared workstream manager, injected after construction to avoid circular dependency */
   workstreamManager: import('../workstream/WorkstreamManager').WorkstreamManager | null = null;
+
+  /** Shared Local Boost service, injected after construction */
+  localBoostService: import('../local-boost/LocalBoostService').LocalBoostService | null = null;
 
   private readonly snapshotStore: OpenTabsSnapshotStore;
   private readonly snapshotEntries = new Map<string, OpenTabSnapshotEntry>();
@@ -316,6 +320,9 @@ export class TabManager {
     if (this.workstreamManager) {
       tab.setWorkstreamManager(this.workstreamManager);
     }
+    if (this.localBoostService) {
+      tab.setLocalBoostService(this.localBoostService);
+    }
     tab.setSessionStore(this.sessionStore);
     tab.setOpenTabSessionIdsGetter(() => this.getOpenTabSessionIds());
     this.seedSnapshotEntry(tab);
@@ -371,6 +378,9 @@ export class TabManager {
     if (this.workstreamManager) {
       tab.setWorkstreamManager(this.workstreamManager);
     }
+    if (this.localBoostService) {
+      tab.setLocalBoostService(this.localBoostService);
+    }
     tab.setSessionStore(this.sessionStore);
     tab.setOpenTabSessionIdsGetter(() => this.getOpenTabSessionIds());
     this.seedSnapshotEntry(tab);
@@ -396,6 +406,47 @@ export class TabManager {
       this.schedulePersistSnapshot();
     }
     this.log(`Happy provider tab created: ${tab.id} cliPath=${happyCliPath}`);
+    return tab;
+  }
+
+  /** Create a new Multi-Participant session tab managed by this TabManager. */
+  createMultiParticipantTab(
+    serverUrl: string,
+    agentProvider: 'claude' | 'codex',
+    viewColumnOverride?: vscode.ViewColumn,
+  ): MultiParticipantSessionTab {
+    const tabNumber = this.nextTabNumber++;
+    const tabColor = TAB_COLORS[(tabNumber - 1) % TAB_COLORS.length];
+    const viewColumn = viewColumnOverride ?? this.resolveViewColumnForNewTab();
+
+    if (this.tabs.size >= 1) {
+      void vscode.workspace
+        .getConfiguration('workbench.editor')
+        .update('wrapTabs', true, vscode.ConfigurationTarget.Global);
+    }
+
+    const tabId = `mp-${Date.now()}-${tabNumber}`;
+    const tab = new MultiParticipantSessionTab(
+      tabId,
+      tabNumber,
+      serverUrl,
+      agentProvider,
+      this.context,
+      {
+        onClosed: (id) => this.handleTabClosed(id),
+        onFocused: (id) => this.handleTabFocused(id),
+      },
+      this.log,
+      viewColumn,
+    );
+
+    this.tabs.set(tab.id, tab);
+    this.tabSlotColors.set(tab.id, tabColor);
+    this.activeTabId = tab.id;
+    this.seedSnapshotEntry(tab);
+    this.treeChangeEmitter.fire();
+    this.broadcastTabsState();
+    this.log(`MP tab created: ${tab.id} color=${tabColor} column=${viewColumn} server=${serverUrl} (total: ${this.tabs.size})`);
     return tab;
   }
 
@@ -554,6 +605,10 @@ export class TabManager {
     const sourceTab = request.sourceTabId ? this.getTabById(request.sourceTabId) : this.getActiveTab();
     if (!sourceTab) {
       throw new Error('No source tab found for provider handoff.');
+    }
+
+    if (sourceTab instanceof MultiParticipantSessionTab) {
+      throw new Error('Multi-participant tabs do not support provider handoff.');
     }
 
     const enabled = vscode.workspace.getConfiguration('claudeMirror').get<boolean>('handoff.enabled', true);
@@ -790,7 +845,7 @@ export class TabManager {
     }
   }
 
-  private wrapHandoffTargetRuntime(tab: ManagedTab): HandoffTargetRuntime {
+  private wrapHandoffTargetRuntime(tab: SessionTab | CodexSessionTab): HandoffTargetRuntime {
     return {
       id: tab.id,
       get sessionId() {
@@ -1066,7 +1121,7 @@ export class TabManager {
     this.isRestoringSnapshot = true;
     let restored = 0;
     let failed = 0;
-    const lazyTabs: ManagedTab[] = [];
+    const lazyTabs: (SessionTab | CodexSessionTab)[] = [];
     // Pin every restored tab into the same editor column while panels are
     // being recreated. If vertical mode is active, a post-restore pass
     // collapses stale editor rows and refreshes the in-webview tab rail.
@@ -1206,7 +1261,7 @@ export class TabManager {
     }
     for (const tab of this.tabs.values()) {
       const sid = tab.sessionId ?? '';
-      const tabKind = tab.getTabKind?.() === 'search' ? 'search' : undefined;
+      const tabKind = (tab as { getTabKind?: () => string }).getTabKind?.() === 'search' ? 'search' : undefined;
       const originalChat = sid ? originalBySessionId.get(sid) : undefined;
       const originalSearch = tabKind === 'search'
         ? originalSearchByTabNumber.get(tab.tabNumber)

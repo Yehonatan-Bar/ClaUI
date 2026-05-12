@@ -37,7 +37,7 @@ User-facing documentation (features, shortcuts, settings): see [README.md](READM
 claude-code-mirror/
 +-- package.json                          # Extension manifest, commands, settings, Activity Bar views
 +-- tsconfig.json                         # TypeScript config (ES2022, JSX)
-+-- webpack.config.js                     # Dual-target: extension (Node) + webview (browser)
++-- webpack.config.js                     # Triple-target: extension (Node) + webview (browser) + local-boost-runtime (Node)
 +-- .vscodeignore
 +-- dist/                                 # Build output
 |   +-- extension.js                      #   Extension host bundle (15 KB)
@@ -159,10 +159,38 @@ claude-code-mirror/
 |   |   |   +-- ExternalWorkFolderIngestor.ts # Explicit folder import for external docs as workstreams
 |   |   |   +-- UserPortfolioStore.ts     #   Cross-project portfolio persistence (globalState, max 30 projects)
 |   |   |   +-- UserPortfolioManager.ts   #   Portfolio orchestrator: health scoring, resume algorithm, path validation
+|   |   +-- local-boost/
+|   |   |   +-- LocalBoostTypes.ts        #   Shared types, version constants, settings interface
+|   |   |   +-- LocalBoostSettings.ts     #   VS Code settings reader (claudeMirror.localBoost.*)
+|   |   |   +-- LocalBoostService.ts      #   Top-level service (lifecycle, initialization, disposal)
+|   |   |   +-- LocalBoostInstaller.ts    #   Runtime directory setup, launcher script generation
+|   |   |   +-- LocalBoostEnvBuilder.ts   #   Agent env var injection (PATH prepend, CLAUI_LOCAL_BOOST_*)
+|   |   |   +-- LocalBoostContextStore.ts #   Per-tab context JSON files (atomic writes)
+|   |   |   +-- LocalBoostTraceReader.ts  #   Trace reading, aggregation, 3-tier retention cleanup
+|   |   |   +-- LocalBoostDailyReportGenerator.ts # Idempotent daily aggregate reports
+|   |   |   +-- LocalBoostHookManager.ts  #   Install/uninstall Claude & Codex hooks
 |   |   +-- types/
 |   |       +-- stream-json.ts            #   CLI protocol type definitions
 |   |       +-- webview-messages.ts       #   postMessage contract, including future multi-participant React `mp*` messages
 |   |       +-- workstreamTypes.ts        #   Workstream map data model (enums, interfaces, constants)
+|   +-- local-boost-runtime/               # Standalone CLI runner (separate webpack target, no VS Code deps)
+|   |   +-- cli.ts                        #   claui-run entry point (decode, execute, redact, filter, trace)
+|   |   +-- SecretRedactor.ts             #   Env-value scanning + regex rules, fail-closed
+|   |   +-- CommandEligibility.ts         #   Allow/deny list, pipeline detection, command family classification
+|   |   +-- CommandTraceWriter.ts         #   Atomic trace file writing
+|   |   +-- executeShellCommand.ts        #   Shell spawn with byte caps, signal forwarding, Windows taskkill
+|   |   +-- NoNetworkGuard.ts             #   Blocks fetch/http/https/net/dgram at require level
+|   |   +-- filters/
+|   |   |   +-- OutputFilterRegistry.ts   #   Filter registry, token estimation, output header builder
+|   |   |   +-- GenericFilter.ts          #   Fallback: ANSI strip, dedup, head/tail, budget caps
+|   |   |   +-- JavaScriptPackageFilter.ts #  npm/pnpm/yarn/bun output compression
+|   |   |   +-- PytestFilter.ts           #   pytest output compression (preserves failures/tracebacks)
+|   |   |   +-- JestVitestFilter.ts       #   jest/vitest output compression
+|   |   |   +-- TypeScriptFilter.ts       #   tsc diagnostic grouping and capping
+|   |   |   +-- EslintFilter.ts           #   eslint issue grouping and capping
+|   |   +-- hooks/
+|   |       +-- claudePreToolUse.ts       #   Claude pre-tool-use hook (rewrites Bash to claui-run)
+|   |       +-- codexPreToolUse.ts        #   Codex pre-tool-use hook (deny + retry pattern)
 |   +-- webview/                          # React webview code (browser context)
 |       +-- index.tsx                     #   React entry point
 |       +-- App.tsx                       #   Main app with welcome/chat/status (StatusBar extracted to components/StatusBar/)
@@ -248,6 +276,7 @@ claude-code-mirror/
 |       |   |   |   +-- ProjectTokensTab.tsx    #  Project: Aggregated token breakdown
 |       |   |   |   +-- ProjectToolsTab.tsx     #  Project: Aggregated tool/category/task type
 |       |   |   |   +-- UsageTab.tsx           #     Session: Usage widget (quota % per bucket)
+|       |   |   |   +-- LocalBoostTab.tsx       #     Session: Local Boost settings + aggregate stats
 |       |   |   |   +-- TokenRatioTab.tsx      #     User: Token-usage ratio tracker (tokens per 1%)
 |       |   |   |   +-- MemoryTab.tsx          #     User: Live VS Code/extension/CLI memory monitor (RSS over time)
 |       |   |   +-- charts/
@@ -313,6 +342,11 @@ claude-code-mirror/
 |       |   |   +-- layout.ts               #   Deterministic lane-based SVG layout algorithm
 |       |   |   +-- visualEncoding.ts        #   Status colors, shapes, sizes, line styles
 |       |   |   +-- animations.ts            #   CSS keyframe definitions
+|       |   +-- LocalBoost/
+|       |   |   +-- LocalBoostStatusBadge.tsx  # StatusBar badge (green/red dot + summary text)
+|       |   |   +-- LocalBoostSettingsPanel.tsx # Toggle, hook management, status info
+|       |   |   +-- LocalBoostTracePanel.tsx    # Aggregate stats cards (commands, tokens, compression)
+|       |   |   +-- LocalBoostTraceDetail.tsx   # Single trace detail card
 |       |   +-- TextSettingsBar/
 |       |       +-- TextSettingsBar.tsx   #   Font size/family/theme controls
 |       +-- styles/
@@ -350,6 +384,7 @@ claude-code-mirror/
     +-- FILE_LOGGER.md                    #   File-based logging with rotation and rename
     +-- FILE_MENTION.md                   #   @ file mention autocomplete feature
     +-- GIT_PUSH_BUTTON.md               #   Git push button and configuration
+    +-- LOCAL_BOOST.md                    #   Local command output compression feature
     +-- MARKDOWN_RENDERING.md            #   Markdown rendering pipeline (marked + DOMPurify)
     +-- MCP_SUPPORT.md                  #   Implemented MCP visibility + management model
     +-- MCP_SUPPORT_PLAN.md             #   MCP product, UX, and architecture roadmap for ClaUi
@@ -595,6 +630,9 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **Happy Provider (remote)** -- Integration with Happy Coder, an external remote AI coding relay that enables cross-device Claude Code sessions (local-to-mobile and back). ClaUi's role is a thin CLI-swap layer: the internal provider id remains `'remote'`, and the implementation reuses the standard `SessionTab` + `ClaudeProcessManager` pipeline, only swapping the executable path to Happy CLI via `ProcessStartOptions.cliPathOverride`. All remote/mobile capabilities are handled by the external Happy CLI and its relay server, not by ClaUi. Auth flow uses QR code / device auth via `happy auth` in a VS Code terminal (`claudeMirror.authenticateHappy`), and `SessionTab` detects auth-required stderr patterns to show targeted guidance.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/REMOTE_SESSIONS.md`
 
+**Local Boost** -- Local-only command output compressor that intercepts Bash commands from coding agents (Claude/Codex), routes eligible commands through a `claui-run` CLI, redacts secrets, filters/compresses noisy output, preserves exit codes, and writes trace files for analytics. Architecture: extension-side service (`LocalBoostService`) manages lifecycle, installer, context store, trace reader, hook manager, and daily reports. A standalone CLI runner (`claui-run`, separate webpack target) executes commands in isolation with no network access. Pre-tool-use hooks rewrite eligible Bash commands to route through `claui-run` with base64url-encoded arguments. Seven specialized output filters (generic, npm/pnpm/yarn, pytest, jest/vitest, tsc, eslint) compress output with configurable budget profiles (balanced/strict/verbose). Three-tier retention: raw logs (7d/100MB), traces (30d/10k), daily reports (90d). UI: StatusBar badge, VitalsInfoPanel toggle, Dashboard "Local Boost" tab with settings and aggregate stats.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/LOCAL_BOOST.md`
+
 **Workstream Map** -- Subway-map style visualization that groups sessions into logical workstreams (coherent threads of work with a goal, status, and history). AI-powered classification pipeline: scoped to open-tab sessions + last 3 days, heuristic pre-clustering (git branch, file overlap Jaccard, temporal proximity), then Sonnet classification via stdin-piped CLI call. Explicit external folder import lets the user enter a folder path and digest supported documents (`md/txt/json/yaml/html/xml/docx`, capped) into a dashed `external_folder` workstream with source-file evidence; normal reclassification preserves those imported workstreams. Stations represent meaningful events (milestones, decisions, blockers, discoveries). SVG deterministic lane layout with visual encodings for status, confidence, type. Layers: Current State, Resume View, Plan Overlay, Resolve Mode. Backend: `WorkstreamManager` orchestrator + 14 service classes. Frontend includes `UserPortfolioView`, `PortfolioProjectMap`, `ProjectMapView`, and shared SVG primitives. Claude and Codex tabs both route Workstream Map/Portfolio messages through the shared manager. Includes **User Portfolio View** (cross-project): `UserPortfolioManager` + `UserPortfolioStore` use `globalState` for cross-workspace persistence; project health scoring (healthy/needs_attention/blocked/stale), cross-project resume recommendations, path validation for deleted projects, and a stacked full-map overview that renders every cached project workstream with simple project separators. Portfolio auto-open is suppressed for unclassified current workspaces so the empty Project Map remains available for first classification. Commands: `claudeMirror.openWorkstreamMap`, `claudeMirror.openWorkstreamPortfolio`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP.md`
 > Plans: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP_PLAN_REWRITE.md` (full spec)
@@ -659,6 +697,15 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 | `claudeMirror.tabs.indicateGroupOnTitle` | `false` | When a tab belongs to a folder, also prefix its native tab title with a colored bar character (opt-in). |
 | `claudeMirror.smartSearch.defaultModel` | `"claude-sonnet-4-6"` | Default model used when `claudeMirror.smartSearch.open` is invoked from the command palette without a `model` argument. |
 | `claudeMirror.smartSearch.allowBash` | `true` | Allow the Smart Search agent to use Bash (ripgrep). Disable to restrict the agent to Read + Glob + Grep only. |
+| `claudeMirror.localBoost.enabled` | `false` | Enable Local Boost command output compression |
+| `claudeMirror.localBoost.filterProfile` | `"balanced"` | Output filter profile: balanced, strict, or verbose |
+| `claudeMirror.localBoost.storeRawRedactedLogs` | `false` | Store raw redacted command output for debugging |
+| `claudeMirror.localBoost.rawLogRetentionDays` | `7` | Days to keep raw logs (1-30) |
+| `claudeMirror.localBoost.maxRawLogMb` | `100` | Max raw log storage in MB (10-500) |
+| `claudeMirror.localBoost.traceRetentionDays` | `30` | Days to keep trace files (7-90) |
+| `claudeMirror.localBoost.maxTraceCount` | `10000` | Max number of trace files to retain (1000-50000) |
+| `claudeMirror.localBoost.dailyReportRetentionDays` | `90` | Days to keep daily reports (30-365) |
+| `claudeMirror.localBoost.codexMode` | `"deny-and-retry"` | How Codex hooks work: deny-and-retry or passthrough |
 
 ---
 

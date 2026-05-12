@@ -172,6 +172,8 @@ export class SessionTab implements WebviewBridge {
   private allowedTools: string[] | null = null;
   /** Smart Search: cwd override (so transcripts under $HOME are reachable). */
   private cwdOverride: string | null = null;
+  /** Local Boost service reference for context file lifecycle */
+  private localBoostService: import('../local-boost/LocalBoostService').LocalBoostService | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -910,6 +912,16 @@ export class SessionTab implements WebviewBridge {
     this.happyAuthDetected = false;
     this.resumeTargetMissingDetected = false;
     const effectiveCwd = options?.cwd ?? this.cwdOverride ?? undefined;
+
+    // Create Local Boost context file before spawning CLI (env vars reference it)
+    if (this.localBoostService?.isEnabled()) {
+      const contextStore = this.localBoostService.getContextStore();
+      if (contextStore) {
+        const workspacePath = effectiveCwd ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+        await contextStore.createContext(this.id, 'claude', workspacePath).catch(() => {});
+      }
+    }
+
     await this.processManager.start({
       ...(options ?? {}),
       cwd: effectiveCwd,
@@ -1089,6 +1101,10 @@ export class SessionTab implements WebviewBridge {
     this.achievementService.onSessionEnd(this.id);
     this.achievementService.unregisterTab(this.id);
     this.skillGenService?.unregisterTab(this.id);
+    // Clean up Local Boost context file
+    if (this.localBoostService?.isEnabled()) {
+      void this.localBoostService.getContextStore()?.disposeContext(this.id).catch(() => {});
+    }
     this.closeBtwSession();
     this.processManager.stop();
     this.fileLogger?.dispose();
@@ -2097,6 +2113,28 @@ export class SessionTab implements WebviewBridge {
       errorRate: totalTurns > 0 ? (totalErrors / totalTurns) * 100 : 0,
     };
 
+    // Attach Local Boost stats if the feature was active
+    if (this.localBoostService?.isEnabled()) {
+      const traceReader = this.localBoostService.getTraceReader();
+      if (traceReader) {
+        void traceReader.getAggregate(
+          vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+        ).then(agg => {
+          if (agg.totalCommands > 0) {
+            summary.localBoost = {
+              commandCount: agg.totalCommands,
+              failedCommandCount: agg.failedCommands,
+              totalRawBytes: agg.totalRawBytes,
+              totalFilteredBytes: agg.totalFilteredBytes,
+              estimatedTokensSaved: agg.totalEstimatedTokensSaved,
+              topCommandFamilies: agg.topCommandFamilies.slice(0, 5),
+            };
+            void this.projectAnalyticsStore.saveSummary(summary);
+          }
+        }).catch(() => {});
+      }
+    }
+
     this.log(`[ProjectAnalytics] Saving summary: session=${sessionId} turns=${totalTurns} cost=$${totalCostUsd.toFixed(4)}`);
     void this.projectAnalyticsStore.saveSummary(summary);
   }
@@ -2175,6 +2213,12 @@ export class SessionTab implements WebviewBridge {
       tabLog(`[SessionStore] Saving initial metadata: session=${event.session_id}, model=${event.model}`);
       this.persistSessionMetadata();
       this.callbacks.onSessionIdAssigned?.(this.id, event.session_id);
+
+      // Update Local Boost context with the CLI-assigned session ID
+      if (this.localBoostService?.isEnabled()) {
+        void this.localBoostService.getContextStore()
+          ?.updateSessionId(this.id, event.session_id).catch(() => {});
+      }
 
       // Startup recovery: if this session already owns a team, start watching it.
       // This covers VS Code reload and session resume scenarios.
@@ -2298,6 +2342,33 @@ export class SessionTab implements WebviewBridge {
   /** Inject the shared WorkstreamManager (forwarded to MessageHandler) */
   setWorkstreamManager(manager: import('../workstream/WorkstreamManager').WorkstreamManager): void {
     this.messageHandler.setWorkstreamManager(manager);
+  }
+
+  /** Inject the shared LocalBoostService (forwarded to MessageHandler + process manager env builder) */
+  setLocalBoostService(service: import('../local-boost/LocalBoostService').LocalBoostService): void {
+    this.localBoostService = service;
+    this.messageHandler.setLocalBoostService(service);
+
+    if (service.isEnabled()) {
+      const runtimePaths = service.getRuntimePaths();
+      if (runtimePaths) {
+        this.processManager.localBoostEnvBuilder = (baseEnv) => {
+          const contextStore = service.getContextStore();
+          return service.buildAgentEnv({
+            baseEnv,
+            provider: 'claude',
+            workspacePath: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
+            tabRuntimeId: this.id,
+            sessionId: this.processManager.currentSessionId ?? null,
+            binDir: runtimePaths.binDir,
+            storeDir: runtimePaths.storeDir,
+            contextFilePath: contextStore?.getContextPath(this.id) ?? '',
+            filterProfile: service.getSettings().filterProfile,
+            storeRawLogs: service.getSettings().storeRawRedactedLogs,
+          });
+        };
+      }
+    }
   }
 
   /** Inject the SessionStore (forwarded to MessageHandler for workstream classification) */

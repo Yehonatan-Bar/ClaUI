@@ -23,6 +23,7 @@ import { TabGroupStore } from './session/TabGroupStore';
 import { TabGroupsTreeProvider } from './views/TabGroupsTreeProvider';
 import { WorkstreamManager } from './workstream/WorkstreamManager';
 import { UserPortfolioManager } from './workstream/UserPortfolioManager';
+import { LocalBoostService } from './local-boost/LocalBoostService';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -36,6 +37,8 @@ function log(message: string): void {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  try {
+
   // Create output channel for debugging (shared by all tabs)
   outputChannel = vscode.window.createOutputChannel('ClaUi');
   context.subscriptions.push(outputChannel);
@@ -56,8 +59,6 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   log('Extension activating...');
-
-  try {
 
   // Create session store for conversation history persistence
   const sessionStore = new SessionStore(context.globalState);
@@ -145,6 +146,11 @@ export function activate(context: vscode.ExtensionContext): void {
   const portfolioManager = new UserPortfolioManager(context.globalState);
   workstreamManager.setPortfolioManager(portfolioManager);
 
+  // Create Local Boost service (local-only command output compression)
+  const localBoostService = new LocalBoostService(context, log);
+  void localBoostService.initialize();
+  context.subscriptions.push(localBoostService);
+
   // Create the tab manager that owns all session tabs
   tabManager = new TabManager(
     context,
@@ -188,6 +194,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Expose workstreamManager to TabManager for message handler access
   tabManager.workstreamManager = workstreamManager;
+  // Expose Local Boost service to TabManager for env injection
+  tabManager.localBoostService = localBoostService;
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       ClaUiSidebarViewProvider.viewType,
@@ -260,9 +268,11 @@ export function activate(context: vscode.ExtensionContext): void {
   log('Extension activated');
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    log(`ACTIVATION FAILED: ${msg}`);
+    const detail = err instanceof Error && err.stack ? `\n${err.stack}` : '';
+    try { log(`ACTIVATION FAILED: ${msg}${detail}`); } catch { /* outputChannel may not exist */ }
+    console.error(`[ClaUi] ACTIVATION FAILED: ${msg}${detail}`);
     vscode.window.showErrorMessage(
-      `ClaUi failed to activate: ${msg}. Check Output > ClaUi for details.`
+      `ClaUi failed to activate: ${msg}. Check Output > ClaUi or Developer Tools console for details.`
     );
     context.subscriptions.push(
       vscode.commands.registerCommand('claudeMirror.startSession', () => {

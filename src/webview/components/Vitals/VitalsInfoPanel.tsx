@@ -3,6 +3,7 @@ import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { resetAdventureWidgetPosition } from './AdventureWidget';
 import { resetUsageWidgetPosition } from '../Usage/UsageWidget';
+import { LocalBoostSettingsPanel } from '../LocalBoost/LocalBoostSettingsPanel';
 
 const LANGUAGE_OPTIONS = [
   'Hebrew', 'Arabic', 'Russian', 'Spanish', 'French',
@@ -488,6 +489,9 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
           ))}
         </div>
       </div>
+
+      <div className="status-bar-group-dropdown-separator" style={{ margin: '8px 0' }} />
+      <LocalBoostSettingsPanel />
     </div>
   );
 };

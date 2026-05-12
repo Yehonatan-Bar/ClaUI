@@ -48,6 +48,9 @@ export class ClaudeProcessManager extends EventEmitter {
   private startModel = '';
   private startCwd = '';
 
+  /** Optional Local Boost env builder; set by SessionTab when feature is enabled */
+  localBoostEnvBuilder: ((baseEnv: NodeJS.ProcessEnv) => Record<string, string | undefined>) | null = null;
+
   constructor(private readonly context: vscode.ExtensionContext) {
     super();
   }
@@ -134,8 +137,18 @@ export class ClaudeProcessManager extends EventEmitter {
     // Build sanitized env; inject user's API key from SecretStorage if configured
     const apiKey = await getStoredApiKey(this.context.secrets);
     const mcpSecretEnv = await new McpSecretsService(this.context.secrets).getInjectedEnv();
-    const env = { ...buildClaudeCliEnv(apiKey), ...mcpSecretEnv };
+    let env = { ...buildClaudeCliEnv(apiKey), ...mcpSecretEnv };
     this.log(`Env: hasAnthropicKey=${!!apiKey} mcpSecretVars=${Object.keys(mcpSecretEnv).length}`);
+
+    // Inject Local Boost environment if available
+    if (this.localBoostEnvBuilder) {
+      try {
+        env = { ...env, ...this.localBoostEnvBuilder(env) };
+        this.log('Local Boost env injected');
+      } catch (err) {
+        this.log(`Local Boost env injection failed: ${err instanceof Error ? err.message : err}`);
+      }
+    }
 
     const child = spawn(cliPath, args, {
       cwd,

@@ -141,6 +141,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private forceReadOnlySandbox: boolean = false;
   /** Smart Search: cwd override (so transcripts under $HOME are reachable). */
   private cwdOverride: string | null = null;
+  /** Local Boost service reference for context file lifecycle */
+  private localBoostService: import('../local-boost/LocalBoostService').LocalBoostService | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -281,6 +283,36 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.messageHandler.setWorkstreamManager(manager);
   }
 
+  /** Inject the shared LocalBoostService (forwarded to CodexMessageHandler + process manager env builder). */
+  setLocalBoostService(service: import('../local-boost/LocalBoostService').LocalBoostService): void {
+    this.localBoostService = service;
+    if ('setLocalBoostService' in this.messageHandler) {
+      (this.messageHandler as { setLocalBoostService: (s: typeof service) => void }).setLocalBoostService(service);
+    }
+
+    const settings = service.getSettings();
+    if (service.isEnabled() && settings.codexMode !== 'off') {
+      const runtimePaths = service.getRuntimePaths();
+      if (runtimePaths) {
+        this.processManager.localBoostEnvBuilder = (baseEnv) => {
+          const contextStore = service.getContextStore();
+          return service.buildAgentEnv({
+            baseEnv,
+            provider: 'codex',
+            workspacePath: this.sessionCwd ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
+            tabRuntimeId: this.id,
+            sessionId: this.threadId ?? null,
+            binDir: runtimePaths.binDir,
+            storeDir: runtimePaths.storeDir,
+            contextFilePath: contextStore?.getContextPath(this.id) ?? '',
+            filterProfile: settings.filterProfile,
+            storeRawLogs: settings.storeRawRedactedLogs,
+          });
+        };
+      }
+    }
+  }
+
   /** Inject the SessionStore (forwarded to CodexMessageHandler for workstream classification). */
   setSessionStore(store: import('../session/SessionStore').SessionStore): void {
     this.messageHandler.setSessionStore(store);
@@ -337,6 +369,15 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.currentModel = this.getCurrentModel();
     this.sessionStartedAt = isFork ? new Date().toISOString() : (this.sessionStartedAt || new Date().toISOString());
     this.analyticsSaved = false;
+
+    // Create Local Boost context file before any turns are sent
+    if (this.localBoostService?.isEnabled()) {
+      const contextStore = this.localBoostService.getContextStore();
+      if (contextStore) {
+        const workspacePath = this.sessionCwd ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+        void contextStore.createContext(this.id, 'codex', workspacePath).catch(() => {});
+      }
+    }
     this.sessionNamingRequested = false;
     this.deferredAutoSessionName = null;
     this.achievementService.onSessionStart(this.id);
@@ -773,6 +814,10 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.achievementService.onSessionEnd(this.id);
     this.achievementService.unregisterTab(this.id);
     this.skillGenService?.unregisterTab(this.id);
+    // Clean up Local Boost context file
+    if (this.localBoostService?.isEnabled()) {
+      void this.localBoostService.getContextStore()?.disposeContext(this.id).catch(() => {});
+    }
     this.fileLogger?.dispose();
     this.panel.dispose();
   }
@@ -1886,6 +1931,12 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       this.sessionStartedAt = this.sessionStartedAt || new Date().toISOString();
       this.analyticsSaved = false;
       tabLog(`Codex thread id set: ${data.threadId}`);
+
+      // Update Local Boost context with the Codex thread ID
+      if (this.localBoostService?.isEnabled()) {
+        void this.localBoostService.getContextStore()
+          ?.updateSessionId(this.id, data.threadId).catch(() => {});
+      }
       this.callbacks.onSessionIdAssigned?.(this.id, data.threadId);
       const restored = this.restoreSessionName(data.threadId);
       if (restored) {

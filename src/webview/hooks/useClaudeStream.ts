@@ -276,6 +276,27 @@ export function useClaudeStream(): void {
           useAppStore.getState().setWorkstreamMapZoom('portfolio');
           break;
 
+        case 'localBoostStatus': {
+          const lbMsg = msg as { type: string; status: NonNullable<ReturnType<typeof useAppStore.getState>['localBoostStatus']> };
+          useAppStore.getState().setLocalBoostStatus(lbMsg.status);
+          break;
+        }
+        case 'localBoostAggregateUpdate': {
+          const lbAgg = msg as { type: string; aggregate: NonNullable<ReturnType<typeof useAppStore.getState>['localBoostAggregate']> };
+          useAppStore.getState().setLocalBoostAggregate(lbAgg.aggregate);
+          break;
+        }
+        case 'localBoostTraceUpdate': {
+          const lbTrace = msg as unknown as { type: string; trace: ReturnType<typeof useAppStore.getState>['localBoostRecentTraces'][number] };
+          useAppStore.getState().addLocalBoostTrace(lbTrace.trace);
+          break;
+        }
+        case 'localBoostError': {
+          const lbErr = msg as { type: string; error: string };
+          useAppStore.getState().setLocalBoostError(lbErr.error);
+          break;
+        }
+
         case 'toggleMcpPanel':
           setMcpPanelOpen(msg.open ?? !useAppStore.getState().mcpPanelOpen);
           if (msg.tab) {

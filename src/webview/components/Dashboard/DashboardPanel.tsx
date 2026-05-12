@@ -15,9 +15,10 @@ import { ProjectToolsTab } from './tabs/ProjectToolsTab';
 import { UsageTab } from './tabs/UsageTab';
 import { TokenRatioTab } from './tabs/TokenRatioTab';
 import { MemoryTab } from './tabs/MemoryTab';
+import { LocalBoostTab } from './tabs/LocalBoostTab';
 import { DASH_COLORS } from './dashboardUtils';
 
-type SessionTab = 'overview' | 'tokens' | 'tools' | 'timeline' | 'commands' | 'context' | 'usage';
+type SessionTab = 'overview' | 'tokens' | 'tools' | 'timeline' | 'commands' | 'context' | 'usage' | 'local-boost';
 type ProjectTab = 'p-overview' | 'p-30-days' | 'p-sessions' | 'p-tokens' | 'p-tools';
 type UserTab = 'u-ratio' | 'u-memory';
 type DashboardTab = SessionTab | ProjectTab | UserTab;
@@ -30,6 +31,7 @@ const SESSION_TABS: { key: SessionTab; label: string }[] = [
   { key: 'commands', label: 'Commands' },
   { key: 'context', label: 'Context' },
   { key: 'usage', label: 'Usage' },
+  { key: 'local-boost', label: 'Local Boost' },
 ];
 
 const PROJECT_TABS: { key: ProjectTab; label: string }[] = [
@@ -253,6 +255,7 @@ export const DashboardPanel: React.FC = () => {
         {mode === 'session' && activeTab === 'commands' && <CommandsTab turnHistory={turnHistory} />}
         {mode === 'session' && activeTab === 'context' && <ContextTab />}
         {mode === 'session' && activeTab === 'usage' && <UsageTab />}
+        {mode === 'session' && activeTab === 'local-boost' && <LocalBoostTab />}
         {/* Project tabs */}
         {mode === 'project' && activeTab === 'p-overview' && <ProjectOverviewTab sessions={projectSessions} />}
         {mode === 'project' && activeTab === 'p-30-days' && <Project30DaysTab sessions={projectSessions} />}

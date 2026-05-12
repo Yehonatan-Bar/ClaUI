@@ -284,6 +284,10 @@ export function registerCommands(
         vscode.window.showWarningMessage('No active ClaUi tab.');
         return;
       }
+      if (tab instanceof MultiParticipantSessionTab) {
+        tab.dispose();
+        return;
+      }
       tab.stopSession();
       vscode.window.showInformationMessage('Claude session stopped.');
     }),
@@ -291,7 +295,8 @@ export function registerCommands(
     // Cancel / pause the ACTIVE tab's in-flight request (Escape key)
     vscode.commands.registerCommand('claudeMirror.cancelRequest', () => {
       const tab = tabManager.getActiveTab();
-      if (tab?.isRunning) {
+      if (!tab || tab instanceof MultiParticipantSessionTab) return;
+      if (tab.isRunning) {
         tab.cancelRequest();
         log('Cancel request sent to active tab');
       }
@@ -310,7 +315,13 @@ export function registerCommands(
     // Send a message to the ACTIVE tab via the CLI control protocol
     vscode.commands.registerCommand('claudeMirror.sendMessage', async () => {
       const tab = tabManager.getActiveTab();
-      if (!tab || !tab.isRunning) {
+      if (!tab || tab instanceof MultiParticipantSessionTab) {
+        vscode.window.showWarningMessage(
+          'No active session. Start one first.'
+        );
+        return;
+      }
+      if (!tab.isRunning) {
         vscode.window.showWarningMessage(
           'No active session. Start one first.'
         );
@@ -330,7 +341,13 @@ export function registerCommands(
     // Compact context in the ACTIVE tab
     vscode.commands.registerCommand('claudeMirror.compact', () => {
       const tab = tabManager.getActiveTab();
-      if (!tab || !tab.isRunning) {
+      if (!tab || tab instanceof MultiParticipantSessionTab) {
+        vscode.window.showWarningMessage(
+          'No active session. Start one first.'
+        );
+        return;
+      }
+      if (!tab.isRunning) {
         vscode.window.showWarningMessage(
           'No active session. Start one first.'
         );
@@ -815,62 +832,83 @@ export function registerCommands(
     )
   );
 
-  // -- Multi-Participant Session (Phase 0 Spike) --
+  // -- Multi-Participant Session --
 
-  let mpTabCounter = 0;
+  /** Shared helper: prompt user for MP connection details and create/connect a tab. */
+  async function promptAndCreateMpTab(): Promise<void> {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const defaultUrl = config.get<string>('multiParticipant.serverUrl', 'ws://localhost:9120');
+
+    const serverUrl = await vscode.window.showInputBox({
+      prompt: 'Coordination server URL',
+      value: defaultUrl,
+      placeHolder: 'ws://localhost:9120',
+      ignoreFocusOut: true,
+    });
+    if (!serverUrl) return;
+
+    const humanName = await vscode.window.showInputBox({
+      prompt: 'Your display name',
+      placeHolder: 'Alice',
+      ignoreFocusOut: true,
+    });
+    if (!humanName) return;
+
+    const agentName = await vscode.window.showInputBox({
+      prompt: 'Your agent\'s display name',
+      placeHolder: 'Claude',
+      ignoreFocusOut: true,
+    });
+    if (!agentName) return;
+
+    const providerPick = await vscode.window.showQuickPick(
+      [
+        { label: 'Claude', provider: 'claude' as const },
+        { label: 'Codex', provider: 'codex' as const },
+      ],
+      { placeHolder: 'Select agent provider', ignoreFocusOut: true }
+    );
+    if (!providerPick) return;
+
+    const mpTab = tabManager.createMultiParticipantTab(serverUrl, providerPick.provider);
+    await mpTab.connect(humanName, agentName, providerPick.provider);
+    log(`Multi-participant tab created: ${mpTab.id} -> ${serverUrl}`);
+  }
+
   context.subscriptions.push(
-    vscode.commands.registerCommand('claudeMirror.joinMultiParticipantSession', async () => {
-      const config = vscode.workspace.getConfiguration('claudeMirror');
-      const defaultUrl = config.get<string>('multiParticipant.serverUrl', 'ws://localhost:9120');
+    vscode.commands.registerCommand('claudeMirror.joinMultiParticipantSession', () => promptAndCreateMpTab())
+  );
 
-      const serverUrl = await vscode.window.showInputBox({
-        prompt: 'Coordination server URL',
-        value: defaultUrl,
-        placeHolder: 'ws://localhost:9120',
-        ignoreFocusOut: true,
-      });
-      if (!serverUrl) return;
+  context.subscriptions.push(
+    vscode.commands.registerCommand('claudeMirror.createMultiParticipantSession', () => promptAndCreateMpTab())
+  );
 
-      const humanName = await vscode.window.showInputBox({
-        prompt: 'Your display name',
-        placeHolder: 'Alice',
-        ignoreFocusOut: true,
-      });
-      if (!humanName) return;
-
-      const agentName = await vscode.window.showInputBox({
-        prompt: 'Your agent\'s display name',
-        placeHolder: 'Claude',
-        ignoreFocusOut: true,
-      });
-      if (!agentName) return;
-
-      const providerPick = await vscode.window.showQuickPick(
-        [
-          { label: 'Claude', provider: 'claude' as const },
-          { label: 'Codex', provider: 'codex' as const },
-        ],
-        { placeHolder: 'Select agent provider', ignoreFocusOut: true }
-      );
-      if (!providerPick) return;
-
-      mpTabCounter++;
-      const tabId = `mp-${Date.now()}-${mpTabCounter}`;
-      const mpTab = new MultiParticipantSessionTab(
-        tabId,
-        mpTabCounter,
-        serverUrl,
-        providerPick.provider,
-        context,
-        {
-          onClosed: (id) => log(`MP tab closed: ${id}`),
-          onFocused: (id) => log(`MP tab focused: ${id}`),
-        },
-        log,
-      );
-
-      await mpTab.connect(humanName, agentName, providerPick.provider);
-      log(`Multi-participant tab created: ${tabId} -> ${serverUrl}`);
+  context.subscriptions.push(
+    vscode.commands.registerCommand('claudeMirror.leaveMultiParticipantSession', () => {
+      const active = tabManager.getActiveTab();
+      if (active instanceof MultiParticipantSessionTab) {
+        active.dispose();
+        log(`Left multi-participant session: ${active.id}`);
+      } else {
+        const allTabs = tabManager.listTabs();
+        const mpTabs = allTabs.filter(t => t.id.startsWith('mp-'));
+        if (mpTabs.length === 0) {
+          vscode.window.showInformationMessage('No active multi-participant session to leave.');
+        } else if (mpTabs.length === 1) {
+          tabManager.closeTab(mpTabs[0].id);
+          log(`Left multi-participant session: ${mpTabs[0].id}`);
+        } else {
+          void vscode.window.showQuickPick(
+            mpTabs.map(t => ({ label: t.displayName, id: t.id })),
+            { placeHolder: 'Select MP session to leave' }
+          ).then(pick => {
+            if (pick) {
+              tabManager.closeTab(pick.id);
+              log(`Left multi-participant session: ${pick.id}`);
+            }
+          });
+        }
+      }
     })
   );
 }

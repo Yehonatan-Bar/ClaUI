@@ -64,6 +64,9 @@ export class CodexExecProcessManager extends EventEmitter {
   private stderrChunkCount = 0;
   private stderrByteCount = 0;
 
+  /** Optional Local Boost env builder; set by SessionTab when feature is enabled */
+  localBoostEnvBuilder: ((baseEnv: NodeJS.ProcessEnv) => Record<string, string | undefined>) | null = null;
+
   constructor(private readonly context: vscode.ExtensionContext) {
     super();
     void this.context; // retained for symmetry with ClaudeProcessManager and future use
@@ -117,9 +120,31 @@ export class CodexExecProcessManager extends EventEmitter {
     this.log(`Spawning Codex: ${cliPath} ${args.join(' ')}`);
     this.log(`CWD: ${cwd || '(none)'}`);
 
+    let env: NodeJS.ProcessEnv = buildSanitizedEnv();
+
+    // Inject Local Boost environment if available
+    if (this.localBoostEnvBuilder) {
+      try {
+        env = { ...env, ...this.localBoostEnvBuilder(env) };
+        this.log('Local Boost env injected for Codex turn');
+        // In instruction-only mode, append usage instruction to Codex CLI args
+        if (env.CLAUI_LOCAL_BOOST === '1') {
+          const codexMode = vscode.workspace.getConfiguration('claudeMirror.localBoost').get<string>('codexMode', 'instruction-only');
+          if (codexMode === 'instruction-only') {
+            const boostInstruction = 'When running Bash commands, prefer using `claui-run` from PATH to compress noisy output. ' +
+              'Usage: claui-run -- <command>. It preserves exit codes and filters output for readability.';
+            args.push('-c', `instructions=${toTomlBasicString(boostInstruction)}`);
+            this.log('Local Boost instruction-only mode: appended claui-run instruction to Codex args');
+          }
+        }
+      } catch (err) {
+        this.log(`Local Boost env injection failed: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
     const child = spawn(cliPath, args, {
       cwd,
-      env: buildSanitizedEnv(),
+      env,
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: true,
     });

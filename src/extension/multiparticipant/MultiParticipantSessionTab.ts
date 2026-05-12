@@ -18,6 +18,7 @@ export interface MultiParticipantSessionTabCallbacks {
 export class MultiParticipantSessionTab {
   readonly tabId: string;
   readonly tabNumber: number;
+  private readonly agentProvider: 'claude' | 'codex';
 
   private panel: vscode.WebviewPanel;
   private client: MultiParticipantClient;
@@ -50,6 +51,7 @@ export class MultiParticipantSessionTab {
   ) {
     this.tabId = tabId;
     this.tabNumber = tabNumber;
+    this.agentProvider = agentProvider;
     this.context = context;
     this.callbacks = callbacks;
     this.log = log || (() => {});
@@ -120,12 +122,22 @@ export class MultiParticipantSessionTab {
     this.client.connect();
   }
 
+  /** Alias for tabId -- matches the interface TabManager expects from managed tabs. */
+  get id(): string {
+    return this.tabId;
+  }
+
+  /** The panel's current view column, used by TabManager for layout decisions. */
+  get viewColumn(): vscode.ViewColumn | undefined {
+    return this.panel.viewColumn;
+  }
+
   reveal(viewColumn?: vscode.ViewColumn, preserveFocus?: boolean): void {
     this.panel.reveal(viewColumn, preserveFocus);
   }
 
   getProvider(): 'claude' | 'codex' {
-    return 'claude';
+    return this.agentProvider;
   }
 
   get isDisposed(): boolean {
@@ -138,6 +150,11 @@ export class MultiParticipantSessionTab {
 
   get sessionId(): string | null {
     return this.session?.sessionId || null;
+  }
+
+  /** Post a message to the webview. Public so TabManager can broadcast tab-list updates. */
+  postMessage(msg: ExtensionToWebviewMessage): void {
+    this.postToWebview(msg);
   }
 
   dispose(): void {

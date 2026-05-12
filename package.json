@@ -68,6 +68,14 @@
         "title": "ClaUi: Join Multi-Participant Session"
       },
       {
+        "command": "claudeMirror.createMultiParticipantSession",
+        "title": "ClaUi: Create Multi-Participant Session"
+      },
+      {
+        "command": "claudeMirror.leaveMultiParticipantSession",
+        "title": "ClaUi: Leave Multi-Participant Session"
+      },
+      {
         "command": "claudeMirror.startSession",
         "title": "ClaUi: Start New Session"
       },
@@ -734,6 +742,96 @@
             "Vertical: ClaUi tabs stay in one editor group and use an in-webview vertical tab rail"
           ],
           "description": "How ClaUi tabs are navigated. Toggle from the in-tab View menu or the Sessions view title bar (gear icon)."
+        },
+        "claudeMirror.localBoost.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Local Boost: local-only command output compression that reduces noisy Bash output before it reaches coding agents. Redacts secrets, filters noise, preserves exit codes."
+        },
+        "claudeMirror.localBoost.filterProfile": {
+          "type": "string",
+          "default": "balanced",
+          "enum": [
+            "balanced",
+            "strict",
+            "verbose"
+          ],
+          "enumDescriptions": [
+            "Balanced: moderate compression (8k success / 16k failure budget)",
+            "Strict: aggressive compression (4k success / 8k failure budget)",
+            "Verbose: minimal compression (32k budget), preserves most output"
+          ],
+          "description": "Output filter profile controlling how aggressively command output is compressed."
+        },
+        "claudeMirror.localBoost.storeRawRedactedLogs": {
+          "type": "boolean",
+          "default": true,
+          "description": "Store redacted raw command output logs locally for debugging. Logs are retained per rawLogRetentionDays."
+        },
+        "claudeMirror.localBoost.rawLogRetentionDays": {
+          "type": "number",
+          "default": 7,
+          "minimum": 1,
+          "maximum": 90,
+          "description": "Days to retain raw redacted log files before automatic cleanup."
+        },
+        "claudeMirror.localBoost.maxRawLogMb": {
+          "type": "number",
+          "default": 100,
+          "minimum": 10,
+          "maximum": 5000,
+          "description": "Maximum total size (MB) of raw redacted log files. Oldest logs are deleted when exceeded."
+        },
+        "claudeMirror.localBoost.traceRetentionDays": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "maximum": 365,
+          "description": "Days to retain trace metadata JSON files before automatic cleanup."
+        },
+        "claudeMirror.localBoost.maxTraceCount": {
+          "type": "number",
+          "default": 10000,
+          "minimum": 100,
+          "maximum": 100000,
+          "description": "Maximum number of trace files to keep. Oldest traces are deleted when exceeded."
+        },
+        "claudeMirror.localBoost.dailyReportRetentionDays": {
+          "type": "number",
+          "default": 90,
+          "minimum": 7,
+          "maximum": 365,
+          "description": "Days to retain daily aggregate report files."
+        },
+        "claudeMirror.localBoost.workspaceLocalStorage": {
+          "type": "boolean",
+          "default": false,
+          "description": "Store traces and logs in <workspace>/.claui/local-boost/ instead of global storage. Opt-in because it writes files inside the project."
+        },
+        "claudeMirror.localBoost.installClaudeHook": {
+          "type": "boolean",
+          "default": false,
+          "description": "Install a Claude Code PreToolUse hook that automatically routes eligible Bash commands through Local Boost compression."
+        },
+        "claudeMirror.localBoost.installCodexHook": {
+          "type": "boolean",
+          "default": false,
+          "description": "Install a Codex PreToolUse hook that routes eligible Bash commands through Local Boost compression."
+        },
+        "claudeMirror.localBoost.codexMode": {
+          "type": "string",
+          "default": "instruction-only",
+          "enum": [
+            "off",
+            "instruction-only",
+            "hook-guard"
+          ],
+          "enumDescriptions": [
+            "Off: no Local Boost for Codex sessions",
+            "Instruction-only: append usage instruction to Codex system prompt (advisory)",
+            "Hook-guard: use deny/retry hook to enforce compression (requires hook support)"
+          ],
+          "description": "How Local Boost integrates with Codex sessions."
         }
       }
     },

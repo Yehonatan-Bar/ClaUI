@@ -1011,7 +1011,21 @@ export type WebviewToExtensionMessage =
   | WorkstreamMapSaveSnapshotRequest
   | WorkstreamMapImportExternalFolderRequest
   | WorkstreamPortfolioRequestDataRequest
-  | WorkstreamPortfolioOpenProjectRequest;
+  | WorkstreamPortfolioOpenProjectRequest
+  | LocalBoostGetStatusRequest
+  | LocalBoostSetEnabledRequest
+  | LocalBoostInstallHooksRequest
+  | LocalBoostUninstallHooksRequest
+  | LocalBoostOpenTraceRequest
+  | LocalBoostClearDataRequest;
+
+// --- Local Boost (Webview -> Extension) ---
+export interface LocalBoostGetStatusRequest { type: 'localBoostGetStatus' }
+export interface LocalBoostSetEnabledRequest { type: 'localBoostSetEnabled'; enabled: boolean }
+export interface LocalBoostInstallHooksRequest { type: 'localBoostInstallHooks'; provider: 'claude' | 'codex' | 'both' }
+export interface LocalBoostUninstallHooksRequest { type: 'localBoostUninstallHooks'; provider: 'claude' | 'codex' | 'both' }
+export interface LocalBoostOpenTraceRequest { type: 'localBoostOpenTrace'; traceId: string }
+export interface LocalBoostClearDataRequest { type: 'localBoostClearData'; scope: 'workspace' | 'all' }
 
 export interface WebviewImageData {
   base64: string;
@@ -1715,6 +1729,16 @@ export interface SessionSummary {
   summary?: string;
   taskType?: string;
   outcome?: 'completed' | 'failed' | 'partial' | 'unknown';
+
+  // Local Boost per-session stats (populated when feature is active)
+  localBoost?: {
+    commandCount: number;
+    failedCommandCount: number;
+    totalRawBytes: number;
+    totalFilteredBytes: number;
+    estimatedTokensSaved: number;
+    topCommandFamilies: Array<{ family: string; count: number }>;
+  };
 }
 
 export interface ProjectAnalyticsDataMessage {
@@ -2472,7 +2496,29 @@ export type ExtensionToWebviewMessage =
   | ToggleWorkstreamMapMessage
   | WorkstreamPortfolioDataMessage
   | WorkstreamPortfolioNavigateToProjectMessage
-  | ToggleWorkstreamPortfolioMessage;
+  | ToggleWorkstreamPortfolioMessage
+  | LocalBoostStatusMessage
+  | LocalBoostTraceUpdateMessage
+  | LocalBoostAggregateUpdateMessage
+  | LocalBoostErrorMessage;
+
+// --- Local Boost (Extension -> Webview) ---
+export interface LocalBoostStatusMessage {
+  type: 'localBoostStatus';
+  status: import('../local-boost/LocalBoostTypes').LocalBoostStatus;
+}
+export interface LocalBoostTraceUpdateMessage {
+  type: 'localBoostTraceUpdate';
+  trace: import('../local-boost/LocalBoostTypes').LocalBoostTraceSummary;
+}
+export interface LocalBoostAggregateUpdateMessage {
+  type: 'localBoostAggregateUpdate';
+  aggregate: import('../local-boost/LocalBoostTypes').LocalBoostAggregate;
+}
+export interface LocalBoostErrorMessage {
+  type: 'localBoostError';
+  error: string;
+}
 
 // --- Workstream Map (Extension -> Webview) ---
 

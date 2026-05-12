@@ -345,6 +345,8 @@ export class MessageHandler {
   private memorySampler: import('../process/ProcessMemorySampler').ProcessMemorySampler | null = null;
   /** Workstream map manager (shared instance, set after construction) */
   private workstreamManager: import('../workstream/WorkstreamManager').WorkstreamManager | null = null;
+  /** Local Boost service (shared instance, set after construction) */
+  private localBoostService: import('../local-boost/LocalBoostService').LocalBoostService | null = null;
   /** Session store for accessing session metadata (needed by workstream classification) */
   private sessionStore: import('../session/SessionStore').SessionStore | null = null;
   /** Returns session IDs for all currently open tabs (injected by TabManager via SessionTab) */
@@ -550,6 +552,10 @@ export class MessageHandler {
   /** Provide the shared WorkstreamManager (used by the workstream map feature). */
   setWorkstreamManager(manager: import('../workstream/WorkstreamManager').WorkstreamManager): void {
     this.workstreamManager = manager;
+  }
+
+  setLocalBoostService(service: import('../local-boost/LocalBoostService').LocalBoostService): void {
+    this.localBoostService = service;
   }
 
   /** Provide the SessionStore for accessing session metadata. */
@@ -3212,6 +3218,27 @@ export class MessageHandler {
           break;
         }
 
+        case 'localBoostGetStatus': {
+          this.handleLocalBoostGetStatus();
+          break;
+        }
+        case 'localBoostSetEnabled': {
+          void this.handleLocalBoostSetEnabled(msg.enabled);
+          break;
+        }
+        case 'localBoostInstallHooks': {
+          void this.handleLocalBoostInstallHooks(msg.provider);
+          break;
+        }
+        case 'localBoostUninstallHooks': {
+          void this.handleLocalBoostUninstallHooks(msg.provider);
+          break;
+        }
+        case 'localBoostClearData': {
+          void this.handleLocalBoostClearData(msg.scope);
+          break;
+        }
+
         case 'ready':
           this.log('Webview ready');
           // Send text display settings
@@ -5686,4 +5713,82 @@ export class MessageHandler {
         this.log(`[SessionNaming] ERROR: ${err}`);
       });
   }
+
+  // --- Local Boost handlers ---
+
+  private handleLocalBoostGetStatus(): void {
+    const service = this.localBoostService;
+    if (!service) {
+      this.webview.postMessage({ type: 'localBoostStatus', status: { enabled: false, installed: false, version: null, claudeHookInstalled: false, codexHookInstalled: false, codexMode: 'off', nodeAvailable: false, error: null } } as any);
+      return;
+    }
+    this.webview.postMessage({ type: 'localBoostStatus', status: service.getStatus() } as any);
+  }
+
+  private async handleLocalBoostSetEnabled(enabled: boolean): Promise<void> {
+    const service = this.localBoostService;
+    if (!service) return;
+    await service.setEnabled(enabled);
+    this.webview.postMessage({ type: 'localBoostStatus', status: service.getStatus() } as any);
+  }
+
+  private async handleLocalBoostInstallHooks(provider: 'claude' | 'codex' | 'both'): Promise<void> {
+    const service = this.localBoostService;
+    const hookManager = service?.getHookManager();
+    if (!hookManager) {
+      this.webview.postMessage({ type: 'localBoostError', error: 'Local Boost is not initialized' } as any);
+      return;
+    }
+    const workspacePath = this.getWorkspacePath();
+    if (!workspacePath) {
+      this.webview.postMessage({ type: 'localBoostError', error: 'No workspace folder open' } as any);
+      return;
+    }
+    try {
+      if (provider === 'claude' || provider === 'both') {
+        await hookManager.installClaudeHook(workspacePath);
+      }
+      if (provider === 'codex' || provider === 'both') {
+        await hookManager.installCodexHook(workspacePath);
+      }
+      this.webview.postMessage({ type: 'localBoostStatus', status: service!.getStatus() } as any);
+    } catch (err) {
+      this.webview.postMessage({ type: 'localBoostError', error: err instanceof Error ? err.message : String(err) } as any);
+    }
+  }
+
+  private async handleLocalBoostUninstallHooks(provider: 'claude' | 'codex' | 'both'): Promise<void> {
+    const service = this.localBoostService;
+    const hookManager = service?.getHookManager();
+    if (!hookManager) return;
+    const workspacePath = this.getWorkspacePath();
+    if (!workspacePath) return;
+    try {
+      if (provider === 'claude' || provider === 'both') {
+        await hookManager.uninstallClaudeHook(workspacePath);
+      }
+      if (provider === 'codex' || provider === 'both') {
+        await hookManager.uninstallCodexHook(workspacePath);
+      }
+      this.webview.postMessage({ type: 'localBoostStatus', status: service!.getStatus() } as any);
+    } catch (err) {
+      this.webview.postMessage({ type: 'localBoostError', error: err instanceof Error ? err.message : String(err) } as any);
+    }
+  }
+
+  private async handleLocalBoostClearData(scope: 'workspace' | 'all'): Promise<void> {
+    const service = this.localBoostService;
+    const traceReader = service?.getTraceReader();
+    if (!traceReader) return;
+    const settings = service!.getSettings();
+    const result = await traceReader.cleanExpired({
+      ...settings,
+      rawLogRetentionDays: 0,
+      traceRetentionDays: 0,
+      dailyReportRetentionDays: 0,
+    });
+    this.log(`[LocalBoost] Cleared data: ${result.deletedTraces} traces, ${result.deletedRawLogs} raw logs, ${result.deletedReports} reports`);
+    this.webview.postMessage({ type: 'localBoostStatus', status: service!.getStatus() } as any);
+  }
+
 }

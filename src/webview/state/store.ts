@@ -785,6 +785,18 @@ export interface AppState {
   resolveMpGuardStop: () => void;
   clearMpState: () => void;
 
+  // Local Boost
+  localBoostEnabled: boolean;
+  localBoostStatus: { enabled: boolean; installed: boolean; version: string | null; claudeHookInstalled: boolean; codexHookInstalled: boolean; codexMode: string; nodeAvailable: boolean; error: string | null } | null;
+  localBoostAggregate: { totalCommands: number; totalEstimatedTokensSaved: number; avgCompressionRatio: number } | null;
+  localBoostRecentTraces: Array<{ traceId: string; timestamp: string; provider: string; commandFamily: string; exitCode: number | null; durationMs: number; rawBytes: number; filteredBytes: number; estimatedTokensSaved: number; filterName: string; redactions: number }>;
+  localBoostError: string | null;
+  setLocalBoostEnabled: (enabled: boolean) => void;
+  setLocalBoostStatus: (status: NonNullable<AppState['localBoostStatus']>) => void;
+  setLocalBoostAggregate: (aggregate: NonNullable<AppState['localBoostAggregate']>) => void;
+  addLocalBoostTrace: (trace: AppState['localBoostRecentTraces'][number]) => void;
+  setLocalBoostError: (error: string | null) => void;
+
   reset: () => void;
 }
 
@@ -2633,6 +2645,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     mpDismissedConflictIds: new Set<string>(),
     mpGuardStop: null,
   }),
+
+  // Local Boost
+  localBoostEnabled: false,
+  localBoostStatus: null,
+  localBoostAggregate: null,
+  localBoostRecentTraces: [],
+  localBoostError: null,
+  setLocalBoostEnabled: (enabled: boolean) => set({ localBoostEnabled: enabled }),
+  setLocalBoostStatus: (status) => set({ localBoostStatus: status, localBoostEnabled: status.enabled }),
+  setLocalBoostAggregate: (aggregate) => set({ localBoostAggregate: aggregate }),
+  addLocalBoostTrace: (trace) => set((state) => ({
+    localBoostRecentTraces: [trace, ...state.localBoostRecentTraces].slice(0, 100),
+  })),
+  setLocalBoostError: (error) => set({ localBoostError: error }),
 
   reset: () =>
     set((state) => ({

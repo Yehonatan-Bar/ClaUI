@@ -9,6 +9,7 @@ import { getModelMaxContext, getContextColor } from '../../utils/modelContextLim
 import { useStatusBarCollapse } from '../../hooks/useStatusBarCollapse';
 import { StatusBarGroupButton } from './StatusBarGroupButton';
 import { AIChip } from './AIChip';
+import { LocalBoostStatusBadge } from '../LocalBoost/LocalBoostStatusBadge';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 
 function formatDuration(durationMs: number): string {
@@ -823,6 +824,7 @@ export const StatusBar: React.FC<{
       </div>
 
       <div className="status-bar-right">
+        <LocalBoostStatusBadge />
         {!hideClockFromBar && clockElement}
         {!hideMcpFromBar && mcpChip}
         {!hideUsageFromBar && usageMetric}
