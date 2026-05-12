@@ -1,10 +1,8 @@
-# Multi-Participant Session (Phase 0 + Phase 1 + Phase 2 Tracks A-D)
+# Multi-Participant Session
 
 ## What This Is
 
 A shared coding session where multiple humans and their code agents (Claude Code, Codex) participate in a single conversation. Each human sees the full transcript in real time. Each agent receives a prompt only when a message is deterministically addressed to it by the coordination server.
-
-Current state: Phase 0 runtime is working, Phase 1 defines the protocol/type surface, Phase 2 implements all four tracks: Track A (A2A loop protection + guard service), Track B (rename handling, JSONL persistence, typing/activity relay), Track C (file change tracking / cancel / approval & conflict UI in the extension host), and Track D (Zustand store slice, useClaudeStream dispatch handlers, and React UI components). Track D is webview-only (can be developed/tested with mock data) and will be integrated with the extension host in Phase 4.
 
 ## Architecture
 
@@ -18,6 +16,8 @@ Current state: Phase 0 runtime is working, Phase 1 defines the protocol/type sur
                      | Guard Service              |
                      | Session Persistence        |
                      | Delta Context Builder      |
+                     | Ping/Pong Keepalive        |
+                     | Stream Coalescing          |
                      +------------+--------------+
                                   |
                  +----------------+----------------+
@@ -41,9 +41,9 @@ Current state: Phase 0 runtime is working, Phase 1 defines the protocol/type sur
 
 | File | Purpose |
 |------|---------|
-| `types.ts` | Data model and protocol contracts: Session, Participant, Message, AgentDelivery, AgentSeenState, DeliveryStatus, A2A approval state, typing/activity state, rename events, file change/conflict reports |
+| `types.ts` | Data model and protocol contracts: Session, Participant, Message, AgentDelivery, AgentSeenState, DeliveryStatus, A2A approval state, typing/activity state, rename events, file change/conflict reports. Includes `rejoinSession`, `rejoinAccepted/Rejected`, and `ping/pong` messages |
 | `Router.ts` | Name validation (`normalizeName`, `extractRouteKey`, `validateParticipantName`), message routing (`routeMessage` - greedy longest-name match then routeKey fallback) |
-| `CoordinationServer.ts` | WebSocket server: session management, join/leave lifecycle, human message routing, agent delivery creation, delta context building, agent prompt formatting, delivery status tracking, A2A gating via LoopController, rename handling, typing/activity relay, JSONL persistence |
+| `CoordinationServer.ts` | WebSocket server: session management, join/leave/rejoin lifecycle, human message routing, agent delivery creation, delta context building, agent prompt formatting, delivery status tracking, A2A gating via LoopController, rename handling, typing/activity relay, JSONL persistence, ping/pong keepalive (10s interval), textDelta stream coalescing (50ms window) |
 | `LoopController.ts` | A2A loop protection state machine: `ask`/`budget`/`always`/`force` modes, budget counting, approval event lifecycle, guard-check triggering, human-intervention reset |
 | `GuardService.ts` | One-shot LLM call to detect unproductive A2A loops. Calls Anthropic API with a structured prompt. 10s timeout, fail-safe to STOP. Configurable model via `CLAUI_GUARD_API_KEY` / `CLAUI_GUARD_MODEL` env vars |
 | `SessionPersistence.ts` | Append-only JSONL persistence for session state. Writes events (init, join, msg, dlv, seen, pstat, leave, rename, loop, appr). Replays on startup to restore full state. One file per session |
@@ -53,31 +53,43 @@ Current state: Phase 0 runtime is working, Phase 1 defines the protocol/type sur
 
 | File | Purpose |
 |------|---------|
-| `MultiParticipantProtocol.ts` | Client-server WebSocket message type definitions (mirrors server types, including Phase 1 contracts) |
-| `MultiParticipantClient.ts` | WebSocket client that connects to the coordination server, handles reconnection |
-| `FileChangeTracker.ts` | Tracks file changes from agent tool_use events and filesystem snapshots. Dual-strategy: (1) structured tool tracking for Claude via StreamDemux, (2) snapshot-based mtime diffing for Codex. Emits `fileChanges` events |
-| `HeadlessAgentRunner.ts` | Drives a local Claude or Codex agent without a visible webview. Creates process managers, demuxers, and a FileChangeTracker. Accepts `deliver()` calls, calls `startTurn`/`finishTurn` lifecycle, takes snapshots before Codex turns. Emits `agentEvent` and `fileChanges` events |
-| `AgentBridge.ts` | Connects server `deliverPrompt` and `cancelAgent` commands to `HeadlessAgentRunner`, reports agent events and `fileChangeReport` messages back to server with workspace metadata |
-| `MultiParticipantSessionTab.ts` | Shared UI tab: human input goes to server (not local agent), displays transcript from all participants, shows streaming agent output. Handles server messages for activity indicators, A2A approvals, guard stops, file conflict warnings, renames, and approval resolution. Inline HTML webview with notification banners and approval action buttons |
+| `MultiParticipantProtocol.ts` | Client-server WebSocket message type definitions (mirrors server types). Includes `rejoinSession`, `rejoinAccepted/Rejected`, `ping/pong` |
+| `MultiParticipantClient.ts` | WebSocket client with auto-reconnect (exponential backoff, max 20 attempts), session identity tracking for rejoin, message queuing during disconnect, ping timeout detection (15s) |
+| `FileChangeTracker.ts` | Tracks file changes from agent tool_use events and filesystem snapshots. Dual-strategy: (1) structured tool tracking for Claude via StreamDemux, (2) snapshot-based mtime diffing for Codex |
+| `HeadlessAgentRunner.ts` | Drives a local Claude or Codex agent without a visible webview. Creates process managers, demuxers, and a FileChangeTracker. Accepts `deliver()` calls, emits `agentEvent` and `fileChanges` events |
+| `AgentBridge.ts` | Connects server `deliverPrompt` and `cancelAgent` commands to `HeadlessAgentRunner`, reports agent events and `fileChangeReport` messages back to server |
+| `MultiParticipantSessionTab.ts` | Shared UI tab using the React webview bundle (`buildWebviewHtml`). Sets `tabKind: 'multiparticipant'` so `App.tsx` renders `MPSessionView`. Translates server messages to `mp`-prefixed `ExtensionToWebviewMessage` types for the Zustand store. Handles rejoin on reconnect |
 
-### Shared Webview Types
-
-| File | Purpose |
-|------|---------|
-| `src/extension/types/webview-messages.ts` | Adds `mp*` postMessage contracts for the React multi-participant UI: session state, participants, messages, delivery status, streaming text, A2A approval, guard stop, participant activity, rename, conflicts, and join/errors |
-
-### Webview Store & Components (Phase 2 Track D)
+### Webview Components (`src/webview/components/MultiParticipant/`)
 
 | File | Purpose |
 |------|---------|
-| `src/webview/state/store.ts` | Multi-participant Zustand state slice: `mpSession`, `mpParticipants`, `mpMessages`, `mpDeliveryStatuses`, `mpStreamingTexts`, `mpApprovals`, `mpTypingStates`, `mpFileConflicts`, plus all setter/update actions and `clearMpState` |
-| `src/webview/hooks/useClaudeStream.ts` | Dispatch handlers mapping all `mp*` ExtensionToWebview messages to the store actions |
-| `src/webview/components/MultiParticipant/ParticipantList.tsx` | Sidebar component: vertical list with status dot, kind badge (H/A), provider icon, route key label, typing indicator |
-| `src/webview/components/MultiParticipant/JoinDialog.tsx` | Modal form: human name, agent name, provider selector, server URL. Client-side validation + server error display |
-| `src/webview/components/MultiParticipant/ConflictWarning.tsx` | Banner showing file conflict warnings from overlapping agent edits. Dismissable per conflict |
-| `src/webview/components/MultiParticipant/MpMessageBubble.tsx` | MP-specific message renderer: participant name badge with deterministic color (hash of participantId), author kind indicator, isMe/isMyAgent styling, delivery status dot, streaming text overlay, RTL support |
-| `src/webview/components/MultiParticipant/mpColors.ts` | Deterministic color assignment: `hashParticipantColor(participantId)` maps to a 12-color palette |
-| `src/webview/components/MultiParticipant/index.ts` | Barrel export for all MP components |
+| `MPSessionView.tsx` | Top-level layout: header (session name + connection badge), sidebar (ParticipantList), main area (MPChatView + MPInputArea), JoinDialog overlay, ApprovalDialog modal, connecting spinner |
+| `MPChatView.tsx` | Scrollable message list with auto-scroll-to-bottom, streaming text area for active deliveries, ConflictWarning and GuardStopNotification banners |
+| `MPInputArea.tsx` | Text input with ParticipantAutocomplete, typing indicator emission (500ms debounce, 5s auto-idle), ActivityIndicators display |
+| `MpMessageBubble.tsx` | Message renderer: participant color border, kind badges, delivery status pills, trigger-message links, rename detection, RTL support, streaming cursor |
+| `ParticipantList.tsx` | Sidebar: status dots, kind badges, provider labels, route key labels, approval pulse indicator, Stop A2A button |
+| `ParticipantAutocomplete.tsx` | Dropdown autocomplete matching participant names/route keys, Tab/Enter accept, arrow navigation |
+| `ActivityIndicators.tsx` | Per-participant activity: bouncing dots (typing), spinning ring (thinking), pulsing dot (streaming) |
+| `ApprovalDialog.tsx` | Modal for A2A approval: Deny, Allow N, Always Allow, Force (with confirmation) |
+| `GuardStopNotification.tsx` | Inline banner for guard stops with reason, message previews, and approval actions |
+| `ConflictWarning.tsx` | File conflict warning banners, dismissable per conflict |
+| `JoinDialog.tsx` | Modal form: server URL, human name, agent name, provider selector |
+| `mpColors.ts` | Deterministic color assignment via FNV-1a hash of participantId, 12-color palette |
+| `mpTypes.ts` | Re-exports protocol types for webview import convenience |
+| `index.ts` | Barrel export for all MP components |
+
+### Shared Integration Points
+
+| File | MP Changes |
+|------|------------|
+| `src/webview/state/store.ts` | `tabKind` type includes `'multiparticipant'`. 18 MP state fields + 19 action methods in the Zustand store |
+| `src/webview/hooks/useClaudeStream.ts` | Dispatches 16 `mp*` ExtensionToWebview message types to store actions |
+| `src/webview/App.tsx` | Routes to `MPSessionView` when `tabKind === 'multiparticipant'` |
+| `src/extension/types/webview-messages.ts` | 8 webview-to-extension + 16 extension-to-webview MP message interfaces. `tabKind` includes `'multiparticipant'` |
+| `src/extension/commands.ts` | `claudeMirror.joinMultiParticipantSession` command |
+| `package.json` | Command + `claudeMirror.multiParticipant.serverUrl` setting |
+| `src/webview/styles/global.css` | MP animations (cursor-blink, dot-bounce, spin, pulse, approval-pulse) + MP layout styles (session view, header, chat view, input area, streaming area, connection badges) |
 
 ## Message Routing
 
@@ -101,7 +113,7 @@ Server creates delivery (pending)
 
 Terminal states: `completed`, `failed`, `interrupted`, `not_delivered`
 
-## Agent-to-Agent Loop Protection (Phase 2 Track A)
+## Agent-to-Agent Loop Protection
 
 When an agent's completed response addresses another agent, the server detects this as agent-to-agent (A2A) communication and gates it through the `LoopController`.
 
@@ -125,31 +137,38 @@ Invoked at every 20th consecutive A2A message in `always` mode. Calls a configur
 3. First response wins. Server broadcasts `approvalResolved`
 4. On approval: delivery is created for the target agent. On deny: no delivery, mode resets to `ask`
 
-### Human Intervention Reset
+## Reconnection Handling
 
-Any human-to-agent message resets `consecutiveA2aCount` to 0 and `lastGuardCheckAt` to 0.
+### Client Auto-Reconnect
 
-### Serialization
+`MultiParticipantClient` implements exponential backoff reconnection:
+- Base delay: 1s, max delay: 30s, max attempts: 20
+- Jitter factor: 0.85-1.15x to prevent thundering herd
+- Queues messages sent during disconnect, flushes on reconnect
+- Tracks `humanParticipantId`, `agentParticipantId`, and `lastSeenSeq` for identity-preserving rejoin
 
-A2A routing is serialized via a promise chain (`a2aRoutingChain`) to prevent race conditions when multiple agents complete simultaneously (e.g., double budget decrement).
+### Rejoin Protocol
 
-## Rename Handling (Phase 2 Track B)
+On reconnect, if the client has stored identity:
+1. Client sends `rejoinSession` with `humanParticipantId`, `agentParticipantId`, `lastSeenSeq`
+2. Server looks up existing participants, marks them online, computes delta transcript (`seq > lastSeenSeq`)
+3. Server responds with `rejoinAccepted` containing the delta (not full transcript)
+4. If participants not found, server sends `rejoinRejected`
 
-Clients send `renameParticipant` with the target participantId and new name. Server validates via `validateParticipantName` with `excludeParticipantId`, updates the participant record, creates a `RenameEvent`, and broadcasts `participantRenamed`. On conflict, sends `renameRejected`. Rename notices are included in the next agent's delta context prompt.
+### Ping/Pong Keepalive
 
-## Session Persistence (Phase 2 Track B)
+- Server sends `ping` every 10s to all connected clients
+- Client responds with `pong` and resets a 15s timeout timer
+- If no ping received within 15s, client closes connection to trigger auto-reconnect
 
-`SessionPersistence` writes append-only JSONL events to `session-{id}.jsonl`:
-- Event types: `init`, `join`, `msg`, `dlv`, `seen`, `pstat`, `leave`, `rename`, `loop`, `appr`
-- On server restart: replays all events to rebuild full session state (session, participants, transcript, deliveries, seen states, loop state, approvals, rename events)
-- All participants are marked offline on restore (they must reconnect)
-- Enabled via `CLAUI_PERSISTENCE_DIR` env var
+## Performance Optimizations
 
-## Typing/Activity Relay (Phase 2 Track B)
+### Stream Coalescing
 
-- Humans send `typingIndicator` (idle/typing) -> server broadcasts `participantActivity` to all other clients
-- Agent delivery events trigger activity broadcasts: `accepted` -> thinking, `firstToken` -> streaming, `completed`/`failed` -> idle
-- Human typing state auto-resets to idle when a message is sent
+The server coalesces rapid `textDelta` agent events within a 50ms window:
+- Multiple deltas arriving within 50ms are accumulated into a single `agentStreamingText` broadcast
+- Buffer is flushed immediately when a delivery reaches a terminal state (completed, failed, interrupted)
+- Reduces WebSocket frame count during fast streaming
 
 ## Delta Context
 
@@ -158,102 +177,21 @@ Agents receive only messages they haven't seen:
 - **Subsequent**: only messages with `seq > lastAckedDeliveredSeq` + current task
 - `AgentSeenState` is advanced only after the owning ClaUi acknowledges the delivery
 
-## Codex Auto-Steer
+## Session Persistence
 
-When a new delivery arrives for a busy Codex agent:
-1. Cancel the current turn (`processManager.cancelTurn()`)
-2. Wait up to 8s for it to stop
-3. Mark the old delivery as `interrupted`
-4. Start the new delivery
+`SessionPersistence` writes append-only JSONL events to `session-{id}.jsonl`:
+- Event types: `init`, `join`, `msg`, `dlv`, `seen`, `pstat`, `leave`, `rename`, `loop`, `appr`
+- On server restart: replays all events to rebuild full session state
+- All participants are marked offline on restore (they must reconnect)
+- Enabled via `CLAUI_PERSISTENCE_DIR` env var
 
-## File Change Tracking (Phase 2 Track C)
+## File Change Tracking
 
-`FileChangeTracker` detects which files an agent modifies during a delivery turn, enabling the server to detect overlapping edits and warn about conflicts.
+`FileChangeTracker` detects which files an agent modifies during a delivery turn:
+- **Claude**: Structured tool-use tracking via StreamDemux (Edit, MultiEdit, Write, NotebookEdit)
+- **Codex**: Snapshot-based mtime diffing + command heuristic parsing
 
-### Dual-Strategy Detection
-
-**Strategy 1 -- Claude tool-use tracking:**
-- Listens to `toolUseStart`, `toolUseDelta`, and `blockStop` events from `StreamDemux`
-- Tracks only write-capable tools: `Edit`, `MultiEdit`, `Write`, `NotebookEdit`
-- Accumulates partial JSON during `toolUseDelta`, parses `file_path`/`path` on `blockStop`
-- Classifies change kind: `Write` -> `create`, others -> `modify`
-- Resolves absolute paths relative to workspace root
-- Source reported as `'tool-use'`
-
-**Strategy 2 -- Codex snapshot-based fallback:**
-- Before each Codex turn: `takeSnapshotBefore()` scans the workspace (top N directory levels, default 2)
-- After turn completion: `diffSnapshot()` rescans and compares mtimes
-- Detects creates (new files), modifies (mtime increased), and deletes (files removed)
-- Excludes common non-source directories (`node_modules`, `.git`, `dist`, `venv`, etc.)
-- Source reported as `'snapshot'`
-
-**Strategy 2b -- Codex command heuristic parsing:**
-- Listens to `commandExecutionComplete` events from `CodexExecDemux`
-- Regex patterns extract file paths from redirect (`>`, `>>`), `tee`, `cp`, and `mv` commands
-- Only counts successful commands (exit code 0 or null)
-- Adds to pending changes alongside snapshot results
-
-### Turn Lifecycle
-
-1. `HeadlessAgentRunner` calls `fileTracker.startTurn(deliveryId)` before each delivery
-2. For Codex: calls `fileTracker.takeSnapshotBefore()` after `startTurn`
-3. During the turn: tool-use events or command events accumulate changes
-4. On completion: `fileTracker.finishTurn()` emits tool-use changes; for Codex, `fileTracker.diffSnapshot()` emits snapshot changes
-5. `HeadlessAgentRunner` forwards `fileChanges` events from the tracker
-6. `AgentBridge` listens for `fileChanges` and sends a `fileChangeReport` to the server with workspace metadata (`workspaceId`, `workspaceRoot`, `source`, `changes`, `reportedAt`)
-
-### Cancel Agent
-
-`AgentBridge` handles `cancelAgent` server messages by calling `runner.cancel(deliveryId)` with agent participant ID filtering (ignores cancels targeted at other agents).
-
-## Extension Host UI (MultiParticipantSessionTab)
-
-The inline HTML webview in `MultiParticipantSessionTab` handles the following server message types with corresponding UI elements:
-
-### Server Message Handlers
-
-| Server Message | Handler | UI Effect |
-|----------------|---------|-----------|
-| `participantRenamed` | `handleParticipantRenamed` | Updates participant list, shows info notification toast |
-| `participantActivity` | `handleParticipantActivity` | Shows typing/thinking/streaming indicator next to participant name |
-| `agentToAgentApproval` | `handleAgentToAgentApproval` | Approval banner with source/target agent names and message preview |
-| `fileConflictWarning` | `handleFileConflictWarning` | Warning banner showing conflicting file paths and agents (dismissable) |
-| `guardStop` | `handleGuardStop` | Error-styled banner with reason and recent message previews |
-| `approvalResolved` | `handleApprovalResolved` | Removes the corresponding approval/guard banner |
-
-### Webview Message Handlers
-
-| Webview Message | Action |
-|-----------------|--------|
-| `approvalDecision` | Sends decision to server (`deny`, `approve-count` with budget 5, `approve-always`, `approve-force`) |
-| `dismissConflict` | Removes conflict from `activeConflicts` map |
-
-### Notification Banners
-
-The webview has a `#notifications` area that renders three styles of banners:
-- **Approval** (blue): A2A approval requests with Deny / Allow 5 / Always / Force buttons
-- **Guard** (red): Guard stop alerts with the same approval action buttons
-- **Conflict** (yellow): File conflict warnings, dismissable with an X button
-- **Info** (muted): Rename notifications and other informational toasts, auto-dismissable
-
-### State Tracked
-
-- `activityStates: Map<string, MPTypingState>` -- per-participant typing/thinking/streaming state
-- `pendingApprovals: Map<string, MPApprovalEvent>` -- pending A2A and guard stop approvals
-- `activeConflicts: Map<string, MPFileConflictWarning>` -- active file conflict warnings
-
-## Phase 1 Protocol Surface
-
-Phase 1 extends types only. The protocol now has contracts for:
-
-- **A2A loop control**: `agentToAgentApproval`, `approvalDecision`, `approvalResolved`, `a2aPendingApproval`, `guardStop`, plus `AgentLoopControlState` and `ApprovalEvent`.
-- **Typing/activity**: client `typingIndicator` and server `participantActivity` using `TypingState` (`idle`, `typing`, `thinking`, `streaming`).
-- **Workspace/file coordination**: client `fileChangeReport`, server `fileConflictWarning`, and server `cancelAgent`.
-- **Rename flow**: client `renameParticipant`, server `participantRenamed`, `renameRejected`, and `RenameEvent`.
-- **Session policy fields**: `agentMode` (`execute` or `plan-only`) and `allowRemoteSteer` (`owner-only`, `ask`, `always`).
-- **React bridge contracts**: `mpJoinSession`, `mpSendMessage`, `mpSessionState`, `mpNewMessage`, `mpDeliveryStatus`, `mpAgentToAgentApproval`, `mpGuardStop`, `mpFileConflictWarning`, and related `mp*` messages in `webview-messages.ts`.
-
-## How to Use (Phase 0)
+## How to Use
 
 ### Start the Server
 ```bash
@@ -282,57 +220,12 @@ npm start
 |---------|---------|-------------|
 | `claudeMirror.multiParticipant.serverUrl` | `ws://localhost:9120` | Coordination server URL |
 
-## Current Runtime Scope
-
-- Server with session management, routing, delivery lifecycle
-- Extension WebSocket client and agent bridge
-- Headless Claude and Codex agent runners
-- File change tracking (tool-use for Claude, snapshot + command heuristic for Codex)
-- Agent cancel support via server `cancelAgent` messages
-- Shared UI tab with message display, input, activity indicators, notifications
-- A2A approval and guard stop banners with approval action buttons (Deny/Allow 5/Always/Force)
-- File conflict warning banners (dismissable)
-- Participant rename notification toasts
-- Name validation with Intl.Segmenter (Hebrew, emoji support)
-- Delta context for agent prompts
-- Codex auto-steer busy policy
-- Delivery status tracking and broadcast
-- A2A loop protection with 4 modes (ask/budget/always/force)
-- Guard service (configurable LLM model, 10s timeout, fail-safe)
-- Approval event lifecycle (create, broadcast, resolve)
-- Rename handling with validation and broadcast
-- Typing/activity indicator relay (typing, thinking, streaming, idle)
-- Session persistence (JSONL append-only, replay on restart)
-- Agent response routing (detect A2A, gate via LoopController)
-- Plan-only mode prompt injection
-- Rename notices in agent delta context
-
-## Phase 2 Track D: Zustand Store Slice
-
-The store slice (`store.ts`) holds all MP-related state and actions:
-
-**State fields**: `mpConnectionStatus`, `mpSession`, `mpParticipants`, `mpMessages`, `mpMyHumanId`, `mpMyAgentId`, `mpApprovals`, `mpTypingStates`, `mpFileConflicts`, `mpStreamingTexts` (keyed by deliveryId), `mpDeliveryStatuses`, `mpJoinDialogOpen`, `mpJoinError`, `mpRenameError`, `mpDismissedConflictIds`.
-
-**Key actions**: `setMpSession` (full hydration from sessionState), `addMpMessage`, `updateMpParticipant`, `removeMpParticipant`, `setMpDeliveryStatus`, `appendMpStreamingText` (supports both delta and accumulated text), `addMpApprovalEvent`, `resolveMpApproval`, `setMpFileConflict` (upsert by conflictId), `setMpTypingState` (upsert by participantId), `clearMpState`.
-
-All state is cleared on session `reset()`.
-
-## Server Configuration (Environment Variables)
+## Environment Variables (Server)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CLAUI_SERVER_PORT` | `9120` | WebSocket server port |
-| `CLAUI_PERSISTENCE_DIR` | (disabled) | Directory for JSONL session persistence |
-| `CLAUI_GUARD_API_KEY` | (disabled) | Anthropic API key for guard model |
-| `CLAUI_GUARD_MODEL` | `claude-haiku-4-5-20251001` | Guard model name |
-| `CLAUI_GUARD_API_URL` | `https://api.anthropic.com/v1/messages` | Custom API URL |
-
-## Not Yet Implemented (Runtime)
-
-- Workspace overlap detection (server-side file tracking, Phase 3 Track E)
-- Webview indicators, delivery status badges, autocomplete (Phase 3 Track F)
-- Approval dialog and manual stop UI in React webview (Phase 3 Track G)
-- React webview integration with extension host (Phase 4)
-- Reconnection handling
-- Git workspace isolation modes
-- Multiple concurrent sessions per server
+| `CLAUI_SERVER_PORT` | `9120` | Server listen port |
+| `CLAUI_PERSISTENCE_DIR` | (none) | Directory for JSONL session persistence |
+| `CLAUI_GUARD_API_KEY` | (none) | Anthropic API key for guard model |
+| `CLAUI_GUARD_MODEL` | `claude-haiku-4-5-20251001` | Model for guard checks |
+| `CLAUI_GUARD_API_URL` | (Anthropic default) | Custom API endpoint for guard |

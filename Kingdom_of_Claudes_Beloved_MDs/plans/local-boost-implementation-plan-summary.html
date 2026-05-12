@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClaUi Local Boost - תוכנית יישום</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 32px;
+            line-height: 1.7;
+        }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 {
+            font-size: 28px;
+            color: #38bdf8;
+            margin-bottom: 8px;
+            border-bottom: 2px solid #1e3a5f;
+            padding-bottom: 12px;
+        }
+        .subtitle {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 32px;
+        }
+        h2 {
+            font-size: 20px;
+            color: #7dd3fc;
+            margin-top: 36px;
+            margin-bottom: 16px;
+            padding-right: 12px;
+            border-right: 4px solid #38bdf8;
+        }
+        h3 {
+            font-size: 16px;
+            color: #bae6fd;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        p, li { font-size: 15px; color: #cbd5e1; }
+        ul { padding-right: 24px; margin-bottom: 12px; }
+        li { margin-bottom: 6px; }
+        .phase-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+            transition: border-color 0.2s;
+        }
+        .phase-card:hover { border-color: #38bdf8; }
+        .phase-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .phase-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+        .phase-badge {
+            font-size: 12px;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+        .badge-low { background: #065f46; color: #6ee7b7; }
+        .badge-medium { background: #78350f; color: #fcd34d; }
+        .badge-high { background: #7f1d1d; color: #fca5a5; }
+        .summary-box {
+            background: #0c1929;
+            border: 1px solid #1e3a5f;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 24px 0;
+        }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #38bdf8;
+        }
+        .stat-label {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+        .highlight { color: #38bdf8; font-weight: 600; }
+        .warning { color: #fbbf24; }
+        .dep-flow {
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 16px 20px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 13px;
+            color: #94a3b8;
+            direction: ltr;
+            text-align: left;
+            overflow-x: auto;
+            margin: 16px 0;
+            white-space: pre;
+            line-height: 1.5;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+        th {
+            background: #1e293b;
+            color: #7dd3fc;
+            padding: 10px 14px;
+            text-align: right;
+            font-size: 13px;
+            border-bottom: 2px solid #334155;
+        }
+        td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #1e293b;
+            font-size: 14px;
+        }
+        tr:hover td { background: #1e293b40; }
+        .security-list li { color: #fca5a5; }
+        .security-list li::marker { color: #ef4444; }
+        .footer {
+            margin-top: 40px;
+            padding-top: 16px;
+            border-top: 1px solid #334155;
+            color: #64748b;
+            font-size: 13px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <h1>ClaUi Local Boost - תוכנית יישום</h1>
+    <p class="subtitle">דחיסת פלט פקודות מקומית לסוכני קוד | תאריך: 2026-05-11</p>
+
+    <h2>מה זה בכלל?</h2>
+    <p>
+        כשסוכני AI (כמו Claude או Codex) מריצים פקודות בטרמינל - למשל הרצת טסטים, בנייה, או התקנת חבילות -
+        הם מקבלים בחזרה <span class="highlight">עשרות אלפי שורות של טקסט</span> שרובו רעש: התקדמות, ספינרים, אזהרות חוזרות, ועוד.
+    </p>
+    <p style="margin-top: 8px;">
+        <span class="highlight">Local Boost</span> הוא שכבת דחיסה מקומית שיושבת בין הסוכן לפקודה.
+        היא מריצה את הפקודה המקורית כרגיל, אבל מסננת את הפלט לפני שהוא חוזר לסוכן -
+        שומרת רק את מה שחשוב (שגיאות, סיכומים, פרטי כשלון) ומורידה רעש.
+    </p>
+
+    <div class="stat-grid">
+        <div class="stat-card">
+            <div class="stat-value">~70%</div>
+            <div class="stat-label">חיסכון משוער בטוקנים</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">100%</div>
+            <div class="stat-label">מקומי - אף מידע לא יוצא החוצה</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">12+</div>
+            <div class="stat-label">פילטרים לכלי פיתוח שונים</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">0</div>
+            <div class="stat-label">תלויות חיצוניות</div>
+        </div>
+    </div>
+
+    <h2>עקרונות מרכזיים</h2>
+    <div class="summary-box">
+        <ul>
+            <li><span class="highlight">מקומי לחלוטין</span> - אין שום חיבור לשרתים חיצוניים, אין טלמטריה, אין OpenTelemetry</li>
+            <li><span class="highlight">בטוח</span> - סודות (טוקנים, סיסמאות, מפתחות API) מצונזרים אוטומטית לפני שמירה או הצגה</li>
+            <li><span class="highlight">שקוף</span> - הפקודה המקורית רצה ללא שינוי. רק הפלט שחוזר לסוכן מסונן</li>
+            <li><span class="highlight">שומר על קוד יציאה</span> - אם הפקודה נכשלה עם קוד 1, הסוכן יראה קוד 1</li>
+            <li><span class="highlight">לא שובר צינורות</span> - לא מחליף פקודות כמו npm או git. עוטף את הפקודה השלמה</li>
+            <li><span class="highlight">ניתן לכיבוי</span> - אפשר לכבות בלחיצה ולהסיר hooks בלי לפגוע בהגדרות המשתמש</li>
+        </ul>
+    </div>
+
+    <h2>איך זה עובד?</h2>
+    <div class="dep-flow">Claude/Codex: "npm test"
+    |
+    v
+PreToolUse Hook (rewrites command)
+    |
+    v
+claui-run --claui-encoded-shell-command &lt;base64(npm test)&gt;
+    |
+    v
+[runs "npm test" normally]
+    |
+    v
+[captures stdout/stderr]
+    |
+    v
+[redacts secrets] --> [filters noisy output] --> [writes local trace]
+    |
+    v
+Returns filtered output to agent
+(exit code preserved)</div>
+
+    <h2>שלבי היישום</h2>
+
+    <div class="phase-card">
+        <div class="phase-header">
+            <span class="phase-title">שלב 1: יסודות - טיפוסים והגדרות</span>
+            <span class="phase-badge badge-low">מורכבות נמוכה</span>
+        </div>
+        <p>הגדרת כל מבני הנתונים המשותפים, הוספת 8 הגדרות חדשות ל-VS Code, יצירת מבנה התיקיות.</p>
+    </div>
+
+    <div class="phase-card">
+        <div class="phase-header">
+            <span class="phase-title">שלב 2: מנוע צנזור סודות</span>
+            <span class="phase-badge badge-high">מורכבות גבוהה</span>
+        </div>
+        <p>
+            מודול קריטי מבחינת אבטחה. סורק משתני סביבה רגישים (טוקנים, סיסמאות, מפתחות),
+            מזהה דפוסי סודות ברגקס (GitHub PATs, AWS keys, JWTs ועוד),
+            ומצנזר אותם <span class="warning">לפני כל שמירה או הצגה</span>.
+            אם הצנזור נכשל - הפלט נחסם לחלוטין (fail-closed).
+        </p>
+    </div>
+
+    <div class="phase-card">
+        <div class="phase-header">
+            <span class="phase-title">שלב 3: מנועי סינון פלט</span>
+            <span class="phase-badge badge-medium">מורכבות בינונית</span>
+        </div>
+        <p>
+            פילטר גנרי (בסיסי) שעובד על כל פקודה + 12 פילטרים ייעודיים:
+            npm/pnpm/yarn/bun, pytest, jest/vitest, tsc, eslint, docker, go, maven/gradle, cargo, git diff.
+            כל פילטר יודע מה לשמור (שגיאות, סיכומים) ומה להסיר (רעש, פרוגרס בארים).
+        </p>
+    </div>
+
+    <div class="phase-card">
+        <div class="phase-header">
+            <span class="phase-title">שלב 4: מסווג פקודות</span>
+            <span class="phase-badge badge-low">מורכבות נמוכה</span>
+        </div>
+        <p>
+            מחליט אילו פקודות צריכות לעבור דרך הדחיסה ואילו לא.
+            פקודות רועשות (טסטים, בנייה, התקנות) - כן.
+            פקודות אינטראקטיביות, מסוכנות, או עם צינורות - לא.
+        </p>
+    </div>
+
+    <div class="phase-card">
+        <div class="phase-header">
+            <span class="phase-title">שלב 5: אחסון עקבות ומעקב</span>
+            <span class="phase-badge badge-medium">מורכבות בינונית</span>
+        </div>
+        <p>
+            כתיבת קבצי trace מקומיים (JSON) לכל פקודה שרצה.
+            כתיבה אטומית (למניעת קבצים שבורים), ניהול שמירת הקשר בין הטאב לסשן,
+            קריאת עקבות למסך הדשבורד, וניקוי אוטומטי (7 ימים ללוגים, 30 יום לעקבות).
+        </p>
+    </div>
+
+    <div class="phase-card">
+        <div class="phase-header">
+            <span class="phase-title">שלב 6: claui-run - הכלי המרכזי</span>
+            <span class="phase-badge badge-high">מורכבות גבוהה</span>
+        </div>
+        <p>
+            תוכנית שורת פקודה (Node.js) שמקבלת פקודה מקודדת, מריצה אותה,
+            מצנזרת סודות, מסננת רעש, כותבת עקבות, ומחזירה את הפלט המסונן.
+            מטפלת בסיגנלים (ביטול), שומרת קוד יציאה, ולא יוצרת חיבורי רשת.
+        </p>
+    </div>
+
+    <div class="phase-card">
+        <div class="phase-header">
+            <span class="phase-title">שלב 7: אינטגרציה לתוסף</span>
+            <span class="phase-badge badge-medium">מורכבות בינונית</span>
+        </div>
+        <p>
+            שירות ראשי שמנהל את כל הפיצ'ר (LocalBoostService),
+            מתקין את קבצי הריצה באחסון VS Code,
+            בונה את משתני הסביבה לתהליכי הסוכן,
+            ומתחבר למחזור החיים של הסשנים.
+        </p>
+    </div>
+
+    <div class="phase-card">
+        <div class="phase-header">
+            <span class="phase-title">שלב 8: חיבור למנהלי תהליכים</span>
+            <span class="phase-badge badge-medium">מורכבות בינונית</span>
+        </div>
+        <p>
+            שינויים מינימליים ב-ClaudeProcessManager ו-CodexExecProcessManager -
+            הזרקת משתני סביבה של Local Boost כשהפיצ'ר מופעל.
+            אם כבוי - אף שינוי לא קורה.
+        </p>
+    </div>
+
+    <div class="phase-card">
+        <div class="phase-header">
+            <span class="phase-title">שלב 9: מערכת Hooks</span>
+            <span class="phase-badge badge-high">מורכבות גבוהה</span>
+        </div>
+        <p>
+            <strong>Claude:</strong> Hook שמשכתב פקודות מתאימות דרך claui-run (שקוף לגמרי).<br>
+            <strong>Codex:</strong> Hook שדוחה פקודות לא עטופות ומבקש מהסוכן לנסות שוב עם claui-run, או מצב הוראות בלבד.<br>
+            כולל התקנה/הסרה בטוחה שלא פוגעת בהגדרות קיימות של המשתמש.
+        </p>
+    </div>
+
+    <div class="phase-card">
+        <div class="phase-header">
+            <span class="phase-title">שלב 10: ממשק משתמש</span>
+            <span class="phase-badge badge-medium">מורכבות בינונית</span>
+        </div>
+        <p>
+            אינדיקטור סטטוס ("Local Boost: On - 12 cmds - ~18k tokens saved"),
+            פאנל הגדרות (הפעלה, התקנת hooks, פרופיל סינון),
+            וטבלת עקבות אחרונות (פקודה, משך, גודל מקורי/מסונן, חיסכון בטוקנים).
+        </p>
+    </div>
+
+    <div class="phase-card">
+        <div class="phase-header">
+            <span class="phase-title">שלב 11: בנייה ואריזה</span>
+            <span class="phase-badge badge-medium">מורכבות בינונית</span>
+        </div>
+        <p>
+            הוספת יעד שלישי ל-webpack (local-boost-runtime), וידוא שקבצי הריצה נארזים ב-VSIX,
+            ושהסקריפטים שנוצרים (claui-run) מצביעים לנתיבים תקינים.
+        </p>
+    </div>
+
+    <div class="phase-card">
+        <div class="phase-header">
+            <span class="phase-title">שלב 12: בדיקות ואבטחה</span>
+            <span class="phase-badge badge-high">מורכבות גבוהה</span>
+        </div>
+        <p>
+            בדיקות יחידה לכל מודול, בדיקות אינטגרציה ל-runner, בדיקות אבטחה סטטיות (אין ייבוא מודולי רשת)
+            ודינמיות (מדמות חסימת רשת), מטריצת QA ידנית ב-VS Code, ורשימת ביקורת אבטחה מלאה.
+        </p>
+    </div>
+
+    <div class="phase-card">
+        <div class="phase-header">
+            <span class="phase-title">שלב 13: תיעוד טכני</span>
+            <span class="phase-badge badge-low">מורכבות נמוכה</span>
+        </div>
+        <p>
+            יצירת מסמך תיעוד מפורט (LOCAL_BOOST.md) בתיקיית התיעוד,
+            עדכון TECHNICAL.md עם רשומת אינדקס חדשה,
+            תיעוד ההגדרות, מבנה הקבצים, סכמת ה-trace, ומודל האבטחה.
+        </p>
+    </div>
+
+    <h2>סדר תלויות</h2>
+    <div class="dep-flow">Phase 1: Types & Settings -------+
+Phase 2: Secret Redactor ---------+---- independent, can run in parallel
+Phase 3: Filters -----------------+
+Phase 4: Command Eligibility -----+
+Phase 5: Trace Writer & Reports --+
+                                  |
+Phase 6: CLI Runner --------depends on 1-5
+                                  |
+Phase 7: Extension Services ------+
+Phase 8: Process Managers + ------+---- sequential
+         Analytics                |
+Phase 9: Hook System -------------+
+Phase 10: Webview UI -------------+
+Phase 11: Build & Webpack --------+
+                                  |
+Phase 12: Testing (ongoing) ------+---- runs throughout
+Phase 13: Documentation ----------+---- final</div>
+
+    <h2>סיכונים ומענים</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>סיכון</th>
+                <th>השפעה</th>
+                <th>מענה</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>דליפת סודות בפלט</td>
+                <td>קריטית</td>
+                <td>מנגנון fail-closed - אם הצנזור נכשל, הפלט נחסם לגמרי</td>
+            </tr>
+            <tr>
+                <td>שבירת צינורות shell</td>
+                <td>גבוהה</td>
+                <td>לא עוטפים פקודות עם צינורות/הפניות. הפקודה המקורית רצה ללא שינוי</td>
+            </tr>
+            <tr>
+                <td>שבירת סשנים קיימים</td>
+                <td>גבוהה</td>
+                <td>כל הקוד מותנה ב-enabled=true. כשכבוי - אפס שינוי בהתנהגות</td>
+            </tr>
+            <tr>
+                <td>Hook פוגע בהגדרות משתמש</td>
+                <td>בינונית</td>
+                <td>גיבוי לפני שינוי ראשון, הסרה רק של הרשומה המנוהלת, שימור כל שאר ההגדרות</td>
+            </tr>
+            <tr>
+                <td>סינון מוגזם מסתיר מידע חשוב</td>
+                <td>בינונית</td>
+                <td>3 פרופילים (strict/balanced/verbose), אפשרות לכיבוי, שמירת לוגים מצונזרים מלאים</td>
+            </tr>
+            <tr>
+                <td>הצטברות קבצים מקומיים</td>
+                <td>נמוכה</td>
+                <td>3 מדיניות שמירה: לוגים 7 ימים/100MB, עקבות 30 ימים/10K, דוחות יומיים 90 יום. ניקוי אוטומטי</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>דגשי אבטחה</h2>
+    <div class="summary-box">
+        <ul class="security-list">
+            <li>אין חיבור לאינטרנט מקוד ה-runner - נאכף בבדיקות סטטיות ודינמיות</li>
+            <li>אין שימוש ב-JFrog Boost, לא בקוד ולא בבינארי</li>
+            <li>אין OpenTelemetry, אין ייצוא נתונים</li>
+            <li>פלט לא מצונזר לעולם לא נשמר לדיסק</li>
+            <li>התקנת hooks היא opt-in בלבד</li>
+            <li>לוגים מקומיים נמחקים אוטומטית (7 ימים ברירת מחדל)</li>
+        </ul>
+    </div>
+
+    <h2>מה נכלל ב-MVP ומה אחרי?</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>MVP</th>
+                <th>Post-MVP</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>claui-run עם מצב פקודה מקודדת</td>
+                <td>Runner נייטיבי (ללא תלות ב-Node)</td>
+            </tr>
+            <tr>
+                <td>צנזור סודות</td>
+                <td>זיהוי טסטים לא יציבים (flaky)</td>
+            </tr>
+            <tr>
+                <td>פילטר גנרי + JS/pytest/tsc/eslint</td>
+                <td>פילטרים נוספים (Playwright, docker, cargo...)</td>
+            </tr>
+            <tr>
+                <td>עקבות מקומיות</td>
+                <td>דוחות מגמות ודשבורדים</td>
+            </tr>
+            <tr>
+                <td>Claude hook (שכתוב)</td>
+                <td>Codex updatedInput (כשייתמך)</td>
+            </tr>
+            <tr>
+                <td>Codex instruction-only + hook guard</td>
+                <td>עטיפת PATH ניסיונית לכל כלי (opt-in)</td>
+            </tr>
+            <tr>
+                <td>סטטוס בסיסי + טבלת עקבות</td>
+                <td>אחסון workspace-local אופציונלי</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="footer">
+        ClaUi Local Boost Implementation Plan | 2026-05-11
+    </div>
+
+</div>
+</body>
+</html>

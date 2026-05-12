@@ -205,7 +205,7 @@ export class MultiParticipantSessionTab {
           this.client.send({
             type: 'agentEvent',
             deliveryId: msg.deliveryId,
-            event: { kind: 'interrupted', deliveryId: msg.deliveryId, interruptedByDeliveryId: '' },
+            event: { kind: 'interrupted', interruptedByDeliveryId: '' },
           });
           break;
 
