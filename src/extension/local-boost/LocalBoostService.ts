@@ -21,6 +21,8 @@ export class LocalBoostService implements vscode.Disposable {
   private reportGenerator: LocalBoostDailyReportGenerator | null = null;
   private disposables: vscode.Disposable[] = [];
   private nodeAvailable = false;
+  private cachedClaudeHookInstalled = false;
+  private cachedCodexHookInstalled = false;
   private error: string | null = null;
   private log: (msg: string) => void;
 
@@ -97,12 +99,19 @@ export class LocalBoostService implements vscode.Disposable {
       enabled: this.settings.enabled,
       installed: this.runtimePaths !== null,
       version: this.runtimePaths ? '1.0.0' : null,
-      claudeHookInstalled: false, // Will be checked on demand
-      codexHookInstalled: false,
+      claudeHookInstalled: this.cachedClaudeHookInstalled,
+      codexHookInstalled: this.cachedCodexHookInstalled,
       codexMode: this.settings.codexMode,
       nodeAvailable: this.nodeAvailable,
       error: this.error,
     };
+  }
+
+  async refreshHookStatus(): Promise<void> {
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspacePath || !this.hookManager) return;
+    this.cachedClaudeHookInstalled = await this.hookManager.isClaudeHookInstalled(workspacePath);
+    this.cachedCodexHookInstalled = await this.hookManager.isCodexHookInstalled(workspacePath);
   }
 
   getRuntimePaths(): LocalBoostRuntimePaths | null {

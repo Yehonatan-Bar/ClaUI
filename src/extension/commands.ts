@@ -838,17 +838,22 @@ export function registerCommands(
   async function promptAndCreateMpTab(): Promise<void> {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const defaultUrl = config.get<string>('multiParticipant.serverUrl', 'ws://localhost:9120');
+    const authToken = config.get<string>('multiParticipant.authToken', '');
+    const defaultHumanName = config.get<string>('multiParticipant.defaultHumanName', '');
+    const defaultAgentName = config.get<string>('multiParticipant.defaultAgentName', '');
+    const defaultProvider = config.get<string>('multiParticipant.defaultAgentProvider', '');
 
     const serverUrl = await vscode.window.showInputBox({
       prompt: 'Coordination server URL',
       value: defaultUrl,
-      placeHolder: 'ws://localhost:9120',
+      placeHolder: 'ws://localhost:9120 or wss://my-server.com/mp',
       ignoreFocusOut: true,
     });
     if (!serverUrl) return;
 
     const humanName = await vscode.window.showInputBox({
       prompt: 'Your display name',
+      value: defaultHumanName || undefined,
       placeHolder: 'Alice',
       ignoreFocusOut: true,
     });
@@ -856,22 +861,37 @@ export function registerCommands(
 
     const agentName = await vscode.window.showInputBox({
       prompt: 'Your agent\'s display name',
+      value: defaultAgentName || undefined,
       placeHolder: 'Claude',
       ignoreFocusOut: true,
     });
     if (!agentName) return;
 
-    const providerPick = await vscode.window.showQuickPick(
-      [
-        { label: 'Claude', provider: 'claude' as const },
-        { label: 'Codex', provider: 'codex' as const },
-      ],
-      { placeHolder: 'Select agent provider', ignoreFocusOut: true }
-    );
-    if (!providerPick) return;
+    let agentProvider: 'claude' | 'codex';
+    if (defaultProvider === 'claude' || defaultProvider === 'codex') {
+      agentProvider = defaultProvider;
+    } else {
+      const providerPick = await vscode.window.showQuickPick(
+        [
+          { label: 'Claude', provider: 'claude' as const },
+          { label: 'Codex', provider: 'codex' as const },
+        ],
+        { placeHolder: 'Select agent provider', ignoreFocusOut: true }
+      );
+      if (!providerPick) return;
+      agentProvider = providerPick.provider;
+    }
 
-    const mpTab = tabManager.createMultiParticipantTab(serverUrl, providerPick.provider);
-    await mpTab.connect(humanName, agentName, providerPick.provider);
+    const sessionPassword = await vscode.window.showInputBox({
+      prompt: 'Session password (set one to create a protected session, or enter existing password to join)',
+      placeHolder: 'Leave empty for no password',
+      password: true,
+      ignoreFocusOut: true,
+    });
+    if (sessionPassword === undefined) return; // cancelled
+
+    const mpTab = tabManager.createMultiParticipantTab(serverUrl, agentProvider, undefined, authToken || undefined);
+    await mpTab.connect(humanName, agentName, agentProvider, sessionPassword || undefined);
     log(`Multi-participant tab created: ${mpTab.id} -> ${serverUrl}`);
   }
 

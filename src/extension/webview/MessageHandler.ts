@@ -1785,6 +1785,18 @@ export class MessageHandler {
             });
           break;
 
+        case 'openMultiParticipant':
+          this.log('Open Multi-Participant session requested from webview');
+          void vscode.commands.executeCommand('claudeMirror.createMultiParticipantSession').then(
+            () => undefined,
+            (err: unknown) => {
+              const message = err instanceof Error ? err.message : String(err);
+              this.log(`Failed to open Multi-Participant session: ${message}`);
+              this.webview.postMessage({ type: 'error', message: `Failed to open Multi-Participant session: ${message}` });
+            }
+          );
+          break;
+
         case 'openSmartSearch':
           this.log(`Open Smart Search requested: provider=${msg.provider} model=${msg.model}`);
           void vscode.commands.executeCommand('claudeMirror.smartSearch.open', {
@@ -3219,7 +3231,7 @@ export class MessageHandler {
         }
 
         case 'localBoostGetStatus': {
-          this.handleLocalBoostGetStatus();
+          void this.handleLocalBoostGetStatus();
           break;
         }
         case 'localBoostSetEnabled': {
@@ -5716,12 +5728,13 @@ export class MessageHandler {
 
   // --- Local Boost handlers ---
 
-  private handleLocalBoostGetStatus(): void {
+  private async handleLocalBoostGetStatus(): Promise<void> {
     const service = this.localBoostService;
     if (!service) {
       this.webview.postMessage({ type: 'localBoostStatus', status: { enabled: false, installed: false, version: null, claudeHookInstalled: false, codexHookInstalled: false, codexMode: 'off', nodeAvailable: false, error: null } } as any);
       return;
     }
+    await service.refreshHookStatus();
     this.webview.postMessage({ type: 'localBoostStatus', status: service.getStatus() } as any);
   }
 
@@ -5729,6 +5742,7 @@ export class MessageHandler {
     const service = this.localBoostService;
     if (!service) return;
     await service.setEnabled(enabled);
+    await service.refreshHookStatus();
     this.webview.postMessage({ type: 'localBoostStatus', status: service.getStatus() } as any);
   }
 
@@ -5736,7 +5750,7 @@ export class MessageHandler {
     const service = this.localBoostService;
     const hookManager = service?.getHookManager();
     if (!hookManager) {
-      this.webview.postMessage({ type: 'localBoostError', error: 'Local Boost is not initialized' } as any);
+      this.webview.postMessage({ type: 'localBoostError', error: 'Local Boost is not initialized. Try disabling and re-enabling.' } as any);
       return;
     }
     const workspacePath = this.getWorkspacePath();
@@ -5747,13 +5761,18 @@ export class MessageHandler {
     try {
       if (provider === 'claude' || provider === 'both') {
         await hookManager.installClaudeHook(workspacePath);
+        this.log(`[LocalBoost] Installed Claude hook at ${workspacePath}`);
       }
       if (provider === 'codex' || provider === 'both') {
         await hookManager.installCodexHook(workspacePath);
+        this.log(`[LocalBoost] Installed Codex hook at ${workspacePath}`);
       }
+      await service!.refreshHookStatus();
       this.webview.postMessage({ type: 'localBoostStatus', status: service!.getStatus() } as any);
     } catch (err) {
-      this.webview.postMessage({ type: 'localBoostError', error: err instanceof Error ? err.message : String(err) } as any);
+      const msg = err instanceof Error ? err.message : String(err);
+      this.log(`[LocalBoost] Hook install error: ${msg}`);
+      this.webview.postMessage({ type: 'localBoostError', error: msg } as any);
     }
   }
 
@@ -5766,13 +5785,18 @@ export class MessageHandler {
     try {
       if (provider === 'claude' || provider === 'both') {
         await hookManager.uninstallClaudeHook(workspacePath);
+        this.log(`[LocalBoost] Removed Claude hook at ${workspacePath}`);
       }
       if (provider === 'codex' || provider === 'both') {
         await hookManager.uninstallCodexHook(workspacePath);
+        this.log(`[LocalBoost] Removed Codex hook at ${workspacePath}`);
       }
+      await service!.refreshHookStatus();
       this.webview.postMessage({ type: 'localBoostStatus', status: service!.getStatus() } as any);
     } catch (err) {
-      this.webview.postMessage({ type: 'localBoostError', error: err instanceof Error ? err.message : String(err) } as any);
+      const msg = err instanceof Error ? err.message : String(err);
+      this.log(`[LocalBoost] Hook uninstall error: ${msg}`);
+      this.webview.postMessage({ type: 'localBoostError', error: msg } as any);
     }
   }
 

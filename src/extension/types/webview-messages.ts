@@ -260,6 +260,10 @@ export interface OpenProviderTabRequest {
   provider: ProviderId;
 }
 
+export interface OpenMultiParticipantRequest {
+  type: 'openMultiParticipant';
+}
+
 export interface OpenSmartSearchRequest {
   type: 'openSmartSearch';
   /** 'claude' or 'codex' — Smart Search runs the picked agent in a search-only tab. */
@@ -881,6 +885,7 @@ export type WebviewToExtensionMessage =
   | SetModelRequest
   | SetProviderRequest
   | OpenProviderTabRequest
+  | OpenMultiParticipantRequest
   | OpenSmartSearchRequest
   | OpenSessionFromSearchRequest
   | SwitchProviderWithContextRequest

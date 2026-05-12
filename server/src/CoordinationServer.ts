@@ -1,4 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
+import { IncomingMessage } from 'http';
+import { URL } from 'url';
 import { v4 as uuid } from 'uuid';
 import {
   Session, Participant, Message, AgentDelivery, AgentSeenState,
@@ -37,6 +39,8 @@ export interface ServerConfig {
   guardApiKey?: string;
   guardModel?: string;
   guardApiUrl?: string;
+  /** If set, clients must send this token via ?token= query param to connect. */
+  sessionToken?: string;
 }
 
 export class CoordinationServer {
@@ -79,6 +83,13 @@ export class CoordinationServer {
     this.guardService = new GuardService(guardConfig, this.log);
   }
 
+  /** Returns a copy of the session safe to send to clients (password stripped, hasPassword flag added). */
+  private publicSession(): Session {
+    if (!this.session) throw new Error('No active session');
+    const { sessionPassword, ...safe } = this.session;
+    return { ...safe, sessionPassword: null, hasPassword: !!sessionPassword } as unknown as Session;
+  }
+
   start(port: number): void {
     // Try to restore from persistence
     if (this.config.persistenceDir) {
@@ -115,6 +126,7 @@ export class CoordinationServer {
         nextSeq: 1,
         agentMode: 'execute',
         allowRemoteSteer: 'owner-only',
+        sessionPassword: null,
       };
       this.loopController = new LoopController(this.session.sessionId, this.log);
       this.log(`Session created: ${this.session.sessionId}`);
@@ -130,8 +142,23 @@ export class CoordinationServer {
       }
     }
 
-    this.wss = new WebSocketServer({ port });
+    const verifyClient = this.config.sessionToken
+      ? (info: { req: IncomingMessage }): boolean => {
+          const reqUrl = new URL(info.req.url || '/', `http://localhost:${port}`);
+          const clientToken = reqUrl.searchParams.get('token');
+          if (clientToken !== this.config.sessionToken) {
+            this.log(`Connection rejected: invalid token from ${info.req.socket.remoteAddress}`);
+            return false;
+          }
+          return true;
+        }
+      : undefined;
+
+    this.wss = new WebSocketServer({ port, verifyClient });
     this.log(`Coordination server listening on port ${port}`);
+    if (this.config.sessionToken) {
+      this.log('Token authentication enabled');
+    }
 
     this.wss.on('connection', (ws) => this.handleConnection(ws));
 
@@ -190,7 +217,7 @@ export class CoordinationServer {
   private handleClientMessage(ws: WebSocket, msg: ClientToServerMessage): void {
     switch (msg.type) {
       case 'joinSession':
-        this.handleJoin(ws, msg.humanName, msg.agentName, msg.agentProvider);
+        this.handleJoin(ws, msg.humanName, msg.agentName, msg.agentProvider, msg.password);
         break;
       case 'rejoinSession':
         this.handleRejoin(ws, msg.humanParticipantId, msg.agentParticipantId, msg.lastSeenSeq);
@@ -227,10 +254,27 @@ export class CoordinationServer {
 
   // -- Join / Leave --
 
-  private handleJoin(ws: WebSocket, humanName: string, agentName: string, agentProvider: 'claude' | 'codex'): void {
+  private handleJoin(ws: WebSocket, humanName: string, agentName: string, agentProvider: 'claude' | 'codex', password?: string): void {
     if (!this.session) {
       this.sendToClient(ws, { type: 'joinRejected', reason: 'No active session' });
       return;
+    }
+
+    const isFirstJoin = this.participants.length === 0;
+
+    if (isFirstJoin) {
+      // First user creates the session — their password becomes the session password
+      this.session.sessionPassword = password || null;
+      if (password) {
+        this.log('[Session] Password set by session creator');
+      }
+    } else if (this.session.sessionPassword) {
+      // Session is password-protected — validate
+      if (!password || password !== this.session.sessionPassword) {
+        this.sendToClient(ws, { type: 'joinRejected', reason: 'Invalid session password' });
+        this.log(`[Session] Join rejected: invalid password from ${humanName}`);
+        return;
+      }
     }
 
     try {
@@ -262,7 +306,7 @@ export class CoordinationServer {
         joinedAt: new Date().toISOString(),
       };
 
-      if (this.participants.length === 0) {
+      if (isFirstJoin) {
         this.session.createdByParticipantId = tempHumanParticipant.participantId;
       }
 
@@ -291,7 +335,7 @@ export class CoordinationServer {
 
       this.sendToClient(ws, {
         type: 'sessionState',
-        session: this.session,
+        session: this.publicSession(),
         participants: this.participants,
         transcript: this.transcript,
         loopControlState: this.loopController?.getState(),
@@ -344,7 +388,7 @@ export class CoordinationServer {
 
     this.sendToClient(ws, {
       type: 'rejoinAccepted',
-      session: this.session,
+      session: this.publicSession(),
       participants: this.participants,
       deltaTranscript,
       lastSeenSeq,

@@ -48,6 +48,7 @@ export class MultiParticipantSessionTab {
     callbacks: MultiParticipantSessionTabCallbacks,
     log?: (msg: string) => void,
     viewColumn?: vscode.ViewColumn,
+    authToken?: string,
   ) {
     this.tabId = tabId;
     this.tabNumber = tabNumber;
@@ -56,7 +57,7 @@ export class MultiParticipantSessionTab {
     this.callbacks = callbacks;
     this.log = log || (() => {});
 
-    this.client = new MultiParticipantClient(serverUrl, this.log);
+    this.client = new MultiParticipantClient(serverUrl, this.log, authToken);
     this.runner = new HeadlessAgentRunner(agentProvider, context, this.log);
     this.bridge = new AgentBridge(this.client, this.runner, this.log);
 
@@ -87,7 +88,7 @@ export class MultiParticipantSessionTab {
     this.wireServerMessages();
   }
 
-  async connect(humanName: string, agentName: string, agentProvider: 'claude' | 'codex'): Promise<void> {
+  async connect(humanName: string, agentName: string, agentProvider: 'claude' | 'codex', password?: string): Promise<void> {
     this.log(`[MPTab] Connecting as ${humanName} with agent ${agentName} (${agentProvider})`);
     this.postToWebview({ type: 'mpConnectionStatus', status: 'connecting' });
 
@@ -102,7 +103,11 @@ export class MultiParticipantSessionTab {
         this.client.send({ type: 'agentStatus', status: 'online' });
       } else {
         this.log('[MPTab] Connected to server, joining session');
-        this.client.send({ type: 'joinSession', humanName, agentName, agentProvider });
+        const joinMsg: { type: 'joinSession'; humanName: string; agentName: string; agentProvider: 'claude' | 'codex'; password?: string } = {
+          type: 'joinSession', humanName, agentName, agentProvider,
+        };
+        if (password) joinMsg.password = password;
+        this.client.send(joinMsg);
         this.client.send({ type: 'agentStatus', status: 'online' });
       }
     });

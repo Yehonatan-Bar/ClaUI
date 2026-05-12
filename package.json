@@ -65,11 +65,13 @@
     "commands": [
       {
         "command": "claudeMirror.joinMultiParticipantSession",
-        "title": "ClaUi: Join Multi-Participant Session"
+        "title": "ClaUi: Join Multi-Participant Session",
+        "icon": "$(organization)"
       },
       {
         "command": "claudeMirror.createMultiParticipantSession",
-        "title": "ClaUi: Create Multi-Participant Session"
+        "title": "ClaUi: Create Multi-Participant Session",
+        "icon": "$(organization)"
       },
       {
         "command": "claudeMirror.leaveMultiParticipantSession",
@@ -261,7 +263,28 @@
         "claudeMirror.multiParticipant.serverUrl": {
           "type": "string",
           "default": "ws://localhost:9120",
-          "description": "WebSocket URL of the multi-participant coordination server"
+          "description": "WebSocket URL of the multi-participant coordination server (e.g. ws://localhost:9120 or wss://my-server.com/mp)"
+        },
+        "claudeMirror.multiParticipant.authToken": {
+          "type": "string",
+          "default": "",
+          "description": "Authentication token for the coordination server. Leave empty if the server does not require one."
+        },
+        "claudeMirror.multiParticipant.defaultHumanName": {
+          "type": "string",
+          "default": "",
+          "description": "Default display name for you (human) in multi-participant sessions. If empty, you will be prompted each time."
+        },
+        "claudeMirror.multiParticipant.defaultAgentName": {
+          "type": "string",
+          "default": "",
+          "description": "Default display name for your AI agent in multi-participant sessions. If empty, you will be prompted each time."
+        },
+        "claudeMirror.multiParticipant.defaultAgentProvider": {
+          "type": "string",
+          "default": "",
+          "enum": ["", "claude", "codex"],
+          "description": "Default AI agent provider for multi-participant sessions. If empty, you will be prompted each time."
         },
         "claudeMirror.codex.cliPath": {
           "type": "string",
@@ -962,6 +985,11 @@
           "command": "claudeMirror.startSession",
           "when": "view == claudeMirror.sessionsTree",
           "group": "navigation@2"
+        },
+        {
+          "command": "claudeMirror.joinMultiParticipantSession",
+          "when": "view == claudeMirror.sessionsTree",
+          "group": "navigation@3"
         },
         {
           "command": "claudeMirror.tabs.openLayoutMenu",

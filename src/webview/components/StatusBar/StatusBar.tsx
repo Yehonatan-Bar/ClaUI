@@ -508,6 +508,9 @@ export const StatusBar: React.FC<{
       <button className="status-bar-group-dropdown-item" onClick={() => { useAppStore.getState().setChatSearchOpen(true); closeAllGroups(); }} data-tooltip="Search chat messages (Ctrl+Shift+F)">
         Search
       </button>
+      <button className="status-bar-group-dropdown-item" onClick={() => { postToExtension({ type: 'openMultiParticipant' }); closeAllGroups(); }} data-tooltip={"Real-time collaboration: multiple users, each with their own AI agent, in one shared session.\n\nRequires a coordination server. See server/deploy/SERVER_SETUP_GUIDE.md in the ClaUi repo - give it to ChatGPT or Claude for step-by-step setup help."}>
+        Multi-Participant
+      </button>
       <div className="status-bar-group-dropdown-separator" />
       <button className="status-bar-group-dropdown-item" onClick={toggleDashboard} data-tooltip="Analytics Dashboard">
         Dashboard

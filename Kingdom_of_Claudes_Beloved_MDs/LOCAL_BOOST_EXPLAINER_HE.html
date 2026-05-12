@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Local Boost - סקירת הפיצ'ר</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    line-height: 1.8;
+    padding: 0;
+  }
+
+  .hero {
+    background: linear-gradient(135deg, #161b22 0%, #0d1117 50%, #0c1520 100%);
+    border-bottom: 1px solid #21262d;
+    padding: 48px 32px 40px;
+    text-align: center;
+  }
+  .hero h1 {
+    font-size: 2.6rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #58a6ff, #3fb950, #58a6ff);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradientShift 4s ease infinite;
+    margin-bottom: 12px;
+  }
+  @keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  .hero .subtitle {
+    font-size: 1.15rem;
+    color: #8b949e;
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px; }
+
+  .section { margin-bottom: 44px; }
+
+  .section-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #f0f6fc;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #21262d;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title .icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  /* TL;DR */
+  .tldr {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-right: 4px solid #58a6ff;
+    border-radius: 8px;
+    padding: 22px 26px;
+    margin-bottom: 44px;
+    font-size: 1.05rem;
+  }
+  .tldr strong { color: #58a6ff; }
+
+  /* Benefits */
+  .benefits-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .benefit-card {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: 22px;
+    text-align: center;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .benefit-card:hover {
+    border-color: #30363d;
+    transform: translateY(-2px);
+  }
+  .benefit-card .metric {
+    font-size: 2.4rem;
+    font-weight: 800;
+    margin-bottom: 4px;
+    direction: ltr;
+  }
+  .benefit-card .metric-label {
+    font-size: 0.88rem;
+    color: #8b949e;
+    margin-bottom: 12px;
+  }
+  .benefit-card .desc {
+    font-size: 0.92rem;
+    color: #c9d1d9;
+    line-height: 1.6;
+  }
+  .color-speed .metric { color: #f0883e; }
+  .color-tokens .metric { color: #3fb950; }
+  .color-security .metric { color: #bc8cff; }
+
+  /* Problem statement */
+  .problem-box {
+    background: #1c1214;
+    border: 1px solid #3d2125;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .problem-box h3 {
+    color: #f85149;
+    font-size: 1rem;
+    margin-bottom: 8px;
+  }
+  .problem-box p {
+    color: #c9d1d9;
+    font-size: 0.92rem;
+  }
+  .problem-box code {
+    background: #21262d;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    direction: ltr;
+    display: inline-block;
+  }
+  .solution-box {
+    background: #121c16;
+    border: 1px solid #1a3a2a;
+    border-radius: 10px;
+    padding: 20px 24px;
+  }
+  .solution-box h3 {
+    color: #3fb950;
+    font-size: 1rem;
+    margin-bottom: 8px;
+  }
+  .solution-box p {
+    color: #c9d1d9;
+    font-size: 0.92rem;
+  }
+
+  /* Flow */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    align-items: center;
+  }
+  .flow-step {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: 16px 22px;
+    width: 100%;
+    max-width: 700px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .flow-step .step-num {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  .flow-step .step-body { flex: 1; }
+  .flow-step .step-title {
+    font-weight: 600;
+    color: #f0f6fc;
+    font-size: 0.98rem;
+  }
+  .flow-step .step-desc {
+    font-size: 0.87rem;
+    color: #8b949e;
+    margin-top: 3px;
+  }
+  .flow-step .step-desc code {
+    background: #21262d;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.82rem;
+    direction: ltr;
+    display: inline-block;
+  }
+  .flow-arrow {
+    color: #30363d;
+    font-size: 1.5rem;
+    line-height: 1;
+    padding: 4px 0;
+    text-align: center;
+  }
+  .s1 .step-num { background: #1a3a5c; color: #58a6ff; }
+  .s2 .step-num { background: #2a1a3a; color: #bc8cff; }
+  .s3 .step-num { background: #1a3a2a; color: #3fb950; }
+  .s4 .step-num { background: #3a1a1a; color: #f85149; }
+  .s5 .step-num { background: #3a2a1a; color: #f0883e; }
+  .s6 .step-num { background: #1a3a3a; color: #56d4dd; }
+
+  /* Comparison */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .comp-box {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: 18px 20px;
+    overflow: hidden;
+  }
+  .comp-box.before { border-top: 3px solid #f85149; }
+  .comp-box.after { border-top: 3px solid #3fb950; }
+  .comp-box h3 {
+    font-size: 0.98rem;
+    margin-bottom: 10px;
+  }
+  .comp-box.before h3 { color: #f85149; }
+  .comp-box.after h3 { color: #3fb950; }
+  .comp-box pre {
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 6px;
+    padding: 14px;
+    font-size: 0.78rem;
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    overflow-x: auto;
+    line-height: 1.55;
+    color: #8b949e;
+    white-space: pre;
+    direction: ltr;
+    text-align: left;
+  }
+  .comp-box pre .hl { color: #f0f6fc; }
+  .comp-box pre .err { color: #f85149; }
+  .comp-box pre .ok { color: #3fb950; }
+  .comp-box pre .dim { color: #484f58; }
+  .comp-box .comp-meta {
+    margin-top: 10px;
+    font-size: 0.82rem;
+    color: #8b949e;
+    display: flex;
+    gap: 16px;
+    direction: ltr;
+  }
+
+  /* Filters */
+  .filter-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .filter-card {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .filter-card .fc-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .filter-card .fc-tag {
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    direction: ltr;
+  }
+  .fc-tag-js { background: #2a2a1a; color: #f0c33e; }
+  .fc-tag-py { background: #1a2a3a; color: #58a6ff; }
+  .fc-tag-ts { background: #1a3a2a; color: #3fb950; }
+  .fc-tag-lint { background: #2a1a2a; color: #bc8cff; }
+  .fc-tag-gen { background: #2a2a2a; color: #8b949e; }
+  .filter-card .fc-name {
+    font-weight: 600;
+    color: #f0f6fc;
+    font-size: 0.92rem;
+  }
+  .filter-card .fc-keeps, .filter-card .fc-strips {
+    font-size: 0.82rem;
+    margin-top: 6px;
+  }
+  .filter-card .fc-keeps { color: #3fb950; }
+  .filter-card .fc-strips { color: #f85149; }
+  .filter-card .fc-keeps::before { content: "V "; font-weight: 700; }
+  .filter-card .fc-strips::before { content: "X "; font-weight: 700; }
+
+  /* Security */
+  .sec-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  .sec-card {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    padding: 18px;
+    border-right: 3px solid #bc8cff;
+  }
+  .sec-card .sc-title {
+    font-weight: 700;
+    color: #f0f6fc;
+    font-size: 0.95rem;
+    margin-bottom: 6px;
+  }
+  .sec-card .sc-body {
+    font-size: 0.88rem;
+    color: #8b949e;
+    line-height: 1.6;
+  }
+  .sec-card code {
+    background: #21262d;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.82rem;
+    direction: ltr;
+    display: inline-block;
+  }
+
+  /* Eligible commands */
+  .elig-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .elig-box {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: 16px 20px;
+  }
+  .elig-box.yes { border-top: 3px solid #3fb950; }
+  .elig-box.no { border-top: 3px solid #f85149; }
+  .elig-box h3 { font-size: 0.95rem; margin-bottom: 10px; }
+  .elig-box.yes h3 { color: #3fb950; }
+  .elig-box.no h3 { color: #f85149; }
+  .elig-list {
+    list-style: none;
+    font-size: 0.88rem;
+    direction: ltr;
+    text-align: left;
+  }
+  .elig-list li {
+    padding: 3px 0;
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+  }
+  .elig-list li code {
+    background: #21262d;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.82rem;
+  }
+  .elig-list .reason {
+    color: #484f58;
+    font-size: 0.78rem;
+  }
+
+  /* Quick start */
+  .qs-steps {
+    display: flex;
+    gap: 16px;
+  }
+  .qs-step {
+    flex: 1;
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: 22px 18px;
+    text-align: center;
+    position: relative;
+  }
+  .qs-step .qs-num {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #1a3a2a;
+    color: #3fb950;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1.1rem;
+    margin: 0 auto 12px;
+  }
+  .qs-step .qs-title {
+    font-weight: 700;
+    color: #f0f6fc;
+    font-size: 0.95rem;
+    margin-bottom: 6px;
+  }
+  .qs-step .qs-desc {
+    font-size: 0.85rem;
+    color: #8b949e;
+    line-height: 1.5;
+  }
+  .qs-step .qs-desc code {
+    background: #21262d;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    direction: ltr;
+    display: inline-block;
+  }
+  .qs-arrow {
+    display: flex;
+    align-items: center;
+    color: #30363d;
+    font-size: 1.6rem;
+    flex-shrink: 0;
+  }
+
+  /* Architecture */
+  .arch-box {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    padding: 24px;
+    direction: ltr;
+    text-align: left;
+  }
+  .arch-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .arch-row:last-child { margin-bottom: 0; }
+  .arch-col {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .arch-col h4 {
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .arch-col .a-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .arch-col ul {
+    list-style: none;
+    font-size: 0.82rem;
+    color: #8b949e;
+  }
+  .arch-col li {
+    padding: 2px 0;
+  }
+  .arch-col li code {
+    color: #c9d1d9;
+    font-size: 0.8rem;
+  }
+  .arch-connector {
+    text-align: center;
+    color: #30363d;
+    font-size: 1.2rem;
+    padding: 4px 0;
+  }
+
+  .footer {
+    text-align: center;
+    padding: 32px;
+    color: #484f58;
+    font-size: 0.82rem;
+    border-top: 1px solid #21262d;
+    margin-top: 24px;
+  }
+
+  @media (max-width: 750px) {
+    .benefits-grid, .filter-cards, .qs-steps { grid-template-columns: 1fr; flex-direction: column; }
+    .comparison, .sec-grid, .elig-grid { grid-template-columns: 1fr; }
+    .arch-row { flex-direction: column; }
+    .qs-arrow { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Local Boost</h1>
+  <p class="subtitle">
+    דחיסה מקומית של פלטי פקודות עבור סוכני AI.
+    פחות טוקנים, תגובות מהירות יותר, סודות לעולם לא נחשפים.
+  </p>
+</div>
+
+<div class="container">
+
+  <!-- TL;DR -->
+  <div class="tldr">
+    <strong>בקצרה:</strong>
+    Local Boost יורט פקודות Bash של Claude/Codex, מריץ אותן דרך מדחס מקומי שמסנן סודות,
+    מנקה רעש, ומחזיר רק את הפלט השימושי. הסוכן מקבל תוצאות נקיות ותמציתיות --
+    צורך פחות טוקנים, מגיב מהר יותר, ולעולם לא רואה את המפתחות שלך.
+  </div>
+
+  <!-- הבעיה והפתרון -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:#2a1a1a;color:#f85149;">?</span>
+      הבעיה והפתרון
+    </div>
+    <div class="problem-box">
+      <h3>הבעיה</h3>
+      <p>
+        כשקלוד מריץ <code>npm test</code> על פרויקט גדול, הוא מקבל בחזרה אלפי שורות פלט --
+        רוב השורות הן PASS, progress bars, הודעות funding, וכיסוי קוד.
+        כל השורות האלה נספרות כטוקנים, ממלאות את חלון ההקשר, מאטות את זמן התגובה,
+        ועלולות לחשוף סודות מ-environment variables.
+      </p>
+    </div>
+    <div class="solution-box">
+      <h3>הפתרון</h3>
+      <p>
+        Local Boost מיירט את הפקודה, מריץ אותה מקומית, מוחק סודות מהפלט,
+        מפעיל פילטר חכם שמשמר רק שגיאות ותקצירים, ומחזיר לסוכן פלט קצר וממוקד.
+        קוד היציאה המקורי נשמר -- הסוכן לא יודע שמשהו השתנה, חוץ מזה שהפלט הרבה יותר שימושי.
+      </p>
+    </div>
+  </div>
+
+  <!-- יתרונות -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:#2a2a1a;color:#f0883e;">*</span>
+      שלושת היתרונות
+    </div>
+    <div class="benefits-grid">
+      <div class="benefit-card color-speed">
+        <div class="metric">2-8x</div>
+        <div class="metric-label">דחיסת פלט</div>
+        <div class="desc">
+          פלט של 12,000 שורות מ-<code>npm test</code> הופך ל-80 שורות ממוקדות.
+          הסוכן קורא פחות, חושב מהר יותר, ומגיב תוך שניות.
+        </div>
+      </div>
+      <div class="benefit-card color-tokens">
+        <div class="metric">~70%</div>
+        <div class="metric-label">חיסכון בטוקנים</div>
+        <div class="desc">
+          פחות טוקנים לכל פקודה = יותר מקום בחלון ההקשר =
+          סשנים ארוכים ופרודוקטיביים יותר לפני שנגמרת המכסה.
+        </div>
+      </div>
+      <div class="benefit-card color-security">
+        <div class="metric">0</div>
+        <div class="metric-label">סודות שנחשפו</div>
+        <div class="desc">
+          מפתחות API, טוקנים, סיסמאות ב-env vars ובפלט פקודות
+          מוחלפים ב-<code>[REDACTED]</code> לפני שהסוכן רואה אותם.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- איך זה עובד -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:#1a3a2a;color:#3fb950;">&#8635;</span>
+      איך זה עובד
+    </div>
+    <div class="flow">
+      <div class="flow-step s1">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">הסוכן מבקש להריץ פקודת Bash</div>
+          <div class="step-desc">קלוד או Codex רוצים להריץ <code>npm test</code> או <code>git diff</code></div>
+        </div>
+      </div>
+      <div class="flow-arrow">&#8595;</div>
+      <div class="flow-step s2">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Hook מיירט את הפקודה</div>
+          <div class="step-desc">
+            Pre-tool-use hook משכתב את הפקודה:
+            <code>npm test</code> הופך ל-<code>claui-run --claui-encoded-shell-command &lt;base64&gt;</code>
+          </div>
+        </div>
+      </div>
+      <div class="flow-arrow">&#8595;</div>
+      <div class="flow-step s3">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">claui-run מריץ את הפקודה המקורית</div>
+          <div class="step-desc">תהליך Node.js נפרד, חסום רשת לחלוטין -- אין גישה ל-fetch, http, net</div>
+        </div>
+      </div>
+      <div class="flow-arrow">&#8595;</div>
+      <div class="flow-step s4">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">סינון סודות מהפלט</div>
+          <div class="step-desc">
+            סריקת ערכי env vars רגישים + זיהוי תבניות: GitHub PATs, מפתחות AWS, JWTs, מפתחות OpenAI
+          </div>
+        </div>
+      </div>
+      <div class="flow-arrow">&#8595;</div>
+      <div class="flow-step s5">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <div class="step-title">הפעלת פילטר חכם</div>
+          <div class="step-desc">
+            פילטר ייעודי לפי סוג הפקודה -- שומר שגיאות, tracebacks, תקצירים. מוחק רעש, progress bars, שורות PASS
+          </div>
+        </div>
+      </div>
+      <div class="flow-arrow">&#8595;</div>
+      <div class="flow-step s6">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <div class="step-title">החזרת פלט דחוס + קוד יציאה מקורי</div>
+          <div class="step-desc">
+            הסוכן מקבל פלט נקי וממוקד. קובץ trace נשמר לסטטיסטיקות בדאשבורד.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- לפני ואחרי -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:#2a1a2a;color:#f85149;">&#8644;</span>
+      לפני ואחרי
+    </div>
+    <div class="comparison">
+      <div class="comp-box before">
+        <h3>בלי Local Boost</h3>
+<pre>
+$ npm test
+
+<span class="dim">> my-app@1.0.0 test
+> jest --coverage</span>
+
+ PASS  src/utils/math.test.ts
+ PASS  src/utils/string.test.ts
+ PASS  src/utils/date.test.ts
+ PASS  src/api/auth.test.ts
+ PASS  src/api/users.test.ts
+<span class="dim">   ... 47 more PASS lines ...</span>
+ <span class="err">FAIL</span>  src/api/orders.test.ts
+  <span class="err">x should validate order total</span>
+    <span class="err">Expected: 150.00</span>
+    <span class="err">Received: 149.99</span>
+    <span class="err">at orders.test.ts:45:5</span>
+
+<span class="dim">----------|---------|---------|
+File      | % Stmts | % Branch|
+----------|---------|---------|
+All files |   87.3  |   72.1  |
+ auth.ts  |   100   |   100   |
+ users.ts |   95.2  |   85.7  |
+ orders.ts|   62.1  |   45.0  |
+   ... 18 more rows ...
+----------|---------|---------|
+
+Test Suites: 1 failed, 52 passed
+Tests: 1 failed, 247 passed
+Time: 14.2 s</span>
+</pre>
+        <div class="comp-meta">
+          <span>~4,200 chars</span>
+          <span>~1,050 tokens</span>
+        </div>
+      </div>
+      <div class="comp-box after">
+        <h3>עם Local Boost</h3>
+<pre>
+<span class="dim">[claui-run] jest | exit 1 | 14.2s</span>
+
+<span class="err">FAIL  src/api/orders.test.ts</span>
+  <span class="err">x should validate order total</span>
+
+    <span class="hl">Expected: 150.00</span>
+    <span class="hl">Received: 149.99</span>
+
+    at <span class="hl">orders.test.ts:45</span>
+
+<span class="ok">---</span>
+<span class="ok">Test Suites: 1 failed, 52 passed</span>
+<span class="ok">Tests: 1 failed, 247 passed</span>
+</pre>
+        <div class="comp-meta">
+          <span>~380 chars</span>
+          <span>~95 tokens</span>
+          <span style="color:#3fb950;font-weight:600;">11x compression</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- פילטרים -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:#1a2a3a;color:#58a6ff;">&#9881;</span>
+      פילטרים חכמים
+    </div>
+    <p style="font-size:0.92rem; color:#8b949e; margin-bottom:16px;">
+      כל פקודה מותאמת לפילטר ייעודי. אם אין התאמה ספציפית, הפילטר הגנרי פועל.
+    </p>
+    <div class="filter-cards">
+      <div class="filter-card">
+        <div class="fc-header">
+          <span class="fc-tag fc-tag-js">npm / yarn / pnpm</span>
+        </div>
+        <div class="fc-keeps">שמירה: שגיאות, תוצאות טסטים, audit</div>
+        <div class="fc-strips">מחיקה: funding, deprecation, progress</div>
+      </div>
+      <div class="filter-card">
+        <div class="fc-header">
+          <span class="fc-tag fc-tag-py">pytest</span>
+        </div>
+        <div class="fc-keeps">שמירה: FAILURES, tracebacks, diffs</div>
+        <div class="fc-strips">מחיקה: collection, platform, dots</div>
+      </div>
+      <div class="filter-card">
+        <div class="fc-header">
+          <span class="fc-tag fc-tag-py">jest / vitest</span>
+        </div>
+        <div class="fc-keeps">שמירה: Expected/Received, stacks</div>
+        <div class="fc-strips">מחיקה: PASS lines, watch hints</div>
+      </div>
+      <div class="filter-card">
+        <div class="fc-header">
+          <span class="fc-tag fc-tag-ts">tsc</span>
+        </div>
+        <div class="fc-keeps">שמירה: שגיאות מקובצות לפי קובץ</div>
+        <div class="fc-strips">מחיקה: כפילויות, מעל 10 לקובץ</div>
+      </div>
+      <div class="filter-card">
+        <div class="fc-header">
+          <span class="fc-tag fc-tag-lint">eslint</span>
+        </div>
+        <div class="fc-keeps">שמירה: issues מקובצים לפי קובץ</div>
+        <div class="fc-strips">מחיקה: קבצים תקינים, verbose</div>
+      </div>
+      <div class="filter-card">
+        <div class="fc-header">
+          <span class="fc-tag fc-tag-gen">Generic</span>
+        </div>
+        <div class="fc-keeps">שמירה: 20 ראשונות + 80 אחרונות + שגיאות</div>
+        <div class="fc-strips">מחיקה: ANSI, spinners, כפילויות</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- אבטחה -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:#2a1a3a;color:#bc8cff;">&#128274;</span>
+      שכבת האבטחה
+    </div>
+    <div class="sec-grid">
+      <div class="sec-card">
+        <div class="sc-title">סריקת Environment Variables</div>
+        <div class="sc-body">
+          כל ה-env vars שמתאימים לתבניות
+          <code>*_TOKEN</code> <code>*_SECRET</code> <code>*_KEY</code> <code>*_PASSWORD</code>
+          נאספים. הערכים שלהם מוחלפים ב-<code>[REDACTED]</code> בכל פלט.
+        </div>
+      </div>
+      <div class="sec-card">
+        <div class="sc-title">זיהוי תבניות ידועות</div>
+        <div class="sc-body">
+          ביטויים רגולריים תופסים GitHub PATs (<code>ghp_*</code>),
+          מפתחות AWS (<code>AKIA*</code>), JWTs, מפתחות OpenAI --
+          גם אם הם לא ב-env vars.
+        </div>
+      </div>
+      <div class="sec-card">
+        <div class="sc-title">עיצוב Fail-Closed</div>
+        <div class="sc-body">
+          אם מנגנון הסינון נתקל בשגיאה, <strong>כל הפלט מדוכא</strong>.
+          אף מידע חלקי או לא-מסונן לא מגיע לסוכן. בטיחות מעל הכל.
+        </div>
+      </div>
+      <div class="sec-card">
+        <div class="sc-title">בידוד רשת מוחלט</div>
+        <div class="sc-body">
+          <code>claui-run</code> חוסם כל גישה לרשת ברמת Node.js:
+          <code>fetch</code>, <code>http</code>, <code>net</code>, <code>dgram</code>.
+          פלט הפקודה לא יכול להישלח לשום מקום.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- פקודות מתאימות -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:#2a2a1a;color:#f0c33e;">&#9745;</span>
+      אילו פקודות עוברות דרך Local Boost?
+    </div>
+    <div class="elig-grid">
+      <div class="elig-box yes">
+        <h3>עוברות דחיסה</h3>
+        <ul class="elig-list">
+          <li><code>git status / diff / log / blame</code></li>
+          <li><code>npm test / install / build / lint</code></li>
+          <li><code>pnpm / yarn / bun</code> <span class="reason">(equivalents)</span></li>
+          <li><code>python / pytest / pip</code></li>
+          <li><code>cargo build / test / clippy</code></li>
+          <li><code>go build / test / vet</code></li>
+          <li><code>tsc / eslint / prettier</code></li>
+          <li><code>make / cmake / gradle / mvn</code></li>
+          <li><code>ls / cat / find / grep / wc</code></li>
+          <li><code>docker build / compose</code></li>
+        </ul>
+      </div>
+      <div class="elig-box no">
+        <h3>רצות רגיל (בלי שינוי)</h3>
+        <ul class="elig-list">
+          <li><code>ssh / scp / rsync</code> <span class="reason">-- interactive / network</span></li>
+          <li><code>sudo / su</code> <span class="reason">-- privilege escalation</span></li>
+          <li><code>vim / nano / emacs</code> <span class="reason">-- interactive editor</span></li>
+          <li><code>npm run dev / start</code> <span class="reason">-- long-running server</span></li>
+          <li><code>docker run</code> <span class="reason">-- container exec</span></li>
+          <li><code>rm -rf /</code> <span class="reason">-- destructive</span></li>
+          <li><code>cmd | cmd</code> <span class="reason">-- pipelines</span></li>
+          <li><code>cmd > file</code> <span class="reason">-- redirections</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ארכיטקטורה -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:#1a3a3a;color:#56d4dd;">&#9635;</span>
+      ארכיטקטורה
+    </div>
+    <div class="arch-box">
+      <div class="arch-row">
+        <div class="arch-col" style="border-right: 3px solid #58a6ff;">
+          <h4><span class="a-dot" style="background:#58a6ff;"></span> VS Code Extension Host</h4>
+          <ul>
+            <li><code>LocalBoostService</code> -- lifecycle, settings</li>
+            <li><code>LocalBoostInstaller</code> -- runtime deployment</li>
+            <li><code>LocalBoostEnvBuilder</code> -- env var injection</li>
+            <li><code>LocalBoostHookManager</code> -- hook install/remove</li>
+            <li><code>LocalBoostTraceReader</code> -- dashboard data</li>
+            <li><code>LocalBoostContextStore</code> -- per-tab context</li>
+          </ul>
+        </div>
+        <div class="arch-col" style="border-right: 3px solid #3fb950;">
+          <h4><span class="a-dot" style="background:#3fb950;"></span> claui-run CLI (No Network)</h4>
+          <ul>
+            <li><code>SecretRedactor</code> -- env scan + regex rules</li>
+            <li><code>CommandEligibility</code> -- allow/deny classification</li>
+            <li><code>OutputFilterRegistry</code> -- 6 specialized filters</li>
+            <li><code>executeShellCommand</code> -- spawn + signal relay</li>
+            <li><code>CommandTraceWriter</code> -- atomic trace files</li>
+            <li><code>NoNetworkGuard</code> -- blocks all network</li>
+          </ul>
+        </div>
+        <div class="arch-col" style="border-right: 3px solid #bc8cff;">
+          <h4><span class="a-dot" style="background:#bc8cff;"></span> Webview (React)</h4>
+          <ul>
+            <li><code>LocalBoostStatusBadge</code> -- StatusBar dot</li>
+            <li><code>LocalBoostSettingsPanel</code> -- toggle + hooks</li>
+            <li><code>LocalBoostTracePanel</code> -- aggregate stats</li>
+            <li><code>LocalBoostTraceDetail</code> -- per-command view</li>
+            <li><code>LocalBoostTab</code> -- Dashboard tab</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- התחלה מהירה -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon" style="background:#1a3a2a;color:#3fb950;">&#9654;</span>
+      התחלה מהירה
+    </div>
+    <div class="qs-steps">
+      <div class="qs-step">
+        <div class="qs-num">1</div>
+        <div class="qs-title">הפעלה</div>
+        <div class="qs-desc">
+          StatusBar &rarr; View &rarr; Vitals<br>
+          גלילה ל-"Local Boost"<br>
+          לחיצה על <strong>Enable</strong>
+        </div>
+      </div>
+      <div class="qs-arrow">&larr;</div>
+      <div class="qs-step">
+        <div class="qs-num">2</div>
+        <div class="qs-title">התקנת Hook</div>
+        <div class="qs-desc">
+          לחיצה על <strong>Install Claude Hook</strong><br>
+          נוצר hook ב-<code>.claude/settings.json</code>
+        </div>
+      </div>
+      <div class="qs-arrow">&larr;</div>
+      <div class="qs-step">
+        <div class="qs-num">3</div>
+        <div class="qs-title">מוכן!</div>
+        <div class="qs-desc">
+          כל פקודת Bash מתאימה נדחסת אוטומטית.<br>
+          סטטיסטיקות ב-Dashboard &rarr; Local Boost
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  ClaUi &middot; Local Boost v1.0.0 &middot; כל העיבוד מתבצע מקומית, שום דבר לא נשלח החוצה.
+</div>
+
+</body>
+</html>

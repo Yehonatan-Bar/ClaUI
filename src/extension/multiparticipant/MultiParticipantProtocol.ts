@@ -23,6 +23,8 @@ export interface MPSession {
   nextSeq: number;
   agentMode: MPAgentMode;
   allowRemoteSteer: MPRemoteSteerPolicy;
+  /** True if the session is password-protected (actual password is never sent). */
+  hasPassword?: boolean;
 }
 
 export interface MPParticipant {
@@ -150,7 +152,7 @@ export interface MPFileConflictWarning {
 // -- Client -> Server --
 
 export type ClientToServerMessage =
-  | { type: 'joinSession'; humanName: string; agentName: string; agentProvider: MPAgentProvider }
+  | { type: 'joinSession'; humanName: string; agentName: string; agentProvider: MPAgentProvider; password?: string }
   | { type: 'rejoinSession'; humanParticipantId: string; agentParticipantId: string; lastSeenSeq: number }
   | { type: 'humanMessage'; rawBody: string }
   | { type: 'agentEvent'; deliveryId: string; event: AgentEventPayload }

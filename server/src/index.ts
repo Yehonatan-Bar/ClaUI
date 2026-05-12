@@ -11,6 +11,7 @@ const server = new CoordinationServer({
   guardApiKey: process.env.CLAUI_GUARD_API_KEY || undefined,
   guardModel: process.env.CLAUI_GUARD_MODEL || undefined,
   guardApiUrl: process.env.CLAUI_GUARD_API_URL || undefined,
+  sessionToken: process.env.CLAUI_SESSION_TOKEN || undefined,
 });
 
 server.start(port);
@@ -31,6 +32,7 @@ console.log('Press Ctrl+C to stop');
 console.log('');
 console.log('Environment options:');
 console.log('  CLAUI_SERVER_PORT        - Server port (default: 9120)');
+console.log('  CLAUI_SESSION_TOKEN      - Auth token required for connections (disabled if unset)');
 console.log('  CLAUI_PERSISTENCE_DIR    - Directory for session persistence (disabled if unset)');
 console.log('  CLAUI_GUARD_API_KEY      - Anthropic API key for guard model (guard disabled if unset)');
 console.log('  CLAUI_GUARD_MODEL        - Guard model name (default: claude-haiku-4-5-20251001)');

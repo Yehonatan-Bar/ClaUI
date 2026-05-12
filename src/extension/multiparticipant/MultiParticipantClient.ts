@@ -18,6 +18,7 @@ const PING_TIMEOUT_MS = 15000;
 export class MultiParticipantClient extends EventEmitter {
   private ws: WebSocket | null = null;
   private serverUrl: string;
+  private authToken: string;
   private log: (msg: string) => void;
 
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -33,10 +34,17 @@ export class MultiParticipantClient extends EventEmitter {
 
   private sendQueue: ClientToServerMessage[] = [];
 
-  constructor(serverUrl: string, log?: (msg: string) => void) {
+  constructor(serverUrl: string, log?: (msg: string) => void, authToken?: string) {
     super();
     this.serverUrl = serverUrl;
+    this.authToken = authToken || '';
     this.log = log || (() => {});
+  }
+
+  private buildConnectUrl(): string {
+    if (!this.authToken) return this.serverUrl;
+    const separator = this.serverUrl.includes('?') ? '&' : '?';
+    return `${this.serverUrl}${separator}token=${encodeURIComponent(this.authToken)}`;
   }
 
   setIdentity(humanId: string, agentId: string): void {
@@ -62,8 +70,9 @@ export class MultiParticipantClient extends EventEmitter {
       try { this.ws.close(); } catch { /* ignore */ }
     }
 
+    const connectUrl = this.buildConnectUrl();
     this.log(`Connecting to coordination server: ${this.serverUrl}`);
-    this.ws = new WebSocket(this.serverUrl);
+    this.ws = new WebSocket(connectUrl);
 
     this.ws.on('open', () => {
       this.log('Connected to coordination server');

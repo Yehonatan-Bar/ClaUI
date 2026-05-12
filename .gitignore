@@ -2,6 +2,7 @@ node_modules/
 dist/
 *.vsix
 .vscode-test/
+.vscode/
 
 # Environment & secrets
 .env
@@ -21,3 +22,12 @@ Thumbs.db
 *.tmp
 BUG_REPORT_Zombie_Node_Processes.html
 Kingdom_of_Claudes_Beloved_MDs/EMAIL_REWRITE_BACKUP_BRANCH_2026-03-18.md
+
+# Multi-Participant documentation (kept local, not in repo)
+Kingdom_of_Claudes_Beloved_MDs/MULTI_PARTICIPANT.md
+Kingdom_of_Claudes_Beloved_MDs/MULTI_PARTICIPANT_AGENT_SESSION_SUMMARY.html
+Kingdom_of_Claudes_Beloved_MDs/plans/MULTI_PARTICIPANT_AGENT_SESSION.md
+Kingdom_of_Claudes_Beloved_MDs/plans/multi-participant-agent-session-implementation-plan.txt
+
+# MP server deployment scripts (local deployment aids)
+server/deploy/

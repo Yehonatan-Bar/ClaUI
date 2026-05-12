@@ -18,6 +18,8 @@ export interface Session {
   nextSeq: number;
   agentMode: AgentMode;
   allowRemoteSteer: RemoteSteerPolicy;
+  /** Set by the first user who joins; subsequent joins must match. Never sent to clients. */
+  sessionPassword: string | null;
 }
 
 export interface Participant {
@@ -173,7 +175,7 @@ export interface FileConflictWarning {
 // -- Client -> Server messages --
 
 export type ClientToServerMessage =
-  | { type: 'joinSession'; humanName: string; agentName: string; agentProvider: AgentProvider }
+  | { type: 'joinSession'; humanName: string; agentName: string; agentProvider: AgentProvider; password?: string }
   | { type: 'rejoinSession'; humanParticipantId: string; agentParticipantId: string; lastSeenSeq: number }
   | { type: 'humanMessage'; rawBody: string }
   | { type: 'agentEvent'; deliveryId: string; event: AgentEventPayload }

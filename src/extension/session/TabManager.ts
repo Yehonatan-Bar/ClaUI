@@ -414,6 +414,7 @@ export class TabManager {
     serverUrl: string,
     agentProvider: 'claude' | 'codex',
     viewColumnOverride?: vscode.ViewColumn,
+    authToken?: string,
   ): MultiParticipantSessionTab {
     const tabNumber = this.nextTabNumber++;
     const tabColor = TAB_COLORS[(tabNumber - 1) % TAB_COLORS.length];
@@ -438,6 +439,7 @@ export class TabManager {
       },
       this.log,
       viewColumn,
+      authToken,
     );
 
     this.tabs.set(tab.id, tab);

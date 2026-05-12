@@ -76,10 +76,22 @@ export function LocalBoostSettingsPanel() {
             Codex mode: {status.codexMode}
           </div>
 
+          <div style={{ fontSize: '12px', marginBottom: '8px' }}>
+            <HookStatus label="Claude Hook" installed={status.claudeHookInstalled} />
+            <HookStatus label="Codex Hook" installed={status.codexHookInstalled} />
+          </div>
+
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '8px' }}>
-            <SmallButton onClick={() => handleInstallHooks('claude')} label="Install Claude Hook" />
-            <SmallButton onClick={() => handleUninstallHooks('claude')} label="Remove Claude Hook" />
-            <SmallButton onClick={() => handleInstallHooks('codex')} label="Install Codex Hook" />
+            <SmallButton
+              onClick={() => status.claudeHookInstalled ? handleUninstallHooks('claude') : handleInstallHooks('claude')}
+              label={status.claudeHookInstalled ? 'Remove Claude Hook' : 'Install Claude Hook'}
+              active={status.claudeHookInstalled}
+            />
+            <SmallButton
+              onClick={() => status.codexHookInstalled ? handleUninstallHooks('codex') : handleInstallHooks('codex')}
+              label={status.codexHookInstalled ? 'Remove Codex Hook' : 'Install Codex Hook'}
+              active={status.codexHookInstalled}
+            />
             <SmallButton onClick={handleClearData} label="Clear Data" />
             <SmallButton onClick={handleRefresh} label="Refresh" />
           </div>
@@ -89,16 +101,35 @@ export function LocalBoostSettingsPanel() {
   );
 }
 
-function SmallButton({ onClick, label }: { onClick: () => void; label: string }) {
+function HookStatus({ label, installed }: { label: string; installed: boolean }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+      <span style={{
+        width: '6px',
+        height: '6px',
+        borderRadius: '50%',
+        backgroundColor: installed ? '#89d185' : '#6c6c6c',
+        display: 'inline-block',
+      }} />
+      <span>{label}: {installed ? 'Installed' : 'Not installed'}</span>
+    </div>
+  );
+}
+
+function SmallButton({ onClick, label, active }: { onClick: () => void; label: string; active?: boolean }) {
   return (
     <button
       onClick={onClick}
       style={{
         padding: '2px 6px',
         borderRadius: '3px',
-        border: '1px solid var(--vscode-button-border, transparent)',
-        backgroundColor: 'var(--vscode-button-secondaryBackground)',
-        color: 'var(--vscode-button-secondaryForeground)',
+        border: `1px solid ${active ? 'var(--vscode-button-border, transparent)' : 'var(--vscode-button-border, transparent)'}`,
+        backgroundColor: active
+          ? 'var(--vscode-button-background)'
+          : 'var(--vscode-button-secondaryBackground)',
+        color: active
+          ? 'var(--vscode-button-foreground)'
+          : 'var(--vscode-button-secondaryForeground)',
         cursor: 'pointer',
         fontSize: '11px',
       }}
