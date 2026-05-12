@@ -2,7 +2,7 @@
   "name": "claude-code-mirror",
   "displayName": "ClaUi",
   "description": "The full IDE experience for Claude Code - multi-tab sessions, analytics, achievements, dual providers, prompt enhancement, and deep customization",
-  "version": "0.1.141",
+  "version": "0.1.142",
   "publisher": "JhonBar",
   "icon": "images/icon.png",
   "engines": {
@@ -283,7 +283,11 @@
         "claudeMirror.multiParticipant.defaultAgentProvider": {
           "type": "string",
           "default": "",
-          "enum": ["", "claude", "codex"],
+          "enum": [
+            "",
+            "claude",
+            "codex"
+          ],
           "description": "Default AI agent provider for multi-participant sessions. If empty, you will be prompted each time."
         },
         "claudeMirror.codex.cliPath": {
