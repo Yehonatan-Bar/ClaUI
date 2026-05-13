@@ -850,6 +850,27 @@ export function registerCommands(
       return false;
     }
 
+    const firstTimeChoice = await vscode.window.showInformationMessage(
+      'Multi-Participant requires a coordination server. If someone on your team already set one up, click "Enter Connection Details". To set up a new server, open the setup guide and give it to an AI assistant.',
+      'Enter Connection Details',
+      'Open Setup Guide',
+    );
+
+    if (firstTimeChoice === 'Open Setup Guide') {
+      const guidePath = path.join(context.extensionPath, 'server', 'deploy', 'SERVER_SETUP_GUIDE.md');
+      if (fs.existsSync(guidePath)) {
+        const doc = await vscode.workspace.openTextDocument(guidePath);
+        await vscode.window.showTextDocument(doc);
+      } else {
+        vscode.window.showWarningMessage('Setup guide not found. Look for SERVER_SETUP_GUIDE.md in the server/deploy/ folder of the ClaUi repository.');
+      }
+      return false;
+    }
+
+    if (firstTimeChoice !== 'Enter Connection Details') {
+      return false;
+    }
+
     const inputUrl = await vscode.window.showInputBox({
       prompt: 'Coordination server URL (one-time setup)',
       value: '',
