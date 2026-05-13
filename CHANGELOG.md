@@ -1,5 +1,70 @@
 # ClaUi - Changelog
 
+## v0.1.145 - 2026-05-13
+
+**Feature: Particle Accelerator — local command output compressor for AI agent sessions**
+
+- New system that intercepts Bash commands from coding agents (Claude/Codex), runs them through a local `claui-run` CLI, and returns compressed, secret-redacted output — reducing token consumption by 2-8x per command
+- Three execution contexts: Extension host (orchestration), standalone `claui-run` CLI (separate webpack bundle, total network isolation), and webview (monitoring dashboard)
+- **Secret redaction**: Two-phase approach — exact env variable value matching (longest-first) plus 14 regex rules for GitHub PATs, AWS keys, JWTs, OpenAI keys, Anthropic keys, Slack tokens, Stripe keys, Google API keys, private key blocks, basic auth URLs, DB URL creds, bearer tokens. Fail-closed: on error, entire output is suppressed
+- **7 output filters**: Generic fallback (ANSI strip, spinner removal, duplicate line collapsing, head/tail preservation), plus specialized filters for npm/pnpm/yarn/bun, pytest, Jest/Vitest, tsc, and eslint — each with domain-specific compression logic
+- **3 budget profiles**: balanced (8k/16k chars), strict (4k/8k), verbose (32k/32k)
+- **Command eligibility**: Deterministic classifier with deny list (ssh, sudo, vim, long-running servers) and allow list (~40 patterns covering git, npm, python, rust, go, etc.)
+- **Pre-tool-use hooks**: Installed into `.claude/settings.json` and `.codex/hooks.json`. Intercepts eligible Bash tool calls and rewrites them to `claui-run --claui-encoded-shell-command <base64url-encoded command>`, preserving the original exit code
+- **No-network guard**: The `claui-run` process overrides `globalThis.fetch` and patches `module.constructor.prototype.require` to block `http`, `https`, `net`, `dgram`, `http2` modules — ensuring the runtime can never exfiltrate data
+- **Trace analytics**: Every processed command writes a JSON trace file. Dashboard shows total commands, tokens saved, and compression ratio. Individual trace cards show command family, duration, exit code, compression, and redaction count
+- **3-tier retention**: Raw logs (7d/100MB), traces (30d/10k files), daily aggregate reports (90d)
+- **UI**: Status badge in StatusBar (green/red dot with command count and tokens saved), settings panel with enable/disable toggle and hook install/uninstall buttons, trace dashboard tab in the main Dashboard
+- Built as a third webpack target (`particle-accelerator-runtime`) with `optimization.minimize = false` (stdout is intentional output)
+- 12 VS Code settings under `claudeMirror.particleAccelerator.*`. Feature is disabled by default (`enabled: false`)
+- 11 test files covering SecretRedactor, CommandEligibility, CommandTraceWriter, ContextStore, EnvBuilder, all filters, both hooks, and a static no-network import ban verification
+- New files: 8 extension services in `src/extension/particle-accelerator/`, 11 runtime files in `src/particle-accelerator-runtime/` (+ `filters/` + `hooks/`), 4 webview components in `src/webview/components/ParticleAccelerator/`, 1 dashboard tab
+- New detail doc: `Kingdom_of_Claudes_Beloved_MDs/PARTICLE_ACCELERATOR.md`
+
+**Feature: Goal — autonomous objective tracking for AI agent sessions**
+
+- Users can define an autonomous objective via a "Goal" item in the StatusBar Tools dropdown. The AI works autonomously toward the goal without requiring repeated "continue" nudging — ideal for migrations, refactors, and full feature implementations
+- **Set Goal mode**: Popover with a textarea and "Set Goal (Ctrl+Enter)" submit button. Sets the objective by sending `/goal <text>` as a message to the CLI (both Claude Code and Codex CLIs natively support the `/goal` command)
+- **Active Goal mode**: Popover shows the current objective text with "Check Status" (sends `/goal`) and "Clear Goal" (sends `/goal clear`) buttons
+- A green banner appears above the input area while a goal is active, showing the objective text (truncated to 80 chars with full text in tooltip) and an X button to clear
+- Goal state (`goalActive`, `goalObjective`) is stored in the Zustand store and is tab-scoped — each tab has independent goal state
+- New message types: `SetGoalStateRequest` (webview to extension), `GoalStateSettingMessage` (extension to webview)
+- ~170 lines of CSS for goal button, popover, and active banner styling
+- Known limitations: no automatic goal completion detection (user must clear manually), single goal per tab, state is lost on tab close/reload
+
+**Fix: Goal state persistence corrected to tab-scoped only**
+
+- Removed `workspaceState` persistence for goal state that was introduced in the initial implementation — goal state is now exclusively tab-scoped in the Zustand store
+- Prevents stale goal state from persisting across tab restarts and avoids cross-tab interference
+
+---
+
+## v0.1.142 - 2026-05-12
+
+**Feature: Multi-Participant Sessions — shared coding conversations with multiple humans and AI agents**
+
+- New session type where multiple humans and their AI code agents (Claude Code / Codex) participate in a single shared conversation in real time. Each human runs their own VS Code instance with ClaUi, connects to a shared coordination server, and all participants see the full transcript
+- **Architecture**: Client-server via WebSocket with hub-and-spoke topology. The server routes messages and maintains the canonical transcript; agents run locally on each participant's machine ("Server Routes, Client Executes")
+- **Coordination Server** (standalone Node.js process, `server/src/`, 8 files): WebSocket server managing session lifecycle, join/leave/rejoin, message routing, participant registry, A2A (agent-to-agent) loop controller, LLM-based guard service, JSONL persistence, ping/pong keepalive (10s), and stream coalescing (50ms window)
+- **Smart message routing**: Greedy longest-name prefix matching determines which agent receives a message. Typing `Claude check this file` routes to the "Claude" agent. Single-character route-key shorthand also supported (`C: check this`). Unaddressed messages broadcast to all humans but trigger no agent
+- **Delta context delivery**: Agents receive only messages they haven't seen — not the full transcript. First delivery includes session opening + last 5 messages + current task; subsequent deliveries include only messages after `lastAckedDeliveredSeq`
+- **A2A loop protection**: 4 modes — `ask` (default: pauses for human approval before every A2A delivery), `budget` (allows N then pauses), `always` (allows indefinitely, guard check every 20 consecutive A2A messages), `force` (no guard, requires confirmation). Guard service uses Claude Haiku to detect unproductive loops (repeated delegation, circular requests, no progress). 10s timeout, fail-safe to STOP
+- **Approval dialog**: Modal with Deny, Allow N, Always Allow, and Force options. Pulse indicator on participant list when approval is pending
+- **File conflict detection**: Tracks which files each agent modifies. Claude uses structured tool_use interception (Edit/MultiEdit/Write/NotebookEdit). Codex uses filesystem snapshot mtime diffing. Conflicts trigger a warning broadcast to all humans
+- **Reconnection**: Exponential backoff (1s base, 30s max, 20 attempts) with jitter. Messages queued during disconnect are flushed on reconnect. Identity-preserving rejoin sends stored participant IDs and `lastSeenSeq` for seamless delta replay
+- **Session persistence**: Append-only JSONL files per session, replayed on server restart to restore full state. All participants marked offline on restore (must reconnect)
+- **Webview UI**: Full React interface with `MPSessionView` (layout), `MPChatView` (scrollable message list), `MpMessageBubble` (color-coded per participant with delivery status pills), `ParticipantList` (sidebar with status dots, kind badges, route keys), `ParticipantAutocomplete` (@-mention dropdown), `JoinDialog` (server URL, human name, agent name, provider selector), `ApprovalDialog`, `GuardStopNotification`, `ActivityIndicators` (typing/thinking/streaming animations), `ConflictWarning`
+- Deterministic participant colors via FNV-1a hash of participant ID
+- New command: `claudeMirror.joinMultiParticipantSession` with workspace settings setup flow
+- `App.tsx` routes to `MPSessionView` when `tabKind === 'multiparticipant'`
+- 18 new MP state fields + 19 action methods in the Zustand store, 16 `mp*` message types dispatched in `useClaudeStream.ts`
+- Extension client module (`src/extension/multiparticipant/`, 7 files): `MultiParticipantClient` (WebSocket + auto-reconnect), `MultiParticipantSessionTab` (VS Code webview panel), `HeadlessAgentRunner` (drives local Claude/Codex without visible webview), `AgentBridge` (connects server commands to runner), `FileChangeTracker` (dual-strategy file monitoring)
+- Configurable via env vars: `CLAUI_SERVER_PORT` (default 9120), `CLAUI_SESSION_TOKEN`, `CLAUI_PERSISTENCE_DIR`, `CLAUI_GUARD_API_KEY`, `CLAUI_GUARD_MODEL`
+- VS Code settings: `claudeMirror.multiParticipant.serverUrl`, `.authToken`, `.defaultHumanName`, `.defaultAgentName`, `.defaultAgentProvider`
+- New detail doc: `Kingdom_of_Claudes_Beloved_MDs/MULTI_PARTICIPANT.md`
+
+---
+
 ## v0.1.138 - 2026-05-06
 
 **Feature: Image lightbox copy to clipboard**

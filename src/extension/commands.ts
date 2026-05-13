@@ -925,11 +925,11 @@ export function registerCommands(
     if (!ready) return;
 
     const config = vscode.workspace.getConfiguration('claudeMirror');
-    const serverUrl = config.get<string>('multiParticipant.serverUrl', 'ws://localhost:9120');
+    const serverUrl = config.get<string>('multiParticipant.serverUrl', '') || 'ws://localhost:9120';
     const authToken = config.get<string>('multiParticipant.authToken', '');
-    const humanName = config.get<string>('multiParticipant.defaultHumanName', 'User');
-    const agentName = config.get<string>('multiParticipant.defaultAgentName', 'Claude');
-    const defaultProvider = config.get<string>('multiParticipant.defaultAgentProvider', 'claude');
+    const humanName = config.get<string>('multiParticipant.defaultHumanName', '') || 'User';
+    const agentName = config.get<string>('multiParticipant.defaultAgentName', '') || 'Claude';
+    const defaultProvider = config.get<string>('multiParticipant.defaultAgentProvider', '') || 'claude';
     const agentProvider = (defaultProvider === 'codex' ? 'codex' : 'claude') as 'claude' | 'codex';
 
     const sessionPassword = await vscode.window.showInputBox({
@@ -941,8 +941,8 @@ export function registerCommands(
     if (sessionPassword === undefined) return;
 
     const mpTab = tabManager.createMultiParticipantTab(serverUrl, agentProvider, undefined, authToken || undefined);
-    await mpTab.connect(humanName, agentName, agentProvider, sessionPassword || undefined);
     log(`Multi-participant tab created: ${mpTab.id} -> ${serverUrl}`);
+    await mpTab.connect(humanName, agentName, agentProvider, sessionPassword || undefined);
   }
 
   context.subscriptions.push(
