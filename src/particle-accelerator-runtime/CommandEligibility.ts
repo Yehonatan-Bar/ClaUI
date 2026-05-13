@@ -96,22 +96,17 @@ export function classifyCommand(command: string): CommandEligibilityResult {
     return { eligible: false, reason: 'Already wrapped by claui-run' };
   }
 
-  // Strip leading env vars to get the actual command
-  const baseCommand = stripLeadingEnvVars(trimmed);
+  // Strip leading env vars and cd prefixes to get the actual command
+  const baseCommand = stripCdPrefix(stripLeadingEnvVars(trimmed));
 
-  // Check deny list first
+  // Check deny list
   for (const pattern of DENY_LIST) {
     if (pattern.test(baseCommand)) {
       return { eligible: false, reason: 'Command is on deny list (interactive/long-running)' };
     }
   }
 
-  // Check for pipeline/redirection patterns (conservative: not eligible)
-  if (hasPipelineOrRedirection(trimmed)) {
-    return { eligible: false, reason: 'Contains pipeline or redirection' };
-  }
-
-  // Check allow list
+  // Match against allow list for family classification (best-effort)
   for (const entry of ALLOW_LIST) {
     if (entry.pattern.test(baseCommand)) {
       return {
@@ -123,29 +118,33 @@ export function classifyCommand(command: string): CommandEligibilityResult {
     }
   }
 
-  return { eligible: false, reason: 'Command not in allow list' };
+  // Default: eligible with generic classification (deny-list-only approach)
+  return {
+    eligible: true,
+    reason: 'Not on deny list',
+    filterHint: 'GenericFilter',
+    commandFamily: detectFamily(baseCommand),
+  };
 }
 
 function stripLeadingEnvVars(command: string): string {
-  // Match env var assignments like KEY=VALUE at the start
   return command.replace(/^(\s*[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+)+/, '');
 }
 
-function hasPipelineOrRedirection(command: string): boolean {
-  // Check for command substitution
-  if (/\$\(/.test(command) || /`[^`]+`/.test(command)) {
-    return true;
-  }
+function stripCdPrefix(command: string): string {
+  // Strip `cd /path &&` or `cd /path ;` prefixes so the actual command is classified
+  return command.replace(/^cd\s+[^\s;|&]+\s*(?:&&|;)\s*/, '');
+}
 
-  // Check for piping (but not || which is logical OR)
-  if (/\|(?!\|)/.test(command)) {
-    return true;
-  }
-
-  // Check for output redirection
-  if (/(?:^|[^2])>>?\s/.test(command) || /2>>?\s/.test(command)) {
-    return true;
-  }
-
-  return false;
+function detectFamily(command: string): string {
+  const first = command.split(/\s/)[0].replace(/^.*[/\\]/, '');
+  const known: Record<string, string> = {
+    npm: 'npm', npx: 'npx', node: 'node', pnpm: 'pnpm', yarn: 'yarn', bun: 'bun',
+    git: 'git', python: 'python', pip: 'pip', pytest: 'pytest',
+    cargo: 'cargo', go: 'go', make: 'make', docker: 'docker',
+    tsc: 'tsc', eslint: 'eslint', jest: 'jest', vitest: 'vitest',
+    ls: 'shell-read', dir: 'shell-read', cat: 'shell-read', find: 'shell-read',
+    grep: 'search', rg: 'search', curl: 'curl', wget: 'wget',
+  };
+  return known[first] ?? 'unknown';
 }

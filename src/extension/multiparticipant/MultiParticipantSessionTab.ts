@@ -249,6 +249,14 @@ export class MultiParticipantSessionTab {
             }
           });
           break;
+
+        case 'mpAddReaction':
+          this.client.send({ type: 'addReaction', messageId: msg.messageId, emoji: msg.emoji });
+          break;
+
+        case 'mpRemoveReaction':
+          this.client.send({ type: 'removeReaction', messageId: msg.messageId, emoji: msg.emoji });
+          break;
       }
     });
   }
@@ -338,6 +346,13 @@ export class MultiParticipantSessionTab {
             decidedByParticipantId: msg.decidedByParticipantId,
             deliveryId: msg.deliveryId,
             deniedReason: msg.deniedReason,
+          });
+          break;
+        case 'reactionUpdate':
+          this.postToWebview({
+            type: 'mpReactionUpdate',
+            messageId: msg.messageId,
+            reactions: msg.reactions,
           });
           break;
         case 'renameRejected':

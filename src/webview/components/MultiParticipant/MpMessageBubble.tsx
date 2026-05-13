@@ -1,5 +1,6 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useAppStore } from '../../state/store';
+import { postToExtension } from '../../hooks/useClaudeStream';
 import type { MPMessage } from './mpTypes';
 import { getParticipantColor, DELIVERY_STATUS_COLORS, KIND_BADGE_COLORS } from './mpColors';
 import { detectRtl } from '../../hooks/useRtlDetection';
@@ -28,6 +29,9 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
   const deliveryStatuses = useAppStore((s) => s.mpDeliveryStatuses);
   const allMessages = useAppStore((s) => s.mpMessages);
   const streamingTexts = useAppStore((s) => s.mpStreamingTexts);
+  const reactions = useAppStore((s) => s.mpReactions[message.messageId]);
+
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const isMe = message.authorParticipantId === myHumanId;
   const isMyAgent = message.authorParticipantId === myAgentId;
@@ -38,6 +42,17 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
     () => participants.find((p) => p.participantId === message.authorParticipantId),
     [participants, message.authorParticipantId]
   );
+
+  // Recipient lookup for "→ Name" indicator
+  const recipientParticipant = useMemo(
+    () => message.recipientParticipantId
+      ? participants.find((p) => p.participantId === message.recipientParticipantId)
+      : undefined,
+    [participants, message.recipientParticipantId]
+  );
+  const recipientColor = recipientParticipant
+    ? getParticipantColor(recipientParticipant.participantId)
+    : undefined;
 
   const currentDisplayName = currentParticipant?.displayName;
   const wasRenamed =
@@ -76,11 +91,23 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
     }
   }, [message.triggerMessageId]);
 
+  const handleReactionToggle = useCallback((emoji: string) => {
+    const existing = reactions?.find((r) => r.emoji === emoji);
+    const alreadyReacted = existing?.participantIds.includes(myHumanId ?? '');
+    if (alreadyReacted) {
+      postToExtension({ type: 'mpRemoveReaction', messageId: message.messageId, emoji });
+    } else {
+      postToExtension({ type: 'mpAddReaction', messageId: message.messageId, emoji });
+    }
+    setPickerOpen(false);
+  }, [reactions, myHumanId, message.messageId]);
+
   // Streaming overlay text for this message's delivery
   const streamingText = message.deliveryId ? streamingTexts[message.deliveryId] : undefined;
 
-  // RTL detection on content
+  // RTL detection on content and streaming text
   const isRtl = detectRtl(message.parsedBody);
+  const isStreamingRtl = streamingText ? detectRtl(streamingText) : isRtl;
 
   return (
     <div
@@ -112,6 +139,14 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
         <span style={{ fontWeight: 600, color: authorColor, fontSize: 13 }}>
           {message.displayNameSnapshot}
         </span>
+
+        {/* Recipient indicator */}
+        {recipientParticipant && (
+          <span style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+            <span style={{ color: '#6e7681' }}>{'→'}</span>
+            <span style={{ fontWeight: 600, color: recipientColor }}>{recipientParticipant.displayName}</span>
+          </span>
+        )}
 
         {/* "You" / "Your Agent" badge */}
         {isMe && (
@@ -241,6 +276,8 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
             color: 'rgba(230, 237, 243, 0.6)',
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
+            direction: isStreamingRtl ? 'rtl' : 'ltr',
+            textAlign: isStreamingRtl ? 'right' : 'left',
             borderTop: '1px dashed rgba(48, 54, 61, 0.5)',
             paddingTop: 4,
             fontStyle: 'italic',
@@ -250,11 +287,112 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
           <span style={pulsingCursorStyle}>|</span>
         </div>
       )}
+
+      {/* Emoji reactions row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 2, position: 'relative' }}>
+        {reactions?.map((r) => {
+          const iReacted = r.participantIds.includes(myHumanId ?? '');
+          return (
+            <button
+              key={r.emoji}
+              onClick={() => handleReactionToggle(r.emoji)}
+              title={r.participantIds.map((pid) => participants.find((p) => p.participantId === pid)?.displayName ?? pid).join(', ')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 3,
+                padding: '1px 6px',
+                borderRadius: 10,
+                border: `1px solid ${iReacted ? '#58a6ff' : 'rgba(48, 54, 61, 0.6)'}`,
+                background: iReacted ? 'rgba(88, 166, 255, 0.12)' : 'rgba(48, 54, 61, 0.3)',
+                cursor: 'pointer',
+                fontSize: 13,
+                lineHeight: 1.4,
+                color: 'var(--vscode-editor-foreground, #e6edf3)',
+              }}
+            >
+              <span>{r.emoji}</span>
+              <span style={{ fontSize: 10, fontWeight: 500, color: iReacted ? '#58a6ff' : '#8b949e' }}>{r.count}</span>
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setPickerOpen((o) => !o)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 22,
+            height: 22,
+            borderRadius: 10,
+            border: '1px solid rgba(48, 54, 61, 0.4)',
+            background: 'transparent',
+            cursor: 'pointer',
+            fontSize: 12,
+            color: '#8b949e',
+            opacity: 0.6,
+          }}
+          title="Add reaction"
+        >
+          +
+        </button>
+
+        {/* Emoji picker popover */}
+        {pickerOpen && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '100%',
+              left: 0,
+              marginBottom: 4,
+              padding: 6,
+              borderRadius: 8,
+              background: 'var(--vscode-editor-background, #1e1e1e)',
+              border: '1px solid var(--vscode-panel-border, #30363d)',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+              display: 'flex',
+              gap: 2,
+              flexWrap: 'wrap',
+              maxWidth: 220,
+              zIndex: 100,
+            }}
+          >
+            {REACTION_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => handleReactionToggle(emoji)}
+                style={{
+                  width: 30,
+                  height: 30,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: 'none',
+                  background: 'transparent',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  fontSize: 16,
+                }}
+                onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'rgba(88, 166, 255, 0.15)'; }}
+                onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'transparent'; }}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
 // --- Helpers ---
+
+const REACTION_EMOJIS = [
+  '\u{1F44D}', '\u{1F44E}', '\u{2764}\u{FE0F}', '\u{1F602}',
+  '\u{1F389}', '\u{1F914}', '\u{1F440}', '\u{1F64F}',
+  '\u{2705}', '\u{274C}', '\u{1F525}', '\u{1F4A1}',
+];
 
 const selfBadgeStyle: React.CSSProperties = {
   fontSize: 10,

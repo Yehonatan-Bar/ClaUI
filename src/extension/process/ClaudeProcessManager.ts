@@ -237,13 +237,17 @@ export class ClaudeProcessManager extends EventEmitter {
   /** Send a message to the CLI process via stdin */
   send(message: CliInputMessage): void {
     if (!this.process?.stdin?.writable) {
+      this.log(`stdin not writable: process=${!!this.process} stdin=${!!this.process?.stdin} writable=${this.process?.stdin?.writable}`);
       throw new Error('Process is not running or stdin is not writable');
     }
-    this.process.stdin.write(JSON.stringify(message) + '\n');
+    const json = JSON.stringify(message);
+    this.log(`stdin write (${json.length} bytes): type=${message.type}`);
+    this.process.stdin.write(json + '\n');
   }
 
   /** Send a user text message */
   sendUserMessage(text: string): void {
+    this.log(`sendUserMessage: ${text.length} chars`);
     this.send({ type: 'user', message: { role: 'user', content: text } });
   }
 

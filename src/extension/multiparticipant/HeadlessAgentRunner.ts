@@ -6,6 +6,7 @@ import { StreamDemux } from '../process/StreamDemux';
 import { CodexExecDemux } from '../process/CodexExecDemux';
 import { FileChangeTracker } from './FileChangeTracker';
 import type { AgentEventPayload, MPAgentBusyPolicy, MPFileChange, MPFileChangeReportSource } from './MultiParticipantProtocol';
+import type { AssistantMessage, ResultSuccess, ResultError } from '../types/stream-json';
 
 const STEER_CANCEL_TIMEOUT_MS = 8000;
 
@@ -41,6 +42,7 @@ export class HeadlessAgentRunner extends EventEmitter {
   // Shared
   private activeDeliveryId: string | null = null;
   private responseText = '';
+  private assistantTextFallback = '';
   private firstTokenSent = false;
   private disposed = false;
 
@@ -118,7 +120,22 @@ export class HeadlessAgentRunner extends EventEmitter {
     this.claudeProcess.setLogger((msg) => this.log(`[Claude] ${msg}`));
 
     this.claudeProcess.on('event', (event) => {
+      // Log every CLI event type for delivery diagnostics
+      if (this.activeDeliveryId) {
+        const evType = event.type === 'stream_event' ? `stream:${event.event?.type}` : event.type;
+        this.log(`[HeadlessRunner] CLI event: ${evType}`);
+      }
       this.claudeDemux!.handleEvent(event);
+    });
+
+    this.claudeProcess.on('stderr', (text: string) => {
+      if (text.trim()) {
+        this.log(`[HeadlessRunner] CLI stderr: ${text.trim().slice(0, 200)}`);
+      }
+    });
+
+    this.claudeProcess.on('raw', (line: string) => {
+      this.log(`[HeadlessRunner] CLI raw (non-JSON): ${line.slice(0, 200)}`);
     });
 
     this.claudeProcess.on('exit', () => {
@@ -157,45 +174,97 @@ export class HeadlessAgentRunner extends EventEmitter {
       this.log('[HeadlessRunner] Claude init received');
     });
 
+    this.claudeDemux.on('messageStart', (data: { messageId: string; model?: string }) => {
+      this.log(`[HeadlessRunner] messageStart: id=${data.messageId} model=${data.model || 'unknown'}`);
+    });
+
     this.claudeDemux.on('textDelta', (data: { text: string }) => {
       if (!this.activeDeliveryId) return;
       if (!this.firstTokenSent) {
         this.firstTokenSent = true;
+        this.log(`[HeadlessRunner] First text token for delivery ${this.activeDeliveryId}`);
         this.emitAgentEvent(this.activeDeliveryId, { kind: 'firstToken' });
       }
       this.responseText += data.text;
       this.emitAgentEvent(this.activeDeliveryId, { kind: 'textDelta', text: data.text });
     });
 
-    this.claudeDemux.on('result', () => {
+    this.claudeDemux.on('toolUseStart', (data: { toolName: string; toolId: string }) => {
+      this.log(`[HeadlessRunner] toolUseStart: ${data.toolName} (${data.toolId})`);
+    });
+
+    this.claudeDemux.on('messageDelta', (data: { stopReason: string }) => {
+      this.log(`[HeadlessRunner] messageDelta: stopReason=${data.stopReason}`);
+    });
+
+    // Capture text from finalized assistant messages as fallback for tool-use-only turns
+    this.claudeDemux.on('assistantMessage', (event: AssistantMessage) => {
       if (!this.activeDeliveryId) return;
+      const blockTypes = event.message.content.map(b => b.type).join(', ');
+      this.log(`[HeadlessRunner] assistantMessage: blocks=[${blockTypes}] stopReason=${event.message.stop_reason}`);
+      const textParts = event.message.content
+        .filter((block) => block.type === 'text' && block.text)
+        .map((block) => block.text!);
+      if (textParts.length > 0) {
+        const msgText = textParts.join('\n');
+        if (this.assistantTextFallback) this.assistantTextFallback += '\n';
+        this.assistantTextFallback += msgText;
+        this.log(`[HeadlessRunner] assistantMessage text: ${msgText.slice(0, 100)}...`);
+      }
+    });
+
+    this.claudeDemux.on('result', (event: ResultSuccess | ResultError) => {
+      const subtype = event?.subtype || 'unknown';
+      if (subtype === 'error') {
+        const errEvent = event as ResultError;
+        this.log(`[HeadlessRunner] result: ERROR - ${errEvent.error}`);
+      } else {
+        const successEvent = event as ResultSuccess;
+        this.log(`[HeadlessRunner] result: success, cost=$${successEvent.cost_usd?.toFixed(4) || '?'}, duration=${successEvent.duration_ms || '?'}ms`);
+      }
+      if (!this.activeDeliveryId) {
+        this.log('[HeadlessRunner] result received but no active delivery - ignoring');
+        return;
+      }
       this.fileTracker.finishTurn();
-      this.emitAgentEvent(this.activeDeliveryId, { kind: 'completed', fullText: this.responseText });
+      // Prefer streaming text; fall back to assistant message text (covers tool-use-only turns)
+      const fullText = this.responseText || this.assistantTextFallback;
+      if (!this.responseText && this.assistantTextFallback) {
+        this.log(`[HeadlessRunner] Using assistantMessage fallback (${this.assistantTextFallback.length} chars)`);
+      }
+      this.log(`[HeadlessRunner] Completing delivery ${this.activeDeliveryId}: streamingText=${this.responseText.length} chars, fallbackText=${this.assistantTextFallback.length} chars, finalText=${fullText.length} chars`);
+      this.emitAgentEvent(this.activeDeliveryId, { kind: 'completed', fullText });
       this.activeDeliveryId = null;
     });
   }
 
   private async deliverClaude(deliveryId: string, prompt: string): Promise<void> {
+    this.log(`[HeadlessRunner] deliverClaude: id=${deliveryId} processReady=${this.claudeReady} busy=${!!this.activeDeliveryId} promptLen=${prompt.length}`);
+
     if (!this.claudeProcess || !this.claudeReady) {
+      this.log(`[HeadlessRunner] REJECT: process=${!!this.claudeProcess} ready=${this.claudeReady}`);
       this.emitAgentEvent(deliveryId, { kind: 'rejected', error: 'Claude process not ready' });
       return;
     }
 
-    // If busy with another delivery, reject (Claude supports sequential, not parallel)
     if (this.activeDeliveryId) {
+      this.log(`[HeadlessRunner] REJECT: busy with ${this.activeDeliveryId}`);
       this.emitAgentEvent(deliveryId, { kind: 'rejected', error: 'Claude is busy with another delivery' });
       return;
     }
 
     this.activeDeliveryId = deliveryId;
     this.responseText = '';
+    this.assistantTextFallback = '';
     this.firstTokenSent = false;
     this.fileTracker.startTurn(deliveryId);
 
     this.emitAgentEvent(deliveryId, { kind: 'accepted' });
     this.emitAgentEvent(deliveryId, { kind: 'started' });
 
+    this.log(`[HeadlessRunner] Sending prompt to Claude CLI (${prompt.length} chars): ${prompt.slice(0, 150)}...`);
     this.claudeProcess.sendUserMessage(prompt);
+    this.log(`[HeadlessRunner] Prompt sent to stdin, waiting for CLI response events...`);
   }
 
   // -- Codex --
@@ -233,6 +302,7 @@ export class HeadlessAgentRunner extends EventEmitter {
 
     this.activeDeliveryId = deliveryId;
     this.responseText = '';
+    this.assistantTextFallback = '';
     this.firstTokenSent = false;
     this.fileTracker.startTurn(deliveryId);
     await this.fileTracker.takeSnapshotBefore();

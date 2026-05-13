@@ -173,6 +173,12 @@ export interface FileConflictWarning {
   message?: string;
 }
 
+export interface ReactionSummary {
+  emoji: string;
+  count: number;
+  participantIds: string[];
+}
+
 // -- Client -> Server messages --
 
 export type ClientToServerMessage =
@@ -185,6 +191,8 @@ export type ClientToServerMessage =
   | { type: 'typingIndicator'; state: Extract<ParticipantActivityState, 'idle' | 'typing'>; updatedAt?: string }
   | { type: 'fileChangeReport'; report: FileChangeReport }
   | { type: 'renameParticipant'; participantId: string; newDisplayName: string }
+  | { type: 'addReaction'; messageId: string; emoji: string }
+  | { type: 'removeReaction'; messageId: string; emoji: string }
   | { type: 'leaveSession' }
   | { type: 'resetSession' }
   | { type: 'pong' };
@@ -202,7 +210,7 @@ export type AgentEventPayload =
 // -- Server -> Client messages --
 
 export type ServerToClientMessage =
-  | { type: 'sessionState'; session: Session; participants: Participant[]; transcript: Message[]; loopControlState?: AgentLoopControlState; approvals?: ApprovalEvent[]; typingStates?: TypingState[]; fileConflicts?: FileConflictWarning[] }
+  | { type: 'sessionState'; session: Session; participants: Participant[]; transcript: Message[]; loopControlState?: AgentLoopControlState; approvals?: ApprovalEvent[]; typingStates?: TypingState[]; fileConflicts?: FileConflictWarning[]; reactions?: Record<string, ReactionSummary[]> }
   | { type: 'newMessage'; message: Message }
   | { type: 'deliverPrompt'; deliveryId: string; agentParticipantId: string; prompt: string; busyPolicy: AgentBusyPolicy | null }
   | { type: 'cancelAgent'; deliveryId: string; agentParticipantId: string; reason?: string }
@@ -220,8 +228,9 @@ export type ServerToClientMessage =
   | { type: 'guardStop'; approval: ApprovalEvent; reason: string; lastMessages: Message[] }
   | { type: 'fileConflictWarning'; warning: FileConflictWarning }
   | { type: 'sessionReset'; session: Session; participants: Participant[] }
+  | { type: 'reactionUpdate'; messageId: string; reactions: ReactionSummary[] }
   | { type: 'error'; code: string; message: string }
   | { type: 'joinRejected'; reason: string }
-  | { type: 'rejoinAccepted'; session: Session; participants: Participant[]; deltaTranscript: Message[]; lastSeenSeq: number }
+  | { type: 'rejoinAccepted'; session: Session; participants: Participant[]; deltaTranscript: Message[]; lastSeenSeq: number; reactions?: Record<string, ReactionSummary[]> }
   | { type: 'rejoinRejected'; reason: string }
   | { type: 'ping' };

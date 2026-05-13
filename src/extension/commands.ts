@@ -842,7 +842,7 @@ export function registerCommands(
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const serverUrl = config.get<string>('multiParticipant.serverUrl', '');
 
-    if (serverUrl && serverUrl !== 'ws://localhost:9120') return true;
+    if (serverUrl) return true;
 
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
@@ -850,13 +850,17 @@ export function registerCommands(
       return false;
     }
 
-    const firstTimeChoice = await vscode.window.showInformationMessage(
-      'Multi-Participant requires a coordination server. If someone on your team already set one up, click "Enter Connection Details". To set up a new server, open the setup guide and give it to an AI assistant.',
-      'Enter Connection Details',
-      'Open Setup Guide',
+    const firstTimeChoice = await vscode.window.showQuickPick(
+      [
+        { label: 'Enter Connection Details', description: 'I have a server URL from my team' },
+        { label: 'Open Setup Guide', description: 'Set up a new coordination server' },
+      ],
+      { placeHolder: 'Multi-Participant requires a coordination server. Press Escape to cancel.' },
     );
 
-    if (firstTimeChoice === 'Open Setup Guide') {
+    if (!firstTimeChoice) return false;
+
+    if (firstTimeChoice.label === 'Open Setup Guide') {
       const guidePath = path.join(context.extensionPath, 'server', 'deploy', 'SERVER_SETUP_GUIDE.md');
       if (fs.existsSync(guidePath)) {
         const doc = await vscode.workspace.openTextDocument(guidePath);
@@ -867,15 +871,10 @@ export function registerCommands(
       return false;
     }
 
-    if (firstTimeChoice !== 'Enter Connection Details') {
-      return false;
-    }
-
     const inputUrl = await vscode.window.showInputBox({
       prompt: 'Coordination server URL (one-time setup)',
       value: '',
       placeHolder: 'wss://your-server.com/mp',
-      ignoreFocusOut: true,
     });
     if (!inputUrl) return false;
 
@@ -883,7 +882,6 @@ export function registerCommands(
       prompt: 'Auth token (shared secret for your team)',
       placeHolder: 'your-shared-token',
       password: true,
-      ignoreFocusOut: true,
     });
     if (inputToken === undefined) return false;
 
@@ -926,7 +924,6 @@ export function registerCommands(
       prompt: 'Your display name',
       value: defaultHumanName || undefined,
       placeHolder: 'Your Name',
-      ignoreFocusOut: true,
     });
     if (!humanName) return;
 
@@ -934,7 +931,6 @@ export function registerCommands(
       prompt: 'Your agent\'s display name',
       value: defaultAgentName || 'Claude',
       placeHolder: 'Claude',
-      ignoreFocusOut: true,
     });
     if (!agentName) return;
 
@@ -942,7 +938,6 @@ export function registerCommands(
       prompt: 'Session password (optional - leave empty for open session)',
       placeHolder: 'Leave empty for no password',
       password: true,
-      ignoreFocusOut: true,
     });
     if (sessionPassword === undefined) return;
 

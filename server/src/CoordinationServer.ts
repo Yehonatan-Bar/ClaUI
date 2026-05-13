@@ -7,7 +7,7 @@ import {
   DeliveryStatus, ClientToServerMessage, ServerToClientMessage, AgentEventPayload,
   AgentBusyPolicy, RenameEvent, TypingState, ParticipantActivityState,
   FileChangeReport, FileConflictWarning, FileConflictDelivery,
-  ApprovalDecisionPayload, AgentLoopControlState, ApprovalEvent,
+  ApprovalDecisionPayload, AgentLoopControlState, ApprovalEvent, ReactionSummary,
 } from './types';
 import { validateParticipantName, routeMessage, extractRouteKey } from './Router';
 import { LoopController } from './LoopController';
@@ -62,6 +62,8 @@ export class CoordinationServer {
   private fileTracker: Map<string, Set<FileTrackerEntry>> = new Map();
   /** Conflict warnings already broadcast, keyed by conflictId. */
   private activeConflicts: Map<string, FileConflictWarning> = new Map();
+  // messageId -> emoji -> Set<participantId>
+  private reactions = new Map<string, Map<string, Set<string>>>();
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private streamCoalesceTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private streamCoalesceBuffers: Map<string, { deliveryId: string; agentParticipantId: string; accumulated: string }> = new Map();
@@ -239,6 +241,12 @@ export class CoordinationServer {
       case 'renameParticipant':
         this.handleRename(ws, msg.participantId, msg.newDisplayName);
         break;
+      case 'addReaction':
+        this.handleAddReaction(ws, msg.messageId, msg.emoji);
+        break;
+      case 'removeReaction':
+        this.handleRemoveReaction(ws, msg.messageId, msg.emoji);
+        break;
       case 'leaveSession':
         this.handleLeave(ws);
         break;
@@ -345,6 +353,7 @@ export class CoordinationServer {
         fileConflicts: this.activeConflicts.size > 0
           ? [...this.activeConflicts.values()]
           : undefined,
+        reactions: this.buildAllReactions(),
       });
 
       this.broadcastExcept(ws, { type: 'participantJoined', participant: tempHumanParticipant });
@@ -393,6 +402,7 @@ export class CoordinationServer {
       participants: this.participants,
       deltaTranscript,
       lastSeenSeq,
+      reactions: this.buildAllReactions(),
     });
 
     this.broadcastExcept(ws, { type: 'participantStatusChange', participantId: humanParticipantId, status: 'online' });
@@ -483,6 +493,7 @@ export class CoordinationServer {
     this.approvalHistory = [];
     this.fileTracker.clear();
     this.activeConflicts.clear();
+    this.reactions.clear();
 
     for (const timer of this.streamCoalesceTimers.values()) {
       clearTimeout(timer);
@@ -530,6 +541,71 @@ export class CoordinationServer {
     });
 
     this.log(`Session reset complete: new session ${newSessionId}`);
+  }
+
+  // -- Emoji Reactions --
+
+  private handleAddReaction(ws: WebSocket, messageId: string, emoji: string): void {
+    const client = this.clients.get(ws);
+    if (!client) return;
+
+    const participantId = client.humanParticipantId;
+
+    if (!this.reactions.has(messageId)) {
+      this.reactions.set(messageId, new Map());
+    }
+    const msgReactions = this.reactions.get(messageId)!;
+    if (!msgReactions.has(emoji)) {
+      msgReactions.set(emoji, new Set());
+    }
+    msgReactions.get(emoji)!.add(participantId);
+
+    const summary = this.buildReactionSummary(messageId);
+    this.broadcast({ type: 'reactionUpdate', messageId, reactions: summary });
+
+    this.persistence?.append('reaction', { messageId, emoji, participantId, action: 'add' });
+  }
+
+  private handleRemoveReaction(ws: WebSocket, messageId: string, emoji: string): void {
+    const client = this.clients.get(ws);
+    if (!client) return;
+
+    const participantId = client.humanParticipantId;
+
+    const msgReactions = this.reactions.get(messageId);
+    if (!msgReactions) return;
+
+    const emojiSet = msgReactions.get(emoji);
+    if (!emojiSet) return;
+
+    emojiSet.delete(participantId);
+    if (emojiSet.size === 0) msgReactions.delete(emoji);
+    if (msgReactions.size === 0) this.reactions.delete(messageId);
+
+    const summary = this.buildReactionSummary(messageId);
+    this.broadcast({ type: 'reactionUpdate', messageId, reactions: summary });
+
+    this.persistence?.append('reaction', { messageId, emoji, participantId, action: 'remove' });
+  }
+
+  private buildReactionSummary(messageId: string): ReactionSummary[] {
+    const msgReactions = this.reactions.get(messageId);
+    if (!msgReactions) return [];
+    const result: ReactionSummary[] = [];
+    for (const [emoji, pids] of msgReactions) {
+      result.push({ emoji, count: pids.size, participantIds: [...pids] });
+    }
+    return result;
+  }
+
+  private buildAllReactions(): Record<string, ReactionSummary[]> | undefined {
+    if (this.reactions.size === 0) return undefined;
+    const result: Record<string, ReactionSummary[]> = {};
+    for (const [messageId, _] of this.reactions) {
+      const summary = this.buildReactionSummary(messageId);
+      if (summary.length > 0) result[messageId] = summary;
+    }
+    return Object.keys(result).length > 0 ? result : undefined;
   }
 
   // -- Human Message --

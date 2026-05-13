@@ -105,8 +105,9 @@ export class ParticleAcceleratorInstaller {
   private async generateLaunchers(binDir: string, runnerJs: string): Promise<void> {
     const isWindows = process.platform === 'win32';
 
-    // Unix launcher
-    const unixScript = `#!/usr/bin/env sh\nexec node "${runnerJs}" "$@"\n`;
+    // Unix launcher (use forward slashes for Git Bash / MSYS2 compatibility)
+    const unixRunnerPath = runnerJs.replace(/\\/g, '/');
+    const unixScript = `#!/usr/bin/env sh\nexec node "${unixRunnerPath}" "$@"\n`;
     const unixPath = path.join(binDir, 'claui-run');
     await fs.promises.writeFile(unixPath, unixScript, 'utf8');
 

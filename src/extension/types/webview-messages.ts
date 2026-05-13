@@ -871,6 +871,18 @@ export interface MpResetSessionRequest {
   type: 'mpResetSession';
 }
 
+export interface MpAddReactionRequest {
+  type: 'mpAddReaction';
+  messageId: string;
+  emoji: string;
+}
+
+export interface MpRemoveReactionRequest {
+  type: 'mpRemoveReaction';
+  messageId: string;
+  emoji: string;
+}
+
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
@@ -996,6 +1008,8 @@ export type WebviewToExtensionMessage =
   | MpCancelAgentRequest
   | MpStopA2ARequest
   | MpResetSessionRequest
+  | MpAddReactionRequest
+  | MpRemoveReactionRequest
   | TeamPanelOpenRequest
   | TeamSendMessageRequest
   | TeamCreateTaskRequest
@@ -2282,6 +2296,7 @@ export interface MpSessionStateMessage {
   approvals?: MPApprovalEvent[];
   typingStates?: MPTypingState[];
   fileConflicts?: MPFileConflictWarning[];
+  reactions?: Record<string, import('../multiparticipant/MultiParticipantProtocol').MPReactionSummary[]>;
 }
 
 export interface MpNewMessageMessage {
@@ -2365,6 +2380,12 @@ export interface MpRenameRejectedMessage {
   participantId: string;
   requestedDisplayName: string;
   reason: string;
+}
+
+export interface MpReactionUpdateMessage {
+  type: 'mpReactionUpdate';
+  messageId: string;
+  reactions: import('../multiparticipant/MultiParticipantProtocol').MPReactionSummary[];
 }
 
 export interface MpErrorMessage {
@@ -2513,6 +2534,7 @@ export type ExtensionToWebviewMessage =
   | MpFileConflictWarningMessage
   | MpParticipantRenamedMessage
   | MpRenameRejectedMessage
+  | MpReactionUpdateMessage
   | MpErrorMessage
   | MpJoinRejectedMessage
   | WorkstreamMapDataMessage

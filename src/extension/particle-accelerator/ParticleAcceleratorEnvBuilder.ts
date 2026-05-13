@@ -23,7 +23,7 @@ export function buildParticleAcceleratorAgentEnv(input: ParticleAcceleratorEnvIn
 
   // Set Particle Accelerator env vars
   env.CLAUI_PARTICLE_ACCELERATOR = '1';
-  env.CLAUI_PARTICLE_ACCELERATOR_VERSION = '1.0.0';
+  env.CLAUI_PARTICLE_ACCELERATOR_VERSION = '1.1.0';
   env.CLAUI_PARTICLE_ACCELERATOR_PROVIDER = input.provider;
   env.CLAUI_PARTICLE_ACCELERATOR_WORKSPACE = input.workspacePath;
   env.CLAUI_PARTICLE_ACCELERATOR_TAB_RUNTIME_ID = input.tabRuntimeId;

@@ -63,7 +63,7 @@ async function main(): Promise<void> {
   }
 
   const cwd = process.cwd();
-  const shell = shellOverride ?? (process.platform === 'win32' ? 'cmd.exe' : '/bin/sh');
+  const shell = shellOverride ?? detectShell();
 
   // Create secret redactor from current env snapshot
   const envSnapshot: Record<string, string> = {};
@@ -266,6 +266,34 @@ function base64urlEncode(text: string): string {
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
+}
+
+function detectShell(): string {
+  if (process.platform !== 'win32') return '/bin/sh';
+
+  // Prefer the SHELL env var set by Git Bash / MSYS2
+  const envShell = process.env.SHELL;
+  if (envShell) {
+    // MSYS paths like /usr/bin/bash need converting to Windows paths
+    const msysRoot = process.env.MSYSTEM_PREFIX;
+    if (msysRoot && envShell.startsWith('/')) {
+      const winPath = msysRoot + envShell.replace(/\//g, '\\');
+      try { fs.accessSync(winPath); return winPath; } catch { /* fall through */ }
+    }
+    // Try the raw value (might already be a Windows path)
+    try { fs.accessSync(envShell); return envShell; } catch { /* fall through */ }
+  }
+
+  // Look for Git Bash in common locations
+  const candidates = [
+    'C:\\Program Files\\Git\\bin\\bash.exe',
+    'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+  ];
+  for (const p of candidates) {
+    try { fs.accessSync(p); return p; } catch { /* continue */ }
+  }
+
+  return 'cmd.exe';
 }
 
 main().catch((err) => {

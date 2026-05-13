@@ -146,6 +146,7 @@ export function useClaudeStream(): void {
     setMpTypingState,
     setMpJoinError,
     setMpRenameError,
+    updateMpReaction,
     clearMpState,
   } = useAppStore();
 
@@ -1082,6 +1083,7 @@ export function useClaudeStream(): void {
             msg.approvals,
             msg.typingStates,
             msg.fileConflicts,
+            msg.reactions,
           );
           break;
 
@@ -1142,6 +1144,10 @@ export function useClaudeStream(): void {
 
         case 'mpError':
           setMpJoinError(msg.message);
+          break;
+
+        case 'mpReactionUpdate':
+          updateMpReaction(msg.messageId, msg.reactions);
           break;
 
         case 'mpJoinRejected':
@@ -1281,6 +1287,7 @@ export function useClaudeStream(): void {
     setMpTypingState,
     setMpJoinError,
     setMpRenameError,
+    updateMpReaction,
     clearMpState,
   ]);
 }

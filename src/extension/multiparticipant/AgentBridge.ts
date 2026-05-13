@@ -87,7 +87,7 @@ export class AgentBridge {
       return;
     }
 
-    this.log(`[AgentBridge] delivering prompt: id=${deliveryId} len=${prompt.length} policy=${busyPolicy}`);
+    this.log(`[AgentBridge] delivering prompt: id=${deliveryId} len=${prompt.length} policy=${busyPolicy}\n  prompt preview: ${prompt.slice(0, 200)}`);
 
     this.runner.deliver(deliveryId, prompt, busyPolicy).catch((err) => {
       this.log(`[AgentBridge] delivery error: ${err}`);

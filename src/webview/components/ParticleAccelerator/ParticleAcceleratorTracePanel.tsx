@@ -1,7 +1,22 @@
+import { useEffect, useRef } from 'react';
 import { useAppStore } from '../../state/store';
+import { postToExtension } from '../../hooks/useClaudeStream';
+
+const REFRESH_INTERVAL_MS = 15_000;
 
 export function ParticleAcceleratorTracePanel() {
   const aggregate = useAppStore(s => s.particleAcceleratorAggregate);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    postToExtension({ type: 'particleAcceleratorGetStatus' } as any);
+    intervalRef.current = setInterval(() => {
+      postToExtension({ type: 'particleAcceleratorGetStatus' } as any);
+    }, REFRESH_INTERVAL_MS);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
 
   if (!aggregate || aggregate.totalCommands === 0) {
     return (

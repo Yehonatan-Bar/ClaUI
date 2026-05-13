@@ -1,4 +1,4 @@
-export const CLAUI_PARTICLE_ACCELERATOR_VERSION = '1.0.0';
+export const CLAUI_PARTICLE_ACCELERATOR_VERSION = '1.1.0';
 export const CLAUI_PARTICLE_ACCELERATOR_SCHEMA_VERSION = 1;
 
 export interface ParticleAcceleratorTrace {

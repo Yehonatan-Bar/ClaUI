@@ -150,6 +150,12 @@ export interface MPFileConflictWarning {
   message?: string;
 }
 
+export interface MPReactionSummary {
+  emoji: string;
+  count: number;
+  participantIds: string[];
+}
+
 // -- Client -> Server --
 
 export type ClientToServerMessage =
@@ -164,6 +170,8 @@ export type ClientToServerMessage =
   | { type: 'renameParticipant'; participantId: string; newDisplayName: string }
   | { type: 'leaveSession' }
   | { type: 'resetSession' }
+  | { type: 'addReaction'; messageId: string; emoji: string }
+  | { type: 'removeReaction'; messageId: string; emoji: string }
   | { type: 'pong' };
 
 export type AgentEventPayload =
@@ -179,7 +187,7 @@ export type AgentEventPayload =
 // -- Server -> Client --
 
 export type ServerToClientMessage =
-  | { type: 'sessionState'; session: MPSession; participants: MPParticipant[]; transcript: MPMessage[]; loopControlState?: MPAgentLoopControlState; approvals?: MPApprovalEvent[]; typingStates?: MPTypingState[]; fileConflicts?: MPFileConflictWarning[] }
+  | { type: 'sessionState'; session: MPSession; participants: MPParticipant[]; transcript: MPMessage[]; loopControlState?: MPAgentLoopControlState; approvals?: MPApprovalEvent[]; typingStates?: MPTypingState[]; fileConflicts?: MPFileConflictWarning[]; reactions?: Record<string, MPReactionSummary[]> }
   | { type: 'newMessage'; message: MPMessage }
   | { type: 'deliverPrompt'; deliveryId: string; agentParticipantId: string; prompt: string; busyPolicy: MPAgentBusyPolicy | null }
   | { type: 'cancelAgent'; deliveryId: string; agentParticipantId: string; reason?: string }
@@ -197,8 +205,9 @@ export type ServerToClientMessage =
   | { type: 'guardStop'; approval: MPApprovalEvent; reason: string; lastMessages: MPMessage[] }
   | { type: 'fileConflictWarning'; warning: MPFileConflictWarning }
   | { type: 'sessionReset'; session: MPSession; participants: MPParticipant[] }
+  | { type: 'reactionUpdate'; messageId: string; reactions: MPReactionSummary[] }
   | { type: 'error'; code: string; message: string }
   | { type: 'joinRejected'; reason: string }
-  | { type: 'rejoinAccepted'; session: MPSession; participants: MPParticipant[]; deltaTranscript: MPMessage[]; lastSeenSeq: number }
+  | { type: 'rejoinAccepted'; session: MPSession; participants: MPParticipant[]; deltaTranscript: MPMessage[]; lastSeenSeq: number; reactions?: Record<string, MPReactionSummary[]> }
   | { type: 'rejoinRejected'; reason: string }
   | { type: 'ping' };

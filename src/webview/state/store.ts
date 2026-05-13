@@ -42,6 +42,7 @@ import type {
   MPTypingState,
   MPFileConflictWarning,
   MPApprovalDecisionType,
+  MPReactionSummary,
 } from '../../extension/multiparticipant/MultiParticipantProtocol';
 import type { AdventureBeat } from '../components/Vitals/adventure/types';
 import { deriveTurnHistoryFromMessages } from '../utils/turnVitals';
@@ -768,10 +769,11 @@ export interface AppState {
   mpRenameError: string | null;
   mpDismissedConflictIds: Set<string>;
   mpGuardStop: { reason: string; lastMessages: Array<{ participantId: string; preview: string }>; resolved: boolean } | null;
+  mpReactions: Record<string, MPReactionSummary[]>;
 
   // Multi-Participant actions
   setMpConnectionStatus: (status: AppState['mpConnectionStatus'], message?: string | null) => void;
-  setMpSession: (session: MPSession | null, participants: MPParticipant[], transcript: MPMessage[], myHumanId: string | null, myAgentId: string | null, approvals?: MPApprovalEvent[], typingStates?: MPTypingState[], fileConflicts?: MPFileConflictWarning[]) => void;
+  setMpSession: (session: MPSession | null, participants: MPParticipant[], transcript: MPMessage[], myHumanId: string | null, myAgentId: string | null, approvals?: MPApprovalEvent[], typingStates?: MPTypingState[], fileConflicts?: MPFileConflictWarning[], reactions?: Record<string, MPReactionSummary[]>) => void;
   addMpMessage: (message: MPMessage) => void;
   setMpParticipants: (participants: MPParticipant[]) => void;
   updateMpParticipant: (participantId: string, updates: Partial<MPParticipant>) => void;
@@ -788,6 +790,8 @@ export interface AppState {
   setMpRenameError: (error: string | null) => void;
   setMpGuardStop: (reason: string, lastMessages: Array<{ participantId: string; preview: string }>) => void;
   resolveMpGuardStop: () => void;
+  setMpReactions: (reactions: Record<string, MPReactionSummary[]>) => void;
+  updateMpReaction: (messageId: string, reactions: MPReactionSummary[]) => void;
   clearMpState: () => void;
 
   // Particle Accelerator
@@ -2536,13 +2540,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   mpRenameError: null,
   mpDismissedConflictIds: new Set<string>(),
   mpGuardStop: null,
+  mpReactions: {},
 
   setMpConnectionStatus: (status, message) => set({
     mpConnectionStatus: status,
     mpConnectionMessage: message ?? null,
   }),
 
-  setMpSession: (session, participants, transcript, myHumanId, myAgentId, approvals, typingStates, fileConflicts) => set({
+  setMpSession: (session, participants, transcript, myHumanId, myAgentId, approvals, typingStates, fileConflicts, reactions) => set({
     mpSession: session,
     mpParticipants: participants,
     mpMessages: transcript,
@@ -2551,6 +2556,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     mpApprovals: approvals ?? [],
     mpTypingStates: typingStates ?? [],
     mpFileConflicts: fileConflicts ?? [],
+    mpReactions: reactions ?? {},
     mpStreamingTexts: {},
     mpDeliveryStatuses: {},
     mpJoinDialogOpen: false,
@@ -2635,6 +2641,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     mpGuardStop: state.mpGuardStop ? { ...state.mpGuardStop, resolved: true } : null,
   })),
 
+  setMpReactions: (reactions) => set({ mpReactions: reactions }),
+
+  updateMpReaction: (messageId, reactions) => set((state) => ({
+    mpReactions: {
+      ...state.mpReactions,
+      ...(reactions.length > 0
+        ? { [messageId]: reactions }
+        : Object.fromEntries(Object.entries(state.mpReactions).filter(([k]) => k !== messageId))),
+    },
+  })),
+
   clearMpState: () => set({
     mpConnectionStatus: null,
     mpConnectionMessage: null,
@@ -2646,6 +2663,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     mpApprovals: [],
     mpTypingStates: [],
     mpFileConflicts: [],
+    mpReactions: {},
     mpStreamingTexts: {},
     mpDeliveryStatuses: {},
     mpJoinDialogOpen: false,
