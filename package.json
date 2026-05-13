@@ -770,14 +770,16 @@
           ],
           "description": "How ClaUi tabs are navigated. Toggle from the in-tab View menu or the Sessions view title bar (gear icon)."
         },
-        "claudeMirror.localBoost.enabled": {
+        "claudeMirror.particleAccelerator.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "Enable Local Boost: local-only command output compression that reduces noisy Bash output before it reaches coding agents. Redacts secrets, filters noise, preserves exit codes."
+          "scope": "application",
+          "description": "Enable Particle Accelerator: local-only command output compression that reduces noisy Bash output before it reaches coding agents. Redacts secrets, filters noise, preserves exit codes. This is a user-level setting that applies to all workspaces."
         },
-        "claudeMirror.localBoost.filterProfile": {
+        "claudeMirror.particleAccelerator.filterProfile": {
           "type": "string",
           "default": "balanced",
+          "scope": "application",
           "enum": [
             "balanced",
             "strict",
@@ -790,75 +792,85 @@
           ],
           "description": "Output filter profile controlling how aggressively command output is compressed."
         },
-        "claudeMirror.localBoost.storeRawRedactedLogs": {
+        "claudeMirror.particleAccelerator.storeRawRedactedLogs": {
           "type": "boolean",
           "default": true,
+          "scope": "application",
           "description": "Store redacted raw command output logs locally for debugging. Logs are retained per rawLogRetentionDays."
         },
-        "claudeMirror.localBoost.rawLogRetentionDays": {
+        "claudeMirror.particleAccelerator.rawLogRetentionDays": {
           "type": "number",
           "default": 7,
           "minimum": 1,
           "maximum": 90,
+          "scope": "application",
           "description": "Days to retain raw redacted log files before automatic cleanup."
         },
-        "claudeMirror.localBoost.maxRawLogMb": {
+        "claudeMirror.particleAccelerator.maxRawLogMb": {
           "type": "number",
           "default": 100,
           "minimum": 10,
           "maximum": 5000,
+          "scope": "application",
           "description": "Maximum total size (MB) of raw redacted log files. Oldest logs are deleted when exceeded."
         },
-        "claudeMirror.localBoost.traceRetentionDays": {
+        "claudeMirror.particleAccelerator.traceRetentionDays": {
           "type": "number",
           "default": 30,
           "minimum": 1,
           "maximum": 365,
+          "scope": "application",
           "description": "Days to retain trace metadata JSON files before automatic cleanup."
         },
-        "claudeMirror.localBoost.maxTraceCount": {
+        "claudeMirror.particleAccelerator.maxTraceCount": {
           "type": "number",
           "default": 10000,
           "minimum": 100,
           "maximum": 100000,
+          "scope": "application",
           "description": "Maximum number of trace files to keep. Oldest traces are deleted when exceeded."
         },
-        "claudeMirror.localBoost.dailyReportRetentionDays": {
+        "claudeMirror.particleAccelerator.dailyReportRetentionDays": {
           "type": "number",
           "default": 90,
           "minimum": 7,
           "maximum": 365,
+          "scope": "application",
           "description": "Days to retain daily aggregate report files."
         },
-        "claudeMirror.localBoost.workspaceLocalStorage": {
+        "claudeMirror.particleAccelerator.workspaceLocalStorage": {
           "type": "boolean",
           "default": false,
-          "description": "Store traces and logs in <workspace>/.claui/local-boost/ instead of global storage. Opt-in because it writes files inside the project."
+          "scope": "resource",
+          "description": "Store traces and logs in <workspace>/.claui/particle-accelerator/ instead of global storage. Opt-in because it writes files inside the project."
         },
-        "claudeMirror.localBoost.installClaudeHook": {
+        "claudeMirror.particleAccelerator.installClaudeHook": {
           "type": "boolean",
           "default": false,
-          "description": "Install a Claude Code PreToolUse hook that automatically routes eligible Bash commands through Local Boost compression."
+          "scope": "resource",
+          "description": "Install a Claude Code PreToolUse hook that automatically routes eligible Bash commands through Particle Accelerator compression."
         },
-        "claudeMirror.localBoost.installCodexHook": {
+        "claudeMirror.particleAccelerator.installCodexHook": {
           "type": "boolean",
           "default": false,
-          "description": "Install a Codex PreToolUse hook that routes eligible Bash commands through Local Boost compression."
+          "scope": "resource",
+          "description": "Install a Codex PreToolUse hook that routes eligible Bash commands through Particle Accelerator compression."
         },
-        "claudeMirror.localBoost.codexMode": {
+        "claudeMirror.particleAccelerator.codexMode": {
           "type": "string",
           "default": "instruction-only",
+          "scope": "application",
           "enum": [
             "off",
             "instruction-only",
             "hook-guard"
           ],
           "enumDescriptions": [
-            "Off: no Local Boost for Codex sessions",
+            "Off: no Particle Accelerator for Codex sessions",
             "Instruction-only: append usage instruction to Codex system prompt (advisory)",
             "Hook-guard: use deny/retry hook to enforce compression (requires hook support)"
           ],
-          "description": "How Local Boost integrates with Codex sessions."
+          "description": "How Particle Accelerator integrates with Codex sessions."
         }
       }
     },

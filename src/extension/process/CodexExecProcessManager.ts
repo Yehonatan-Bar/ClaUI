@@ -64,8 +64,8 @@ export class CodexExecProcessManager extends EventEmitter {
   private stderrChunkCount = 0;
   private stderrByteCount = 0;
 
-  /** Optional Local Boost env builder; set by SessionTab when feature is enabled */
-  localBoostEnvBuilder: ((baseEnv: NodeJS.ProcessEnv) => Record<string, string | undefined>) | null = null;
+  /** Optional Particle Accelerator env builder; set by SessionTab when feature is enabled */
+  particleAcceleratorEnvBuilder: ((baseEnv: NodeJS.ProcessEnv) => Record<string, string | undefined>) | null = null;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     super();
@@ -122,23 +122,23 @@ export class CodexExecProcessManager extends EventEmitter {
 
     let env: NodeJS.ProcessEnv = buildSanitizedEnv();
 
-    // Inject Local Boost environment if available
-    if (this.localBoostEnvBuilder) {
+    // Inject Particle Accelerator environment if available
+    if (this.particleAcceleratorEnvBuilder) {
       try {
-        env = { ...env, ...this.localBoostEnvBuilder(env) };
-        this.log('Local Boost env injected for Codex turn');
+        env = { ...env, ...this.particleAcceleratorEnvBuilder(env) };
+        this.log('Particle Accelerator env injected for Codex turn');
         // In instruction-only mode, append usage instruction to Codex CLI args
-        if (env.CLAUI_LOCAL_BOOST === '1') {
-          const codexMode = vscode.workspace.getConfiguration('claudeMirror.localBoost').get<string>('codexMode', 'instruction-only');
+        if (env.CLAUI_PARTICLE_ACCELERATOR === '1') {
+          const codexMode = vscode.workspace.getConfiguration('claudeMirror.particleAccelerator').get<string>('codexMode', 'instruction-only');
           if (codexMode === 'instruction-only') {
-            const boostInstruction = 'When running Bash commands, prefer using `claui-run` from PATH to compress noisy output. ' +
+            const acceleratorInstruction = 'When running Bash commands, prefer using `claui-run` from PATH to compress noisy output. ' +
               'Usage: claui-run -- <command>. It preserves exit codes and filters output for readability.';
-            args.push('-c', `instructions=${toTomlBasicString(boostInstruction)}`);
-            this.log('Local Boost instruction-only mode: appended claui-run instruction to Codex args');
+            args.push('-c', `instructions=${toTomlBasicString(acceleratorInstruction)}`);
+            this.log('Particle Accelerator instruction-only mode: appended claui-run instruction to Codex args');
           }
         }
       } catch (err) {
-        this.log(`Local Boost env injection failed: ${err instanceof Error ? err.message : err}`);
+        this.log(`Particle Accelerator env injection failed: ${err instanceof Error ? err.message : err}`);
       }
     }
 

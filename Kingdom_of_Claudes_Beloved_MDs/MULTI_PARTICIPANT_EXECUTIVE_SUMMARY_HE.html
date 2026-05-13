@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>סיכום תוכנית: סשן סוכנים עם מספר משתתפים</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a5f9f;
+            border-bottom: 3px solid #1a5f9f;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2c7aa8;
+            margin-top: 25px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-right: 4px solid #1a5f9f;
+            border-radius: 4px;
+        }
+        .key-point {
+            margin: 10px 0;
+            padding: 10px 15px;
+            background: #e8f4f8;
+            border-right: 3px solid #1a5f9f;
+        }
+        .highlight {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        ul {
+            margin: 10px 0;
+            padding-right: 20px;
+        }
+        li {
+            margin: 8px 0;
+        }
+        .phase {
+            background: #e8f4f8;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        strong {
+            color: #1a5f9f;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>סיכום תוכנית הביצוע: סשן משותף עם סוכני קוד</h1>
+
+    <div class="section">
+        <h2>מטרת הפיצ׳ר</h2>
+        <p>לאפשר למספר מתכנתים ולסוכני קוד שלהם (Claude Code ו-Codex) להשתתף באותה שיחה משותפת. כל מתכנת רואה את כל השיחה בזמן אמת, וכל סוכן מקבל הוראה רק כשמישהו ממוען אליו בדרך ברורה ודטרמינסטית.</p>
+    </div>
+
+    <div class="section">
+        <h2>ארכיטקטורה בסיסית</h2>
+        <div class="key-point">
+            <strong>שרת תיאום מרכזי</strong> - מנהל את השיחה הקנונית, מכתיב לכל סוכן מה עליו לעשות, שומר על סדר ובטיחות
+        </div>
+        <div class="key-point">
+            <strong>ClaUi Extension</strong> - בכל חלון VS Code של משתתף, מנהל את הסוכן המקומי שלו, שולח/מקבל הודעות מהשרת
+        </div>
+        <div class="key-point">
+            <strong>סוכנים מקומיים</strong> - Claude Code ו-Codex רצים בכל משתתף, מפעילים קוד בעבודה משותפת
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>כיצד זה עובד</h2>
+        <ol>
+            <li><strong>משתתף שולח הודעה</strong> - אם היא מתחילה בשם או אות של סוכן (למשל "ד: תבדוק את זה"), השרת מנתב אותה אליו</li>
+            <li><strong>השרת שולח prompt לסוכן</strong> - עם קונטקסט של ההודעות החדשות מאז הפעם האחרונה</li>
+            <li><strong>הסוכן עובד ומחזיר תוצאה</strong> - התוצאה מוצגת לכולם</li>
+            <li><strong>אם סוכן מדבר לסוכן אחר</strong> - השרת משעה ומבקש אישור משתתף אנושי (הגנה מפני לולאות אינסופיות)</li>
+        </ol>
+    </div>
+
+    <div class="highlight">
+        <h3>שיפור מרכזי בהערת המשתמש</h3>
+        <p><strong>בעיה קודמת:</strong> כאשר סוכן קודקס עובד וצריך לעדכן אותו למשימה חדשה, היה צריך שלב 1) לשלוח את ההודעה ו-2) ללחוץ על כפתור steer בנפרד.</p>
+        <p><strong>הפתרון:</strong> כל זה אוטומטי עכשיו. השרת שולח prompt אחת עם הsteer flag מובנה, ללא התערבות משתמש נוספת. המשתמש שלח את ההודעה - השאר קורה אוטומטית.</p>
+    </div>
+
+    <div class="section">
+        <h2>תכונות עיקריות</h2>
+
+        <h3>1. ניתוב חכם</h3>
+        <ul>
+            <li>ניתן להשתמש בשם מלא ("Claude") או אות אחת ("ק")</li>
+            <li>שפיר לעברית וסימנים אחרים</li>
+            <li>ודא שאין התנגשויות בשמות או באותיות</li>
+        </ul>
+
+        <h3>2. הגנה מלופים בין סוכנים</h3>
+        <ul>
+            <li><strong>מצב ברירת מחדל:</strong> כל פנייה בין סוכנים דורשת אישור (טוב וביטוח מקסימלי)</li>
+            <li><strong>מצב תקציב:</strong> אפשר להסכים ל-N הודעות בין סוכנים, אז עצור</li>
+            <li><strong>מצב אוטומטי:</strong> הסכם לתקשורת חופשית, אבל משומר "שומר" - דגם קל שבודק כל 20 הודעות אם עדיין קורה משהו יוצר או זה לולאה אינסופית</li>
+            <li><strong>מצב כפוי:</strong> לא בטוח - בשימוש רק על ידי משתתפים שיודעים מה הם עושים</li>
+        </ul>
+
+        <h3>3. מודעות לתנגשויות קבצים</h3>
+        <ul>
+            <li>השרת עוקב אילו קבצים משתנים על ידי איזה סוכן</li>
+            <li>אם שני סוכנים משנים את אותו קובץ בו-זמנית, כל המשתתפים מקבלים אזהרה</li>
+            <li>אפשרות "תכנית בלבד" - סוכנים מתכננים שינויים ללא שינוי בפועל</li>
+        </ul>
+
+        <h3>4. מצביעי פעילות בזמן אמת</h3>
+        <ul>
+            <li>כל משתתף רואה מיד כאשר מישהו הוא מקלידה או סוכן חושב/מייצר תוצאה</li>
+            <li>זה עוזר להתאמות משותפות ולהבנת מה קורה עכשיו</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>מודל הנתונים</h2>
+        <ul>
+            <li><strong>סשן:</strong> שיחה משותפת עם הגדרות וכללים</li>
+            <li><strong>משתתף:</strong> אדם או סוכן עם שם, אות ניתוב, סטטוס (מקוון/לא מקוון)</li>
+            <li><strong>הודעה:</strong> משהו שנאמר בשיחה, קישור למשימה שיגרמה לסוכן לענות</li>
+            <li><strong>מסירה:</strong> סוכן מקבל prompt - מעקב אחרי הצלחה, כשל, ביטול</li>
+            <li><strong>בקרת A2A:</strong> משטר של אישורים או שומר לשמירה על בטיחות</li>
+        </ul>
+    </div>
+
+    <div class="phase">
+        <h2>שלבי הביצוע</h2>
+
+        <h3>שלב 1: סוגים וחוזים (1 יום)</h3>
+        <p>הגדר את כל סוגי ההודעות, מבנים הנתונים, וחוזים עם השרת. יכולים להיות בהקבילה.</p>
+
+        <h3>שלב 2: ליבה עיקרית (3-5 ימים, בהקבילה)</h3>
+        <ul>
+            <li><strong>שרת:</strong> ניתוב, מנגנון A2A, שירות שומר</li>
+            <li><strong>שרת:</strong> שינוי שמות, שמירת נתונים, מצביעי קלדה</li>
+            <li><strong>Extension:</strong> עקוב קבצים, חיבור סוכנים</li>
+            <li><strong>Frontend:</strong> חנות Zustand, רכיבי React בסיסיים</li>
+        </ul>
+
+        <h3>שלב 3: תכונות מתקדמות (2-3 ימים, בהקבילה)</h3>
+        <ul>
+            <li>גילוי תנגשויות קבצים, תכנית בלבד</li>
+            <li>מצביעים מתקדמים, קישורים בין הודעות</li>
+            <li>דיאלוג אישור, כפתור עצור</li>
+        </ul>
+
+        <h3>שלב 4: שילוב וביצוח (3-5 ימים, סדרתי)</h3>
+        <ul>
+            <li>עברה ל-React מלא</li>
+            <li>בדיקה end-to-end עם מתכנתים אמיתיים</li>
+            <li>טיפול בשגיאות, התחברות מחדש, שפה עברית</li>
+        </ul>
+
+        <h3>זמן כולל משוער</h3>
+        <p><strong>10-14 ימים</strong> עם מטלה מקביל (לעומת 20-25 ימים אם ברתתי)</p>
+    </div>
+
+    <div class="section">
+        <h2>סיכום</h2>
+        <p>התוכנית מספקת דרך בטוחה וגמישה למספר מתכנתים לעבוד בצורה משותפת עם סוכני קוד שלהם. הגנה עמידה מלופים משדרת שהתוכנית לעולם לא תלכד בלולאה אינסופית, בעוד שאפשרות "תמיד" עם שומר אומרת שיכול להיות ריצה אוטומטית כשהמשתתפים בטוחים בזה.</p>
+        <p><strong>השיפור המרכזי:</strong> כל ה-steering אוטומטי - אף התערבות משתמש לא נדרשת מעבר לשליחת ההודעה הראשונית.</p>
+    </div>
+
+    <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px;">
+        <p>סיכום תוכנית - עדכון אחרון: בהתאם להערות המשתמש על Codex auto-steering אוטומטי</p>
+    </footer>
+</div>
+</body>
+</html>

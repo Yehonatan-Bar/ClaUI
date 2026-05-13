@@ -345,8 +345,8 @@ export class MessageHandler {
   private memorySampler: import('../process/ProcessMemorySampler').ProcessMemorySampler | null = null;
   /** Workstream map manager (shared instance, set after construction) */
   private workstreamManager: import('../workstream/WorkstreamManager').WorkstreamManager | null = null;
-  /** Local Boost service (shared instance, set after construction) */
-  private localBoostService: import('../local-boost/LocalBoostService').LocalBoostService | null = null;
+  /** Particle Accelerator service (shared instance, set after construction) */
+  private particleAcceleratorService: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService | null = null;
   /** Session store for accessing session metadata (needed by workstream classification) */
   private sessionStore: import('../session/SessionStore').SessionStore | null = null;
   /** Returns session IDs for all currently open tabs (injected by TabManager via SessionTab) */
@@ -554,8 +554,8 @@ export class MessageHandler {
     this.workstreamManager = manager;
   }
 
-  setLocalBoostService(service: import('../local-boost/LocalBoostService').LocalBoostService): void {
-    this.localBoostService = service;
+  setParticleAcceleratorService(service: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService): void {
+    this.particleAcceleratorService = service;
   }
 
   /** Provide the SessionStore for accessing session metadata. */
@@ -3238,24 +3238,24 @@ export class MessageHandler {
           break;
         }
 
-        case 'localBoostGetStatus': {
-          void this.handleLocalBoostGetStatus();
+        case 'particleAcceleratorGetStatus': {
+          void this.handleParticleAcceleratorGetStatus();
           break;
         }
-        case 'localBoostSetEnabled': {
-          void this.handleLocalBoostSetEnabled(msg.enabled);
+        case 'particleAcceleratorSetEnabled': {
+          void this.handleParticleAcceleratorSetEnabled(msg.enabled);
           break;
         }
-        case 'localBoostInstallHooks': {
-          void this.handleLocalBoostInstallHooks(msg.provider);
+        case 'particleAcceleratorInstallHooks': {
+          void this.handleParticleAcceleratorInstallHooks(msg.provider);
           break;
         }
-        case 'localBoostUninstallHooks': {
-          void this.handleLocalBoostUninstallHooks(msg.provider);
+        case 'particleAcceleratorUninstallHooks': {
+          void this.handleParticleAcceleratorUninstallHooks(msg.provider);
           break;
         }
-        case 'localBoostClearData': {
-          void this.handleLocalBoostClearData(msg.scope);
+        case 'particleAcceleratorClearData': {
+          void this.handleParticleAcceleratorClearData(msg.scope);
           break;
         }
 
@@ -5743,58 +5743,68 @@ export class MessageHandler {
       });
   }
 
-  // --- Local Boost handlers ---
+  // --- Particle Accelerator handlers ---
 
-  private async handleLocalBoostGetStatus(): Promise<void> {
-    const service = this.localBoostService;
+  private async handleParticleAcceleratorGetStatus(): Promise<void> {
+    const service = this.particleAcceleratorService;
     if (!service) {
-      this.webview.postMessage({ type: 'localBoostStatus', status: { enabled: false, installed: false, version: null, claudeHookInstalled: false, codexHookInstalled: false, codexMode: 'off', nodeAvailable: false, error: null } } as any);
+      this.webview.postMessage({ type: 'particleAcceleratorStatus', status: { enabled: false, installed: false, version: null, claudeHookInstalled: false, codexHookInstalled: false, codexMode: 'off', nodeAvailable: false, error: null } } as any);
       return;
     }
     await service.refreshHookStatus();
-    this.webview.postMessage({ type: 'localBoostStatus', status: service.getStatus() } as any);
+    this.webview.postMessage({ type: 'particleAcceleratorStatus', status: service.getStatus() } as any);
+
+    const traceReader = service.getTraceReader();
+    if (traceReader) {
+      try {
+        const aggregate = await traceReader.getAggregate();
+        this.webview.postMessage({ type: 'particleAcceleratorAggregateUpdate', aggregate } as any);
+      } catch {
+        // Aggregate fetch is best-effort
+      }
+    }
   }
 
-  private async handleLocalBoostSetEnabled(enabled: boolean): Promise<void> {
-    const service = this.localBoostService;
+  private async handleParticleAcceleratorSetEnabled(enabled: boolean): Promise<void> {
+    const service = this.particleAcceleratorService;
     if (!service) return;
     await service.setEnabled(enabled);
     await service.refreshHookStatus();
-    this.webview.postMessage({ type: 'localBoostStatus', status: service.getStatus() } as any);
+    this.webview.postMessage({ type: 'particleAcceleratorStatus', status: service.getStatus() } as any);
   }
 
-  private async handleLocalBoostInstallHooks(provider: 'claude' | 'codex' | 'both'): Promise<void> {
-    const service = this.localBoostService;
+  private async handleParticleAcceleratorInstallHooks(provider: 'claude' | 'codex' | 'both'): Promise<void> {
+    const service = this.particleAcceleratorService;
     const hookManager = service?.getHookManager();
     if (!hookManager) {
-      this.webview.postMessage({ type: 'localBoostError', error: 'Local Boost is not initialized. Try disabling and re-enabling.' } as any);
+      this.webview.postMessage({ type: 'particleAcceleratorError', error: 'Particle Accelerator is not initialized. Try disabling and re-enabling.' } as any);
       return;
     }
     const workspacePath = this.getWorkspacePath();
     if (!workspacePath) {
-      this.webview.postMessage({ type: 'localBoostError', error: 'No workspace folder open' } as any);
+      this.webview.postMessage({ type: 'particleAcceleratorError', error: 'No workspace folder open' } as any);
       return;
     }
     try {
       if (provider === 'claude' || provider === 'both') {
         await hookManager.installClaudeHook(workspacePath);
-        this.log(`[LocalBoost] Installed Claude hook at ${workspacePath}`);
+        this.log(`[ParticleAccelerator] Installed Claude hook at ${workspacePath}`);
       }
       if (provider === 'codex' || provider === 'both') {
         await hookManager.installCodexHook(workspacePath);
-        this.log(`[LocalBoost] Installed Codex hook at ${workspacePath}`);
+        this.log(`[ParticleAccelerator] Installed Codex hook at ${workspacePath}`);
       }
       await service!.refreshHookStatus();
-      this.webview.postMessage({ type: 'localBoostStatus', status: service!.getStatus() } as any);
+      this.webview.postMessage({ type: 'particleAcceleratorStatus', status: service!.getStatus() } as any);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      this.log(`[LocalBoost] Hook install error: ${msg}`);
-      this.webview.postMessage({ type: 'localBoostError', error: msg } as any);
+      this.log(`[ParticleAccelerator] Hook install error: ${msg}`);
+      this.webview.postMessage({ type: 'particleAcceleratorError', error: msg } as any);
     }
   }
 
-  private async handleLocalBoostUninstallHooks(provider: 'claude' | 'codex' | 'both'): Promise<void> {
-    const service = this.localBoostService;
+  private async handleParticleAcceleratorUninstallHooks(provider: 'claude' | 'codex' | 'both'): Promise<void> {
+    const service = this.particleAcceleratorService;
     const hookManager = service?.getHookManager();
     if (!hookManager) return;
     const workspacePath = this.getWorkspacePath();
@@ -5802,23 +5812,23 @@ export class MessageHandler {
     try {
       if (provider === 'claude' || provider === 'both') {
         await hookManager.uninstallClaudeHook(workspacePath);
-        this.log(`[LocalBoost] Removed Claude hook at ${workspacePath}`);
+        this.log(`[ParticleAccelerator] Removed Claude hook at ${workspacePath}`);
       }
       if (provider === 'codex' || provider === 'both') {
         await hookManager.uninstallCodexHook(workspacePath);
-        this.log(`[LocalBoost] Removed Codex hook at ${workspacePath}`);
+        this.log(`[ParticleAccelerator] Removed Codex hook at ${workspacePath}`);
       }
       await service!.refreshHookStatus();
-      this.webview.postMessage({ type: 'localBoostStatus', status: service!.getStatus() } as any);
+      this.webview.postMessage({ type: 'particleAcceleratorStatus', status: service!.getStatus() } as any);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      this.log(`[LocalBoost] Hook uninstall error: ${msg}`);
-      this.webview.postMessage({ type: 'localBoostError', error: msg } as any);
+      this.log(`[ParticleAccelerator] Hook uninstall error: ${msg}`);
+      this.webview.postMessage({ type: 'particleAcceleratorError', error: msg } as any);
     }
   }
 
-  private async handleLocalBoostClearData(scope: 'workspace' | 'all'): Promise<void> {
-    const service = this.localBoostService;
+  private async handleParticleAcceleratorClearData(scope: 'workspace' | 'all'): Promise<void> {
+    const service = this.particleAcceleratorService;
     const traceReader = service?.getTraceReader();
     if (!traceReader) return;
     const settings = service!.getSettings();
@@ -5828,8 +5838,8 @@ export class MessageHandler {
       traceRetentionDays: 0,
       dailyReportRetentionDays: 0,
     });
-    this.log(`[LocalBoost] Cleared data: ${result.deletedTraces} traces, ${result.deletedRawLogs} raw logs, ${result.deletedReports} reports`);
-    this.webview.postMessage({ type: 'localBoostStatus', status: service!.getStatus() } as any);
+    this.log(`[ParticleAccelerator] Cleared data: ${result.deletedTraces} traces, ${result.deletedRawLogs} raw logs, ${result.deletedReports} reports`);
+    this.webview.postMessage({ type: 'particleAcceleratorStatus', status: service!.getStatus() } as any);
   }
 
 }

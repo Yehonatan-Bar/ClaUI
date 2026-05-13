@@ -23,7 +23,7 @@ import { TabGroupStore } from './session/TabGroupStore';
 import { TabGroupsTreeProvider } from './views/TabGroupsTreeProvider';
 import { WorkstreamManager } from './workstream/WorkstreamManager';
 import { UserPortfolioManager } from './workstream/UserPortfolioManager';
-import { LocalBoostService } from './local-boost/LocalBoostService';
+import { ParticleAcceleratorService } from './particle-accelerator/ParticleAcceleratorService';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -146,10 +146,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const portfolioManager = new UserPortfolioManager(context.globalState);
   workstreamManager.setPortfolioManager(portfolioManager);
 
-  // Create Local Boost service (local-only command output compression)
-  const localBoostService = new LocalBoostService(context, log);
-  void localBoostService.initialize();
-  context.subscriptions.push(localBoostService);
+  // Create Particle Accelerator service (local-only command output compression)
+  const particleAcceleratorService = new ParticleAcceleratorService(context, log);
+  void particleAcceleratorService.initialize();
+  context.subscriptions.push(particleAcceleratorService);
 
   // Create the tab manager that owns all session tabs
   tabManager = new TabManager(
@@ -194,8 +194,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Expose workstreamManager to TabManager for message handler access
   tabManager.workstreamManager = workstreamManager;
-  // Expose Local Boost service to TabManager for env injection
-  tabManager.localBoostService = localBoostService;
+  // Expose Particle Accelerator service to TabManager for env injection
+  tabManager.particleAcceleratorService = particleAcceleratorService;
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       ClaUiSidebarViewProvider.viewType,

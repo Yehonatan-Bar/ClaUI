@@ -48,8 +48,8 @@ export class ClaudeProcessManager extends EventEmitter {
   private startModel = '';
   private startCwd = '';
 
-  /** Optional Local Boost env builder; set by SessionTab when feature is enabled */
-  localBoostEnvBuilder: ((baseEnv: NodeJS.ProcessEnv) => Record<string, string | undefined>) | null = null;
+  /** Optional Particle Accelerator env builder; set by SessionTab when feature is enabled */
+  particleAcceleratorEnvBuilder: ((baseEnv: NodeJS.ProcessEnv) => Record<string, string | undefined>) | null = null;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     super();
@@ -140,13 +140,13 @@ export class ClaudeProcessManager extends EventEmitter {
     let env = { ...buildClaudeCliEnv(apiKey), ...mcpSecretEnv };
     this.log(`Env: hasAnthropicKey=${!!apiKey} mcpSecretVars=${Object.keys(mcpSecretEnv).length}`);
 
-    // Inject Local Boost environment if available
-    if (this.localBoostEnvBuilder) {
+    // Inject Particle Accelerator environment if available
+    if (this.particleAcceleratorEnvBuilder) {
       try {
-        env = { ...env, ...this.localBoostEnvBuilder(env) };
-        this.log('Local Boost env injected');
+        env = { ...env, ...this.particleAcceleratorEnvBuilder(env) };
+        this.log('Particle Accelerator env injected');
       } catch (err) {
-        this.log(`Local Boost env injection failed: ${err instanceof Error ? err.message : err}`);
+        this.log(`Particle Accelerator env injection failed: ${err instanceof Error ? err.message : err}`);
       }
     }
 

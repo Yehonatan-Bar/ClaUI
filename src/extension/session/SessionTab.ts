@@ -172,8 +172,8 @@ export class SessionTab implements WebviewBridge {
   private allowedTools: string[] | null = null;
   /** Smart Search: cwd override (so transcripts under $HOME are reachable). */
   private cwdOverride: string | null = null;
-  /** Local Boost service reference for context file lifecycle */
-  private localBoostService: import('../local-boost/LocalBoostService').LocalBoostService | null = null;
+  /** Particle Accelerator service reference for context file lifecycle */
+  private particleAcceleratorService: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -913,9 +913,9 @@ export class SessionTab implements WebviewBridge {
     this.resumeTargetMissingDetected = false;
     const effectiveCwd = options?.cwd ?? this.cwdOverride ?? undefined;
 
-    // Create Local Boost context file before spawning CLI (env vars reference it)
-    if (this.localBoostService?.isEnabled()) {
-      const contextStore = this.localBoostService.getContextStore();
+    // Create Particle Accelerator context file before spawning CLI (env vars reference it)
+    if (this.particleAcceleratorService?.isEnabled()) {
+      const contextStore = this.particleAcceleratorService.getContextStore();
       if (contextStore) {
         const workspacePath = effectiveCwd ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
         await contextStore.createContext(this.id, 'claude', workspacePath).catch(() => {});
@@ -1101,9 +1101,9 @@ export class SessionTab implements WebviewBridge {
     this.achievementService.onSessionEnd(this.id);
     this.achievementService.unregisterTab(this.id);
     this.skillGenService?.unregisterTab(this.id);
-    // Clean up Local Boost context file
-    if (this.localBoostService?.isEnabled()) {
-      void this.localBoostService.getContextStore()?.disposeContext(this.id).catch(() => {});
+    // Clean up Particle Accelerator context file
+    if (this.particleAcceleratorService?.isEnabled()) {
+      void this.particleAcceleratorService.getContextStore()?.disposeContext(this.id).catch(() => {});
     }
     this.closeBtwSession();
     this.processManager.stop();
@@ -2113,15 +2113,15 @@ export class SessionTab implements WebviewBridge {
       errorRate: totalTurns > 0 ? (totalErrors / totalTurns) * 100 : 0,
     };
 
-    // Attach Local Boost stats if the feature was active
-    if (this.localBoostService?.isEnabled()) {
-      const traceReader = this.localBoostService.getTraceReader();
+    // Attach Particle Accelerator stats if the feature was active
+    if (this.particleAcceleratorService?.isEnabled()) {
+      const traceReader = this.particleAcceleratorService.getTraceReader();
       if (traceReader) {
         void traceReader.getAggregate(
           vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
         ).then(agg => {
           if (agg.totalCommands > 0) {
-            summary.localBoost = {
+            summary.particleAccelerator = {
               commandCount: agg.totalCommands,
               failedCommandCount: agg.failedCommands,
               totalRawBytes: agg.totalRawBytes,
@@ -2214,9 +2214,9 @@ export class SessionTab implements WebviewBridge {
       this.persistSessionMetadata();
       this.callbacks.onSessionIdAssigned?.(this.id, event.session_id);
 
-      // Update Local Boost context with the CLI-assigned session ID
-      if (this.localBoostService?.isEnabled()) {
-        void this.localBoostService.getContextStore()
+      // Update Particle Accelerator context with the CLI-assigned session ID
+      if (this.particleAcceleratorService?.isEnabled()) {
+        void this.particleAcceleratorService.getContextStore()
           ?.updateSessionId(this.id, event.session_id).catch(() => {});
       }
 
@@ -2344,15 +2344,15 @@ export class SessionTab implements WebviewBridge {
     this.messageHandler.setWorkstreamManager(manager);
   }
 
-  /** Inject the shared LocalBoostService (forwarded to MessageHandler + process manager env builder) */
-  setLocalBoostService(service: import('../local-boost/LocalBoostService').LocalBoostService): void {
-    this.localBoostService = service;
-    this.messageHandler.setLocalBoostService(service);
+  /** Inject the shared ParticleAcceleratorService (forwarded to MessageHandler + process manager env builder) */
+  setParticleAcceleratorService(service: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService): void {
+    this.particleAcceleratorService = service;
+    this.messageHandler.setParticleAcceleratorService(service);
 
     if (service.isEnabled()) {
       const runtimePaths = service.getRuntimePaths();
       if (runtimePaths) {
-        this.processManager.localBoostEnvBuilder = (baseEnv) => {
+        this.processManager.particleAcceleratorEnvBuilder = (baseEnv) => {
           const contextStore = service.getContextStore();
           return service.buildAgentEnv({
             baseEnv,

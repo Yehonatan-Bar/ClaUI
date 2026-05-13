@@ -59,18 +59,18 @@ module.exports = [
     },
     devtool: 'nosources-source-map',
   },
-  // Local Boost runtime (Node.js CLI, runs outside VS Code)
+  // Particle Accelerator runtime (Node.js CLI, runs outside VS Code)
   {
-    name: 'local-boost-runtime',
+    name: 'particle-accelerator-runtime',
     target: 'node',
     mode: 'none',
     entry: {
-      'cli': './src/local-boost-runtime/cli.ts',
-      'hooks/claude-pre-tool-use': './src/local-boost-runtime/hooks/claudePreToolUse.ts',
-      'hooks/codex-pre-tool-use': './src/local-boost-runtime/hooks/codexPreToolUse.ts',
+      'cli': './src/particle-accelerator-runtime/cli.ts',
+      'hooks/claude-pre-tool-use': './src/particle-accelerator-runtime/hooks/claudePreToolUse.ts',
+      'hooks/codex-pre-tool-use': './src/particle-accelerator-runtime/hooks/codexPreToolUse.ts',
     },
     output: {
-      path: path.resolve(__dirname, 'dist', 'local-boost-runtime'),
+      path: path.resolve(__dirname, 'dist', 'particle-accelerator-runtime'),
       filename: '[name].js',
       libraryTarget: 'commonjs2',
     },

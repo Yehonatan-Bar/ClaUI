@@ -75,8 +75,8 @@ export class TabManager {
   /** Shared workstream manager, injected after construction to avoid circular dependency */
   workstreamManager: import('../workstream/WorkstreamManager').WorkstreamManager | null = null;
 
-  /** Shared Local Boost service, injected after construction */
-  localBoostService: import('../local-boost/LocalBoostService').LocalBoostService | null = null;
+  /** Shared Particle Accelerator service, injected after construction */
+  particleAcceleratorService: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService | null = null;
 
   private readonly snapshotStore: OpenTabsSnapshotStore;
   private readonly snapshotEntries = new Map<string, OpenTabSnapshotEntry>();
@@ -320,8 +320,8 @@ export class TabManager {
     if (this.workstreamManager) {
       tab.setWorkstreamManager(this.workstreamManager);
     }
-    if (this.localBoostService) {
-      tab.setLocalBoostService(this.localBoostService);
+    if (this.particleAcceleratorService) {
+      tab.setParticleAcceleratorService(this.particleAcceleratorService);
     }
     tab.setSessionStore(this.sessionStore);
     tab.setOpenTabSessionIdsGetter(() => this.getOpenTabSessionIds());
@@ -378,8 +378,8 @@ export class TabManager {
     if (this.workstreamManager) {
       tab.setWorkstreamManager(this.workstreamManager);
     }
-    if (this.localBoostService) {
-      tab.setLocalBoostService(this.localBoostService);
+    if (this.particleAcceleratorService) {
+      tab.setParticleAcceleratorService(this.particleAcceleratorService);
     }
     tab.setSessionStore(this.sessionStore);
     tab.setOpenTabSessionIdsGetter(() => this.getOpenTabSessionIds());

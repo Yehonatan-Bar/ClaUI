@@ -141,8 +141,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private forceReadOnlySandbox: boolean = false;
   /** Smart Search: cwd override (so transcripts under $HOME are reachable). */
   private cwdOverride: string | null = null;
-  /** Local Boost service reference for context file lifecycle */
-  private localBoostService: import('../local-boost/LocalBoostService').LocalBoostService | null = null;
+  /** Particle Accelerator service reference for context file lifecycle */
+  private particleAcceleratorService: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -283,18 +283,18 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.messageHandler.setWorkstreamManager(manager);
   }
 
-  /** Inject the shared LocalBoostService (forwarded to CodexMessageHandler + process manager env builder). */
-  setLocalBoostService(service: import('../local-boost/LocalBoostService').LocalBoostService): void {
-    this.localBoostService = service;
-    if ('setLocalBoostService' in this.messageHandler) {
-      (this.messageHandler as { setLocalBoostService: (s: typeof service) => void }).setLocalBoostService(service);
+  /** Inject the shared ParticleAcceleratorService (forwarded to CodexMessageHandler + process manager env builder). */
+  setParticleAcceleratorService(service: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService): void {
+    this.particleAcceleratorService = service;
+    if ('setParticleAcceleratorService' in this.messageHandler) {
+      (this.messageHandler as { setParticleAcceleratorService: (s: typeof service) => void }).setParticleAcceleratorService(service);
     }
 
     const settings = service.getSettings();
     if (service.isEnabled() && settings.codexMode !== 'off') {
       const runtimePaths = service.getRuntimePaths();
       if (runtimePaths) {
-        this.processManager.localBoostEnvBuilder = (baseEnv) => {
+        this.processManager.particleAcceleratorEnvBuilder = (baseEnv) => {
           const contextStore = service.getContextStore();
           return service.buildAgentEnv({
             baseEnv,
@@ -370,9 +370,9 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.sessionStartedAt = isFork ? new Date().toISOString() : (this.sessionStartedAt || new Date().toISOString());
     this.analyticsSaved = false;
 
-    // Create Local Boost context file before any turns are sent
-    if (this.localBoostService?.isEnabled()) {
-      const contextStore = this.localBoostService.getContextStore();
+    // Create Particle Accelerator context file before any turns are sent
+    if (this.particleAcceleratorService?.isEnabled()) {
+      const contextStore = this.particleAcceleratorService.getContextStore();
       if (contextStore) {
         const workspacePath = this.sessionCwd ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
         void contextStore.createContext(this.id, 'codex', workspacePath).catch(() => {});
@@ -814,9 +814,9 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.achievementService.onSessionEnd(this.id);
     this.achievementService.unregisterTab(this.id);
     this.skillGenService?.unregisterTab(this.id);
-    // Clean up Local Boost context file
-    if (this.localBoostService?.isEnabled()) {
-      void this.localBoostService.getContextStore()?.disposeContext(this.id).catch(() => {});
+    // Clean up Particle Accelerator context file
+    if (this.particleAcceleratorService?.isEnabled()) {
+      void this.particleAcceleratorService.getContextStore()?.disposeContext(this.id).catch(() => {});
     }
     this.fileLogger?.dispose();
     this.panel.dispose();
@@ -1932,9 +1932,9 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       this.analyticsSaved = false;
       tabLog(`Codex thread id set: ${data.threadId}`);
 
-      // Update Local Boost context with the Codex thread ID
-      if (this.localBoostService?.isEnabled()) {
-        void this.localBoostService.getContextStore()
+      // Update Particle Accelerator context with the Codex thread ID
+      if (this.particleAcceleratorService?.isEnabled()) {
+        void this.particleAcceleratorService.getContextStore()
           ?.updateSessionId(this.id, data.threadId).catch(() => {});
       }
       this.callbacks.onSessionIdAssigned?.(this.id, data.threadId);

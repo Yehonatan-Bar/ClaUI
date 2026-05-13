@@ -1018,20 +1018,20 @@ export type WebviewToExtensionMessage =
   | WorkstreamMapImportExternalFolderRequest
   | WorkstreamPortfolioRequestDataRequest
   | WorkstreamPortfolioOpenProjectRequest
-  | LocalBoostGetStatusRequest
-  | LocalBoostSetEnabledRequest
-  | LocalBoostInstallHooksRequest
-  | LocalBoostUninstallHooksRequest
-  | LocalBoostOpenTraceRequest
-  | LocalBoostClearDataRequest;
+  | ParticleAcceleratorGetStatusRequest
+  | ParticleAcceleratorSetEnabledRequest
+  | ParticleAcceleratorInstallHooksRequest
+  | ParticleAcceleratorUninstallHooksRequest
+  | ParticleAcceleratorOpenTraceRequest
+  | ParticleAcceleratorClearDataRequest;
 
-// --- Local Boost (Webview -> Extension) ---
-export interface LocalBoostGetStatusRequest { type: 'localBoostGetStatus' }
-export interface LocalBoostSetEnabledRequest { type: 'localBoostSetEnabled'; enabled: boolean }
-export interface LocalBoostInstallHooksRequest { type: 'localBoostInstallHooks'; provider: 'claude' | 'codex' | 'both' }
-export interface LocalBoostUninstallHooksRequest { type: 'localBoostUninstallHooks'; provider: 'claude' | 'codex' | 'both' }
-export interface LocalBoostOpenTraceRequest { type: 'localBoostOpenTrace'; traceId: string }
-export interface LocalBoostClearDataRequest { type: 'localBoostClearData'; scope: 'workspace' | 'all' }
+// --- Particle Accelerator (Webview -> Extension) ---
+export interface ParticleAcceleratorGetStatusRequest { type: 'particleAcceleratorGetStatus' }
+export interface ParticleAcceleratorSetEnabledRequest { type: 'particleAcceleratorSetEnabled'; enabled: boolean }
+export interface ParticleAcceleratorInstallHooksRequest { type: 'particleAcceleratorInstallHooks'; provider: 'claude' | 'codex' | 'both' }
+export interface ParticleAcceleratorUninstallHooksRequest { type: 'particleAcceleratorUninstallHooks'; provider: 'claude' | 'codex' | 'both' }
+export interface ParticleAcceleratorOpenTraceRequest { type: 'particleAcceleratorOpenTrace'; traceId: string }
+export interface ParticleAcceleratorClearDataRequest { type: 'particleAcceleratorClearData'; scope: 'workspace' | 'all' }
 
 export interface WebviewImageData {
   base64: string;
@@ -1750,8 +1750,8 @@ export interface SessionSummary {
   taskType?: string;
   outcome?: 'completed' | 'failed' | 'partial' | 'unknown';
 
-  // Local Boost per-session stats (populated when feature is active)
-  localBoost?: {
+  // Particle Accelerator per-session stats (populated when feature is active)
+  particleAccelerator?: {
     commandCount: number;
     failedCommandCount: number;
     totalRawBytes: number;
@@ -2518,26 +2518,26 @@ export type ExtensionToWebviewMessage =
   | WorkstreamPortfolioDataMessage
   | WorkstreamPortfolioNavigateToProjectMessage
   | ToggleWorkstreamPortfolioMessage
-  | LocalBoostStatusMessage
-  | LocalBoostTraceUpdateMessage
-  | LocalBoostAggregateUpdateMessage
-  | LocalBoostErrorMessage;
+  | ParticleAcceleratorStatusMessage
+  | ParticleAcceleratorTraceUpdateMessage
+  | ParticleAcceleratorAggregateUpdateMessage
+  | ParticleAcceleratorErrorMessage;
 
-// --- Local Boost (Extension -> Webview) ---
-export interface LocalBoostStatusMessage {
-  type: 'localBoostStatus';
-  status: import('../local-boost/LocalBoostTypes').LocalBoostStatus;
+// --- Particle Accelerator (Extension -> Webview) ---
+export interface ParticleAcceleratorStatusMessage {
+  type: 'particleAcceleratorStatus';
+  status: import('../particle-accelerator/ParticleAcceleratorTypes').ParticleAcceleratorStatus;
 }
-export interface LocalBoostTraceUpdateMessage {
-  type: 'localBoostTraceUpdate';
-  trace: import('../local-boost/LocalBoostTypes').LocalBoostTraceSummary;
+export interface ParticleAcceleratorTraceUpdateMessage {
+  type: 'particleAcceleratorTraceUpdate';
+  trace: import('../particle-accelerator/ParticleAcceleratorTypes').ParticleAcceleratorTraceSummary;
 }
-export interface LocalBoostAggregateUpdateMessage {
-  type: 'localBoostAggregateUpdate';
-  aggregate: import('../local-boost/LocalBoostTypes').LocalBoostAggregate;
+export interface ParticleAcceleratorAggregateUpdateMessage {
+  type: 'particleAcceleratorAggregateUpdate';
+  aggregate: import('../particle-accelerator/ParticleAcceleratorTypes').ParticleAcceleratorAggregate;
 }
-export interface LocalBoostErrorMessage {
-  type: 'localBoostError';
+export interface ParticleAcceleratorErrorMessage {
+  type: 'particleAcceleratorError';
   error: string;
 }
 

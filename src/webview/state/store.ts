@@ -790,17 +790,17 @@ export interface AppState {
   resolveMpGuardStop: () => void;
   clearMpState: () => void;
 
-  // Local Boost
-  localBoostEnabled: boolean;
-  localBoostStatus: { enabled: boolean; installed: boolean; version: string | null; claudeHookInstalled: boolean; codexHookInstalled: boolean; codexMode: string; nodeAvailable: boolean; error: string | null } | null;
-  localBoostAggregate: { totalCommands: number; totalEstimatedTokensSaved: number; avgCompressionRatio: number } | null;
-  localBoostRecentTraces: Array<{ traceId: string; timestamp: string; provider: string; commandFamily: string; exitCode: number | null; durationMs: number; rawBytes: number; filteredBytes: number; estimatedTokensSaved: number; filterName: string; redactions: number }>;
-  localBoostError: string | null;
-  setLocalBoostEnabled: (enabled: boolean) => void;
-  setLocalBoostStatus: (status: NonNullable<AppState['localBoostStatus']>) => void;
-  setLocalBoostAggregate: (aggregate: NonNullable<AppState['localBoostAggregate']>) => void;
-  addLocalBoostTrace: (trace: AppState['localBoostRecentTraces'][number]) => void;
-  setLocalBoostError: (error: string | null) => void;
+  // Particle Accelerator
+  particleAcceleratorEnabled: boolean;
+  particleAcceleratorStatus: { enabled: boolean; installed: boolean; version: string | null; claudeHookInstalled: boolean; codexHookInstalled: boolean; codexMode: string; nodeAvailable: boolean; error: string | null } | null;
+  particleAcceleratorAggregate: { totalCommands: number; totalEstimatedTokensSaved: number; avgCompressionRatio: number } | null;
+  particleAcceleratorRecentTraces: Array<{ traceId: string; timestamp: string; provider: string; commandFamily: string; exitCode: number | null; durationMs: number; rawBytes: number; filteredBytes: number; estimatedTokensSaved: number; filterName: string; redactions: number }>;
+  particleAcceleratorError: string | null;
+  setParticleAcceleratorEnabled: (enabled: boolean) => void;
+  setParticleAcceleratorStatus: (status: NonNullable<AppState['particleAcceleratorStatus']>) => void;
+  setParticleAcceleratorAggregate: (aggregate: NonNullable<AppState['particleAcceleratorAggregate']>) => void;
+  addParticleAcceleratorTrace: (trace: AppState['particleAcceleratorRecentTraces'][number]) => void;
+  setParticleAcceleratorError: (error: string | null) => void;
 
   reset: () => void;
 }
@@ -2655,19 +2655,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     mpGuardStop: null,
   }),
 
-  // Local Boost
-  localBoostEnabled: false,
-  localBoostStatus: null,
-  localBoostAggregate: null,
-  localBoostRecentTraces: [],
-  localBoostError: null,
-  setLocalBoostEnabled: (enabled: boolean) => set({ localBoostEnabled: enabled }),
-  setLocalBoostStatus: (status) => set({ localBoostStatus: status, localBoostEnabled: status.enabled }),
-  setLocalBoostAggregate: (aggregate) => set({ localBoostAggregate: aggregate }),
-  addLocalBoostTrace: (trace) => set((state) => ({
-    localBoostRecentTraces: [trace, ...state.localBoostRecentTraces].slice(0, 100),
+  // Particle Accelerator
+  particleAcceleratorEnabled: false,
+  particleAcceleratorStatus: null,
+  particleAcceleratorAggregate: null,
+  particleAcceleratorRecentTraces: [],
+  particleAcceleratorError: null,
+  setParticleAcceleratorEnabled: (enabled: boolean) => set({ particleAcceleratorEnabled: enabled }),
+  setParticleAcceleratorStatus: (status) => set({ particleAcceleratorStatus: status, particleAcceleratorEnabled: status.enabled }),
+  setParticleAcceleratorAggregate: (aggregate) => set({ particleAcceleratorAggregate: aggregate }),
+  addParticleAcceleratorTrace: (trace) => set((state) => ({
+    particleAcceleratorRecentTraces: [trace, ...state.particleAcceleratorRecentTraces].slice(0, 100),
   })),
-  setLocalBoostError: (error) => set({ localBoostError: error }),
+  setParticleAcceleratorError: (error) => set({ particleAcceleratorError: error }),
 
   reset: () =>
     set((state) => ({

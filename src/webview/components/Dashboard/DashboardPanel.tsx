@@ -15,12 +15,12 @@ import { ProjectToolsTab } from './tabs/ProjectToolsTab';
 import { UsageTab } from './tabs/UsageTab';
 import { TokenRatioTab } from './tabs/TokenRatioTab';
 import { MemoryTab } from './tabs/MemoryTab';
-import { LocalBoostTab } from './tabs/LocalBoostTab';
+import { ParticleAcceleratorTab } from './tabs/ParticleAcceleratorTab';
 import { DASH_COLORS } from './dashboardUtils';
 
-type SessionTab = 'overview' | 'tokens' | 'tools' | 'timeline' | 'commands' | 'context' | 'usage' | 'local-boost';
+type SessionTab = 'overview' | 'tokens' | 'tools' | 'timeline' | 'commands' | 'context' | 'usage';
 type ProjectTab = 'p-overview' | 'p-30-days' | 'p-sessions' | 'p-tokens' | 'p-tools';
-type UserTab = 'u-ratio' | 'u-memory';
+type UserTab = 'u-ratio' | 'u-memory' | 'u-particle-accelerator';
 type DashboardTab = SessionTab | ProjectTab | UserTab;
 
 const SESSION_TABS: { key: SessionTab; label: string }[] = [
@@ -31,7 +31,6 @@ const SESSION_TABS: { key: SessionTab; label: string }[] = [
   { key: 'commands', label: 'Commands' },
   { key: 'context', label: 'Context' },
   { key: 'usage', label: 'Usage' },
-  { key: 'local-boost', label: 'Local Boost' },
 ];
 
 const PROJECT_TABS: { key: ProjectTab; label: string }[] = [
@@ -45,6 +44,7 @@ const PROJECT_TABS: { key: ProjectTab; label: string }[] = [
 const USER_TABS: { key: UserTab; label: string }[] = [
   { key: 'u-ratio', label: 'Token Ratio' },
   { key: 'u-memory', label: 'Memory' },
+  { key: 'u-particle-accelerator', label: 'Particle Accelerator' },
 ];
 
 const modeToggleBase: React.CSSProperties = {
@@ -255,7 +255,6 @@ export const DashboardPanel: React.FC = () => {
         {mode === 'session' && activeTab === 'commands' && <CommandsTab turnHistory={turnHistory} />}
         {mode === 'session' && activeTab === 'context' && <ContextTab />}
         {mode === 'session' && activeTab === 'usage' && <UsageTab />}
-        {mode === 'session' && activeTab === 'local-boost' && <LocalBoostTab />}
         {/* Project tabs */}
         {mode === 'project' && activeTab === 'p-overview' && <ProjectOverviewTab sessions={projectSessions} />}
         {mode === 'project' && activeTab === 'p-30-days' && <Project30DaysTab sessions={projectSessions} />}
@@ -265,6 +264,7 @@ export const DashboardPanel: React.FC = () => {
         {/* User tabs */}
         {mode === 'user' && activeTab === 'u-ratio' && <TokenRatioTab />}
         {mode === 'user' && activeTab === 'u-memory' && <MemoryTab />}
+        {mode === 'user' && activeTab === 'u-particle-accelerator' && <ParticleAcceleratorTab />}
       </div>
     </div>
   );
