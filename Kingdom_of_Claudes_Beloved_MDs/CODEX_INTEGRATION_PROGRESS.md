@@ -141,11 +141,11 @@ Important details already in place (do not break):
 - `providerSetting` message currently syncs only the default provider setting from VS Code config.
 - Claude `MessageHandler` now sends `provider: 'claude'` on `sessionStarted` messages so the webview can track current tab provider.
 
-Current UI behavior (Stage 1 only):
+Current provider shortcut behavior:
 
-- The `Codex` button in the status bar currently only sets `claudeMirror.provider = codex`.
-- It does **not** open a new tab or start a Codex runtime yet.
-- The button is disabled while the current tab is busy (to match the plan direction and avoid switching during turns).
+- The AI chip provider pills open clean provider tabs through `openProviderTab`.
+- The Claude/Codex pills stay enabled regardless of current-tab busy/handoff state, including the active provider pill, so users can start parallel clean sessions without stopping the current turn.
+- Carry-context remains a separate explicit handoff action and still requires an idle source tab.
 
 Stage 2 implementation guidance (to align with Stage 1 foundation):
 

@@ -74,8 +74,16 @@ export const AIChip: React.FC<AIChipProps> = ({ isOpen, onToggle, displayMode = 
   const modelDisplayName = getClaudeModelLabel(model);
   const shortModelName = getClaudeModelCompactLabel(model);
 
+  const isCleanProviderShortcut = (targetProvider: ProviderId): boolean =>
+    targetProvider === 'claude' || targetProvider === 'codex';
+
+  const isProviderPillDisabled = (targetProvider: ProviderId): boolean => {
+    if (isCleanProviderShortcut(targetProvider)) return false;
+    return isHandoffRunning || isBusy || provider === targetProvider;
+  };
+
   const handleOpenProviderTab = (targetProvider: ProviderId) => {
-    if (provider === targetProvider || isBusy || isHandoffRunning) return;
+    if (isProviderPillDisabled(targetProvider)) return;
     if (selectedProvider !== targetProvider) {
       setSelectedProvider(targetProvider);
     }
@@ -143,7 +151,7 @@ export const AIChip: React.FC<AIChipProps> = ({ isOpen, onToggle, displayMode = 
                 key={p}
                 className={`ai-chip-provider-pill ${currentProvider === p ? 'active' : ''}`}
                 onClick={() => handleOpenProviderTab(p)}
-                disabled={isBusy || isHandoffRunning || provider === p}
+                disabled={isProviderPillDisabled(p)}
                 style={currentProvider === p ? { background: PROVIDER_COLORS[p] } : undefined}
               >
                 {PROVIDER_LABELS[p]}

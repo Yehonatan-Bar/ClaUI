@@ -67,6 +67,7 @@ export class CoordinationServer {
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private streamCoalesceTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private streamCoalesceBuffers: Map<string, { deliveryId: string; agentParticipantId: string; accumulated: string }> = new Map();
+  private tokenAuthenticatedSockets = new WeakSet<WebSocket>();
   private config: ServerConfig;
   private log: (msg: string) => void;
 
@@ -158,7 +159,7 @@ export class CoordinationServer {
       this.log('Token authentication enabled');
     }
 
-    this.wss.on('connection', (ws) => this.handleConnection(ws));
+    this.wss.on('connection', (ws, req) => this.handleConnection(ws, req));
 
     this.pingInterval = setInterval(() => {
       for (const [ws] of this.clients) {
@@ -190,8 +191,14 @@ export class CoordinationServer {
     }
   }
 
-  private handleConnection(ws: WebSocket): void {
-    this.log('New WebSocket connection');
+  private handleConnection(ws: WebSocket, req?: IncomingMessage): void {
+    if (this.config.sessionToken && req?.url) {
+      const reqUrl = new URL(req.url, 'http://localhost');
+      if (reqUrl.searchParams.get('token') === this.config.sessionToken) {
+        this.tokenAuthenticatedSockets.add(ws);
+      }
+    }
+    this.log('New WebSocket connection' + (this.tokenAuthenticatedSockets.has(ws) ? ' (token-auth)' : ''));
 
     ws.on('message', (data) => {
       try {
@@ -276,11 +283,15 @@ export class CoordinationServer {
         this.log('[Session] Password set by session creator');
       }
     } else if (this.session.sessionPassword) {
-      // Session is password-protected — validate
-      if (!password || password !== this.session.sessionPassword) {
+      // Token-authenticated connections bypass session password
+      const isTokenAuth = this.tokenAuthenticatedSockets.has(ws);
+      if (!isTokenAuth && (!password || password !== this.session.sessionPassword)) {
         this.sendToClient(ws, { type: 'joinRejected', reason: 'Invalid session password' });
         this.log(`[Session] Join rejected: invalid password from ${humanName}`);
         return;
+      }
+      if (isTokenAuth && (!password || password !== this.session.sessionPassword)) {
+        this.log(`[Session] Password bypassed via token auth for ${humanName}`);
       }
     }
 

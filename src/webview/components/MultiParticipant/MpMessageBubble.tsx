@@ -118,7 +118,8 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
   const streamingText = message.deliveryId ? streamingTexts[message.deliveryId] : undefined;
 
   // RTL detection on content and streaming text
-  const isRtl = detectRtl(message.parsedBody);
+  const displayBody = message.routePrefix ? `${message.routePrefix}, ${message.parsedBody}` : message.parsedBody;
+  const isRtl = detectRtl(displayBody);
   const isStreamingRtl = streamingText ? detectRtl(streamingText) : isRtl;
 
   return (
@@ -259,7 +260,7 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
             {triggerMessage.displayNameSnapshot}
           </span>
           <span style={{ color: '#8b949e' }}>
-            : {truncateText(triggerMessage.parsedBody, 50)}
+            : {truncateText(triggerMessage.routePrefix ? `${triggerMessage.routePrefix}, ${triggerMessage.parsedBody}` : triggerMessage.parsedBody, 50)}
           </span>
         </button>
       )}
@@ -276,7 +277,7 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
           textAlign: isRtl ? 'right' : 'left',
         }}
       >
-        {message.parsedBody}
+        {displayBody}
       </div>
 
       {/* Streaming text overlay */}

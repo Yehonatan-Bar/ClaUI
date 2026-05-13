@@ -28,6 +28,7 @@ Allow switching providers mid-session while preserving practical task continuity
 ## Safety/Hardening
 
 - Busy guard: cannot switch while current turn is running.
+- The clean Claude/Codex provider pills are not handoff actions and remain available regardless of the current tab's busy/handoff state.
 - Per-tab lock: prevents duplicate concurrent switches.
 - Cooldown: prevents rapid ping-pong switching.
 - Secret redaction before artifact persistence.
