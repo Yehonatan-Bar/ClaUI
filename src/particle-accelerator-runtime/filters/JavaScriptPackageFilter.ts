@@ -1,5 +1,6 @@
 import { FilterInput, FilterOutput } from '../../extension/particle-accelerator/ParticleAcceleratorTypes';
 import { OutputFilter, estimateTokens, buildOutputHeader } from './OutputFilterRegistry';
+import { getBudgetCap } from './filterUtils';
 
 const SUPPORTS_PATTERN = /^(npm|pnpm|yarn|bun)\s+(test|t|build|compile|install|ci|i|lint|audit|run\s+(test|build|lint))\b/;
 
@@ -20,12 +21,6 @@ const IMPORTANT_PATTERNS = [
   /PASS/i, /warning/i, /✓|✗|✘|×/,
 ];
 
-const BUDGETS: Record<string, { success: number; failure: number }> = {
-  balanced: { success: 8000, failure: 16000 },
-  strict: { success: 4000, failure: 8000 },
-  verbose: { success: 32000, failure: 32000 },
-};
-
 export class JavaScriptPackageFilter implements OutputFilter {
   name = 'JavaScriptPackageFilter';
   version = '1.0.0';
@@ -35,8 +30,7 @@ export class JavaScriptPackageFilter implements OutputFilter {
   }
 
   filter(input: FilterInput): FilterOutput {
-    const budget = BUDGETS[input.profile] ?? BUDGETS.balanced;
-    const cap = input.exitCode === 0 ? budget.success : budget.failure;
+    const cap = getBudgetCap(input.profile, input.exitCode, input.budgetOverrides);
 
     const filteredStdout = filterJsOutput(input.stdout, cap, input.exitCode !== 0);
     const filteredStderr = filterJsOutput(input.stderr, Math.floor(cap / 4), true);

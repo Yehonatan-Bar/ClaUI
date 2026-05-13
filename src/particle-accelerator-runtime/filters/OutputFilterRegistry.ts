@@ -44,33 +44,26 @@ export class OutputFilterRegistry {
   }
 
   findFilter(input: FilterInput): OutputFilter {
-    if (this.config.disabledFilters) {
-      const disabled = new Set(this.config.disabledFilters);
-      for (const f of this.filters) {
-        if (!disabled.has(f.name) && f.supports(input)) {
-          return f;
-        }
-      }
-    } else {
-      for (const f of this.filters) {
-        if (f.supports(input)) {
-          return f;
-        }
+    const disabled = this.config.disabledFilters
+      ? new Set(this.config.disabledFilters)
+      : null;
+
+    for (const f of this.filters) {
+      if (f.supports(input)) {
+        // Check disabled AFTER supports() — DeclarativeFilter sets its name dynamically in supports()
+        if (disabled?.has(f.name)) continue;
+        return f;
       }
     }
-    // Fallback: last filter should be GenericFilter
     return this.filters[this.filters.length - 1];
   }
 
   applyFilter(input: FilterInput): FilterOutput {
     const filter = this.findFilter(input);
 
-    // Apply budget overrides from config
     const budgetOverride = this.config.budgetOverrides?.[filter.name];
     if (budgetOverride) {
-      // Budget overrides are applied inside each filter via the profile,
-      // but we can't easily inject them. For now, config overrides are
-      // handled at the filter level if filters read them.
+      input = { ...input, budgetOverrides: budgetOverride };
     }
 
     return filter.filter(input);

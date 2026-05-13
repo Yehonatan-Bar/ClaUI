@@ -1,13 +1,8 @@
 import { FilterInput, FilterOutput } from '../../extension/particle-accelerator/ParticleAcceleratorTypes';
 import { OutputFilter, estimateTokens, buildOutputHeader } from './OutputFilterRegistry';
+import { getBudgetCap } from './filterUtils';
 
 const SUPPORTS_PATTERN = /^(npx\s+)?tsc\b/;
-
-const BUDGETS: Record<string, { success: number; failure: number }> = {
-  balanced: { success: 8000, failure: 16000 },
-  strict: { success: 4000, failure: 8000 },
-  verbose: { success: 32000, failure: 32000 },
-};
 
 export class TypeScriptFilter implements OutputFilter {
   name = 'TypeScriptFilter';
@@ -18,8 +13,7 @@ export class TypeScriptFilter implements OutputFilter {
   }
 
   filter(input: FilterInput): FilterOutput {
-    const budget = BUDGETS[input.profile] ?? BUDGETS.balanced;
-    const cap = input.exitCode === 0 ? budget.success : budget.failure;
+    const cap = getBudgetCap(input.profile, input.exitCode, input.budgetOverrides);
 
     const filteredStdout = filterTscOutput(input.stdout, cap);
     const filteredStderr = filterTscOutput(input.stderr, Math.floor(cap / 4));

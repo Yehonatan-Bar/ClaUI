@@ -146,14 +146,14 @@ describe('claudePreToolUse hook logic', () => {
     assert.equal(result.action, 'passthrough');
   });
 
-  it('passes through for unknown commands (not in allow list)', () => {
+  it('intercepts unknown commands (eligible with generic fallback)', () => {
     const result = simulateClaudeHook('Bash', 'some-random-binary');
-    assert.equal(result.action, 'passthrough');
+    assert.equal(result.action, 'allow');
   });
 
-  it('passes through for piped commands', () => {
+  it('intercepts piped commands (classified by leading command)', () => {
     const result = simulateClaudeHook('Bash', 'npm test | grep FAIL');
-    assert.equal(result.action, 'passthrough');
+    assert.equal(result.action, 'allow');
   });
 
   // ── Already-wrapped commands are passthrough ──────────────────────────

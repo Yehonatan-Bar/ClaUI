@@ -5753,6 +5753,12 @@ export class MessageHandler {
       } catch {
         // Aggregate fetch is best-effort
       }
+      try {
+        const recentTraces = await traceReader.getRecentTraces(100);
+        this.webview.postMessage({ type: 'particleAcceleratorRecentTraces', traces: recentTraces } as any);
+      } catch {
+        // Recent traces fetch is best-effort
+      }
     }
   }
 

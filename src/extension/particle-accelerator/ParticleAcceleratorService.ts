@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import {
   ParticleAcceleratorStatus, ParticleAcceleratorRuntimePaths, ParticleAcceleratorEnvInput,
-  ParticleAcceleratorSettings,
+  ParticleAcceleratorSettings, CLAUI_PARTICLE_ACCELERATOR_VERSION,
 } from './ParticleAcceleratorTypes';
 import { getParticleAcceleratorSettings, onSettingsChanged } from './ParticleAcceleratorSettings';
 import { ParticleAcceleratorInstaller } from './ParticleAcceleratorInstaller';
@@ -98,7 +98,7 @@ export class ParticleAcceleratorService implements vscode.Disposable {
     return {
       enabled: this.settings.enabled,
       installed: this.runtimePaths !== null,
-      version: this.runtimePaths ? '1.0.0' : null,
+      version: this.runtimePaths ? CLAUI_PARTICLE_ACCELERATOR_VERSION : null,
       claudeHookInstalled: this.cachedClaudeHookInstalled,
       codexHookInstalled: this.cachedCodexHookInstalled,
       codexMode: this.settings.codexMode,

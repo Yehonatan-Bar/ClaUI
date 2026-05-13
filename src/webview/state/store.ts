@@ -797,13 +797,26 @@ export interface AppState {
   // Particle Accelerator
   particleAcceleratorEnabled: boolean;
   particleAcceleratorStatus: { enabled: boolean; installed: boolean; version: string | null; claudeHookInstalled: boolean; codexHookInstalled: boolean; codexMode: string; nodeAvailable: boolean; error: string | null } | null;
-  particleAcceleratorAggregate: { totalCommands: number; totalEstimatedTokensSaved: number; avgCompressionRatio: number } | null;
+  particleAcceleratorAggregate: {
+    totalCommands: number;
+    failedCommands: number;
+    totalRawBytes: number;
+    totalFilteredBytes: number;
+    totalEstimatedTokensSaved: number;
+    avgCompressionRatio: number;
+    avgDurationMs: number;
+    totalRedactions: number;
+    topCommandFamilies: Array<{ family: string; count: number; tokensSaved: number }>;
+    topFilters: Array<{ filter: string; count: number }>;
+    providerBreakdown: Record<string, { count: number; tokensSaved: number }>;
+  } | null;
   particleAcceleratorRecentTraces: Array<{ traceId: string; timestamp: string; provider: string; commandFamily: string; exitCode: number | null; durationMs: number; rawBytes: number; filteredBytes: number; estimatedTokensSaved: number; filterName: string; redactions: number }>;
   particleAcceleratorError: string | null;
   setParticleAcceleratorEnabled: (enabled: boolean) => void;
   setParticleAcceleratorStatus: (status: NonNullable<AppState['particleAcceleratorStatus']>) => void;
   setParticleAcceleratorAggregate: (aggregate: NonNullable<AppState['particleAcceleratorAggregate']>) => void;
   addParticleAcceleratorTrace: (trace: AppState['particleAcceleratorRecentTraces'][number]) => void;
+  setParticleAcceleratorRecentTraces: (traces: AppState['particleAcceleratorRecentTraces']) => void;
   setParticleAcceleratorError: (error: string | null) => void;
 
   reset: () => void;
@@ -2685,6 +2698,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   addParticleAcceleratorTrace: (trace) => set((state) => ({
     particleAcceleratorRecentTraces: [trace, ...state.particleAcceleratorRecentTraces].slice(0, 100),
   })),
+  setParticleAcceleratorRecentTraces: (traces) => set({ particleAcceleratorRecentTraces: traces.slice(0, 100) }),
   setParticleAcceleratorError: (error) => set({ particleAcceleratorError: error }),
 
   reset: () =>

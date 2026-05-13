@@ -79,22 +79,56 @@ Error handling per spec: decode failure = exit 127, redaction failure = suppress
 `createSecretRedactor(envSnapshot)` builds a sensitive value list from env keys matching patterns (`*_TOKEN`, `*_SECRET`, `*_KEY`, `*_PASSWORD`, etc.), sorts longest-first for replacement priority. Regex rules for GitHub PATs (`ghp_*`), AWS keys, JWTs, OpenAI keys, etc. Fail-closed: returns suppression message on error. Supports chunked redaction with 200-char overlap for boundary handling.
 
 ### CommandEligibility (`CommandEligibility.ts`)
-`classifyCommand(command)` returns `{eligible, reason, filterHint?, commandFamily?}`. Deny list (ssh, sudo, vim, npm run dev, docker run, etc.), allow list (~40 patterns grouped by family: git, npm, python, rust, go, etc.). Strips leading env var assignments. Detects pipelines and redirections.
+`classifyCommand(command)` returns `{eligible, reason, filterHint?, commandFamily?}`. Three-phase classification:
+1. Reject: output redirections (`>`/`>>`), command substitutions (`$()`, backticks)
+2. Strip prefixes: env vars, `cd` prefix, pipe suffix (for classification only -- pipes still execute)
+3. Deny list (ssh, sudo, vim, npm run dev, docker run, etc.)
+4. Allow list (~80 patterns) with filter hints and command family classification
+5. Default: eligible with GenericFilter (deny-list-only approach)
 
 ### Output Filters
 
-Registry pattern: `OutputFilterRegistry` with `register()`, `findFilter()`, `applyFilter()`.
+Registry pattern: `OutputFilterRegistry` with `register()`, `findFilter()`, `applyFilter()`. Registration order (first match wins):
 
-| Filter | Matches | Key Behavior |
-|--------|---------|-------------|
-| GenericFilter | Fallback | ANSI strip, dedup, head 20 + tail 80, budget caps |
-| JavaScriptPackageFilter | npm/pnpm/yarn/bun | Suppresses funding, deprecation, progress bars |
-| PytestFilter | pytest | Preserves FAILURES, tracebacks, summary |
-| JestVitestFilter | jest/vitest | Preserves Expected/Received, stack frames |
-| TypeScriptFilter | tsc | Groups by file, caps at 10 errors/file |
-| EslintFilter | eslint | Groups by file, caps at 10 issues/file |
+| Priority | Filter | Matches | Key Behavior |
+|----------|--------|---------|-------------|
+| 1 | User DeclarativeFilter | User-defined JSON | Custom suppress/preserve patterns |
+| 2 | JavaScriptPackageFilter | npm/pnpm/yarn/bun | Suppresses funding, deprecation, progress |
+| 3 | PytestFilter | pytest | Preserves FAILURES, tracebacks, summary |
+| 4 | JestVitestFilter | jest/vitest | Preserves Expected/Received, stack frames |
+| 5 | TypeScriptFilter | tsc | Groups by file, caps at 10 errors/file |
+| 6 | EslintFilter | eslint | Groups by file, caps at 10 issues/file |
+| 7 | GitSemanticFilter | git diff/log/show/status | Per-file diff grouping, commit limiting |
+| 8 | DeclarativeFilter (built-in) | 55+ commands | Data-driven suppress/preserve/groupByFile |
+| 9 | GenericFilter | Fallback | ANSI strip, dedup, head 20 + tail 80 |
 
-Budget profiles (GenericFilter):
+### DeclarativeFilter Engine (`filters/DeclarativeFilter.ts`)
+
+Data-driven filter that processes `DeclarativeFilterDefinition` objects. Each definition specifies command patterns (regex), suppress patterns (noise), important patterns (signal), and optional diagnostic grouping by file. One class handles all definitions -- filter name in traces is `DeclarativeFilter:<id>` (e.g., `DeclarativeFilter:docker-build`).
+
+55 built-in definitions in `filters/builtinDefinitions.ts` covering: Docker, Go, Rust/Cargo, Python tools (pip, mypy, ruff, black, flake8, pylint), .NET, Kubernetes, Terraform, AWS/GCloud, Maven/Gradle, GCC/Clang/Make, Playwright, Next.js, Vite, Prisma, Swift/Xcode, Homebrew, Turbo/NX, and more.
+
+### GitSemanticFilter (`filters/GitSemanticFilter.ts`)
+
+Semantic filter for git commands with subcommand-specific handlers:
+- **git diff**: Parses into per-file sections, counts +/- per file, caps hunks per file (5), generates summary
+- **git log**: Limits to 25 entries, truncates long messages
+- **git status**: Collapses untracked file lists >15 entries
+- **git show**: Hybrid metadata + diff filtering
+
+### User Custom Filters (`filters/UserFilterLoader.ts`)
+
+Users can define custom declarative filters in JSON files:
+- `.claui/filters.json` in project root (highest priority)
+- `${storeDir}/config/filters.json` (global)
+
+Format: `{ "customFilters": [{ "id": "...", "commandPatterns": [...], "suppressPatterns": [...], "importantPatterns": [...] }] }`
+
+### Shared Utilities (`filters/filterUtils.ts`)
+
+Common ANSI stripping, budget calculation, and `FilterOutput` builder used by all filters.
+
+Budget profiles:
 - **balanced**: 8k char budget, 16k hard cap
 - **strict**: 4k char budget, 8k hard cap
 - **verbose**: 32k char budget, 32k hard cap
@@ -117,8 +151,8 @@ All in `src/webview/components/ParticleAccelerator/`.
 
 - **ParticleAcceleratorStatusBadge**: Renders in the StatusBar right section. Green/red dot + summary text (command count, tokens saved). Hidden when Particle Accelerator is disabled.
 - **ParticleAcceleratorSettingsPanel**: Enable/disable toggle, version/node info, hook install/uninstall buttons, clear data, refresh. Rendered in VitalsInfoPanel and Dashboard ParticleAccelerator tab.
-- **ParticleAcceleratorTracePanel**: 3-column stat cards grid (total commands, tokens saved, compression ratio).
-- **ParticleAcceleratorTraceDetail**: Single trace card with command family, timestamp, exit code, duration, compression, redaction count.
+- **ParticleAcceleratorTracePanel**: Full dashboard with 6 overview stat cards (commands + failed, tokens saved, compression, data volume, avg duration, secrets redacted), provider breakdown (Claude vs Codex), top command families bar chart, top filters bar chart, and recent traces list (expandable, initially 10, up to 100).
+- **ParticleAcceleratorTraceDetail**: Single trace card with command family, provider badge (color-coded Claude/Codex), timestamp, exit code (red-highlighted on failure), duration, compression, token savings, redaction count, filter name.
 
 ## Data Flow (Extension <-> Webview)
 
@@ -126,9 +160,9 @@ WebviewToExtension messages:
 - `particleAcceleratorGetStatus` / `particleAcceleratorSetEnabled` / `particleAcceleratorInstallHooks` / `particleAcceleratorUninstallHooks` / `particleAcceleratorClearData`
 
 ExtensionToWebview messages:
-- `particleAcceleratorStatus` / `particleAcceleratorTraceUpdate` / `particleAcceleratorAggregateUpdate` / `particleAcceleratorError`
+- `particleAcceleratorStatus` / `particleAcceleratorTraceUpdate` / `particleAcceleratorAggregateUpdate` / `particleAcceleratorRecentTraces` / `particleAcceleratorError`
 
-Zustand store fields: `particleAcceleratorEnabled`, `particleAcceleratorStatus`, `particleAcceleratorAggregate`, `particleAcceleratorRecentTraces`, `particleAcceleratorError` with setters (`addParticleAcceleratorTrace` prepends and caps at 100 entries).
+Zustand store fields: `particleAcceleratorEnabled`, `particleAcceleratorStatus`, `particleAcceleratorAggregate` (full aggregate with all 11 fields: totalCommands, failedCommands, totalRawBytes, totalFilteredBytes, totalEstimatedTokensSaved, avgCompressionRatio, avgDurationMs, totalRedactions, topCommandFamilies, topFilters, providerBreakdown), `particleAcceleratorRecentTraces`, `particleAcceleratorError`. Setters: `addParticleAcceleratorTrace` (prepend + cap at 100), `setParticleAcceleratorRecentTraces` (batch replace from extension).
 
 ## Store Directory Layout
 

@@ -11,6 +11,10 @@ import { PytestFilter } from './filters/PytestFilter';
 import { JestVitestFilter } from './filters/JestVitestFilter';
 import { TypeScriptFilter } from './filters/TypeScriptFilter';
 import { EslintFilter } from './filters/EslintFilter';
+import { GitSemanticFilter } from './filters/GitSemanticFilter';
+import { DeclarativeFilter } from './filters/DeclarativeFilter';
+import { BUILTIN_DEFINITIONS } from './filters/builtinDefinitions';
+import { loadUserFilters } from './filters/UserFilterLoader';
 import {
   ParticleAcceleratorTrace, ParticleAcceleratorContextFile, FilterConfig,
   CLAUI_PARTICLE_ACCELERATOR_SCHEMA_VERSION,
@@ -107,12 +111,28 @@ async function main(): Promise<void> {
 
   // Set up filter registry
   const registry = new OutputFilterRegistry();
+
+  // User custom declarative filters (highest priority)
+  const userDefs = loadUserFilters(storeDir, cwd);
+  if (userDefs.length > 0) {
+    registry.register(new DeclarativeFilter(userDefs));
+  }
+
+  // Existing specialized filters
   registry.register(new JavaScriptPackageFilter());
   registry.register(new PytestFilter());
   registry.register(new JestVitestFilter());
   registry.register(new TypeScriptFilter());
   registry.register(new EslintFilter());
-  registry.register(new GenericFilter()); // Must be last (fallback)
+
+  // Git semantic filter
+  registry.register(new GitSemanticFilter());
+
+  // Built-in declarative filters (55+ command definitions)
+  registry.register(new DeclarativeFilter(BUILTIN_DEFINITIONS));
+
+  // Generic fallback (must be last)
+  registry.register(new GenericFilter());
 
   // Load filter config if available
   if (storeDir) {

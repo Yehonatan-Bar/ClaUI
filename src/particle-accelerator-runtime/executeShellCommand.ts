@@ -22,7 +22,8 @@ export function executeShellCommand(
     let stderrBytes = 0;
 
     const isWindows = process.platform === 'win32';
-    const shellArgs = isWindows
+    const isCmdLike = isWindows && /cmd(\.exe)?$/i.test(options.shell);
+    const shellArgs = isCmdLike
       ? ['/c', command]
       : ['-c', command];
 

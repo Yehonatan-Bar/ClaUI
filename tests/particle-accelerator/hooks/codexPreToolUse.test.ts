@@ -192,14 +192,14 @@ describe('codexPreToolUse hook logic', () => {
     assert.equal(result.action, 'passthrough');
   });
 
-  it('passes through for unknown commands (not in allow list)', () => {
+  it('intercepts unknown commands (eligible with generic fallback)', () => {
     const result = simulateCodexHook('Bash', 'some-random-binary');
-    assert.equal(result.action, 'passthrough');
+    assert.equal(result.action, 'deny');
   });
 
-  it('passes through for piped commands', () => {
+  it('intercepts piped commands (classified by leading command)', () => {
     const result = simulateCodexHook('Bash', 'npm test | grep FAIL');
-    assert.equal(result.action, 'passthrough');
+    assert.equal(result.action, 'deny');
   });
 
   // ── Already-wrapped commands are passthrough ──────────────────────────

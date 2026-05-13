@@ -33,7 +33,7 @@ describe('buildParticleAcceleratorAgentEnv', () => {
 
   it('sets CLAUI_PARTICLE_ACCELERATOR_VERSION', () => {
     const env = buildParticleAcceleratorAgentEnv(makeInput());
-    assert.equal(env.CLAUI_PARTICLE_ACCELERATOR_VERSION, '1.0.0');
+    assert.equal(env.CLAUI_PARTICLE_ACCELERATOR_VERSION, '1.1.0');
   });
 
   it('sets CLAUI_PARTICLE_ACCELERATOR_PROVIDER from input', () => {

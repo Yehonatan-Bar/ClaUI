@@ -35,7 +35,7 @@ describe('classifyCommand', () => {
     const result = classifyCommand('go test');
     assert.equal(result.eligible, true);
     assert.equal(result.commandFamily, 'go');
-    assert.equal(result.filterHint, 'GoFilter');
+    assert.equal(result.filterHint, 'DeclarativeFilter');
   });
 
   // ── Deny-list (not eligible) ──────────────────────────────────────────
@@ -76,11 +76,10 @@ describe('classifyCommand', () => {
 
   // ── Pipeline / Redirection (not eligible) ─────────────────────────────
 
-  it('npm test | grep foo -> not eligible (pipeline)', () => {
+  it('npm test | grep foo -> eligible (pipes are classified by leading command)', () => {
     const result = classifyCommand('npm test | grep foo');
-    assert.equal(result.eligible, false);
-    assert.ok(result.reason.toLowerCase().includes('pipeline') || result.reason.toLowerCase().includes('redirection'),
-      `expected reason to mention pipeline/redirection, got "${result.reason}"`);
+    assert.equal(result.eligible, true);
+    assert.ok(result.commandFamily?.includes('npm'), `expected commandFamily to include "npm", got "${result.commandFamily}"`);
   });
 
   it('npm test > out.txt -> not eligible (redirection)', () => {
@@ -93,8 +92,8 @@ describe('classifyCommand', () => {
   it('$(npm test) -> not eligible (command substitution)', () => {
     const result = classifyCommand('$(npm test)');
     assert.equal(result.eligible, false);
-    assert.ok(result.reason.toLowerCase().includes('pipeline') || result.reason.toLowerCase().includes('redirection'),
-      `expected reason to mention pipeline/redirection, got "${result.reason}"`);
+    assert.ok(result.reason.toLowerCase().includes('substitution'),
+      `expected reason to mention substitution, got "${result.reason}"`);
   });
 
   // ── Env-var stripping ─────────────────────────────────────────────────
@@ -105,11 +104,99 @@ describe('classifyCommand', () => {
     assert.ok(result.commandFamily?.includes('npm'), `expected commandFamily to include "npm", got "${result.commandFamily}"`);
   });
 
-  // ── Unknown command (default deny) ────────────────────────────────────
+  // ── Unknown command (default eligible with GenericFilter) ──────────────
 
-  it('unknown-command -> not eligible (not in allow list)', () => {
+  it('unknown-command -> eligible with generic fallback', () => {
     const result = classifyCommand('unknown-command');
+    assert.equal(result.eligible, true);
+    assert.equal(result.filterHint, 'GenericFilter');
+    assert.equal(result.commandFamily, 'unknown');
+  });
+
+  // ── New filter coverage ──────────────────────────────────────────────
+
+  it('docker build -> eligible with DeclarativeFilter', () => {
+    const result = classifyCommand('docker build .');
+    assert.equal(result.eligible, true);
+    assert.equal(result.commandFamily, 'docker-build');
+    assert.equal(result.filterHint, 'DeclarativeFilter');
+  });
+
+  it('git diff -> eligible with GitSemanticFilter', () => {
+    const result = classifyCommand('git diff');
+    assert.equal(result.eligible, true);
+    assert.equal(result.commandFamily, 'git');
+    assert.equal(result.filterHint, 'GitSemanticFilter');
+  });
+
+  it('cargo test -> eligible with DeclarativeFilter', () => {
+    const result = classifyCommand('cargo test');
+    assert.equal(result.eligible, true);
+    assert.equal(result.commandFamily, 'cargo');
+    assert.equal(result.filterHint, 'DeclarativeFilter');
+  });
+
+  it('kubectl get pods -> eligible with DeclarativeFilter', () => {
+    const result = classifyCommand('kubectl get pods');
+    assert.equal(result.eligible, true);
+    assert.equal(result.commandFamily, 'kubectl');
+    assert.equal(result.filterHint, 'DeclarativeFilter');
+  });
+
+  it('terraform plan -> eligible with DeclarativeFilter', () => {
+    const result = classifyCommand('terraform plan');
+    assert.equal(result.eligible, true);
+    assert.equal(result.commandFamily, 'terraform');
+    assert.equal(result.filterHint, 'DeclarativeFilter');
+  });
+
+  it('pipe with docker build | tee -> eligible, classified by leading command', () => {
+    const result = classifyCommand('docker build . | tee build.log');
+    assert.equal(result.eligible, true);
+    assert.equal(result.commandFamily, 'docker-build');
+  });
+
+  it('2>&1 redirection -> not eligible', () => {
+    const result = classifyCommand('npm test > results.txt');
     assert.equal(result.eligible, false);
-    assert.ok(result.reason.toLowerCase().includes('not in allow'), `expected reason about not in allow list, got "${result.reason}"`);
+  });
+
+  it('backtick substitution -> not eligible', () => {
+    const result = classifyCommand('echo `npm test`');
+    assert.equal(result.eligible, false);
+  });
+
+  it('pipe to denied command -> not eligible (deny-list checks all segments)', () => {
+    const result = classifyCommand('npm test | ssh host');
+    assert.equal(result.eligible, false);
+    assert.ok(result.reason.toLowerCase().includes('deny'), `expected deny reason, got "${result.reason}"`);
+  });
+
+  it('pipe to vim -> not eligible (deny-list checks piped segments)', () => {
+    const result = classifyCommand('git diff | vim -');
+    assert.equal(result.eligible, false);
+  });
+
+  it('&& chain to denied command -> not eligible', () => {
+    const result = classifyCommand('npm test && ssh host');
+    assert.equal(result.eligible, false);
+    assert.ok(result.reason.toLowerCase().includes('deny'), `expected deny reason, got "${result.reason}"`);
+  });
+
+  it('; chain to denied command -> not eligible', () => {
+    const result = classifyCommand('npm test; ssh host');
+    assert.equal(result.eligible, false);
+    assert.ok(result.reason.toLowerCase().includes('deny'), `expected deny reason, got "${result.reason}"`);
+  });
+
+  it('|| chain to denied command -> not eligible', () => {
+    const result = classifyCommand('npm test || vim file.txt');
+    assert.equal(result.eligible, false);
+    assert.ok(result.reason.toLowerCase().includes('deny'), `expected deny reason, got "${result.reason}"`);
+  });
+
+  it('&& chain of safe commands -> eligible', () => {
+    const result = classifyCommand('npm install && npm test');
+    assert.equal(result.eligible, true);
   });
 });

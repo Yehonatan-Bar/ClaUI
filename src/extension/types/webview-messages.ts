@@ -2548,6 +2548,7 @@ export type ExtensionToWebviewMessage =
   | ParticleAcceleratorStatusMessage
   | ParticleAcceleratorTraceUpdateMessage
   | ParticleAcceleratorAggregateUpdateMessage
+  | ParticleAcceleratorRecentTracesMessage
   | ParticleAcceleratorErrorMessage;
 
 // --- Particle Accelerator (Extension -> Webview) ---
@@ -2562,6 +2563,10 @@ export interface ParticleAcceleratorTraceUpdateMessage {
 export interface ParticleAcceleratorAggregateUpdateMessage {
   type: 'particleAcceleratorAggregateUpdate';
   aggregate: import('../particle-accelerator/ParticleAcceleratorTypes').ParticleAcceleratorAggregate;
+}
+export interface ParticleAcceleratorRecentTracesMessage {
+  type: 'particleAcceleratorRecentTraces';
+  traces: import('../particle-accelerator/ParticleAcceleratorTypes').ParticleAcceleratorTraceSummary[];
 }
 export interface ParticleAcceleratorErrorMessage {
   type: 'particleAcceleratorError';

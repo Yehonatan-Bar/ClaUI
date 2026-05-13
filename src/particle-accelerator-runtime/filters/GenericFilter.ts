@@ -1,5 +1,6 @@
 import { FilterInput, FilterOutput } from '../../extension/particle-accelerator/ParticleAcceleratorTypes';
 import { OutputFilter, estimateTokens, buildOutputHeader } from './OutputFilterRegistry';
+import { getBudgetCap } from './filterUtils';
 
 const ANSI_REGEX = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b\([A-Z]|\x1b[=>]/g;
 const SPINNER_REGEX = /[⠀-⣿─-╿▀-▟■-◿⏰-⏳⌚⌛]/g;
@@ -16,12 +17,6 @@ const SUMMARY_PATTERNS = [
   /total/i, /summary/i, /\d+\s+of\s+\d+/i,
 ];
 
-const BUDGETS: Record<string, { success: number; failure: number }> = {
-  balanced: { success: 8000, failure: 16000 },
-  strict: { success: 4000, failure: 8000 },
-  verbose: { success: 32000, failure: 32000 },
-};
-
 export class GenericFilter implements OutputFilter {
   name = 'GenericFilter';
   version = '1.0.0';
@@ -31,8 +26,7 @@ export class GenericFilter implements OutputFilter {
   }
 
   filter(input: FilterInput): FilterOutput {
-    const budget = BUDGETS[input.profile] ?? BUDGETS.balanced;
-    const cap = input.exitCode === 0 ? budget.success : budget.failure;
+    const cap = getBudgetCap(input.profile, input.exitCode, input.budgetOverrides);
 
     const filteredStdout = filterText(input.stdout, cap);
     const filteredStderr = filterText(input.stderr, Math.floor(cap / 4));

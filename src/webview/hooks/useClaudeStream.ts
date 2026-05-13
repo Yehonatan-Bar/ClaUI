@@ -292,6 +292,11 @@ export function useClaudeStream(): void {
           useAppStore.getState().addParticleAcceleratorTrace(lbTrace.trace);
           break;
         }
+        case 'particleAcceleratorRecentTraces': {
+          const lbTraces = msg as unknown as { type: string; traces: ReturnType<typeof useAppStore.getState>['particleAcceleratorRecentTraces'] };
+          useAppStore.getState().setParticleAcceleratorRecentTraces(lbTraces.traces);
+          break;
+        }
         case 'particleAcceleratorError': {
           const lbErr = msg as { type: string; error: string };
           useAppStore.getState().setParticleAcceleratorError(lbErr.error);

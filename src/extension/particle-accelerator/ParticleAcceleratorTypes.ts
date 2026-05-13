@@ -127,6 +127,7 @@ export interface FilterInput {
   durationMs: number;
   profile: 'balanced' | 'strict' | 'verbose';
   redactionResult: RedactionResult;
+  budgetOverrides?: { success?: number; failure?: number };
 }
 
 export interface FilterOutput {
@@ -180,10 +181,22 @@ export interface ParticleAcceleratorRuntimePaths {
   storeDir: string;
 }
 
+export interface DeclarativeFilterDefinition {
+  id: string;
+  displayName: string;
+  version: string;
+  commandPatterns: string[];
+  suppressPatterns?: string[];
+  importantPatterns?: string[];
+  groupByFile?: boolean;
+  diagnosticPattern?: string;
+  maxDiagnosticsPerFile?: number;
+}
+
 export interface FilterConfig {
   budgetOverrides?: Record<string, { success?: number; failure?: number }>;
-  extraImportantPatterns?: string[];
   disabledFilters?: string[];
+  customFilters?: DeclarativeFilterDefinition[];
 }
 
 export interface ParticleAcceleratorSettings {
