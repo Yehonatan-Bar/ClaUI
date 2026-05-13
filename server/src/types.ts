@@ -31,6 +31,7 @@ export interface Participant {
   routeKey: string;
   ownerHumanId: string | null;
   provider: AgentProvider | null;
+  model: string | null;
   status: ParticipantStatus;
   joinedAt: string;
 }
@@ -175,7 +176,7 @@ export interface FileConflictWarning {
 // -- Client -> Server messages --
 
 export type ClientToServerMessage =
-  | { type: 'joinSession'; humanName: string; agentName: string; agentProvider: AgentProvider; password?: string }
+  | { type: 'joinSession'; humanName: string; agentName: string; agentProvider: AgentProvider; agentModel?: string; password?: string }
   | { type: 'rejoinSession'; humanParticipantId: string; agentParticipantId: string; lastSeenSeq: number }
   | { type: 'humanMessage'; rawBody: string }
   | { type: 'agentEvent'; deliveryId: string; event: AgentEventPayload }
@@ -185,6 +186,7 @@ export type ClientToServerMessage =
   | { type: 'fileChangeReport'; report: FileChangeReport }
   | { type: 'renameParticipant'; participantId: string; newDisplayName: string }
   | { type: 'leaveSession' }
+  | { type: 'resetSession' }
   | { type: 'pong' };
 
 export type AgentEventPayload =
@@ -217,6 +219,7 @@ export type ServerToClientMessage =
   | { type: 'approvalResolved'; approval: ApprovalEvent; decision: ApprovalDecisionPayload; decidedByParticipantId: string | null; deliveryId?: string | null; deniedReason?: string }
   | { type: 'guardStop'; approval: ApprovalEvent; reason: string; lastMessages: Message[] }
   | { type: 'fileConflictWarning'; warning: FileConflictWarning }
+  | { type: 'sessionReset'; session: Session; participants: Participant[] }
   | { type: 'error'; code: string; message: string }
   | { type: 'joinRejected'; reason: string }
   | { type: 'rejoinAccepted'; session: Session; participants: Participant[]; deltaTranscript: Message[]; lastSeenSeq: number }

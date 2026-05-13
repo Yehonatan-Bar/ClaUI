@@ -36,6 +36,7 @@ export interface MPParticipant {
   routeKey: string;
   ownerHumanId: string | null;
   provider: MPAgentProvider | null;
+  model: string | null;
   status: MPParticipantStatus;
   joinedAt: string;
 }
@@ -152,7 +153,7 @@ export interface MPFileConflictWarning {
 // -- Client -> Server --
 
 export type ClientToServerMessage =
-  | { type: 'joinSession'; humanName: string; agentName: string; agentProvider: MPAgentProvider; password?: string }
+  | { type: 'joinSession'; humanName: string; agentName: string; agentProvider: MPAgentProvider; agentModel?: string; password?: string }
   | { type: 'rejoinSession'; humanParticipantId: string; agentParticipantId: string; lastSeenSeq: number }
   | { type: 'humanMessage'; rawBody: string }
   | { type: 'agentEvent'; deliveryId: string; event: AgentEventPayload }
@@ -162,6 +163,7 @@ export type ClientToServerMessage =
   | { type: 'fileChangeReport'; report: MPFileChangeReport }
   | { type: 'renameParticipant'; participantId: string; newDisplayName: string }
   | { type: 'leaveSession' }
+  | { type: 'resetSession' }
   | { type: 'pong' };
 
 export type AgentEventPayload =
@@ -194,6 +196,7 @@ export type ServerToClientMessage =
   | { type: 'approvalResolved'; approval: MPApprovalEvent; decision: MPApprovalDecisionPayload; decidedByParticipantId: string | null; deliveryId?: string | null; deniedReason?: string }
   | { type: 'guardStop'; approval: MPApprovalEvent; reason: string; lastMessages: MPMessage[] }
   | { type: 'fileConflictWarning'; warning: MPFileConflictWarning }
+  | { type: 'sessionReset'; session: MPSession; participants: MPParticipant[] }
   | { type: 'error'; code: string; message: string }
   | { type: 'joinRejected'; reason: string }
   | { type: 'rejoinAccepted'; session: MPSession; participants: MPParticipant[]; deltaTranscript: MPMessage[]; lastSeenSeq: number }

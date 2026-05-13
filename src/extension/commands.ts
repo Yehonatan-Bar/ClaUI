@@ -835,15 +835,12 @@ export function registerCommands(
   // -- Multi-Participant Session --
 
   /**
-   * Ensures MP settings exist in workspace .vscode/settings.json.
-   * Returns true if settings are ready (either already existed or were just written).
-   * Returns false if no workspace is open or user cancelled setup.
+   * Ensures MP connection settings (URL + token) exist in workspace .vscode/settings.json.
+   * Only runs the setup wizard if serverUrl is not yet configured.
    */
-  async function ensureMpWorkspaceSettings(): Promise<boolean> {
+  async function ensureMpConnectionSettings(): Promise<boolean> {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const serverUrl = config.get<string>('multiParticipant.serverUrl', '');
-    const authToken = config.get<string>('multiParticipant.authToken', '');
-    const humanName = config.get<string>('multiParticipant.defaultHumanName', '');
 
     if (serverUrl && serverUrl !== 'ws://localhost:9120') return true;
 
@@ -854,8 +851,8 @@ export function registerCommands(
     }
 
     const inputUrl = await vscode.window.showInputBox({
-      prompt: 'Coordination server URL',
-      value: serverUrl || '',
+      prompt: 'Coordination server URL (one-time setup)',
+      value: '',
       placeHolder: 'wss://your-server.com/mp',
       ignoreFocusOut: true,
     });
@@ -863,20 +860,11 @@ export function registerCommands(
 
     const inputToken = await vscode.window.showInputBox({
       prompt: 'Auth token (shared secret for your team)',
-      value: authToken || '',
       placeHolder: 'your-shared-token',
       password: true,
       ignoreFocusOut: true,
     });
     if (inputToken === undefined) return false;
-
-    const inputName = await vscode.window.showInputBox({
-      prompt: 'Your display name',
-      value: humanName || '',
-      placeHolder: 'Your Name',
-      ignoreFocusOut: true,
-    });
-    if (!inputName) return false;
 
     const vscodeDirPath = path.join(workspaceFolder.uri.fsPath, '.vscode');
     const settingsPath = path.join(vscodeDirPath, 'settings.json');
@@ -893,44 +881,41 @@ export function registerCommands(
 
     existing['claudeMirror.multiParticipant.serverUrl'] = inputUrl;
     if (inputToken) existing['claudeMirror.multiParticipant.authToken'] = inputToken;
-    existing['claudeMirror.multiParticipant.defaultHumanName'] = inputName;
-    if (!existing['claudeMirror.multiParticipant.defaultAgentName']) {
-      existing['claudeMirror.multiParticipant.defaultAgentName'] = 'Claude';
-    }
-    if (!existing['claudeMirror.multiParticipant.defaultAgentProvider']) {
-      existing['claudeMirror.multiParticipant.defaultAgentProvider'] = 'claude';
-    }
 
     if (!fs.existsSync(vscodeDirPath)) fs.mkdirSync(vscodeDirPath, { recursive: true });
     fs.writeFileSync(settingsPath, JSON.stringify(existing, null, 2), 'utf-8');
 
-    log(`MP settings written to ${settingsPath}`);
-
-    const openFile = 'Open Settings File';
-    const choice = await vscode.window.showInformationMessage(
-      `Multi-Participant enabled! Settings saved to .vscode/settings.json. You can edit server URL, token, or display name there anytime.`,
-      openFile
-    );
-    if (choice === openFile) {
-      const doc = await vscode.workspace.openTextDocument(settingsPath);
-      await vscode.window.showTextDocument(doc);
-    }
-
+    log(`MP connection settings written to ${settingsPath}`);
+    vscode.window.showInformationMessage('Multi-Participant connection configured. You can update server URL and token in .vscode/settings.json anytime.');
     return true;
   }
 
-  /** Shared helper: ensure settings exist, then create/connect an MP tab. */
+  /** Shared helper: ensure connection settings, prompt for session details, then connect. */
   async function promptAndCreateMpTab(): Promise<void> {
-    const ready = await ensureMpWorkspaceSettings();
+    const ready = await ensureMpConnectionSettings();
     if (!ready) return;
 
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const serverUrl = config.get<string>('multiParticipant.serverUrl', '') || 'ws://localhost:9120';
     const authToken = config.get<string>('multiParticipant.authToken', '');
-    const humanName = config.get<string>('multiParticipant.defaultHumanName', '') || 'User';
-    const agentName = config.get<string>('multiParticipant.defaultAgentName', '') || 'Claude';
-    const defaultProvider = config.get<string>('multiParticipant.defaultAgentProvider', '') || 'claude';
-    const agentProvider = (defaultProvider === 'codex' ? 'codex' : 'claude') as 'claude' | 'codex';
+    const defaultHumanName = config.get<string>('multiParticipant.defaultHumanName', '');
+    const defaultAgentName = config.get<string>('multiParticipant.defaultAgentName', '');
+
+    const humanName = await vscode.window.showInputBox({
+      prompt: 'Your display name',
+      value: defaultHumanName || undefined,
+      placeHolder: 'Your Name',
+      ignoreFocusOut: true,
+    });
+    if (!humanName) return;
+
+    const agentName = await vscode.window.showInputBox({
+      prompt: 'Your agent\'s display name',
+      value: defaultAgentName || 'Claude',
+      placeHolder: 'Claude',
+      ignoreFocusOut: true,
+    });
+    if (!agentName) return;
 
     const sessionPassword = await vscode.window.showInputBox({
       prompt: 'Session password (optional - leave empty for open session)',
@@ -940,6 +925,7 @@ export function registerCommands(
     });
     if (sessionPassword === undefined) return;
 
+    const agentProvider = 'claude' as const;
     const mpTab = tabManager.createMultiParticipantTab(serverUrl, agentProvider, undefined, authToken || undefined);
     log(`Multi-participant tab created: ${mpTab.id} -> ${serverUrl}`);
     await mpTab.connect(humanName, agentName, agentProvider, sessionPassword || undefined);

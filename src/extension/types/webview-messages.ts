@@ -867,6 +867,10 @@ export interface MpStopA2ARequest {
   type: 'mpStopA2A';
 }
 
+export interface MpResetSessionRequest {
+  type: 'mpResetSession';
+}
+
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
@@ -991,6 +995,7 @@ export type WebviewToExtensionMessage =
   | MpRenameParticipantRequest
   | MpCancelAgentRequest
   | MpStopA2ARequest
+  | MpResetSessionRequest
   | TeamPanelOpenRequest
   | TeamSendMessageRequest
   | TeamCreateTaskRequest

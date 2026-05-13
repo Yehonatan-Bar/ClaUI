@@ -9599,6 +9599,26 @@ html, body, #root {
   font-size: 13px;
 }
 
+.mp-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mp-reset-button {
+  padding: 4px 12px;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.mp-reset-button:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
 .mp-connection-badge {
   font-size: 11px;
   padding: 2px 8px;

@@ -96,7 +96,7 @@ export class CoordinationServer {
       const restored = SessionPersistence.loadLatestSession(this.config.persistenceDir, this.log);
       if (restored) {
         this.session = restored.session;
-        this.participants = restored.participants;
+        this.participants = [];
         this.transcript = restored.transcript;
         this.deliveries = restored.deliveries;
         this.seenState = restored.seenState;
@@ -108,11 +108,7 @@ export class CoordinationServer {
           this.loopController.restoreState(restored.loopState);
         }
 
-        for (const p of this.participants) {
-          p.status = 'offline';
-        }
-
-        this.log(`Restored session ${this.session.sessionId} with ${this.transcript.length} messages`);
+        this.log(`Restored session ${this.session.sessionId} with ${this.transcript.length} messages (participants cleared - they must rejoin)`);
       }
     }
 
@@ -217,7 +213,7 @@ export class CoordinationServer {
   private handleClientMessage(ws: WebSocket, msg: ClientToServerMessage): void {
     switch (msg.type) {
       case 'joinSession':
-        this.handleJoin(ws, msg.humanName, msg.agentName, msg.agentProvider, msg.password);
+        this.handleJoin(ws, msg.humanName, msg.agentName, msg.agentProvider, msg.agentModel, msg.password);
         break;
       case 'rejoinSession':
         this.handleRejoin(ws, msg.humanParticipantId, msg.agentParticipantId, msg.lastSeenSeq);
@@ -246,6 +242,9 @@ export class CoordinationServer {
       case 'leaveSession':
         this.handleLeave(ws);
         break;
+      case 'resetSession':
+        this.handleResetSession(ws);
+        break;
       case 'pong':
         // Client responded to ping, connection is alive
         break;
@@ -254,7 +253,7 @@ export class CoordinationServer {
 
   // -- Join / Leave --
 
-  private handleJoin(ws: WebSocket, humanName: string, agentName: string, agentProvider: 'claude' | 'codex', password?: string): void {
+  private handleJoin(ws: WebSocket, humanName: string, agentName: string, agentProvider: 'claude' | 'codex', agentModel?: string, password?: string): void {
     if (!this.session) {
       this.sendToClient(ws, { type: 'joinRejected', reason: 'No active session' });
       return;
@@ -288,6 +287,7 @@ export class CoordinationServer {
         routeKey: humanValidated.routeKey,
         ownerHumanId: null,
         provider: null,
+        model: null,
         status: 'online',
         joinedAt: new Date().toISOString(),
       };
@@ -302,6 +302,7 @@ export class CoordinationServer {
         routeKey: agentValidated.routeKey,
         ownerHumanId: tempHumanParticipant.participantId,
         provider: agentProvider,
+        model: agentModel || null,
         status: 'online',
         joinedAt: new Date().toISOString(),
       };
@@ -411,18 +412,19 @@ export class CoordinationServer {
     const agent = this.participants.find(p => p.participantId === client.agentParticipantId);
 
     if (human) {
-      human.status = 'offline';
       this.broadcast({ type: 'participantLeft', participantId: human.participantId });
       this.persistence?.append('leave', { participantId: human.participantId });
     }
     if (agent) {
-      agent.status = 'offline';
       this.broadcast({ type: 'participantLeft', participantId: agent.participantId });
       this.persistence?.append('leave', { participantId: agent.participantId });
     }
 
+    this.participants = this.participants.filter(
+      p => p.participantId !== client.humanParticipantId && p.participantId !== client.agentParticipantId
+    );
     this.clients.delete(ws);
-    this.log(`Left: ${human?.displayName || 'unknown'}`);
+    this.log(`Left: ${human?.displayName || 'unknown'} (participants remaining: ${this.participants.length})`);
   }
 
   private handleDisconnect(ws: WebSocket): void {
@@ -433,18 +435,101 @@ export class CoordinationServer {
     const agent = this.participants.find(p => p.participantId === client.agentParticipantId);
 
     if (human) {
-      human.status = 'offline';
-      this.broadcastExcept(ws, { type: 'participantStatusChange', participantId: human.participantId, status: 'offline' });
-      this.persistence?.append('pstat', { participantId: human.participantId, status: 'offline' });
+      this.broadcastExcept(ws, { type: 'participantLeft', participantId: human.participantId });
+      this.persistence?.append('leave', { participantId: human.participantId });
     }
     if (agent) {
-      agent.status = 'offline';
-      this.broadcastExcept(ws, { type: 'participantStatusChange', participantId: agent.participantId, status: 'offline' });
-      this.persistence?.append('pstat', { participantId: agent.participantId, status: 'offline' });
+      this.broadcastExcept(ws, { type: 'participantLeft', participantId: agent.participantId });
+      this.persistence?.append('leave', { participantId: agent.participantId });
     }
 
+    this.participants = this.participants.filter(
+      p => p.participantId !== client.humanParticipantId && p.participantId !== client.agentParticipantId
+    );
     this.clients.delete(ws);
-    this.log(`Disconnected: ${human?.displayName || 'unknown'}`);
+    this.log(`Disconnected: ${human?.displayName || 'unknown'} (participants remaining: ${this.participants.length})`);
+  }
+
+  // -- Reset Session --
+
+  private handleResetSession(ws: WebSocket): void {
+    if (!this.session) return;
+
+    const client = this.clients.get(ws);
+    if (!client) return;
+
+    this.log(`Session reset requested by ${client.humanParticipantId}`);
+
+    this.persistence?.close();
+
+    const newSessionId = uuid();
+    this.session = {
+      sessionId: newSessionId,
+      name: 'Multi-Participant Session',
+      createdAt: new Date().toISOString(),
+      createdByParticipantId: client.humanParticipantId,
+      status: 'active',
+      nextSeq: 1,
+      agentMode: 'execute',
+      allowRemoteSteer: 'owner-only',
+      sessionPassword: this.session.sessionPassword,
+    };
+
+    this.transcript = [];
+    this.deliveries.clear();
+    this.seenState.clear();
+    this.renameEvents = [];
+    this.typingStates.clear();
+    this.approvalHistory = [];
+    this.fileTracker.clear();
+    this.activeConflicts.clear();
+
+    for (const timer of this.streamCoalesceTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.streamCoalesceTimers.clear();
+    this.streamCoalesceBuffers.clear();
+
+    this.loopController = new LoopController(newSessionId, this.log);
+
+    for (const p of this.participants) {
+      p.sessionId = newSessionId;
+    }
+
+    for (const p of this.participants) {
+      if (p.kind === 'agent') {
+        this.seenState.set(p.participantId, {
+          agentParticipantId: p.participantId,
+          sessionId: newSessionId,
+          lastAckedDeliveredSeq: 0,
+          lastDeliveryId: null,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    if (this.config.persistenceDir) {
+      this.persistence = new SessionPersistence(
+        this.config.persistenceDir, newSessionId, this.log,
+      );
+      this.persistence.init();
+      this.persistence.append('init', { session: this.session });
+      for (const c of this.clients.values()) {
+        const human = this.participants.find(p => p.participantId === c.humanParticipantId);
+        const agent = this.participants.find(p => p.participantId === c.agentParticipantId);
+        if (human && agent) {
+          this.persistence.append('join', { human, agent });
+        }
+      }
+    }
+
+    this.broadcast({
+      type: 'sessionReset',
+      session: this.publicSession(),
+      participants: this.participants,
+    });
+
+    this.log(`Session reset complete: new session ${newSessionId}`);
   }
 
   // -- Human Message --

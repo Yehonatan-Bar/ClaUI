@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../../state/store';
+import { postToExtension } from '../../hooks/useClaudeStream';
 import { JoinDialog } from './JoinDialog';
 import { ParticipantList } from './ParticipantList';
 import { ApprovalDialog } from './ApprovalDialog';
@@ -22,10 +23,19 @@ export const MPSessionView: React.FC = () => {
         <>
           <div className="mp-header">
             <div className="mp-session-name">{session.name}</div>
-            <div className={`mp-connection-badge mp-connection-badge--${connectionStatus || 'disconnected'}`}>
-              {connectionStatus === 'connected' ? 'Connected' :
-               connectionStatus === 'connecting' ? 'Connecting...' :
-               connectionStatus === 'error' ? 'Error' : 'Disconnected'}
+            <div className="mp-header-actions">
+              <button
+                className="mp-reset-button"
+                onClick={() => postToExtension({ type: 'mpResetSession' })}
+                title="Start a new session"
+              >
+                New Session
+              </button>
+              <div className={`mp-connection-badge mp-connection-badge--${connectionStatus || 'disconnected'}`}>
+                {connectionStatus === 'connected' ? 'Connected' :
+                 connectionStatus === 'connecting' ? 'Connecting...' :
+                 connectionStatus === 'error' ? 'Error' : 'Disconnected'}
+              </div>
             </div>
           </div>
 

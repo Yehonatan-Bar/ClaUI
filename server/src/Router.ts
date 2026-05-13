@@ -101,5 +101,46 @@ export function routeMessage(rawBody: string, participants: Participant[]): Rout
     }
   }
 
+  // Fallback: scan subsequent lines for "Name:" pattern.
+  // Handles cases where agents add preamble text before the addressing prefix.
+  const lines = body.split(/\r?\n/);
+  for (let li = 1; li < lines.length; li++) {
+    const line = lines[li].trimStart();
+    if (!line) continue;
+    const normalizedLine = line.normalize('NFC');
+
+    for (const p of sorted) {
+      const lineStart = normalizedLine.slice(0, p.displayName.length).toLocaleLowerCase('und');
+      if (lineStart === p.canonicalName) {
+        const afterName = line.substring(p.displayName.length);
+        if (afterName.length > 0 && afterName[0] === ':') {
+          const stripped = afterName.replace(/^[:\s]+/, '');
+          const remaining = [stripped, ...lines.slice(li + 1)].join('\n').trim();
+          return {
+            recipientParticipantId: p.participantId,
+            parsedBody: remaining,
+            routePrefix: line.substring(0, p.displayName.length),
+          };
+        }
+      }
+    }
+
+    const lineGrapheme = extractRouteKey(normalizedLine);
+    const lineCandidate = participants.find(p => p.routeKey === lineGrapheme);
+    if (lineCandidate) {
+      const gLen = getFirstGraphemeEndIndex(line);
+      const afterKey = line.substring(gLen);
+      if (afterKey.length > 0 && afterKey[0] === ':') {
+        const stripped = afterKey.replace(/^[:\s]+/, '');
+        const remaining = [stripped, ...lines.slice(li + 1)].join('\n').trim();
+        return {
+          recipientParticipantId: lineCandidate.participantId,
+          parsedBody: remaining,
+          routePrefix: line.substring(0, gLen),
+        };
+      }
+    }
+  }
+
   return { recipientParticipantId: null, parsedBody: body, routePrefix: null };
 }

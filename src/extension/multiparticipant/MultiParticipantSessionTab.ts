@@ -92,6 +92,9 @@ export class MultiParticipantSessionTab {
     this.log(`[MPTab] Connecting as ${humanName} with agent ${agentName} (${agentProvider})`);
     this.postToWebview({ type: 'mpConnectionStatus', status: 'connecting' });
 
+    const rawModel = vscode.workspace.getConfiguration('claudeMirror').get<string>('model', '');
+    const agentModel = rawModel && !rawModel.includes('(') ? rawModel : '';
+
     await this.runner.startAgent();
     this.log('[MPTab] Agent process started');
 
@@ -103,9 +106,10 @@ export class MultiParticipantSessionTab {
         this.client.send({ type: 'agentStatus', status: 'online' });
       } else {
         this.log('[MPTab] Connected to server, joining session');
-        const joinMsg: { type: 'joinSession'; humanName: string; agentName: string; agentProvider: 'claude' | 'codex'; password?: string } = {
+        const joinMsg: { type: 'joinSession'; humanName: string; agentName: string; agentProvider: 'claude' | 'codex'; agentModel?: string; password?: string } = {
           type: 'joinSession', humanName, agentName, agentProvider,
         };
+        if (agentModel) joinMsg.agentModel = agentModel;
         if (password) joinMsg.password = password;
         this.client.send(joinMsg);
         this.client.send({ type: 'agentStatus', status: 'online' });
@@ -234,6 +238,17 @@ export class MultiParticipantSessionTab {
         case 'mpStopA2A':
           // Reset loop control to 'ask' mode - handled via approval denial
           break;
+
+        case 'mpResetSession':
+          vscode.window.showWarningMessage(
+            'Start a new session? The current transcript will be archived.',
+            'Yes', 'No',
+          ).then(choice => {
+            if (choice === 'Yes') {
+              this.client.send({ type: 'resetSession' });
+            }
+          });
+          break;
       }
     });
   }
@@ -333,6 +348,9 @@ export class MultiParticipantSessionTab {
             reason: msg.reason,
           });
           break;
+        case 'sessionReset':
+          this.handleSessionReset(msg);
+          break;
         case 'rejoinAccepted':
           this.handleRejoinAccepted(msg);
           break;
@@ -341,7 +359,12 @@ export class MultiParticipantSessionTab {
           this.postToWebview({ type: 'mpError', code: 'rejoin_rejected', message: msg.reason });
           break;
         case 'joinRejected':
+          this.log(`[MPTab] Join rejected: ${msg.reason}`);
           this.postToWebview({ type: 'mpJoinRejected', reason: msg.reason });
+          this.postToWebview({ type: 'mpConnectionStatus', status: 'error', message: msg.reason });
+          vscode.window.showErrorMessage(
+            `Multi-Participant join rejected: ${msg.reason}. Note: each participant's name must start with a unique letter.`
+          );
           break;
         case 'ping':
           this.client.send({ type: 'pong' });
@@ -372,6 +395,17 @@ export class MultiParticipantSessionTab {
     this.panel.title = this.session.name;
     this.sendFullState();
     this.log(`[MPTab] Session state received: ${this.participants.length} participants, ${this.transcript.length} messages`);
+  }
+
+  private handleSessionReset(msg: Extract<ServerToClientMessage, { type: 'sessionReset' }>): void {
+    this.session = msg.session;
+    this.participants = msg.participants;
+    this.transcript = [];
+    this.pendingApprovals.clear();
+    this.activeConflicts.clear();
+    this.panel.title = this.session.name;
+    this.sendFullState();
+    this.log(`[MPTab] Session reset: new session ${this.session.sessionId}`);
   }
 
   private handleRejoinAccepted(msg: Extract<ServerToClientMessage, { type: 'rejoinAccepted' }>): void {

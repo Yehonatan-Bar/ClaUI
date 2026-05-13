@@ -138,6 +138,22 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
           </span>
         )}
 
+        {/* Model badge for agents */}
+        {kind === 'agent' && (currentParticipant?.model || currentParticipant?.provider) && (
+          <span
+            style={{
+              fontSize: 10,
+              padding: '1px 5px',
+              borderRadius: 3,
+              backgroundColor: 'rgba(139, 148, 158, 0.13)',
+              color: '#8b949e',
+              fontWeight: 500,
+            }}
+          >
+            {formatModelLabel(currentParticipant.model, currentParticipant.provider)}
+          </span>
+        )}
+
         {/* Rename display (F5) */}
         {wasRenamed && (
           <span style={{ fontSize: 11, color: '#8b949e', fontStyle: 'italic' }}>
@@ -263,4 +279,17 @@ function formatTime(ts: string | number): string {
 function truncateText(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text;
   return text.slice(0, maxLen) + '...';
+}
+
+function formatModelLabel(model: string | null | undefined, provider: string | null | undefined): string {
+  if (model) {
+    // "claude-sonnet-4-6" -> "Sonnet 4.6", "claude-opus-4-6" -> "Opus 4.6"
+    const match = model.match(/(?:claude-)?(\w+)-(\d+)-(\d+)/i);
+    if (match) {
+      const family = match[1].charAt(0).toUpperCase() + match[1].slice(1);
+      return `${family} ${match[2]}.${match[3]}`;
+    }
+    return model;
+  }
+  return provider || 'agent';
 }

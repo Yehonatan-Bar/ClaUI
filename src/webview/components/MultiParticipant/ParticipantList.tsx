@@ -161,8 +161,8 @@ export const ParticipantList: React.FC = () => {
               {participant.kind}
             </span>
 
-            {/* Provider */}
-            {participant.provider && (
+            {/* Model / Provider */}
+            {(participant.model || participant.provider) && (
               <span
                 style={{
                   fontSize: 10,
@@ -170,7 +170,7 @@ export const ParticipantList: React.FC = () => {
                   flexShrink: 0,
                 }}
               >
-                {participant.provider}
+                {formatModelLabel(participant.model, participant.provider)}
               </span>
             )}
 
@@ -232,3 +232,15 @@ const STATUS_DOT_COLORS: Record<string, string> = {
   busy: '#e3b341',
   offline: '#6e7681',
 };
+
+function formatModelLabel(model: string | null | undefined, provider: string | null | undefined): string {
+  if (model) {
+    const match = model.match(/(?:claude-)?(\w+)-(\d+)-(\d+)/i);
+    if (match) {
+      const family = match[1].charAt(0).toUpperCase() + match[1].slice(1);
+      return `${family} ${match[2]}.${match[3]}`;
+    }
+    return model;
+  }
+  return provider || '';
+}

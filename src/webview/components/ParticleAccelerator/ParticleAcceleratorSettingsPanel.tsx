@@ -1,9 +1,14 @@
+import { useEffect } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 
 export function ParticleAcceleratorSettingsPanel() {
   const status = useAppStore(s => s.particleAcceleratorStatus);
   const error = useAppStore(s => s.particleAcceleratorError);
+
+  useEffect(() => {
+    postToExtension({ type: 'particleAcceleratorGetStatus' } as any);
+  }, []);
 
   const handleToggle = () => {
     postToExtension({ type: 'particleAcceleratorSetEnabled', enabled: !status?.enabled } as any);
