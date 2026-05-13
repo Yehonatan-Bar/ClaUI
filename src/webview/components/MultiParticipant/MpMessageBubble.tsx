@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import type { MPMessage } from './mpTypes';
@@ -32,6 +32,18 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
   const reactions = useAppStore((s) => s.mpReactions[message.messageId]);
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [pickerOpen]);
 
   const isMe = message.authorParticipantId === myHumanId;
   const isMyAgent = message.authorParticipantId === myAgentId;
@@ -289,7 +301,7 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
       )}
 
       {/* Emoji reactions row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 2, position: 'relative' }}>
+      <div ref={pickerRef} style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginTop: 2, position: 'relative' }}>
         {reactions?.map((r) => {
           const iReacted = r.participantIds.includes(myHumanId ?? '');
           return (
