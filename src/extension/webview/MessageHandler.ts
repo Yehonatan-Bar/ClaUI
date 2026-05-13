@@ -1966,11 +1966,7 @@ export class MessageHandler {
           break;
 
         case 'setGoalState':
-          this.log(`Setting goal state: active=${msg.active}`);
-          if (this.workspaceState) {
-            void this.workspaceState.update('claui.goalActive', msg.active);
-            void this.workspaceState.update('claui.goalObjective', msg.objective);
-          }
+          this.log(`Setting goal state: active=${msg.active} (tab-scoped, no cross-tab persistence)`);
           break;
 
         case 'setVitalsEnabled':
@@ -3277,8 +3273,7 @@ export class MessageHandler {
           this.sendGitPushSettings();
           // Send ultrathink mode (project-level)
           this.sendUltrathinkModeSetting();
-          // Send goal state (project-level)
-          this.sendGoalStateSetting();
+          // Goal state is tab-scoped (lives in webview Zustand store only)
           // Send session vitals setting
           this.sendVitalsSetting();
           // Send tab layout setting (mirrors claudeMirror.tabs.layout)
@@ -3688,12 +3683,8 @@ export class MessageHandler {
     this.webview.postMessage({ type: 'ultrathinkModeSetting', mode });
   }
 
-  /** Read goal state from workspaceState and send to webview */
-  private sendGoalStateSetting(): void {
-    const active = this.workspaceState?.get<boolean>('claui.goalActive', false) ?? false;
-    const objective = this.workspaceState?.get<string>('claui.goalObjective', '') ?? '';
-    this.webview.postMessage({ type: 'goalStateSetting', active, objective });
-  }
+  // Goal state is tab-scoped: each webview Zustand store holds its own goalActive/goalObjective.
+  // No cross-tab persistence via workspaceState.
 
   /** Read session vitals setting from VS Code config and send to webview */
   private sendVitalsSetting(): void {
