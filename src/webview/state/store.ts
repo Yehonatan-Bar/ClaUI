@@ -259,6 +259,7 @@ export interface AppState {
 
   // Tab arrangement (mirrors claudeMirror.tabs.layout)
   tabLayout: 'horizontal' | 'vertical';
+  verticalTabRailWidth: number | null;
   openTabs: WebviewTabSummary[];
   activeTabId: string | null;
 
@@ -674,6 +675,7 @@ export interface AppState {
   setGoalActive: (active: boolean, objective: string) => void;
   setVitalsEnabled: (enabled: boolean) => void;
   setTabLayout: (layout: 'horizontal' | 'vertical') => void;
+  setVerticalTabRailWidth: (width: number | null) => void;
   setOpenTabs: (tabs: WebviewTabSummary[], activeTabId: string | null) => void;
   setWeatherWidgetEnabled: (enabled: boolean) => void;
   setCheckpointState: (state: CheckpointState) => void;
@@ -1031,6 +1033,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   goalActive: false,
   goalObjective: '',
   tabLayout: 'horizontal' as 'horizontal' | 'vertical',
+  verticalTabRailWidth: null as number | null,
   openTabs: [],
   activeTabId: null,
   vitalsEnabled: false,
@@ -2154,6 +2157,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setGoalActive: (active, objective) => set({ goalActive: active, goalObjective: objective }),
 
   setTabLayout: (layout) => set({ tabLayout: layout }),
+  setVerticalTabRailWidth: (width) => set({ verticalTabRailWidth: width }),
   setOpenTabs: (tabs, activeTabId) => set({ openTabs: tabs, activeTabId }),
 
   setVitalsEnabled: (enabled) =>

@@ -83,6 +83,7 @@ export class TabManager {
   private snapshotDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isRestoringSnapshot = false;
   private isShuttingDown = false;
+  private savedShowTabs: string | null = null;
   private static readonly SNAPSHOT_DEBOUNCE_MS = 500;
   private static readonly MAX_RESTORE = 10;
   private static readonly LAYOUT_SETTLE_MS = 75;
@@ -725,6 +726,16 @@ export class TabManager {
     // currently-open set, not the post-disposal empty state.
     const finalSnapshot = this.buildSnapshot();
 
+    // Restore native tabs if we hid them for vertical layout
+    if (this.savedShowTabs) {
+      try {
+        const editorConfig = vscode.workspace.getConfiguration('workbench.editor');
+        await editorConfig.update('showTabs', this.savedShowTabs, vscode.ConfigurationTarget.Global);
+        this.log(`[TabLayout] Restored native tabs to "${this.savedShowTabs}" on shutdown`);
+      } catch { /* best-effort */ }
+      this.savedShowTabs = null;
+    }
+
     for (const tab of this.tabs.values()) {
       tab.dispose();
     }
@@ -831,6 +842,8 @@ export class TabManager {
 
     await this.closeEmptyEditorGroups();
 
+    await this.syncNativeTabVisibility(mode);
+
     if (mode === 'vertical') {
       this.log(`[TabLayout] Applied vertical tab rail layout: ${live.length} tab(s) in one editor group`);
     } else {
@@ -841,6 +854,28 @@ export class TabManager {
       activeBeforeLayout.reveal(undefined, false);
     }
     this.broadcastTabsState();
+  }
+
+  /**
+   * Hide VS Code's native editor tabs when vertical rail is active,
+   * restore the original value when switching back to horizontal.
+   */
+  private async syncNativeTabVisibility(mode: 'horizontal' | 'vertical'): Promise<void> {
+    const editorConfig = vscode.workspace.getConfiguration('workbench.editor');
+    const current = editorConfig.get<string>('showTabs', 'multiple');
+
+    if (mode === 'vertical') {
+      if (current !== 'none') {
+        this.savedShowTabs = current;
+      }
+      await editorConfig.update('showTabs', 'none', vscode.ConfigurationTarget.Global);
+      this.log(`[TabLayout] Hid native tabs (was "${this.savedShowTabs}")`);
+    } else {
+      const restore = this.savedShowTabs ?? 'multiple';
+      await editorConfig.update('showTabs', restore, vscode.ConfigurationTarget.Global);
+      this.log(`[TabLayout] Restored native tabs to "${restore}"`);
+      this.savedShowTabs = null;
+    }
   }
 
   /** Sweep the editor area for empty editor groups left behind by previous

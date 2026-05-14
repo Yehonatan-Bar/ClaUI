@@ -37,20 +37,55 @@ import { MPSessionView } from './components/MultiParticipant';
 const SESSION_SUMMARY_IDLE_MS = 60 * 60 * 1000;
 const SESSION_SUMMARY_DEFER_MS = 3 * 60 * 60 * 1000;
 
+const RAIL_MIN_WIDTH = 80;
+const RAIL_MAX_WIDTH = 300;
+
 const VerticalTabRail: React.FC = () => {
   const tabs = useAppStore((s) => s.openTabs);
   const activeTabId = useAppStore((s) => s.activeTabId);
+  const setRailWidth = useAppStore((s) => s.setVerticalTabRailWidth);
+  const railRef = useRef<HTMLElement>(null);
+  const dragging = useRef(false);
+
   const sortedTabs = useMemo(
     () => [...tabs].sort((a, b) => (a.orderInGroup ?? a.tabNumber) - (b.orderInGroup ?? b.tabNumber)),
     [tabs]
   );
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current) return;
+      const newWidth = Math.min(RAIL_MAX_WIDTH, Math.max(RAIL_MIN_WIDTH, ev.clientX));
+      setRailWidth(newWidth);
+    };
+
+    const onUp = () => {
+      dragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [setRailWidth]);
+
+  const handleDoubleClick = useCallback(() => {
+    setRailWidth(null);
+  }, [setRailWidth]);
 
   if (sortedTabs.length <= 1) {
     return null;
   }
 
   return (
-    <nav className="vertical-tab-rail" aria-label="ClaUi tabs">
+    <nav className="vertical-tab-rail" aria-label="ClaUi tabs" ref={railRef}>
       <div className="vertical-tab-rail-list">
         {sortedTabs.map((tab) => {
           const isActive = tab.id === activeTabId;
@@ -78,6 +113,12 @@ const VerticalTabRail: React.FC = () => {
           );
         })}
       </div>
+      <div
+        className="vertical-tab-resize-handle"
+        onMouseDown={handleResizeStart}
+        onDoubleClick={handleDoubleClick}
+        title="Drag to resize, double-click to reset"
+      />
     </nav>
   );
 };
@@ -154,6 +195,7 @@ const ChatAppContent: React.FC = () => {
     activitySummaryEnabled,
     tabLayout,
     openTabs,
+    verticalTabRailWidth,
   } = useAppStore();
   const forkInit = useAppStore((s) => s.forkInit);
   const [showDisablePermanently, setShowDisablePermanently] = useState(false);
@@ -264,7 +306,8 @@ const ChatAppContent: React.FC = () => {
   const containerStyle = useMemo(() => ({
     '--chat-font-size': `${textSettings.fontSize}px`,
     '--chat-font-family': textSettings.fontFamily || undefined,
-  } as React.CSSProperties), [textSettings.fontSize, textSettings.fontFamily]);
+    ...(verticalTabRailWidth ? { '--vertical-tab-rail-width': `${verticalTabRailWidth}px` } : {}),
+  } as React.CSSProperties), [textSettings.fontSize, textSettings.fontFamily, verticalTabRailWidth]);
 
   const showVerticalTabRail = tabLayout === 'vertical' && openTabs.length > 1;
 

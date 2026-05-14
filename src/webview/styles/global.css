@@ -129,6 +129,22 @@ html, body, #root {
   text-align: center;
 }
 
+.vertical-tab-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 25;
+}
+.vertical-tab-resize-handle:hover,
+.vertical-tab-resize-handle:active {
+  background: var(--vscode-focusBorder, #3794ff);
+  opacity: 0.5;
+  border-radius: 2px;
+}
+
 /* Terminal Hacker: green-on-black palette with sharper terminal contrast */
 .app-container.theme-terminal-hacker {
   --theme-chat-font-family: 'Consolas', 'Courier New', monospace;
