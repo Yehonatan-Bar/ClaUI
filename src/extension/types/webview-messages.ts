@@ -829,6 +829,10 @@ export interface MpJoinSessionRequest {
   humanName: string;
   agentName: string;
   agentProvider: MPAgentProvider;
+  sessionNumber?: number;
+  sessionName?: string;
+  mode?: 'create' | 'join';
+  password?: string;
 }
 
 export interface MpLeaveSessionRequest {

@@ -33,6 +33,8 @@ export class MultiParticipantSessionTab {
   private transcript: MPMessage[] = [];
   private humanParticipantId: string | null = null;
   private agentParticipantId: string | null = null;
+  private sessionNumber: number = 0;
+  private sessionName: string = '';
   private pendingApprovals: Map<string, MPApprovalEvent> = new Map();
   private activeConflicts: Map<string, MPFileConflictWarning> = new Map();
   private webviewReady = false;
@@ -88,8 +90,16 @@ export class MultiParticipantSessionTab {
     this.wireServerMessages();
   }
 
-  async connect(humanName: string, agentName: string, agentProvider: 'claude' | 'codex', password?: string): Promise<void> {
-    this.log(`[MPTab] Connecting as ${humanName} with agent ${agentName} (${agentProvider})`);
+  async connect(humanName: string, agentName: string, agentProvider: 'claude' | 'codex', password?: string, sessionNumber?: number, sessionName?: string, mode: 'create' | 'join' = 'join'): Promise<void> {
+    this.sessionNumber = sessionNumber ?? 0;
+    this.sessionName = sessionName ?? '';
+    this.client.setSessionNumber(this.sessionNumber);
+
+    if (this.sessionName) {
+      this.panel.title = this.sessionName;
+    }
+
+    this.log(`[MPTab] Connecting as ${humanName} with agent ${agentName} (${agentProvider}) to room ${this.sessionNumber} (${mode})`);
     this.postToWebview({ type: 'mpConnectionStatus', status: 'connecting' });
 
     const rawModel = vscode.workspace.getConfiguration('claudeMirror').get<string>('model', '');
@@ -104,10 +114,19 @@ export class MultiParticipantSessionTab {
         this.log('[MPTab] Reconnected, attempting rejoin');
         this.client.sendRejoin();
         this.client.send({ type: 'agentStatus', status: 'online' });
+      } else if (mode === 'create') {
+        this.log('[MPTab] Connected to server, creating session');
+        const createMsg: { type: 'createSession'; sessionNumber: number; sessionName: string; humanName: string; agentName: string; agentProvider: 'claude' | 'codex'; agentModel?: string; password?: string } = {
+          type: 'createSession', sessionNumber: this.sessionNumber, sessionName: this.sessionName || `Session ${this.sessionNumber}`, humanName, agentName, agentProvider,
+        };
+        if (agentModel) createMsg.agentModel = agentModel;
+        if (password) createMsg.password = password;
+        this.client.send(createMsg);
+        this.client.send({ type: 'agentStatus', status: 'online' });
       } else {
         this.log('[MPTab] Connected to server, joining session');
-        const joinMsg: { type: 'joinSession'; humanName: string; agentName: string; agentProvider: 'claude' | 'codex'; agentModel?: string; password?: string } = {
-          type: 'joinSession', humanName, agentName, agentProvider,
+        const joinMsg: { type: 'joinSession'; sessionNumber: number; humanName: string; agentName: string; agentProvider: 'claude' | 'codex'; agentModel?: string; password?: string } = {
+          type: 'joinSession', sessionNumber: this.sessionNumber, humanName, agentName, agentProvider,
         };
         if (agentModel) joinMsg.agentModel = agentModel;
         if (password) joinMsg.password = password;
@@ -154,7 +173,7 @@ export class MultiParticipantSessionTab {
   }
 
   get displayName(): string {
-    return this.session?.name || `MP Session #${this.tabNumber}`;
+    return this.session?.name || this.sessionName || `MP Session #${this.tabNumber}`;
   }
 
   get sessionId(): string | null {
@@ -216,7 +235,7 @@ export class MultiParticipantSessionTab {
           break;
 
         case 'mpJoinSession':
-          this.connect(msg.humanName, msg.agentName, msg.agentProvider);
+          this.connect(msg.humanName, msg.agentName, msg.agentProvider, msg.password, msg.sessionNumber, msg.sessionName, msg.mode || 'join');
           break;
 
         case 'mpRenameParticipant':
@@ -396,6 +415,10 @@ export class MultiParticipantSessionTab {
     this.participants = msg.participants;
     this.transcript = msg.transcript;
 
+    if (this.session.sessionNumber != null) {
+      this.sessionNumber = this.session.sessionNumber;
+    }
+
     const humans = this.participants.filter(p => p.kind === 'human');
     const agents = this.participants.filter(p => p.kind === 'agent');
     if (humans.length > 0) {
@@ -406,10 +429,10 @@ export class MultiParticipantSessionTab {
       this.bridge.setAgentParticipantId(this.agentParticipantId);
     }
 
-    this.client.setIdentity(this.humanParticipantId!, this.agentParticipantId!);
+    this.client.setIdentity(this.humanParticipantId!, this.agentParticipantId!, this.sessionNumber);
     this.panel.title = this.session.name;
     this.sendFullState();
-    this.log(`[MPTab] Session state received: ${this.participants.length} participants, ${this.transcript.length} messages`);
+    this.log(`[MPTab] Session state received: room ${this.sessionNumber}, ${this.participants.length} participants, ${this.transcript.length} messages`);
   }
 
   private handleSessionReset(msg: Extract<ServerToClientMessage, { type: 'sessionReset' }>): void {
@@ -426,12 +449,15 @@ export class MultiParticipantSessionTab {
   private handleRejoinAccepted(msg: Extract<ServerToClientMessage, { type: 'rejoinAccepted' }>): void {
     this.session = msg.session;
     this.participants = msg.participants;
+    if (this.session.sessionNumber != null) {
+      this.sessionNumber = this.session.sessionNumber;
+    }
     for (const m of msg.deltaTranscript) {
       this.transcript.push(m);
     }
     this.panel.title = this.session.name;
     this.sendFullState();
-    this.log(`[MPTab] Rejoin accepted: ${msg.deltaTranscript.length} new messages since seq ${msg.lastSeenSeq}`);
+    this.log(`[MPTab] Rejoin accepted: room ${this.sessionNumber}, ${msg.deltaTranscript.length} new messages since seq ${msg.lastSeenSeq}`);
   }
 
   private handleNewMessage(message: MPMessage): void {

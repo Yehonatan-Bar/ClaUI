@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Particle Accelerator - יתרונות לארגון</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #fafbfc;
+    color: #1f2937;
+    line-height: 1.75;
+  }
+
+  .page-header {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    padding: 52px 32px 44px;
+    text-align: center;
+    color: #fff;
+  }
+  .page-header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    letter-spacing: -0.5px;
+  }
+  .page-header .tagline {
+    font-size: 1.1rem;
+    color: #94a3b8;
+    max-width: 620px;
+    margin: 0 auto;
+    font-weight: 400;
+  }
+
+  .container {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 40px 24px 48px;
+  }
+
+  /* --- Summary box --- */
+  .summary-box {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 28px 32px;
+    margin-bottom: 40px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    font-size: 1.05rem;
+    color: #334155;
+    border-right: 5px solid #3b82f6;
+  }
+  .summary-box strong { color: #1e293b; }
+
+  /* --- Section --- */
+  .section {
+    margin-bottom: 44px;
+  }
+  .section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 18px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e2e8f0;
+  }
+
+  /* --- KPI cards --- */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 10px;
+  }
+  .kpi-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px 18px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: box-shadow 0.2s;
+  }
+  .kpi-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+  .kpi-value {
+    font-size: 2.2rem;
+    font-weight: 800;
+    letter-spacing: -1px;
+    direction: ltr;
+  }
+  .kpi-label {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+  .kpi-card.blue .kpi-value { color: #3b82f6; }
+  .kpi-card.green .kpi-value { color: #16a34a; }
+  .kpi-card.purple .kpi-value { color: #7c3aed; }
+  .kpi-card.orange .kpi-value { color: #ea580c; }
+
+  /* --- Before/After comparison --- */
+  .comparison-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    direction: ltr;
+  }
+  .comparison-table thead th {
+    background: #f8fafc;
+    padding: 14px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #475569;
+    text-align: center;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .comparison-table thead th:first-child { text-align: left; }
+  .comparison-table tbody td {
+    padding: 12px 16px;
+    font-size: 0.92rem;
+    text-align: center;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+  }
+  .comparison-table tbody td:first-child {
+    text-align: left;
+    font-weight: 500;
+    color: #1e293b;
+  }
+  .comparison-table tbody tr:last-child td { border-bottom: none; }
+  .comparison-table .saved { color: #16a34a; font-weight: 700; }
+  .comparison-table .muted { color: #94a3b8; }
+  .comparison-table caption {
+    caption-side: bottom;
+    text-align: right;
+    direction: rtl;
+    padding: 10px 16px;
+    font-size: 0.8rem;
+    color: #94a3b8;
+  }
+
+  /* --- Benefit rows --- */
+  .benefit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .benefit-item {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .benefit-item h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 8px;
+  }
+  .benefit-item p {
+    font-size: 0.92rem;
+    color: #475569;
+    line-height: 1.7;
+  }
+  .benefit-item .accent-bar {
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    margin-bottom: 14px;
+  }
+  .accent-blue { background: #3b82f6; }
+  .accent-green { background: #16a34a; }
+  .accent-purple { background: #7c3aed; }
+  .accent-orange { background: #ea580c; }
+
+  /* --- Security section --- */
+  .security-list {
+    list-style: none;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .security-list li {
+    padding: 18px 24px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .security-list li:last-child { border-bottom: none; }
+  .sec-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+    font-weight: 700;
+    background: #f0e6ff;
+    color: #7c3aed;
+  }
+  .sec-text strong {
+    display: block;
+    font-size: 0.95rem;
+    color: #0f172a;
+    margin-bottom: 2px;
+  }
+  .sec-text span {
+    font-size: 0.88rem;
+    color: #64748b;
+  }
+
+  /* --- How it works (simple) --- */
+  .how-steps {
+    display: flex;
+    gap: 0;
+    align-items: stretch;
+  }
+  .how-step {
+    flex: 1;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    padding: 24px 18px;
+    text-align: center;
+    position: relative;
+  }
+  .how-step:first-child { border-radius: 12px 0 0 12px; }
+  .how-step:last-child { border-radius: 0 12px 12px 0; }
+  .how-step-num {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #eff6ff;
+    color: #3b82f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1rem;
+    margin: 0 auto 12px;
+  }
+  .how-step h4 {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 6px;
+  }
+  .how-step p {
+    font-size: 0.82rem;
+    color: #64748b;
+    line-height: 1.5;
+  }
+  .how-arrow {
+    display: flex;
+    align-items: center;
+    color: #cbd5e1;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+    padding: 0 2px;
+  }
+
+  /* --- Footer --- */
+  .page-footer {
+    text-align: center;
+    padding: 28px 24px;
+    font-size: 0.82rem;
+    color: #94a3b8;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  @media (max-width: 700px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .benefit-grid { grid-template-columns: 1fr; }
+    .how-steps { flex-direction: column; gap: 8px; }
+    .how-step { border-radius: 12px !important; }
+    .how-arrow { transform: rotate(90deg); justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Particle Accelerator</h1>
+  <p class="tagline">
+    כלי שמפחית צריכת טוקנים של סוכני AI, מגן על מידע רגיש, ומקצר זמני עבודה -- הכל אוטומטית וללא התערבות המשתמש.
+  </p>
+</div>
+
+<div class="container">
+
+  <!-- Summary -->
+  <div class="summary-box">
+    כשסוכן AI (כמו Claude) מריץ פקודות בזמן עבודה, הוא מקבל בחזרה כמויות גדולות של פלט טקסטואלי.
+    רוב המידע הזה חסר ערך עבורו -- שורות חוזרות, פסי התקדמות, הודעות שגרתיות.
+    <strong>Particle Accelerator</strong> מסנן את הרעש, משאיר רק את הנתונים החשובים, ומוודא שמידע רגיש כמו סיסמאות ומפתחות גישה לעולם לא נחשף לסוכן.
+  </div>
+
+  <!-- KPIs -->
+  <div class="section">
+    <div class="section-title">נתוני ביצועים בפועל</div>
+    <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 16px;">
+      מדידות אמיתיות מסשן עבודה יומיומי על פרויקט פעיל:
+    </p>
+    <div class="kpi-row">
+      <div class="kpi-card green">
+        <div class="kpi-value">93%</div>
+        <div class="kpi-label">דחיסת פלט מרבית<br>(שינויי קוד גדולים)</div>
+      </div>
+      <div class="kpi-card blue">
+        <div class="kpi-value">~49K</div>
+        <div class="kpi-label">טוקנים שנחסכו<br>ב-4 פקודות בלבד</div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-value">0</div>
+        <div class="kpi-label">סודות שנחשפו<br>לסוכן ה-AI</div>
+      </div>
+      <div class="kpi-card orange">
+        <div class="kpi-value">0%</div>
+        <div class="kpi-label">פגיעה בדיוק<br>(פלט קצר עובר כמות שהוא)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Measured Data Table -->
+  <div class="section">
+    <div class="section-title">השוואת גדלי פלט -- לפני ואחרי</div>
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th>סוג הפקודה</th>
+          <th>גודל מקורי</th>
+          <th>אחרי סינון</th>
+          <th>חיסכון</th>
+          <th>טוקנים שנחסכו</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>שינויי קוד (diff)</td>
+          <td>110 KB</td>
+          <td>8 KB</td>
+          <td class="saved">93%</td>
+          <td class="saved">25,484</td>
+        </tr>
+        <tr>
+          <td>רשימת קבצים בפרויקט</td>
+          <td>91 KB</td>
+          <td>8 KB</td>
+          <td class="saved">91%</td>
+          <td class="saved">20,703</td>
+        </tr>
+        <tr>
+          <td>עץ תלויות (npm)</td>
+          <td>13 KB</td>
+          <td>3 KB</td>
+          <td class="saved">78%</td>
+          <td class="saved">2,526</td>
+        </tr>
+        <tr>
+          <td>היסטוריית שינויים</td>
+          <td>6.4 KB</td>
+          <td>6.4 KB</td>
+          <td class="muted">0%</td>
+          <td class="muted">0</td>
+        </tr>
+      </tbody>
+      <caption>* השורה האחרונה מדגימה: פלט שכבר תמציתי לא נדחס -- המערכת מזהה שאין צורך בסינון.</caption>
+    </table>
+  </div>
+
+  <!-- Benefits for the org -->
+  <div class="section">
+    <div class="section-title">יתרונות למשתמש ולארגון</div>
+    <div class="benefit-grid">
+      <div class="benefit-item">
+        <div class="accent-bar accent-green"></div>
+        <h3>חיסכון כספי ישיר</h3>
+        <p>
+          שימוש ב-AI נמדד בטוקנים, וטוקנים עולים כסף.
+          כשהסוכן צורך 90% פחות טוקנים על פלטי פקודות, העלות של כל סשן עבודה יורדת משמעותית.
+          בפרויקט פעיל, החיסכון מצטבר לאלפי טוקנים בשעה.
+        </p>
+      </div>
+      <div class="benefit-item">
+        <div class="accent-bar accent-blue"></div>
+        <h3>סשנים ארוכים ופרודוקטיביים יותר</h3>
+        <p>
+          לכל סוכן AI יש חלון הקשר מוגבל. פלטי פקודות גדולים ממלאים אותו מהר ומכריחים את המשתמש להתחיל סשן חדש.
+          עם סינון, החלון מתמלא לאט יותר, והמשתמש מספיק לסיים משימות מורכבות ברצף אחד.
+        </p>
+      </div>
+      <div class="benefit-item">
+        <div class="accent-bar accent-purple"></div>
+        <h3>הגנה על מידע רגיש</h3>
+        <p>
+          פלטי פקודות עלולים לכלול מפתחות API, סיסמאות, וטוקני גישה.
+          המערכת מזהה ומחליפה מידע רגיש לפני שהסוכן רואה אותו -- כולל תבניות מוכרות של שירותי ענן נפוצים.
+          אף מידע רגיש לא יוצא מהמחשב.
+        </p>
+      </div>
+      <div class="benefit-item">
+        <div class="accent-bar accent-orange"></div>
+        <h3>תגובות מהירות ומדויקות יותר</h3>
+        <p>
+          סוכן שמקבל 100 שורות במקום 5,000 מגיב מהר יותר ומתמקד בשגיאות האמיתיות.
+          הוא לא "מתבלבל" ממידע לא רלוונטי ולא מבזבז זמן על ניתוח פסי התקדמות או הודעות שגרתיות.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Security -->
+  <div class="section">
+    <div class="section-title">שכבות ההגנה</div>
+    <ul class="security-list">
+      <li>
+        <div class="sec-icon">1</div>
+        <div class="sec-text">
+          <strong>סריקת סודות אוטומטית</strong>
+          <span>כל ערך רגיש מתוך משתני סביבה (סיסמאות, מפתחות, טוקנים) מזוהה ומוחלף לפני שמגיע לסוכן.</span>
+        </div>
+      </li>
+      <li>
+        <div class="sec-icon">2</div>
+        <div class="sec-text">
+          <strong>זיהוי תבניות מוכרות</strong>
+          <span>המערכת מזהה פורמטים של מפתחות גישה לשירותי ענן נפוצים (AWS, GitHub, OpenAI ואחרים) גם כשהם מופיעים בתוך פלט ולא במשתני סביבה.</span>
+        </div>
+      </li>
+      <li>
+        <div class="sec-icon">3</div>
+        <div class="sec-text">
+          <strong>בידוד רשת מוחלט</strong>
+          <span>תהליך הסינון פועל ללא גישה לאינטרנט. גם אם הפלט מכיל מידע רגיש, אין דרך שהוא ייצא מהמחשב דרך הכלי הזה.</span>
+        </div>
+      </li>
+      <li>
+        <div class="sec-icon">4</div>
+        <div class="sec-text">
+          <strong>כשל בטוח</strong>
+          <span>אם מנגנון הסינון נתקל בבעיה, הוא חוסם את כל הפלט במקום להעביר אותו חלקית. עדיף להחמיץ תוצאה מאשר לחשוף סוד.</span>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- How it works (simple) -->
+  <div class="section">
+    <div class="section-title">איך זה עובד (בקצרה)</div>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="how-step-num">1</div>
+        <h4>הסוכן מריץ פקודה</h4>
+        <p>פעולה רגילה במהלך עבודה, כמו בדיקת קוד או התקנת חבילות</p>
+      </div>
+      <div class="how-arrow">&larr;</div>
+      <div class="how-step">
+        <div class="how-step-num">2</div>
+        <h4>המערכת מיירטת</h4>
+        <p>הפקודה עוברת דרך שכבת סינון מקומית לפני שהפלט חוזר לסוכן</p>
+      </div>
+      <div class="how-arrow">&larr;</div>
+      <div class="how-step">
+        <div class="how-step-num">3</div>
+        <h4>ניקוי והגנה</h4>
+        <p>סודות מוסתרים, רעש מסונן, רק מידע שימושי נשמר</p>
+      </div>
+      <div class="how-arrow">&larr;</div>
+      <div class="how-step">
+        <div class="how-step-num">4</div>
+        <h4>פלט נקי חוזר</h4>
+        <p>הסוכן ממשיך לעבוד עם תוצאה תמציתית ובטוחה</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom line -->
+  <div class="section">
+    <div class="section-title">שורה תחתונה</div>
+    <div class="summary-box" style="border-right-color: #16a34a;">
+      הכלי פועל ברקע, ללא צורך בהתערבות של המשתמש.
+      הוא <strong>מפחית עלויות</strong> (פחות טוקנים = פחות כסף),
+      <strong>משפר פרודוקטיביות</strong> (סשנים ארוכים יותר, תגובות מהירות יותר),
+      ו<strong>מגן על הארגון</strong> (מידע רגיש לא נחשף לסוכן AI).
+      הכל קורה מקומית על מחשב המשתמש -- שום מידע לא נשלח החוצה.
+    </div>
+  </div>
+
+</div>
+
+<div class="page-footer">
+  ClaUi &middot; Particle Accelerator v1.1.0 &middot; מסמך עודכן: מאי 2026
+</div>
+
+</body>
+</html>

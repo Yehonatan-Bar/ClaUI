@@ -9,10 +9,14 @@ export const JoinDialog: React.FC = () => {
   const connectionStatus = useAppStore((s) => s.mpConnectionStatus);
   const setOpen = useAppStore((s) => s.setMpJoinDialogOpen);
 
+  const [mode, setMode] = useState<'create' | 'join'>('join');
   const [humanName, setHumanName] = useState('');
   const [agentName, setAgentName] = useState('');
   const [agentProvider, setAgentProvider] = useState<MPAgentProvider>('claude');
   const [serverUrl, setServerUrl] = useState('');
+  const [sessionNumber, setSessionNumber] = useState('');
+  const [sessionName, setSessionName] = useState('');
+  const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
   const isConnecting = connectionStatus === 'connecting';
@@ -20,6 +24,7 @@ export const JoinDialog: React.FC = () => {
   const handleSubmit = useCallback(() => {
     const trimmedHuman = humanName.trim();
     const trimmedAgent = agentName.trim();
+    const trimmedSessionNum = sessionNumber.trim();
 
     if (!trimmedHuman) {
       setLocalError('Name is required');
@@ -37,6 +42,19 @@ export const JoinDialog: React.FC = () => {
       setLocalError('Agent name too long (max 32 characters)');
       return;
     }
+    if (!trimmedSessionNum) {
+      setLocalError('Session number is required');
+      return;
+    }
+    const num = parseInt(trimmedSessionNum, 10);
+    if (isNaN(num) || num < 0) {
+      setLocalError('Session number must be a non-negative integer');
+      return;
+    }
+    if (mode === 'create' && !sessionName.trim()) {
+      setLocalError('Session name is required when creating');
+      return;
+    }
 
     setLocalError(null);
     postToExtension({
@@ -45,8 +63,12 @@ export const JoinDialog: React.FC = () => {
       agentName: trimmedAgent,
       agentProvider,
       serverUrl: serverUrl.trim() || undefined,
+      sessionNumber: num,
+      sessionName: mode === 'create' ? sessionName.trim() : undefined,
+      mode,
+      password: password || undefined,
     });
-  }, [humanName, agentName, agentProvider, serverUrl]);
+  }, [humanName, agentName, agentProvider, serverUrl, sessionNumber, sessionName, mode, password]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isConnecting) handleSubmit();
@@ -82,8 +104,66 @@ export const JoinDialog: React.FC = () => {
           color: 'var(--vscode-foreground, #e6edf3)',
           marginBottom: 16,
         }}>
-          Join Multi-Participant Session
+          Multi-Participant Session
         </div>
+
+        <label style={labelStyle}>Mode</label>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          {(['join', 'create'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              style={{
+                flex: 1,
+                padding: '6px 12px',
+                borderRadius: 4,
+                border: `1px solid ${mode === m ? '#58a6ff' : 'var(--vscode-panel-border, #30363d)'}`,
+                background: mode === m ? '#58a6ff22' : 'transparent',
+                color: mode === m ? '#58a6ff' : 'var(--vscode-foreground, #e6edf3)',
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: mode === m ? 600 : 400,
+              }}
+            >
+              {m === 'create' ? 'Create' : 'Join'}
+            </button>
+          ))}
+        </div>
+
+        <label style={labelStyle}>Session Number</label>
+        <input
+          type="text"
+          placeholder="e.g. 1, 42, 100"
+          value={sessionNumber}
+          onChange={(e) => setSessionNumber(e.target.value.replace(/[^0-9]/g, ''))}
+          onKeyDown={handleKeyDown}
+          style={inputStyle}
+        />
+
+        {mode === 'create' && (
+          <>
+            <label style={labelStyle}>Session Name</label>
+            <input
+              type="text"
+              placeholder="e.g. Code Review, Planning"
+              value={sessionName}
+              onChange={(e) => setSessionName(e.target.value)}
+              onKeyDown={handleKeyDown}
+              style={inputStyle}
+              maxLength={64}
+            />
+          </>
+        )}
+
+        <label style={labelStyle}>Password (optional)</label>
+        <input
+          type="password"
+          placeholder="Leave empty for no password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={handleKeyDown}
+          style={inputStyle}
+        />
 
         <label style={labelStyle}>Server URL (optional)</label>
         <input
@@ -184,7 +264,7 @@ export const JoinDialog: React.FC = () => {
               opacity: isConnecting ? 0.6 : 1,
             }}
           >
-            {isConnecting ? 'Connecting...' : 'Join'}
+            {isConnecting ? 'Connecting...' : mode === 'create' ? 'Create' : 'Join'}
           </button>
         </div>
       </div>

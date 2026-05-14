@@ -51,20 +51,62 @@ export class SessionPersistence {
     this.writeStream.write(JSON.stringify(record) + '\n');
   }
 
+  /** Sort session files by modification time, newest first. */
+  private static sortFilesByMtime(dataDir: string): string[] {
+    return fs.readdirSync(dataDir)
+      .filter(f => f.startsWith('session-') && f.endsWith('.jsonl'))
+      .map(f => ({ name: f, mtimeMs: fs.statSync(path.join(dataDir, f)).mtimeMs }))
+      .sort((a, b) => b.mtimeMs - a.mtimeMs)
+      .map(f => f.name);
+  }
+
   static loadLatestSession(dataDir: string, log?: (msg: string) => void): SessionState | null {
     const logger = log || console.log;
     if (!fs.existsSync(dataDir)) return null;
 
-    const files = fs.readdirSync(dataDir)
-      .filter(f => f.startsWith('session-') && f.endsWith('.jsonl'))
-      .sort()
-      .reverse();
+    const files = SessionPersistence.sortFilesByMtime(dataDir);
 
     if (files.length === 0) return null;
 
     const filePath = path.join(dataDir, files[0]);
     logger(`Persistence: loading from ${filePath}`);
     return SessionPersistence.loadFromFile(filePath, log);
+  }
+
+  /**
+   * Load all persisted sessions and return them keyed by sessionNumber.
+   * Files are sorted by mtime newest-first so the latest file per sessionNumber wins
+   * (handles reset scenarios where multiple files exist for the same room).
+   * Legacy sessions without sessionNumber are skipped.
+   */
+  static loadAllSessions(dataDir: string, log?: (msg: string) => void): Map<number, SessionState> {
+    const logger = log || console.log;
+    const result = new Map<number, SessionState>();
+    if (!fs.existsSync(dataDir)) return result;
+
+    const files = SessionPersistence.sortFilesByMtime(dataDir);
+
+    for (const file of files) {
+      const filePath = path.join(dataDir, file);
+      const state = SessionPersistence.loadFromFile(filePath, log);
+      if (!state) continue;
+
+      if (state.session.sessionNumber == null) {
+        logger(`Persistence: skipping legacy session without sessionNumber from ${file}`);
+        continue;
+      }
+
+      const num = state.session.sessionNumber;
+      if (result.has(num)) {
+        logger(`Persistence: skipping older room ${num} from ${file} (latest already loaded)`);
+        continue;
+      }
+
+      result.set(num, state);
+      logger(`Persistence: loaded room ${num} from ${file}`);
+    }
+
+    return result;
   }
 
   static loadFromFile(filePath: string, log?: (msg: string) => void): SessionState | null {
@@ -147,6 +189,12 @@ export class SessionPersistence {
 
           case 'loop':
             loopState = record.d;
+            break;
+
+          case 'session-update':
+            if (session) {
+              Object.assign(session, record.d);
+            }
             break;
 
           case 'appr': {

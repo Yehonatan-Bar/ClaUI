@@ -9597,6 +9597,18 @@ html, body, #root {
 .mp-session-name {
   font-weight: 600;
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mp-session-number {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #8b949e);
+  background: var(--vscode-badge-background, #30363d);
+  padding: 1px 5px;
+  border-radius: 3px;
 }
 
 .mp-header-actions {

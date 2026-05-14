@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="UTF-8">
+<title>תוכנית תיקון - שחזור סשנים</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; background: #f8f9fa; color: #1a1a2e; line-height: 1.7; }
+  h1 { color: #16213e; border-bottom: 3px solid #0f3460; padding-bottom: 10px; }
+  h2 { color: #0f3460; margin-top: 30px; }
+  h3 { color: #533483; }
+  .bug-card { background: #fff; border-right: 4px solid #e94560; border-radius: 8px; padding: 15px 20px; margin: 15px 0; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+  .fix-card { background: #fff; border-right: 4px solid #0f3460; border-radius: 8px; padding: 15px 20px; margin: 15px 0; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+  .phase { background: #e8f4f8; border-radius: 8px; padding: 15px 20px; margin: 15px 0; }
+  .phase-title { font-weight: bold; color: #0f3460; font-size: 1.1em; }
+  .risk-low { color: #27ae60; font-weight: bold; }
+  .risk-medium { color: #f39c12; font-weight: bold; }
+  .impact-high { color: #e94560; font-weight: bold; }
+  table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+  th, td { border: 1px solid #ddd; padding: 10px 14px; text-align: right; }
+  th { background: #0f3460; color: white; }
+  tr:nth-child(even) { background: #f2f2f2; }
+  .summary { background: #fff3cd; border-radius: 8px; padding: 15px 20px; margin: 20px 0; border: 1px solid #ffc107; }
+  .verify { background: #d4edda; border-radius: 8px; padding: 15px 20px; margin: 15px 0; border: 1px solid #28a745; }
+  ul { padding-right: 25px; }
+  li { margin: 5px 0; }
+</style>
+</head>
+<body>
+
+<h1>תוכנית תיקון: שחזור סשנים ב-ClaUi</h1>
+
+<div class="summary">
+<strong>סיכום:</strong> פיצ'ר שחזור הסשנים סובל מ-5 באגים מקושרים שגורמים לאיבוד סשנים, שמות, וסדר. הגורם המרכזי: המערכת שומרת רשימת סשנים, אבל בעת שחזור בוחרת את הישנים במקום החדשים, ואז מוחקת את כל מה שלא שוחזר.
+</div>
+
+<h2>הבעיות שזוהו</h2>
+
+<div class="bug-card">
+<h3>1. שחזור הסשנים הישנים במקום החדשים</h3>
+<p>המערכת ממיינת לפי מספר סידורי (מספר יצירה) ולוקחת את 10 הראשונים - כלומר <strong>הכי ישנים</strong>. הסשנים האחרונים שעבדת עליהם נחתכים.</p>
+<p>אושר בלוגים: סשנים אחרונים כמו "שחזור סשנים" לא שוחזרו, בעוד סשנים ישנים יותר כן.</p>
+</div>
+
+<div class="bug-card">
+<h3>2. מחיקת סשנים שלא שוחזרו</h3>
+<p>אחרי שחזור חלקי (למשל 10 מתוך 15), המערכת <strong>מוחקת את כל הרשימה המקורית</strong> ושומרת רק את מה ששוחזר. כלומר 5 הסשנים שלא שוחזרו אבדו לצמיתות. כל מחזור שחזור מאבד עוד נתונים.</p>
+</div>
+
+<div class="bug-card">
+<h3>3. שמות סשנים אובדים</h3>
+<p>השם המותאם אישית של כל סשן נשמר ב-snapshot, אבל אחרי שחזור הוא <strong>לא מועתק חזרה</strong>. בנוסף, השחזור תלוי רק במאגר חיצוני (SessionStore) - אם הוא לא מעודכן, השם אובד.</p>
+</div>
+
+<div class="bug-card">
+<h3>4. סדר הטאבים לא נשמר</h3>
+<p>הסדר מבוסס על מספר יצירה זמני, לא על המיקום האמיתי שהמשתמש בחר. אחרי שחזור, הטאבים יכולים להופיע בסדר שונה ממה שהיה.</p>
+</div>
+
+<div class="bug-card">
+<h3>5. הטאב הפעיל יכול להיחתך</h3>
+<p>אם הטאב שהיה פעיל (מוצג) לפני הסגירה הוא לא בין 10 הראשונים לפי מספר יצירה, הוא לא ישוחזר כלל.</p>
+</div>
+
+<h2>תוכנית התיקון</h2>
+
+<div class="fix-card">
+<h3>תיקון 1: בחירת הסשנים הנכונים לשחזור</h3>
+<p>במקום לבחור לפי מספר יצירה (ישן ראשון), נבחר לפי <strong>זמן מיקוד אחרון</strong> - הסשנים שהשתמשת בהם לאחרונה יקבלו עדיפות. בנוסף, <strong>הטאב הפעיל תמיד ייכלל</strong>, גם אם חורג מהמגבלה.</p>
+<p>המגבלה של 10 תהפוך להגדרה ניתנת לשינוי (ברירת מחדל: 15).</p>
+</div>
+
+<div class="fix-card">
+<h3>תיקון 2: שימור סשנים שלא שוחזרו</h3>
+<p>סשנים שנחתכו בגלל המגבלה <strong>לא יימחקו</strong> מהרשימה. הם יישארו שמורים ויהיו זמינים לשחזור עתידי. כך שחזור חלקי לא ישמיד מידע.</p>
+</div>
+
+<div class="fix-card">
+<h3>תיקון 3: שימור שמות סשנים</h3>
+<p>השם המותאם אישית <strong>יועתק</strong> בכל מחזור שחזור. בנוסף, בעת שחזור עצל (lazy resume) אם מאגר השמות לא מכיל את השם, המערכת תשתמש בשם מה-snapshot כגיבוי.</p>
+</div>
+
+<div class="fix-card">
+<h3>תיקון 4: שמירת סדר ומיקוד</h3>
+<p>נוסיף שדות חדשים לרשומת הסשן: <strong>זמן מיקוד אחרון</strong> ו<strong>מיקום ויזואלי</strong>. אלה ישמשו לבחירה חכמה ולשחזור בסדר הנכון.</p>
+</div>
+
+<div class="fix-card">
+<h3>תיקון 5: ריענון אחרון לפני סגירה</h3>
+<p>לפני שמירת הרשימה הסופית בעת סגירת VS Code, המערכת תבצע ריענון אחרון של מזהי סשנים - כדי לתפוס סשנים חדשים שעדיין לא הספיקו לקבל מזהה.</p>
+</div>
+
+<h2>שלבי ביצוע</h2>
+
+<div class="phase">
+<div class="phase-title">שלב 1 - תיקונים דחופים (סיכון נמוך, השפעה גבוהה)</div>
+<ul>
+<li>תיקון כיוון הבחירה (חדשים במקום ישנים)</li>
+<li>הגנה על הטאב הפעיל</li>
+<li>שימור שמות סשנים</li>
+<li>ריענון מזהים לפני סגירה</li>
+</ul>
+</div>
+
+<div class="phase">
+<div class="phase-title">שלב 2 - שיפור מבני (סיכון בינוני, השפעה גבוהה)</div>
+<ul>
+<li>שימור סשנים שלא שוחזרו (במקום מחיקה)</li>
+<li>ניקוי רשומות שמורות כשסשן נפתח ידנית</li>
+<li>הגבלת מספר רשומות שמורות (עד 50)</li>
+</ul>
+</div>
+
+<div class="phase">
+<div class="phase-title">שלב 3 - שיפור חוויה (סיכון נמוך)</div>
+<ul>
+<li>מעקב אחר זמן מיקוד אחרון</li>
+<li>שמירת סדר ויזואלי</li>
+<li>הגדרה ניתנת לשינוי של מגבלת שחזור</li>
+</ul>
+</div>
+
+<h2>סיכון ובדיקות</h2>
+
+<table>
+<tr><th>תיקון</th><th>סיכון</th><th>השפעה</th></tr>
+<tr><td>בחירת סשנים נכונה</td><td class="risk-low">נמוך</td><td class="impact-high">גבוהה</td></tr>
+<tr><td>שימור שמות</td><td class="risk-low">נמוך</td><td class="impact-high">גבוהה</td></tr>
+<tr><td>ריענון מזהים</td><td class="risk-low">נמוך</td><td>בינונית</td></tr>
+<tr><td>שימור סשנים לא-משוחזרים</td><td class="risk-medium">בינוני</td><td class="impact-high">גבוהה</td></tr>
+<tr><td>סדר ומיקוד</td><td class="risk-low">נמוך</td><td>בינונית</td></tr>
+</table>
+
+<div class="verify">
+<h3>בדיקות אימות</h3>
+<ul>
+<li>פתיחת 12+ טאבים עם שמות, סגירה ופתיחה מחדש - אימות שהאחרונים שוחזרו עם שמות</li>
+<li>סגירה ופתיחה נוספת - אימות ששמות שורדים שני מחזורים</li>
+<li>אימות שהטאב הפעיל תמיד נכלל בשחזור</li>
+<li>אימות שסשנים מעבר למגבלה נשמרים (לא נמחקים)</li>
+</ul>
+</div>
+
+</body>
+</html>

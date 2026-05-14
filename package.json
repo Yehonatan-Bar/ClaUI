@@ -407,7 +407,14 @@
         "claudeMirror.restoreSessionsOnStartup": {
           "type": "boolean",
           "default": true,
-          "description": "When VS Code reopens this workspace, automatically resume all ClaUi session tabs (Claude and Codex) that were open when it last closed. Up to 10 tabs are restored serially."
+          "description": "When VS Code reopens this workspace, automatically resume all ClaUi session tabs (Claude and Codex) that were open when it last closed."
+        },
+        "claudeMirror.restoreSessionsMaxTabs": {
+          "type": "number",
+          "default": 15,
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Maximum number of session tabs to restore on startup. The most recently focused tabs are preferred when truncating."
         },
         "claudeMirror.activitySummary": {
           "type": "boolean",

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaUi - שיחה מרובת משתתפים</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-dim: #58a6ff22;
+    --green: #3fb950;
+    --green-dim: #3fb95022;
+    --orange: #d29922;
+    --orange-dim: #d2992222;
+    --purple: #bc8cff;
+    --purple-dim: #bc8cff22;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 40px 20px;
+  }
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--accent);
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 15px;
+    margin-bottom: 40px;
+  }
+  .role-section {
+    margin-bottom: 48px;
+  }
+  .role-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .role-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 18px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .role-badge.creator {
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid var(--green);
+  }
+  .role-badge.joiner {
+    background: var(--purple-dim);
+    color: var(--purple);
+    border: 1px solid var(--purple);
+  }
+  .role-title {
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .role-desc {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .prereq {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+  }
+  .prereq-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--orange);
+    margin-bottom: 8px;
+  }
+  .prereq ul {
+    list-style: none;
+    padding: 0;
+  }
+  .prereq li {
+    padding: 4px 0;
+    font-size: 14px;
+  }
+  .prereq li::before {
+    content: "\2022";
+    color: var(--orange);
+    margin-left: 8px;
+    font-weight: bold;
+  }
+  .step {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .step-num {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+  .step-content {
+    flex: 1;
+  }
+  .step-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .step-detail {
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .step-detail strong {
+    color: var(--text);
+  }
+  .highlight {
+    display: inline-block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 8px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    direction: ltr;
+  }
+  .info-box {
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .info-box.warn {
+    background: var(--orange-dim);
+    border-color: var(--orange);
+  }
+  .separator {
+    border: none;
+    border-top: 1px dashed var(--border);
+    margin: 40px 0;
+  }
+  .share-box {
+    background: var(--green-dim);
+    border: 1px solid var(--green);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .share-box strong {
+    color: var(--green);
+  }
+  .settings-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  .settings-table th, .settings-table td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: right;
+  }
+  .settings-table th {
+    background: var(--surface);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .messaging-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 40px;
+  }
+  .messaging-section h3 {
+    font-size: 18px;
+    margin-bottom: 12px;
+    color: var(--accent);
+  }
+  .msg-example {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    font-size: 14px;
+  }
+  .msg-example .arrow {
+    color: var(--green);
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+  .msg-example .desc {
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>ClaUi - שיחה מרובת משתתפים</h1>
+  <p class="subtitle">מדריך למשתמש: איך ליצור או להצטרף לשיחה משותפת עם סוכני AI</p>
+
+  <!-- ==================== CREATOR ==================== -->
+  <div class="role-section">
+    <div class="role-header">
+      <div class="role-badge creator">1</div>
+      <div>
+        <div class="role-title">משתמש ראשון - יוצר הסשן</div>
+        <div class="role-desc">מי שפותח את השיחה ומזמין אחרים להצטרף</div>
+      </div>
+    </div>
+
+    <div class="prereq">
+      <div class="prereq-title">דרישות מקדימות</div>
+      <ul>
+        <li>תוסף ClaUi מותקן ב-VS Code</li>
+        <li>גישה לשרת התיאום (כתובת URL וטוקן אימות מהמנהל)</li>
+      </ul>
+    </div>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">הגדרת חיבור לשרת (פעם אחת בלבד)</div>
+        <div class="step-detail">
+          פתח את הגדרות VS Code:<br>
+          <span class="highlight">Ctrl+Shift+P</span> &larr;
+          <span class="highlight">Preferences: Open Settings (JSON)</span><br>
+          הוסף את השורות הבאות:
+        </div>
+        <table class="settings-table">
+          <tr>
+            <th>הגדרה</th>
+            <th>ערך</th>
+          </tr>
+          <tr>
+            <td><span class="highlight">claudeMirror.multiParticipant.serverUrl</span></td>
+            <td>כתובת השרת שקיבלת (למשל <span class="highlight">wss://server.com/mp</span>)</td>
+          </tr>
+          <tr>
+            <td><span class="highlight">claudeMirror.multiParticipant.authToken</span></td>
+            <td>הטוקן הסודי שקיבלת מהמנהל</td>
+          </tr>
+          <tr>
+            <td><span class="highlight">claudeMirror.multiParticipant.defaultHumanName</span></td>
+            <td>השם שלך (למשל "יוני")</td>
+          </tr>
+        </table>
+        <div class="info-box">
+          זו הגדרה חד-פעמית. אחרי שהזנת את הפרטים, הם יישמרו ולא תצטרך להזין אותם שוב.
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">יצירת סשן חדש</div>
+        <div class="step-detail">
+          <span class="highlight">Ctrl+Shift+P</span> &larr;
+          <strong>ClaUi: Create Multi-Participant Session</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">הזנת פרטים</div>
+        <div class="step-detail">
+          VS Code יבקש ממך למלא:
+          <ul style="margin-top: 8px; padding-right: 20px;">
+            <li><strong>השם שלך</strong> - איך תופיע בשיחה (למשל "יוני")</li>
+            <li><strong>שם הסוכן</strong> - איך ייקרא הסוכן שלך (למשל "Claude")</li>
+            <li><strong>שם הסשן</strong> - נושא השיחה (למשל "סקירת קוד", "תכנון פרויקט")</li>
+            <li><strong>מספר סשן</strong> - מספר ייחודי לזיהוי (למשל 42)</li>
+            <li><strong>סיסמה</strong> - אופציונלי, להגנה על הסשן</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">הסשן נפתח</div>
+        <div class="step-detail">
+          ייפתח טאב חדש ב-VS Code עם שם הסשן. בפינה תראה את מספר הסשן (למשל <strong>#42</strong>) ותג חיבור ירוק.
+        </div>
+      </div>
+    </div>
+
+    <div class="share-box">
+      <strong>שתף עם המשתתפים האחרים:</strong><br>
+      שלח להם את <strong>מספר הסשן</strong> (למשל 42) ואת <strong>הסיסמה</strong> (אם הגדרת). הם צריכים רק את המספר כדי להצטרף.
+    </div>
+  </div>
+
+  <hr class="separator">
+
+  <!-- ==================== JOINER ==================== -->
+  <div class="role-section">
+    <div class="role-header">
+      <div class="role-badge joiner">2</div>
+      <div>
+        <div class="role-title">משתמש שני - מצטרף לסשן קיים</div>
+        <div class="role-desc">מי שקיבל מספר סשן ורוצה להצטרף לשיחה</div>
+      </div>
+    </div>
+
+    <div class="prereq">
+      <div class="prereq-title">מה צריך לפני</div>
+      <ul>
+        <li>תוסף ClaUi מותקן ב-VS Code</li>
+        <li>כתובת השרת והטוקן (אותם פרטים כמו למשתמש הראשון)</li>
+        <li>מספר הסשן שקיבלת מיוצר הסשן</li>
+        <li>סיסמת הסשן (אם הוגדרה)</li>
+      </ul>
+    </div>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">הגדרת חיבור לשרת (פעם אחת בלבד)</div>
+        <div class="step-detail">
+          בדיוק כמו אצל המשתמש הראשון - פתח הגדרות VS Code והזן את כתובת השרת, הטוקן, והשם שלך. ראה את הטבלה בחלק של המשתמש הראשון.
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">הצטרפות לסשן</div>
+        <div class="step-detail">
+          <span class="highlight">Ctrl+Shift+P</span> &larr;
+          <strong>ClaUi: Join Multi-Participant Session</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">הזנת פרטים</div>
+        <div class="step-detail">
+          VS Code יבקש ממך:
+          <ul style="margin-top: 8px; padding-right: 20px;">
+            <li><strong>השם שלך</strong> - איך תופיע בשיחה</li>
+            <li><strong>שם הסוכן</strong> - השם שייתן לסוכן שלך</li>
+            <li><strong>מספר סשן</strong> - המספר שקיבלת מיוצר הסשן</li>
+            <li><strong>סיסמה</strong> - אם הסשן מוגן בסיסמה</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">הסשן נפתח</div>
+        <div class="step-detail">
+          ייפתח טאב עם שם הסשן. תראה את כל ההודעות הקודמות ואת רשימת המשתתפים בצד.
+        </div>
+      </div>
+    </div>
+
+    <div class="info-box warn">
+      אם קיבלת הודעת שגיאה "No session found" - ודא שהמספר נכון ושיוצר הסשן כבר פתח אותו.
+      אם קיבלת "Invalid session password" - בדוק את הסיסמה עם יוצר הסשן.
+    </div>
+  </div>
+
+  <hr class="separator">
+
+  <!-- ==================== MESSAGING ==================== -->
+  <div class="messaging-section">
+    <h3>איך לשלוח הודעות</h3>
+    <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;">
+      אחרי שכולם מחוברים, כל משתתף רואה את כל ההודעות בזמן אמת.
+    </p>
+
+    <div class="msg-example">
+      <span class="arrow">&larr;</span>
+      <div>
+        <strong>הודעה רגילה:</strong> פשוט כתוב טקסט - כל בני האדם בסשן יראו אותו.<br>
+        <span class="desc">הסוכנים לא יקבלו את ההודעה אלא אם כן פנית אליהם בשם.</span>
+      </div>
+    </div>
+
+    <div class="msg-example">
+      <span class="arrow">&larr;</span>
+      <div>
+        <strong>פנייה לסוכן:</strong> התחל עם שם הסוכן.<br>
+        <span class="desc">למשל: <span class="highlight">Claude check this file</span> - ישלח הודעה לסוכן Claude.</span>
+      </div>
+    </div>
+
+    <div class="msg-example">
+      <span class="arrow">&larr;</span>
+      <div>
+        <strong>קיצור:</strong> השתמש באות הראשונה + נקודתיים.<br>
+        <span class="desc">למשל: <span class="highlight">C: check this file</span> - קיצור לפנייה ל-Claude.</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

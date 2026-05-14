@@ -22,6 +22,7 @@ import {
 
 interface ConnectedClient {
   ws: WebSocket;
+  sessionNumber: number;
   humanParticipantId: string;
   agentParticipantId: string;
 }
@@ -31,6 +32,26 @@ interface FileTrackerEntry {
   deliveryId: string;
   agentParticipantId: string;
   agentDisplayName: string;
+}
+
+/** All per-session state isolated into a room. */
+interface SessionRoom {
+  session: Session;
+  participants: Participant[];
+  transcript: Message[];
+  deliveries: Map<string, AgentDelivery>;
+  seenState: Map<string, AgentSeenState>;
+  loopController: LoopController;
+  persistence: SessionPersistence | null;
+  renameEvents: RenameEvent[];
+  typingStates: Map<string, TypingState>;
+  approvalHistory: ApprovalEvent[];
+  a2aRoutingChain: Promise<void>;
+  fileTracker: Map<string, Set<FileTrackerEntry>>;
+  activeConflicts: Map<string, FileConflictWarning>;
+  reactions: Map<string, Map<string, Set<string>>>;
+  streamCoalesceTimers: Map<string, ReturnType<typeof setTimeout>>;
+  streamCoalesceBuffers: Map<string, { deliveryId: string; agentParticipantId: string; accumulated: string }>;
 }
 
 export interface ServerConfig {
@@ -45,28 +66,10 @@ export interface ServerConfig {
 
 export class CoordinationServer {
   private wss: WebSocketServer | null = null;
-  private session: Session | null = null;
-  private participants: Participant[] = [];
-  private transcript: Message[] = [];
-  private deliveries: Map<string, AgentDelivery> = new Map();
-  private seenState: Map<string, AgentSeenState> = new Map();
+  private rooms: Map<number, SessionRoom> = new Map();
   private clients: Map<WebSocket, ConnectedClient> = new Map();
-  private loopController: LoopController | null = null;
   private guardService: GuardService;
-  private persistence: SessionPersistence | null = null;
-  private renameEvents: RenameEvent[] = [];
-  private typingStates: Map<string, TypingState> = new Map();
-  private approvalHistory: ApprovalEvent[] = [];
-  private a2aRoutingChain: Promise<void> = Promise.resolve();
-  /** Maps "workspaceId:normalizedPath" to the set of active deliveries touching that file. */
-  private fileTracker: Map<string, Set<FileTrackerEntry>> = new Map();
-  /** Conflict warnings already broadcast, keyed by conflictId. */
-  private activeConflicts: Map<string, FileConflictWarning> = new Map();
-  // messageId -> emoji -> Set<participantId>
-  private reactions = new Map<string, Map<string, Set<string>>>();
   private pingInterval: ReturnType<typeof setInterval> | null = null;
-  private streamCoalesceTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
-  private streamCoalesceBuffers: Map<string, { deliveryId: string; agentParticipantId: string; accumulated: string }> = new Map();
   private tokenAuthenticatedSockets = new WeakSet<WebSocket>();
   private config: ServerConfig;
   private log: (msg: string) => void;
@@ -87,57 +90,104 @@ export class CoordinationServer {
   }
 
   /** Returns a copy of the session safe to send to clients (password stripped, hasPassword flag added). */
-  private publicSession(): Session {
-    if (!this.session) throw new Error('No active session');
-    const { sessionPassword, ...safe } = this.session;
+  private publicSession(room: SessionRoom): Session {
+    const { sessionPassword, ...safe } = room.session;
     return { ...safe, sessionPassword: null, hasPassword: !!sessionPassword } as unknown as Session;
   }
 
-  start(port: number): void {
-    // Try to restore from persistence
-    if (this.config.persistenceDir) {
-      const restored = SessionPersistence.loadLatestSession(this.config.persistenceDir, this.log);
-      if (restored) {
-        this.session = restored.session;
-        this.participants = [];
-        this.transcript = restored.transcript;
-        this.deliveries = restored.deliveries;
-        this.seenState = restored.seenState;
-        this.renameEvents = restored.renameEvents;
-        this.approvalHistory = restored.approvals;
+  /** Look up the room a client belongs to. */
+  private getRoomForClient(ws: WebSocket): SessionRoom | undefined {
+    const client = this.clients.get(ws);
+    if (!client) return undefined;
+    return this.rooms.get(client.sessionNumber);
+  }
 
-        this.loopController = new LoopController(restored.session.sessionId, this.log);
+  private createRoom(sessionNumber: number, sessionName: string, password?: string): SessionRoom {
+    const sessionId = uuid();
+    const session: Session = {
+      sessionId,
+      sessionNumber,
+      name: sessionName || `Session #${sessionNumber}`,
+      createdAt: new Date().toISOString(),
+      createdByParticipantId: '',
+      status: 'active',
+      nextSeq: 1,
+      agentMode: 'execute',
+      allowRemoteSteer: 'owner-only',
+      sessionPassword: password || null,
+    };
+
+    const loopController = new LoopController(sessionId, this.log);
+
+    let persistence: SessionPersistence | null = null;
+    if (this.config.persistenceDir) {
+      persistence = new SessionPersistence(this.config.persistenceDir, sessionId, this.log);
+      persistence.init();
+      persistence.append('init', { session });
+    }
+
+    const room: SessionRoom = {
+      session,
+      participants: [],
+      transcript: [],
+      deliveries: new Map(),
+      seenState: new Map(),
+      loopController,
+      persistence,
+      renameEvents: [],
+      typingStates: new Map(),
+      approvalHistory: [],
+      a2aRoutingChain: Promise.resolve(),
+      fileTracker: new Map(),
+      activeConflicts: new Map(),
+      reactions: new Map(),
+      streamCoalesceTimers: new Map(),
+      streamCoalesceBuffers: new Map(),
+    };
+
+    this.rooms.set(sessionNumber, room);
+    this.log(`[Room ${sessionNumber}] Created session ${sessionId} "${session.name}"`);
+    return room;
+  }
+
+  start(port: number): void {
+    // Restore persisted sessions
+    if (this.config.persistenceDir) {
+      const allSessions = SessionPersistence.loadAllSessions(this.config.persistenceDir, this.log);
+      for (const [sessionNumber, restored] of allSessions) {
+        const offlineParticipants = restored.participants.map(p => ({ ...p, status: 'offline' as const }));
+        const room: SessionRoom = {
+          session: restored.session,
+          participants: offlineParticipants,
+          transcript: restored.transcript,
+          deliveries: restored.deliveries,
+          seenState: restored.seenState,
+          loopController: new LoopController(restored.session.sessionId, this.log),
+          persistence: null,
+          renameEvents: restored.renameEvents,
+          typingStates: new Map(),
+          approvalHistory: restored.approvals,
+          a2aRoutingChain: Promise.resolve(),
+          fileTracker: new Map(),
+          activeConflicts: new Map(),
+          reactions: new Map(),
+          streamCoalesceTimers: new Map(),
+          streamCoalesceBuffers: new Map(),
+        };
+
         if (restored.loopState) {
-          this.loopController.restoreState(restored.loopState);
+          room.loopController.restoreState(restored.loopState);
         }
 
-        this.log(`Restored session ${this.session.sessionId} with ${this.transcript.length} messages (participants cleared - they must rejoin)`);
-      }
-    }
+        if (this.config.persistenceDir) {
+          room.persistence = new SessionPersistence(
+            this.config.persistenceDir, restored.session.sessionId, this.log,
+          );
+          room.persistence.init();
+        }
 
-    if (!this.session) {
-      this.session = {
-        sessionId: uuid(),
-        name: 'Multi-Participant Session',
-        createdAt: new Date().toISOString(),
-        createdByParticipantId: '',
-        status: 'active',
-        nextSeq: 1,
-        agentMode: 'execute',
-        allowRemoteSteer: 'owner-only',
-        sessionPassword: null,
-      };
-      this.loopController = new LoopController(this.session.sessionId, this.log);
-      this.log(`Session created: ${this.session.sessionId}`);
-    }
-
-    if (this.config.persistenceDir && this.session) {
-      this.persistence = new SessionPersistence(
-        this.config.persistenceDir, this.session.sessionId, this.log,
-      );
-      this.persistence.init();
-      if (this.transcript.length === 0) {
-        this.persistence.append('init', { session: this.session });
+        this.rooms.set(sessionNumber, room);
+        this.log(`Restored room ${sessionNumber}: session ${restored.session.sessionId} "${restored.session.name}" with ${restored.transcript.length} messages, ${offlineParticipants.length} participants (offline)`);
       }
     }
 
@@ -155,6 +205,7 @@ export class CoordinationServer {
 
     this.wss = new WebSocketServer({ port, verifyClient });
     this.log(`Coordination server listening on port ${port}`);
+    this.log(`Active rooms: ${this.rooms.size}`);
     if (this.config.sessionToken) {
       this.log('Token authentication enabled');
     }
@@ -175,18 +226,20 @@ export class CoordinationServer {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
     }
-    for (const timer of this.streamCoalesceTimers.values()) {
-      clearTimeout(timer);
+    for (const room of this.rooms.values()) {
+      for (const timer of room.streamCoalesceTimers.values()) {
+        clearTimeout(timer);
+      }
+      room.streamCoalesceTimers.clear();
+      room.streamCoalesceBuffers.clear();
+      room.persistence?.close();
     }
-    this.streamCoalesceTimers.clear();
-    this.streamCoalesceBuffers.clear();
     if (this.wss) {
       for (const client of this.clients.keys()) {
         client.close();
       }
       this.wss.close();
       this.wss = null;
-      this.persistence?.close();
       this.log('Coordination server stopped');
     }
   }
@@ -221,11 +274,14 @@ export class CoordinationServer {
 
   private handleClientMessage(ws: WebSocket, msg: ClientToServerMessage): void {
     switch (msg.type) {
+      case 'createSession':
+        this.handleCreate(ws, msg.sessionNumber, msg.sessionName, msg.humanName, msg.agentName, msg.agentProvider, msg.agentModel, msg.password);
+        break;
       case 'joinSession':
-        this.handleJoin(ws, msg.humanName, msg.agentName, msg.agentProvider, msg.agentModel, msg.password);
+        this.handleJoin(ws, msg.sessionNumber, msg.humanName, msg.agentName, msg.agentProvider, msg.agentModel, msg.password);
         break;
       case 'rejoinSession':
-        this.handleRejoin(ws, msg.humanParticipantId, msg.agentParticipantId, msg.lastSeenSeq);
+        this.handleRejoin(ws, msg.sessionNumber, msg.humanParticipantId, msg.agentParticipantId, msg.lastSeenSeq);
         break;
       case 'humanMessage':
         this.handleHumanMessage(ws, msg.rawBody);
@@ -261,45 +317,56 @@ export class CoordinationServer {
         this.handleResetSession(ws);
         break;
       case 'pong':
-        // Client responded to ping, connection is alive
         break;
     }
   }
 
-  // -- Join / Leave --
+  // -- Create / Join / Leave --
 
-  private handleJoin(ws: WebSocket, humanName: string, agentName: string, agentProvider: 'claude' | 'codex', agentModel?: string, password?: string): void {
-    if (!this.session) {
-      this.sendToClient(ws, { type: 'joinRejected', reason: 'No active session' });
+  private handleCreate(ws: WebSocket, sessionNumber: number, sessionName: string, humanName: string, agentName: string, agentProvider: 'claude' | 'codex', agentModel?: string, password?: string): void {
+    if (this.rooms.has(sessionNumber)) {
+      this.sendToClient(ws, { type: 'joinRejected', reason: `Session number ${sessionNumber} already exists` });
+      this.log(`[Room ${sessionNumber}] Create rejected: session number already in use`);
       return;
     }
 
-    const isFirstJoin = this.participants.length === 0;
+    const room = this.createRoom(sessionNumber, sessionName, password);
+    if (password) {
+      this.log(`[Room ${sessionNumber}] Password set by session creator`);
+    }
 
-    if (isFirstJoin) {
-      // First user creates the session — their password becomes the session password
-      this.session.sessionPassword = password || null;
-      if (password) {
-        this.log('[Session] Password set by session creator');
-      }
-    } else if (this.session.sessionPassword) {
-      // Token-authenticated connections bypass session password
+    this.addParticipantToRoom(ws, room, sessionNumber, humanName, agentName, agentProvider, agentModel, true);
+  }
+
+  private handleJoin(ws: WebSocket, sessionNumber: number, humanName: string, agentName: string, agentProvider: 'claude' | 'codex', agentModel?: string, password?: string): void {
+    const room = this.rooms.get(sessionNumber);
+    if (!room) {
+      this.sendToClient(ws, { type: 'joinRejected', reason: `No session found with number ${sessionNumber}` });
+      this.log(`[Room ${sessionNumber}] Join rejected: session not found`);
+      return;
+    }
+
+    if (room.session.sessionPassword) {
       const isTokenAuth = this.tokenAuthenticatedSockets.has(ws);
-      if (!isTokenAuth && (!password || password !== this.session.sessionPassword)) {
+      if (!isTokenAuth && (!password || password !== room.session.sessionPassword)) {
         this.sendToClient(ws, { type: 'joinRejected', reason: 'Invalid session password' });
-        this.log(`[Session] Join rejected: invalid password from ${humanName}`);
+        this.log(`[Room ${sessionNumber}] Join rejected: invalid password from ${humanName}`);
         return;
       }
-      if (isTokenAuth && (!password || password !== this.session.sessionPassword)) {
-        this.log(`[Session] Password bypassed via token auth for ${humanName}`);
+      if (isTokenAuth && (!password || password !== room.session.sessionPassword)) {
+        this.log(`[Room ${sessionNumber}] Password bypassed via token auth for ${humanName}`);
       }
     }
 
+    this.addParticipantToRoom(ws, room, sessionNumber, humanName, agentName, agentProvider, agentModel, false);
+  }
+
+  private addParticipantToRoom(ws: WebSocket, room: SessionRoom, sessionNumber: number, humanName: string, agentName: string, agentProvider: 'claude' | 'codex', agentModel?: string, isCreator?: boolean): void {
     try {
-      const humanValidated = validateParticipantName(humanName, this.participants);
+      const humanValidated = validateParticipantName(humanName, room.participants);
       const tempHumanParticipant: Participant = {
         participantId: uuid(),
-        sessionId: this.session.sessionId,
+        sessionId: room.session.sessionId,
         kind: 'human',
         displayName: humanValidated.displayName,
         canonicalName: humanValidated.canonicalName,
@@ -311,10 +378,10 @@ export class CoordinationServer {
         joinedAt: new Date().toISOString(),
       };
 
-      const agentValidated = validateParticipantName(agentName, [...this.participants, tempHumanParticipant]);
+      const agentValidated = validateParticipantName(agentName, [...room.participants, tempHumanParticipant]);
       const agentParticipant: Participant = {
         participantId: uuid(),
-        sessionId: this.session.sessionId,
+        sessionId: room.session.sessionId,
         kind: 'agent',
         displayName: agentValidated.displayName,
         canonicalName: agentValidated.canonicalName,
@@ -326,28 +393,32 @@ export class CoordinationServer {
         joinedAt: new Date().toISOString(),
       };
 
-      if (isFirstJoin) {
-        this.session.createdByParticipantId = tempHumanParticipant.participantId;
+      if (isCreator) {
+        room.session.createdByParticipantId = tempHumanParticipant.participantId;
+        room.persistence?.append('session-update', {
+          createdByParticipantId: tempHumanParticipant.participantId,
+        });
       }
 
-      this.participants.push(tempHumanParticipant, agentParticipant);
+      room.participants.push(tempHumanParticipant, agentParticipant);
 
       const agentSeen: AgentSeenState = {
         agentParticipantId: agentParticipant.participantId,
-        sessionId: this.session.sessionId,
+        sessionId: room.session.sessionId,
         lastAckedDeliveredSeq: 0,
         lastDeliveryId: null,
         updatedAt: new Date().toISOString(),
       };
-      this.seenState.set(agentParticipant.participantId, agentSeen);
+      room.seenState.set(agentParticipant.participantId, agentSeen);
 
       this.clients.set(ws, {
         ws,
+        sessionNumber,
         humanParticipantId: tempHumanParticipant.participantId,
         agentParticipantId: agentParticipant.participantId,
       });
 
-      this.persistence?.append('join', {
+      room.persistence?.append('join', {
         human: tempHumanParticipant,
         agent: agentParticipant,
         agentSeen,
@@ -355,44 +426,49 @@ export class CoordinationServer {
 
       this.sendToClient(ws, {
         type: 'sessionState',
-        session: this.publicSession(),
-        participants: this.participants,
-        transcript: this.transcript,
-        loopControlState: this.loopController?.getState(),
-        approvals: this.approvalHistory.filter(a => a.decision === null),
-        typingStates: [...this.typingStates.values()],
-        fileConflicts: this.activeConflicts.size > 0
-          ? [...this.activeConflicts.values()]
+        session: this.publicSession(room),
+        participants: room.participants,
+        transcript: room.transcript,
+        loopControlState: room.loopController.getState(),
+        approvals: room.approvalHistory.filter(a => a.decision === null),
+        typingStates: [...room.typingStates.values()],
+        fileConflicts: room.activeConflicts.size > 0
+          ? [...room.activeConflicts.values()]
           : undefined,
-        reactions: this.buildAllReactions(),
+        reactions: this.buildAllReactions(room),
       });
 
-      this.broadcastExcept(ws, { type: 'participantJoined', participant: tempHumanParticipant });
-      this.broadcastExcept(ws, { type: 'participantJoined', participant: agentParticipant });
+      this.broadcastToRoomExcept(room, ws, { type: 'participantJoined', participant: tempHumanParticipant });
+      this.broadcastToRoomExcept(room, ws, { type: 'participantJoined', participant: agentParticipant });
 
-      this.log(`Joined: ${humanName} (human) + ${agentName} (${agentProvider} agent)`);
+      this.log(`[Room ${sessionNumber}] ${isCreator ? 'Created' : 'Joined'}: ${humanName} (human) + ${agentName} (${agentProvider} agent)`);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       this.sendToClient(ws, { type: 'joinRejected', reason });
-      this.log(`Join rejected: ${reason}`);
+      this.log(`[Room ${sessionNumber}] Join rejected: ${reason}`);
+      if (isCreator && room.participants.length === 0) {
+        room.persistence?.close();
+        this.rooms.delete(sessionNumber);
+        this.log(`[Room ${sessionNumber}] Cleaned up empty new room after join failure`);
+      }
     }
   }
 
-  private handleRejoin(ws: WebSocket, humanParticipantId: string, agentParticipantId: string, lastSeenSeq: number): void {
-    if (!this.session) {
-      this.sendToClient(ws, { type: 'rejoinRejected', reason: 'No active session' });
+  private handleRejoin(ws: WebSocket, sessionNumber: number, humanParticipantId: string, agentParticipantId: string, lastSeenSeq: number): void {
+    const room = this.rooms.get(sessionNumber);
+    if (!room) {
+      this.sendToClient(ws, { type: 'rejoinRejected', reason: `No active session for room ${sessionNumber}` });
       return;
     }
 
-    const human = this.participants.find(p => p.participantId === humanParticipantId);
-    const agent = this.participants.find(p => p.participantId === agentParticipantId);
+    const human = room.participants.find(p => p.participantId === humanParticipantId);
+    const agent = room.participants.find(p => p.participantId === agentParticipantId);
 
     if (!human || !agent) {
       this.sendToClient(ws, { type: 'rejoinRejected', reason: 'Participant IDs not found in session' });
       return;
     }
 
-    // Remove any stale WebSocket mapping for this participant pair
     for (const [oldWs, client] of this.clients.entries()) {
       if (client.humanParticipantId === humanParticipantId) {
         this.clients.delete(oldWs);
@@ -403,124 +479,135 @@ export class CoordinationServer {
     human.status = 'online';
     agent.status = 'online';
 
-    this.clients.set(ws, { ws, humanParticipantId, agentParticipantId });
+    this.clients.set(ws, { ws, sessionNumber, humanParticipantId, agentParticipantId });
 
-    const deltaTranscript = this.transcript.filter(m => m.seq > lastSeenSeq);
+    const deltaTranscript = room.transcript.filter(m => m.seq > lastSeenSeq);
 
     this.sendToClient(ws, {
       type: 'rejoinAccepted',
-      session: this.publicSession(),
-      participants: this.participants,
+      session: this.publicSession(room),
+      participants: room.participants,
       deltaTranscript,
       lastSeenSeq,
-      reactions: this.buildAllReactions(),
+      reactions: this.buildAllReactions(room),
     });
 
-    this.broadcastExcept(ws, { type: 'participantStatusChange', participantId: humanParticipantId, status: 'online' });
-    this.broadcastExcept(ws, { type: 'participantStatusChange', participantId: agentParticipantId, status: 'online' });
+    this.broadcastToRoomExcept(room, ws, { type: 'participantStatusChange', participantId: humanParticipantId, status: 'online' });
+    this.broadcastToRoomExcept(room, ws, { type: 'participantStatusChange', participantId: agentParticipantId, status: 'online' });
 
-    this.persistence?.append('pstat', { participantId: humanParticipantId, status: 'online' });
-    this.persistence?.append('pstat', { participantId: agentParticipantId, status: 'online' });
+    room.persistence?.append('pstat', { participantId: humanParticipantId, status: 'online' });
+    room.persistence?.append('pstat', { participantId: agentParticipantId, status: 'online' });
 
-    this.log(`Rejoined: ${human.displayName} (${deltaTranscript.length} missed messages)`);
+    this.log(`[Room ${sessionNumber}] Rejoined: ${human.displayName} (${deltaTranscript.length} missed messages)`);
   }
 
   private handleLeave(ws: WebSocket): void {
     const client = this.clients.get(ws);
     if (!client) return;
 
-    const human = this.participants.find(p => p.participantId === client.humanParticipantId);
-    const agent = this.participants.find(p => p.participantId === client.agentParticipantId);
+    const room = this.rooms.get(client.sessionNumber);
+    if (!room) return;
+
+    const human = room.participants.find(p => p.participantId === client.humanParticipantId);
+    const agent = room.participants.find(p => p.participantId === client.agentParticipantId);
 
     if (human) {
-      this.broadcast({ type: 'participantLeft', participantId: human.participantId });
-      this.persistence?.append('leave', { participantId: human.participantId });
+      this.broadcastToRoom(room, { type: 'participantLeft', participantId: human.participantId });
+      room.persistence?.append('leave', { participantId: human.participantId });
     }
     if (agent) {
-      this.broadcast({ type: 'participantLeft', participantId: agent.participantId });
-      this.persistence?.append('leave', { participantId: agent.participantId });
+      this.broadcastToRoom(room, { type: 'participantLeft', participantId: agent.participantId });
+      room.persistence?.append('leave', { participantId: agent.participantId });
     }
 
-    this.participants = this.participants.filter(
+    room.participants = room.participants.filter(
       p => p.participantId !== client.humanParticipantId && p.participantId !== client.agentParticipantId
     );
     this.clients.delete(ws);
-    this.log(`Left: ${human?.displayName || 'unknown'} (participants remaining: ${this.participants.length})`);
+    this.log(`[Room ${client.sessionNumber}] Left: ${human?.displayName || 'unknown'} (participants remaining: ${room.participants.length})`);
   }
 
   private handleDisconnect(ws: WebSocket): void {
     const client = this.clients.get(ws);
     if (!client) return;
 
-    const human = this.participants.find(p => p.participantId === client.humanParticipantId);
-    const agent = this.participants.find(p => p.participantId === client.agentParticipantId);
+    const room = this.rooms.get(client.sessionNumber);
+    if (!room) {
+      this.clients.delete(ws);
+      return;
+    }
+
+    const human = room.participants.find(p => p.participantId === client.humanParticipantId);
+    const agent = room.participants.find(p => p.participantId === client.agentParticipantId);
 
     if (human) {
-      this.broadcastExcept(ws, { type: 'participantLeft', participantId: human.participantId });
-      this.persistence?.append('leave', { participantId: human.participantId });
+      this.broadcastToRoomExcept(room, ws, { type: 'participantLeft', participantId: human.participantId });
+      room.persistence?.append('leave', { participantId: human.participantId });
     }
     if (agent) {
-      this.broadcastExcept(ws, { type: 'participantLeft', participantId: agent.participantId });
-      this.persistence?.append('leave', { participantId: agent.participantId });
+      this.broadcastToRoomExcept(room, ws, { type: 'participantLeft', participantId: agent.participantId });
+      room.persistence?.append('leave', { participantId: agent.participantId });
     }
 
-    this.participants = this.participants.filter(
+    room.participants = room.participants.filter(
       p => p.participantId !== client.humanParticipantId && p.participantId !== client.agentParticipantId
     );
     this.clients.delete(ws);
-    this.log(`Disconnected: ${human?.displayName || 'unknown'} (participants remaining: ${this.participants.length})`);
+    this.log(`[Room ${client.sessionNumber}] Disconnected: ${human?.displayName || 'unknown'} (participants remaining: ${room.participants.length})`);
   }
 
   // -- Reset Session --
 
   private handleResetSession(ws: WebSocket): void {
-    if (!this.session) return;
-
     const client = this.clients.get(ws);
     if (!client) return;
 
-    this.log(`Session reset requested by ${client.humanParticipantId}`);
+    const room = this.rooms.get(client.sessionNumber);
+    if (!room) return;
 
-    this.persistence?.close();
+    this.log(`[Room ${client.sessionNumber}] Session reset requested by ${client.humanParticipantId}`);
+
+    room.persistence?.close();
 
     const newSessionId = uuid();
-    this.session = {
+    room.session = {
       sessionId: newSessionId,
-      name: 'Multi-Participant Session',
+      sessionNumber: room.session.sessionNumber,
+      name: room.session.name,
       createdAt: new Date().toISOString(),
       createdByParticipantId: client.humanParticipantId,
       status: 'active',
       nextSeq: 1,
       agentMode: 'execute',
       allowRemoteSteer: 'owner-only',
-      sessionPassword: this.session.sessionPassword,
+      sessionPassword: room.session.sessionPassword,
     };
 
-    this.transcript = [];
-    this.deliveries.clear();
-    this.seenState.clear();
-    this.renameEvents = [];
-    this.typingStates.clear();
-    this.approvalHistory = [];
-    this.fileTracker.clear();
-    this.activeConflicts.clear();
-    this.reactions.clear();
+    room.transcript = [];
+    room.deliveries.clear();
+    room.seenState.clear();
+    room.renameEvents = [];
+    room.typingStates.clear();
+    room.approvalHistory = [];
+    room.fileTracker.clear();
+    room.activeConflicts.clear();
+    room.reactions.clear();
 
-    for (const timer of this.streamCoalesceTimers.values()) {
+    for (const timer of room.streamCoalesceTimers.values()) {
       clearTimeout(timer);
     }
-    this.streamCoalesceTimers.clear();
-    this.streamCoalesceBuffers.clear();
+    room.streamCoalesceTimers.clear();
+    room.streamCoalesceBuffers.clear();
 
-    this.loopController = new LoopController(newSessionId, this.log);
+    room.loopController = new LoopController(newSessionId, this.log);
 
-    for (const p of this.participants) {
+    for (const p of room.participants) {
       p.sessionId = newSessionId;
     }
 
-    for (const p of this.participants) {
+    for (const p of room.participants) {
       if (p.kind === 'agent') {
-        this.seenState.set(p.participantId, {
+        room.seenState.set(p.participantId, {
           agentParticipantId: p.participantId,
           sessionId: newSessionId,
           lastAckedDeliveredSeq: 0,
@@ -531,27 +618,28 @@ export class CoordinationServer {
     }
 
     if (this.config.persistenceDir) {
-      this.persistence = new SessionPersistence(
+      room.persistence = new SessionPersistence(
         this.config.persistenceDir, newSessionId, this.log,
       );
-      this.persistence.init();
-      this.persistence.append('init', { session: this.session });
+      room.persistence.init();
+      room.persistence.append('init', { session: room.session });
       for (const c of this.clients.values()) {
-        const human = this.participants.find(p => p.participantId === c.humanParticipantId);
-        const agent = this.participants.find(p => p.participantId === c.agentParticipantId);
+        if (c.sessionNumber !== client.sessionNumber) continue;
+        const human = room.participants.find(p => p.participantId === c.humanParticipantId);
+        const agent = room.participants.find(p => p.participantId === c.agentParticipantId);
         if (human && agent) {
-          this.persistence.append('join', { human, agent });
+          room.persistence.append('join', { human, agent });
         }
       }
     }
 
-    this.broadcast({
+    this.broadcastToRoom(room, {
       type: 'sessionReset',
-      session: this.publicSession(),
-      participants: this.participants,
+      session: this.publicSession(room),
+      participants: room.participants,
     });
 
-    this.log(`Session reset complete: new session ${newSessionId}`);
+    this.log(`[Room ${client.sessionNumber}] Session reset complete: new session ${newSessionId}`);
   }
 
   // -- Emoji Reactions --
@@ -560,30 +648,36 @@ export class CoordinationServer {
     const client = this.clients.get(ws);
     if (!client) return;
 
+    const room = this.rooms.get(client.sessionNumber);
+    if (!room) return;
+
     const participantId = client.humanParticipantId;
 
-    if (!this.reactions.has(messageId)) {
-      this.reactions.set(messageId, new Map());
+    if (!room.reactions.has(messageId)) {
+      room.reactions.set(messageId, new Map());
     }
-    const msgReactions = this.reactions.get(messageId)!;
+    const msgReactions = room.reactions.get(messageId)!;
     if (!msgReactions.has(emoji)) {
       msgReactions.set(emoji, new Set());
     }
     msgReactions.get(emoji)!.add(participantId);
 
-    const summary = this.buildReactionSummary(messageId);
-    this.broadcast({ type: 'reactionUpdate', messageId, reactions: summary });
+    const summary = this.buildReactionSummary(room, messageId);
+    this.broadcastToRoom(room, { type: 'reactionUpdate', messageId, reactions: summary });
 
-    this.persistence?.append('reaction', { messageId, emoji, participantId, action: 'add' });
+    room.persistence?.append('reaction', { messageId, emoji, participantId, action: 'add' });
   }
 
   private handleRemoveReaction(ws: WebSocket, messageId: string, emoji: string): void {
     const client = this.clients.get(ws);
     if (!client) return;
 
+    const room = this.rooms.get(client.sessionNumber);
+    if (!room) return;
+
     const participantId = client.humanParticipantId;
 
-    const msgReactions = this.reactions.get(messageId);
+    const msgReactions = room.reactions.get(messageId);
     if (!msgReactions) return;
 
     const emojiSet = msgReactions.get(emoji);
@@ -591,16 +685,16 @@ export class CoordinationServer {
 
     emojiSet.delete(participantId);
     if (emojiSet.size === 0) msgReactions.delete(emoji);
-    if (msgReactions.size === 0) this.reactions.delete(messageId);
+    if (msgReactions.size === 0) room.reactions.delete(messageId);
 
-    const summary = this.buildReactionSummary(messageId);
-    this.broadcast({ type: 'reactionUpdate', messageId, reactions: summary });
+    const summary = this.buildReactionSummary(room, messageId);
+    this.broadcastToRoom(room, { type: 'reactionUpdate', messageId, reactions: summary });
 
-    this.persistence?.append('reaction', { messageId, emoji, participantId, action: 'remove' });
+    room.persistence?.append('reaction', { messageId, emoji, participantId, action: 'remove' });
   }
 
-  private buildReactionSummary(messageId: string): ReactionSummary[] {
-    const msgReactions = this.reactions.get(messageId);
+  private buildReactionSummary(room: SessionRoom, messageId: string): ReactionSummary[] {
+    const msgReactions = room.reactions.get(messageId);
     if (!msgReactions) return [];
     const result: ReactionSummary[] = [];
     for (const [emoji, pids] of msgReactions) {
@@ -609,11 +703,11 @@ export class CoordinationServer {
     return result;
   }
 
-  private buildAllReactions(): Record<string, ReactionSummary[]> | undefined {
-    if (this.reactions.size === 0) return undefined;
+  private buildAllReactions(room: SessionRoom): Record<string, ReactionSummary[]> | undefined {
+    if (room.reactions.size === 0) return undefined;
     const result: Record<string, ReactionSummary[]> = {};
-    for (const [messageId, _] of this.reactions) {
-      const summary = this.buildReactionSummary(messageId);
+    for (const [messageId, _] of room.reactions) {
+      const summary = this.buildReactionSummary(room, messageId);
       if (summary.length > 0) result[messageId] = summary;
     }
     return Object.keys(result).length > 0 ? result : undefined;
@@ -623,17 +717,20 @@ export class CoordinationServer {
 
   private handleHumanMessage(ws: WebSocket, rawBody: string): void {
     const client = this.clients.get(ws);
-    if (!client || !this.session) return;
+    if (!client) return;
 
-    const author = this.participants.find(p => p.participantId === client.humanParticipantId);
+    const room = this.rooms.get(client.sessionNumber);
+    if (!room) return;
+
+    const author = room.participants.find(p => p.participantId === client.humanParticipantId);
     if (!author) return;
 
-    const route = routeMessage(rawBody, this.participants);
+    const route = routeMessage(rawBody, room.participants);
 
-    const seq = this.session.nextSeq++;
+    const seq = room.session.nextSeq++;
     const message: Message = {
       messageId: uuid(),
-      sessionId: this.session.sessionId,
+      sessionId: room.session.sessionId,
       seq,
       authorParticipantId: author.participantId,
       recipientParticipantId: route.recipientParticipantId,
@@ -648,35 +745,31 @@ export class CoordinationServer {
       triggerDeliveryId: null,
     };
 
-    this.transcript.push(message);
-    this.persistence?.append('msg', message);
-    this.log(`Message #${seq} from ${author.displayName}: "${rawBody.substring(0, 80)}..."`);
+    room.transcript.push(message);
+    room.persistence?.append('msg', message);
+    this.log(`[Room ${client.sessionNumber}] Message #${seq} from ${author.displayName}: "${rawBody.substring(0, 80)}..."`);
 
-    this.broadcastActivity(author.participantId, 'idle');
-    this.broadcast({ type: 'newMessage', message });
+    this.broadcastActivity(room, author.participantId, 'idle');
+    this.broadcastToRoom(room, { type: 'newMessage', message });
 
     if (route.recipientParticipantId) {
-      const recipient = this.participants.find(p => p.participantId === route.recipientParticipantId);
+      const recipient = room.participants.find(p => p.participantId === route.recipientParticipantId);
       if (recipient && recipient.kind === 'agent') {
-        this.loopController?.resetOnHumanIntervention();
-        if (this.loopController) {
-          this.persistence?.append('loop', this.loopController.getState());
-        }
-        this.deliverToAgent(recipient, message);
+        room.loopController.resetOnHumanIntervention();
+        room.persistence?.append('loop', room.loopController.getState());
+        this.deliverToAgent(room, recipient, message);
       }
     }
   }
 
   // -- Agent Delivery --
 
-  private deliverToAgent(agent: Participant, triggerMessage: Message): void {
-    if (!this.session) return;
-
+  private deliverToAgent(room: SessionRoom, agent: Participant, triggerMessage: Message): void {
     const deliveryId = uuid();
-    const deltaContext = this.buildDeltaContext(agent, triggerMessage);
-    const prompt = this.formatAgentPrompt(agent, deltaContext, triggerMessage);
+    const deltaContext = this.buildDeltaContext(room, agent, triggerMessage);
+    const prompt = this.formatAgentPrompt(room, agent, deltaContext, triggerMessage);
 
-    const ownerClient = this.findClientForAgent(agent);
+    const ownerClient = this.findClientForAgent(room, agent);
     let busyPolicy: AgentBusyPolicy | null = 'direct';
     if (agent.provider === 'codex') {
       busyPolicy = 'codex-auto-steer';
@@ -684,7 +777,7 @@ export class CoordinationServer {
 
     const delivery: AgentDelivery = {
       deliveryId,
-      sessionId: this.session.sessionId,
+      sessionId: room.session.sessionId,
       agentParticipantId: agent.participantId,
       triggerMessageId: triggerMessage.messageId,
       triggerSeq: triggerMessage.seq,
@@ -702,8 +795,8 @@ export class CoordinationServer {
       completedAt: null,
     };
 
-    this.deliveries.set(deliveryId, delivery);
-    this.persistence?.append('dlv', delivery);
+    room.deliveries.set(deliveryId, delivery);
+    room.persistence?.append('dlv', delivery);
 
     triggerMessage.deliveryId = deliveryId;
     triggerMessage.agentTurnStatus = 'pending';
@@ -712,15 +805,15 @@ export class CoordinationServer {
       delivery.status = 'not_delivered';
       delivery.notDeliveredReason = 'agent-offline';
       triggerMessage.agentTurnStatus = 'not_delivered';
-      this.persistence?.append('dlv', delivery);
-      this.broadcast({
+      room.persistence?.append('dlv', delivery);
+      this.broadcastToRoom(room, {
         type: 'deliveryStatusUpdate',
         deliveryId,
         agentParticipantId: agent.participantId,
         agentDisplayName: agent.displayName,
         status: 'not_delivered',
       });
-      this.log(`Delivery ${deliveryId}: agent ${agent.displayName} is offline, not delivered`);
+      this.log(`[Room ${room.session.sessionNumber}] Delivery ${deliveryId}: agent ${agent.displayName} is offline, not delivered`);
       return;
     }
 
@@ -732,7 +825,7 @@ export class CoordinationServer {
       busyPolicy,
     });
 
-    this.broadcast({
+    this.broadcastToRoom(room, {
       type: 'deliveryStatusUpdate',
       deliveryId,
       agentParticipantId: agent.participantId,
@@ -740,47 +833,53 @@ export class CoordinationServer {
       status: 'pending',
     });
 
-    this.log(`Delivery ${deliveryId}: sent to ${agent.displayName} (${agent.provider}), busyPolicy=${busyPolicy}`);
+    this.log(`[Room ${room.session.sessionNumber}] Delivery ${deliveryId}: sent to ${agent.displayName} (${agent.provider}), busyPolicy=${busyPolicy}`);
   }
 
   // -- Agent Events --
 
   private handleAgentEvent(ws: WebSocket, deliveryId: string, event: AgentEventPayload): void {
-    const delivery = this.deliveries.get(deliveryId);
-    if (!delivery || !this.session) return;
+    const client = this.clients.get(ws);
+    if (!client) return;
 
-    const agent = this.participants.find(p => p.participantId === delivery.agentParticipantId);
+    const room = this.rooms.get(client.sessionNumber);
+    if (!room) return;
+
+    const delivery = room.deliveries.get(deliveryId);
+    if (!delivery) return;
+
+    const agent = room.participants.find(p => p.participantId === delivery.agentParticipantId);
     if (!agent) return;
 
     switch (event.kind) {
       case 'accepted': {
         delivery.status = 'acknowledged';
         delivery.acknowledgedAt = new Date().toISOString();
-        const seen = this.seenState.get(agent.participantId);
+        const seen = room.seenState.get(agent.participantId);
         if (seen) {
           seen.lastAckedDeliveredSeq = delivery.contextEndSeq;
           seen.lastDeliveryId = deliveryId;
           seen.updatedAt = new Date().toISOString();
-          this.persistence?.append('seen', seen);
+          room.persistence?.append('seen', seen);
         }
-        this.persistence?.append('dlv', delivery);
-        this.broadcast({
+        room.persistence?.append('dlv', delivery);
+        this.broadcastToRoom(room, {
           type: 'deliveryStatusUpdate',
           deliveryId,
           agentParticipantId: agent.participantId,
           agentDisplayName: agent.displayName,
           status: 'acknowledged',
         });
-        this.broadcastActivity(agent.participantId, 'thinking');
-        this.log(`Delivery ${deliveryId}: acknowledged by ClaUi`);
+        this.broadcastActivity(room, agent.participantId, 'thinking');
+        this.log(`[Room ${client.sessionNumber}] Delivery ${deliveryId}: acknowledged by ClaUi`);
         break;
       }
 
       case 'rejected': {
         delivery.status = 'failed';
         delivery.errorText = event.error;
-        this.persistence?.append('dlv', delivery);
-        this.broadcast({
+        room.persistence?.append('dlv', delivery);
+        this.broadcastToRoom(room, {
           type: 'deliveryStatusUpdate',
           deliveryId,
           agentParticipantId: agent.participantId,
@@ -788,17 +887,17 @@ export class CoordinationServer {
           status: 'failed',
           errorText: event.error,
         });
-        this.broadcastActivity(agent.participantId, 'idle');
-        this.cleanupFileTrackerForDelivery(deliveryId);
-        this.log(`Delivery ${deliveryId}: rejected - ${event.error}`);
+        this.broadcastActivity(room, agent.participantId, 'idle');
+        this.cleanupFileTrackerForDelivery(room, deliveryId);
+        this.log(`[Room ${client.sessionNumber}] Delivery ${deliveryId}: rejected - ${event.error}`);
         break;
       }
 
       case 'started': {
         delivery.status = 'running';
         delivery.startedAt = new Date().toISOString();
-        this.persistence?.append('dlv', delivery);
-        this.broadcast({
+        room.persistence?.append('dlv', delivery);
+        this.broadcastToRoom(room, {
           type: 'deliveryStatusUpdate',
           deliveryId,
           agentParticipantId: agent.participantId,
@@ -810,35 +909,34 @@ export class CoordinationServer {
 
       case 'firstToken': {
         delivery.status = 'streaming';
-        this.persistence?.append('dlv', delivery);
-        this.broadcast({
+        room.persistence?.append('dlv', delivery);
+        this.broadcastToRoom(room, {
           type: 'deliveryStatusUpdate',
           deliveryId,
           agentParticipantId: agent.participantId,
           agentDisplayName: agent.displayName,
           status: 'streaming',
         });
-        this.broadcastActivity(agent.participantId, 'streaming');
+        this.broadcastActivity(room, agent.participantId, 'streaming');
         break;
       }
 
       case 'textDelta': {
-        this.coalesceStreamingText(deliveryId, agent.participantId, event.text);
+        this.coalesceStreamingText(room, deliveryId, agent.participantId, event.text);
         break;
       }
 
       case 'completed': {
-        this.flushStreamingBuffer(deliveryId);
+        this.flushStreamingBuffer(room, deliveryId);
         delivery.status = 'completed';
         delivery.completedAt = new Date().toISOString();
 
-        // Route the agent's response to detect addressing
-        const route = routeMessage(event.fullText, this.participants);
+        const route = routeMessage(event.fullText, room.participants);
 
-        const seq = this.session.nextSeq++;
+        const seq = room.session.nextSeq++;
         const responseMessage: Message = {
           messageId: uuid(),
-          sessionId: this.session.sessionId,
+          sessionId: room.session.sessionId,
           seq,
           authorParticipantId: agent.participantId,
           recipientParticipantId: route.recipientParticipantId,
@@ -852,46 +950,45 @@ export class CoordinationServer {
           triggerMessageId: delivery.triggerMessageId,
           triggerDeliveryId: deliveryId,
         };
-        this.transcript.push(responseMessage);
+        room.transcript.push(responseMessage);
         delivery.responseMessageId = responseMessage.messageId;
 
-        this.persistence?.append('msg', responseMessage);
-        this.persistence?.append('dlv', delivery);
+        room.persistence?.append('msg', responseMessage);
+        room.persistence?.append('dlv', delivery);
 
-        this.broadcast({ type: 'newMessage', message: responseMessage });
-        this.broadcast({
+        this.broadcastToRoom(room, { type: 'newMessage', message: responseMessage });
+        this.broadcastToRoom(room, {
           type: 'deliveryStatusUpdate',
           deliveryId,
           agentParticipantId: agent.participantId,
           agentDisplayName: agent.displayName,
           status: 'completed',
         });
-        this.broadcastActivity(agent.participantId, 'idle');
-        this.cleanupFileTrackerForDelivery(deliveryId);
+        this.broadcastActivity(room, agent.participantId, 'idle');
+        this.cleanupFileTrackerForDelivery(room, deliveryId);
 
-        // Check if agent response addresses another agent (A2A)
         if (route.recipientParticipantId) {
-          const recipient = this.participants.find(p => p.participantId === route.recipientParticipantId);
-          if (recipient && recipient.kind === 'agent' && this.loopController) {
-            this.a2aRoutingChain = this.a2aRoutingChain
-              .then(() => this.handleAgentToAgentRouting(agent, recipient, responseMessage))
-              .catch(err => this.log(`Error in A2A routing: ${err}`));
+          const recipient = room.participants.find(p => p.participantId === route.recipientParticipantId);
+          if (recipient && recipient.kind === 'agent') {
+            room.a2aRoutingChain = room.a2aRoutingChain
+              .then(() => this.handleAgentToAgentRouting(room, agent, recipient, responseMessage))
+              .catch(err => this.log(`[Room ${client.sessionNumber}] Error in A2A routing: ${err}`));
           } else if (recipient && recipient.kind === 'agent') {
-            this.deliverToAgent(recipient, responseMessage);
+            this.deliverToAgent(room, recipient, responseMessage);
           }
         }
 
-        this.log(`Delivery ${deliveryId}: completed, response #${seq} (${event.fullText.length} chars)`);
+        this.log(`[Room ${client.sessionNumber}] Delivery ${deliveryId}: completed, response #${seq} (${event.fullText.length} chars)`);
         break;
       }
 
       case 'failed': {
-        this.flushStreamingBuffer(deliveryId);
+        this.flushStreamingBuffer(room, deliveryId);
         delivery.status = 'failed';
         delivery.errorText = event.error;
         delivery.completedAt = new Date().toISOString();
-        this.persistence?.append('dlv', delivery);
-        this.broadcast({
+        room.persistence?.append('dlv', delivery);
+        this.broadcastToRoom(room, {
           type: 'deliveryStatusUpdate',
           deliveryId,
           agentParticipantId: agent.participantId,
@@ -899,19 +996,19 @@ export class CoordinationServer {
           status: 'failed',
           errorText: event.error,
         });
-        this.broadcastActivity(agent.participantId, 'idle');
-        this.cleanupFileTrackerForDelivery(deliveryId);
-        this.log(`Delivery ${deliveryId}: failed - ${event.error}`);
+        this.broadcastActivity(room, agent.participantId, 'idle');
+        this.cleanupFileTrackerForDelivery(room, deliveryId);
+        this.log(`[Room ${client.sessionNumber}] Delivery ${deliveryId}: failed - ${event.error}`);
         break;
       }
 
       case 'interrupted': {
-        this.flushStreamingBuffer(deliveryId);
+        this.flushStreamingBuffer(room, deliveryId);
         delivery.status = 'interrupted';
         delivery.interruptedByDeliveryId = event.interruptedByDeliveryId;
         delivery.completedAt = new Date().toISOString();
-        this.persistence?.append('dlv', delivery);
-        this.broadcast({
+        room.persistence?.append('dlv', delivery);
+        this.broadcastToRoom(room, {
           type: 'deliveryStatusUpdate',
           deliveryId,
           agentParticipantId: agent.participantId,
@@ -919,8 +1016,8 @@ export class CoordinationServer {
           status: 'interrupted',
           interruptedByDeliveryId: event.interruptedByDeliveryId,
         });
-        this.cleanupFileTrackerForDelivery(deliveryId);
-        this.log(`Delivery ${deliveryId}: interrupted by ${event.interruptedByDeliveryId}`);
+        this.cleanupFileTrackerForDelivery(room, deliveryId);
+        this.log(`[Room ${client.sessionNumber}] Delivery ${deliveryId}: interrupted by ${event.interruptedByDeliveryId}`);
         break;
       }
     }
@@ -930,30 +1027,32 @@ export class CoordinationServer {
     const client = this.clients.get(ws);
     if (!client) return;
 
-    const agent = this.participants.find(p => p.participantId === client.agentParticipantId);
+    const room = this.rooms.get(client.sessionNumber);
+    if (!room) return;
+
+    const agent = room.participants.find(p => p.participantId === client.agentParticipantId);
     if (!agent) return;
 
     agent.status = status;
-    this.persistence?.append('pstat', { participantId: agent.participantId, status });
-    this.broadcast({
+    room.persistence?.append('pstat', { participantId: agent.participantId, status });
+    this.broadcastToRoom(room, {
       type: 'participantStatusChange',
       participantId: agent.participantId,
       status,
     });
-    this.log(`Agent ${agent.displayName} status: ${status}`);
+    this.log(`[Room ${client.sessionNumber}] Agent ${agent.displayName} status: ${status}`);
   }
 
   // -- Agent-to-Agent Loop Protection --
 
   private async handleAgentToAgentRouting(
+    room: SessionRoom,
     sourceAgent: Participant,
     targetAgent: Participant,
     responseMessage: Message,
   ): Promise<void> {
-    if (!this.loopController || !this.session) return;
-
-    const result = this.loopController.processA2A(
-      this.session.sessionId,
+    const result = room.loopController.processA2A(
+      room.session.sessionId,
       sourceAgent,
       targetAgent,
       responseMessage,
@@ -961,76 +1060,76 @@ export class CoordinationServer {
 
     switch (result.action) {
       case 'deliver': {
-        this.persistence?.append('loop', this.loopController.getState());
-        this.deliverToAgent(targetAgent, responseMessage);
+        room.persistence?.append('loop', room.loopController.getState());
+        this.deliverToAgent(room, targetAgent, responseMessage);
         break;
       }
 
       case 'pause': {
-        this.approvalHistory.push(result.approval);
-        this.persistence?.append('appr', result.approval);
-        this.persistence?.append('loop', this.loopController.getState());
+        room.approvalHistory.push(result.approval);
+        room.persistence?.append('appr', result.approval);
+        room.persistence?.append('loop', room.loopController.getState());
 
-        this.broadcast({
+        this.broadcastToRoom(room, {
           type: 'agentToAgentApproval',
           approval: result.approval,
           pendingMessage: responseMessage,
           sourceAgent,
           targetAgent,
         });
-        this.broadcast({
+        this.broadcastToRoom(room, {
           type: 'a2aPendingApproval',
           approval: result.approval,
           pendingMessageId: responseMessage.messageId,
           sourceAgentId: sourceAgent.participantId,
           targetAgentId: targetAgent.participantId,
         });
-        this.log(`A2A paused: ${sourceAgent.displayName} -> ${targetAgent.displayName}, approval ${result.approval.eventId}`);
+        this.log(`[Room ${room.session.sessionNumber}] A2A paused: ${sourceAgent.displayName} -> ${targetAgent.displayName}, approval ${result.approval.eventId}`);
         break;
       }
 
       case 'guard-check': {
-        const agents = this.participants.filter(p => p.kind === 'agent');
-        const recentMessages = this.transcript.slice(-5);
+        const agents = room.participants.filter(p => p.kind === 'agent');
+        const recentMessages = room.transcript.slice(-5);
 
         const guardResult = await this.guardService.check(
-          this.session.name,
+          room.session.name,
           agents,
-          this.loopController.getState(),
+          room.loopController.getState(),
           recentMessages,
-          this.participants,
+          room.participants,
         );
 
         if (guardResult === 'continue') {
-          this.loopController.advanceGuardCheckpoint();
-          this.persistence?.append('loop', this.loopController.getState());
-          this.deliverToAgent(targetAgent, responseMessage);
+          room.loopController.advanceGuardCheckpoint();
+          room.persistence?.append('loop', room.loopController.getState());
+          this.deliverToAgent(room, targetAgent, responseMessage);
         } else {
-          const approval = this.loopController.createGuardPauseApproval(
-            this.session.sessionId,
+          const approval = room.loopController.createGuardPauseApproval(
+            room.session.sessionId,
             sourceAgent,
             targetAgent,
             responseMessage,
           );
-          this.approvalHistory.push(approval);
-          this.persistence?.append('appr', approval);
-          this.persistence?.append('loop', this.loopController.getState());
+          room.approvalHistory.push(approval);
+          room.persistence?.append('appr', approval);
+          room.persistence?.append('loop', room.loopController.getState());
 
-          const lastMessages = this.transcript.slice(-5);
-          this.broadcast({
+          const lastMessages = room.transcript.slice(-5);
+          this.broadcastToRoom(room, {
             type: 'guardStop',
             approval,
             reason: 'Guard model detected potential unproductive loop',
             lastMessages,
           });
-          this.broadcast({
+          this.broadcastToRoom(room, {
             type: 'agentToAgentApproval',
             approval,
             pendingMessage: responseMessage,
             sourceAgent,
             targetAgent,
           });
-          this.log(`Guard STOP: ${sourceAgent.displayName} -> ${targetAgent.displayName}`);
+          this.log(`[Room ${room.session.sessionNumber}] Guard STOP: ${sourceAgent.displayName} -> ${targetAgent.displayName}`);
         }
         break;
       }
@@ -1045,9 +1144,12 @@ export class CoordinationServer {
     decision: ApprovalDecisionPayload,
   ): void {
     const client = this.clients.get(ws);
-    if (!client || !this.loopController || !this.session) return;
+    if (!client) return;
 
-    const result = this.loopController.processApprovalDecision(
+    const room = this.rooms.get(client.sessionNumber);
+    if (!room) return;
+
+    const result = room.loopController.processApprovalDecision(
       eventId,
       decision,
       client.humanParticipantId,
@@ -1064,27 +1166,27 @@ export class CoordinationServer {
 
     const { approval, pendingMessage, targetAgent } = result;
 
-    this.persistence?.append('appr', approval);
-    this.persistence?.append('loop', this.loopController.getState());
+    room.persistence?.append('appr', approval);
+    room.persistence?.append('loop', room.loopController.getState());
 
     if (decision.type === 'deny') {
-      this.broadcast({
+      this.broadcastToRoom(room, {
         type: 'approvalResolved',
         approval,
         decision,
         decidedByParticipantId: client.humanParticipantId,
         deniedReason: 'Human denied agent-to-agent delivery',
       });
-      this.log(`A2A denied: approval ${eventId}`);
+      this.log(`[Room ${client.sessionNumber}] A2A denied: approval ${eventId}`);
     } else {
-      this.broadcast({
+      this.broadcastToRoom(room, {
         type: 'approvalResolved',
         approval,
         decision,
         decidedByParticipantId: client.humanParticipantId,
       });
-      this.deliverToAgent(targetAgent, pendingMessage);
-      this.log(`A2A approved (${decision.type}): approval ${eventId}`);
+      this.deliverToAgent(room, targetAgent, pendingMessage);
+      this.log(`[Room ${client.sessionNumber}] A2A approved (${decision.type}): approval ${eventId}`);
     }
   }
 
@@ -1097,19 +1199,23 @@ export class CoordinationServer {
     const client = this.clients.get(ws);
     if (!client) return;
 
-    const human = this.participants.find(p => p.participantId === client.humanParticipantId);
+    const room = this.rooms.get(client.sessionNumber);
+    if (!room) return;
+
+    const human = room.participants.find(p => p.participantId === client.humanParticipantId);
     if (!human) return;
 
-    this.broadcastActivity(human.participantId, state, ws);
+    this.broadcastActivity(room, human.participantId, state, ws);
   }
 
   private broadcastActivity(
+    room: SessionRoom,
     participantId: string,
     state: ParticipantActivityState,
     excludeWs?: WebSocket,
   ): void {
     const now = new Date().toISOString();
-    this.typingStates.set(participantId, { participantId, state, updatedAt: now });
+    room.typingStates.set(participantId, { participantId, state, updatedAt: now });
 
     const msg: ServerToClientMessage = {
       type: 'participantActivity',
@@ -1117,9 +1223,9 @@ export class CoordinationServer {
     };
 
     if (excludeWs) {
-      this.broadcastExcept(excludeWs, msg);
+      this.broadcastToRoomExcept(room, excludeWs, msg);
     } else {
-      this.broadcast(msg);
+      this.broadcastToRoom(room, msg);
     }
   }
 
@@ -1131,7 +1237,10 @@ export class CoordinationServer {
     newDisplayName: string,
   ): void {
     const client = this.clients.get(ws);
-    if (!client || !this.session) return;
+    if (!client) return;
+
+    const room = this.rooms.get(client.sessionNumber);
+    if (!room) return;
 
     if (participantId !== client.humanParticipantId && participantId !== client.agentParticipantId) {
       this.sendToClient(ws, {
@@ -1143,7 +1252,7 @@ export class CoordinationServer {
       return;
     }
 
-    const participant = this.participants.find(p => p.participantId === participantId);
+    const participant = room.participants.find(p => p.participantId === participantId);
     if (!participant) {
       this.sendToClient(ws, {
         type: 'renameRejected',
@@ -1155,11 +1264,11 @@ export class CoordinationServer {
     }
 
     try {
-      const validated = validateParticipantName(newDisplayName, this.participants, participantId);
+      const validated = validateParticipantName(newDisplayName, room.participants, participantId);
 
       const renameEvent: RenameEvent = {
         eventId: uuid(),
-        sessionId: this.session.sessionId,
+        sessionId: room.session.sessionId,
         participantId,
         oldDisplayName: participant.displayName,
         newDisplayName: validated.displayName,
@@ -1172,16 +1281,16 @@ export class CoordinationServer {
       participant.canonicalName = validated.canonicalName;
       participant.routeKey = validated.routeKey;
 
-      this.renameEvents.push(renameEvent);
-      this.persistence?.append('rename', { event: renameEvent, participant });
+      room.renameEvents.push(renameEvent);
+      room.persistence?.append('rename', { event: renameEvent, participant });
 
-      this.broadcast({
+      this.broadcastToRoom(room, {
         type: 'participantRenamed',
         event: renameEvent,
         participant,
       });
 
-      this.log(`Renamed: ${renameEvent.oldDisplayName} -> ${renameEvent.newDisplayName}`);
+      this.log(`[Room ${client.sessionNumber}] Renamed: ${renameEvent.oldDisplayName} -> ${renameEvent.newDisplayName}`);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       this.sendToClient(ws, {
@@ -1190,22 +1299,14 @@ export class CoordinationServer {
         requestedDisplayName: newDisplayName,
         reason,
       });
-      this.log(`Rename rejected: ${reason}`);
+      this.log(`[Room ${client.sessionNumber}] Rename rejected: ${reason}`);
     }
   }
 
   // -- File Change Reports & Overlap Detection --
 
-  /**
-   * Normalize a file path for consistent map lookups.
-   * Lowercases on Windows (case-insensitive FS), resolves . and .. segments,
-   * and normalizes separators to forward slashes.
-   */
   private normalizeFilePath(filePath: string): string {
-    // Normalize separators to forward slash
     let normalized = filePath.replace(/\\/g, '/');
-
-    // Resolve . and .. segments
     const parts: string[] = [];
     for (const segment of normalized.split('/')) {
       if (segment === '.' || segment === '') continue;
@@ -1216,32 +1317,32 @@ export class CoordinationServer {
       }
     }
     normalized = parts.join('/');
-
-    // Case-insensitive comparison (Windows is the primary target, safe on all platforms)
     return normalized.toLowerCase();
   }
 
-  /** Build the composite key for the file tracker map. */
   private fileTrackerKey(workspaceId: string, normalizedPath: string): string {
     return `${workspaceId}:${normalizedPath}`;
   }
 
   private handleFileChangeReport(_ws: WebSocket, report: FileChangeReport): void {
-    if (!this.session) return;
+    const client = this.clients.get(_ws);
+    if (!client) return;
 
-    this.log(`File change report: delivery ${report.deliveryId}, ${report.changes.length} changes in workspace ${report.workspaceId}`);
+    const room = this.rooms.get(client.sessionNumber);
+    if (!room) return;
 
-    // Resolve the agent participant info for this report
-    const delivery = this.deliveries.get(report.deliveryId);
+    this.log(`[Room ${client.sessionNumber}] File change report: delivery ${report.deliveryId}, ${report.changes.length} changes in workspace ${report.workspaceId}`);
+
+    const delivery = room.deliveries.get(report.deliveryId);
     if (!delivery) {
-      this.log(`File change report: unknown delivery ${report.deliveryId}, ignoring`);
+      this.log(`[Room ${client.sessionNumber}] File change report: unknown delivery ${report.deliveryId}, ignoring`);
       return;
     }
 
     const agentParticipantId = report.agentParticipantId || delivery.agentParticipantId;
-    const agent = this.participants.find(p => p.participantId === agentParticipantId);
+    const agent = room.participants.find(p => p.participantId === agentParticipantId);
     if (!agent) {
-      this.log(`File change report: unknown agent ${agentParticipantId}, ignoring`);
+      this.log(`[Room ${client.sessionNumber}] File change report: unknown agent ${agentParticipantId}, ignoring`);
       return;
     }
 
@@ -1251,20 +1352,18 @@ export class CoordinationServer {
       agentDisplayName: agent.displayName,
     };
 
-    // Track each changed file and collect overlap candidates
     const overlappingPaths: string[] = [];
 
     for (const change of report.changes) {
       const normalizedPath = this.normalizeFilePath(change.path);
       const key = this.fileTrackerKey(report.workspaceId, normalizedPath);
 
-      let entries = this.fileTracker.get(key);
+      let entries = room.fileTracker.get(key);
       if (!entries) {
         entries = new Set();
-        this.fileTracker.set(key, entries);
+        room.fileTracker.set(key, entries);
       }
 
-      // Check for overlap: another delivery (different deliveryId) is modifying the same file
       let hasOverlap = false;
       for (const existing of entries) {
         if (existing.deliveryId !== report.deliveryId) {
@@ -1273,7 +1372,6 @@ export class CoordinationServer {
         }
       }
 
-      // Add or update the entry for this delivery (avoid duplicates for same delivery)
       let alreadyTracked = false;
       for (const existing of entries) {
         if (existing.deliveryId === report.deliveryId) {
@@ -1290,31 +1388,21 @@ export class CoordinationServer {
       }
     }
 
-    // Persist the file change report
-    this.persistence?.append('fcr', report);
+    room.persistence?.append('fcr', report);
 
-    // If overlaps detected, build and broadcast a conflict warning
     if (overlappingPaths.length > 0) {
-      this.broadcastFileConflictWarning(report.workspaceId, overlappingPaths);
+      this.broadcastFileConflictWarning(room, report.workspaceId, overlappingPaths);
     }
   }
 
-  /**
-   * Build a FileConflictWarning for the given workspace and overlapping paths,
-   * then broadcast it to all connected humans.
-   */
-  private broadcastFileConflictWarning(workspaceId: string, overlappingPaths: string[]): void {
-    if (!this.session) return;
-
-    // Deduplicate paths
+  private broadcastFileConflictWarning(room: SessionRoom, workspaceId: string, overlappingPaths: string[]): void {
     const uniquePaths = [...new Set(overlappingPaths)];
 
-    // Gather all deliveries involved in the conflicting paths
     const deliveryMap = new Map<string, { entry: FileTrackerEntry; paths: Set<string> }>();
 
     for (const normalizedPath of uniquePaths) {
       const key = this.fileTrackerKey(workspaceId, normalizedPath);
-      const entries = this.fileTracker.get(key);
+      const entries = room.fileTracker.get(key);
       if (!entries) continue;
 
       for (const entry of entries) {
@@ -1327,7 +1415,6 @@ export class CoordinationServer {
       }
     }
 
-    // Build the FileConflictDelivery array
     const conflictDeliveries: FileConflictDelivery[] = [];
     for (const [deliveryId, record] of deliveryMap) {
       conflictDeliveries.push({
@@ -1338,13 +1425,12 @@ export class CoordinationServer {
       });
     }
 
-    // Build a human-readable summary message
     const agentNames = conflictDeliveries.map(d => d.agentDisplayName);
     const message = `File conflict detected: ${agentNames.join(' and ')} are editing the same file(s): ${uniquePaths.join(', ')}`;
 
     const warning: FileConflictWarning = {
       conflictId: uuid(),
-      sessionId: this.session.sessionId,
+      sessionId: room.session.sessionId,
       workspaceId,
       filePaths: uniquePaths,
       deliveries: conflictDeliveries,
@@ -1352,26 +1438,21 @@ export class CoordinationServer {
       message,
     };
 
-    this.activeConflicts.set(warning.conflictId, warning);
-    this.persistence?.append('fconflict', warning);
+    room.activeConflicts.set(warning.conflictId, warning);
+    room.persistence?.append('fconflict', warning);
 
-    // Broadcast to all connected clients
-    this.broadcast({ type: 'fileConflictWarning', warning });
-    this.log(`File conflict warning: ${message}`);
+    this.broadcastToRoom(room, { type: 'fileConflictWarning', warning });
+    this.log(`[Room ${room.session.sessionNumber}] File conflict warning: ${message}`);
   }
 
-  /**
-   * Remove all file tracker entries associated with a given delivery.
-   * Called when a delivery reaches a terminal state.
-   */
-  private cleanupFileTrackerForDelivery(deliveryId: string): void {
+  private cleanupFileTrackerForDelivery(room: SessionRoom, deliveryId: string): void {
     const keysToDelete: string[] = [];
 
-    for (const [key, entries] of this.fileTracker) {
+    for (const [key, entries] of room.fileTracker) {
       for (const entry of entries) {
         if (entry.deliveryId === deliveryId) {
           entries.delete(entry);
-          break; // At most one entry per deliveryId per key
+          break;
         }
       }
       if (entries.size === 0) {
@@ -1380,68 +1461,65 @@ export class CoordinationServer {
     }
 
     for (const key of keysToDelete) {
-      this.fileTracker.delete(key);
+      room.fileTracker.delete(key);
     }
 
-    if (keysToDelete.length > 0 || this.fileTracker.size > 0) {
-      this.log(`File tracker cleanup for delivery ${deliveryId}: removed from ${keysToDelete.length} file(s), ${this.fileTracker.size} tracked file(s) remaining`);
+    if (keysToDelete.length > 0 || room.fileTracker.size > 0) {
+      this.log(`[Room ${room.session.sessionNumber}] File tracker cleanup for delivery ${deliveryId}: removed from ${keysToDelete.length} file(s), ${room.fileTracker.size} tracked file(s) remaining`);
     }
   }
 
   // -- Delta Context --
 
-  private getPromptFormatterDeps(): PromptFormatterDeps {
+  private getPromptFormatterDeps(room: SessionRoom): PromptFormatterDeps {
     return {
-      participants: this.participants,
-      transcript: this.transcript,
-      seenState: this.seenState,
-      renameEvents: this.renameEvents,
-      agentMode: this.session?.agentMode ?? 'execute',
+      participants: room.participants,
+      transcript: room.transcript,
+      seenState: room.seenState,
+      renameEvents: room.renameEvents,
+      agentMode: room.session.agentMode ?? 'execute',
     };
   }
 
-  private buildDeltaContext(agent: Participant, currentMessage: Message) {
-    return buildDeltaContextFn(agent, currentMessage, this.getPromptFormatterDeps());
+  private buildDeltaContext(room: SessionRoom, agent: Participant, currentMessage: Message) {
+    return buildDeltaContextFn(agent, currentMessage, this.getPromptFormatterDeps(room));
   }
 
   private formatAgentPrompt(
+    room: SessionRoom,
     agent: Participant,
     deltaContext: { startSeq: number; contextMessages: Message[]; renameNotices: string[] },
     currentMessage: Message,
   ): string {
-    return formatAgentPromptFn(agent, deltaContext, currentMessage, this.getPromptFormatterDeps());
-  }
-
-  private escapeXml(text: string): string {
-    return escapeXmlFn(text);
+    return formatAgentPromptFn(agent, deltaContext, currentMessage, this.getPromptFormatterDeps(room));
   }
 
   // -- Helpers --
 
-  private findClientForAgent(agent: Participant): ConnectedClient | undefined {
+  private findClientForAgent(room: SessionRoom, agent: Participant): ConnectedClient | undefined {
     for (const client of this.clients.values()) {
-      if (client.agentParticipantId === agent.participantId) {
+      if (client.sessionNumber === room.session.sessionNumber && client.agentParticipantId === agent.participantId) {
         return client;
       }
     }
     return undefined;
   }
 
-  private coalesceStreamingText(deliveryId: string, agentParticipantId: string, text: string): void {
-    const existing = this.streamCoalesceBuffers.get(deliveryId);
+  private coalesceStreamingText(room: SessionRoom, deliveryId: string, agentParticipantId: string, text: string): void {
+    const existing = room.streamCoalesceBuffers.get(deliveryId);
     if (existing) {
       existing.accumulated += text;
     } else {
-      this.streamCoalesceBuffers.set(deliveryId, { deliveryId, agentParticipantId, accumulated: text });
+      room.streamCoalesceBuffers.set(deliveryId, { deliveryId, agentParticipantId, accumulated: text });
     }
 
-    if (!this.streamCoalesceTimers.has(deliveryId)) {
-      this.streamCoalesceTimers.set(deliveryId, setTimeout(() => {
-        this.streamCoalesceTimers.delete(deliveryId);
-        const buffer = this.streamCoalesceBuffers.get(deliveryId);
+    if (!room.streamCoalesceTimers.has(deliveryId)) {
+      room.streamCoalesceTimers.set(deliveryId, setTimeout(() => {
+        room.streamCoalesceTimers.delete(deliveryId);
+        const buffer = room.streamCoalesceBuffers.get(deliveryId);
         if (buffer) {
-          this.streamCoalesceBuffers.delete(deliveryId);
-          this.broadcast({
+          room.streamCoalesceBuffers.delete(deliveryId);
+          this.broadcastToRoom(room, {
             type: 'agentStreamingText',
             deliveryId: buffer.deliveryId,
             agentParticipantId: buffer.agentParticipantId,
@@ -1452,16 +1530,16 @@ export class CoordinationServer {
     }
   }
 
-  private flushStreamingBuffer(deliveryId: string): void {
-    const timer = this.streamCoalesceTimers.get(deliveryId);
+  private flushStreamingBuffer(room: SessionRoom, deliveryId: string): void {
+    const timer = room.streamCoalesceTimers.get(deliveryId);
     if (timer) {
       clearTimeout(timer);
-      this.streamCoalesceTimers.delete(deliveryId);
+      room.streamCoalesceTimers.delete(deliveryId);
     }
-    const buffer = this.streamCoalesceBuffers.get(deliveryId);
+    const buffer = room.streamCoalesceBuffers.get(deliveryId);
     if (buffer) {
-      this.streamCoalesceBuffers.delete(deliveryId);
-      this.broadcast({
+      room.streamCoalesceBuffers.delete(deliveryId);
+      this.broadcastToRoom(room, {
         type: 'agentStreamingText',
         deliveryId: buffer.deliveryId,
         agentParticipantId: buffer.agentParticipantId,
@@ -1476,19 +1554,21 @@ export class CoordinationServer {
     }
   }
 
-  private broadcast(msg: ServerToClientMessage): void {
+  /** Broadcast a message to all clients in a specific room. */
+  private broadcastToRoom(room: SessionRoom, msg: ServerToClientMessage): void {
     const data = JSON.stringify(msg);
     for (const client of this.clients.values()) {
-      if (client.ws.readyState === WebSocket.OPEN) {
+      if (client.sessionNumber === room.session.sessionNumber && client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(data);
       }
     }
   }
 
-  private broadcastExcept(excludeWs: WebSocket, msg: ServerToClientMessage): void {
+  /** Broadcast to all clients in a room except the specified one. */
+  private broadcastToRoomExcept(room: SessionRoom, excludeWs: WebSocket, msg: ServerToClientMessage): void {
     const data = JSON.stringify(msg);
     for (const client of this.clients.values()) {
-      if (client.ws !== excludeWs && client.ws.readyState === WebSocket.OPEN) {
+      if (client.sessionNumber === room.session.sessionNumber && client.ws !== excludeWs && client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(data);
       }
     }

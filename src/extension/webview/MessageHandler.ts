@@ -1040,9 +1040,11 @@ export class MessageHandler {
    */
   private postCheckpointState(): void {
     if (!this.checkpointManager) return;
+    const state = this.checkpointManager.getState();
+    this.log(`[CP-DIAG] postCheckpointState: ${state.checkpoints.length} checkpoints, revertedToIndex=${state.revertedToIndex}, messageIds=[${state.checkpoints.map(c => c.messageId).join(',')}]`);
     this.webview.postMessage({
       type: 'checkpointState',
-      state: this.checkpointManager.getState(),
+      state,
     });
   }
 
@@ -4634,6 +4636,7 @@ export class MessageHandler {
    * path, so a duplicate call from the other path is a no-op.
    */
   captureCheckpointForToolBlock(toolName: string, rawInput: string, source: string = 'unknown'): void {
+    this.log(`[CP-DIAG] captureCheckpointForToolBlock called: tool="${toolName}" hasManager=${!!this.checkpointManager} isWriteTool=${CODE_WRITE_TOOLS.includes(toolName)} inputLen=${rawInput.length}`);
     if (!this.checkpointManager) return;
     if (!CODE_WRITE_TOOLS.includes(toolName)) return;
     // Extract file_path using regex first - rawInput may be truncated

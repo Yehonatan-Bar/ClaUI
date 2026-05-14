@@ -28,6 +28,7 @@ export class MultiParticipantClient extends EventEmitter {
 
   private humanParticipantId: string | null = null;
   private agentParticipantId: string | null = null;
+  private sessionNumber: number = 0;
   private lastSeenSeq = 0;
 
   private pingTimer: ReturnType<typeof setTimeout> | null = null;
@@ -47,9 +48,16 @@ export class MultiParticipantClient extends EventEmitter {
     return `${this.serverUrl}${separator}token=${encodeURIComponent(this.authToken)}`;
   }
 
-  setIdentity(humanId: string, agentId: string): void {
+  setIdentity(humanId: string, agentId: string, sessionNumber?: number): void {
     this.humanParticipantId = humanId;
     this.agentParticipantId = agentId;
+    if (sessionNumber != null) {
+      this.sessionNumber = sessionNumber;
+    }
+  }
+
+  setSessionNumber(num: number): void {
+    this.sessionNumber = num;
   }
 
   updateLastSeenSeq(seq: number): void {
@@ -163,6 +171,7 @@ export class MultiParticipantClient extends EventEmitter {
     if (this.humanParticipantId && this.agentParticipantId) {
       this.send({
         type: 'rejoinSession',
+        sessionNumber: this.sessionNumber,
         humanParticipantId: this.humanParticipantId,
         agentParticipantId: this.agentParticipantId,
         lastSeenSeq: this.lastSeenSeq,

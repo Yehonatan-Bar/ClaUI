@@ -16,6 +16,7 @@ export type MPFileChangeReportSource = 'tool-use' | 'snapshot';
 
 export interface MPSession {
   sessionId: string;
+  sessionNumber: number;
   name: string;
   createdAt: string;
   createdByParticipantId: string;
@@ -159,8 +160,9 @@ export interface MPReactionSummary {
 // -- Client -> Server --
 
 export type ClientToServerMessage =
-  | { type: 'joinSession'; humanName: string; agentName: string; agentProvider: MPAgentProvider; agentModel?: string; password?: string }
-  | { type: 'rejoinSession'; humanParticipantId: string; agentParticipantId: string; lastSeenSeq: number }
+  | { type: 'createSession'; sessionNumber: number; sessionName: string; humanName: string; agentName: string; agentProvider: MPAgentProvider; agentModel?: string; password?: string }
+  | { type: 'joinSession'; sessionNumber: number; humanName: string; agentName: string; agentProvider: MPAgentProvider; agentModel?: string; password?: string }
+  | { type: 'rejoinSession'; sessionNumber: number; humanParticipantId: string; agentParticipantId: string; lastSeenSeq: number }
   | { type: 'humanMessage'; rawBody: string }
   | { type: 'agentEvent'; deliveryId: string; event: AgentEventPayload }
   | { type: 'agentStatus'; status: MPParticipantStatus }

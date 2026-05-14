@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClaUi - Multi-Participant Sessions</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-dim: #58a6ff22;
+    --green: #3fb950;
+    --green-dim: #3fb95022;
+    --orange: #d29922;
+    --orange-dim: #d2992222;
+    --purple: #bc8cff;
+    --purple-dim: #bc8cff22;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 40px 20px;
+  }
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--accent);
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 15px;
+    margin-bottom: 40px;
+  }
+  .role-section {
+    margin-bottom: 48px;
+  }
+  .role-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .role-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 18px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .role-badge.creator {
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid var(--green);
+  }
+  .role-badge.joiner {
+    background: var(--purple-dim);
+    color: var(--purple);
+    border: 1px solid var(--purple);
+  }
+  .role-title {
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .role-desc {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .prereq {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+  }
+  .prereq-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--orange);
+    margin-bottom: 8px;
+  }
+  .prereq ul {
+    list-style: none;
+    padding: 0;
+  }
+  .prereq li {
+    padding: 4px 0;
+    font-size: 14px;
+  }
+  .prereq li::before {
+    content: "\2022";
+    color: var(--orange);
+    margin-right: 8px;
+    font-weight: bold;
+  }
+  .step {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .step-num {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+  .step-content {
+    flex: 1;
+  }
+  .step-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .step-detail {
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .step-detail strong {
+    color: var(--text);
+  }
+  .highlight {
+    display: inline-block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 8px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    color: var(--accent);
+  }
+  .info-box {
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .info-box.warn {
+    background: var(--orange-dim);
+    border-color: var(--orange);
+  }
+  .separator {
+    border: none;
+    border-top: 1px dashed var(--border);
+    margin: 40px 0;
+  }
+  .share-box {
+    background: var(--green-dim);
+    border: 1px solid var(--green);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .share-box strong {
+    color: var(--green);
+  }
+  .settings-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  .settings-table th, .settings-table td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .settings-table th {
+    background: var(--surface);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .messaging-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 40px;
+  }
+  .messaging-section h3 {
+    font-size: 18px;
+    margin-bottom: 12px;
+    color: var(--accent);
+  }
+  .msg-example {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    font-size: 14px;
+  }
+  .msg-example .arrow {
+    color: var(--green);
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+  .msg-example .desc {
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>ClaUi - Multi-Participant Sessions</h1>
+  <p class="subtitle">User guide: how to create or join a shared session with AI agents</p>
+
+  <!-- ==================== CREATOR ==================== -->
+  <div class="role-section">
+    <div class="role-header">
+      <div class="role-badge creator">1</div>
+      <div>
+        <div class="role-title">First User - Session Creator</div>
+        <div class="role-desc">The person who opens the session and invites others to join</div>
+      </div>
+    </div>
+
+    <div class="prereq">
+      <div class="prereq-title">Prerequisites</div>
+      <ul>
+        <li>ClaUi extension installed in VS Code</li>
+        <li>Access to the coordination server (URL and auth token from your admin)</li>
+      </ul>
+    </div>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">Configure Server Connection (one-time setup)</div>
+        <div class="step-detail">
+          Open VS Code settings:<br>
+          <span class="highlight">Ctrl+Shift+P</span> &rarr;
+          <span class="highlight">Preferences: Open Settings (JSON)</span><br>
+          Add the following entries:
+        </div>
+        <table class="settings-table">
+          <tr>
+            <th>Setting</th>
+            <th>Value</th>
+          </tr>
+          <tr>
+            <td><span class="highlight">claudeMirror.multiParticipant.serverUrl</span></td>
+            <td>The server URL you received (e.g. <span class="highlight">wss://server.com/mp</span>)</td>
+          </tr>
+          <tr>
+            <td><span class="highlight">claudeMirror.multiParticipant.authToken</span></td>
+            <td>The shared secret token from your admin</td>
+          </tr>
+          <tr>
+            <td><span class="highlight">claudeMirror.multiParticipant.defaultHumanName</span></td>
+            <td>Your display name (e.g. "Alice")</td>
+          </tr>
+        </table>
+        <div class="info-box">
+          This is a one-time setup. Once entered, these settings are saved and you won't need to enter them again.
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">Create a New Session</div>
+        <div class="step-detail">
+          <span class="highlight">Ctrl+Shift+P</span> &rarr;
+          <strong>ClaUi: Create Multi-Participant Session</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">Fill In the Details</div>
+        <div class="step-detail">
+          VS Code will prompt you for:
+          <ul style="margin-top: 8px; padding-left: 20px;">
+            <li><strong>Your name</strong> - How you'll appear in the chat (e.g. "Alice")</li>
+            <li><strong>Agent name</strong> - What your AI agent will be called (e.g. "Claude")</li>
+            <li><strong>Session name</strong> - Topic of the session (e.g. "Code Review", "Sprint Planning")</li>
+            <li><strong>Session number</strong> - A unique number to identify this session (e.g. 42)</li>
+            <li><strong>Password</strong> - Optional, to protect the session from uninvited participants</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">Session Opens</div>
+        <div class="step-detail">
+          A new tab opens in VS Code with the session name as the title. You'll see the session number as a badge (e.g. <strong>#42</strong>) and a green connection indicator.
+        </div>
+      </div>
+    </div>
+
+    <div class="share-box">
+      <strong>Share with other participants:</strong><br>
+      Send them the <strong>session number</strong> (e.g. 42) and the <strong>password</strong> (if you set one). They only need the number to join.
+    </div>
+  </div>
+
+  <hr class="separator">
+
+  <!-- ==================== JOINER ==================== -->
+  <div class="role-section">
+    <div class="role-header">
+      <div class="role-badge joiner">2</div>
+      <div>
+        <div class="role-title">Second User - Joining an Existing Session</div>
+        <div class="role-desc">Someone who received a session number and wants to join</div>
+      </div>
+    </div>
+
+    <div class="prereq">
+      <div class="prereq-title">What You Need</div>
+      <ul>
+        <li>ClaUi extension installed in VS Code</li>
+        <li>Server URL and auth token (same details as the first user)</li>
+        <li>The session number from the session creator</li>
+        <li>The session password (if one was set)</li>
+      </ul>
+    </div>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">Configure Server Connection (one-time setup)</div>
+        <div class="step-detail">
+          Same as the first user - open VS Code settings and enter the server URL, auth token, and your name. See the settings table in the section above.
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">Join the Session</div>
+        <div class="step-detail">
+          <span class="highlight">Ctrl+Shift+P</span> &rarr;
+          <strong>ClaUi: Join Multi-Participant Session</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">Fill In the Details</div>
+        <div class="step-detail">
+          VS Code will prompt you for:
+          <ul style="margin-top: 8px; padding-left: 20px;">
+            <li><strong>Your name</strong> - How you'll appear in the chat</li>
+            <li><strong>Agent name</strong> - What your AI agent will be called</li>
+            <li><strong>Session number</strong> - The number you received from the session creator</li>
+            <li><strong>Password</strong> - If the session is password-protected</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">Session Opens</div>
+        <div class="step-detail">
+          A tab opens with the session name. You'll see all previous messages and the list of participants in the sidebar.
+        </div>
+      </div>
+    </div>
+
+    <div class="info-box warn">
+      If you see "No session found" - double-check the session number and make sure the creator has already opened the session.
+      If you see "Invalid session password" - verify the password with the session creator.
+    </div>
+  </div>
+
+  <hr class="separator">
+
+  <!-- ==================== MESSAGING ==================== -->
+  <div class="messaging-section">
+    <h3>How to Send Messages</h3>
+    <p style="color: var(--muted); font-size: 14px; margin-bottom: 16px;">
+      Once everyone is connected, all participants see messages in real time.
+    </p>
+
+    <div class="msg-example">
+      <span class="arrow">&rarr;</span>
+      <div>
+        <strong>Regular message:</strong> Just type text - all humans in the session will see it.<br>
+        <span class="desc">Agents won't receive the message unless you address them by name.</span>
+      </div>
+    </div>
+
+    <div class="msg-example">
+      <span class="arrow">&rarr;</span>
+      <div>
+        <strong>Address an agent:</strong> Start with the agent's name.<br>
+        <span class="desc">Example: <span class="highlight">Claude check this file</span> - sends a prompt to the Claude agent.</span>
+      </div>
+    </div>
+
+    <div class="msg-example">
+      <span class="arrow">&rarr;</span>
+      <div>
+        <strong>Shorthand:</strong> Use the first letter + colon.<br>
+        <span class="desc">Example: <span class="highlight">C: check this file</span> - shortcut to address Claude.</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

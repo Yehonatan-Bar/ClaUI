@@ -832,7 +832,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
    *  the spawn (e.g. snapshot persistence) still return the correct id.
    *  The actual spawn happens the first time the user focuses this tab
    *  after armLazyWake() is called. */
-  prepareForLazyResume(sessionId: string): void {
+  prepareForLazyResume(sessionId: string, nameHint?: string): void {
     if (this.disposed) {
       return;
     }
@@ -840,6 +840,9 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.lazyWakeArmed = false;
     this.threadId = sessionId;
     this.restoreSessionName(sessionId);
+    if (nameHint && this.baseTitle === `Codex ${this.tabNumber}`) {
+      this.setTabName(nameHint);
+    }
     this.log(
       `[Codex Tab ${this.tabNumber}] Lazy-resume prepared for thread ${sessionId.slice(0, 8)}; CLI will spawn on first user focus.`,
     );

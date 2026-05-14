@@ -702,6 +702,25 @@ export class TabManager {
       this.snapshotDebounceTimer = null;
     }
 
+    // Last-chance sessionId refresh from live tabs
+    for (const [tabId, tab] of this.tabs.entries()) {
+      const entry = this.snapshotEntries.get(tabId);
+      if (entry && !entry.sessionId) {
+        const sid = tab.sessionId;
+        if (sid) {
+          entry.sessionId = sid;
+          entry.savedAt = new Date().toISOString();
+        }
+      }
+    }
+
+    // Assign visual order before final snapshot
+    let order = 0;
+    for (const entry of this.snapshotEntries.values()) {
+      if (!entry.sessionId && entry.tabKind !== 'search') continue;
+      entry.tabOrder = order++;
+    }
+
     // Capture the snapshot BEFORE disposing any tabs so it reflects the
     // currently-open set, not the post-disposal empty state.
     const finalSnapshot = this.buildSnapshot();
@@ -926,6 +945,10 @@ export class TabManager {
 
   private handleTabFocused(tabId: string): void {
     this.activeTabId = tabId;
+    const entry = this.snapshotEntries.get(tabId);
+    if (entry) {
+      entry.lastFocusedAt = new Date().toISOString();
+    }
     this.schedulePersistSnapshot();
     this.log(`Tab focused: ${tabId}`);
     this.broadcastTabsState();
@@ -956,6 +979,8 @@ export class TabManager {
     }
     entry.sessionId = sessionId;
     entry.savedAt = new Date().toISOString();
+    const preservedKey = `preserved-${sessionId}`;
+    this.snapshotEntries.delete(preservedKey);
     this.schedulePersistSnapshot();
   }
 
@@ -1080,12 +1105,25 @@ export class TabManager {
         return true;
       });
 
-    entries.sort((a, b) => a.tabNumber - b.tabNumber);
+    const maxRestore = vscode.workspace
+      .getConfiguration('claudeMirror')
+      .get<number>('restoreSessionsMaxTabs', TabManager.MAX_RESTORE);
 
-    const truncated = entries.length > TabManager.MAX_RESTORE;
-    if (truncated) {
-      entries = entries.slice(0, TabManager.MAX_RESTORE);
+    let truncated = false;
+    if (entries.length > maxRestore) {
+      truncated = true;
+      entries.sort((a, b) => {
+        const tA = a.lastFocusedAt ? new Date(a.lastFocusedAt).getTime() : 0;
+        const tB = b.lastFocusedAt ? new Date(b.lastFocusedAt).getTime() : 0;
+        return tB - tA;
+      });
+      const activeIdx = entries.findIndex(e => e.sessionId === snapshot.activeSessionId);
+      if (activeIdx > maxRestore - 1) {
+        [entries[maxRestore - 1], entries[activeIdx]] = [entries[activeIdx], entries[maxRestore - 1]];
+      }
+      entries = entries.slice(0, maxRestore);
     }
+    entries.sort((a, b) => (a.tabOrder ?? a.tabNumber) - (b.tabOrder ?? b.tabNumber));
 
     if (entries.length === 0) {
       this.log('[OpenTabsSnapshot] All snapshot entries filtered out');
@@ -1199,7 +1237,7 @@ export class TabManager {
               } else {
                 // Lazy: panel + UI ready, but the CLI process is deferred
                 // until the user actually focuses this tab.
-                tab.prepareForLazyResume(entry.sessionId);
+                tab.prepareForLazyResume(entry.sessionId, entry.customName);
                 lazyTabs.push(tab);
               }
               restored++;
@@ -1277,20 +1315,42 @@ export class TabManager {
           tab instanceof SessionTab ? (tab.getCliPathOverride() ?? undefined) : undefined,
         workspacePath: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
         savedAt: new Date().toISOString(),
+        customName: original?.customName,
         groupId: original?.groupId,
         orderInGroup: original?.orderInGroup,
         tabKind,
         searchModel: tabKind === 'search' ? originalSearch?.searchModel : undefined,
+        lastFocusedAt: original?.lastFocusedAt,
+        tabOrder: original?.tabOrder,
       });
       this.applyEffectiveTabIcon(tab.id);
     }
+
+    // Carry forward UNRESTORED entries from the original snapshot so they
+    // survive partial restores and can be reopened later.
+    const restoredSessionIds = new Set<string>();
+    for (const tab of this.tabs.values()) {
+      if (tab.sessionId) restoredSessionIds.add(tab.sessionId);
+    }
+    let preservedCount = 0;
+    const MAX_PRESERVED = 50;
+    for (const originalEntry of snapshot.entries) {
+      if (originalEntry.tabKind === 'search') continue;
+      if (!originalEntry.sessionId) continue;
+      if (restoredSessionIds.has(originalEntry.sessionId)) continue;
+      if (preservedCount >= MAX_PRESERVED) break;
+      const preservedKey = `preserved-${originalEntry.sessionId}`;
+      this.snapshotEntries.set(preservedKey, originalEntry);
+      preservedCount++;
+    }
+
     void this.persistSnapshotNow();
     this.treeChangeEmitter.fire();
     this.broadcastTabsState();
 
     if (truncated) {
       void vscode.window.showInformationMessage(
-        `ClaUi restored the ${TabManager.MAX_RESTORE} most recent sessions. Older sessions can be reopened from Conversation History (Ctrl+Shift+H).`
+        `ClaUi restored the ${maxRestore} most recent sessions. Older sessions can be reopened from Conversation History (Ctrl+Shift+H).`
       );
     }
     if (failed > 0) {

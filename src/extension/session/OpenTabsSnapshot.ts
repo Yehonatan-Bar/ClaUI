@@ -17,6 +17,10 @@ export interface OpenTabSnapshotEntry {
   tabKind?: 'chat' | 'search';
   /** Model selected for a Smart Search tab (used to re-spawn the agent on restore). */
   searchModel?: string;
+  /** ISO timestamp — when the tab was last focused (used to pick most-recent tabs on truncation). */
+  lastFocusedAt?: string;
+  /** Explicit visual position (0-based), assigned on shutdown for stable restore order. */
+  tabOrder?: number;
 }
 
 export interface OpenTabsSnapshot {
