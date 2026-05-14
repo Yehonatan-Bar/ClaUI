@@ -1522,7 +1522,6 @@ export class SessionTab implements WebviewBridge {
         } else if (inner.type === 'content_block_start') {
           const block = (inner as import('../types/stream-json').ContentBlockStart).content_block;
           const idx = (inner as import('../types/stream-json').ContentBlockStart).index;
-          tabLog(`[CP-DIAG] content_block_start idx=${idx} type=${block.type} name=${block.name || 'none'}`);
           if (block.type === 'tool_use' && block.name) {
             cpToolNames.set(idx, block.name);
             cpToolInputs.set(idx, '');
@@ -1537,7 +1536,6 @@ export class SessionTab implements WebviewBridge {
         } else if (inner.type === 'content_block_stop') {
           const idx = (inner as import('../types/stream-json').ContentBlockStop).index;
           const toolName = cpToolNames.get(idx);
-          tabLog(`[CP-DIAG] content_block_stop idx=${idx} toolName=${toolName || 'none'} inputLen=${(cpToolInputs.get(idx) || '').length}`);
           if (toolName) {
             const rawInput = cpToolInputs.get(idx) || '';
             this.messageHandler.captureCheckpointForToolBlock(toolName, rawInput, 'wireProcessEvents');

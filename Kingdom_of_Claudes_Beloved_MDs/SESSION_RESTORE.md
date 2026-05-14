@@ -38,6 +38,12 @@ interface OpenTabSnapshotEntry {
   cliPathOverride?: string;     // set for remote (Happy) tabs
   workspacePath?: string;       // used to filter cross-workspace leaks
   savedAt: string;              // ISO
+  groupId?: string;             // Folder this tab belongs to (TabGroupStore id)
+  orderInGroup?: number;        // Sibling order within its parent
+  tabKind?: 'chat' | 'search';  // 'chat' is default; 'search' is Smart Search
+  searchModel?: string;         // Model for Smart Search tabs
+  lastFocusedAt?: string;       // ISO timestamp — when tab was last focused (for selection on truncation)
+  tabOrder?: number;            // Explicit visual position (0-based), assigned on shutdown for stable order
 }
 
 interface OpenTabsSnapshot {
@@ -63,15 +69,20 @@ interface OpenTabsSnapshot {
 
 1. Read the snapshot from `workspaceState`.
 2. Filter entries: drop those without a `sessionId`, drop those whose `workspacePath` does not match the current workspace, de-duplicate by `sessionId`.
-3. Sort by the original `tabNumber` (colors cycle mod the palette, so ordering preserves the visual layout).
-4. Truncate to `MAX_RESTORE = 10` tabs; show an information toast if truncated.
+3. **Select tabs to restore** (if more than max):
+   - Read `claudeMirror.restoreSessionsMaxTabs` setting (default 15, configurable 1–50).
+   - Sort entries by `lastFocusedAt` (descending, most recent first) to identify the most-used tabs.
+   - **Guarantee active tab inclusion**: If `snapshot.activeSessionId` falls outside the kept set, swap it into position.
+   - Keep the top N entries by recency, then re-sort by `tabOrder` (or fallback `tabNumber`) for creation order.
+   - Show an information toast if truncated.
+4. **Preserve unrestored entries**: After this restore cycle, tabs that were not restored survive in the snapshot as `preserved-{sessionId}` keys (preserved up to 50 entries), so they can be manually reopened later without losing their metadata. Preserved entries are cleared when the corresponding tab is manually re-opened via `handleSessionIdAssigned`.
 5. **Crash-loop check**: if the workspace flag `claudeMirror.restoreInProgress` is still `true` from a previous launch, the previous restore did not complete cleanly. The flag is cleared, auto-restore is skipped, and the user is shown a warning toast with a `Restore now` button that re-invokes `restoreFromSnapshot({ force: true })`.
 6. Set `restoreInProgress = true` for the duration of the loop (cleared in `finally`).
 7. Inside `vscode.window.withProgress`, restore each entry **serially**:
    - `tabManager.createTabForProvider(entry.provider, restoreColumn)` creates the tab. `restoreColumn` is `undefined` for the first iteration; after the first tab is created, its actual `panel.viewColumn` (or `ViewColumn.Two` if not yet resolved) is captured and reused for every subsequent restore so all panels stack into a single editor column. Without this pin, each `Beside` call would treat the just-created panel as the active editor and split into a new column, scattering the restored tabs across the editor area.
    - For `remote`, the live `claudeMirror.happy.cliPath` setting wins over the snapshot value in case the CLI moved; snapshot value is the fallback.
    - **If the entry matches `snapshot.activeSessionId`** → `await tab.startSession({ resume: entry.sessionId })` (eager spawn so the user lands on a working session).
-   - **Otherwise** → `tab.prepareForLazyResume(entry.sessionId)` (lazy: panel is created, tab name is restored, `sessionId` is seeded into the process manager, but the CLI process is **not** spawned). The tab is added to a `lazyTabs` collection.
+   - **Otherwise** → `tab.prepareForLazyResume(entry.sessionId, entry.customName)` (lazy: panel is created, tab name is restored, `sessionId` is seeded into the process manager, but the CLI process is **not** spawned). If the tab name could not be restored from the session store (still showing default like `ClaUi 1`), the snapshot's `customName` is applied as a fallback. The tab is added to a `lazyTabs` collection.
    - Per-tab failures are caught, logged, and counted but do not abort the batch.
 8. If `snapshot.activeSessionId` maps to a restored tab, call `tab.reveal()` to re-focus it.
 9. After reveal, schedule `armLazyWake()` on every lazy tab via `setTimeout(0)` so any view-state-active events caused by panel creation and reveal have already flushed before user-driven focus is allowed to wake a lazy tab.
@@ -79,10 +90,11 @@ interface OpenTabsSnapshot {
 
 ### Lazy resume (per non-active tab)
 
-`SessionTab.prepareForLazyResume(sessionId)` and `CodexSessionTab.prepareForLazyResume(sessionId)`:
+`SessionTab.prepareForLazyResume(sessionId, nameHint?)` and `CodexSessionTab.prepareForLazyResume(sessionId, nameHint?)`:
 - Set `pendingResumeSessionId = sessionId`, `lazyWakeArmed = false`.
 - Seed the underlying process manager / `threadId` so `tab.sessionId` returns the correct id even before the CLI spawns (this keeps snapshot persistence accurate).
 - Call the existing `restoreSessionName(sessionId)` so the tab title shows the right name immediately.
+- **Fallback name restoration**: If the tab title is still at its default (e.g., `ClaUi 1`, `Codex 1`), apply the snapshot's `customName` (passed via `nameHint`). This handles the case where the SessionStore didn't have the name cached and ensures the user's chosen name survives restore cycles.
 - Do **not** spawn the CLI process or load conversation history.
 
 `armLazyWake()` flips `lazyWakeArmed = true` if a pending sessionId is set. It is called once by `TabManager.restoreFromSnapshot` after the restore loop and active-tab reveal have completed.
@@ -109,7 +121,9 @@ This prevents double-opening on first install while letting the feature "just wo
 |------|----------|
 | Workspace changed since save | Entries with a mismatched `workspacePath` are filtered out |
 | Session JSONL deleted from disk | `--resume` errors → caught per-entry; summary toast reports `restored X of Y` |
-| More than 10 tabs were open | Hard cap; oldest (lowest `tabNumber`) entries are restored; info toast |
+| More than max tabs (default 15) | Selects most recently focused tabs; rest are preserved as `preserved-{sessionId}` for manual reopen; info toast |
+| Active tab would be truncated | Swapped into the kept set to guarantee it's always restored |
+| Tab name lost from SessionStore | Fallback to snapshot's `customName` (passed via `nameHint` to `prepareForLazyResume`) |
 | Duplicate sessionIds | De-duped before spawning |
 | Remote (Happy) CLI path changed | Live setting wins over the snapshot value |
 | VS Code crash (no graceful shutdown) | Debounced writes already captured recent state |
@@ -134,11 +148,19 @@ The callbacks are optional so existing consumers of `SessionTabCallbacks` (outsi
 
 `DiagnosticsCollector.ts` includes `restoreSessionsOnStartup` in the `ClaUi Settings` section so bug reports show whether the feature is enabled.
 
-## Constants
+## Constants & Settings
 
-| Constant | Value | Meaning |
-|----------|-------|---------|
-| `SNAPSHOT_DEBOUNCE_MS` | 500 | How long tab changes coalesce before writing the snapshot |
-| `MAX_RESTORE` | 10 | Hard cap on tabs restored per startup |
+| Item | Value/Default | Meaning |
+|------|---|---------|
+| `SNAPSHOT_DEBOUNCE_MS` | 500 ms | How long tab changes coalesce before writing the snapshot |
+| `claudeMirror.restoreSessionsMaxTabs` | 15 (range 1–50) | Configurable max tabs restored per startup (reads from workspace settings) |
+| `MAX_PRESERVED_ENTRIES` | 50 | Cap on preserved (unrestored) entries to prevent unbounded growth |
 | `STORAGE_KEY` | `claudeMirror.openTabsSnapshot` | `workspaceState` Memento key for the snapshot |
 | `RESTORE_IN_PROGRESS_KEY` | `claudeMirror.restoreInProgress` | `workspaceState` Memento key for the crash-loop breaker flag |
+
+## New fields in OpenTabSnapshotEntry
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `lastFocusedAt` | string (ISO) | When the tab was last focused; used to select most-recent tabs on truncation |
+| `tabOrder` | number | Explicit visual position (0-based), assigned on shutdown for stable restore order |

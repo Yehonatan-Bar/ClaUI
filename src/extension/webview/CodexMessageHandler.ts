@@ -1773,17 +1773,29 @@ export class CodexMessageHandler {
 
     const resolvedPath = await this.resolveOpenFilePath(parsed.filePath);
     const uri = vscode.Uri.file(resolvedPath);
-    const openOptions: vscode.TextDocumentShowOptions = {};
+    const showOptions: vscode.TextDocumentShowOptions = {};
     if (parsed.line !== undefined) {
       const line = Math.max(1, parsed.line);
       const col = Math.max(1, parsed.col ?? 1);
       const pos = new vscode.Position(line - 1, col - 1);
-      openOptions.selection = new vscode.Range(pos, pos);
+      showOptions.selection = new vscode.Range(pos, pos);
     }
-    void vscode.commands.executeCommand('vscode.open', uri, openOptions).then(
-      () => this.log(`Opened file (Codex handler): ${resolvedPath}${parsed.line ? `:${parsed.line}` : ''}`),
-      (err) => this.log(`Failed to open file (Codex handler): ${this.errMsg(err)}`)
-    );
+
+    const layout = vscode.workspace.getConfiguration('claudeMirror.tabs').get<string>('layout', 'horizontal');
+    if (layout === 'vertical') {
+      showOptions.viewColumn = vscode.ViewColumn.Beside;
+      showOptions.preserveFocus = true;
+    }
+
+    try {
+      const doc = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(doc, showOptions);
+      this.log(`Opened file (Codex handler): ${resolvedPath}${parsed.line ? `:${parsed.line}` : ''}`);
+    } catch {
+      await vscode.commands.executeCommand('vscode.open', uri,
+        layout === 'vertical' ? vscode.ViewColumn.Beside : undefined);
+      this.log(`Opened file (Codex non-text fallback): ${resolvedPath}`);
+    }
   }
 
   private handleOpenUrl(url: string): void {

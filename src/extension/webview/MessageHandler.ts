@@ -1041,7 +1041,6 @@ export class MessageHandler {
   private postCheckpointState(): void {
     if (!this.checkpointManager) return;
     const state = this.checkpointManager.getState();
-    this.log(`[CP-DIAG] postCheckpointState: ${state.checkpoints.length} checkpoints, revertedToIndex=${state.revertedToIndex}, messageIds=[${state.checkpoints.map(c => c.messageId).join(',')}]`);
     this.webview.postMessage({
       type: 'checkpointState',
       state,
@@ -3562,18 +3561,29 @@ export class MessageHandler {
 
     const resolvedPath = await this.resolveOpenFilePath(parsed.filePath);
     const uri = vscode.Uri.file(resolvedPath);
-    const openOptions: vscode.TextDocumentShowOptions = {};
+    const showOptions: vscode.TextDocumentShowOptions = {};
     if (parsed.line !== undefined) {
       const line = Math.max(1, parsed.line);
       const col = Math.max(1, parsed.col ?? 1);
       const pos = new vscode.Position(line - 1, col - 1);
-      openOptions.selection = new vscode.Range(pos, pos);
+      showOptions.selection = new vscode.Range(pos, pos);
     }
 
-    vscode.commands.executeCommand('vscode.open', uri, openOptions).then(
-      () => this.log(`Opened file: ${resolvedPath}${parsed.line ? `:${parsed.line}` : ''}`),
-      (err) => this.log(`Failed to open file: ${err}`)
-    );
+    const layout = vscode.workspace.getConfiguration('claudeMirror.tabs').get<string>('layout', 'horizontal');
+    if (layout === 'vertical') {
+      showOptions.viewColumn = vscode.ViewColumn.Beside;
+      showOptions.preserveFocus = true;
+    }
+
+    try {
+      const doc = await vscode.workspace.openTextDocument(uri);
+      await vscode.window.showTextDocument(doc, showOptions);
+      this.log(`Opened file: ${resolvedPath}${parsed.line ? `:${parsed.line}` : ''}`);
+    } catch {
+      await vscode.commands.executeCommand('vscode.open', uri,
+        layout === 'vertical' ? vscode.ViewColumn.Beside : undefined);
+      this.log(`Opened file (non-text fallback): ${resolvedPath}`);
+    }
   }
 
   /** Open a URL in the user's default external browser */
@@ -4636,7 +4646,6 @@ export class MessageHandler {
    * path, so a duplicate call from the other path is a no-op.
    */
   captureCheckpointForToolBlock(toolName: string, rawInput: string, source: string = 'unknown'): void {
-    this.log(`[CP-DIAG] captureCheckpointForToolBlock called: tool="${toolName}" hasManager=${!!this.checkpointManager} isWriteTool=${CODE_WRITE_TOOLS.includes(toolName)} inputLen=${rawInput.length}`);
     if (!this.checkpointManager) return;
     if (!CODE_WRITE_TOOLS.includes(toolName)) return;
     // Extract file_path using regex first - rawInput may be truncated

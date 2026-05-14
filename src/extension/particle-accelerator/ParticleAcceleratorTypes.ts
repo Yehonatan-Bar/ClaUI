@@ -29,6 +29,10 @@ export interface ParticleAcceleratorTrace {
     filteredStderrBytes: number;
     estimatedTokensSaved: number;
     compressionRatio: number;
+    rawLines: number;
+    filteredLines: number;
+    rawWords: number;
+    filteredWords: number;
   };
   filter: {
     name: string;
@@ -58,6 +62,9 @@ export interface ParticleAcceleratorTraceSummary {
   estimatedTokensSaved: number;
   filterName: string;
   redactions: number;
+  rulesTriggered: string[];
+  rawLines: number;
+  filteredLines: number;
 }
 
 export interface ParticleAcceleratorStatus {
@@ -80,6 +87,11 @@ export interface ParticleAcceleratorAggregate {
   avgCompressionRatio: number;
   avgDurationMs: number;
   totalRedactions: number;
+  totalRawLines: number;
+  totalFilteredLines: number;
+  totalRawWords: number;
+  totalFilteredWords: number;
+  secretTypeBreakdown: Array<{ secretType: string; count: number }>;
   topCommandFamilies: Array<{ family: string; count: number; tokensSaved: number }>;
   topFilters: Array<{ filter: string; count: number }>;
   providerBreakdown: Record<string, { count: number; tokensSaved: number }>;

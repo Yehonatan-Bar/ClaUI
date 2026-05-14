@@ -151,8 +151,8 @@ All in `src/webview/components/ParticleAccelerator/`.
 
 - **ParticleAcceleratorStatusBadge**: Renders in the StatusBar right section. Green/red dot + summary text (command count, tokens saved). Hidden when Particle Accelerator is disabled.
 - **ParticleAcceleratorSettingsPanel**: Enable/disable toggle, version/node info, hook install/uninstall buttons, clear data, refresh. Rendered in VitalsInfoPanel and Dashboard ParticleAccelerator tab.
-- **ParticleAcceleratorTracePanel**: Full dashboard with 6 overview stat cards (commands + failed, tokens saved, compression, data volume, avg duration, secrets redacted), provider breakdown (Claude vs Codex), top command families bar chart, top filters bar chart, and recent traces list (expandable, initially 10, up to 100).
-- **ParticleAcceleratorTraceDetail**: Single trace card with command family, provider badge (color-coded Claude/Codex), timestamp, exit code (red-highlighted on failure), duration, compression, token savings, redaction count, filter name.
+- **ParticleAcceleratorTracePanel**: Value-first dashboard layout with three sections: (1) **Data Filtered hero** - prominent blue-bordered card showing tokens saved, words filtered, and lines filtered with raw totals, plus compression ratio and byte savings summary; (2) **Secret Protection** - yellow-bordered card showing total redactions and a pill-badge breakdown by secret type (GitHub PAT, JWT, AWS Key, etc.) with friendly labels from `SECRET_TYPE_LABELS` map; (3) **Operations overview** - 3-column grid (commands, avg duration, data volume), followed by provider breakdown, top command families bar chart, top filters bar chart, and recent traces list (expandable, initially 10, up to 100).
+- **ParticleAcceleratorTraceDetail**: Single trace card with command family, provider badge (color-coded Claude/Codex), timestamp, exit code (red-highlighted on failure), duration, compression, token savings, lines saved, redaction count with secret type labels (short form from `SECRET_TYPE_SHORT` map), filter name.
 
 ## Data Flow (Extension <-> Webview)
 
@@ -162,7 +162,7 @@ WebviewToExtension messages:
 ExtensionToWebview messages:
 - `particleAcceleratorStatus` / `particleAcceleratorTraceUpdate` / `particleAcceleratorAggregateUpdate` / `particleAcceleratorRecentTraces` / `particleAcceleratorError`
 
-Zustand store fields: `particleAcceleratorEnabled`, `particleAcceleratorStatus`, `particleAcceleratorAggregate` (full aggregate with all 11 fields: totalCommands, failedCommands, totalRawBytes, totalFilteredBytes, totalEstimatedTokensSaved, avgCompressionRatio, avgDurationMs, totalRedactions, topCommandFamilies, topFilters, providerBreakdown), `particleAcceleratorRecentTraces`, `particleAcceleratorError`. Setters: `addParticleAcceleratorTrace` (prepend + cap at 100), `setParticleAcceleratorRecentTraces` (batch replace from extension).
+Zustand store fields: `particleAcceleratorEnabled`, `particleAcceleratorStatus`, `particleAcceleratorAggregate` (full aggregate with 16 fields: totalCommands, failedCommands, totalRawBytes, totalFilteredBytes, totalEstimatedTokensSaved, avgCompressionRatio, avgDurationMs, totalRedactions, totalRawLines, totalFilteredLines, totalRawWords, totalFilteredWords, secretTypeBreakdown, topCommandFamilies, topFilters, providerBreakdown), `particleAcceleratorRecentTraces` (each trace includes rulesTriggered, rawLines, filteredLines), `particleAcceleratorError`. Setters: `addParticleAcceleratorTrace` (prepend + cap at 100), `setParticleAcceleratorRecentTraces` (batch replace from extension).
 
 ## Store Directory Layout
 

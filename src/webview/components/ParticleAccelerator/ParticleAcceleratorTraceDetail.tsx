@@ -1,3 +1,21 @@
+const SECRET_TYPE_SHORT: Record<string, string> = {
+  'env-value': 'Env',
+  'github-classic-pat': 'GitHub PAT',
+  'github-fine-grained': 'GitHub PAT',
+  'aws-access-key': 'AWS Key',
+  'aws-secret-key': 'AWS Secret',
+  'jwt': 'JWT',
+  'openai-key': 'OpenAI',
+  'anthropic-key': 'Anthropic',
+  'slack-token': 'Slack',
+  'stripe-key': 'Stripe',
+  'google-api-key': 'Google',
+  'private-key-block': 'PEM Key',
+  'basic-auth-url': 'Auth URL',
+  'db-url-creds': 'DB Creds',
+  'bearer-token': 'Bearer',
+};
+
 export function ParticleAcceleratorTraceDetail({ trace }: { trace: {
   traceId: string;
   timestamp: string;
@@ -10,10 +28,15 @@ export function ParticleAcceleratorTraceDetail({ trace }: { trace: {
   estimatedTokensSaved: number;
   filterName: string;
   redactions: number;
+  rulesTriggered?: string[];
+  rawLines?: number;
+  filteredLines?: number;
 } }) {
   const ratio = trace.rawBytes > 0 ? (trace.rawBytes / (trace.filteredBytes || 1)).toFixed(1) : '1.0';
   const durationSec = (trace.durationMs / 1000).toFixed(1);
   const failed = trace.exitCode !== null && trace.exitCode !== 0;
+  const rules = trace.rulesTriggered ?? [];
+  const linesSaved = (trace.rawLines ?? 0) - (trace.filteredLines ?? 0);
 
   return (
     <div style={{
@@ -51,7 +74,17 @@ export function ParticleAcceleratorTraceDetail({ trace }: { trace: {
         <span>{durationSec}s</span>
         <span>{ratio}x</span>
         <span>~{trace.estimatedTokensSaved} tokens</span>
-        {trace.redactions > 0 && <span style={{ color: '#e3b341' }}>{trace.redactions} redacted</span>}
+        {linesSaved > 0 && <span>{linesSaved} lines</span>}
+        {trace.redactions > 0 && (
+          <span style={{ color: '#e3b341' }}>
+            {trace.redactions} redacted
+            {rules.length > 0 && (
+              <span style={{ opacity: 0.7 }}>
+                {' '}({rules.map(r => SECRET_TYPE_SHORT[r] ?? r).join(', ')})
+              </span>
+            )}
+          </span>
+        )}
         <span style={{ opacity: 0.4 }}>{trace.filterName}</span>
       </div>
     </div>

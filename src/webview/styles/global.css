@@ -61,6 +61,19 @@ html, body, #root {
   padding-left: var(--vertical-tab-rail-width);
 }
 
+.app-vertical-rail-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  --vertical-tab-rail-width: clamp(96px, 28vw, 132px);
+}
+.app-vertical-rail-wrapper > :not(.vertical-tab-rail) {
+  flex: 1;
+  min-width: 0;
+  margin-left: var(--vertical-tab-rail-width);
+}
+
 .vertical-tab-rail {
   position: absolute;
   inset: 0 auto 0 0;

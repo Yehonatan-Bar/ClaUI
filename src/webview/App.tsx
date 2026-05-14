@@ -135,8 +135,26 @@ const VerticalTabRail: React.FC = () => {
 export const App: React.FC = () => {
   useClaudeStream();
   const tabKind = useAppStore((s) => s.tabKind);
-  if (tabKind === 'search') {
+  const tabLayout = useAppStore((s) => s.tabLayout);
+  const openTabs = useAppStore((s) => s.openTabs);
+  const verticalTabRailWidth = useAppStore((s) => s.verticalTabRailWidth);
+  const showVerticalTabRail = tabLayout === 'vertical' && openTabs.length > 1;
+
+  const wrapWithRail = (content: React.ReactNode) => {
+    if (!showVerticalTabRail) return content;
+    const style = verticalTabRailWidth
+      ? { '--vertical-tab-rail-width': `${verticalTabRailWidth}px` } as React.CSSProperties
+      : undefined;
     return (
+      <div className="app-vertical-rail-wrapper" style={style}>
+        <VerticalTabRail />
+        {content}
+      </div>
+    );
+  };
+
+  if (tabKind === 'search') {
+    return wrapWithRail(
       <>
         <GlobalTooltip />
         <ImageLightbox />
@@ -145,9 +163,9 @@ export const App: React.FC = () => {
     );
   }
   if (tabKind === 'multiparticipant') {
-    return <MPSessionView />;
+    return wrapWithRail(<MPSessionView />);
   }
-  return <ChatAppContent />;
+  return wrapWithRail(<ChatAppContent />);
 };
 
 const ChatAppContent: React.FC = () => {
@@ -193,9 +211,6 @@ const ChatAppContent: React.FC = () => {
     activitySummaryDismissed,
     setActivitySummaryDismissed,
     activitySummaryEnabled,
-    tabLayout,
-    openTabs,
-    verticalTabRailWidth,
   } = useAppStore();
   const forkInit = useAppStore((s) => s.forkInit);
   const [showDisablePermanently, setShowDisablePermanently] = useState(false);
@@ -306,14 +321,10 @@ const ChatAppContent: React.FC = () => {
   const containerStyle = useMemo(() => ({
     '--chat-font-size': `${textSettings.fontSize}px`,
     '--chat-font-family': textSettings.fontFamily || undefined,
-    ...(verticalTabRailWidth ? { '--vertical-tab-rail-width': `${verticalTabRailWidth}px` } : {}),
-  } as React.CSSProperties), [textSettings.fontSize, textSettings.fontFamily, verticalTabRailWidth]);
-
-  const showVerticalTabRail = tabLayout === 'vertical' && openTabs.length > 1;
+  } as React.CSSProperties), [textSettings.fontSize, textSettings.fontFamily]);
 
   return (
-    <div className={`app-container theme-${typingTheme} ${showVerticalTabRail ? 'app-container--vertical-tabs' : ''}`} style={containerStyle}>
-      {showVerticalTabRail && <VerticalTabRail />}
+    <div className={`app-container theme-${typingTheme}`} style={containerStyle}>
       {/* Prompt history panel overlay */}
       {promptHistoryPanelOpen && <PromptHistoryPanel />}
       {achievementsEnabled && achievementPanelOpen && <AchievementPanel />}

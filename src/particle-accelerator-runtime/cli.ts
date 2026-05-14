@@ -22,6 +22,16 @@ import {
 
 const MAX_OUTPUT_BYTES = 10 * 1024 * 1024; // 10 MB
 
+function countLines(text: string): number {
+  if (!text) return 0;
+  return text.split('\n').length;
+}
+
+function countWords(text: string): number {
+  if (!text) return 0;
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
 async function main(): Promise<void> {
   try {
     enforceNoNetwork();
@@ -241,6 +251,10 @@ async function main(): Promise<void> {
         filteredStderrBytes: filterOutput.filteredStderrBytes,
         estimatedTokensSaved: estimateTokens(totalRaw - totalFiltered),
         compressionRatio: totalRaw > 0 ? totalRaw / (totalFiltered || 1) : 1,
+        rawLines: countLines(result.stdout) + countLines(result.stderr),
+        filteredLines: countLines(filterOutput.filteredStdout) + countLines(filterOutput.filteredStderr),
+        rawWords: countWords(result.stdout) + countWords(result.stderr),
+        filteredWords: countWords(filterOutput.filteredStdout) + countWords(filterOutput.filteredStderr),
       },
       filter: {
         name: filterOutput.filterName,

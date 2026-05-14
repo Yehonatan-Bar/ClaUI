@@ -136,6 +136,9 @@ export class ParticleAcceleratorTraceReader {
       estimatedTokensSaved: trace.output.estimatedTokensSaved,
       filterName: trace.filter.name,
       redactions: trace.redaction.replacements,
+      rulesTriggered: trace.redaction.rulesTriggered ?? [],
+      rawLines: trace.output.rawLines ?? 0,
+      filteredLines: trace.output.filteredLines ?? 0,
     };
   }
 
@@ -143,9 +146,12 @@ export class ParticleAcceleratorTraceReader {
     const familyCounts = new Map<string, { count: number; tokensSaved: number }>();
     const filterCounts = new Map<string, number>();
     const providerCounts = new Map<string, { count: number; tokensSaved: number }>();
+    const secretTypeCounts = new Map<string, number>();
 
     let totalRaw = 0, totalFiltered = 0, totalTokensSaved = 0;
     let totalDurationMs = 0, totalRedactions = 0, failedCount = 0;
+    let totalRawLines = 0, totalFilteredLines = 0;
+    let totalRawWords = 0, totalFilteredWords = 0;
 
     for (const s of summaries) {
       totalRaw += s.rawBytes;
@@ -153,6 +159,8 @@ export class ParticleAcceleratorTraceReader {
       totalTokensSaved += s.estimatedTokensSaved;
       totalDurationMs += s.durationMs;
       totalRedactions += s.redactions;
+      totalRawLines += s.rawLines ?? 0;
+      totalFilteredLines += s.filteredLines ?? 0;
       if (s.exitCode !== 0) failedCount++;
 
       const fc = familyCounts.get(s.commandFamily) ?? { count: 0, tokensSaved: 0 };
@@ -166,7 +174,15 @@ export class ParticleAcceleratorTraceReader {
       pc.count++;
       pc.tokensSaved += s.estimatedTokensSaved;
       providerCounts.set(s.provider, pc);
+
+      for (const rule of (s.rulesTriggered ?? [])) {
+        secretTypeCounts.set(rule, (secretTypeCounts.get(rule) ?? 0) + 1);
+      }
     }
+
+    // Estimate words from bytes (~5 bytes per word for mixed content)
+    totalRawWords = Math.round(totalRaw / 5);
+    totalFilteredWords = Math.round(totalFiltered / 5);
 
     const n = summaries.length || 1;
 
@@ -179,6 +195,13 @@ export class ParticleAcceleratorTraceReader {
       avgCompressionRatio: totalRaw > 0 ? totalRaw / (totalFiltered || 1) : 1,
       avgDurationMs: totalDurationMs / n,
       totalRedactions,
+      totalRawLines,
+      totalFilteredLines,
+      totalRawWords,
+      totalFilteredWords,
+      secretTypeBreakdown: Array.from(secretTypeCounts.entries())
+        .map(([secretType, count]) => ({ secretType, count }))
+        .sort((a, b) => b.count - a.count),
       topCommandFamilies: Array.from(familyCounts.entries())
         .map(([family, data]) => ({ family, ...data }))
         .sort((a, b) => b.count - a.count)

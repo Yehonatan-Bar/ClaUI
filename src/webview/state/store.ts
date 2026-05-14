@@ -808,11 +808,16 @@ export interface AppState {
     avgCompressionRatio: number;
     avgDurationMs: number;
     totalRedactions: number;
+    totalRawLines: number;
+    totalFilteredLines: number;
+    totalRawWords: number;
+    totalFilteredWords: number;
+    secretTypeBreakdown: Array<{ secretType: string; count: number }>;
     topCommandFamilies: Array<{ family: string; count: number; tokensSaved: number }>;
     topFilters: Array<{ filter: string; count: number }>;
     providerBreakdown: Record<string, { count: number; tokensSaved: number }>;
   } | null;
-  particleAcceleratorRecentTraces: Array<{ traceId: string; timestamp: string; provider: string; commandFamily: string; exitCode: number | null; durationMs: number; rawBytes: number; filteredBytes: number; estimatedTokensSaved: number; filterName: string; redactions: number }>;
+  particleAcceleratorRecentTraces: Array<{ traceId: string; timestamp: string; provider: string; commandFamily: string; exitCode: number | null; durationMs: number; rawBytes: number; filteredBytes: number; estimatedTokensSaved: number; filterName: string; redactions: number; rulesTriggered?: string[]; rawLines?: number; filteredLines?: number }>;
   particleAcceleratorError: string | null;
   setParticleAcceleratorEnabled: (enabled: boolean) => void;
   setParticleAcceleratorStatus: (status: NonNullable<AppState['particleAcceleratorStatus']>) => void;
