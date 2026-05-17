@@ -1075,7 +1075,7 @@ export function useClaudeStream(): void {
 
         // --- Multi-Participant ---
         case 'mpInitDialog':
-          useAppStore.getState().setMpDialogDefaults({ mode: msg.mode, humanName: msg.defaultHumanName, agentName: msg.defaultAgentName });
+          useAppStore.getState().setMpDialogDefaults({ mode: msg.mode, humanName: msg.defaultHumanName, agentName: msg.defaultAgentName, serverUrl: msg.serverUrl });
           break;
 
         case 'mpConnectionStatus':

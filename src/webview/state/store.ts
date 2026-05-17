@@ -769,7 +769,7 @@ export interface AppState {
   mpJoinDialogOpen: boolean;
   mpJoinError: string | null;
   mpRenameError: string | null;
-  mpDialogDefaults: { mode: 'create' | 'join'; humanName: string; agentName: string } | null;
+  mpDialogDefaults: { mode: 'create' | 'join'; humanName: string; agentName: string; serverUrl: string } | null;
   mpDismissedConflictIds: Set<string>;
   mpGuardStop: { reason: string; lastMessages: Array<{ participantId: string; preview: string }>; resolved: boolean } | null;
   mpReactions: Record<string, MPReactionSummary[]>;
@@ -791,7 +791,7 @@ export interface AppState {
   setMpJoinDialogOpen: (open: boolean) => void;
   setMpJoinError: (error: string | null) => void;
   setMpRenameError: (error: string | null) => void;
-  setMpDialogDefaults: (defaults: { mode: 'create' | 'join'; humanName: string; agentName: string }) => void;
+  setMpDialogDefaults: (defaults: { mode: 'create' | 'join'; humanName: string; agentName: string; serverUrl: string }) => void;
   setMpGuardStop: (reason: string, lastMessages: Array<{ participantId: string; preview: string }>) => void;
   resolveMpGuardStop: () => void;
   setMpReactions: (reactions: Record<string, MPReactionSummary[]>) => void;

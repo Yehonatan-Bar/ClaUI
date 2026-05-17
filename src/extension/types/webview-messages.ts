@@ -2408,6 +2408,7 @@ export interface MpInitDialogMessage {
   mode: 'create' | 'join';
   defaultHumanName: string;
   defaultAgentName: string;
+  serverUrl: string;
 }
 
 export type ExtensionToWebviewMessage =

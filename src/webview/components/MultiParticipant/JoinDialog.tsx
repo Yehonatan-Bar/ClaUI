@@ -26,6 +26,7 @@ export const JoinDialog: React.FC = () => {
       setMode(defaults.mode);
       if (defaults.humanName) setHumanName(defaults.humanName);
       if (defaults.agentName) setAgentName(defaults.agentName);
+      if (defaults.serverUrl) setServerUrl(defaults.serverUrl);
       setDefaultsApplied(true);
     }
   }, [defaults, defaultsApplied]);

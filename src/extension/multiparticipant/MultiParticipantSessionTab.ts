@@ -218,11 +218,13 @@ export class MultiParticipantSessionTab {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const defaultHumanName = config.get<string>('multiParticipant.defaultHumanName', '');
     const defaultAgentName = config.get<string>('multiParticipant.defaultAgentName', '');
+    const serverUrl = config.get<string>('multiParticipant.serverUrl', '');
     this.postToWebview({
       type: 'mpInitDialog',
       mode: this.dialogMode,
       defaultHumanName: defaultHumanName || '',
       defaultAgentName: defaultAgentName || '',
+      serverUrl: serverUrl || '',
     });
   }
 
