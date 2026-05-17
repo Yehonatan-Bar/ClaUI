@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Particle Accelerator - Security Assessment Report</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2129;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --red: #f85149;
+    --red-bg: rgba(248, 81, 73, 0.08);
+    --red-border: rgba(248, 81, 73, 0.25);
+    --green: #3fb950;
+    --green-bg: rgba(63, 185, 80, 0.08);
+    --green-border: rgba(63, 185, 80, 0.25);
+    --yellow: #e3b341;
+    --yellow-bg: rgba(227, 179, 65, 0.08);
+    --yellow-border: rgba(227, 179, 65, 0.25);
+    --blue: #58a6ff;
+    --blue-bg: rgba(88, 166, 255, 0.08);
+    --purple: #bc8cff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+  }
+
+  .header {
+    background: linear-gradient(135deg, #1a1e2e 0%, #0d1117 50%, #1a1520 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 48px 0;
+    text-align: center;
+  }
+
+  .header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .header .subtitle {
+    font-size: 16px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+  }
+
+  .header .badge {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--yellow-bg);
+    border: 1px solid var(--yellow-border);
+    color: var(--yellow);
+  }
+
+  .container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+
+  .section {
+    margin-bottom: 40px;
+  }
+
+  .section-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-title .num {
+    color: var(--blue);
+    margin-right: 8px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  .stat-card .value {
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .stat-card .label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 6px;
+  }
+
+  .stat-card.danger .value { color: var(--red); }
+  .stat-card.success .value { color: var(--green); }
+  .stat-card.warning .value { color: var(--yellow); }
+  .stat-card.info .value { color: var(--blue); }
+
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .comparison-panel {
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .comparison-panel .panel-header {
+    padding: 10px 16px;
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .comparison-panel.unprotected {
+    border: 1px solid var(--red-border);
+  }
+  .comparison-panel.unprotected .panel-header {
+    background: var(--red-bg);
+    color: var(--red);
+    border-bottom: 1px solid var(--red-border);
+  }
+
+  .comparison-panel.protected {
+    border: 1px solid var(--green-border);
+  }
+  .comparison-panel.protected .panel-header {
+    background: var(--green-bg);
+    color: var(--green);
+    border-bottom: 1px solid var(--green-border);
+  }
+
+  .comparison-panel .panel-body {
+    padding: 14px;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 11.5px;
+    line-height: 1.7;
+    background: var(--surface2);
+    max-height: 520px;
+    overflow-y: auto;
+  }
+
+  .secret-exposed {
+    background: rgba(248, 81, 73, 0.15);
+    color: #ff7b72;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border: 1px solid rgba(248, 81, 73, 0.25);
+    word-break: break-all;
+  }
+
+  .secret-redacted {
+    background: rgba(63, 185, 80, 0.15);
+    color: #3fb950;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border: 1px solid rgba(63, 185, 80, 0.25);
+    font-weight: 600;
+  }
+
+  .dim { color: var(--text-muted); }
+
+  .secret-types-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .secret-type-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    border-left: 3px solid var(--yellow);
+  }
+
+  .secret-type-card .type-name {
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  .secret-type-card .type-pattern {
+    font-family: monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    word-break: break-all;
+  }
+
+  .secret-type-card .type-risk {
+    font-size: 11px;
+    color: var(--red);
+    font-weight: 500;
+  }
+
+  .risk-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .risk-table th {
+    text-align: left;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .risk-table td {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+  }
+
+  .risk-level {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .risk-critical {
+    background: var(--red-bg);
+    border: 1px solid var(--red-border);
+    color: var(--red);
+  }
+
+  .risk-high {
+    background: rgba(219, 109, 40, 0.1);
+    border: 1px solid rgba(219, 109, 40, 0.3);
+    color: #db6d28;
+  }
+
+  .value-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .value-card {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .value-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+  }
+
+  .value-card.v-security::before { background: var(--green); }
+  .value-card.v-compliance::before { background: var(--blue); }
+  .value-card.v-auto::before { background: var(--purple); }
+  .value-card.v-zero::before { background: var(--yellow); }
+
+  .value-card h4 {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .value-card p {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .conclusion {
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.05), rgba(188, 140, 255, 0.05));
+    border: 1px solid rgba(88, 166, 255, 0.2);
+    border-radius: 8px;
+    padding: 24px;
+    text-align: center;
+  }
+
+  .conclusion h3 {
+    font-size: 18px;
+    margin-bottom: 10px;
+    color: var(--blue);
+  }
+
+  .conclusion p {
+    font-size: 14px;
+    color: var(--text-muted);
+    max-width: 700px;
+    margin: 0 auto;
+  }
+
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  .dot-red { background: var(--red); }
+  .dot-green { background: var(--green); }
+
+  .footer {
+    text-align: center;
+    padding: 24px;
+    color: var(--text-muted);
+    font-size: 11px;
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+  }
+
+  @media (max-width: 768px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .comparison { grid-template-columns: 1fr; }
+    .secret-types-grid { grid-template-columns: 1fr; }
+    .value-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Particle Accelerator</h1>
+  <div class="subtitle">Security Assessment Report &mdash; Secret Redaction Capabilities</div>
+  <span class="badge">ClaUI Extension &bull; Security Demo &bull; 2026</span>
+</div>
+
+<div class="container">
+
+  <!-- Executive Summary -->
+  <div class="section">
+    <h2 class="section-title"><span class="num">01</span> Executive Summary</h2>
+    <div class="card">
+      <p>This report documents a controlled security experiment testing Particle Accelerator's ability to detect and redact sensitive data in AI coding agent command output. A test script containing <strong>16 fake secrets across 14 distinct secret formats</strong> was executed. The system successfully identified and redacted <strong>100% of all secrets</strong> before they could reach the AI model's context window.</p>
+      <br>
+      <p style="color: var(--text-muted); font-size: 13px;">When AI coding agents (Claude, Codex) execute shell commands, the raw output &mdash; which may contain API keys, tokens, passwords, and certificates &mdash; flows directly into the model's context. Particle Accelerator intercepts this output and scrubs all sensitive data before the AI ever sees it.</p>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card warning">
+        <div class="value">16</div>
+        <div class="label">Secrets Detected</div>
+      </div>
+      <div class="stat-card success">
+        <div class="value">100%</div>
+        <div class="label">Redaction Rate</div>
+      </div>
+      <div class="stat-card info">
+        <div class="value">14</div>
+        <div class="label">Secret Types Covered</div>
+      </div>
+      <div class="stat-card danger">
+        <div class="value">0</div>
+        <div class="label">Secrets Leaked</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- The Experiment -->
+  <div class="section">
+    <h2 class="section-title"><span class="num">02</span> The Experiment</h2>
+    <div class="card">
+      <p><strong>Methodology:</strong> A Bash script (<code>pa-security-demo.sh</code>) was created containing fake but format-accurate secrets matching all 14 regex patterns and environment variable patterns used by the SecretRedactor engine. The script was executed within a ClaUI session with Particle Accelerator enabled.</p>
+      <br>
+      <p><strong>Two-phase comparison:</strong></p>
+      <ul style="margin: 8px 0 0 20px; color: var(--text-muted); font-size: 13px;">
+        <li><span class="dot dot-red"></span><strong style="color: var(--red);">Without PA:</strong> Raw command output reaches the AI model, exposing all secrets</li>
+        <li><span class="dot dot-green"></span><strong style="color: var(--green);">With PA:</strong> Intercepted output has all secrets replaced with <code>[REDACTED]</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Side-by-Side Comparison -->
+  <div class="section">
+    <h2 class="section-title"><span class="num">03</span> Results: Side-by-Side Comparison</h2>
+
+    <div class="comparison">
+      <div class="comparison-panel unprotected">
+        <div class="panel-header"><span class="dot dot-red"></span> Without Particle Accelerator</div>
+        <div class="panel-body">
+<span class="dim">[1/14] GitHub Classic PAT</span>
+  Cloning with token: <span class="secret-exposed">ghp_a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8</span>
+
+<span class="dim">[2/14] GitHub Fine-Grained PAT</span>
+  Auth: <span class="secret-exposed">github_pat_11AABBC2D3EeFfGg...zz0123</span>
+
+<span class="dim">[3/14] AWS Access Key</span>
+  <span class="secret-exposed">AKIAIOSFODNN7EXAMPLE</span>
+
+<span class="dim">[4/14] JWT Token</span>
+  Authorization: <span class="secret-exposed">eyJhbGciOiJIUzI1NiIs...adQssw5c</span>
+
+<span class="dim">[5/14] OpenAI API Key</span>
+  <span class="secret-exposed">sk-proj1234567890abcdefghijklmnopqrstuvwxyz</span>
+
+<span class="dim">[6/14] Anthropic API Key</span>
+  <span class="secret-exposed">sk-ant-api03-abcdefghijklmn...1234567890</span>
+
+<span class="dim">[7/14] Slack Bot Token</span>
+  <span class="secret-exposed">xoxb-123456789012-123456...qrstuv</span>
+
+<span class="dim">[8/14] Stripe Secret Key</span>
+  <span class="secret-exposed">sk_test_4eC39HqLyjWDarjt...9abcdef</span>
+
+<span class="dim">[9/14] Google API Key</span>
+  <span class="secret-exposed">AIzaSyDfakekey1234567890123456...3456</span>
+
+<span class="dim">[10/14] Private Key Block</span>
+  <span class="secret-exposed">-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWy...
+FakeKeyDataNotRealNotRealNotReal...
+-----END RSA PRIVATE KEY-----</span>
+
+<span class="dim">[11/14] Basic Auth URL</span>
+  https://<span class="secret-exposed">admin:SuperSecret123@</span>api.example.com
+
+<span class="dim">[12/14] Database URL Credentials</span>
+  <span class="secret-exposed">postgres://dbuser:p4ssw0rd_s3cret@</span>db.example.com
+  <span class="secret-exposed">redis://cache_user:r3d1s_p4ss@</span>redis.example.com
+
+<span class="dim">[13/14] Bearer Token</span>
+  Authorization: <span class="secret-exposed">Bearer eyJhbGciOiJSUzI1N...567890</span>
+
+<span class="dim">[14/14] Mixed Secrets</span>
+  token=<span class="secret-exposed">ghp_x1Y2z3A4b5C6...n7O8</span>
+  stripe=<span class="secret-exposed">sk_live_51HxG2aBcD...01234</span>
+        </div>
+      </div>
+
+      <div class="comparison-panel protected">
+        <div class="panel-header"><span class="dot dot-green"></span> With Particle Accelerator</div>
+        <div class="panel-body">
+<span class="dim">[1/14] GitHub Classic PAT</span>
+  Cloning with token: <span class="secret-redacted">[REDACTED]</span>
+
+<span class="dim">[2/14] GitHub Fine-Grained PAT</span>
+  Auth: <span class="secret-redacted">[REDACTED]</span>
+
+<span class="dim">[3/14] AWS Access Key</span>
+  <span class="secret-redacted">[REDACTED]</span>
+
+<span class="dim">[4/14] JWT Token</span>
+  Authorization: <span class="secret-redacted">[REDACTED]</span>
+
+<span class="dim">[5/14] OpenAI API Key</span>
+  <span class="secret-redacted">[REDACTED]</span>
+
+<span class="dim">[6/14] Anthropic API Key</span>
+  <span class="secret-redacted">[REDACTED]</span>
+
+<span class="dim">[7/14] Slack Bot Token</span>
+  <span class="secret-redacted">[REDACTED]</span>
+
+<span class="dim">[8/14] Stripe Secret Key</span>
+  <span class="secret-redacted">[REDACTED]</span>
+
+<span class="dim">[9/14] Google API Key</span>
+  <span class="secret-redacted">[REDACTED]</span>
+
+<span class="dim">[10/14] Private Key Block</span>
+  <span class="secret-redacted">[REDACTED]</span>
+
+<span class="dim">[11/14] Basic Auth URL</span>
+  https<span class="secret-redacted">[REDACTED]</span>api.example.com
+
+<span class="dim">[12/14] Database URL Credentials</span>
+  postgres<span class="secret-redacted">[REDACTED]</span>db.example.com
+  redis<span class="secret-redacted">[REDACTED]</span>redis.example.com
+
+<span class="dim">[13/14] Bearer Token</span>
+  Authorization: <span class="secret-redacted">[REDACTED]</span>
+
+<span class="dim">[14/14] Mixed Secrets</span>
+  token=<span class="secret-redacted">[REDACTED]</span>
+  stripe=<span class="secret-redacted">[REDACTED]</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Secret Types -->
+  <div class="section">
+    <h2 class="section-title"><span class="num">04</span> Detected Secret Types</h2>
+
+    <div class="secret-types-grid">
+      <div class="secret-type-card">
+        <div class="type-name">GitHub PAT (Classic)</div>
+        <div class="type-pattern">ghp_[A-Za-z0-9]{36}</div>
+        <div class="type-risk">Grants repository access</div>
+      </div>
+      <div class="secret-type-card">
+        <div class="type-name">GitHub PAT (Fine-Grained)</div>
+        <div class="type-pattern">github_pat_[A-Za-z0-9_]{82}</div>
+        <div class="type-risk">Scoped repository / org access</div>
+      </div>
+      <div class="secret-type-card">
+        <div class="type-name">AWS Access Key</div>
+        <div class="type-pattern">AKIA[0-9A-Z]{16}</div>
+        <div class="type-risk">Cloud infrastructure access</div>
+      </div>
+      <div class="secret-type-card">
+        <div class="type-name">JWT Token</div>
+        <div class="type-pattern">eyJ...header.payload.signature</div>
+        <div class="type-risk">Session hijacking / impersonation</div>
+      </div>
+      <div class="secret-type-card">
+        <div class="type-name">OpenAI API Key</div>
+        <div class="type-pattern">sk-[A-Za-z0-9]{20,}</div>
+        <div class="type-risk">Billing abuse / data exfiltration</div>
+      </div>
+      <div class="secret-type-card">
+        <div class="type-name">Anthropic API Key</div>
+        <div class="type-pattern">sk-ant-[A-Za-z0-9-]{20,}</div>
+        <div class="type-risk">Billing abuse / data exfiltration</div>
+      </div>
+      <div class="secret-type-card">
+        <div class="type-name">Slack Token</div>
+        <div class="type-pattern">xox[bpras]-[A-Za-z0-9-]+</div>
+        <div class="type-risk">Workspace data / message access</div>
+      </div>
+      <div class="secret-type-card">
+        <div class="type-name">Stripe Key</div>
+        <div class="type-pattern">[rs]k_(live|test)_[A-Za-z0-9]{20,}</div>
+        <div class="type-risk">Payment processing / financial data</div>
+      </div>
+      <div class="secret-type-card">
+        <div class="type-name">Google API Key</div>
+        <div class="type-pattern">AIza[A-Za-z0-9_-]{35}</div>
+        <div class="type-risk">Google service abuse / billing</div>
+      </div>
+      <div class="secret-type-card">
+        <div class="type-name">Private Key (PEM)</div>
+        <div class="type-pattern">-----BEGIN *PRIVATE KEY-----</div>
+        <div class="type-risk">Full identity compromise / TLS</div>
+      </div>
+      <div class="secret-type-card">
+        <div class="type-name">Basic Auth URL</div>
+        <div class="type-pattern">://user:password@host</div>
+        <div class="type-risk">Credential exposure in URLs</div>
+      </div>
+      <div class="secret-type-card">
+        <div class="type-name">Database URL</div>
+        <div class="type-pattern">postgres|mysql|redis://user:pass@</div>
+        <div class="type-risk">Direct database access</div>
+      </div>
+      <div class="secret-type-card">
+        <div class="type-name">Bearer Token</div>
+        <div class="type-pattern">Bearer [token]{20,}</div>
+        <div class="type-risk">API authentication bypass</div>
+      </div>
+      <div class="secret-type-card">
+        <div class="type-name">Environment Variables</div>
+        <div class="type-pattern">*_TOKEN, *_SECRET, *_KEY, *_PASSWORD</div>
+        <div class="type-risk">Scans env values matching sensitive key names</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Risk Assessment -->
+  <div class="section">
+    <h2 class="section-title"><span class="num">05</span> Organizational Risk Assessment</h2>
+
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <table class="risk-table">
+        <thead>
+          <tr>
+            <th>Scenario</th>
+            <th>Without PA</th>
+            <th>With PA</th>
+            <th>Risk Level</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Secret appears in AI model context</td>
+            <td style="color: var(--red);">Exposed in plain text</td>
+            <td style="color: var(--green);">Replaced with [REDACTED]</td>
+            <td><span class="risk-level risk-critical">CRITICAL</span></td>
+          </tr>
+          <tr>
+            <td>Secret stored in AI provider logs</td>
+            <td style="color: var(--red);">May be retained in conversation logs</td>
+            <td style="color: var(--green);">Never reaches provider</td>
+            <td><span class="risk-level risk-critical">CRITICAL</span></td>
+          </tr>
+          <tr>
+            <td>Secret echoed back in AI response</td>
+            <td style="color: var(--red);">Model may reference the secret</td>
+            <td style="color: var(--green);">Model has no secret to reference</td>
+            <td><span class="risk-level risk-high">HIGH</span></td>
+          </tr>
+          <tr>
+            <td>git diff / git log leaks credentials</td>
+            <td style="color: var(--red);">Full credential in diff output</td>
+            <td style="color: var(--green);">Redacted before AI sees diff</td>
+            <td><span class="risk-level risk-high">HIGH</span></td>
+          </tr>
+          <tr>
+            <td>env / printenv command output</td>
+            <td style="color: var(--red);">All env values exposed</td>
+            <td style="color: var(--green);">Sensitive values scrubbed</td>
+            <td><span class="risk-level risk-critical">CRITICAL</span></td>
+          </tr>
+          <tr>
+            <td>Database connection error messages</td>
+            <td style="color: var(--red);">Connection strings with passwords</td>
+            <td style="color: var(--green);">Credentials stripped from URLs</td>
+            <td><span class="risk-level risk-high">HIGH</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Organizational Value -->
+  <div class="section">
+    <h2 class="section-title"><span class="num">06</span> Organizational Value</h2>
+
+    <div class="value-row">
+      <div class="value-card v-security">
+        <h4>Defense in Depth</h4>
+        <p>Adds an automated security layer between AI agents and sensitive data. Even if a developer accidentally commits secrets or they exist in environment variables, they are scrubbed before reaching any external AI provider.</p>
+      </div>
+      <div class="value-card v-compliance">
+        <h4>Compliance Alignment</h4>
+        <p>Supports SOC 2, ISO 27001, and GDPR requirements for data loss prevention. Demonstrates that the organization has controls in place to prevent credential exposure to third-party AI services.</p>
+      </div>
+    </div>
+
+    <div class="value-row">
+      <div class="value-card v-auto">
+        <h4>Zero-Configuration Protection</h4>
+        <p>14 secret patterns are detected automatically with no configuration needed. The system uses both regex pattern matching and environment variable value scanning for comprehensive coverage.</p>
+      </div>
+      <div class="value-card v-zero">
+        <h4>Fail-Closed Design</h4>
+        <p>If the redaction engine encounters any error, the entire output is suppressed rather than allowing potentially sensitive data through. Security is never compromised by edge cases.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conclusion -->
+  <div class="section">
+    <div class="conclusion">
+      <h3>Conclusion</h3>
+      <p>Particle Accelerator successfully detected and redacted <strong>100% of secrets</strong> across all 14 tested patterns. The system provides automated, zero-configuration protection against secret leakage to AI providers, adding a critical security layer for organizations using AI coding agents in production environments.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Particle Accelerator Security Assessment &bull; ClaUI Extension &bull; All secrets in this report are fake and non-functional
+</div>
+
+</body>
+</html>
