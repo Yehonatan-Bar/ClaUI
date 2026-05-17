@@ -83,7 +83,8 @@ export class MultiParticipantClient extends EventEmitter {
     }
 
     const connectUrl = this.buildConnectUrl();
-    this.log(`Connecting to coordination server: ${this.serverUrl}`);
+    const tokenIncluded = connectUrl.includes('token=');
+    this.log(`Connecting to coordination server: ${this.serverUrl} (auth: ${tokenIncluded ? 'token appended, ' + this.authToken.length + ' chars' : 'NO token'})`);
     this.ws = new WebSocket(connectUrl);
 
     this.ws.on('open', () => {

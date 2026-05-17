@@ -153,6 +153,19 @@ export class TabManager {
         });
       })
     );
+
+    // When a regular text editor gets focus (non-ClaUi), restore native tabs
+    // so the user still has tab navigation. ClaUi panels re-hide them on focus.
+    context.subscriptions.push(
+      vscode.window.onDidChangeActiveTextEditor(() => {
+        if (this.getTabLayout() !== 'vertical' || !this.savedShowTabs) return;
+        const cfg = vscode.workspace.getConfiguration('workbench.editor');
+        const current = cfg.get<string>('showTabs');
+        if (current === 'none') {
+          void Promise.resolve(cfg.update('showTabs', this.savedShowTabs, vscode.ConfigurationTarget.Global)).catch(() => {});
+        }
+      })
+    );
   }
 
   /** Public accessors for the TreeView. */
@@ -987,6 +1000,14 @@ export class TabManager {
     this.schedulePersistSnapshot();
     this.log(`Tab focused: ${tabId}`);
     this.broadcastTabsState();
+
+    // Re-hide native tabs when a ClaUi panel regains focus in vertical mode
+    if (this.getTabLayout() === 'vertical' && this.savedShowTabs) {
+      const cfg = vscode.workspace.getConfiguration('workbench.editor');
+      if (cfg.get<string>('showTabs') !== 'none') {
+        void Promise.resolve(cfg.update('showTabs', 'none', vscode.ConfigurationTarget.Global)).catch(() => {});
+      }
+    }
   }
 
   // --- Open-tabs snapshot (restore-on-startup feature) ---

@@ -193,10 +193,14 @@ export class CoordinationServer {
 
     const verifyClient = this.config.sessionToken
       ? (info: { req: IncomingMessage }): boolean => {
-          const reqUrl = new URL(info.req.url || '/', `http://localhost:${port}`);
+          const rawUrl = info.req.url || '/';
+          const reqUrl = new URL(rawUrl, `http://localhost:${port}`);
           const clientToken = reqUrl.searchParams.get('token');
           if (clientToken !== this.config.sessionToken) {
-            this.log(`Connection rejected: invalid token from ${info.req.socket.remoteAddress}`);
+            const detail = clientToken === null
+              ? 'no token param in URL'
+              : `token length ${clientToken.length} vs expected ${this.config.sessionToken!.length}`;
+            this.log(`Connection rejected: ${detail} from ${info.req.socket.remoteAddress} (url path: ${reqUrl.pathname})`);
             return false;
           }
           return true;
