@@ -909,103 +909,28 @@ export function registerCommands(
     return true;
   }
 
-  /** Shared helper: collect common MP settings (server URL, auth token, names). */
-  async function collectMpCommonSettings(): Promise<{
-    serverUrl: string;
-    authToken: string;
-    humanName: string;
-    agentName: string;
-  } | null> {
+  /** Open a multi-participant panel with the JoinDialog in create mode. */
+  async function createMpSession(): Promise<void> {
     const ready = await ensureMpConnectionSettings();
-    if (!ready) return null;
-
+    if (!ready) return;
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const serverUrl = config.get<string>('multiParticipant.serverUrl', '') || 'ws://localhost:9120';
     const authToken = config.get<string>('multiParticipant.authToken', '');
-    const defaultHumanName = config.get<string>('multiParticipant.defaultHumanName', '');
-    const defaultAgentName = config.get<string>('multiParticipant.defaultAgentName', '');
-
-    const humanName = await vscode.window.showInputBox({
-      prompt: 'Your display name',
-      value: defaultHumanName || undefined,
-      placeHolder: 'Your Name',
-    });
-    if (!humanName) return null;
-
-    const agentName = await vscode.window.showInputBox({
-      prompt: 'Your agent\'s display name',
-      value: defaultAgentName || 'Claude',
-      placeHolder: 'Claude',
-    });
-    if (!agentName) return null;
-
-    return { serverUrl, authToken, humanName, agentName };
+    const mpTab = tabManager.createMultiParticipantTab(serverUrl, 'claude', undefined, authToken || undefined);
+    mpTab.initDialog('create');
+    log(`Multi-participant tab created: ${mpTab.id} (create mode)`);
   }
 
-  /** Create a new multi-participant session: prompts for session name + number. */
-  async function createMpSession(): Promise<void> {
-    const common = await collectMpCommonSettings();
-    if (!common) return;
-
-    const sessionName = await vscode.window.showInputBox({
-      prompt: 'Session name (displayed to all participants)',
-      placeHolder: 'e.g. Code Review, Planning',
-    });
-    if (!sessionName) return;
-
-    const sessionNumberStr = await vscode.window.showInputBox({
-      prompt: 'Session number (unique identifier for this session)',
-      placeHolder: 'e.g. 1, 42, 100',
-      validateInput: (val) => {
-        const n = parseInt(val, 10);
-        if (isNaN(n) || n < 0) return 'Enter a non-negative integer';
-        return null;
-      },
-    });
-    if (sessionNumberStr === undefined) return;
-    const sessionNumber = parseInt(sessionNumberStr, 10);
-
-    const sessionPassword = await vscode.window.showInputBox({
-      prompt: 'Session password (optional - leave empty for open session)',
-      placeHolder: 'Leave empty for no password',
-      password: true,
-    });
-    if (sessionPassword === undefined) return;
-
-    const agentProvider = 'claude' as const;
-    const mpTab = tabManager.createMultiParticipantTab(common.serverUrl, agentProvider, undefined, common.authToken || undefined);
-    log(`Multi-participant tab created: ${mpTab.id} -> ${common.serverUrl}, room ${sessionNumber}`);
-    await mpTab.connect(common.humanName, common.agentName, agentProvider, sessionPassword || undefined, sessionNumber, sessionName, 'create');
-  }
-
-  /** Join an existing multi-participant session: prompts for session number only. */
+  /** Open a multi-participant panel with the JoinDialog in join mode. */
   async function joinMpSession(): Promise<void> {
-    const common = await collectMpCommonSettings();
-    if (!common) return;
-
-    const sessionNumberStr = await vscode.window.showInputBox({
-      prompt: 'Session number (provided by the session creator)',
-      placeHolder: 'e.g. 1, 42, 100',
-      validateInput: (val) => {
-        const n = parseInt(val, 10);
-        if (isNaN(n) || n < 0) return 'Enter a non-negative integer';
-        return null;
-      },
-    });
-    if (sessionNumberStr === undefined) return;
-    const sessionNumber = parseInt(sessionNumberStr, 10);
-
-    const sessionPassword = await vscode.window.showInputBox({
-      prompt: 'Session password (leave empty if the session has no password)',
-      placeHolder: 'Leave empty for no password',
-      password: true,
-    });
-    if (sessionPassword === undefined) return;
-
-    const agentProvider = 'claude' as const;
-    const mpTab = tabManager.createMultiParticipantTab(common.serverUrl, agentProvider, undefined, common.authToken || undefined);
-    log(`Multi-participant tab created: ${mpTab.id} -> ${common.serverUrl}, joining room ${sessionNumber}`);
-    await mpTab.connect(common.humanName, common.agentName, agentProvider, sessionPassword || undefined, sessionNumber, undefined, 'join');
+    const ready = await ensureMpConnectionSettings();
+    if (!ready) return;
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const serverUrl = config.get<string>('multiParticipant.serverUrl', '') || 'ws://localhost:9120';
+    const authToken = config.get<string>('multiParticipant.authToken', '');
+    const mpTab = tabManager.createMultiParticipantTab(serverUrl, 'claude', undefined, authToken || undefined);
+    mpTab.initDialog('join');
+    log(`Multi-participant tab created: ${mpTab.id} (join mode)`);
   }
 
   context.subscriptions.push(

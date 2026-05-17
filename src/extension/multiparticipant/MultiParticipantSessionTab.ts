@@ -40,6 +40,7 @@ export class MultiParticipantSessionTab {
   private webviewReady = false;
   private pendingMessages: ExtensionToWebviewMessage[] = [];
   private disposed = false;
+  private dialogMode: 'create' | 'join' = 'join';
 
   constructor(
     tabId: string,
@@ -90,7 +91,7 @@ export class MultiParticipantSessionTab {
     this.wireServerMessages();
   }
 
-  async connect(humanName: string, agentName: string, agentProvider: 'claude' | 'codex', password?: string, sessionNumber?: number, sessionName?: string, mode: 'create' | 'join' = 'join'): Promise<void> {
+  connect(humanName: string, agentName: string, agentProvider: 'claude' | 'codex', password?: string, sessionNumber?: number, sessionName?: string, mode: 'create' | 'join' = 'join'): void {
     this.sessionNumber = sessionNumber ?? 0;
     this.sessionName = sessionName ?? '';
     this.client.setSessionNumber(this.sessionNumber);
@@ -104,14 +105,6 @@ export class MultiParticipantSessionTab {
 
     const rawModel = vscode.workspace.getConfiguration('claudeMirror').get<string>('model', '');
     const agentModel = rawModel && !rawModel.includes('(') ? rawModel : '';
-
-    try {
-      await this.runner.startAgent();
-      this.log('[MPTab] Agent process started');
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      this.log(`[MPTab] Agent failed to start: ${errMsg} -- continuing for chat only`);
-    }
 
     this.client.removeAllListeners('connected');
     this.client.removeAllListeners('disconnected');
@@ -157,7 +150,16 @@ export class MultiParticipantSessionTab {
       this.postToWebview({ type: 'mpConnectionStatus', status: 'error', message: err.message });
     });
 
+    // Connect WebSocket immediately - independent of agent process
     this.client.connect();
+
+    // Start agent in background - doesn't block the WebSocket connection
+    this.runner.startAgent().then(() => {
+      this.log('[MPTab] Agent process started');
+    }).catch((err) => {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      this.log(`[MPTab] Agent failed to start: ${errMsg} -- continuing for chat only`);
+    });
   }
 
   /** Alias for tabId -- matches the interface TabManager expects from managed tabs. */
@@ -205,6 +207,25 @@ export class MultiParticipantSessionTab {
     this.log('[MPTab] Disposed');
   }
 
+  initDialog(mode: 'create' | 'join'): void {
+    this.dialogMode = mode;
+    if (this.webviewReady) {
+      this.sendDialogDefaults();
+    }
+  }
+
+  private sendDialogDefaults(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const defaultHumanName = config.get<string>('multiParticipant.defaultHumanName', '');
+    const defaultAgentName = config.get<string>('multiParticipant.defaultAgentName', '');
+    this.postToWebview({
+      type: 'mpInitDialog',
+      mode: this.dialogMode,
+      defaultHumanName: defaultHumanName || '',
+      defaultAgentName: defaultAgentName || '',
+    });
+  }
+
   // -- Webview Messages (React -> Extension) --
 
   private wireWebviewMessages(): void {
@@ -219,6 +240,7 @@ export class MultiParticipantSessionTab {
             tabKind: 'multiparticipant',
           });
           this.flushPendingMessages();
+          this.sendDialogDefaults();
           if (this.session) {
             this.sendFullState();
           }

@@ -769,6 +769,7 @@ export interface AppState {
   mpJoinDialogOpen: boolean;
   mpJoinError: string | null;
   mpRenameError: string | null;
+  mpDialogDefaults: { mode: 'create' | 'join'; humanName: string; agentName: string } | null;
   mpDismissedConflictIds: Set<string>;
   mpGuardStop: { reason: string; lastMessages: Array<{ participantId: string; preview: string }>; resolved: boolean } | null;
   mpReactions: Record<string, MPReactionSummary[]>;
@@ -790,6 +791,7 @@ export interface AppState {
   setMpJoinDialogOpen: (open: boolean) => void;
   setMpJoinError: (error: string | null) => void;
   setMpRenameError: (error: string | null) => void;
+  setMpDialogDefaults: (defaults: { mode: 'create' | 'join'; humanName: string; agentName: string }) => void;
   setMpGuardStop: (reason: string, lastMessages: Array<{ participantId: string; preview: string }>) => void;
   resolveMpGuardStop: () => void;
   setMpReactions: (reactions: Record<string, MPReactionSummary[]>) => void;
@@ -2560,6 +2562,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   mpJoinDialogOpen: true,
   mpJoinError: null,
   mpRenameError: null,
+  mpDialogDefaults: null,
   mpDismissedConflictIds: new Set<string>(),
   mpGuardStop: null,
   mpReactions: {},
@@ -2656,6 +2659,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setMpJoinDialogOpen: (open) => set({ mpJoinDialogOpen: open, mpJoinError: null }),
   setMpJoinError: (error) => set({ mpJoinError: error, mpJoinDialogOpen: true }),
   setMpRenameError: (error) => set({ mpRenameError: error }),
+  setMpDialogDefaults: (defaults) => set({ mpDialogDefaults: defaults, mpJoinDialogOpen: true }),
 
   setMpGuardStop: (reason, lastMessages) => set({
     mpGuardStop: { reason, lastMessages, resolved: false },
@@ -2693,6 +2697,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     mpJoinDialogOpen: true,
     mpJoinError: null,
     mpRenameError: null,
+    mpDialogDefaults: null,
     mpDismissedConflictIds: new Set<string>(),
     mpGuardStop: null,
   }),
@@ -2871,6 +2876,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       mpJoinDialogOpen: true,
       mpJoinError: null,
       mpRenameError: null,
+      mpDialogDefaults: null,
       mpDismissedConflictIds: new Set<string>(),
       mpGuardStop: null,
     })),

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import type { MPAgentProvider } from '../../../extension/multiparticipant/MultiParticipantProtocol';
@@ -8,6 +8,7 @@ export const JoinDialog: React.FC = () => {
   const joinError = useAppStore((s) => s.mpJoinError);
   const connectionStatus = useAppStore((s) => s.mpConnectionStatus);
   const setOpen = useAppStore((s) => s.setMpJoinDialogOpen);
+  const defaults = useAppStore((s) => s.mpDialogDefaults);
 
   const [mode, setMode] = useState<'create' | 'join'>('join');
   const [humanName, setHumanName] = useState('');
@@ -18,6 +19,16 @@ export const JoinDialog: React.FC = () => {
   const [sessionName, setSessionName] = useState('');
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
+  const [defaultsApplied, setDefaultsApplied] = useState(false);
+
+  useEffect(() => {
+    if (defaults && !defaultsApplied) {
+      setMode(defaults.mode);
+      if (defaults.humanName) setHumanName(defaults.humanName);
+      if (defaults.agentName) setAgentName(defaults.agentName);
+      setDefaultsApplied(true);
+    }
+  }, [defaults, defaultsApplied]);
 
   const isConnecting = connectionStatus === 'connecting';
 

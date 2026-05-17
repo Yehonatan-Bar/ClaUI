@@ -2403,6 +2403,13 @@ export interface MpJoinRejectedMessage {
   reason: string;
 }
 
+export interface MpInitDialogMessage {
+  type: 'mpInitDialog';
+  mode: 'create' | 'join';
+  defaultHumanName: string;
+  defaultAgentName: string;
+}
+
 export type ExtensionToWebviewMessage =
   | McpInventoryMessage
   | McpCatalogMessage
@@ -2541,6 +2548,7 @@ export type ExtensionToWebviewMessage =
   | MpReactionUpdateMessage
   | MpErrorMessage
   | MpJoinRejectedMessage
+  | MpInitDialogMessage
   | WorkstreamMapDataMessage
   | WorkstreamMapClassifyingMessage
   | WorkstreamMapErrorMessage
