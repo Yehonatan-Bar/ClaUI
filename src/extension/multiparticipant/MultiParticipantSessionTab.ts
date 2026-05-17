@@ -105,8 +105,18 @@ export class MultiParticipantSessionTab {
     const rawModel = vscode.workspace.getConfiguration('claudeMirror').get<string>('model', '');
     const agentModel = rawModel && !rawModel.includes('(') ? rawModel : '';
 
-    await this.runner.startAgent();
-    this.log('[MPTab] Agent process started');
+    try {
+      await this.runner.startAgent();
+      this.log('[MPTab] Agent process started');
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      this.log(`[MPTab] Agent failed to start: ${errMsg} -- continuing for chat only`);
+    }
+
+    this.client.removeAllListeners('connected');
+    this.client.removeAllListeners('disconnected');
+    this.client.removeAllListeners('reconnecting');
+    this.client.removeAllListeners('error');
 
     this.client.on('connected', () => {
       this.postToWebview({ type: 'mpConnectionStatus', status: 'connected' });
@@ -235,6 +245,9 @@ export class MultiParticipantSessionTab {
           break;
 
         case 'mpJoinSession':
+          if (msg.serverUrl) {
+            this.client.setServerUrl(msg.serverUrl);
+          }
           this.connect(msg.humanName, msg.agentName, msg.agentProvider, msg.password, msg.sessionNumber, msg.sessionName, msg.mode || 'join');
           break;
 

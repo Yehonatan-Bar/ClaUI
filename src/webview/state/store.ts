@@ -2557,17 +2557,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   mpFileConflicts: [],
   mpStreamingTexts: {},
   mpDeliveryStatuses: {},
-  mpJoinDialogOpen: false,
+  mpJoinDialogOpen: true,
   mpJoinError: null,
   mpRenameError: null,
   mpDismissedConflictIds: new Set<string>(),
   mpGuardStop: null,
   mpReactions: {},
 
-  setMpConnectionStatus: (status, message) => set({
+  setMpConnectionStatus: (status, message) => set(state => ({
     mpConnectionStatus: status,
     mpConnectionMessage: message ?? null,
-  }),
+    ...(status === 'connecting' ? { mpJoinDialogOpen: false } : {}),
+    ...(status === 'error' && !state.mpSession ? { mpJoinDialogOpen: true } : {}),
+  })),
 
   setMpSession: (session, participants, transcript, myHumanId, myAgentId, approvals, typingStates, fileConflicts, reactions) => set({
     mpSession: session,
@@ -2652,7 +2654,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   }),
 
   setMpJoinDialogOpen: (open) => set({ mpJoinDialogOpen: open, mpJoinError: null }),
-  setMpJoinError: (error) => set({ mpJoinError: error }),
+  setMpJoinError: (error) => set({ mpJoinError: error, mpJoinDialogOpen: true }),
   setMpRenameError: (error) => set({ mpRenameError: error }),
 
   setMpGuardStop: (reason, lastMessages) => set({
@@ -2688,7 +2690,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     mpReactions: {},
     mpStreamingTexts: {},
     mpDeliveryStatuses: {},
-    mpJoinDialogOpen: false,
+    mpJoinDialogOpen: true,
     mpJoinError: null,
     mpRenameError: null,
     mpDismissedConflictIds: new Set<string>(),
@@ -2866,7 +2868,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       mpFileConflicts: [],
       mpStreamingTexts: {},
       mpDeliveryStatuses: {},
-      mpJoinDialogOpen: false,
+      mpJoinDialogOpen: true,
       mpJoinError: null,
       mpRenameError: null,
       mpDismissedConflictIds: new Set<string>(),

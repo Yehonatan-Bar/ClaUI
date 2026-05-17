@@ -56,6 +56,10 @@ export class MultiParticipantClient extends EventEmitter {
     }
   }
 
+  setServerUrl(url: string): void {
+    this.serverUrl = url;
+  }
+
   setSessionNumber(num: number): void {
     this.sessionNumber = num;
   }

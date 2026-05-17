@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { JoinDialog } from './JoinDialog';
@@ -11,15 +11,8 @@ export const MPSessionView: React.FC = () => {
   const connectionStatus = useAppStore((s) => s.mpConnectionStatus);
   const session = useAppStore((s) => s.mpSession);
   const joinDialogOpen = useAppStore((s) => s.mpJoinDialogOpen);
-  const setJoinDialogOpen = useAppStore((s) => s.setMpJoinDialogOpen);
 
-  useEffect(() => {
-    if (!session && connectionStatus !== 'connecting') {
-      setJoinDialogOpen(true);
-    }
-  }, [session, connectionStatus, setJoinDialogOpen]);
-
-  const showJoinDialog = joinDialogOpen || (!session && connectionStatus !== 'connecting');
+  const showJoinDialog = joinDialogOpen && !session;
 
   return (
     <div className="mp-session-view">
