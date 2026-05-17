@@ -157,10 +157,14 @@ export class TabManager {
     // When a regular text editor gets focus (non-ClaUi), restore native tabs
     // so the user still has tab navigation. ClaUi panels re-hide them on focus.
     context.subscriptions.push(
-      vscode.window.onDidChangeActiveTextEditor(() => {
-        if (this.getTabLayout() !== 'vertical' || !this.savedShowTabs) return;
+      vscode.window.onDidChangeActiveTextEditor((editor) => {
+        const layout = this.getTabLayout();
+        this.log(`[TabLayout] activeTextEditor changed: editor=${editor ? 'TextEditor' : 'none'} layout=${layout} savedShowTabs=${this.savedShowTabs}`);
+        if (layout !== 'vertical' || !this.savedShowTabs) return;
+        if (!editor) return;
         const cfg = vscode.workspace.getConfiguration('workbench.editor');
         const current = cfg.get<string>('showTabs');
+        this.log(`[TabLayout] Restoring native tabs: current=${current} restoreTo=${this.savedShowTabs}`);
         if (current === 'none') {
           void Promise.resolve(cfg.update('showTabs', this.savedShowTabs, vscode.ConfigurationTarget.Global)).catch(() => {});
         }
@@ -1004,7 +1008,9 @@ export class TabManager {
     // Re-hide native tabs when a ClaUi panel regains focus in vertical mode
     if (this.getTabLayout() === 'vertical' && this.savedShowTabs) {
       const cfg = vscode.workspace.getConfiguration('workbench.editor');
-      if (cfg.get<string>('showTabs') !== 'none') {
+      const current = cfg.get<string>('showTabs');
+      this.log(`[TabLayout] ClaUi panel focused, re-hiding native tabs: current=${current}`);
+      if (current !== 'none') {
         void Promise.resolve(cfg.update('showTabs', 'none', vscode.ConfigurationTarget.Global)).catch(() => {});
       }
     }
