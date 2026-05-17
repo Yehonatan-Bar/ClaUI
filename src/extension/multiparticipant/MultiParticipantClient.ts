@@ -60,6 +60,10 @@ export class MultiParticipantClient extends EventEmitter {
     this.serverUrl = url;
   }
 
+  setAuthToken(token: string): void {
+    this.authToken = token;
+  }
+
   setSessionNumber(num: number): void {
     this.sessionNumber = num;
   }
@@ -234,5 +238,9 @@ export class MultiParticipantClient extends EventEmitter {
 
   get isConnected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  get hasToken(): boolean {
+    return this.authToken.length > 0;
   }
 }

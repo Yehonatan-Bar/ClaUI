@@ -840,9 +840,10 @@ export function registerCommands(
    */
   async function ensureMpConnectionSettings(): Promise<boolean> {
     const config = vscode.workspace.getConfiguration('claudeMirror');
-    const serverUrl = config.get<string>('multiParticipant.serverUrl', '');
+    const inspection = config.inspect<string>('multiParticipant.serverUrl');
+    const userConfigured = inspection?.globalValue || inspection?.workspaceValue || inspection?.workspaceFolderValue;
 
-    if (serverUrl) return true;
+    if (userConfigured) return true;
 
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
@@ -885,26 +886,12 @@ export function registerCommands(
     });
     if (inputToken === undefined) return false;
 
-    const vscodeDirPath = path.join(workspaceFolder.uri.fsPath, '.vscode');
-    const settingsPath = path.join(vscodeDirPath, 'settings.json');
-
-    let existing: Record<string, unknown> = {};
-    try {
-      if (fs.existsSync(settingsPath)) {
-        const raw = fs.readFileSync(settingsPath, 'utf-8');
-        existing = JSON.parse(raw);
-      }
-    } catch {
-      existing = {};
+    await config.update('multiParticipant.serverUrl', inputUrl, vscode.ConfigurationTarget.Workspace);
+    if (inputToken) {
+      await config.update('multiParticipant.authToken', inputToken, vscode.ConfigurationTarget.Workspace);
     }
 
-    existing['claudeMirror.multiParticipant.serverUrl'] = inputUrl;
-    if (inputToken) existing['claudeMirror.multiParticipant.authToken'] = inputToken;
-
-    if (!fs.existsSync(vscodeDirPath)) fs.mkdirSync(vscodeDirPath, { recursive: true });
-    fs.writeFileSync(settingsPath, JSON.stringify(existing, null, 2), 'utf-8');
-
-    log(`MP connection settings written to ${settingsPath}`);
+    log(`MP connection settings saved to workspace config`);
     vscode.window.showInformationMessage('Multi-Participant connection configured. You can update server URL and token in .vscode/settings.json anytime.');
     return true;
   }

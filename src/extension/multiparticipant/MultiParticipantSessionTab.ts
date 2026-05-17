@@ -272,6 +272,13 @@ export class MultiParticipantSessionTab {
           if (msg.serverUrl) {
             this.client.setServerUrl(msg.serverUrl);
           }
+          if (!this.client.hasToken) {
+            const token = vscode.workspace.getConfiguration('claudeMirror').get<string>('multiParticipant.authToken', '');
+            if (token) {
+              this.client.setAuthToken(token);
+              this.log('[MPTab] Auth token loaded from settings');
+            }
+          }
           this.connect(msg.humanName, msg.agentName, msg.agentProvider, msg.password, msg.sessionNumber, msg.sessionName, msg.mode || 'join');
           break;
 

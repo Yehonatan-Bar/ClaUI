@@ -262,7 +262,7 @@
         },
         "claudeMirror.multiParticipant.serverUrl": {
           "type": "string",
-          "default": "ws://localhost:9120",
+          "default": "",
           "description": "WebSocket URL of the multi-participant coordination server (e.g. ws://localhost:9120 or wss://my-server.com/mp)"
         },
         "claudeMirror.multiParticipant.authToken": {
