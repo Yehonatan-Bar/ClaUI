@@ -35,9 +35,11 @@ export const ParticipantAutocomplete: React.FC<ParticipantAutocompleteProps> = (
   const suggestions = useMemo(() => {
     if (!inputValue || inputValue.length === 0) return [];
 
-    // Don't show suggestions if text already has accepted format "Name: ..."
-    const acceptedPattern = /^[^\s:]+:\s/;
-    if (acceptedPattern.test(inputValue)) return [];
+    // Don't show suggestions if text already starts with a known participant name
+    const alreadyAccepted = participants.some(
+      (p) => inputValue.startsWith(`${p.displayName}: `)
+    );
+    if (alreadyAccepted) return [];
 
     // Find the "prefix" - everything before the first space or colon
     const prefixMatch = inputValue.match(/^([^\s:]+)/);
