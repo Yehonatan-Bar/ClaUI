@@ -94,7 +94,7 @@ const VerticalTabRail: React.FC = () => {
           return (
             <button
               key={tab.id}
-              className={`vertical-tab-item ${isActive ? 'active' : ''}`}
+              className={`vertical-tab-item ${isActive ? 'active' : ''} ${tab.isBusy ? 'vertical-tab-busy' : ''}`}
               onClick={() => {
                 if (!isActive) {
                   postToExtension({ type: 'focusTab', tabId: tab.id });
@@ -104,11 +104,12 @@ const VerticalTabRail: React.FC = () => {
               title={`${providerLabel}: ${tab.displayName}`}
               aria-current={isActive ? 'page' : undefined}
             >
-              <span className={`vertical-tab-color ${tab.isBusy ? 'vertical-tab-busy' : ''}`} aria-hidden="true" />
               <span className="vertical-tab-title">{tab.displayName}</span>
-              <span className="vertical-tab-provider" aria-hidden="true">
-                {tab.provider === 'codex' ? 'X' : tab.provider === 'remote' ? 'H' : 'C'}
-              </span>
+              {tab.provider !== 'claude' && (
+                <span className="vertical-tab-provider" aria-hidden="true">
+                  {tab.provider === 'codex' ? 'X' : 'H'}
+                </span>
+              )}
             </button>
           );
         })}
