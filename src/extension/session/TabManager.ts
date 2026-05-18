@@ -56,6 +56,7 @@ export interface TabSummary {
   groupId?: string;
   orderInGroup?: number;
   slotColor: string;
+  isBusy: boolean;
 }
 
 /**
@@ -191,6 +192,7 @@ export class TabManager {
         groupId: entry?.groupId,
         orderInGroup: entry?.orderInGroup,
         slotColor: this.tabSlotColors.get(tab.id) ?? TAB_COLORS[0],
+        isBusy: (tab as { isBusyState?: () => boolean }).isBusyState?.() ?? false,
       });
     }
     return out;
@@ -320,6 +322,7 @@ export class TabManager {
         onSummaryGenerated: (sessionId) => this.notifySummaryChanged(sessionId),
         onProviderChanged: (tabId, provider, cliPathOverride) =>
           this.handleProviderChanged(tabId, provider, cliPathOverride),
+        onBusyStateChanged: () => this.broadcastTabsState(),
       },
       this.sessionStore,
       this.projectAnalyticsStore,
@@ -380,6 +383,7 @@ export class TabManager {
         onSummaryGenerated: (sessionId) => this.notifySummaryChanged(sessionId),
         onProviderChanged: (tabId, provider, cliPathOverride) =>
           this.handleProviderChanged(tabId, provider, cliPathOverride),
+        onBusyStateChanged: () => this.broadcastTabsState(),
       },
       this.sessionStore,
       this.projectAnalyticsStore,

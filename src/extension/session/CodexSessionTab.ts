@@ -1994,6 +1994,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     } else {
       this.stopThinkingAnimation();
     }
+    this.callbacks.onBusyStateChanged?.(this.id, busy);
   }
 
   private startThinkingAnimation(): void {

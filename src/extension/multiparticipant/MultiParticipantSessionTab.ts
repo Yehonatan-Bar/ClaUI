@@ -86,6 +86,14 @@ export class MultiParticipantSessionTab {
       }
     });
 
+    context.subscriptions.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration('claudeMirror.tabs.layout') && this.webviewReady) {
+          this.sendTabLayoutSetting();
+        }
+      })
+    );
+
     this.panel.webview.html = buildWebviewHtml(this.panel.webview, context);
     this.wireWebviewMessages();
     this.wireServerMessages();
@@ -243,10 +251,27 @@ export class MultiParticipantSessionTab {
           });
           this.flushPendingMessages();
           this.sendDialogDefaults();
+          this.sendTabLayoutSetting();
           if (this.session) {
             this.sendFullState();
           }
           break;
+
+        case 'requestTabList':
+          void vscode.commands.executeCommand('claudeMirror.tabs.refreshList');
+          break;
+
+        case 'focusTab':
+          void vscode.commands.executeCommand('claudeMirror.tabs.focus', msg.tabId);
+          break;
+
+        case 'setTabLayout': {
+          const layout = msg.layout as 'horizontal' | 'vertical';
+          void vscode.workspace
+            .getConfiguration('claudeMirror.tabs')
+            .update('layout', layout, vscode.ConfigurationTarget.Global);
+          break;
+        }
 
         case 'mpSendMessage':
           this.client.send({ type: 'humanMessage', rawBody: msg.rawBody });
@@ -558,6 +583,13 @@ export class MultiParticipantSessionTab {
       approvals: pendingApprovalsList.length > 0 ? pendingApprovalsList : undefined,
       fileConflicts: activeConflictsList.length > 0 ? activeConflictsList : undefined,
     });
+  }
+
+  private sendTabLayoutSetting(): void {
+    const layout = vscode.workspace
+      .getConfiguration('claudeMirror.tabs')
+      .get<'horizontal' | 'vertical'>('layout', 'horizontal');
+    this.postToWebview({ type: 'tabLayoutSetting', layout });
   }
 
   private postToWebview(msg: ExtensionToWebviewMessage): void {

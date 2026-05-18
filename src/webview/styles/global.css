@@ -124,6 +124,16 @@ html, body, #root {
   height: 7px;
   border-radius: 50%;
   background: var(--tab-color, var(--vscode-focusBorder, #3794ff));
+  flex-shrink: 0;
+}
+.vertical-tab-color.vertical-tab-busy {
+  background: transparent;
+  border: 1.5px solid var(--tab-color, var(--vscode-focusBorder, #3794ff));
+  border-top-color: transparent;
+  animation: vtab-spin 0.8s linear infinite;
+}
+@keyframes vtab-spin {
+  to { transform: rotate(360deg); }
 }
 
 .vertical-tab-title {

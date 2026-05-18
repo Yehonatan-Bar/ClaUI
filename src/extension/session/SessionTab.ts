@@ -55,6 +55,7 @@ export interface SessionTabCallbacks {
    *  (e.g. auto-fallback from Happy to Claude when the Happy CLI is missing).
    *  TabManager uses this to update the persisted snapshot entry. */
   onProviderChanged?: (tabId: string, provider: ProviderId, cliPathOverride: string | null) => void;
+  onBusyStateChanged?: (tabId: string, busy: boolean) => void;
 }
 
 /**
@@ -1320,6 +1321,7 @@ export class SessionTab implements WebviewBridge {
     } else {
       this.stopThinkingAnimation();
     }
+    this.callbacks.onBusyStateChanged?.(this.id, busy);
   }
 
   /** Start cycling through spinner frames in the tab title */

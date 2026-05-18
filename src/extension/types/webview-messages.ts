@@ -1566,6 +1566,7 @@ export interface WebviewTabSummary {
   groupId?: string;
   orderInGroup?: number;
   slotColor: string;
+  isBusy?: boolean;
 }
 
 export interface TabListMessage {
