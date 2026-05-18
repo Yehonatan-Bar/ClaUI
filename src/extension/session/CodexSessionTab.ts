@@ -245,6 +245,9 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     if (outbound.type === 'processBusy') {
       this.setBusy(outbound.busy);
     }
+    if (outbound.type === 'sessionEnded') {
+      this.setBusy(false);
+    }
     if (!this.isWebviewReady) {
       this.pendingMessages.push(outbound);
       return;
@@ -1328,10 +1331,15 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       }
       if (event.type === 'error' || event.type === 'turn.failed') {
         this.turnStructuredErrorDetected = true;
+        // Direct bypass: clear busy on error/failure without relying on the demux
+        // EventEmitter path, which has been observed to silently not fire in
+        // webpack production builds (same bug as SessionTab's demux.on('result')).
+        this.setBusy(false);
       }
       if (event.type === 'turn.completed') {
         this.turnStructuredErrorDetected = false;
         this.scheduleTurnCompletedExitWatchdog();
+        this.setBusy(false);
       }
       this.demux.handleEvent(event);
     });

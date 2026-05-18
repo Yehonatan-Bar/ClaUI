@@ -124,6 +124,8 @@ html, body, #root {
   height: 7px;
   border-radius: 50%;
   background: var(--tab-color, var(--vscode-focusBorder, #3794ff));
+  border: none;
+  animation: none;
   flex-shrink: 0;
 }
 .vertical-tab-color.vertical-tab-busy {
