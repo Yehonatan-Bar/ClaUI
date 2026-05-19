@@ -1,5 +1,7 @@
 # Codex Integration Progress
 
+> **Note:** This is a historical development log, not a current-state specification. For current Codex feature status, refer to `COMPLETE_FEATURE_LIST.md` (section 5) and `CODEX_FAST_MODE.md`.
+
 ## 2026-05-05 - Codex Fast Mode support
 
 - Added a Codex `Speed` selector in the AI chip via `CodexServiceTierSelector`.

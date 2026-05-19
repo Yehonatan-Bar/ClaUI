@@ -43,14 +43,6 @@ Vertical 24px strip rendered alongside the message list (right side). Each turn 
   - Composite 0.60+ -> thunderstorm/fast
   - **Special overrides**: previous error + current success -> rainbow/normal; no turns -> night/slow; disconnected -> snowflake
 
-### Cost Heat Bar
-4px horizontal gradient strip showing cost accumulation.
-
-- **File**: `src/webview/components/Vitals/CostHeatBar.tsx`
-- **Gradient**: green -> yellow -> orange -> red
-- **Fill**: `width = min(totalCostUsd / budgetUsd * 100, 100)%` (budget default = $1.00)
-- **Hidden** when cost is 0
-
 ### Turn Intensity Borders
 Colored left border on each assistant message bubble, reflecting the turn's category and tool intensity.
 
@@ -69,7 +61,7 @@ Wrapper that renders WeatherWidget when its own toggle (`weatherWidgetEnabled`) 
 Dropdown panel opened by clicking the gear settings button in the StatusBar. Shows explanations of all vitals components and toggle switches.
 
 - **File**: `src/webview/components/Vitals/VitalsInfoPanel.tsx`
-- **Content**: Explains weather icon, cost heat bar, timeline, intensity borders, and adventure widget
+- **Content**: Explains weather icon, timeline, intensity borders, and adventure widget
 - **Tooltips**: Every setting label has a `data-tooltip` attribute providing a description of the feature. Uses the global tooltip system (event-delegated via `data-tooltip` attribute, styled as `.global-tooltip` in `global.css`).
 - **Settings rows** (each with descriptive tooltip on hover):
   - **Claude Account**: Login/Logout/Refresh buttons for Claude CLI authentication
@@ -118,7 +110,7 @@ Zustand store
     - weather (recalculated on every addTurnRecord)
     |
     v
-React components (SessionTimeline, WeatherWidget, CostHeatBar, MessageBubble)
+React components (SessionTimeline, WeatherWidget, MessageBubble)
 ```
 
 ### Turn Categorization
@@ -171,7 +163,6 @@ Both settings sync two-way between VS Code config and the webview via `MessageHa
 | `src/webview/App.tsx` | VitalsContainer, chat-area-wrapper layout, toggle button |
 | `src/webview/components/Vitals/SessionTimeline.tsx` | Timeline minimap component |
 | `src/webview/components/Vitals/WeatherWidget.tsx` | Weather mood icon |
-| `src/webview/components/Vitals/CostHeatBar.tsx` | Cost gradient bar |
 | `src/webview/components/Vitals/VitalsContainer.tsx` | Conditional wrapper |
 | `src/webview/components/Vitals/VitalsInfoPanel.tsx` | Info panel with explanations + toggle |
 | `src/extension/auth/AuthManager.ts` | Claude auth status/logout helpers (`auth status --json`, `auth logout`) |
@@ -183,7 +174,7 @@ Both settings sync two-way between VS Code config and the webview via `MessageHa
 
 - Vitals components only update on `turnComplete` events (once per completed turn), NOT on streaming text deltas
 - `SessionTimeline` uses `React.memo` with custom comparator - re-renders when turn history reference or scroll fraction changes
-- `WeatherWidget` and `CostHeatBar` use `React.memo`
+- `WeatherWidget` uses `React.memo`
 - `turnByMessageId` provides O(1) lookup in `MessageBubble` (no array scanning)
 - Turn history capped at 200 entries to prevent memory growth
 

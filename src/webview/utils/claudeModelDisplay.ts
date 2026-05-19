@@ -12,7 +12,7 @@ export const CLAUDE_MODEL_OPTIONS: ClaudeModelOption[] = [
   { label: 'Haiku 4.5', value: 'claude-haiku-4-5-20251001' },
 ];
 
-const STATUS_VALUES = new Set(['connecting...', 'connected', 'unknown']);
+const STATUS_VALUES = new Set(['connected', 'unknown']);
 const CLAUDE_FAMILIES = new Set(['opus', 'sonnet', 'haiku']);
 
 function inferClaudeModelLabel(model: string): string | null {

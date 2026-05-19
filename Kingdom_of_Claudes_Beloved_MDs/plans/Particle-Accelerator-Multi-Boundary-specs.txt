@@ -1,0 +1,1067 @@
+
+# Technical Specification: Multi-Boundary Secret Protection for ClaUi Particle Accelerator 
+
+## 1. Background
+
+The current **Particle Accelerator** is a local-only command-output compressor and secret redaction layer for ClaUi. It intercepts Bash commands issued by Claude/Codex, routes eligible commands through `claui-run`, executes them in a separate Node.js runtime, redacts secrets, filters noisy output, preserves the original exit code, and writes trace files for analytics. 
+
+The current CLI flow is already strong for terminal output: `enforceNoNetwork -> read context -> create redactor -> execute command -> redact output -> classify command -> filter output -> write trace -> output filtered result -> exit with original code`. The `SecretRedactor` already uses environment-derived sensitive values, regex rules, longest-first replacement, fail-closed behavior, and chunked redaction with overlap. 
+
+The research shows that this is necessary but not sufficient. Secret leakage in agentic coding tools does not happen only through the visible prompt. Major leakage boundaries include automatic context expansion, file exposure, shell output, MCP/tool calls, browser/screenshot traces, Git artifacts, local history/config exports, telemetry, and diagnostics.  Official current docs support the same direction: Claude Code exposes hooks across session, turn, and tool-call lifecycle events, not only Bash pre-tool-use events; Codex warns that internet access can enable prompt injection and exfiltration of code or secrets; GitHub documents that Copilot cloud agent does not honor content exclusions and can see/update excluded files. ([Claude API Docs][1])
+
+## 2. Goal
+
+Upgrade Particle Accelerator into a **multi-boundary, destination-aware DLP broker** for Claude Code and Codex sessions inside ClaUi.
+
+The upgraded system should:
+
+1. Preserve agent usefulness by allowing ordinary coding, build, test, lint, Git-read, and diagnostics workflows to continue with minimal friction.
+2. Prevent hard secrets from leaving the workstation, entering model context, being persisted to logs, being sent to MCP servers, being published to Git/PRs/issues, or being exposed via terminal output.
+3. Replace destructive blocking with structured redaction whenever the agent can still reason productively.
+4. Make hidden context visible to the user through manifests and precise approval prompts.
+5. Record audit metadata without storing raw secrets.
+
+## 3. Non-Goals
+
+This feature will not be treated as a complete sandbox or network security boundary. A VS Code wrapper cannot fully constrain unrelated extensions or external CLIs that open their own network connections outside the brokered workflow; high-assurance deployments still need extension allowlisting, process allowlisting, and network egress controls. 
+
+This feature will also not attempt full OCR-based screenshot redaction in the first release. Screenshot and visual leakage detection should be treated as a separate high-risk mode because robust visual redaction remains hard and can be expensive. 
+
+## 4. Design Summary
+
+Introduce a new shared subsystem:
+
+```text
+SecretProtectionBroker
+  ├─ SecretScanner
+  │   ├─ EnvValueScanner
+  │   ├─ RegexRuleScanner
+  │   ├─ EntropyScanner
+  │   ├─ PathSensitivityClassifier
+  │   ├─ StructuredPayloadScanner
+  │   └─ PiiAndInternalTopologyScanner
+  ├─ DestinationClassifier
+  ├─ CommandRiskClassifier
+  ├─ ContextManifestBuilder
+  ├─ PolicyEngine
+  ├─ RedactionEngine
+  ├─ ApprovalEngine
+  ├─ AuditEventWriter
+  └─ SafePersistenceGuard
+```
+
+This broker should be used by both:
+
+```text
+Extension host
+  - prompt/context/file/Git/MCP/browser/persistence decisions
+  - policy loading
+  - approval UI
+  - audit view
+
+claui-run runtime
+  - command preflight
+  - stdout/stderr redaction
+  - safe output compression
+  - trace-safe persistence
+```
+
+The research recommends a policy-broker architecture that converts each meaningful boundary crossing into a structured event, scans it, decides an action, and records a secret-safe audit entry. 
+
+## 5. Boundaries to Protect
+
+The upgraded implementation must protect these boundaries:
+
+| Boundary           | Example                                                 | Default action                                 |
+| ------------------ | ------------------------------------------------------- | ---------------------------------------------- |
+| Prompt submission  | User pastes token, `.env`, stack trace with JWT         | Block hard secrets, redact soft sensitive data |
+| Context expansion  | Agent auto-attaches full file instead of selected lines | Require approval if scope exceeds user intent  |
+| File exposure      | `.env`, `.ssh`, `.aws`, `terraform.tfstate`, prod dumps | Hard block protected paths                     |
+| Command execution  | `env`, `printenv`, `cat .env`, `curl --data @-`         | Block or approval based on risk                |
+| Terminal output    | Test logs print DB URL or bearer token                  | Redact before reinjection into agent loop      |
+| MCP/tool calls     | Remote MCP receives repo context or logs                | Proxy, scan, approve, or block                 |
+| Browser/screenshot | Authenticated dashboard or customer data                | Approval required; metadata scan first         |
+| Git publication    | Commit, PR body, issue comment, review comment          | Block on secret hit                            |
+| Persistence        | traces, raw logs, JSONL, diagnostics, exports           | Store redacted content only; audit hashes      |
+
+The research specifically says leakage taxonomy should be organized by boundary crossed, not by file type, because the same secret can leak through prompt text, terminal output, MCP responses, screenshots, Git comments, or persisted logs. 
+
+## 6. Core Data Model
+
+### 6.1 `DlpEvent`
+
+```ts
+export interface DlpEvent {
+  id: string;
+  timestamp: string;
+  sessionId?: string;
+  turnId?: string;
+  provider: 'claude' | 'codex';
+  workspacePath: string;
+
+  boundary:
+    | 'prompt.submit'
+    | 'context.attach'
+    | 'file.read_for_context'
+    | 'command.preflight'
+    | 'command.output'
+    | 'git.diff'
+    | 'git.publish'
+    | 'mcp.request'
+    | 'mcp.response'
+    | 'browser.capture'
+    | 'persistence.write'
+    | 'telemetry.export'
+    | 'diagnostic.export';
+
+  source: {
+    kind: 'text' | 'file' | 'terminal' | 'git' | 'mcp' | 'browser' | 'config' | 'trace';
+    path?: string;
+    command?: string;
+    lineRange?: { start: number; end: number };
+    uri?: string;
+    toolName?: string;
+  };
+
+  destination: DlpDestination;
+  contentPreview?: string; // redacted only
+  contentBytes: number;
+  contentHash: string; // sha256 of raw content, never reversible
+}
+```
+
+### 6.2 `DlpDestination`
+
+```ts
+export interface DlpDestination {
+  kind:
+    | 'local_agent'
+    | 'remote_model_provider'
+    | 'terminal_stdout_to_agent'
+    | 'local_disk'
+    | 'git_remote'
+    | 'mcp_server'
+    | 'browser_context'
+    | 'telemetry_backend'
+    | 'diagnostic_export';
+
+  provider?: 'anthropic' | 'openai' | 'github' | 'other';
+  remote?: boolean;
+  host?: string;
+  trustTier: 'trusted_local' | 'trusted_org' | 'approved_remote' | 'unknown_remote' | 'public';
+}
+```
+
+### 6.3 `DlpFinding`
+
+```ts
+export interface DlpFinding {
+  id: string;
+  ruleId: string;
+  type:
+    | 'hard_secret'
+    | 'api_key'
+    | 'private_key'
+    | 'cloud_credential'
+    | 'database_credential'
+    | 'jwt'
+    | 'webhook'
+    | 'pii'
+    | 'internal_topology'
+    | 'protected_path'
+    | 'agent_control_file'
+    | 'git_control_file'
+    | 'prompt_injection_marker'
+    | 'network_exfil_primitive'
+    | 'large_sensitive_output';
+
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  confidence: 'low' | 'medium' | 'high';
+  location: {
+    byteStart?: number;
+    byteEnd?: number;
+    line?: number;
+    path?: string;
+  };
+  redaction: RedactionToken;
+}
+```
+
+### 6.4 `RedactionToken`
+
+Use stable, structured redaction tokens so the agent can continue reasoning:
+
+```ts
+export interface RedactionToken {
+  text: string;
+  type: string;
+  stableId: string; // hmac(sessionSalt, rawSecret)
+  hashPrefix: string; // sha256 prefix for audit correlation
+  originalLength: number;
+  sourceHint?: string;
+}
+```
+
+Example output:
+
+```text
+<REDACTED type="AWS_SECRET_ACCESS_KEY" id="sec_8f12a9" source=".env" length="40" />
+```
+
+The research explicitly recommends stable redaction rather than silently dropping content, because it lets the agent keep reasoning while making removed material visible. 
+
+## 7. Policy Engine
+
+### 7.1 Policy file
+
+Add a project-level policy file:
+
+```text
+.claui/secret-protection.policy.json
+```
+
+Example:
+
+```json
+{
+  "schemaVersion": 1,
+  "mode": "balanced",
+  "protectedPaths": [
+    ".env",
+    ".env.*",
+    ".ssh/**",
+    ".aws/**",
+    ".kube/config",
+    "terraform.tfstate",
+    "**/secrets*.json",
+    "**/credentials*",
+    ".git/**",
+    ".claude/**",
+    ".codex/**",
+    ".cursor/**",
+    ".vscode/settings.json"
+  ],
+  "internalDomains": [
+    "*.corp",
+    "*.internal",
+    "*.cluster.local"
+  ],
+  "allowedModelProviders": ["anthropic", "openai"],
+  "allowedMcpServers": [],
+  "allowedGitRemotes": ["github.com:my-org/**"],
+  "blockedCommands": [
+    "cat .env*",
+    "printenv",
+    "env",
+    "set",
+    "aws configure export-credentials"
+  ],
+  "approvalRequiredCommandClasses": [
+    "network_upload",
+    "credential_discovery",
+    "security_control_write",
+    "large_output",
+    "browser_capture"
+  ],
+  "hardBlockRules": [
+    "private_key",
+    "cloud_secret_pair",
+    "agent_control_file_write",
+    "git_control_file_write",
+    "secret_to_git_publication"
+  ],
+  "exceptionMaxMinutes": 30
+}
+```
+
+The research recommends a project-level policy file for protected paths, internal domains, allowed providers, MCP servers, Git remotes, blocked commands, approval-required command classes, PII thresholds, exception scopes, and repo-specific sensitive zones. 
+
+### 7.2 Decision output
+
+```ts
+export interface DlpDecision {
+  action: 'allow' | 'redact' | 'warn' | 'require_approval' | 'block' | 'summarize_locally';
+  reason: string;
+  findings: DlpFinding[];
+  redactedContent?: string;
+  safeSummary?: string;
+  approvalRequest?: ApprovalRequest;
+  audit: AuditEvent;
+}
+```
+
+### 7.3 Destination-aware rules
+
+The same finding must be treated differently depending on destination:
+
+| Finding          | Local-only terminal output |     Remote model |       MCP server | Git publication |     Trace/raw log |
+| ---------------- | -------------------------: | ---------------: | ---------------: | --------------: | ----------------: |
+| Private key      |                     Redact |            Block |            Block |           Block |      Redact/block |
+| JWT              |                     Redact |     Redact/block |  Block if remote |           Block |            Redact |
+| Internal URL     |                Allow/audit |             Warn | Require approval |      Warn/block | Redact optionally |
+| PII density high |                  Summarize | Require approval |   Block/approval |           Block |            Redact |
+| `.env` file      |              Block context |            Block |            Block |           Block | Never persist raw |
+
+This is important because destination-aware decisions are stronger than a single sensitivity score; the same internal hostname may be acceptable locally but not acceptable in a remote MCP call or public issue comment. 
+
+## 8. Scanner Design
+
+### 8.1 Rule packs
+
+Implement versioned rule packs:
+
+```text
+src/shared/secret-protection/rules/
+  cloud/aws.ts
+  cloud/gcp.ts
+  cloud/azure.ts
+  providers/openai.ts
+  providers/anthropic.ts
+  providers/github.ts
+  vcs/git.ts
+  files/protectedPaths.ts
+  pii/basic.ts
+  topology/internal.ts
+  commands/exfiltration.ts
+```
+
+### 8.2 Detection classes
+
+The scanner must combine:
+
+1. Exact environment value scanning.
+2. Provider-specific token regexes.
+3. Private key block detection.
+4. Cloud credential pair detection.
+5. Database DSN detection.
+6. JWT/bearer token detection.
+7. Webhook URL detection.
+8. High-entropy string detection with context keywords.
+9. Path-based protected file detection.
+10. Internal topology detection.
+11. PII density detection.
+12. Prompt-injection marker detection.
+13. Network exfil primitive detection.
+
+The research’s recommended defaults include hard-blocking hard secrets, private keys, `.env*`, auth/cookie databases, plaintext settings exports, `.git/**` and agent-control writes, agent-originated external POST/PUT/PATCH/DELETE, publication of secrets to Git/comments/issues, and unsanctioned MCP servers. 
+
+### 8.3 False-positive control
+
+To avoid damaging agent productivity:
+
+1. Use confidence levels.
+2. Pair high-entropy detection with nearby keywords.
+3. Lower severity for obvious examples in fixtures, docs, and tests unless destination is public or remote.
+4. Allow redaction instead of blocking for terminal output.
+5. Use deterministic placeholders so the agent can correlate repeated values.
+6. Use local summaries for large outputs instead of removing all context.
+
+## 9. Command Preflight Upgrade
+
+The current `CommandEligibility` is useful for routing/filter selection, but it should be upgraded into a semantic security classifier. The current classifier rejects redirections and substitutions, strips prefixes for classification, applies a deny list, applies an allow list, and defaults to GenericFilter for otherwise eligible commands. 
+
+### 9.1 New `CommandRiskClassifier`
+
+```ts
+export interface CommandRisk {
+  classes: CommandRiskClass[];
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  requiresApproval: boolean;
+  hardBlock: boolean;
+  explanation: string;
+}
+
+export type CommandRiskClass =
+  | 'safe_read'
+  | 'build_or_test'
+  | 'package_install'
+  | 'credential_discovery'
+  | 'env_dump'
+  | 'secret_file_read'
+  | 'network_download'
+  | 'network_upload'
+  | 'git_publish'
+  | 'git_control_write'
+  | 'agent_control_write'
+  | 'shell_obfuscation'
+  | 'destructive'
+  | 'long_running'
+  | 'interactive'
+  | 'browser_capture';
+```
+
+### 9.2 Hard-block command patterns
+
+Hard-block or require explicit one-time approval for:
+
+```text
+cat .env
+cat .env.*
+printenv
+env
+set
+export
+aws configure export-credentials
+gcloud auth print-access-token
+gh auth token
+kubectl config view --raw
+cat ~/.ssh/*
+cat ~/.aws/credentials
+cat ~/.kube/config
+curl -X POST ...
+curl --data ...
+wget --post-data ...
+nc ...
+scp ...
+rsync ... remote:
+git config --global credential.helper ...
+git config core.hooksPath ...
+echo ... > .git/hooks/*
+echo ... > .claude/settings.json
+echo ... > .codex/hooks.json
+```
+
+### 9.3 Network exfiltration
+
+Codex official docs warn that enabling agent internet access increases security risk, including prompt injection from untrusted web content and exfiltration of code or secrets, and recommend allowing only the domains and HTTP methods needed. ([OpenAI Developers][2])
+
+Therefore, in `claui-run`:
+
+1. Classify outbound network commands before execution.
+2. Default-block outbound upload semantics from agent-originated shell commands.
+3. Allow package-manager downloads only through known registries and only when no sensitive payload is piped or uploaded.
+4. Record destination host, method, and command family in audit logs.
+5. Never rely on the current Node-level `NoNetworkGuard` as shell-level network isolation, because spawned shell commands can still invoke external binaries unless separately controlled.
+
+## 10. Pre-Send and Context Manifest
+
+### 10.1 Manifest before send
+
+Before sending prompt/context to Claude or Codex, build a manifest:
+
+```ts
+export interface ContextManifest {
+  sessionId: string;
+  turnId: string;
+  provider: 'claude' | 'codex';
+  model?: string;
+  destination: DlpDestination;
+  userPromptBytes: number;
+  attachedFiles: Array<{
+    path: string;
+    lineRange?: { start: number; end: number };
+    byteCount: number;
+    sensitivity: 'normal' | 'sensitive' | 'protected';
+    findings: DlpFinding[];
+  }>;
+  screenshots: Array<{
+    source: string;
+    domain?: string;
+    authenticated?: boolean;
+  }>;
+  mcpResources: Array<{
+    server: string;
+    resource: string;
+    trustTier: string;
+  }>;
+  decision: DlpDecision;
+}
+```
+
+The research highlights “selection mismatch” as a practical failure mode: the user selects a small range, but the actual context includes a whole file, multiple files, or screenshots. The control is to require approval when actual send scope exceeds visible user intent. 
+
+### 10.2 User-visible approval
+
+Approval prompts must answer:
+
+```text
+What is leaving?
+Where is it going?
+Why was it flagged?
+What are the safe options?
+```
+
+Example:
+
+```text
+This request would send 2 protected files to Anthropic:
+- .env.production
+- terraform.tfstate
+
+Detected:
+- AWS access key pair
+- Database password
+- Internal production hostname
+
+Recommended action: Remove protected files and continue.
+```
+
+Actions:
+
+```text
+[Redact and continue]
+[Remove files from context]
+[Open local-only safe summary]
+[Approve once for this destination]
+[Block]
+```
+
+The research recommends explicit outbound manifests before risky sends and approval dialogs that explain what is leaving, where it is going, why it was flagged, and how to proceed safely. 
+
+## 11. Post-Tool Output Redaction
+
+This is where Particle Accelerator is already strongest. The upgrade should keep the existing behavior but make it richer.
+
+### 11.1 Redaction before compression
+
+Maintain this order:
+
+```text
+raw stdout/stderr
+  -> secret scan
+  -> structured redaction
+  -> sensitivity classification
+  -> command-specific filter/compression
+  -> safe output to agent
+  -> trace-safe audit persistence
+```
+
+Redaction must happen before filtering. Otherwise, a filter may preserve a “useful” error line that contains a token.
+
+### 11.2 Preserve debugging usefulness
+
+For common outputs, redact values but preserve structure:
+
+```text
+DATABASE_URL=postgres://user:<REDACTED type="DB_PASSWORD" id="sec_a19b" />@db.internal:5432/app
+Authorization: Bearer <REDACTED type="JWT" id="sec_0ff3" />
+AWS_SECRET_ACCESS_KEY=<REDACTED type="AWS_SECRET_ACCESS_KEY" id="sec_92ad" length="40" />
+```
+
+This allows the model to understand that a DB URL, JWT, or AWS credential was present without receiving the raw value.
+
+### 11.3 Large sensitive output
+
+If output exceeds a threshold and has sensitive density:
+
+```text
+Action: summarize_locally
+```
+
+The safe output should be:
+
+```text
+<OUTPUT_SUMMARY source="pytest" rawBytes="184923" redactedFindings="17">
+- 3 failing tests
+- 2 failures related to auth token validation
+- 1 failure related to DB connection string parsing
+- 17 sensitive values were redacted
+</OUTPUT_SUMMARY>
+```
+
+## 12. Git Protection
+
+Add a `GitPublicationScanner` that runs before:
+
+```text
+git commit
+git push
+gh pr create
+gh pr edit
+gh issue comment
+gh pr review
+```
+
+Also scan:
+
+```text
+commit message
+branch name
+diff content
+PR title/body
+issue comments
+review comments
+generated patches
+```
+
+Hard-block:
+
+```text
+private keys
+cloud credentials
+API tokens
+`.env*` content
+JWTs unless clearly fake/example
+credential-bearing DSNs
+```
+
+The research identifies Git artifacts and publication paths as first-class leakage channels and recommends rescanning diffs, commits, PR bodies, issue comments, review comments, and branch names before publication. 
+
+## 13. Agent-Control and Git-Control File Protection
+
+Hard-protect these paths from agent-originated writes:
+
+```text
+.git/**
+.gitconfig
+.git/hooks/**
+.claude/**
+.codex/**
+.cursor/**
+.roo/**
+.continue/**
+.cline/**
+.vscode/**
+```
+
+Allow only through a deliberate, one-time approval flow that clearly explains the control-plane risk.
+
+Reason: the research includes concrete advisory patterns where agent-created MCP/control files or Git hook/config changes become execution or sandbox-escape mechanisms. 
+
+## 14. MCP Protection
+
+Introduce an optional `McpProxy` layer for any MCP server configured through ClaUi.
+
+```text
+Agent -> ClaUi MCP Proxy -> Real MCP Server
+```
+
+The proxy should scan:
+
+```text
+tool definitions
+tool arguments
+resource reads
+tool responses
+server URLs
+server trust tier
+```
+
+Default policy:
+
+```text
+local trusted MCP: allow after scan
+org-approved remote MCP: require approval for first use per session
+unknown remote MCP: block
+write-capable MCP: require approval per call
+MCP response with secrets: redact before model reinjection
+```
+
+OpenAI’s MCP guidance warns that even read-only MCPs can embed prompt-injection payloads and that MCP servers may request data users may not be comfortable sharing; it recommends reviewing data shared with MCP servers carefully. ([OpenAI Developers][3])
+
+## 15. Browser and Screenshot Protection
+
+For Claude/Codex workflows that can use browser output, screenshots, or web search:
+
+1. Treat browser capture as a high-risk boundary.
+2. Require approval before attaching screenshots from authenticated pages.
+3. Show domain, capture count, and whether text extraction is enabled.
+4. Redact metadata and file/window names before diagnostics.
+5. Block model-generated Markdown/Mermaid/HTML that causes remote image fetches unless explicitly approved.
+6. Treat web results as untrusted instructions, not trusted task directives.
+
+Codex’s approvals/security docs say web results should still be treated as untrusted even when using cached web search, and warn that network access or web search can let the agent fetch and follow untrusted instructions. ([OpenAI Developers][4])
+
+## 16. Persistence Guard
+
+The current Particle Accelerator stores traces and optionally raw redacted logs, with retention settings and hard caps.  Keep that model, but add a `SafePersistenceGuard`.
+
+### 16.1 Never persist raw secrets
+
+Before writing any of these:
+
+```text
+traces
+raw logs
+daily reports
+diagnostic exports
+JSONL session records
+settings exports
+bug reports
+analytics payloads
+```
+
+run:
+
+```text
+DlpEvent(boundary='persistence.write')
+  -> SecretScanner
+  -> RedactionEngine
+  -> AuditEventWriter
+```
+
+### 16.2 Audit event shape
+
+```ts
+export interface AuditEvent {
+  id: string;
+  timestamp: string;
+  sessionId?: string;
+  turnId?: string;
+  boundary: DlpEvent['boundary'];
+  action: DlpDecision['action'];
+  ruleIds: string[];
+  findingTypes: string[];
+  severityMax: string;
+  destinationKind: DlpDestination['kind'];
+  destinationHostHash?: string;
+  contentHash: string;
+  redactedBytes: number;
+  redactionCount: number;
+  pathCategory?: string;
+  approvedBy?: string;
+  approvalExpiresAt?: string;
+}
+```
+
+Do not store raw matched values. Store only hashes, rule IDs, counts, byte lengths, source categories, destination categories, and approval metadata.
+
+## 17. Approval and Exception System
+
+Add scoped exceptions:
+
+```ts
+export interface DlpException {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  userId: string;
+  workspaceHash: string;
+  provider: 'claude' | 'codex';
+  destination: DlpDestination;
+  ruleId: string;
+  pathPattern?: string;
+  commandPatternHash?: string;
+  maxUses: number;
+  usedCount: number;
+}
+```
+
+Allowed:
+
+```text
+Approve once for this file and this model provider.
+Approve once for this MCP server and this tool call.
+Approve this internal URL for this workspace for 30 minutes.
+```
+
+Never allow exceptions for:
+
+```text
+private keys
+well-formed cloud credentials
+agent-control-file writes
+Git hook/config writes
+publication of detected secrets to Git/PR/issues
+unknown remote MCP servers receiving secrets
+```
+
+The research recommends narrow temporary exceptions bound to repo, destination, rule, path, user, and short expiry, while keeping private keys, cloud credentials, Git hook writes, agent-control writes, and public publication as non-overridable hard blocks. 
+
+## 18. Integration with Claude Code
+
+Claude Code supports hooks that fire at multiple lifecycle points, including session events, turn events, and tool-call events such as `PreToolUse` and `PostToolUse`; hook handlers receive JSON context and can inspect input and return decisions. ([Claude API Docs][1])
+
+Use these hooks where available:
+
+```text
+UserPromptSubmit      -> prompt scanner + context manifest
+PreToolUse            -> command/file/MCP/browser preflight
+PostToolUse           -> tool output scanner
+ConfigChange          -> protect settings and permission changes
+SessionEnd            -> safe persistence cleanup/audit flush
+```
+
+Implementation:
+
+```text
+src/particle-accelerator-runtime/hooks/claudePreToolUse.ts
+  -> keep Bash rewrite
+  -> add command risk decision
+
+new:
+src/particle-accelerator-runtime/hooks/claudePostToolUse.ts
+  -> scan tool output before reinjection
+
+new:
+src/particle-accelerator-runtime/hooks/claudeUserPromptSubmit.ts
+  -> scan prompt/context manifest
+```
+
+Claude Code’s security docs also recommend project-specific permission settings, auditing permissions, managed settings, OpenTelemetry monitoring, and ConfigChange hooks for auditing or blocking settings changes. ([Claude API Docs][5])
+
+## 19. Integration with Codex
+
+Keep the existing two Codex modes:
+
+```text
+instruction-only
+hook-guard
+```
+
+But strengthen both.
+
+### 19.1 Instruction-only mode
+
+Append stronger system instruction:
+
+```text
+When executing shell commands, use claui-run for all eligible commands.
+Do not print environment variables, secrets, tokens, credentials, .env files, private keys, or auth configs.
+Do not send command output to external URLs.
+If a command requires network upload, ask for user approval.
+```
+
+Instruction-only mode is weaker than hooks. Mark it in UI as:
+
+```text
+Protection level: advisory + output redaction only
+```
+
+### 19.2 Hook-guard mode
+
+When hooks are available, enforce:
+
+```text
+Pre-command classification
+Post-output redaction
+Git publication scan
+Safe persistence
+```
+
+### 19.3 Network mode
+
+Codex official docs say agent internet access is off by default during the agent phase and that enabling it increases risk, including prompt injection and exfiltration of code or secrets. ([OpenAI Developers][2]) The wrapper should therefore expose:
+
+```json
+{
+  "codexNetworkPolicy": {
+    "agentInternet": "off_by_default",
+    "allowedDomains": [],
+    "allowedMethods": ["GET"],
+    "blockUploadMethods": true,
+    "warnOnLiveWebSearch": true
+  }
+}
+```
+
+## 20. UI Changes
+
+### 20.1 Status badge
+
+Current Particle Accelerator UI already reports command count, tokens saved, filtered data, redactions, command families, filters, and provider breakdown.  Extend it with:
+
+```text
+Secret Protection: Active
+Hard blocks: 3
+Redactions: 28
+Approvals: 2
+MCP blocked: 1
+Git publication scans: 5
+```
+
+### 20.2 Trace detail
+
+Add:
+
+```text
+DLP action
+Boundary
+Destination
+Rules triggered
+Findings by type
+Redacted bytes
+Approval ID
+Exception expiry
+```
+
+### 20.3 Outbound manifest panel
+
+New panel:
+
+```text
+Destination: Anthropic / OpenAI / local disk / MCP / GitHub
+Files: 4
+Protected files: 0
+Sensitive findings: 2
+Screenshots: 0
+MCP resources: 0
+Decision: Redact and continue
+```
+
+## 21. Configuration
+
+Add settings under:
+
+```text
+claudeMirror.secretProtection.*
+```
+
+Recommended defaults:
+
+```json
+{
+  "claudeMirror.secretProtection.enabled": true,
+  "claudeMirror.secretProtection.mode": "balanced",
+  "claudeMirror.secretProtection.blockProtectedPaths": true,
+  "claudeMirror.secretProtection.scanPrompts": true,
+  "claudeMirror.secretProtection.scanTerminalOutput": true,
+  "claudeMirror.secretProtection.scanGitPublication": true,
+  "claudeMirror.secretProtection.scanMcp": true,
+  "claudeMirror.secretProtection.requireBrowserCaptureApproval": true,
+  "claudeMirror.secretProtection.storeRawSecrets": false,
+  "claudeMirror.secretProtection.exceptionMaxMinutes": 30,
+  "claudeMirror.secretProtection.auditRetentionDays": 90
+}
+```
+
+Modes:
+
+```text
+off        -> no DLP, legacy Particle Accelerator only
+observe    -> scan and audit, do not block
+balanced   -> redact by default, block hard secrets
+strict     -> require approval for remote boundaries and sensitive paths
+enterprise -> centrally managed, no local override
+```
+
+## 22. Runtime Safety
+
+### 22.1 Fail-closed behavior
+
+If scanner fails:
+
+```text
+prompt/context boundary: block or require approval
+terminal output boundary: suppress sensitive output and return safe failure message
+persistence boundary: do not write raw data
+Git publication boundary: block
+```
+
+The current redactor already has fail-closed behavior for redaction errors; preserve and extend this behavior across boundaries. 
+
+### 22.2 Performance budget
+
+Target:
+
+```text
+Prompt scan under 100 ms for <= 128 KB
+Terminal output scan streaming with 200-char overlap
+Large output: chunked scan, local summary after threshold
+Path classification before content read
+Regex pack compiled once per process
+Entropy scan only on candidate tokens
+```
+
+## 23. Test Plan
+
+Add tests under:
+
+```text
+tests/secret-protection/
+```
+
+Required tests:
+
+```text
+SecretScanner.privateKeys.test.ts
+SecretScanner.providerTokens.test.ts
+SecretScanner.entropy.test.ts
+PathSensitivityClassifier.test.ts
+CommandRiskClassifier.test.ts
+RedactionEngine.stableTokens.test.ts
+PolicyEngine.destinationAware.test.ts
+ContextManifestBuilder.test.ts
+GitPublicationScanner.test.ts
+McpProxyScanner.test.ts
+SafePersistenceGuard.test.ts
+ApprovalEngine.scope.test.ts
+ClaudeHooks.integration.test.ts
+CodexHooks.integration.test.ts
+ParticleAcceleratorDlpRegression.test.ts
+```
+
+The existing test suite already covers secret redaction, command eligibility, trace writing, context store lifecycle, env builder, filters, hooks, and no-network import verification, so the new test suite should be added as an extension rather than replacing the current tests. 
+
+## 24. Rollout Plan
+
+### Phase 1: Strengthen existing terminal protection
+
+Implement:
+
+```text
+shared SecretScanner
+structured redaction tokens
+CommandRiskClassifier
+destination-aware DlpDecision
+SafePersistenceGuard for traces/raw logs
+UI redaction details
+```
+
+This gives immediate protection without changing the agent workflow much.
+
+### Phase 2: Context and Git boundaries
+
+Implement:
+
+```text
+prompt scanner
+context manifest
+protected path blocking
+selection mismatch detection
+Git diff/commit/PR/issue scanner
+approval UI
+```
+
+This closes the biggest non-terminal gaps.
+
+### Phase 3: MCP/browser/telemetry hardening
+
+Implement:
+
+```text
+MCP proxy
+browser/screenshot approval
+telemetry/export scanner
+diagnostic scrubber
+policy file
+exception engine
+```
+
+### Phase 4: Enterprise controls
+
+Implement:
+
+```text
+central policy distribution
+SIEM-safe audit export
+org allowlists
+shadow-mode tuning
+incident replay tests
+extension/process/network integration guidance
+```
+
+## 25. Acceptance Criteria
+
+The feature is acceptable when:
+
+1. A command that prints `process.env.OPENAI_API_KEY` returns only a structured redaction token to the agent.
+2. A command that attempts `cat .env` is blocked or requires approval depending on policy.
+3. A test failure containing a DB URL remains useful but redacts credentials.
+4. A selected-line prompt does not silently attach the whole file without manifest/approval.
+5. `.git/hooks/**`, `.claude/**`, `.codex/**`, and `.cursor/**` writes are blocked by default.
+6. Git commit/PR/issue publication is blocked if a hard secret is detected.
+7. Raw traces and diagnostics never persist raw detected secrets.
+8. Exceptions expire and are scoped to repo, destination, rule, path, user, and time.
+9. Ordinary `npm test`, `pytest`, `tsc`, `eslint`, `git status`, and `git diff` workflows continue without unnecessary prompts.
+10. Redacted output remains semantically useful to Claude/Codex.
+
+## 26. Key Implementation Decision
+
+Do not build this as “more regexes inside `SecretRedactor` only.” Keep `SecretRedactor` as one scanner component, but promote the feature into a shared, destination-aware **SecretProtectionBroker** used by prompts, files, commands, terminal output, Git, MCP, browser captures, telemetry, and persistence. That matches the current risk model and lets Particle Accelerator preserve its main advantage: the agent still gets compact, useful signal, but secrets are removed before they cross the next boundary.
+
+[1]: https://docs.anthropic.com/en/docs/claude-code/hooks "Hooks reference - Claude Code Docs"
+[2]: https://developers.openai.com/codex/cloud/internet-access "Agent internet access – Codex web | OpenAI Developers"
+[3]: https://developers.openai.com/api/docs/guides/deep-research "Deep research | OpenAI API"
+[4]: https://developers.openai.com/codex/agent-approvals-security "Agent approvals & security – Codex | OpenAI Developers"
+[5]: https://docs.anthropic.com/en/docs/claude-code/security "Security - Claude Code Docs"

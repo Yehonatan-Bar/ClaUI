@@ -13,7 +13,7 @@ ClaUi spawns child processes via `child_process.spawn()` with `shell: true` on W
 
 ## killProcessTree(child)
 
-Exported from `killTree.ts`. Used by all 12 CLI spawn points in the extension.
+Exported from `killTree.ts`. Used by all CLI spawn points in the extension. Every new process spawn MUST use `killProcessTree` for cleanup.
 
 **Windows behavior**: Runs `taskkill /F /T /PID <pid>` which force-kills the process and all its descendants (the `/T` flag kills the entire tree).
 
@@ -32,9 +32,12 @@ Exported from `killTree.ts`. Used by all 12 CLI spawn points in the extension.
 | `TurnAnalyzer.ts` | Timeout kill of analysis process |
 | `PromptEnhancer.ts` | Timeout kill of enhancer process |
 | `PromptTranslator.ts` | Timeout kill of translator process |
+| `VisualProgressProcessor.ts` | Timeout kill of visual progress process |
+| `SessionSummarizer.ts` | Timeout kill of summarizer process |
 | `ClaudeCliCaller.ts` | Timeout kill of skill-gen CLI process |
 | `AchievementInsightAnalyzer.ts` | Timeout kill of insight analysis process |
 | `PythonPhaseRunner.ts` | Cancel/cleanup of Python subprocess |
+| `executeShellCommand.ts` | Particle accelerator shell command cleanup |
 
 ## Orphan Cleanup
 

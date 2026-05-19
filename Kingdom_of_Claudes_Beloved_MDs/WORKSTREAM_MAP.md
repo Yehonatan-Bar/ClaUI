@@ -8,8 +8,8 @@ Subway-map style visualization that groups sessions into logical workstreams -- 
 
 | Document | Purpose |
 |----------|---------|
-| `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP_PLAN_REWRITE.md` | Full product specification and development plan (English, 51KB). Detailed principles, subway-map metaphor, success criteria, all 10 implementation phases |
-| `Kingdom_of_Claudes_Beloved_MDs/html/workstream-map-feature-doc.html` | Visual HTML feature documentation (Hebrew, dark-themed, formatted for presentation) |
+| `Kingdom_of_Claudes_Beloved_MDs/Archive/plans/WORKSTREAM_MAP_PLAN_REWRITE.md` | Historical: Full product specification and development plan (archived) |
+| `Kingdom_of_Claudes_Beloved_MDs/Archive/html-content/workstream-map-feature-doc.html` | Historical: Visual HTML feature documentation (archived) |
 
 ---
 
@@ -501,7 +501,7 @@ Computed in priority order (first match wins):
 - Opening a current-workspace project navigates to its live Project Map.
 - Opening a different-workspace project with cached map data shows its cached snapshot with a stale-data banner ("Cached snapshot from [date]") and an "Open Workspace" button.
 - Opening a different-workspace project without cached data opens that workspace folder via `vscode.openFolder`.
-- The cached map view renders `ProjectMapView` with cached `ProjectMapState` in read-only mode (no reclassify/resolve controls). `CachedMapBanner` provides "Back" and "Open Workspace" actions.
+- The cached map view renders `ProjectMapView` with cached `ProjectMapState` in read-only mode (no reclassify/resolve controls). A stale-data banner provides "Back" and "Open Workspace" actions.
 - Missing/deleted project sections are grayed out with a "not found" label and are not clickable.
 - Back button from Project Map returns to portfolio when the user entered from there.
 

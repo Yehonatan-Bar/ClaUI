@@ -65,7 +65,7 @@ export const SmartSearchView: React.FC = () => {
   const providerLabel = provider === 'codex' ? 'Codex' : 'Claude';
   const modelLabel = useMemo(() => {
     if (provider === 'codex') {
-      return model && model !== 'connecting...' && model !== 'Codex (default)' ? model : 'Codex';
+      return model && model !== 'Codex (default)' ? model : 'Codex';
     }
     return getClaudeModelLabel(model) || 'Claude';
   }, [model, provider]);

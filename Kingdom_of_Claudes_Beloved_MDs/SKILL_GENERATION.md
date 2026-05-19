@@ -8,6 +8,7 @@ Automatically generates Claude skills from accumulated SR-PTD (post-task documen
 
 | File | Purpose |
 |------|---------|
+| `src/extension/skillgen/SkillGenTypes.ts` | Shared type definitions for the skill generation system |
 | `src/extension/skillgen/SkillGenStore.ts` | Document ledger persistence via `globalState` |
 | `src/extension/skillgen/SkillGenService.ts` | Main orchestrator (scan, preflight, lock, pipeline, dedup, install) |
 | `src/extension/skillgen/PhaseOrchestrator.ts` | Phase-by-phase pipeline execution (replaced PythonPipelineRunner) |
@@ -39,6 +40,7 @@ Automatically generates Claude skills from accumulated SR-PTD (post-task documen
 | File | Purpose |
 |------|---------|
 | `src/webview/components/SkillGen/SkillGenPanel.tsx` | Full overlay panel UI |
+| `src/webview/components/SkillGen/SkillGenOnboarding.tsx` | Onboarding/getting-started component for new users |
 | `src/webview/components/SkillGen/index.ts` | Barrel export |
 
 ### Shared

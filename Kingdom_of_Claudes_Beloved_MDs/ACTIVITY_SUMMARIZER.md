@@ -23,7 +23,7 @@ Periodically summarizes Claude's tool activity via Haiku and updates the busy in
 
 3. **Threshold + debounce**: After accumulating N tool uses (default: 3, configurable via `claudeMirror.activitySummaryThreshold`), the summarizer waits 2 seconds (debounce) to batch rapid tool uses, then calls Haiku.
 
-4. **Haiku call**: Spawns `claude -p --model claude-haiku-4-5-20251001` with a prompt listing the recent tools. Same spawn pattern as `SessionNamer` (stdin pipe, env cleanup, 10s timeout).
+4. **Haiku call**: Spawns `claude -p --model claude-haiku-4-5-20251001` with a prompt listing the recent tools. Same spawn pattern as `SessionNamer` (stdin pipe, env cleanup, 45s timeout).
 
 5. **Response parsing**: Haiku returns exactly 2 lines:
    - Line 1: Short activity label (3-6 words) for the tab title
@@ -96,6 +96,6 @@ The `claudeMirror.activitySummary` setting can also be toggled from the **View >
 - `inFlight` flag prevents concurrent Haiku calls
 - `reset()` called on `startSession`, `clearSession`, `editAndResend`
 - Config check (`claudeMirror.activitySummary`) at `recordToolUse` time
-- 10-second timeout on Haiku process
+- 45-second timeout on Haiku process (configurable via `timeoutMs` option)
 - `disposed` check in SessionTab callback prevents post-dispose crashes
 - Cost: ~$0.0002 per call, negligible.

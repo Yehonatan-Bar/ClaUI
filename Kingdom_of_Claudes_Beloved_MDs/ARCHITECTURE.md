@@ -405,16 +405,36 @@ Modal overlay component with 3 tabs for browsing prompt history:
 
 ### TabManager (`session/TabManager.ts`)
 
-Manages `Map<string, SessionTab>`:
-- `createTab()` - Creates new SessionTab with next color from palette, sets as active
+Manages `Map<string, ManagedTab>` where `ManagedTab = SessionTab | CodexSessionTab | MultiParticipantSessionTab`:
+
+**Tab creation methods:**
+- `createClaudeTab()` / `createTab()` - Creates a `SessionTab` for Claude sessions
+- `createCodexTab()` - Creates a `CodexSessionTab` for Codex sessions
+- `createRemoteTab()` - Creates a `SessionTab` with CLI path override for remote/Happy providers
+- `createMultiParticipantTab()` - Creates a `MultiParticipantSessionTab` for shared sessions
+- `createSmartSearchTab()` - Creates a Smart Search tab (read-only tool allowlist, magenta slot color)
+
+**Core operations:**
 - `getActiveTab()` - Returns focused tab (or null)
 - `getOrCreateTab()` - Returns active tab or creates one
 - `closeTab(tabId)` - Disposes a specific tab
-- `closeAllTabs()` - Cleanup for deactivate
-- Active tab tracking via `onFocused` callback
-- Single shared status bar item across all tabs
+- `closeAllTabs()` - Saves open-tabs snapshot, then cleanup for deactivate
+- `focusTab(tabId)` - Focuses a specific tab
+
+**Tab layout:**
+- `applyTabLayout()` - Supports `horizontal` and `vertical` modes, including hiding/restoring VS Code native editor tabs for vertical rail mode
 - Tab color palette: 8 distinct colors (blue, coral, green, orange, purple, cyan, gold, brick) cycling across tabs
-- Tab grouping: first tab opens `ViewColumn.Beside`, subsequent tabs reuse the same column
+- First tab opens `ViewColumn.Beside`, subsequent tabs reuse the same column (stacked tabs)
+
+**Additional responsibilities:**
+- **Snapshot persistence**: Saves/restores open tabs to `workspaceState` for crash recovery (debounced 500ms, max 10 tabs restored by default, crash-loop breaker)
+- **Provider handoff**: Orchestrates context handoff between Claude and Codex providers with 4-second cooldown
+- **Tab grouping**: `moveTabToGroup()`, `reorderTabs()`, integration with `TabGroupStore`
+- **Broadcasting**: `broadcastTabsState()` sends tab list to all open webviews
+- **Status bar**: Single shared status bar item across all tabs
+- **CLI process enumeration**: `enumerateCliProcesses()` for memory dashboard attribution
+- **Tree change events**: Emitters for `onTreeStateChanged` and `onSummaryChanged`
+- Active tab tracking via `onFocused` callback
 
 ### WebviewBridge Interface (`webview/MessageHandler.ts`)
 

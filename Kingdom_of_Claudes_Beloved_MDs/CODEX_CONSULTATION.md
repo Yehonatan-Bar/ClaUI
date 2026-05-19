@@ -25,7 +25,7 @@ Allows users to consult an external GPT expert (Codex) directly from the ClaUi c
 | `src/webview/state/store.ts` | `codexConsultPanelOpen` state + action |
 | `src/extension/types/webview-messages.ts` | `CodexConsultRequest` message type |
 | `src/extension/webview/MessageHandler.ts` | Handles `codexConsult` message, builds structured prompt, sends to CLI |
-| `src/webview/styles/global.css` | Panel and button styles (`.codex-consult-*`, `.status-bar-consult-btn`) |
+| `src/webview/styles/global.css` | Panel and button styles (`.codex-consult-*`) |
 
 ## Message Flow
 
@@ -100,11 +100,12 @@ The Codex MCP server (`@openai/codex`) runs GPT models that can dispatch `shell_
 
 ## UI Behavior
 
-- **Consult button**: Visible only when a session is connected (`isConnected === true`)
+- **Consult button**: Visible only when a session is connected AND the provider supports Codex consultation (`isConnected && providerCapabilities.supportsCodexConsult`)
 - **Panel**: Opens above InputArea. Auto-focuses textarea. Closes on submit or Escape
 - **Submit**: Ctrl+Enter or click "Consult" button. Disabled when busy or empty
-- **StatusBar expanded mode**: Direct button between Feedback and Git
-- **StatusBar collapsed mode**: Inside "More" dropdown after Dashboard
+- **StatusBar full/medium layout**: Inside the "Tools" dropdown group
+- **StatusBar collapsed mode**: Inside "More" dropdown
+- **StatusBar minimal mode**: Inside "Menu" dropdown
 
 ## Dependencies
 

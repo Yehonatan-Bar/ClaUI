@@ -156,7 +156,7 @@ A full-screen overlay with three modes, opened from the "Dashboard" button in th
 **Project Tools:**
 - Aggregated tool/category/task type distribution across all sessions
 
-### 8.3 User Mode (Amber pill, 1 tab)
+### 8.3 User Mode (Amber pill, 3 tabs)
 
 **Token-Usage Ratio:**
 - Correlates cost-weighted token consumption with Anthropic usage percentage
@@ -168,6 +168,15 @@ A full-screen overlay with three modes, opened from the "Dashboard" button in th
 - "Resample Now" button for immediate usage fetch without waiting for automatic interval
 - "Clear Data" button to reset all stored samples
 - First baseline sample created after just 2 turns; subsequent samples every 5 turns
+
+**Memory:**
+- Streams a process-memory snapshot every 2.5s while the tab is open
+- Stat cards: total VS Code RSS, Extension Host RSS (with V8 heap used/total), ClaUi CLI trees, system memory %
+- Area chart, VS Code process category bars, per-tab CLI tree table
+
+**Particle Accelerator:**
+- Skill filter management UI for the Particle Accelerator system
+- See `Kingdom_of_Claudes_Beloved_MDs/PARTICLE_ACCELERATOR.md` for details
 
 ### 8.4 Data Persistence
 
@@ -189,7 +198,7 @@ A full-screen overlay with three modes, opened from the "Dashboard" button in th
 
 ## 10. Session Vitals
 
-A visual session health dashboard with 5 components:
+A visual session health dashboard with 4 components:
 
 - **Weather Widget** - Animated mood icon reflecting error/success patterns via sliding window algorithm. Clear sky = smooth sailing, storms = many errors, rainbow = just recovered from errors
 - **Session Timeline** - Vertical color-coded minimap alongside messages on the right side. Each segment = one completed Claude turn. Colors:
@@ -201,7 +210,6 @@ A visual session health dashboard with 5 components:
   - Cyan = command tools (Bash/Terminal)
   - Magenta = skill tool (Skill invocations)
   - Click any segment to jump to that message
-- **Cost Heat Bar** - Gradient strip showing cumulative cost accumulation over the session
 - **Turn Intensity Borders** - Colored left border on assistant messages using the same category colors as the timeline (including magenta for skill turns). Border width reflects tool activity:
   - Thin/light = 0 tools
   - Medium = 1-3 tools
@@ -213,7 +221,7 @@ A visual session health dashboard with 5 components:
 
 ## 11. Adventure Widget (Dungeon Crawler)
 
-- **Pixel-art maze** - Each CLI turn extends a 40x40 cell thin-wall maze rendered on a Canvas 2D engine
+- **Pixel-art maze** - Each CLI turn extends a 220x220 cell thin-wall maze rendered on a Canvas 2D engine
 - **Encounter mapping** - Each turn maps to an encounter type:
   - Scrolls = Read operations
   - Anvils = Edit operations
@@ -242,7 +250,7 @@ A visual session health dashboard with 5 components:
 
 ### 12.2 Notifications & UI
 
-- **Toast notifications** - Rarity-colored toast stack with auto-dismiss (5s) and optional sound effect
+- **Toast notifications** - Rarity-colored toast stack with auto-dismiss (10s) and optional sound effect (rarity-specific frequencies: common 520Hz, rare 640Hz, epic 780Hz, legendary 920Hz)
 - **Achievement panel** - Overlay showing level, XP bar, unlocked count, session goals, language selector, info modal
 - **Trophy count in status bar** - Shows total unlocked achievements count (e.g., "26 gbiea") directly in the status bar
 - **Session recap card** - End-of-session summary showing duration, bugs fixed, tests passed, files touched, languages used, badges earned, XP gained, coding pattern
@@ -297,7 +305,7 @@ A visual session health dashboard with 5 components:
 ## 16. Prompt Enhancer
 
 - **AI-powered rewriting** - Improves user prompts before sending using a meta-prompt with advanced prompt engineering techniques (scaffolding, structure, context cues)
-- **Manual mode** - Sparkles button (near Send) or `Ctrl+Shift+E` opens a comparison panel showing original and enhanced prompts stacked vertically for side-by-side review
+- **Manual mode** - Sparkles button (near Send) opens a comparison panel showing original and enhanced prompts stacked vertically for side-by-side review
 - **Auto mode** - Intercepts Send, enhances the prompt, then auto-sends. Falls back to original on failure
 - **Gear popover** - Opens next to the sparkles button with auto-enhance toggle and model selector
 - **Configurable model** - Haiku / Sonnet 4.6 / Sonnet 4.5 / Opus 4.6 via `claudeMirror.promptEnhancer.model`
@@ -535,7 +543,8 @@ All toggles sync bidirectionally with VS Code settings.
 | `Ctrl+Alt+P` | Open plan documents |
 | `Ctrl+Alt+L` | Open log directory |
 | `Ctrl+Alt+A` | Toggle achievements panel |
-| `Ctrl+Shift+E` | Prompt enhancer (manual mode) |
+| `Ctrl+Alt+D` | Discover sessions (disk-wide scan) |
+| `Ctrl+Alt+T` | Toggle team panel |
 
 Mac users: Replace `Ctrl` with `Cmd` for all shortcuts.
 
@@ -581,8 +590,55 @@ Mac users: Replace `Ctrl` with `Cmd` for all shortcuts.
 
 ---
 
+## 33. Smart Search
+
+- **Dedicated search tabs** - Smart Search tabs with read-only tool allowlists and magenta slot color
+- **Model selection** - Choose which model to use for search
+- See `Kingdom_of_Claudes_Beloved_MDs/SMART_SEARCH.md` for details
+
+---
+
+## 34. Workstream Map & Portfolio
+
+- **Subway-map visualization** - Groups sessions into logical workstreams with SVG rendering, pan/zoom, and animations
+- **Cross-project portfolio** - Top-level view across all projects stored in `globalState`
+- **External folder import** - Import non-Claude work evidence from disk folders
+- See `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP.md` for details
+
+---
+
+## 35. Tab Groups (Tab Folders)
+
+- **Color-coded folders** - Group tabs into named folders with custom colors
+- **Drag-and-drop** - Reorder tabs and move between groups
+- See `Kingdom_of_Claudes_Beloved_MDs/TAB_GROUPS.md` for details
+
+---
+
+## 36. Session End Summary
+
+- **End-of-session card** - Summary showing duration, bugs fixed, tests passed, files touched, languages used
+- See `Kingdom_of_Claudes_Beloved_MDs/SESSION_SUMMARY.md` for details
+
+---
+
+## 37. Usage Limit Deferred Send
+
+- **Deferred sending** - When usage limits are hit, messages are queued and sent automatically when usage resets
+- See `Kingdom_of_Claudes_Beloved_MDs/USAGE_LIMIT_DEFERRED_SEND.md` for details
+
+---
+
+## 38. Provider Handoff
+
+- **Cross-provider context handoff** - Orchestrated transfer of conversation context between Claude and Codex providers
+- **State machine** - 5-phase handoff: collecting_context, creating_target_tab, starting_target_session, arming_first_user_prompt, completed/failed
+- See `Kingdom_of_Claudes_Beloved_MDs/PROVIDER_HANDOFF.md` for details
+
+---
+
 ## Summary
 
-**32 major feature categories comprising approximately 160+ individual capabilities.**
+**38 major feature categories comprising approximately 180+ individual capabilities.**
 
 ClaUi transforms the Claude Code CLI into a full-featured visual IDE experience with multi-tab sessions, analytics, gamification, AI-powered prompt enhancement, dual provider support (Claude + Codex), social features, and deep customization.

@@ -57,7 +57,7 @@ interface FeedbackResult {
 
 1. **Text-only** (no attachments): Uses `application/x-www-form-urlencoded` via `URLSearchParams`
 2. **With attachments (paid plan)**: Uses `multipart/form-data` via global `FormData` + `File`
-3. **With attachments (free plan fallback)**: If Formspree rejects with "File Uploads Not Permitted", automatically falls back to text-only submission (drops file attachment, keeps message body)
+3. **With attachments (fallback)**: If multipart upload fails for any reason, automatically falls back to **text-only** submission -- attachments are silently dropped, only the message body is sent
 
 All paths use the global `fetch()` API (Node 18+, available in VS Code's Electron).
 
@@ -68,7 +68,7 @@ All paths use the global `fetch()` API (Node 18+, available in VS Code's Electro
 | Files per submission | 10 |
 | Max file size | 25 MB each |
 | Total request size | 100 MB |
-| File uploads | Paid plan only ($10+/month); free plan uses base64 fallback |
+| File uploads | Paid plan only ($10+/month); free plan falls back to text-only (no attachments) |
 
 ## Error Handling
 

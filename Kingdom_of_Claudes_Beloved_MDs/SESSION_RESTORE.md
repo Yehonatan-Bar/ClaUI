@@ -25,17 +25,23 @@ On startup:
 
 ```typescript
 interface OpenTabSnapshotEntry {
+  tabNumber: number;              // Creation sequence (fallback order)
+  provider: ProviderId;           // Provider identifier (claude, codex, happy, etc.)
   sessionId: string;              // Unique tab identifier
   customName?: string;            // User-set tab name (if custom)
+  cliPathOverride?: string;       // Custom CLI path for remote/happy providers
+  workspacePath?: string;         // Workspace path for remote sessions
+  savedAt: string;                // ISO timestamp when snapshot was saved
   groupId?: string;               // Parent folder in tab tree
-  tabNumber: number;              // Creation sequence (fallback order)
-  tabKind?: string;               // claude | codex | happy | search
-  lastFocusedAt?: string;         // ISO timestamp (new)
-  tabOrder?: number;              // Visual position 0-based (new)
+  orderInGroup?: number;          // Sibling order within its parent group
+  tabKind?: 'chat' | 'search';   // Tab kind: 'chat' (default) or 'search' (Smart Search)
+  searchModel?: string;           // Model for Smart Search tabs (used on restore)
+  lastFocusedAt?: string;         // ISO timestamp (for most-recent selection)
+  tabOrder?: number;              // Visual position 0-based (assigned on shutdown)
 }
 ```
 
-Backwards compatible: `lastFocusedAt` and `tabOrder` are optional. Old snapshots without these fields fall back to `tabNumber` for ordering.
+Key design: `provider` is a separate field from `tabKind`. Provider identifies which CLI/runtime handles the tab (Claude, Codex, Happy), while `tabKind` distinguishes chat vs. Smart Search tabs. Old snapshots without `lastFocusedAt` and `tabOrder` fall back to `tabNumber` for ordering.
 
 ## Key Components
 

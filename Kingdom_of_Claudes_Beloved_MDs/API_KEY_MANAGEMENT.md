@@ -43,23 +43,35 @@ Stores or clears the API key. Empty string = delete.
 ### `maskApiKey(key: string | undefined): string`
 Returns `****abcd` (last 4 chars) or empty string.
 
-## Spawn Points (9 total)
+## Spawn Points
 
-All 9 CLI spawn points use `envUtils`:
+All CLI spawn points use `envUtils`. Every new spawn point MUST use `buildClaudeCliEnv` (for Claude CLI) or `buildSanitizedEnv` (for non-Claude processes).
 
-| # | File | Function Used | Key Injection |
-|---|------|---------------|---------------|
-| 1 | `ClaudeProcessManager.ts` | `buildClaudeCliEnv(apiKey)` | Yes (reads from SecretStorage before spawn) |
-| 2 | `CodexExecProcessManager.ts` | `buildSanitizedEnv()` | No (Codex path) |
-| 3 | `SessionNamer.ts` | `buildClaudeCliEnv(apiKey)` | Yes (apiKey param) |
-| 4 | `MessageTranslator.ts` | `buildClaudeCliEnv(apiKey)` | Yes (apiKey param) |
-| 5 | `TurnAnalyzer.ts` | `buildClaudeCliEnv(this.apiKey)` | Yes (setApiKey setter) |
-| 6 | `ActivitySummarizer.ts` | `buildClaudeCliEnv(this.apiKey)` | Yes (setApiKey setter) |
-| 7 | `PromptEnhancer.ts` | `buildClaudeCliEnv(apiKey)` | Yes (apiKey param) |
-| 8 | `AchievementInsightAnalyzer.ts` | `buildClaudeCliEnv(this.apiKey)` | Yes (refreshes from SecretStorage before spawn) |
-| 9 | `ClaudeCliCaller.ts` | `buildClaudeCliEnv(this.apiKey)` | Yes (setApiKey setter, propagated from PhaseOrchestrator) |
+### `buildClaudeCliEnv` consumers (Claude CLI processes)
 
-**Skipped:** `PythonPhaseRunner.ts` spawns Python, not Claude CLI.
+| File | Key Injection |
+|------|---------------|
+| `ClaudeProcessManager.ts` | Yes (reads from SecretStorage before spawn) |
+| `SessionNamer.ts` | Yes (apiKey param) |
+| `MessageTranslator.ts` | Yes (apiKey param) |
+| `TurnAnalyzer.ts` | Yes (setApiKey setter) |
+| `ActivitySummarizer.ts` | Yes (setApiKey setter) |
+| `PromptEnhancer.ts` | Yes (apiKey param) |
+| `PromptTranslator.ts` | Yes (apiKey param) |
+| `VisualProgressProcessor.ts` | Yes (apiKey param) |
+| `SessionSummarizer.ts` | Yes (apiKey param) |
+| `AchievementInsightAnalyzer.ts` | Yes (refreshes from SecretStorage before spawn) |
+| `ClaudeCliCaller.ts` | Yes (setApiKey setter, propagated from PhaseOrchestrator) |
+
+### `buildSanitizedEnv` consumers (non-Claude processes)
+
+| File | Purpose |
+|------|---------|
+| `CodexExecProcessManager.ts` | Codex CLI (no key injection -- prevents secret leakage) |
+| `CodexSessionNamer.ts` | Codex naming process |
+| `SessionSummarizer.ts` | Also uses sanitized env for some paths |
+
+**Note:** `PythonPhaseRunner.ts` spawns Python, not a Claude CLI process.
 
 ## API Key Threading
 

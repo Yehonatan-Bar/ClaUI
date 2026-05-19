@@ -886,6 +886,88 @@
             "Hook-guard: use deny/retry hook to enforce compression (requires hook support)"
           ],
           "description": "How Particle Accelerator integrates with Codex sessions."
+        },
+        "claudeMirror.secretProtection.enabled": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "Enable Secret Protection Broker: multi-boundary DLP that scans prompts, terminal output, MCP calls, Git commits, and more for leaked secrets, credentials, and sensitive data."
+        },
+        "claudeMirror.secretProtection.mode": {
+          "type": "string",
+          "default": "balanced",
+          "scope": "application",
+          "enum": [
+            "off",
+            "observe",
+            "balanced",
+            "strict"
+          ],
+          "enumDescriptions": [
+            "Off: secret protection disabled",
+            "Observe: log findings but never block or redact (audit-only)",
+            "Balanced: redact high-severity secrets, warn on medium, allow low",
+            "Strict: block or redact all detected secrets, require approval for borderline cases"
+          ],
+          "description": "Secret protection enforcement mode. Observe mode is safe for onboarding; balanced is recommended for daily use."
+        },
+        "claudeMirror.secretProtection.blockProtectedPaths": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Block agent access to sensitive file paths (.env, .ssh, .aws, private keys, terraform state). Disable per-workspace if needed."
+        },
+        "claudeMirror.secretProtection.scanPrompts": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Scan user prompts and attached context for secrets before sending to the remote model."
+        },
+        "claudeMirror.secretProtection.scanTerminalOutput": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Scan terminal/command output for secrets (extends Particle Accelerator redaction with structured DLP tokens)."
+        },
+        "claudeMirror.secretProtection.scanGitPublication": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Scan git commit diffs, messages, PR titles, and branch names for leaked secrets before publication."
+        },
+        "claudeMirror.secretProtection.scanMcp": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Scan MCP tool call arguments and responses for secrets before they cross trust boundaries."
+        },
+        "claudeMirror.secretProtection.requireBrowserCaptureApproval": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Require user approval before browser screenshots or page content are sent to the remote model."
+        },
+        "claudeMirror.secretProtection.exceptionMaxMinutes": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "maximum": 1440,
+          "scope": "application",
+          "description": "Maximum duration (minutes) for temporary secret protection exceptions. Exceptions auto-expire after this period."
+        },
+        "claudeMirror.secretProtection.auditRetentionDays": {
+          "type": "number",
+          "default": 90,
+          "minimum": 1,
+          "maximum": 365,
+          "scope": "application",
+          "description": "Days to retain DLP audit event logs before automatic cleanup."
+        },
+        "claudeMirror.secretProtection.enableEntropyScanner": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "description": "Enable experimental entropy-based secret detection. Uses Shannon entropy on sliding windows to catch high-randomness strings that may be secrets. May produce false positives."
         }
       }
     },

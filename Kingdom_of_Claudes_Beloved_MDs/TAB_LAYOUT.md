@@ -27,7 +27,7 @@ All three entry points write the same config key. `TabManager` listens for that 
   - `joinAllEditorGroups()` normalizes stale split/row layouts with `workbench.action.joinAllGroups` before refreshing either layout.
   - `broadcastTabsState()` sends the open tab list and active tab id to every webview as `tabList`.
   - `restoreFromSnapshot()` recreates tabs in one column first, then applies the selected layout after restore.
-- `src/extension/commands/tabGroupCommands.ts` - `claudeMirror.tabs.openLayoutMenu` QuickPick plus `claudeMirror.tabs.refreshList`, `claudeMirror.tabs.close`, and `claudeMirror.tabs.reorder` commands.
+- `src/extension/commands/tabGroupCommands.ts` - `claudeMirror.tabs.openLayoutMenu` QuickPick plus `claudeMirror.tabs.refreshList` (internal command, not in package.json contributes), `claudeMirror.tabs.close`, and `claudeMirror.tabs.reorder` commands.
 - `src/extension/webview/MessageHandler.ts` + `CodexMessageHandler.ts`
   - `setTabLayout` message writes the config key (`ConfigurationTarget.Global`).
   - `sendTabLayoutSetting()` pushes the current value to the webview as `tabLayoutSetting`; called on init and config changes.

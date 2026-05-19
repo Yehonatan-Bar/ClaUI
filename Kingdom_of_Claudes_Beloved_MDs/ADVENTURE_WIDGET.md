@@ -108,10 +108,10 @@ IDLE --[turnComplete]--> WALKING --[arrive]--> ENCOUNTER --[anim done]--> RESOLU
 
 ## Maze Generation
 
-Uses **recursive backtracker** algorithm on a 40x40 cell grid:
+Uses **recursive backtracker** algorithm on a 220x220 cell grid:
 - Walls exist by default between all cells
 - Passages stored as `Set<string>` of removed wall keys (format: `"x,y,E"` for east wall, `"x,y,S"` for south wall)
-- Initial generation: ~300 cells from center (grid position 20,20) to fill viewport with dense maze
+- Initial generation: ~300 cells from center (grid position 110,110) to fill viewport with dense maze
 - 8 torch markers placed at random visited cells for ambient glow
 
 ### Beat-to-Maze Mapping

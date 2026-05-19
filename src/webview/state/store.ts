@@ -1311,7 +1311,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           state.sessionId !== sessionId);
       return {
         sessionId,
-        model,
+        model: model || (isBrandNewSession ? null : state.model),
         ...(tabKind ? { tabKind } : {}),
         isConnected: true,
         lastError: null,

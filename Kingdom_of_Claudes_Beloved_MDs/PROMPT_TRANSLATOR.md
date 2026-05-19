@@ -125,6 +125,7 @@ Babel Fish acts as a **master switch** that controls both `promptTranslator.enab
 - Auto-translation triggers on each `assistantMessage` event (intermediate + final), with deduplication via `babelFishTranslatedIds` Set to prevent re-translating when `--include-partial-messages` fires duplicate events for the same message ID
 - The dedup set is cleared on the `result` event (end of turn), ready for the next turn
 - Code blocks (fenced ```) are stripped from the text before translation
-- MessageTranslator has a 30-second timeout; PromptTranslator has a 60-second timeout
+- MessageTranslator has a dynamic timeout that scales with text length: base 45s + 10s per 1000 characters, capped at 120s
+- PromptTranslator has a fixed 60-second timeout (input is truncated to 3000 characters)
 - Both translators use `buildClaudeCliEnv(apiKey)` from `envUtils.ts` for API key injection
-- Windows process tree kill uses `taskkill /F /T /PID` pattern (PromptTranslator only; MessageTranslator uses `child.kill('SIGTERM')`)
+- Both translators use `killProcessTree` for Windows process tree kill (`taskkill /F /T /PID` pattern)

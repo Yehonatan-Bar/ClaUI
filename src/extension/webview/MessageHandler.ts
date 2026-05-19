@@ -1632,7 +1632,7 @@ export class MessageHandler {
               this.webview.postMessage({
                 type: 'sessionStarted',
                 sessionId: this.processManager.currentSessionId || 'pending',
-                model: 'connecting...',
+                model: this.processManager.configuredModel,
                 provider: this.getActiveProvider(),
               });
             })
@@ -1743,7 +1743,7 @@ export class MessageHandler {
               this.webview.postMessage({
                 type: 'sessionStarted',
                 sessionId: this.processManager.currentSessionId || 'pending',
-                model: 'connecting...',
+                model: this.processManager.configuredModel,
                 provider: this.getActiveProvider(),
               });
             })
@@ -2807,7 +2807,7 @@ export class MessageHandler {
                 this.webview.postMessage({
                   type: 'sessionStarted',
                   sessionId: this.processManager.currentSessionId || 'pending',
-                  model: 'connecting...',
+                  model: this.processManager.configuredModel,
                   provider: this.getActiveProvider(),
                 });
                 // Send the edited message immediately - don't wait for system/init.
@@ -4226,7 +4226,7 @@ export class MessageHandler {
           this.currentThinkingEffort = event.thinking_effort;
           this.log(`system/init thinking_effort=${event.thinking_effort}`);
         }
-        // Update webview with real session info (replaces the "connecting..." placeholder)
+        // Update webview with real session info from CLI init event
         this.webview.postMessage({
           type: 'sessionStarted',
           sessionId: event.session_id,

@@ -937,7 +937,7 @@ export class SessionTab implements WebviewBridge {
     this.postMessage({
       type: 'sessionStarted',
       sessionId: this.processManager.currentSessionId || 'pending',
-      model: 'connecting...',
+      model: this.processManager.configuredModel,
       isResume: !!options?.resume,
       provider: this.getProvider(),
       tabKind: this.kind,

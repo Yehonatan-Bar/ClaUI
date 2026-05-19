@@ -58,11 +58,12 @@ Language change:
 
 ## MessageTranslator Service
 
-Follows the exact `SessionNamer` pattern:
+Follows the `SessionNamer` spawn pattern:
 - Spawns `claude -p --model claude-sonnet-4-6` as a child process
 - Pipes the translation prompt via stdin (avoids shell escaping issues)
-- Cleans environment (`CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT` deleted)
-- 30-second timeout (longer than SessionNamer's 10s since translations can be longer)
+- Cleans environment via `buildClaudeCliEnv(apiKey)` (strips `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `ANTHROPIC_API_KEY`, then injects explicit key)
+- **Dynamic timeout** that scales with text length: base 45 seconds + 10 seconds per 1000 characters, capped at 120 seconds
+- Uses `killProcessTree` on timeout (kills the entire process tree on Windows via `taskkill /F /T /PID`)
 - Accepts optional `language` parameter (defaults to config setting, then "Hebrew")
 - Returns translated text or `null` on failure
 
@@ -113,6 +114,6 @@ Zustand store fields:
 ## Interactions with Other Components
 
 - **RTL Detection** (`useRtlDetection.ts`): Exports `detectRtl()` for InputArea. Messages use `dir="auto"` natively. Translated content uses `dir="rtl"` for Hebrew/Arabic, `dir="auto"` for all other languages.
-- **SessionNamer** (`SessionNamer.ts`): Same CLI spawn pattern, different model (Sonnet vs Haiku) and timeout (30s vs 10s).
+- **SessionNamer** (`SessionNamer.ts`): Same CLI spawn pattern, different model (Sonnet vs Haiku) and timeout (dynamic 45-120s vs 10s).
 - **MessageHandler** (`MessageHandler.ts`): Translation is wired via `setMessageTranslator()` setter, same pattern as `setSessionNamer()` and `setActivitySummarizer()`.
 - **VitalsInfoPanel** (`VitalsInfoPanel.tsx`): Houses the language selection dropdown alongside other settings toggles.

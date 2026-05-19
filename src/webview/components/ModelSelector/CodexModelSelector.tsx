@@ -49,7 +49,7 @@ export const CodexModelSelector: React.FC = () => {
     postToExtension({ type: 'setModel', model: newModel });
   }, [setSelectedModel]);
 
-  const activeModelLabel = model && model !== 'connecting...' && model !== 'connected' && model !== 'unknown'
+  const activeModelLabel = model && model !== 'connected' && model !== 'unknown'
     ? model
     : null;
 

@@ -27,7 +27,7 @@ export const ModelSelector: React.FC = () => {
   }, [setSelectedModel]);
 
   // Resolve display label for active model (from CLI, shown as hint)
-  const activeModelLabel = model && model !== 'connecting...' && model !== 'connected' && model !== 'unknown'
+  const activeModelLabel = model && model !== 'connected' && model !== 'unknown'
     ? getClaudeModelLabel(model)
     : null;
 

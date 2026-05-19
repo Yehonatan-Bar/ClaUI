@@ -48,6 +48,10 @@ export class ClaudeProcessManager extends EventEmitter {
   private startModel = '';
   private startCwd = '';
 
+  get configuredModel(): string {
+    return this.startModel;
+  }
+
   /** Optional Particle Accelerator env builder; set by SessionTab when feature is enabled */
   particleAcceleratorEnvBuilder: ((baseEnv: NodeJS.ProcessEnv) => Record<string, string | undefined>) | null = null;
 
