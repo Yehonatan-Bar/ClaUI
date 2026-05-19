@@ -265,6 +265,14 @@ export class MultiParticipantSessionTab {
           void vscode.commands.executeCommand('claudeMirror.tabs.focus', msg.tabId);
           break;
 
+        case 'closeTab':
+          void vscode.commands.executeCommand('claudeMirror.tabs.close', msg.tabId);
+          break;
+
+        case 'reorderTabs':
+          void vscode.commands.executeCommand('claudeMirror.tabs.reorder', msg.tabIds);
+          break;
+
         case 'setTabLayout': {
           const layout = msg.layout as 'horizontal' | 'vertical';
           void vscode.workspace

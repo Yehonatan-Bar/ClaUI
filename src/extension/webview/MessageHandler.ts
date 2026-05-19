@@ -1986,6 +1986,14 @@ export class MessageHandler {
           void vscode.commands.executeCommand('claudeMirror.tabs.focus', msg.tabId);
           break;
 
+        case 'closeTab':
+          void vscode.commands.executeCommand('claudeMirror.tabs.close', msg.tabId);
+          break;
+
+        case 'reorderTabs':
+          void vscode.commands.executeCommand('claudeMirror.tabs.reorder', msg.tabIds);
+          break;
+
         case 'requestTabList':
           void vscode.commands.executeCommand('claudeMirror.tabs.refreshList');
           break;

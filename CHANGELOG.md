@@ -1,5 +1,20 @@
 # ClaUi - Changelog
 
+## v0.1.167 - 2026-05-19
+
+**Feature: Vertical Tab Rail enhancements**
+
+- **Native tab hiding**: When vertical tab mode is active, VS Code's native horizontal tab strip is automatically hidden (`workbench.editor.showTabs` set to `'none'`). The original value is saved and restored when switching back to horizontal mode, when a regular document gets focus, or on extension shutdown. Re-entering a ClaUi panel re-hides the native tabs automatically
+- **Resizable rail width**: The vertical tab rail can now be resized by dragging the handle on its right edge (80px-300px range). Double-click the handle to reset to the CSS default (`clamp(96px, 28vw, 132px)`). Width is stored in Zustand state and applied as a CSS custom property override
+- **Multi-participant tab support**: The vertical tab rail now appears on multi-participant session tabs. Previously, only chat and search tabs showed the rail. `wrapWithRail()` was lifted to the `App` component level so all tab kinds are wrapped uniformly. Added `requestTabList`, `focusTab`, `closeTab`, `reorderTabs`, and `setTabLayout` message handlers to `MultiParticipantSessionTab.ts`
+- **Document focus restore**: When a regular document (TextEditor) gains focus while vertical mode is active, native tabs are restored so the document's tab strip is visible. Returning to a ClaUi panel re-hides them. Uses `onDidChangeActiveTextEditor` and `WebviewPanel.onDidChangeViewState` listeners
+- **Hover-to-close button**: The provider letter (C for Claude, X for Codex, H for Happy) on each vertical tab item becomes a red X close button on hover. Clicking it sends `closeTab` to the extension, which disposes the tab. Uses CSS `::after` content swap with `data-letter` attribute
+- **Drag-and-drop reordering**: Tabs in the vertical rail can be reordered by dragging them up or down. A blue drop indicator line shows the target position during drag. On drop, the new order is persisted via `orderInGroup` on each snapshot entry. New command: `claudeMirror.tabs.reorder`, new message type: `reorderTabs`
+- New commands: `claudeMirror.tabs.close`, `claudeMirror.tabs.reorder` (both hidden from command palette)
+- New message types: `CloseTabRequest`, `ReorderTabsRequest`
+
+---
+
 ## v0.1.145 - 2026-05-13
 
 **Feature: Particle Accelerator — local command output compressor for AI agent sessions**

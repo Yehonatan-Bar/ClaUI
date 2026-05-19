@@ -484,6 +484,16 @@ export interface FocusTabRequest {
   tabId: string;
 }
 
+export interface CloseTabRequest {
+  type: 'closeTab';
+  tabId: string;
+}
+
+export interface ReorderTabsRequest {
+  type: 'reorderTabs';
+  tabIds: string[];
+}
+
 export interface RequestTabListRequest {
   type: 'requestTabList';
 }
@@ -943,6 +953,8 @@ export type WebviewToExtensionMessage =
   | SetVitalsEnabledRequest
   | SetTabLayoutRequest
   | FocusTabRequest
+  | CloseTabRequest
+  | ReorderTabsRequest
   | RequestTabListRequest
   | SetDetailedDiffViewEnabledRequest
   | SetAdventureWidgetEnabledRequest

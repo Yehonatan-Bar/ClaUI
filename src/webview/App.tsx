@@ -45,7 +45,9 @@ const VerticalTabRail: React.FC = () => {
   const activeTabId = useAppStore((s) => s.activeTabId);
   const setRailWidth = useAppStore((s) => s.setVerticalTabRailWidth);
   const railRef = useRef<HTMLElement>(null);
-  const dragging = useRef(false);
+  const resizing = useRef(false);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
 
   const sortedTabs = useMemo(
     () => [...tabs].sort((a, b) => (a.orderInGroup ?? a.tabNumber) - (b.orderInGroup ?? b.tabNumber)),
@@ -54,18 +56,18 @@ const VerticalTabRail: React.FC = () => {
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    dragging.current = true;
+    resizing.current = true;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
 
     const onMove = (ev: MouseEvent) => {
-      if (!dragging.current) return;
+      if (!resizing.current) return;
       const newWidth = Math.min(RAIL_MAX_WIDTH, Math.max(RAIL_MIN_WIDTH, ev.clientX));
       setRailWidth(newWidth);
     };
 
     const onUp = () => {
-      dragging.current = false;
+      resizing.current = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       document.removeEventListener('mousemove', onMove);
@@ -80,37 +82,88 @@ const VerticalTabRail: React.FC = () => {
     setRailWidth(null);
   }, [setRailWidth]);
 
+  const handleDrop = useCallback(() => {
+    if (!draggedId || dropIndex === null) return;
+    const fromIndex = sortedTabs.findIndex(t => t.id === draggedId);
+    if (fromIndex === -1 || fromIndex === dropIndex || fromIndex + 1 === dropIndex) {
+      setDraggedId(null);
+      setDropIndex(null);
+      return;
+    }
+    const ids = sortedTabs.map(t => t.id);
+    ids.splice(fromIndex, 1);
+    const insertAt = fromIndex < dropIndex ? dropIndex - 1 : dropIndex;
+    ids.splice(insertAt, 0, draggedId);
+    postToExtension({ type: 'reorderTabs', tabIds: ids });
+    setDraggedId(null);
+    setDropIndex(null);
+  }, [draggedId, dropIndex, sortedTabs]);
+
   if (sortedTabs.length <= 1) {
     return null;
   }
 
+  const dragFromIndex = draggedId ? sortedTabs.findIndex(t => t.id === draggedId) : -1;
+
   return (
     <nav className="vertical-tab-rail" aria-label="ClaUi tabs" ref={railRef}>
-      <div className="vertical-tab-rail-list">
-        {sortedTabs.map((tab) => {
+      <div
+        className="vertical-tab-rail-list"
+        onDragOver={(e) => e.preventDefault()}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropIndex(null);
+        }}
+        onDrop={(e) => { e.preventDefault(); handleDrop(); }}
+      >
+        {sortedTabs.map((tab, index) => {
           const isActive = tab.id === activeTabId;
+          const isDragged = tab.id === draggedId;
           const providerLabel =
             tab.provider === 'codex' ? 'Codex' : tab.provider === 'remote' ? 'Happy' : 'Claude';
+          const showDropBefore = dropIndex === index &&
+            dragFromIndex !== index && dragFromIndex !== index - 1;
+          const showDropAfter = dropIndex === sortedTabs.length &&
+            index === sortedTabs.length - 1 && dragFromIndex !== sortedTabs.length - 1;
           return (
-            <button
-              key={tab.id}
-              className={`vertical-tab-item ${isActive ? 'active' : ''} ${tab.isBusy ? 'vertical-tab-busy' : ''}`}
-              onClick={() => {
-                if (!isActive) {
-                  postToExtension({ type: 'focusTab', tabId: tab.id });
-                }
-              }}
-              style={{ '--tab-color': tab.slotColor } as React.CSSProperties}
-              title={`${providerLabel}: ${tab.displayName}`}
-              aria-current={isActive ? 'page' : undefined}
-            >
-              <span className="vertical-tab-title">{tab.displayName}</span>
-              {tab.provider !== 'claude' && (
-                <span className="vertical-tab-provider" aria-hidden="true">
-                  {tab.provider === 'codex' ? 'X' : 'H'}
-                </span>
-              )}
-            </button>
+            <React.Fragment key={tab.id}>
+              {showDropBefore && <div className="vertical-tab-drop-indicator" />}
+              <button
+                className={`vertical-tab-item ${isActive ? 'active' : ''} ${tab.isBusy ? 'vertical-tab-busy' : ''} ${isDragged ? 'vertical-tab-dragging' : ''}`}
+                draggable
+                onDragStart={(e) => {
+                  setDraggedId(tab.id);
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', tab.id);
+                }}
+                onDragEnd={() => { setDraggedId(null); setDropIndex(null); }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setDropIndex(e.clientY < rect.top + rect.height / 2 ? index : index + 1);
+                }}
+                onClick={() => {
+                  if (!isActive) {
+                    postToExtension({ type: 'focusTab', tabId: tab.id });
+                  }
+                }}
+                style={{ '--tab-color': tab.slotColor } as React.CSSProperties}
+                title={`${providerLabel}: ${tab.displayName}`}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <span className="vertical-tab-title">{tab.displayName}</span>
+                <span
+                  className="vertical-tab-provider"
+                  aria-label="Close tab"
+                  role="button"
+                  data-letter={tab.provider === 'codex' ? 'X' : tab.provider === 'remote' ? 'H' : 'C'}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    postToExtension({ type: 'closeTab', tabId: tab.id });
+                  }}
+                />
+              </button>
+              {showDropAfter && <div className="vertical-tab-drop-indicator" />}
+            </React.Fragment>
           );
         })}
       </div>

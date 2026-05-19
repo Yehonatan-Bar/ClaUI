@@ -166,6 +166,14 @@
         "title": "ClaUi: Focus Tab"
       },
       {
+        "command": "claudeMirror.tabs.close",
+        "title": "ClaUi: Close Tab"
+      },
+      {
+        "command": "claudeMirror.tabs.reorder",
+        "title": "ClaUi: Reorder Tabs"
+      },
+      {
         "command": "claudeMirror.groups.create",
         "title": "ClaUi: New Folder",
         "icon": "$(new-folder)"
@@ -987,6 +995,14 @@
         },
         {
           "command": "claudeMirror.tabs.focus",
+          "when": "false"
+        },
+        {
+          "command": "claudeMirror.tabs.close",
+          "when": "false"
+        },
+        {
+          "command": "claudeMirror.tabs.reorder",
           "when": "false"
         },
         {

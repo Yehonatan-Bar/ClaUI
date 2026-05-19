@@ -610,6 +610,20 @@ export class TabManager {
     // onClosed callback handles map cleanup and active selection
   }
 
+  /** Reorder tabs based on the given array of tab IDs. */
+  reorderTabs(tabIds: string[]): void {
+    for (let i = 0; i < tabIds.length; i++) {
+      const entry = this.snapshotEntries.get(tabIds[i]);
+      if (entry) {
+        entry.orderInGroup = i;
+        entry.savedAt = new Date().toISOString();
+      }
+    }
+    this.schedulePersistSnapshot();
+    this.treeChangeEmitter.fire();
+    this.broadcastTabsState();
+  }
+
   getTabById(tabId: string): ManagedTab | null {
     const tab = this.tabs.get(tabId);
     if (!tab) {

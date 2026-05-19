@@ -27,12 +27,12 @@ All three entry points write the same config key. `TabManager` listens for that 
   - `joinAllEditorGroups()` normalizes stale split/row layouts with `workbench.action.joinAllGroups` before refreshing either layout.
   - `broadcastTabsState()` sends the open tab list and active tab id to every webview as `tabList`.
   - `restoreFromSnapshot()` recreates tabs in one column first, then applies the selected layout after restore.
-- `src/extension/commands/tabGroupCommands.ts` - `claudeMirror.tabs.openLayoutMenu` QuickPick plus `claudeMirror.tabs.refreshList` for webview tab-list refresh requests.
+- `src/extension/commands/tabGroupCommands.ts` - `claudeMirror.tabs.openLayoutMenu` QuickPick plus `claudeMirror.tabs.refreshList`, `claudeMirror.tabs.close`, and `claudeMirror.tabs.reorder` commands.
 - `src/extension/webview/MessageHandler.ts` + `CodexMessageHandler.ts`
   - `setTabLayout` message writes the config key (`ConfigurationTarget.Global`).
   - `sendTabLayoutSetting()` pushes the current value to the webview as `tabLayoutSetting`; called on init and config changes.
 - `src/webview/App.tsx`
-  - `VerticalTabRail` renders the left-side in-webview tab navigator when vertical mode is active and more than one tab is open. Includes a draggable resize handle on the right edge (80px-300px, double-click to reset).
+  - `VerticalTabRail` renders the left-side in-webview tab navigator when vertical mode is active and more than one tab is open. Includes a draggable resize handle on the right edge (80px-300px, double-click to reset). Tabs are drag-and-drop reorderable; the provider letter (C/X/H) becomes a red close button on hover.
   - The `App` component wraps all tab kinds (chat, search, multiparticipant) with `wrapWithRail()`, so the vertical rail appears regardless of which tab kind is active.
 - `src/webview/state/store.ts` - `tabLayout`, `verticalTabRailWidth`, `openTabs`, `activeTabId`, `setTabLayout()`, `setVerticalTabRailWidth()`, and `setOpenTabs()`.
 - `src/webview/hooks/useClaudeStream.ts` - handles inbound `tabLayoutSetting` and `tabList`; sends `requestTabList` on webview ready.
@@ -45,6 +45,8 @@ All three entry points write the same config key. `TabManager` listens for that 
 - Vertical mode hides VS Code's native horizontal tab strip via `workbench.editor.showTabs = 'none'`. The original value is saved and restored when switching back to horizontal or on extension shutdown.
 - The vertical rail width is resizable by dragging the handle on its right edge. Double-click resets to the CSS default (`clamp(96px, 28vw, 132px)`). Width is stored in Zustand state (`verticalTabRailWidth`) and applied as a CSS variable override.
 - Clicking an item in the vertical rail posts `focusTab`, which routes through the existing `claudeMirror.tabs.focus` command.
+- Hovering over the provider letter (C/X/H) on a tab item turns it into a red X close button. Clicking it sends `closeTab` -> `claudeMirror.tabs.close`.
+- Tabs can be reordered by dragging them up/down. A blue drop indicator shows the target position. On drop, `reorderTabs` -> `claudeMirror.tabs.reorder` updates `orderInGroup` on each snapshot entry and persists the new order.
 - Both layouts collapse stale editor splits into one editor group so old row layouts are repaired when the user toggles again.
 - Horizontal mode no longer calls `workbench.action.closeSidebar`; Explorer/sidebar state is left alone.
 

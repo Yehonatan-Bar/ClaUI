@@ -58,7 +58,7 @@ html, body, #root {
 }
 
 .app-container--vertical-tabs {
-  padding-left: var(--vertical-tab-rail-width);
+  padding-left: 0;
 }
 
 .app-vertical-rail-wrapper {
@@ -71,18 +71,16 @@ html, body, #root {
 .app-vertical-rail-wrapper > :not(.vertical-tab-rail) {
   flex: 1;
   min-width: 0;
-  margin-left: var(--vertical-tab-rail-width);
 }
 
 .vertical-tab-rail {
-  position: absolute;
-  inset: 0 auto 0 0;
+  position: relative;
+  flex-shrink: 0;
   width: var(--vertical-tab-rail-width);
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--vscode-panel-border, #333);
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
-  z-index: 20;
 }
 
 .vertical-tab-rail-list {
@@ -144,6 +142,37 @@ html, body, #root {
   font-size: 10px;
   font-weight: 700;
   text-align: center;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.vertical-tab-provider::after {
+  content: attr(data-letter);
+}
+.vertical-tab-item:hover .vertical-tab-provider::after {
+  content: '\00d7';
+}
+.vertical-tab-item:hover .vertical-tab-provider {
+  color: #f44747;
+  font-size: 14px;
+  font-weight: 400;
+}
+.vertical-tab-provider:hover {
+  background: rgba(244, 71, 71, 0.2);
+}
+
+.vertical-tab-item.vertical-tab-dragging {
+  opacity: 0.35;
+}
+
+.vertical-tab-drop-indicator {
+  height: 2px;
+  background: var(--vscode-focusBorder, #3794ff);
+  border-radius: 1px;
+  margin: 0 6px;
+  flex-shrink: 0;
 }
 
 .vertical-tab-resize-handle {

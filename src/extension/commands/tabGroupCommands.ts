@@ -63,6 +63,14 @@ export function registerTabGroupCommands(
       tabManager.broadcastTabsState();
     }),
 
+    vscode.commands.registerCommand('claudeMirror.tabs.close', (tabId: string) => {
+      tabManager.closeTab(tabId);
+    }),
+
+    vscode.commands.registerCommand('claudeMirror.tabs.reorder', (tabIds: string[]) => {
+      tabManager.reorderTabs(tabIds);
+    }),
+
     // Create a top-level folder
     vscode.commands.registerCommand('claudeMirror.groups.create', async () => {
       const label = await vscode.window.showInputBox({
