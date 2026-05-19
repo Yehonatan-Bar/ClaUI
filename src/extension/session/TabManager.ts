@@ -79,6 +79,9 @@ export class TabManager {
   /** Shared Particle Accelerator service, injected after construction */
   particleAcceleratorService: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService | null = null;
 
+  /** Shared Secret Protection service, injected after construction */
+  secretProtectionService: import('../secret-protection/SecretProtectionService').SecretProtectionService | null = null;
+
   private readonly snapshotStore: OpenTabsSnapshotStore;
   private readonly snapshotEntries = new Map<string, OpenTabSnapshotEntry>();
   private snapshotDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -344,6 +347,9 @@ export class TabManager {
     if (this.particleAcceleratorService) {
       tab.setParticleAcceleratorService(this.particleAcceleratorService);
     }
+    if (this.secretProtectionService) {
+      tab.setSecretProtectionService(this.secretProtectionService);
+    }
     tab.setSessionStore(this.sessionStore);
     tab.setOpenTabSessionIdsGetter(() => this.getOpenTabSessionIds());
     this.seedSnapshotEntry(tab);
@@ -402,6 +408,9 @@ export class TabManager {
     }
     if (this.particleAcceleratorService) {
       tab.setParticleAcceleratorService(this.particleAcceleratorService);
+    }
+    if (this.secretProtectionService) {
+      tab.setSecretProtectionService(this.secretProtectionService);
     }
     tab.setSessionStore(this.sessionStore);
     tab.setOpenTabSessionIdsGetter(() => this.getOpenTabSessionIds());
@@ -570,6 +579,17 @@ export class TabManager {
     const selected = pickPreferredCodexCliCandidate(candidates);
     await config.update('codex.cliPath', selected.path, true);
     this.log(`[SmartSearch] Proactively configured Codex CLI: "${selected.path}" (${selected.version ?? 'unknown'}).`);
+  }
+
+  /** Re-apply SecretProtectionService to all existing tabs (called when settings change at runtime). */
+  refreshSecretProtectionForAllTabs(): void {
+    if (!this.secretProtectionService) { return; }
+    for (const tab of this.tabs.values()) {
+      if (tab.isDisposed) { continue; }
+      if ('setSecretProtectionService' in tab) {
+        (tab as SessionTab | CodexSessionTab).setSecretProtectionService(this.secretProtectionService);
+      }
+    }
   }
 
   /** Get the currently focused tab, or null if none (skips disposed zombie tabs) */

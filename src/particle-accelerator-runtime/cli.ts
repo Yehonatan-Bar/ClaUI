@@ -19,6 +19,9 @@ import {
   ParticleAcceleratorTrace, ParticleAcceleratorContextFile, FilterConfig,
   CLAUI_PARTICLE_ACCELERATOR_SCHEMA_VERSION,
 } from '../extension/particle-accelerator/ParticleAcceleratorTypes';
+import { CompositeSecretScanner } from '../shared/secret-protection/scanners/CompositeSecretScanner';
+import { RedactionEngine } from '../shared/secret-protection/RedactionEngine';
+import type { SecretProtectionSettings, FindingSeverity } from '../shared/secret-protection/types';
 
 const MAX_OUTPUT_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -115,6 +118,91 @@ async function main(): Promise<void> {
     allRulesTriggered.add('ERROR');
   }
 
+  // Secret Protection DLP scanning (complements existing SecretRedactor)
+  let dlpFindingCount = 0;
+  const dlpBoundaries: string[] = [];
+  let dlpSeverityMax: string | null = null;
+  let dlpRedactionTokenCount = 0;
+
+  const secretProtectionEnabled = process.env.CLAUI_SECRET_PROTECTION === '1';
+  const secretProtectionMode = process.env.CLAUI_SECRET_PROTECTION_MODE ?? 'balanced';
+  const scanTerminalOutput = process.env.CLAUI_SECRET_PROTECTION_SCAN_TERMINAL !== 'false';
+
+  // Shared scanner instance: reused for both terminal and persistence boundaries
+  let dlpScanner: CompositeSecretScanner | null = null;
+
+  if (secretProtectionEnabled && secretProtectionMode !== 'off') {
+    try {
+      const spSettings: SecretProtectionSettings = {
+        enabled: true,
+        mode: secretProtectionMode as SecretProtectionSettings['mode'],
+        blockProtectedPaths: true,
+        scanPrompts: true,
+        scanTerminalOutput,
+        scanGitPublication: true,
+        scanMcp: true,
+        requireBrowserCaptureApproval: true,
+        exceptionMaxMinutes: 30,
+        auditRetentionDays: 90,
+        enableEntropyScanner: process.env.CLAUI_SECRET_PROTECTION_ENTROPY === 'true',
+      };
+      dlpScanner = new CompositeSecretScanner(spSettings);
+    } catch {
+      // Scanner construction failure; proceed without DLP
+    }
+  }
+
+  const STRUCTURED_TOKEN_RE = /<REDACTED\s+type="[^"]*"\s+id="[^"]*"\s*\/>/g;
+
+  if (dlpScanner && scanTerminalOutput) {
+    try {
+      const terminalContext = {
+        boundary: 'command.output' as const,
+        destination: { kind: 'terminal_stdout_to_agent' as const, trustTier: 'trusted_local' as const },
+      };
+
+      // Scan stdout and stderr SEPARATELY so byte offsets match each string
+      const stdoutScan = dlpScanner.scan(redactedStdout, terminalContext);
+      const stderrScan = dlpScanner.scan(redactedStderr, terminalContext);
+
+      dlpFindingCount = stdoutScan.findings.length + stderrScan.findings.length;
+      if (dlpFindingCount > 0) {
+        dlpBoundaries.push('command.output');
+      }
+
+      const severityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+      let maxSevNum = 0;
+      for (const f of [...stdoutScan.findings, ...stderrScan.findings]) {
+        const num = severityOrder[f.severity] ?? 0;
+        if (num > maxSevNum) {
+          maxSevNum = num;
+          dlpSeverityMax = f.severity;
+        }
+      }
+
+      if (secretProtectionMode === 'strict' || secretProtectionMode === 'balanced') {
+        const dlpEngine = new RedactionEngine();
+
+        if (stdoutScan.findings.length > 0) {
+          const r = dlpEngine.redact(redactedStdout, stdoutScan.findings);
+          redactedStdout = r.redacted.replace(STRUCTURED_TOKEN_RE, '[REDACTED]');
+          dlpRedactionTokenCount += r.replacementCount;
+          totalRedactions += r.replacementCount;
+        }
+
+        if (stderrScan.findings.length > 0) {
+          const engine2 = new RedactionEngine();
+          const r = engine2.redact(redactedStderr, stderrScan.findings);
+          redactedStderr = r.redacted.replace(STRUCTURED_TOKEN_RE, '[REDACTED]');
+          dlpRedactionTokenCount += r.replacementCount;
+          totalRedactions += r.replacementCount;
+        }
+      }
+    } catch {
+      // DLP scanning is best-effort in the CLI pipeline
+    }
+  }
+
   // Classify command for filter selection
   const classification = classifyCommand(command);
   const commandFamily = classification.commandFamily ?? 'unknown';
@@ -198,19 +286,63 @@ async function main(): Promise<void> {
   if (storeDir) {
     const traceWriter = new CommandTraceWriter(storeDir);
 
-    // Write raw redacted logs
+    // Write raw redacted logs (persistence boundary: may apply stricter
+    // redaction than terminal output -- e.g. PII is allowed to terminal
+    // but redacted for persistence)
     let stdoutLogPath: string | null = null;
     let stderrLogPath: string | null = null;
 
     if (storeRawLogs) {
+      let persistStdout = redactedStdout;
+      let persistStderr = redactedStderr;
+
+      if (dlpScanner) {
+        try {
+          const persistContext = {
+            boundary: 'persistence.write' as const,
+            destination: { kind: 'local_disk' as const, trustTier: 'trusted_local' as const },
+          };
+          const pStdout = dlpScanner.scan(persistStdout, persistContext);
+          if (pStdout.findings.length > 0) {
+            const eng = new RedactionEngine();
+            const pResult = eng.redact(persistStdout, pStdout.findings);
+            persistStdout = pResult.redacted.replace(STRUCTURED_TOKEN_RE, '[REDACTED]');
+            dlpFindingCount += pStdout.findings.length;
+            dlpRedactionTokenCount += pResult.replacementCount;
+            if (!dlpBoundaries.includes('persistence.write')) {
+              dlpBoundaries.push('persistence.write');
+            }
+          }
+          const pStderr = dlpScanner.scan(persistStderr, persistContext);
+          if (pStderr.findings.length > 0) {
+            const eng = new RedactionEngine();
+            const pResult = eng.redact(persistStderr, pStderr.findings);
+            persistStderr = pResult.redacted.replace(STRUCTURED_TOKEN_RE, '[REDACTED]');
+            dlpFindingCount += pStderr.findings.length;
+            dlpRedactionTokenCount += pResult.replacementCount;
+          }
+          // Update severity max from persistence findings
+          const persistSeverityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+          for (const f of [...pStdout.findings, ...pStderr.findings]) {
+            const num = persistSeverityOrder[f.severity] ?? 0;
+            const curMax = dlpSeverityMax ? (persistSeverityOrder[dlpSeverityMax] ?? 0) : 0;
+            if (num > curMax) {
+              dlpSeverityMax = f.severity;
+            }
+          }
+        } catch {
+          // Persistence scan failure; write with terminal-redacted content
+        }
+      }
+
       try {
-        await traceWriter.writeRawLog(traceId, 'stdout', redactedStdout);
+        await traceWriter.writeRawLog(traceId, 'stdout', persistStdout);
         stdoutLogPath = `raw/${new Date().toISOString().slice(0, 10)}/${traceId}.stdout.log`;
       } catch {
         // Can't write raw log; continue
       }
       try {
-        await traceWriter.writeRawLog(traceId, 'stderr', redactedStderr);
+        await traceWriter.writeRawLog(traceId, 'stderr', persistStderr);
         stderrLogPath = `raw/${new Date().toISOString().slice(0, 10)}/${traceId}.stderr.log`;
       } catch {
         // Can't write raw log; continue
@@ -223,6 +355,38 @@ async function main(): Promise<void> {
     const totalRaw = rawStdoutBytes + rawStderrBytes;
     const totalFiltered = filterOutput.filteredStdoutBytes + filterOutput.filteredStderrBytes;
 
+    // DLP: scan command string before persisting in trace (may contain secrets as args)
+    let safeCommand = command;
+    if (dlpScanner) {
+      try {
+        const cmdContext = {
+          boundary: 'persistence.write' as const,
+          destination: { kind: 'local_disk' as const, trustTier: 'trusted_local' as const },
+        };
+        const cmdScan = dlpScanner.scan(command, cmdContext);
+        if (cmdScan.findings.length > 0) {
+          const cmdEngine = new RedactionEngine();
+          safeCommand = cmdEngine.redact(command, cmdScan.findings).redacted
+            .replace(STRUCTURED_TOKEN_RE, '[REDACTED]');
+          dlpFindingCount += cmdScan.findings.length;
+          dlpRedactionTokenCount += cmdScan.findings.length;
+          if (!dlpBoundaries.includes('persistence.write')) {
+            dlpBoundaries.push('persistence.write');
+          }
+          const severityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+          for (const f of cmdScan.findings) {
+            const num = severityOrder[f.severity] ?? 0;
+            const curMax = dlpSeverityMax ? (severityOrder[dlpSeverityMax] ?? 0) : 0;
+            if (num > curMax) {
+              dlpSeverityMax = f.severity;
+            }
+          }
+        }
+      } catch {
+        // Command scan failure; persist original command
+      }
+    }
+
     const trace: ParticleAcceleratorTrace = {
       schemaVersion: CLAUI_PARTICLE_ACCELERATOR_SCHEMA_VERSION,
       traceId,
@@ -233,9 +397,9 @@ async function main(): Promise<void> {
       turnId: context?.turnId ?? null,
       workspacePath: context?.workspacePath ?? cwd,
       command: {
-        original: command,
+        original: safeCommand,
         family: commandFamily,
-        encoded: base64urlEncode(command),
+        encoded: base64urlEncode(safeCommand),
       },
       execution: {
         exitCode: result.exitCode,
@@ -270,6 +434,12 @@ async function main(): Promise<void> {
         stdoutLogPath,
         stderrLogPath,
       },
+      dlp: secretProtectionEnabled ? {
+        findingCount: dlpFindingCount,
+        boundaries: dlpBoundaries,
+        severityMax: dlpSeverityMax,
+        redactionTokenCount: dlpRedactionTokenCount,
+      } : undefined,
     };
 
     try {

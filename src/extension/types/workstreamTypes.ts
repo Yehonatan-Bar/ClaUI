@@ -58,7 +58,8 @@ export type ModelTier =
 
 export type WorkstreamSource =
   | 'session'
-  | 'external_folder';
+  | 'external_folder'
+  | 'git_history';
 
 // --- Supporting types ---
 
@@ -499,6 +500,7 @@ export interface WorkstreamMapFilter {
 
 export interface EnrichedSessionData {
   sessionId: string;
+  source?: 'session' | 'git_history';
   firstPrompt?: string;
   summary?: string;
   filesModified?: string[];

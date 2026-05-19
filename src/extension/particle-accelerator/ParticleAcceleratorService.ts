@@ -38,6 +38,9 @@ export class ParticleAcceleratorService implements vscode.Disposable {
   async initialize(): Promise<void> {
     if (!this.settings.enabled) {
       this.log('[ParticleAccelerator] Disabled by settings');
+      // Clean up stale hooks from a previous enabled session and
+      // update runtime files so the env-var kill-switch is deployed
+      await this.cleanupWhenDisabled();
       return;
     }
 
@@ -75,10 +78,14 @@ export class ParticleAcceleratorService implements vscode.Disposable {
       }).catch(() => {});
 
       // Listen for settings changes
-      this.disposables.push(onSettingsChanged(newSettings => {
+      this.disposables.push(onSettingsChanged(async newSettings => {
+        const wasEnabled = this.settings.enabled;
         this.settings = newSettings;
         if (this.hookManager) {
           this.hookManager = new ParticleAcceleratorHookManager(this.runtimePaths!, newSettings);
+        }
+        if (wasEnabled && !newSettings.enabled) {
+          await this.uninstallAllHooks();
         }
       }));
 
@@ -139,6 +146,9 @@ export class ParticleAcceleratorService implements vscode.Disposable {
   }
 
   async setEnabled(enabled: boolean): Promise<void> {
+    if (!enabled) {
+      await this.uninstallAllHooks();
+    }
     await vscode.workspace.getConfiguration('claudeMirror.particleAccelerator')
       .update('enabled', enabled, vscode.ConfigurationTarget.Global);
     this.settings = { ...this.settings, enabled };
@@ -158,6 +168,42 @@ export class ParticleAcceleratorService implements vscode.Disposable {
       d.dispose();
     }
     this.disposables = [];
+  }
+
+  private async uninstallAllHooks(): Promise<void> {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) return;
+
+    // Uninstall methods only use the MANAGED_MARKER to find/remove entries,
+    // so dummy runtimePaths are safe when the real ones aren't available
+    const dummyPaths: ParticleAcceleratorRuntimePaths = {
+      binDir: '', runnerJs: '', hooksDir: '', storeDir: '',
+    };
+    const hm = this.hookManager
+      ?? new ParticleAcceleratorHookManager(this.runtimePaths ?? dummyPaths, this.settings);
+
+    for (const folder of folders) {
+      const wp = folder.uri.fsPath;
+      try { await hm.uninstallClaudeHook(wp); } catch { /* best effort */ }
+      try { await hm.uninstallCodexHook(wp); } catch { /* best effort */ }
+    }
+    this.cachedClaudeHookInstalled = false;
+    this.cachedCodexHookInstalled = false;
+    this.log('[ParticleAccelerator] Hooks uninstalled (feature disabled)');
+  }
+
+  /** On cold start with disabled: uninstall stale hooks and update runtime files so the kill-switch is deployed */
+  private async cleanupWhenDisabled(): Promise<void> {
+    await this.uninstallAllHooks();
+
+    // Update runtime files so the env-var kill-switch is in the compiled hook scripts.
+    // This protects hooks installed in workspaces not currently open.
+    try {
+      await this.installer.ensureRuntime();
+      this.log('[ParticleAccelerator] Runtime updated (kill-switch deployed for stale hooks)');
+    } catch {
+      // Non-critical — the hooks in open workspaces are already uninstalled above
+    }
   }
 
   private getStoreDir(): string {

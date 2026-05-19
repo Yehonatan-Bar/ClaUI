@@ -43,6 +43,14 @@ export function buildParticleAcceleratorAgentEnv(input: ParticleAcceleratorEnvIn
     env.CLAUI_PARTICLE_ACCELERATOR_STORE_RAW_LOGS = input.storeRawLogs ? 'true' : 'false';
   }
 
+  // Pass secret protection settings to CLI runtime
+  if (input.secretProtection?.enabled) {
+    env.CLAUI_SECRET_PROTECTION = '1';
+    env.CLAUI_SECRET_PROTECTION_MODE = input.secretProtection.mode;
+    env.CLAUI_SECRET_PROTECTION_ENTROPY = input.secretProtection.enableEntropyScanner ? 'true' : 'false';
+    env.CLAUI_SECRET_PROTECTION_SCAN_TERMINAL = input.secretProtection.scanTerminalOutput ? 'true' : 'false';
+  }
+
   // Remove external telemetry vars
   for (const key of Object.keys(env)) {
     if (TELEMETRY_VARS_TO_REMOVE.some(p => p.test(key))) {

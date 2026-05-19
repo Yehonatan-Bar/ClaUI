@@ -67,6 +67,9 @@ export class CodexExecProcessManager extends EventEmitter {
   /** Optional Particle Accelerator env builder; set by SessionTab when feature is enabled */
   particleAcceleratorEnvBuilder: ((baseEnv: NodeJS.ProcessEnv) => Record<string, string | undefined>) | null = null;
 
+  /** Whether secret protection DLP scanning is active; set by CodexSessionTab */
+  secretProtectionEnabled = false;
+
   constructor(private readonly context: vscode.ExtensionContext) {
     super();
     void this.context; // retained for symmetry with ClaudeProcessManager and future use
@@ -140,6 +143,11 @@ export class CodexExecProcessManager extends EventEmitter {
       } catch (err) {
         this.log(`Particle Accelerator env injection failed: ${err instanceof Error ? err.message : err}`);
       }
+    }
+
+    // Signal secret protection to the CLI process and hooks
+    if (this.secretProtectionEnabled) {
+      env.CLAUI_SECRET_PROTECTION = '1';
     }
 
     const child = spawn(cliPath, args, {

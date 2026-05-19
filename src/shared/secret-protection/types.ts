@@ -8,58 +8,96 @@ export type TrustTier =
   | 'public';
 
 export type DestinationKind =
+  | 'local_agent'
+  | 'remote_model_provider'
+  | 'terminal_stdout_to_agent'
   | 'local_disk'
-  | 'local_terminal'
-  | 'remote_model'
-  | 'mcp_server'
   | 'git_remote'
-  | 'browser'
-  | 'trace_log';
+  | 'mcp_server'
+  | 'browser_context'
+  | 'telemetry_backend'
+  | 'diagnostic_export';
 
 export interface DlpDestination {
   kind: DestinationKind;
-  provider: string | null;
-  remote: boolean;
+  provider?: 'anthropic' | 'openai' | 'github' | 'other';
+  remote?: boolean;
+  host?: string;
   trustTier: TrustTier;
 }
 
 // --- Boundary ---
 
 export type DlpBoundary =
-  | 'prompt_submission'
-  | 'context_expansion'
-  | 'file_exposure'
-  | 'command_execution'
-  | 'terminal_output'
-  | 'mcp_tool_call'
-  | 'browser_screenshot'
-  | 'git_publication'
-  | 'persistence';
+  | 'prompt.submit'
+  | 'context.attach'
+  | 'file.read_for_context'
+  | 'command.preflight'
+  | 'command.output'
+  | 'git.diff'
+  | 'git.publish'
+  | 'mcp.request'
+  | 'mcp.response'
+  | 'browser.capture'
+  | 'persistence.write'
+  | 'telemetry.export'
+  | 'diagnostic.export';
+
+// --- Source ---
+
+export interface DlpSource {
+  kind: 'text' | 'file' | 'terminal' | 'git' | 'mcp' | 'browser' | 'config' | 'trace';
+  path?: string;
+  command?: string;
+  lineRange?: { start: number; end: number };
+  uri?: string;
+  toolName?: string;
+}
 
 // --- Findings & Redaction ---
 
-export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
-export type FindingConfidence = 'definite' | 'high' | 'medium' | 'low';
+export type FindingSeverity = 'critical' | 'high' | 'medium' | 'low';
+export type FindingConfidence = 'high' | 'medium' | 'low';
+
+export type FindingType =
+  | 'hard_secret'
+  | 'api_key'
+  | 'private_key'
+  | 'cloud_credential'
+  | 'database_credential'
+  | 'jwt'
+  | 'webhook'
+  | 'pii'
+  | 'internal_topology'
+  | 'protected_path'
+  | 'agent_control_file'
+  | 'git_control_file'
+  | 'prompt_injection_marker'
+  | 'network_exfil_primitive'
+  | 'large_sensitive_output';
 
 export interface DlpFinding {
+  id: string;
   ruleId: string;
-  type: string;
+  type: FindingType;
   severity: FindingSeverity;
   confidence: FindingConfidence;
   location: {
-    offset: number;
-    length: number;
-    lineNumber?: number;
-    context?: string;
+    byteStart?: number;
+    byteEnd?: number;
+    line?: number;
+    path?: string;
   };
-  redactionToken: RedactionToken;
+  redaction: RedactionToken;
 }
 
 export interface RedactionToken {
   text: string;
+  type: string;
   stableId: string;
   hashPrefix: string;
   originalLength: number;
+  sourceHint?: string;
 }
 
 // --- Events ---
@@ -67,10 +105,14 @@ export interface RedactionToken {
 export interface DlpEvent {
   id: string;
   timestamp: string;
-  sessionId: string | null;
+  sessionId?: string;
+  turnId?: string;
+  provider: 'claude' | 'codex';
+  workspacePath: string;
   boundary: DlpBoundary;
-  source: string;
+  source: DlpSource;
   destination: DlpDestination;
+  contentPreview?: string;
   contentBytes: number;
   contentHash: string;
 }
@@ -85,12 +127,28 @@ export type DlpAction =
   | 'block'
   | 'summarize_locally';
 
+export interface ApprovalRequest {
+  findingId: string;
+  boundary: DlpBoundary;
+  destination: DlpDestination;
+  description: string;
+  options: ApprovalOption[];
+}
+
+export type ApprovalOption =
+  | 'redact_and_continue'
+  | 'remove_from_context'
+  | 'approve_once'
+  | 'block';
+
 export interface DlpDecision {
   action: DlpAction;
-  findings: DlpFinding[];
-  redactedContent: string | null;
-  audit: AuditEvent | null;
   reason: string;
+  findings: DlpFinding[];
+  redactedContent?: string;
+  safeSummary?: string;
+  approvalRequest?: ApprovalRequest;
+  audit: AuditEvent;
 }
 
 // --- Audit ---
@@ -98,15 +156,21 @@ export interface DlpDecision {
 export interface AuditEvent {
   id: string;
   timestamp: string;
-  sessionId: string | null;
+  sessionId?: string;
+  turnId?: string;
   boundary: DlpBoundary;
   action: DlpAction;
   ruleIds: string[];
   findingTypes: string[];
   severityMax: FindingSeverity | null;
+  destinationKind: DestinationKind;
+  destinationHostHash?: string;
   contentHash: string;
+  redactedBytes: number;
   redactionCount: number;
-  destination: DlpDestination;
+  pathCategory?: string;
+  approvedBy?: string;
+  approvalExpiresAt?: string;
 }
 
 // --- Exceptions ---
@@ -115,55 +179,72 @@ export interface DlpException {
   id: string;
   createdAt: string;
   expiresAt: string;
-  provider: string | null;
-  destination: DlpDestination | null;
-  ruleId: string | null;
-  boundary: DlpBoundary | null;
+  userId: string;
+  workspaceHash: string;
+  provider: 'claude' | 'codex';
+  destination: DlpDestination;
+  ruleId: string;
+  pathPattern?: string;
+  commandPatternHash?: string;
   maxUses: number;
-  usesRemaining: number;
+  usedCount: number;
 }
 
 // --- Command Risk ---
 
 export type CommandRiskClass =
   | 'safe_read'
-  | 'safe_write_local'
+  | 'build_or_test'
+  | 'package_install'
   | 'credential_discovery'
-  | 'credential_use'
+  | 'env_dump'
+  | 'secret_file_read'
   | 'network_download'
   | 'network_upload'
   | 'git_publish'
-  | 'git_history_rewrite'
-  | 'agent_control_read'
+  | 'git_control_write'
   | 'agent_control_write'
   | 'shell_obfuscation'
-  | 'process_injection'
-  | 'file_exfiltration'
-  | 'environment_mutation'
-  | 'service_management'
-  | 'unknown';
+  | 'destructive'
+  | 'long_running'
+  | 'interactive'
+  | 'browser_capture';
 
 export interface CommandRisk {
   classes: CommandRiskClass[];
   severity: FindingSeverity;
   requiresApproval: boolean;
   hardBlock: boolean;
+  explanation: string;
 }
 
 // --- Context Manifest ---
 
-export interface ContextManifestEntry {
-  filePath: string;
-  sizeBytes: number;
-  sensitive: boolean;
-  findings: DlpFinding[];
-}
-
 export interface ContextManifest {
-  attachedFiles: ContextManifestEntry[];
-  screenshots: ContextManifestEntry[];
-  mcpResources: ContextManifestEntry[];
-  decision: DlpDecision | null;
+  sessionId: string;
+  turnId: string;
+  provider: 'claude' | 'codex';
+  model?: string;
+  destination: DlpDestination;
+  userPromptBytes: number;
+  attachedFiles: Array<{
+    path: string;
+    lineRange?: { start: number; end: number };
+    byteCount: number;
+    sensitivity: 'normal' | 'sensitive' | 'protected';
+    findings: DlpFinding[];
+  }>;
+  screenshots: Array<{
+    source: string;
+    domain?: string;
+    authenticated?: boolean;
+  }>;
+  mcpResources: Array<{
+    server: string;
+    resource: string;
+    trustTier: string;
+  }>;
+  decision: DlpDecision;
 }
 
 // --- Settings ---
@@ -187,12 +268,15 @@ export interface SecretProtectionSettings {
 // --- Policy Config ---
 
 export interface PolicyConfig {
+  schemaVersion: number;
   mode: SecretProtectionMode;
   protectedPaths: string[];
   internalDomains: string[];
-  allowedProviders: string[];
+  allowedModelProviders: string[];
   allowedMcpServers: string[];
+  allowedGitRemotes: string[];
   blockedCommands: string[];
+  approvalRequiredCommandClasses: CommandRiskClass[];
   hardBlockRules: string[];
   exceptionMaxMinutes: number;
   allowlistedSecretHmacs: string[];

@@ -24,6 +24,7 @@ import { TabGroupsTreeProvider } from './views/TabGroupsTreeProvider';
 import { WorkstreamManager } from './workstream/WorkstreamManager';
 import { UserPortfolioManager } from './workstream/UserPortfolioManager';
 import { ParticleAcceleratorService } from './particle-accelerator/ParticleAcceleratorService';
+import { SecretProtectionService } from './secret-protection/SecretProtectionService';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -151,6 +152,11 @@ export function activate(context: vscode.ExtensionContext): void {
   void particleAcceleratorService.initialize();
   context.subscriptions.push(particleAcceleratorService);
 
+  // Create Secret Protection service (multi-boundary DLP broker)
+  const secretProtectionService = new SecretProtectionService(context, log);
+  void secretProtectionService.initialize();
+  context.subscriptions.push(secretProtectionService);
+
   // Create the tab manager that owns all session tabs
   tabManager = new TabManager(
     context,
@@ -196,6 +202,12 @@ export function activate(context: vscode.ExtensionContext): void {
   tabManager.workstreamManager = workstreamManager;
   // Expose Particle Accelerator service to TabManager for env injection
   tabManager.particleAcceleratorService = particleAcceleratorService;
+  // Expose Secret Protection service to TabManager for DLP scanning
+  tabManager.secretProtectionService = secretProtectionService;
+  // Propagate settings changes to all existing tabs at runtime
+  secretProtectionService.onDidChangeSettings(() => {
+    tabManager.refreshSecretProtectionForAllTabs();
+  });
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       ClaUiSidebarViewProvider.viewType,

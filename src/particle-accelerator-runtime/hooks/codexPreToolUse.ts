@@ -14,6 +14,12 @@ interface HookOutput {
 }
 
 async function main(): Promise<void> {
+  // Feature kill-switch: when the extension disables PA, it stops injecting this env var
+  if (process.env.CLAUI_PARTICLE_ACCELERATOR !== '1') {
+    process.exit(0);
+    return;
+  }
+
   const chunks: Buffer[] = [];
 
   for await (const chunk of process.stdin) {

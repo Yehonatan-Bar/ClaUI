@@ -155,6 +155,7 @@ claude-code-mirror/
 |   |   |   +-- WorkstreamNLEditor.ts     #   Natural language map editing (pattern + Sonnet fallback)
 |   |   |   +-- WorkstreamImportanceScorer.ts #  Composite importance/attention scoring
 |   |   |   +-- SessionBackfiller.ts      #   Enriches existing sessions with workstream fields
+|   |   |   +-- GitCommitIngestor.ts     #   Discovers orphan git commits and creates synthetic sessions
 |   |   |   +-- FileTracker.ts            #   Captures file/git signals from tool events
 |   |   |   +-- ExternalWorkFolderIngestor.ts # Explicit folder import for external docs as workstreams
 |   |   |   +-- UserPortfolioStore.ts     #   Cross-project portfolio persistence (globalState, max 30 projects)
@@ -169,6 +170,12 @@ claude-code-mirror/
 |   |   |   +-- ParticleAcceleratorTraceReader.ts  #   Trace reading, aggregation, 3-tier retention cleanup
 |   |   |   +-- ParticleAcceleratorDailyReportGenerator.ts # Idempotent daily aggregate reports
 |   |   |   +-- ParticleAcceleratorHookManager.ts  #   Install/uninstall Claude & Codex hooks
+|   |   +-- secret-protection/
+|   |   |   +-- SecretProtectionSettings.ts        #   VS Code settings reader (claudeMirror.secretProtection.*)
+|   |   |   +-- SecretProtectionService.ts         #   Top-level DLP service (lifecycle, broker creation, settings watcher)
+|   |   |   +-- SecretProtectionBroker.ts          #   Central DLP orchestrator (boundary-specific scan methods, fail-closed)
+|   |   |   +-- guards/
+|   |   |       +-- SafePersistenceGuard.ts        #   Wraps trace/log writes through persistence boundary scanning
 |   |   +-- types/
 |   |       +-- stream-json.ts            #   CLI protocol type definitions
 |   |       +-- webview-messages.ts       #   postMessage contract, including future multi-participant React `mp*` messages
@@ -196,6 +203,34 @@ claude-code-mirror/
 |   |   +-- hooks/
 |   |       +-- claudePreToolUse.ts       #   Claude pre-tool-use hook (rewrites Bash to claui-run)
 |   |       +-- codexPreToolUse.ts        #   Codex pre-tool-use hook (deny + retry pattern)
+|   +-- shared/                           # Cross-boundary modules (imported by both extension and runtime)
+|   |   +-- secret-protection/
+|   |       +-- types.ts                  #   Core DLP types: DlpEvent, DlpDestination, DlpFinding, RedactionToken, PolicyConfig, etc.
+|   |       +-- policySchema.ts           #   Policy loader + validator (.claui/secret-protection.policy.json)
+|   |       +-- PolicyEngine.ts           #   Destination-aware decision matrix (finding x destination -> action), mode-aware, exception-checking
+|   |       +-- RedactionEngine.ts        #   Structured token replacement with overlap-by-severity, streaming chunked mode, deferred-findings flush
+|   |       +-- CommandRiskClassifier.ts   #   Command risk classification (16 classes, cross-pipe obfuscation, integrates CommandEligibility)
+|   |       +-- AuditEventWriter.ts       #   JSONL date-partitioned audit log (write, read, prune)
+|   |       +-- DestinationClassifier.ts  #   Boundary -> DlpDestination mapping with trust tier resolution
+|   |       +-- scanners/
+|   |       |   +-- types.ts              #   Scanner interfaces: ISecretScanner, ScanContext, ScanResult
+|   |       |   +-- EnvValueScanner.ts    #   Env KEY=VALUE scanning with HMAC tokens
+|   |       |   +-- RegexRuleScanner.ts   #   Provider token regexes (14 built-in + rule pack rules, pattern-source dedup)
+|   |       |   +-- EntropyScanner.ts     #   Shannon entropy scanner (opt-in)
+|   |       |   +-- PathSensitivityClassifier.ts #  File path sensitivity (6 finders: absolute, tilde, relative, dot-prefixed, bare ext, specific names)
+|   |       |   +-- StructuredPayloadScanner.ts  #  JSON/YAML sensitive key detection
+|   |       |   +-- PiiAndInternalTopologyScanner.ts # Email, RFC 1918 IPs, internal hostnames
+|   |       |   +-- CompositeSecretScanner.ts    #  Orchestrator: all 6 scanners + dedup + perf budget
+|   |       +-- rules/
+|   |           +-- types.ts              #   Rule pack schema: RulePackDefinition, RuleDefinition (with type?: FindingType)
+|   |           +-- index.ts              #   Registry: getRulePack(), getAllRulePacks(), getEnabledRulePacks()
+|   |           +-- cloud/               #   AWS (4 rules), GCP (3), Azure (3)
+|   |           +-- providers/           #   GitHub (4), OpenAI (2), Anthropic (1), Slack (4), Stripe (3)
+|   |           +-- vcs/                 #   Git credentials (2)
+|   |           +-- files/               #   Protected file paths (8)
+|   |           +-- pii/                 #   Email, phone, SSN (3)
+|   |           +-- topology/            #   Internal IPs, hostnames (4)
+|   |           +-- commands/            #   Exfiltration patterns (4)
 |   +-- webview/                          # React webview code (browser context)
 |       +-- index.tsx                     #   React entry point
 |       +-- App.tsx                       #   Main app with welcome/chat/status (StatusBar extracted to components/StatusBar/)
@@ -644,6 +679,9 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **Particle Accelerator** -- Local-only command output compressor that intercepts Bash commands from coding agents (Claude/Codex), routes eligible commands through a `claui-run` CLI, redacts secrets, filters/compresses noisy output, preserves exit codes, and writes trace files for analytics. Architecture: extension-side service (`ParticleAcceleratorService`) manages lifecycle, installer, context store, trace reader, hook manager, and daily reports. A standalone CLI runner (`claui-run`, separate webpack target) executes commands in isolation with no network access. Pre-tool-use hooks rewrite eligible Bash commands to route through `claui-run` with base64url-encoded arguments. Three-tier filter architecture: (1) specialized TypeScript filters (npm/pnpm/yarn, pytest, jest/vitest, tsc, eslint, git semantic) for structurally complex output, (2) declarative filter engine with 55 built-in definitions covering Docker, Go, Rust, .NET, K8s, Cloud/Infra, C/C++, linters, and more, (3) generic fallback. User-defined custom filters via `.claui/filters.json`. Command eligibility: three-phase classification with pipe stripping, redirect/substitution rejection, expanded allow list (~80 commands). Configurable budget profiles (balanced/strict/verbose). Three-tier retention: raw logs (7d/100MB), traces (30d/10k), daily reports (90d). UI: StatusBar badge, VitalsInfoPanel toggle, Dashboard "Particle Accelerator" tab with settings and aggregate stats.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/PARTICLE_ACCELERATOR.md`
 
+**Secret Protection Broker** -- Multi-boundary, destination-aware DLP broker that extends Particle Accelerator's terminal-output redaction into a comprehensive secret protection system across 9+ boundaries: prompt submission, context expansion, file exposure, command execution, terminal output, MCP/tool calls, browser/screenshot, Git publication, and persistence. Foundation types define the full data model (`DlpEvent`, `DlpDestination`, `DlpFinding`, `RedactionToken`, `DlpDecision`, `AuditEvent`, `PolicyConfig`). Project-level policy via `.claui/secret-protection.policy.json` controls protected paths, allowed providers/remotes, command risk classes, and exception scoping. VS Code settings under `claudeMirror.secretProtection.*` (11 settings: mode, per-boundary scan toggles, entropy scanner opt-in, audit retention). Core detection engine: 6 scanner implementations (env values, regex rules, entropy, path sensitivity, structured payloads, PII/topology) orchestrated by `CompositeSecretScanner` with severity-based dedup and 100ms perf budget. 13 rule packs (45 rules, each with explicit `FindingType`) covering cloud providers, API tokens, VCS, protected files, PII, internal topology, and exfiltration commands. `RedactionEngine` with severity-prioritized overlap handling, streaming chunked mode with automatic deferred-findings flush (no unredacted tail leak). `CommandRiskClassifier` with 16 risk classes, cross-pipe obfuscation detection, and `CommandEligibility` integration. `AuditEventWriter` for date-partitioned JSONL audit logs. `DestinationClassifier` for boundary-to-trust-tier mapping. **Orchestration layer**: `PolicyEngine` implements a destination-aware decision matrix (finding-type x destination-category -> action) with mode-aware evaluation (off/observe/balanced/strict), hard-block rule enforcement, HMAC allowlisting, and exception checking. `SecretProtectionBroker` provides boundary-specific scan methods (prompt, context, file, command, terminal, MCP, git, persistence) with fail-closed error handling. `SecretProtectionService` manages lifecycle (initialization, settings watcher, disposal) following the same pattern as `ParticleAcceleratorService`. `SafePersistenceGuard` wraps trace/log writes through the persistence boundary. CLI pipeline integration adds `CompositeSecretScanner` to `claui-run` with DLP findings in trace metadata. Upcoming: boundary hooks, approval system, UI panels.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/SECRET_PROTECTION_BROKER.md`
+
 **Workstream Map** -- Subway-map style visualization that groups sessions into logical workstreams (coherent threads of work with a goal, status, and history). AI-powered classification pipeline: scoped to open-tab sessions + last 3 days, heuristic pre-clustering (git branch, file overlap Jaccard, temporal proximity), then Sonnet classification via stdin-piped CLI call. Explicit external folder import lets the user enter a folder path and digest supported documents (`md/txt/json/yaml/html/xml/docx`, capped) into a dashed `external_folder` workstream with source-file evidence; normal reclassification preserves those imported workstreams. Stations represent meaningful events (milestones, decisions, blockers, discoveries). SVG deterministic lane layout with visual encodings for status, confidence, type. Layers: Current State, Resume View, Plan Overlay, Resolve Mode. Backend: `WorkstreamManager` orchestrator + 14 service classes. Frontend includes `UserPortfolioView`, `PortfolioProjectMap`, `ProjectMapView`, and shared SVG primitives. Claude and Codex tabs both route Workstream Map/Portfolio messages through the shared manager. Includes **User Portfolio View** (cross-project): `UserPortfolioManager` + `UserPortfolioStore` use `globalState` for cross-workspace persistence; project health scoring (healthy/needs_attention/blocked/stale), cross-project resume recommendations, path validation for deleted projects, and a stacked full-map overview that renders every cached project workstream with simple project separators. Portfolio auto-open is suppressed for unclassified current workspaces so the empty Project Map remains available for first classification. Commands: `claudeMirror.openWorkstreamMap`, `claudeMirror.openWorkstreamPortfolio`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP.md`
 
@@ -716,6 +754,17 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 | `claudeMirror.particleAccelerator.maxTraceCount` | `10000` | Max number of trace files to retain (1000-50000) |
 | `claudeMirror.particleAccelerator.dailyReportRetentionDays` | `90` | Days to keep daily reports (30-365) |
 | `claudeMirror.particleAccelerator.codexMode` | `"deny-and-retry"` | How Codex hooks work: deny-and-retry or passthrough |
+| `claudeMirror.secretProtection.enabled` | `false` | Enable multi-boundary Secret Protection Broker |
+| `claudeMirror.secretProtection.mode` | `"balanced"` | Enforcement mode: off, observe, balanced, strict |
+| `claudeMirror.secretProtection.blockProtectedPaths` | `true` | Block agent access to sensitive file paths |
+| `claudeMirror.secretProtection.scanPrompts` | `true` | Scan prompts/context before sending to remote model |
+| `claudeMirror.secretProtection.scanTerminalOutput` | `true` | Scan terminal output with structured DLP tokens |
+| `claudeMirror.secretProtection.scanGitPublication` | `true` | Scan git diffs/commits/PR bodies for secrets |
+| `claudeMirror.secretProtection.scanMcp` | `true` | Scan MCP tool call arguments and responses |
+| `claudeMirror.secretProtection.requireBrowserCaptureApproval` | `true` | Require approval for browser screenshots to model |
+| `claudeMirror.secretProtection.exceptionMaxMinutes` | `30` | Max duration for temporary DLP exceptions (1-1440) |
+| `claudeMirror.secretProtection.auditRetentionDays` | `90` | Days to retain DLP audit logs (1-365) |
+| `claudeMirror.secretProtection.enableEntropyScanner` | `false` | Enable experimental entropy-based secret detection |
 
 ---
 

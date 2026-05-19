@@ -2,7 +2,7 @@ import { RedactionResult } from '../extension/particle-accelerator/ParticleAccel
 
 const REDACTED = '[REDACTED]';
 
-const SENSITIVE_KEY_PATTERNS = [
+export const SENSITIVE_KEY_PATTERNS = [
   /_TOKEN$/i, /_SECRET$/i, /_KEY$/i, /_PASSWORD$/i, /_CREDENTIAL$/i,
   /_AUTH$/i, /_PRIVATE$/i, /_API_KEY$/i, /_APIKEY$/i, /_ACCESS_KEY/i,
   /^AWS_/i, /^AZURE_/i,
@@ -12,12 +12,12 @@ const SENSITIVE_KEY_PATTERNS = [
   /^SLACK_/i, /^STRIPE_/i, /^NUGET_/i,
 ];
 
-interface RegexRule {
+export interface RegexRule {
   name: string;
   pattern: RegExp;
 }
 
-const REGEX_RULES: RegexRule[] = [
+export const REGEX_RULES: RegexRule[] = [
   { name: 'github-classic-pat', pattern: /ghp_[A-Za-z0-9]{36}/g },
   { name: 'github-fine-grained', pattern: /github_pat_[A-Za-z0-9_]{82}/g },
   { name: 'aws-access-key', pattern: /AKIA[0-9A-Z]{16}/g },

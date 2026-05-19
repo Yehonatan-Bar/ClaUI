@@ -134,6 +134,12 @@ export class CodexMessageHandler {
   private openTabSessionIdsGetter: (() => string[]) | null = null;
   private memoryStreamTimer: ReturnType<typeof setInterval> | null = null;
   private memorySampleInFlight = false;
+  /** Secret Protection service (shared instance, set after construction) */
+  private secretProtectionService: import('../secret-protection/SecretProtectionService').SecretProtectionService | null = null;
+
+  setSecretProtectionService(service: import('../secret-protection/SecretProtectionService').SecretProtectionService): void {
+    this.secretProtectionService = service;
+  }
 
   setMemorySampler(sampler: import('../process/ProcessMemorySampler').ProcessMemorySampler): void {
     this.memorySampler = sampler;
@@ -422,11 +428,32 @@ export class CodexMessageHandler {
       this.achievementService.onUserPrompt(this.tabId, text);
       void this.promptHistoryStore.addPrompt(text);
     }
+
+    // DLP: scan prompt before sending to model
+    let textToSend = text;
+    if (this.secretProtectionService?.isEnabled()) {
+      const broker = this.secretProtectionService.getBroker();
+      if (broker) {
+        const decision = await broker.scanPromptSubmission(textToSend);
+        if (decision.action === 'block') {
+          this.log(`[SecretProtection] Prompt blocked: ${decision.reason}`);
+          this.postToWebview({
+            type: 'error',
+            message: `Secret protection blocked this prompt: ${decision.reason}`,
+          });
+          return;
+        }
+        if (decision.action === 'redact' && decision.redactedContent) {
+          textToSend = decision.redactedContent;
+        }
+      }
+    }
+
     const content = this.buildPromptContent(text, normalizedImages);
     this.postUserMessage(content, true);
     this.postToWebview({ type: 'processBusy', busy: true });
 
-    const deferred = this.buildDeferredHandoffPayload(text, { imageCount: normalizedImages?.length ?? 0 });
+    const deferred = this.buildDeferredHandoffPayload(textToSend, { imageCount: normalizedImages?.length ?? 0 });
     try {
       if (normalizedImages) {
         await this.session.sendWithImages(deferred.text, normalizedImages, { steer: !!opts?.steer });

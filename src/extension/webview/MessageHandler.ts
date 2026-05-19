@@ -558,6 +558,13 @@ export class MessageHandler {
     this.particleAcceleratorService = service;
   }
 
+  /** Secret Protection service (shared instance, set after construction) */
+  private secretProtectionService: import('../secret-protection/SecretProtectionService').SecretProtectionService | null = null;
+
+  setSecretProtectionService(service: import('../secret-protection/SecretProtectionService').SecretProtectionService): void {
+    this.secretProtectionService = service;
+  }
+
   /** Provide the SessionStore for accessing session metadata. */
   setSessionStore(store: import('../session/SessionStore').SessionStore): void {
     this.sessionStore = store;
@@ -1501,6 +1508,31 @@ export class MessageHandler {
           this.clearCodexConsultTimeout();
           this._codexConsultStartedAt = null;
           this.achievementService.onUserPrompt(this.tabId, msg.text);
+          // DLP: scan prompt before sending to model
+          if (this.secretProtectionService?.isEnabled()) {
+            const broker = this.secretProtectionService.getBroker();
+            if (broker) {
+              void broker.scanPromptSubmission(msg.text).then((decision) => {
+                if (decision.action === 'block') {
+                  this.log(`[SecretProtection] Prompt blocked: ${decision.reason}`);
+                  this.webview.postMessage({
+                    type: 'error',
+                    message: `Secret protection blocked this prompt: ${decision.reason}`,
+                  });
+                  return;
+                }
+                const textToSend = decision.action === 'redact' && decision.redactedContent
+                  ? decision.redactedContent
+                  : msg.text;
+                this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock], true);
+                this.control.sendText(this.consumeDeferredHandoffContext(textToSend));
+                this.webview.postMessage({ type: 'processBusy', busy: true });
+                this.triggerSessionNaming(msg.text);
+                void this.promptHistoryStore.addPrompt(msg.text);
+              });
+              break;
+            }
+          }
           // Optimistic: show user message in UI immediately (before CLI echoes it back)
           this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock], true);
           this.control.sendText(this.consumeDeferredHandoffContext(msg.text));
@@ -2435,16 +2467,16 @@ export class MessageHandler {
           const wsProjectId3 = this.getWorkstreamProjectId();
           const allSummaries = this.projectAnalyticsStore.getSummaries();
 
-          // Scope: only sessions with open tabs OR from the last 3 days
+          // Scope: only sessions with open tabs OR with last activity within 4 days
           const openTabIds = new Set(this.openTabSessionIdsGetter?.() ?? []);
-          const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+          const fourDaysAgo = Date.now() - 4 * 24 * 60 * 60 * 1000;
           const summaries = allSummaries.filter(s => {
             if (openTabIds.has(s.sessionId)) return true;
-            const ts = s.endedAt ?? s.startedAt;
-            if (ts && new Date(ts).getTime() > threeDaysAgo) return true;
+            const lastActivity = s.endedAt ?? s.startedAt;
+            if (lastActivity && new Date(lastActivity).getTime() > fourDaysAgo) return true;
             return false;
           });
-          this.log(`[WorkstreamMap] Scoped ${allSummaries.length} total summaries -> ${summaries.length} (openTabs=${openTabIds.size}, recentCutoff=3d)`);
+          this.log(`[WorkstreamMap] Scoped ${allSummaries.length} total summaries -> ${summaries.length} (openTabs=${openTabIds.size}, recentCutoff=4d)`);
 
           const metadataMap = new Map<string, import('../session/SessionStore').SessionMetadata>();
           if (this.sessionStore) {
@@ -2456,7 +2488,7 @@ export class MessageHandler {
           this.workstreamManager.onProgress((progress, phase) => {
             this.webview.postMessage({ type: 'workstreamMapClassifying', progress, phase });
           });
-          void this.workstreamManager.classifyProject(wsProjectId3, summaries, metadataMap, { force: msg.force })
+          void this.workstreamManager.classifyProject(wsProjectId3, summaries, metadataMap, { force: msg.force }, allSummaries)
             .then(state => {
               this.log(`[WorkstreamMap] Classification complete: ${state.workstreams.length} workstreams, ${state.stations.length} stations`);
               this.webview.postMessage({ type: 'workstreamMapData', data: state });

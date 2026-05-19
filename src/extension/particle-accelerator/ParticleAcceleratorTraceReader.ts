@@ -139,6 +139,8 @@ export class ParticleAcceleratorTraceReader {
       rulesTriggered: trace.redaction.rulesTriggered ?? [],
       rawLines: trace.output.rawLines ?? 0,
       filteredLines: trace.output.filteredLines ?? 0,
+      dlpFindingCount: trace.dlp?.findingCount,
+      dlpSeverityMax: trace.dlp?.severityMax,
     };
   }
 

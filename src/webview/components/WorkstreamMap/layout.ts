@@ -112,17 +112,16 @@ function sortWorkstreams(workstreams: Workstream[]): Workstream[] {
     if (a.userPinned && !b.userPinned) { return -1; }
     if (!a.userPinned && b.userPinned) { return 1; }
 
-    // Then by status priority
+    // Then by most recent activity (top = most recently changed)
+    const activityDiff = new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime();
+    if (activityDiff !== 0) { return activityDiff; }
+
+    // Then by status priority as tiebreaker
     const statusDiff = STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status];
     if (statusDiff !== 0) { return statusDiff; }
 
     // Then by importance
-    if (b.importanceScore !== a.importanceScore) {
-      return b.importanceScore - a.importanceScore;
-    }
-
-    // Then by recent activity
-    return new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime();
+    return b.importanceScore - a.importanceScore;
   });
 }
 

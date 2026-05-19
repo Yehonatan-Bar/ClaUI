@@ -143,6 +143,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private cwdOverride: string | null = null;
   /** Particle Accelerator service reference for context file lifecycle */
   private particleAcceleratorService: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService | null = null;
+  /** Secret Protection service reference for DLP scanning */
+  private secretProtectionService: import('../secret-protection/SecretProtectionService').SecretProtectionService | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -298,7 +300,9 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       const runtimePaths = service.getRuntimePaths();
       if (runtimePaths) {
         this.processManager.particleAcceleratorEnvBuilder = (baseEnv) => {
+          if (!service.isEnabled()) return baseEnv;
           const contextStore = service.getContextStore();
+          const currentSettings = service.getSettings();
           return service.buildAgentEnv({
             baseEnv,
             provider: 'codex',
@@ -308,12 +312,27 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
             binDir: runtimePaths.binDir,
             storeDir: runtimePaths.storeDir,
             contextFilePath: contextStore?.getContextPath(this.id) ?? '',
-            filterProfile: settings.filterProfile,
-            storeRawLogs: settings.storeRawRedactedLogs,
+            filterProfile: currentSettings.filterProfile,
+            storeRawLogs: currentSettings.storeRawRedactedLogs,
+            secretProtection: this.secretProtectionService?.isEnabled() ? {
+              enabled: true,
+              mode: this.secretProtectionService.getSettings().mode,
+              enableEntropyScanner: this.secretProtectionService.getSettings().enableEntropyScanner,
+              scanTerminalOutput: this.secretProtectionService.getSettings().scanTerminalOutput,
+            } : undefined,
           });
         };
       }
     }
+  }
+
+  /** Inject the shared SecretProtectionService (forwarded to CodexMessageHandler + process manager env flag). */
+  setSecretProtectionService(service: import('../secret-protection/SecretProtectionService').SecretProtectionService): void {
+    this.secretProtectionService = service;
+    if ('setSecretProtectionService' in this.messageHandler) {
+      (this.messageHandler as { setSecretProtectionService: (s: typeof service) => void }).setSecretProtectionService(service);
+    }
+    this.processManager.secretProtectionEnabled = service.isEnabled();
   }
 
   /** Inject the SessionStore (forwarded to CodexMessageHandler for workstream classification). */

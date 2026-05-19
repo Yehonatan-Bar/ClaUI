@@ -175,6 +175,8 @@ export class SessionTab implements WebviewBridge {
   private cwdOverride: string | null = null;
   /** Particle Accelerator service reference for context file lifecycle */
   private particleAcceleratorService: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService | null = null;
+  /** Secret Protection service reference for DLP scanning */
+  private secretProtectionService: import('../secret-protection/SecretProtectionService').SecretProtectionService | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -2358,7 +2360,9 @@ export class SessionTab implements WebviewBridge {
       const runtimePaths = service.getRuntimePaths();
       if (runtimePaths) {
         this.processManager.particleAcceleratorEnvBuilder = (baseEnv) => {
+          if (!service.isEnabled()) return baseEnv;
           const contextStore = service.getContextStore();
+          const spService = this.secretProtectionService;
           return service.buildAgentEnv({
             baseEnv,
             provider: 'claude',
@@ -2370,10 +2374,23 @@ export class SessionTab implements WebviewBridge {
             contextFilePath: contextStore?.getContextPath(this.id) ?? '',
             filterProfile: service.getSettings().filterProfile,
             storeRawLogs: service.getSettings().storeRawRedactedLogs,
+            secretProtection: spService?.isEnabled() ? {
+              enabled: true,
+              mode: spService.getSettings().mode,
+              enableEntropyScanner: spService.getSettings().enableEntropyScanner,
+              scanTerminalOutput: spService.getSettings().scanTerminalOutput,
+            } : undefined,
           });
         };
       }
     }
+  }
+
+  /** Inject the shared SecretProtectionService (forwarded to MessageHandler + process manager env flag) */
+  setSecretProtectionService(service: import('../secret-protection/SecretProtectionService').SecretProtectionService): void {
+    this.secretProtectionService = service;
+    this.messageHandler.setSecretProtectionService(service);
+    this.processManager.secretProtectionEnabled = service.isEnabled();
   }
 
   /** Inject the SessionStore (forwarded to MessageHandler for workstream classification) */

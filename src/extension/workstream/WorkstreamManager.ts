@@ -27,6 +27,7 @@ import { PlanRealityAnalyzer } from './PlanRealityAnalyzer';
 import { WorkstreamNLEditor } from './WorkstreamNLEditor';
 import { WorkstreamImportanceScorer } from './WorkstreamImportanceScorer';
 import { SessionBackfiller } from './SessionBackfiller';
+import { GitCommitIngestor } from './GitCommitIngestor';
 import { UserPortfolioManager } from './UserPortfolioManager';
 import { ExternalWorkFolderIngestor } from './ExternalWorkFolderIngestor';
 import { WORKSTREAM_STATUS_COLORS } from '../types/workstreamTypes';
@@ -42,6 +43,7 @@ export class WorkstreamManager {
   private readonly nlEditor: WorkstreamNLEditor;
   private readonly scorer: WorkstreamImportanceScorer;
   private readonly backfiller: SessionBackfiller;
+  private readonly gitIngestor: GitCommitIngestor;
   private readonly externalIngestor: ExternalWorkFolderIngestor;
   private portfolioManager: UserPortfolioManager | null = null;
 
@@ -64,6 +66,7 @@ export class WorkstreamManager {
     this.nlEditor = new WorkstreamNLEditor();
     this.scorer = new WorkstreamImportanceScorer();
     this.backfiller = new SessionBackfiller();
+    this.gitIngestor = new GitCommitIngestor(logFn);
     this.externalIngestor = new ExternalWorkFolderIngestor(logFn);
   }
 
@@ -88,6 +91,7 @@ export class WorkstreamManager {
     sessionSummaries: SessionSummary[],
     sessionMetadataMap: Map<string, SessionMetadata>,
     options: ClassificationOptions = {},
+    allSessionSummaries?: SessionSummary[],
   ): Promise<ProjectMapState> {
     const cliPath = this.getCliPath();
     const workspacePath = this.getWorkspacePath();
@@ -110,7 +114,30 @@ export class WorkstreamManager {
       }
     }
 
-    if (adequateSessions.length === 0) {
+    // Phase 2: Ingest orphan git commits as synthetic sessions
+    this.reportProgress(0.10, 'Scanning git history...');
+    const knownCommitHashes = new Set<string>();
+    const sessionTimeWindows: Array<{ start: number; end: number }> = [];
+    for (const s of (allSessionSummaries ?? sessionSummaries)) {
+      if (s.gitCommit) { knownCommitHashes.add(s.gitCommit); }
+      const start = s.startedAt ? new Date(s.startedAt).getTime() : 0;
+      const end = s.endedAt ? new Date(s.endedAt).getTime() : 0;
+      if (start > 0 && end > 0) {
+        sessionTimeWindows.push({ start, end });
+      }
+    }
+
+    let gitSessions: import('../types/workstreamTypes').EnrichedSessionData[] = [];
+    try {
+      gitSessions = this.gitIngestor.ingest(workspacePath, knownCommitHashes, sessionTimeWindows);
+      this.log.appendLine(`[WorkstreamMap] Git ingestion: ${gitSessions.length} synthetic sessions from orphan commits`);
+    } catch (e) {
+      this.log.appendLine(`[WorkstreamMap] Git ingestion failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    const allAdequateSessions = [...adequateSessions, ...gitSessions];
+
+    if (allAdequateSessions.length === 0) {
       this.log.appendLine('[WorkstreamMap] No adequately enriched sessions for classification');
       return this.createEmptyState(projectId, workspacePath);
     }
@@ -121,7 +148,7 @@ export class WorkstreamManager {
     let classificationOutput;
     try {
       classificationOutput = await this.classifier.classify(
-        adequateSessions, existingState, { ...options, force: options.force ?? !existingState }, cliPath, workspacePath
+        allAdequateSessions, existingState, { ...options, force: options.force ?? !existingState }, cliPath, workspacePath
       );
     } catch (e) {
       this.log.appendLine(`[WorkstreamMap] Classification FAILED: ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
@@ -142,7 +169,7 @@ export class WorkstreamManager {
       const existing = existingState?.workstreams.find(w => w.id === cw.id);
       const wsId = cw.id ?? existing?.id ?? crypto.randomUUID();
 
-      const sessionData = adequateSessions.filter(s => cw.sessionIds.includes(s.sessionId));
+      const sessionData = allAdequateSessions.filter(s => cw.sessionIds.includes(s.sessionId));
       const allFiles = sessionData.flatMap(s => s.filesModified ?? []);
       const allReadFiles = sessionData.flatMap(s => s.filesRead ?? []);
 
@@ -212,7 +239,7 @@ export class WorkstreamManager {
     let stations: Station[] = existingState?.stations ?? [];
     try {
       const extractionResults = await this.stationExtractor.extractBatch(
-        adequateSessions, wsMap, cliPath, workspacePath,
+        allAdequateSessions, wsMap, cliPath, workspacePath,
       );
 
       const newStations: Station[] = [];
@@ -233,7 +260,7 @@ export class WorkstreamManager {
             whyItMatters: extracted.whyItMatters,
             sessionId,
             order: newStations.length,
-            timestamp: adequateSessions.find(s => s.sessionId === sessionId)?.startedAt ?? now,
+            timestamp: allAdequateSessions.find(s => s.sessionId === sessionId)?.startedAt ?? now,
             importanceScore: extracted.importanceScore,
             attentionScore: extracted.attentionScore,
             visibleInProjectMap: this.scorer.shouldShowInProjectMap({

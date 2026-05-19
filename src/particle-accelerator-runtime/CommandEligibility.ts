@@ -1,6 +1,6 @@
 import { CommandEligibilityResult } from '../extension/particle-accelerator/ParticleAcceleratorTypes';
 
-const DENY_LIST: RegExp[] = [
+export const DENY_LIST: RegExp[] = [
   /^ssh\b/, /^scp\b/, /^rsync\b.*:/, /^sudo\b/, /^su\b/, /^passwd\b/,
   /^(vim|vi|nano|emacs)\b/, /^(less|more)\b/, /^man\b/,
   /^(top|htop)\b/, /^watch\b/, /^tail\s+-f\b/,
@@ -10,13 +10,13 @@ const DENY_LIST: RegExp[] = [
   /\bread\s+-/,
 ];
 
-interface AllowEntry {
+export interface AllowEntry {
   pattern: RegExp;
   family: string;
   filterHint: string;
 }
 
-const ALLOW_LIST: AllowEntry[] = [
+export const ALLOW_LIST: AllowEntry[] = [
   // ── JavaScript / Node ──────────────────────────────────────────────
   { pattern: /^npm\s+(test|t)\b/, family: 'npm-test', filterHint: 'JavaScriptPackageFilter' },
   { pattern: /^npm\s+(run\s+)?(build|compile)\b/, family: 'npm-build', filterHint: 'JavaScriptPackageFilter' },

@@ -48,6 +48,12 @@ export interface ParticleAcceleratorTrace {
     stdoutLogPath: string | null;
     stderrLogPath: string | null;
   };
+  dlp?: {
+    findingCount: number;
+    boundaries: string[];
+    severityMax: string | null;
+    redactionTokenCount: number;
+  };
 }
 
 export interface ParticleAcceleratorTraceSummary {
@@ -65,6 +71,8 @@ export interface ParticleAcceleratorTraceSummary {
   rulesTriggered: string[];
   rawLines: number;
   filteredLines: number;
+  dlpFindingCount?: number;
+  dlpSeverityMax?: string | null;
 }
 
 export interface ParticleAcceleratorStatus {
@@ -167,6 +175,12 @@ export interface ParticleAcceleratorEnvInput {
   shell?: string;
   filterProfile?: 'balanced' | 'strict' | 'verbose';
   storeRawLogs?: boolean;
+  secretProtection?: {
+    enabled: boolean;
+    mode: string;
+    enableEntropyScanner: boolean;
+    scanTerminalOutput: boolean;
+  };
 }
 
 export interface ParticleAcceleratorDailyReport {

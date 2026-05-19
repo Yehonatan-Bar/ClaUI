@@ -53,10 +53,10 @@ export class WorkstreamClassifier {
     const clusters: CandidateCluster[] = [];
     const assigned = new Set<string>();
 
-    // Group by git branch
+    // Group by git branch (all branches including main/master)
     const branchGroups = new Map<string, EnrichedSessionData[]>();
     for (const s of sessions) {
-      if (s.gitBranch && s.gitBranch !== 'main' && s.gitBranch !== 'master') {
+      if (s.gitBranch) {
         const group = branchGroups.get(s.gitBranch) || [];
         group.push(s);
         branchGroups.set(s.gitBranch, group);
@@ -196,6 +196,7 @@ export class WorkstreamClassifier {
   ): string {
     const sessionBlock = sessions.map(s => JSON.stringify({
       id: s.sessionId,
+      source: s.source ?? 'session',
       firstPrompt: s.firstPrompt?.slice(0, 200),
       summary: s.summary?.slice(0, 300),
       filesModified: s.filesModified?.slice(0, 20),
@@ -235,9 +236,11 @@ A workstream is a coherent thread of work with a clear goal. Examples: "Add onbo
 
 Rules:
 - Prefer fewer meaningful workstreams over many tiny ones
-- Do not merge unrelated work just because it happened nearby in time
+- Do not merge unrelated work just because it happened nearby in time or shares the same branch
+- Sessions on the same branch (including main/master) may belong to DIFFERENT workstreams - use file overlap and content to determine grouping, not branch alone
 - Do not split one coherent bug investigation into many lines unless the goal actually diverged
 - Respect all protected user assignments exactly
+- Sessions with source "git_history" are inferred from git commits not tracked by any interactive session (e.g., work done by external tools like Codex). Treat them as real work and group them with related interactive sessions when the files and goals align
 - Sessions that don't clearly belong anywhere should go into an "Uncertain Work" workstream
 - Never include "ultrathink" in workstream labels - it is a thinking activation keyword, not part of the actual work content. Strip it from any user prompt text before deriving labels
 - Return confidence scores (0-1) and reasons
