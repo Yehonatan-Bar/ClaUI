@@ -412,16 +412,28 @@ export function useClaudeStream(): void {
           if (!currentState.streamingMessageId) {
             // No active streaming message - this is a replayed/complete message
             // (e.g. during session resume). Add directly to the messages array.
-            addAssistantMessage(msg.messageId, msg.content, msg.model, msg.thinkingEffort);
+            addAssistantMessage(msg.messageId, msg.content, msg.model, msg.thinkingEffort, {
+              secretsDetected: msg.secretsDetected,
+              redactionApplied: msg.redactionApplied,
+            });
           } else if (isCodexMode) {
             // Codex emits complete agent messages (not incremental snapshots).
             // Upsert immediately so the reply survives any end-of-turn ordering race
             // between messageStop/costUpdate/processBusy messages.
-            addAssistantMessage(msg.messageId, msg.content, msg.model, msg.thinkingEffort);
-            updateAssistantSnapshot(msg.messageId, msg.content, msg.model);
+            addAssistantMessage(msg.messageId, msg.content, msg.model, msg.thinkingEffort, {
+              secretsDetected: msg.secretsDetected,
+              redactionApplied: msg.redactionApplied,
+            });
+            updateAssistantSnapshot(msg.messageId, msg.content, msg.model, {
+              secretsDetected: msg.secretsDetected,
+              redactionApplied: msg.redactionApplied,
+            });
           } else {
             // Mid-stream snapshot during live streaming - store for metadata only.
-            updateAssistantSnapshot(msg.messageId, msg.content, msg.model);
+            updateAssistantSnapshot(msg.messageId, msg.content, msg.model, {
+              secretsDetected: msg.secretsDetected,
+              redactionApplied: msg.redactionApplied,
+            });
           }
           logState('after assistantMessage');
           break;
@@ -439,7 +451,10 @@ export function useClaudeStream(): void {
             'type:', typeof msg.content,
             'value:', msg.content
           );
-          addUserMessage(msg.content, msg.source ?? 'input');
+          addUserMessage(msg.content, msg.source ?? 'input', {
+            secretsDetected: msg.secretsDetected,
+            redactionApplied: msg.redactionApplied,
+          });
           logState('after addUserMessage');
           break;
 

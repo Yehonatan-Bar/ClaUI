@@ -262,7 +262,8 @@ All 4 scanners implement `ISecretScanner`, self-filter by `APPLICABLE_BOUNDARIES
 | Boundary | Integration Point | How |
 |----------|-------------------|-----|
 | Git publish | `MessageHandler.handleGitPush()`, `CodexMessageHandler.handleGitPush()` | Runs `git diff HEAD` + `git status --porcelain -uall` in parallel. For untracked files: reads file content (up to 256KB, first 200 lines) and builds synthetic diff with added lines so content scanners can detect secrets inside new files. Calls `broker.scanGitPublication()`, blocks if decision is `block`/`require_approval`. Gated by `scanGitPublication` setting. Fail-closed on scan error. |
-| MCP request | `claudePreToolUse.ts`, `codexPreToolUse.ts` (CLI hooks) | Intercepts tools matching `mcp__*` via a dedicated hook entry (separate from the Bash matcher). Gated by `CLAUI_SECRET_PROTECTION_SCAN_MCP` env var (passed from `ParticleAcceleratorEnvBuilder`). Scans args via `CompositeSecretScanner` at `mcp.request` boundary, denies if critical/high findings in balanced/strict mode. Runs independently of PA kill-switch. |
+| MCP request | `claudePreToolUse.ts`, `codexPreToolUse.ts` (CLI hooks) | Intercepts tools matching `mcp__*` via a dedicated hook entry (separate from the Bash matcher). Gated by `CLAUI_SECRET_PROTECTION_SCAN_MCP` env var (passed from `ParticleAcceleratorEnvBuilder`). Scans args via `CompositeSecretScanner` at `mcp.request` boundary, denies if critical/high findings in balanced/strict mode, and fails closed if the scanner cannot run. Runs independently of PA kill-switch. |
+| Browser/image capture | `MessageHandler.sendMessageWithImages`, `CodexMessageHandler.dispatchPrompt()` | Pasted image payloads are treated as `browser.capture` and audited through `broker.scanBrowserCapture()`. If `requireBrowserCaptureApproval` is enabled, the send is blocked until an approval flow exists. The audit event records metadata only (image count/media types/size), not raw base64 image content. |
 | Diagnostic export | `BugReportService.submit()` | Scans assembled report content via `broker.scanDiagnosticExport()` before Formspree submission. Blocks or redacts as appropriate. ZIP attachment is built from the (potentially redacted) sections, not raw sources. `SecretProtectionService` wired via `setSecretProtectionService()` during `bugReportInit`. |
 | Prompt submit | `MessageHandler` (3 scan points), `CodexMessageHandler.dispatchPrompt()` | Scans composed payload (user text + handoff context) via `broker.scanPromptSubmission()`. Gated by `scanPrompts` setting. |
 | **Scanner support only** | `mcp.response`, `telemetry.export` | ServerOutboundScanner supports these boundaries, but no caller currently triggers scanning at these points. |
@@ -300,8 +301,9 @@ Both hooks point to the same JS file; the tool name prefix determines which code
 
 - `src/webview/store/auditSlice.ts` and `src/webview/store/dlpSettingsSlice.ts` define the DLP UI state defaults/helpers.
 - `src/webview/state/store.ts` owns `secretProtectionSettings`, status fields, audit events, last event, compliance report, panel tab/open state, loading, and errors.
-- `useClaudeStream.ts` handles `secretProtectionStatus`, `secretProtectionAuditEvents`, `secretProtectionComplianceReport`, and `secretProtectionError`.
-- `MessageHandler` and `CodexMessageHandler` handle `secretProtectionGetStatus`, `secretProtectionSetSetting`, `secretProtectionGetAuditEvents`, and `secretProtectionGetComplianceReport`.
+- `useClaudeStream.ts` handles `secretProtectionStatus`, `secretProtectionAuditEvents`, `secretProtectionComplianceReport`, and `secretProtectionError`, and passes per-message `secretsDetected` / `redactionApplied` metadata into chat state.
+- `MessageHandler` and `CodexMessageHandler` handle `secretProtectionGetStatus`, `secretProtectionSetSetting`, `secretProtectionGetAuditEvents`, and `secretProtectionGetComplianceReport`. Prompt-send decisions also attach `secretsDetected` / `redactionApplied` metadata to displayed user messages.
+- `MessageBubble.tsx` displays compact Secrets / Redacted badges when those fields are present on a chat message.
 
 ### Approval and Codex Enforcement
 
@@ -312,4 +314,4 @@ Both hooks point to the same JS file; the tool name prefix determines which code
 
 ### Tests
 
-Step 5 adds 14 node:test files under `tests/unit`, `tests/integration`, and `tests/regression` covering scanner units, redaction, policy decisions, audit writer compatibility, approval engine behavior, git publication scanning, multi-way redaction, and backward-compatible import paths.
+Step 5 adds node:test coverage under `tests/unit`, `tests/integration`, `tests/regression`, and `tests/secret-protection` covering scanner units (including multipart structured payloads), browser-capture approval gating, redaction, policy decisions, audit writer compatibility, approval engine behavior, git publication scanning, multi-way redaction, and backward-compatible import paths.

@@ -16,6 +16,7 @@ import type {
   CodexReasoningEffort,
   CodexServiceTier,
   CodexModelOption,
+  DlpMessageMetadata,
   ExtensionToWebviewMessage,
   ProviderCapabilities,
   ProviderId,
@@ -25,6 +26,7 @@ import type {
   WebviewImageData,
   WebviewToExtensionMessage,
 } from '../types/webview-messages';
+import type { DlpDecision } from '../../shared/secret-protection/types';
 
 export interface CodexSessionController {
   startSession(options?: { resume?: string; cwd?: string }): Promise<void>;
@@ -312,7 +314,11 @@ export class CodexMessageHandler {
   }
 
   /** Post a userMessage with dedup (same pattern as MessageHandler). */
-  private postUserMessage(content: ContentBlock[], isOptimistic = false): void {
+  private postUserMessage(
+    content: ContentBlock[],
+    isOptimistic = false,
+    dlpMetadata?: DlpMessageMetadata,
+  ): void {
     const text = content
       .filter((b) => b.type === 'text')
       .map((b) => (b as any).text || '')
@@ -324,7 +330,16 @@ export class CodexMessageHandler {
     if (isOptimistic) {
       this.lastPostedUserMsg = { text, time: Date.now() };
     }
-    this.postToWebview({ type: 'userMessage', content });
+    this.postToWebview({ type: 'userMessage', content, ...dlpMetadata });
+  }
+
+  private dlpMetadataFromDecision(decision: DlpDecision): DlpMessageMetadata {
+    return {
+      secretsDetected: decision.findings.length > 0,
+      redactionApplied: decision.action === 'redact'
+        || decision.action === 'summarize_locally'
+        || decision.audit.redactionCount > 0,
+    };
   }
 
   /**
@@ -422,19 +437,78 @@ export class CodexMessageHandler {
     return content;
   }
 
+  private describeImageCaptures(images: WebviewImageData[], promptText: string): string {
+    const mediaTypes = [...new Set(images.map((img) => img.mediaType))].join(',') || 'unknown';
+    const totalBase64Bytes = images.reduce((sum, img) => sum + img.base64.length, 0);
+    return [
+      `image_count=${images.length}`,
+      `media_types=${mediaTypes}`,
+      `base64_chars=${totalBase64Bytes}`,
+      `prompt_bytes=${Buffer.byteLength(promptText, 'utf8')}`,
+    ].join('; ');
+  }
+
+  private async resolveBrowserCaptureDecision(
+    images: WebviewImageData[] | undefined,
+    composedText: string,
+  ): Promise<boolean> {
+    if (!images?.length || !this.secretProtectionService?.isEnabled()) {
+      return true;
+    }
+    const broker = this.secretProtectionService.getBroker();
+    if (!broker) {
+      return true;
+    }
+
+    const decision = await broker.scanBrowserCapture(
+      this.describeImageCaptures(images, composedText),
+    );
+    switch (decision.action) {
+      case 'block':
+      case 'require_approval':
+        this.log(`[SecretProtection] Browser capture ${decision.action}: ${decision.reason}`);
+        this.postToWebview({
+          type: 'error',
+          message: `Secret protection blocked this image capture: ${decision.reason}`,
+        });
+        return false;
+      case 'summarize_locally':
+        if (!decision.safeSummary) {
+          this.log(`[SecretProtection] Browser capture blocked (summarize_locally, no safe summary): ${decision.reason}`);
+          this.postToWebview({
+            type: 'error',
+            message: `Secret protection blocked this image capture: ${decision.reason}`,
+          });
+          return false;
+        }
+        return true;
+      case 'warn':
+        this.log(`[SecretProtection] Browser capture warning: ${decision.reason}`);
+        return true;
+      default:
+        return true;
+    }
+  }
+
   private async dispatchPrompt(text: string, images?: WebviewImageData[], opts?: { steer?: boolean }): Promise<void> {
     const normalizedImages = images && images.length > 0 ? images : undefined;
 
     // Build final payload (including handoff context) BEFORE scanning
     const deferred = this.buildDeferredHandoffPayload(text, { imageCount: normalizedImages?.length ?? 0 });
 
+    if (!(await this.resolveBrowserCaptureDecision(normalizedImages, deferred.text))) {
+      return;
+    }
+
     // DLP: scan the FINAL composed payload (including handoff context)
     // All side effects (achievement, history, UI) happen AFTER DLP approves.
     let dlpRedacted = false;
+    let dlpMetadata: DlpMessageMetadata | undefined;
     if (this.secretProtectionService?.isEnabled() && this.secretProtectionService.getSettings().scanPrompts) {
       const broker = this.secretProtectionService.getBroker();
       if (broker) {
         const decision = await broker.scanPromptSubmission(deferred.text);
+        dlpMetadata = this.dlpMetadataFromDecision(decision);
         switch (decision.action) {
           case 'block':
           case 'require_approval':
@@ -476,7 +550,7 @@ export class CodexMessageHandler {
       }
     }
     const content = this.buildPromptContent(text, normalizedImages);
-    this.postUserMessage(content, true);
+    this.postUserMessage(content, true, dlpMetadata);
     this.postToWebview({ type: 'processBusy', busy: true });
 
     try {

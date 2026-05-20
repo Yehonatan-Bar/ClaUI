@@ -30,6 +30,7 @@ import { openHtmlPreviewPanel } from './HtmlPreviewPanel';
 import type {
   AdventureBeatMessage,
   ExtensionToWebviewMessage,
+  DlpMessageMetadata,
   McpConfigPaths,
   McpMutationRecord,
   McpServerInfo,
@@ -50,6 +51,7 @@ import type {
   ResultError,
   ContentBlock,
 } from '../types/stream-json';
+import type { DlpDecision } from '../../shared/secret-protection/types';
 
 /**
  * Minimal interface that MessageHandler needs to communicate with a webview.
@@ -1065,6 +1067,7 @@ export class MessageHandler {
     content: ContentBlock[],
     isOptimistic = false,
     source: 'input' | 'auto-prompt' = 'input',
+    dlpMetadata?: DlpMessageMetadata,
   ): void {
     const text = content
       .filter((b) => b.type === 'text')
@@ -1077,7 +1080,7 @@ export class MessageHandler {
     if (isOptimistic) {
       this.lastPostedUserMsg = { text, time: Date.now() };
     }
-    this.webview.postMessage({ type: 'userMessage', content, source });
+    this.webview.postMessage({ type: 'userMessage', content, source, ...dlpMetadata });
   }
 
   /**
@@ -1098,10 +1101,16 @@ export class MessageHandler {
    * Resolve a DLP decision into the text to send, or null to block.
    * `require_approval` is fail-closed; approval flow handled via ExceptionStore on the broker.
    */
-  private resolveDlpDecision(
-    decision: import('../../shared/secret-protection/types').DlpDecision,
-    composedText: string,
-  ): string | null {
+  private dlpMetadataFromDecision(decision: DlpDecision): DlpMessageMetadata {
+    return {
+      secretsDetected: decision.findings.length > 0,
+      redactionApplied: decision.action === 'redact'
+        || decision.action === 'summarize_locally'
+        || decision.audit.redactionCount > 0,
+    };
+  }
+
+  private resolveDlpDecision(decision: DlpDecision, composedText: string): string | null {
     switch (decision.action) {
       case 'block':
       case 'require_approval':
@@ -1129,6 +1138,59 @@ export class MessageHandler {
     }
   }
 
+  private describeImageCaptures(images: WebviewImageData[], promptText: string): string {
+    const mediaTypes = [...new Set(images.map((img) => img.mediaType))].join(',') || 'unknown';
+    const totalBase64Bytes = images.reduce((sum, img) => sum + img.base64.length, 0);
+    return [
+      `image_count=${images.length}`,
+      `media_types=${mediaTypes}`,
+      `base64_chars=${totalBase64Bytes}`,
+      `prompt_bytes=${Buffer.byteLength(promptText, 'utf8')}`,
+    ].join('; ');
+  }
+
+  private async resolveBrowserCaptureDecision(
+    images: WebviewImageData[],
+    composedText: string,
+  ): Promise<boolean> {
+    if (images.length === 0) return true;
+    const service = this.secretProtectionService;
+    if (!service?.isEnabled()) {
+      return true;
+    }
+    const broker = service.getBroker();
+    if (!broker) return true;
+
+    const decision = await broker.scanBrowserCapture(
+      this.describeImageCaptures(images, composedText),
+    );
+    switch (decision.action) {
+      case 'block':
+      case 'require_approval':
+        this.log(`[SecretProtection] Browser capture ${decision.action}: ${decision.reason}`);
+        this.webview.postMessage({
+          type: 'error',
+          message: `Secret protection blocked this image capture: ${decision.reason}`,
+        });
+        return false;
+      case 'summarize_locally':
+        if (!decision.safeSummary) {
+          this.log(`[SecretProtection] Browser capture blocked (summarize_locally, no safe summary): ${decision.reason}`);
+          this.webview.postMessage({
+            type: 'error',
+            message: `Secret protection blocked this image capture: ${decision.reason}`,
+          });
+          return false;
+        }
+        return true;
+      case 'warn':
+        this.log(`[SecretProtection] Browser capture warning: ${decision.reason}`);
+        return true;
+      default:
+        return true;
+    }
+  }
+
   /**
    * Shared DLP-aware dispatch for deferred send paths (usage-limit queue, scheduled messages).
    * Scans the final payload (text + handoff), handles all DLP actions, and only commits side
@@ -1144,16 +1206,21 @@ export class MessageHandler {
       const hasImages = images.length > 0;
       const composedText = this.peekDeferredHandoffContext(text, { imageCount: images.length });
 
+      if (!(await this.resolveBrowserCaptureDecision(images, composedText))) {
+        onSuccess();
+        return;
+      }
+
       // DLP scan if enabled and scanPrompts setting is on
       let textToSend = composedText;
       let dlpRedacted = false;
+      let dlpMetadata: DlpMessageMetadata | undefined;
       if (this.secretProtectionService?.isEnabled() && this.secretProtectionService.getSettings().scanPrompts) {
         const broker = this.secretProtectionService.getBroker();
         if (broker) {
-          const resolved = this.resolveDlpDecision(
-            await broker.scanPromptSubmission(composedText),
-            composedText,
-          );
+          const decision = await broker.scanPromptSubmission(composedText);
+          dlpMetadata = this.dlpMetadataFromDecision(decision);
+          const resolved = this.resolveDlpDecision(decision, composedText);
           if (!resolved) { onSuccess(); return; }
           textToSend = resolved;
           dlpRedacted = textToSend !== composedText;
@@ -1172,7 +1239,7 @@ export class MessageHandler {
           source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
         } as ContentBlock);
       }
-      this.postUserMessage(content, true);
+      this.postUserMessage(content, true, 'input', dlpMetadata);
       if (hasImages) {
         this.control.sendWithImages(textToSend, images);
       } else {
@@ -1573,7 +1640,12 @@ export class MessageHandler {
                 if (!resolved) { return; }
                 this.pendingHandoffPrompt = null;
                 this.achievementService.onUserPrompt(this.tabId, msg.text);
-                this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock], true);
+                this.postUserMessage(
+                  [{ type: 'text', text: msg.text } as ContentBlock],
+                  true,
+                  'input',
+                  this.dlpMetadataFromDecision(decision),
+                );
                 this.control.sendText(resolved);
                 this.webview.postMessage({ type: 'processBusy', busy: true });
                 this.triggerSessionNaming(msg.text);
@@ -1614,66 +1686,15 @@ export class MessageHandler {
           this.cancelExitPlanApproveResumeFallback();
           this.cancelPostApproveNudge();
           this.clearApprovalTracking();
-          // DLP: scan composed payload (text + handoff) even if msg.text is empty
-          // because handoff context may contain secrets
-          if (this.secretProtectionService?.isEnabled() && this.secretProtectionService.getSettings().scanPrompts) {
-            const broker = this.secretProtectionService.getBroker();
-            if (broker) {
-              const composedText = this.peekDeferredHandoffContext(msg.text, { imageCount: msg.images.length });
-              void broker.scanPromptSubmission(composedText).then((decision) => {
-                const resolved = this.resolveDlpDecision(decision, composedText);
-                if (!resolved) { return; }
-                this.pendingHandoffPrompt = null;
-                if (msg.text.trim()) {
-                  this.achievementService.onUserPrompt(this.tabId, msg.text);
-                }
-                const imgContent: ContentBlock[] = [];
-                if (msg.text) { imgContent.push({ type: 'text', text: msg.text }); }
-                for (const img of msg.images) {
-                  imgContent.push({
-                    type: 'image',
-                    source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
-                  } as ContentBlock);
-                }
-                this.postUserMessage(imgContent, true);
-                this.control.sendWithImages(resolved, msg.images);
-                this.webview.postMessage({ type: 'processBusy', busy: true });
-                this.triggerSessionNaming(msg.text);
-                if (msg.text.trim() && decision.action !== 'redact' && decision.action !== 'summarize_locally') {
-                  void this.promptHistoryStore.addPrompt(msg.text);
-                }
-              });
-              break;
-            }
-          }
-          if (msg.text.trim()) {
-            this.achievementService.onUserPrompt(this.tabId, msg.text);
-          }
-          // Optimistic: show user message in UI immediately (before CLI echoes it back)
-          const imgContent: ContentBlock[] = [];
-          if (msg.text) {
-            imgContent.push({ type: 'text', text: msg.text });
-          }
-          for (const img of msg.images) {
-            imgContent.push({
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: img.mediaType,
-                data: img.base64,
-              },
-            } as ContentBlock);
-          }
-          this.postUserMessage(imgContent, true);
-          this.control.sendWithImages(
-            this.consumeDeferredHandoffContext(msg.text, { imageCount: msg.images.length }),
+          void this.dlpScanAndDispatch(
+            msg.text,
             msg.images,
+            () => undefined,
+            (message) => this.webview.postMessage({
+              type: 'error',
+              message: `Failed to send message with images: ${message}`,
+            }),
           );
-          this.webview.postMessage({ type: 'processBusy', busy: true });
-          this.triggerSessionNaming(msg.text);
-          if (msg.text.trim()) {
-            void this.promptHistoryStore.addPrompt(msg.text);
-          }
           break;
         }
 

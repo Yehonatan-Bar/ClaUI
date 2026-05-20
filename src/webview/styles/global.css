@@ -7679,6 +7679,25 @@ html, body, #root {
   color: #ff9800;
 }
 
+.dlp-message-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+  background: color-mix(in srgb, #f59e0b 20%, transparent);
+  color: #f59e0b;
+}
+
+.dlp-message-badge-redacted {
+  background: color-mix(in srgb, #10b981 20%, transparent);
+  color: #10b981;
+}
+
 /* Pulsing animation for live streaming badges */
 .thinking-effort-live {
   animation: thinking-effort-pulse 1.5s ease-in-out infinite;

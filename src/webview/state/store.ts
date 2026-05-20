@@ -4,6 +4,7 @@ import type {
   BugReportContext,
   CodexReasoningEffort,
   CodexServiceTier,
+  DlpMessageMetadata,
   HandoffStage,
   McpConfigDiffPreview,
   McpConfigPaths,
@@ -61,6 +62,8 @@ export interface ChatMessage {
   model?: string;
   timestamp: number;
   thinkingEffort?: string;
+  secretsDetected?: boolean;
+  redactionApplied?: boolean;
   // Origin of user-role messages. 'input' = real prompt typed by the user via
   // the input box. 'auto-prompt' = injected by ClaUi (e.g. team idle, queued
   // prompt). Absent (treated as 'input') for assistant messages and pre-fix
@@ -93,6 +96,7 @@ interface AssistantSnapshot {
   messageId: string;
   content: ContentBlock[];
   model: string;
+  dlpMetadata?: DlpMessageMetadata;
 }
 
 // --- Visual Progress Mode types ---
@@ -594,8 +598,18 @@ export interface AppState {
   setSession: (sessionId: string, model: string, tabKind?: 'chat' | 'search' | 'multiparticipant') => void;
   setTabKind: (kind: 'chat' | 'search' | 'multiparticipant') => void;
   endSession: (reason: string) => void;
-  addUserMessage: (content: string | ContentBlock[], source?: 'input' | 'auto-prompt') => void;
-  addAssistantMessage: (messageId: string, content: ContentBlock[], model: string, thinkingEffort?: string) => void;
+  addUserMessage: (
+    content: string | ContentBlock[],
+    source?: 'input' | 'auto-prompt',
+    dlpMetadata?: DlpMessageMetadata,
+  ) => void;
+  addAssistantMessage: (
+    messageId: string,
+    content: ContentBlock[],
+    model: string,
+    thinkingEffort?: string,
+    dlpMetadata?: DlpMessageMetadata,
+  ) => void;
   addInjectedAssistantContent: (content: ContentBlock[]) => void;
 
   // Streaming lifecycle
@@ -619,7 +633,8 @@ export interface AppState {
   updateAssistantSnapshot: (
     messageId: string,
     content: ContentBlock[],
-    model: string
+    model: string,
+    dlpMetadata?: DlpMessageMetadata,
   ) => void;
   finalizeStreamingMessage: () => void;
   clearStreaming: () => void;
@@ -1429,7 +1444,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
-  addUserMessage: (content, source = 'input') => {
+  addUserMessage: (content, source = 'input', dlpMetadata) => {
     // Normalize content: CLI may send a plain string instead of ContentBlock[]
     const normalizedContent: ContentBlock[] = typeof content === 'string'
       ? [{ type: 'text', text: content }]
@@ -1490,6 +1505,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             content: userVisibleContent,
             timestamp: Date.now(),
             source,
+            ...dlpMetadata,
           },
         ],
       };
@@ -1533,7 +1549,7 @@ export const useAppStore = create<AppState>((set, get) => ({
    * Add a complete assistant message directly to the messages array.
    * Used for replayed messages during session resume (no streaming pipeline).
    */
-  addAssistantMessage: (messageId, content, model, thinkingEffort?) => {
+  addAssistantMessage: (messageId, content, model, thinkingEffort?, dlpMetadata?) => {
     // Normalize content defensively
     const normalizedContent: ContentBlock[] = Array.isArray(content)
       ? content
@@ -1546,6 +1562,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       model,
       timestamp: Date.now(),
       thinkingEffort: thinkingEffort || get().currentThinkingEffort || undefined,
+      ...dlpMetadata,
     };
 
     set((state) => {
@@ -1655,8 +1672,8 @@ export const useAppStore = create<AppState>((set, get) => ({
    * This is NOT added to the messages array - it's used as the authoritative
    * content when the message is finalized (on messageStop or result).
    */
-  updateAssistantSnapshot: (messageId, content, model) =>
-    set({ lastAssistantSnapshot: { messageId, content, model } }),
+  updateAssistantSnapshot: (messageId, content, model, dlpMetadata) =>
+    set({ lastAssistantSnapshot: { messageId, content, model, dlpMetadata } }),
 
   /**
    * Convert current streaming state into a finalized ChatMessage.
@@ -1708,6 +1725,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       model,
       timestamp: Date.now(),
       thinkingEffort: state.currentThinkingEffort || undefined,
+      ...snapshot?.dlpMetadata,
     };
 
     // Upsert into messages (in case the same message ID was already finalized)

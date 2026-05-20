@@ -66,6 +66,8 @@ Audit logs are append-only JSONL files and never store raw secret values:
 
 The Audit tab requests events through `secretProtectionGetAuditEvents` and compliance summaries through `secretProtectionGetComplianceReport`. Retention cleanup runs when the broker is created and uses `claudeMirror.secretProtection.auditRetentionDays`.
 
+Prompt scans also attach `secretsDetected` and `redactionApplied` metadata to displayed chat messages, and the message bubble renders compact badges when a prompt was flagged or redacted.
+
 ## Hooks and Runtime
 
 For tool-boundary enforcement, install Particle Accelerator hooks. The hook manager installs both:
@@ -91,6 +93,7 @@ Quick functional checks:
 
 - Send a prompt containing `API_TOKEN=supersecretvalue123` in balanced mode and confirm it is blocked or redacted before the model boundary.
 - Try a git publication flow with a staged `.env` or private key-like content and confirm the Git push path blocks.
+- Paste an image while `requireBrowserCaptureApproval` is enabled and confirm the prompt is blocked with a browser/image capture audit event.
 - Open the Secret Protection panel and confirm the Audit tab lists the latest DLP decision.
 - In observe mode, confirm findings are logged while content is allowed.
 
@@ -101,6 +104,7 @@ Wired today:
 - Prompt submission: `MessageHandler`, `CodexMessageHandler`
 - Git publication: `handleGitPush()` in both handlers
 - MCP request: Claude/Codex pre-tool-use hooks
+- Browser/image capture: image prompt sends in both handlers when approval is required
 - Diagnostic export: `BugReportService.submit()`
 - Terminal output: `claui-run` when Secret Protection env vars are set
 - Persistence writes: `SafePersistenceGuard`

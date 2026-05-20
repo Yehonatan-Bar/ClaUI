@@ -91,6 +91,49 @@ export class SecretProtectionBroker {
     return this.scan(content, 'mcp.request', { mcpServerUrl: serverUrl, host: serverUrl });
   }
 
+  async scanBrowserCapture(description: string, host?: string): Promise<DlpDecision> {
+    const boundary: DlpBoundary = 'browser.capture';
+    const destination = classifyDestination(boundary, { host });
+    const contentHash = crypto.createHash('sha256').update(description).digest('hex').slice(0, 16);
+
+    if (this.settings.requireBrowserCaptureApproval) {
+      const audit = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        sessionId: this.sessionId,
+        boundary,
+        action: 'require_approval' as const,
+        ruleIds: ['browser-capture-approval-required'],
+        findingTypes: ['browser_capture'],
+        severityMax: 'medium' as const,
+        destinationKind: destination.kind,
+        contentHash,
+        redactedBytes: 0,
+        redactionCount: 0,
+      };
+
+      if (this.auditStoreDir) {
+        await this.auditWriter.writeEvent(audit, this.auditStoreDir);
+      }
+
+      return {
+        action: 'require_approval',
+        reason: 'Browser/image capture requires explicit approval before it is sent to the model',
+        findings: [],
+        approvalRequest: {
+          findingId: 'browser-capture-approval-required',
+          boundary,
+          destination,
+          description: 'Image capture is a high-risk boundary because it may contain secrets, PII, or authenticated page content.',
+          options: ['remove_from_context', 'approve_once', 'block'],
+        },
+        audit,
+      };
+    }
+
+    return this.scan(description, boundary, { host });
+  }
+
   async scanGitPublication(diff: string, commitMsg?: string, remoteName?: string): Promise<DlpDecision> {
     const content = (commitMsg ? commitMsg + '\n' : '') + diff;
     return this.scan(content, 'git.publish', { remoteName });

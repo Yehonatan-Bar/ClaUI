@@ -58,7 +58,13 @@ function scanMcpArgs(input: HookInput): HookOutput | null {
       }
     }
   } catch {
-    // Scanner failure: fail-open for MCP to avoid breaking tool calls
+    return {
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason: `ClaUi Secret Protection could not scan MCP tool "${toolName}" and blocked it fail-closed.`,
+      },
+    };
   }
   return null;
 }

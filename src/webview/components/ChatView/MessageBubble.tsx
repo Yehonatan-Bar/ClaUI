@@ -281,6 +281,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
             {message.thinkingEffort}
           </span>
         )}
+        {message.secretsDetected && (
+          <span className="dlp-message-badge" data-tooltip="Secret Protection detected sensitive content">
+            Secrets
+          </span>
+        )}
+        {message.redactionApplied && (
+          <span className="dlp-message-badge dlp-message-badge-redacted" data-tooltip="Secret Protection redacted content before sending">
+            Redacted
+          </span>
+        )}
         {textContent && (
           <button
             className="copy-message-btn"

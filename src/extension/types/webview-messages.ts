@@ -1148,14 +1148,19 @@ export interface SessionEndedMessage {
   reason: 'stopped' | 'crashed' | 'completed';
 }
 
-export interface StreamingTextMessage {
+export interface DlpMessageMetadata {
+  secretsDetected?: boolean;
+  redactionApplied?: boolean;
+}
+
+export interface StreamingTextMessage extends DlpMessageMetadata {
   type: 'streamingText';
   text: string;
   messageId: string;
   blockIndex: number;
 }
 
-export interface AssistantCompleteMessage {
+export interface AssistantCompleteMessage extends DlpMessageMetadata {
   type: 'assistantMessage';
   messageId: string;
   content: ContentBlock[];
@@ -1163,7 +1168,7 @@ export interface AssistantCompleteMessage {
   thinkingEffort?: string;
 }
 
-export interface UserMessageDisplay {
+export interface UserMessageDisplay extends DlpMessageMetadata {
   type: 'userMessage';
   content: ContentBlock[];
   // Origin of this user message. 'input' = typed by the user via the input box.
@@ -1235,7 +1240,7 @@ export interface ToolUseInputMessage {
   partialJson: string;
 }
 
-export interface ToolResultMessage {
+export interface ToolResultMessage extends DlpMessageMetadata {
   type: 'toolResult';
   toolId: string;
   content: string | ContentBlock[];
