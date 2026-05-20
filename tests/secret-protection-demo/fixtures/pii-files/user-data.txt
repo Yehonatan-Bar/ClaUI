@@ -1,0 +1,15 @@
+User records for demo testing:
+
+Name: John Demo
+Email: john.demo@company.internal
+Phone: +1 (555) 123-4567
+SSN: 123-45-6789
+
+Name: Jane Test
+Email: jane.test@corp.example.com
+Phone: 555-987-6543
+SSN: 987-65-4321
+
+Name: Bob Fixture
+Email: bob.fixture@testcorp.internal
+Phone: (555) 246-8135

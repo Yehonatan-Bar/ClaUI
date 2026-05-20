@@ -1,0 +1,22 @@
+https://github.com/microsoft/vscode
+https://www.npmjs.com/package/typescript
+https://developer.mozilla.org/en-US/docs/Web
+https://stackoverflow.com/questions/tagged/typescript
+
+Git commit hashes:
+abc123de f4567890 12345678 90123456 7890abcd
+fd4be42a 1b2c3d4e 5f678901 23456789 01234567
+
+SHA-256 checksums:
+e3b0c442 98fc1c14 9afbf4c8 996fb924 27ae41e4 649b934c a495991b 7852b855
+a591a6d4 0bf42040 4a011733 cfb7b190 d62c65bf 0bcda32b 57b277d9 ad9f146e
+
+Version strings:
+v1.0.0
+v2.3.4-beta.1
+1.2.3-rc.1+build.456
+
+NPM package specifiers:
+typescript@5.4.5
+react@18.2.0
+webpack@5.91.0

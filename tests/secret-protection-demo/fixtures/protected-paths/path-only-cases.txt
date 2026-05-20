@@ -1,0 +1,19 @@
+Reading file: /home/demo/.env
+Content from: /app/.env.production
+Found at: C:\Users\demo\.ssh\id_rsa
+Key file: /etc/ssl/private/server.key
+Certificate: /etc/ssl/certs/server.pem
+PKCS12: /home/demo/keystore.p12
+PFX file: C:\Certificates\demo.pfx
+AWS config: /home/demo/.aws/credentials
+Azure config: /home/demo/.azure/config
+Kube config: /home/demo/.kube/config
+Terraform state: /infra/terraform.tfstate
+Secrets file: /app/config/secrets.json
+Credentials file: /app/config/credentials.yaml
+Claude config: /home/demo/.claude/settings.json
+Codex config: /home/demo/.codex/config.yaml
+Cursor config: /home/demo/.cursor/settings.json
+Git internal: /repo/.git/config
+NPM config: /home/demo/.npmrc
+PyPI config: /home/demo/.pypirc

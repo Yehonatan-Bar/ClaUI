@@ -1,0 +1,7 @@
+demo-results.json
+live-evidence.json
+screenshot-manifest.json
+secret-protection-demo-report.html
+audit/
+*.png
+*.jpg

@@ -110,3 +110,28 @@ Wired today:
 - Persistence writes: `SafePersistenceGuard`
 
 Scanner support also exists for MCP responses and telemetry export, but those code paths need a caller before enforcement is active there.
+
+## Automated Demo Testing
+
+Run the full Secret Protection evidence suite to verify all scanners, rule packs, and boundaries:
+
+```powershell
+npm run demo:secret-protection
+```
+
+Generate a standalone HTML report from the results:
+
+```powershell
+npm run demo:secret-protection:report
+```
+
+The suite exercises 26 fixtures across all 13 boundaries and produces:
+
+- `tests/secret-protection-demo/results/demo-results.json`: measured scanner, policy, redaction, command-risk, no-regression proxy, policy matrix, and acceptance evidence
+- `tests/secret-protection-demo/results/live-evidence.json`: live-demo evidence placeholder plus automated clean workflow evidence
+- `tests/secret-protection-demo/results/screenshot-manifest.json`: screenshot manifest for live captures
+- `tests/secret-protection-demo/results/secret-protection-demo-report.html`: standalone report generated from the JSON evidence
+
+Wired boundaries use `SecretProtectionBroker`; `git.diff`, `mcp.response`, and `telemetry.export` are marked scanner-only until extension callers exist.
+
+For a step-by-step live demo walkthrough, see `tests/secret-protection-demo/DEMO_GUIDE.md`.

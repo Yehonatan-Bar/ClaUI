@@ -1,0 +1,17 @@
+{
+  "appName": "Demo Application",
+  "version": "1.0.0",
+  "environment": "development",
+  "port": 3000,
+  "logLevel": "info",
+  "features": {
+    "darkMode": true,
+    "notifications": true,
+    "analytics": false
+  },
+  "api": {
+    "baseUrl": "/api/v2",
+    "timeout": 5000,
+    "retries": 3
+  }
+}

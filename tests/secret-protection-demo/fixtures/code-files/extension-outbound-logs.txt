@@ -1,0 +1,9 @@
+2026-05-20T10:30:00Z [INFO] Connection established
+password = "DemoHardcodedPasswordInLogs1234567890"
+connectionString = "Server=db.example.com;Database=TestDB;User Id=admin;Password=DemoConnStringInLogs123;"
+Error at C:\Users\demo\AppData\Local\internal-server\src\api\handlers.ts:42
+  at processRequest (C:\Users\demo\internal-server\src\middleware\auth.ts:15)
+REDIS_URL=redis://:DemoRedisInLogs123@redis.internal.example.com:6379
+Authorization: Bearer DemoAuthHeaderInExtensionLogs1234567890abcdef
+connect.sid=s%3ADemoSessionTokenInExtensionLogs1234567890abcdef.FakeSignature
+ERROR [PostgreSQL] FATAL: password authentication failed for user "admin" using password "DemoDbErrorPassword123"

@@ -1,0 +1,621 @@
+{
+  "$schema": "fixture-manifest-v1",
+  "description": "Fixture manifest mapping every test fixture to expected detection rules, finding types, severities, and applicable DLP boundaries. Rule IDs are based on actual scanner output discovery.",
+  "generatedAt": "2026-05-20",
+  "boundaries": [
+    "prompt.submit",
+    "context.attach",
+    "file.read_for_context",
+    "command.preflight",
+    "command.output",
+    "git.diff",
+    "git.publish",
+    "mcp.request",
+    "mcp.response",
+    "browser.capture",
+    "persistence.write",
+    "telemetry.export",
+    "diagnostic.export"
+  ],
+
+  "fixtures": [
+
+    {
+      "id": "env-cloud",
+      "description": "AWS, GCP, and Azure credentials in .env file: access keys, session token, API key, OAuth token, client secret, connection string",
+      "category": "cloud-credentials",
+      "fixtureFile": "env-files/.env.cloud",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["cloud_credential", "hard_secret"],
+      "expectedRuleIds": [
+        "regex-aws-access-key",
+        "regex-aws-secret-key",
+        "regex-aws-session-token",
+        "regex-azure-client-secret",
+        "regex-azure-connection-string",
+        "env-value-gcp_api_key",
+        "env-value-gcp_oauth_token"
+      ],
+      "expectedSeverityMin": "critical",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export", "browser.capture", "persistence.write"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Covers all three major cloud providers: AWS AKIA prefix keys, GCP AIzaSy/ya29 tokens, Azure client_secret and connection strings"
+    },
+
+    {
+      "id": "env-database",
+      "description": "Database connection URLs and strings with embedded credentials (PostgreSQL, Redis, MongoDB, AMQP, ADO.NET)",
+      "category": "database-credentials",
+      "fixtureFile": "env-files/.env.database",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["hard_secret", "database_credential", "pii"],
+      "expectedRuleIds": [
+        "webview-env-block-paste",
+        "env-value-connection_string",
+        "webview-url-embedded-creds",
+        "env-value-database_url",
+        "ext-log-env-leak",
+        "server-db-url-leak",
+        "server-db-connstr-leak",
+        "regex-basic-auth-url",
+        "pii-email",
+        "regex-db-url-creds"
+      ],
+      "expectedSeverityMin": "critical",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Multiple DB URL formats with user:pass, ADO.NET connection string with Password="
+    },
+
+    {
+      "id": "env-entropy",
+      "description": "High-entropy random tokens for entropy-based scanner testing",
+      "category": "entropy-detection",
+      "fixtureFile": "env-files/.env.entropy",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["hard_secret"],
+      "expectedRuleIds": [
+        "webview-env-block-paste",
+        "env-value-entropy_token",
+        "env-value-random_secret",
+        "entropy-high"
+      ],
+      "expectedSeverityMin": "high",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Base64-like strings and random alphanumeric tokens triggering entropy and env-value detection"
+    },
+
+    {
+      "id": "env-general",
+      "description": "Generic sensitive environment variables: API_KEY, AUTH_TOKEN, passwords, PRIVATE_KEY, SMTP_PASSWORD, NuGet key",
+      "category": "generic-secrets",
+      "fixtureFile": "env-files/.env.general",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["hard_secret"],
+      "expectedRuleIds": [
+        "webview-env-block-paste",
+        "env-value-api_key",
+        "env-value-auth_token",
+        "ext-log-env-leak",
+        "env-value-nuget_api_key",
+        "env-value-private_key",
+        "env-value-smtp_password",
+        "env-value-mail_password"
+      ],
+      "expectedSeverityMin": "high",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Tests EnvValueScanner for generic KEY=value patterns with sensitive variable names"
+    },
+
+    {
+      "id": "env-providers",
+      "description": "SaaS/AI provider tokens: OpenAI key and org ID, Anthropic, GitHub, Slack, Stripe keys and tokens",
+      "category": "provider-credentials",
+      "fixtureFile": "env-files/.env.providers",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["api_key", "hard_secret"],
+      "expectedRuleIds": [
+        "webview-openai-key-paste",
+        "regex-openai-org-id",
+        "webview-anthropic-key-paste",
+        "regex-stripe-secret-key",
+        "env-value-github_token",
+        "env-value-github_pat",
+        "webview-env-block-paste",
+        "env-value-stripe_restricted_key",
+        "env-value-stripe_webhook_secret",
+        "env-value-openai_api_key",
+        "env-value-anthropic_api_key",
+        "env-value-slack_bot_token",
+        "env-value-slack_user_token",
+        "env-value-slack_app_token"
+      ],
+      "expectedSeverityMin": "critical",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Comprehensive provider env file: sk- OpenAI, org- OpenAI org ID, sk-ant- Anthropic, ghp_/github_pat_ GitHub, xoxb-/xoxp-/xapp- Slack, sk_live_/rk_test_/whsec_ Stripe"
+    },
+
+    {
+      "id": "code-config-with-creds",
+      "description": "JSON config with password, connection_string, api_key, secret, token, bearer auth, client_secret, and private_key fields",
+      "category": "structured-config",
+      "fixtureFile": "code-files/config-with-creds.json",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["private_key", "hard_secret", "api_key", "database_credential"],
+      "expectedRuleIds": [
+        "regex-private-key-block",
+        "structured-password",
+        "structured-connection_string",
+        "structured-api_key",
+        "structured-secret",
+        "structured-token",
+        "regex-bearer-token",
+        "structured-client_secret",
+        "server-db-connstr-leak",
+        "server-oauth-client-secret"
+      ],
+      "expectedSeverityMin": "critical",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Tests StructuredPayloadScanner for JSON key-value detection of sensitive fields, plus private key block and bearer token"
+    },
+
+    {
+      "id": "code-connection-strings-yaml",
+      "description": "YAML config with passwords, connection strings, DB URLs, SMTP password, and high-entropy tokens",
+      "category": "structured-config",
+      "fixtureFile": "code-files/connection-strings.yaml",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["hard_secret", "database_credential", "pii"],
+      "expectedRuleIds": [
+        "structured-password",
+        "structured-connection_string",
+        "regex-db-url-creds",
+        "structured-secret",
+        "structured-smtp_password",
+        "entropy-high",
+        "pii-email",
+        "ext-connection-string",
+        "server-db-url-leak"
+      ],
+      "expectedSeverityMin": "critical",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Tests StructuredPayloadScanner for YAML key-value patterns; multiple DB URL formats with embedded creds"
+    },
+
+    {
+      "id": "code-extension-outbound-logs",
+      "description": "Extension outbound log content: git credential output, bearer token, email, connection string, env leak, auth header, stack trace paths",
+      "category": "extension-outbound",
+      "fixtureFile": "code-files/extension-outbound-logs.txt",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["hard_secret", "api_key", "pii", "database_credential"],
+      "expectedRuleIds": [
+        "regex-git-credential-helper-output",
+        "regex-bearer-token",
+        "pii-email",
+        "entropy-high",
+        "ext-connection-string",
+        "ext-log-env-leak",
+        "ext-auth-header-leak",
+        "ext-stack-trace-path",
+        "server-db-connstr-leak"
+      ],
+      "expectedSeverityMin": "critical",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Tests ExtensionOutboundScanner; log output patterns that could leak credentials through various channels"
+    },
+
+    {
+      "id": "code-gcp-service-account",
+      "description": "Full GCP service account JSON with type:service_account and embedded private key",
+      "category": "cloud-gcp",
+      "fixtureFile": "code-files/gcp-service-account.json",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["private_key", "pii"],
+      "expectedRuleIds": [
+        "regex-private-key-block",
+        "pii-email"
+      ],
+      "expectedSeverityMin": "critical",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Detected by private key block within service account JSON and email field"
+    },
+
+    {
+      "id": "code-hardcoded-secrets",
+      "description": "TypeScript file with hardcoded OpenAI key, Stripe key, private key, git credential output, Slack/Discord webhooks, bearer token, URL with creds, explicit secret disclosure, basic auth URL, and more",
+      "category": "hardcoded-secrets",
+      "fixtureFile": "code-files/hardcoded-secrets.ts",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["api_key", "private_key", "hard_secret", "webhook", "database_credential"],
+      "expectedRuleIds": [
+        "webview-openai-key-paste",
+        "regex-stripe-secret-key",
+        "regex-private-key-block",
+        "regex-git-credential-helper-output",
+        "regex-slack-webhook-url",
+        "webview-discord-webhook",
+        "regex-bearer-token",
+        "webview-url-embedded-creds",
+        "webview-explicit-secret-disclosure",
+        "entropy-high",
+        "ext-hardcoded-password",
+        "structured-apikey",
+        "ext-auth-header-leak",
+        "regex-basic-auth-url"
+      ],
+      "expectedSeverityMin": "critical",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Covers multiple rule packs in a single TS file: provider keys, crypto, auth patterns, webhooks, and explicit prompt-style secret disclosure"
+    },
+
+    {
+      "id": "code-server-outbound-payloads",
+      "description": "Server outbound content: client_secret, basic auth URL, session tokens, OAuth, DB connection strings, cert material, API key header, URL token param, SMTP creds, SSN, credit card, session cookie",
+      "category": "server-outbound",
+      "fixtureFile": "code-files/server-outbound-payloads.txt",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["hard_secret", "api_key", "database_credential", "pii", "private_key"],
+      "expectedRuleIds": [
+        "structured-client_secret",
+        "regex-basic-auth-url",
+        "entropy-high",
+        "webview-base64-blob",
+        "ext-session-token-leak",
+        "server-oauth-client-secret",
+        "server-db-connstr-leak",
+        "server-cert-material-leak",
+        "server-api-key-header",
+        "server-url-token-param",
+        "server-smtp-creds",
+        "server-ssn-in-payload",
+        "server-credit-card-in-payload",
+        "server-session-cookie-leak"
+      ],
+      "expectedSeverityMin": "critical",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "mcp.response", "git.publish", "telemetry.export", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Tests ServerOutboundScanner comprehensively; also triggers PII, structured, and crypto rules"
+    },
+
+    {
+      "id": "cmd-exfiltration",
+      "description": "Data exfiltration commands: curl POST/upload, wget post-data, nc/ncat, pipe to curl/nc, plus .env path references",
+      "category": "commands-exfiltration",
+      "fixtureFile": "commands/exfiltration-commands.txt",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["network_exfil_primitive", "protected_path"],
+      "expectedRuleIds": [
+        "path-dotenv",
+        "regex-cmd-curl-upload",
+        "regex-cmd-wget-post",
+        "regex-cmd-netcat",
+        "regex-cmd-pipe-to-remote"
+      ],
+      "expectedSeverityMin": "high",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["command.preflight", "prompt.submit", "command.output", "mcp.request"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Tests commands-exfiltration rule pack: all exfiltration vectors including piped chains and eval; also detects .env path references"
+    },
+
+    {
+      "id": "cmd-risky",
+      "description": "Risky commands: cat .env, cat ~/.ssh/id_rsa, cat ~/.aws/credentials, printenv, key files, terraform state, secrets.json, agent config dirs, git dir",
+      "category": "risky-commands",
+      "fixtureFile": "commands/risky-commands.txt",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["protected_path", "agent_control_file", "git_control_file", "pii"],
+      "expectedRuleIds": [
+        "path-dotenv",
+        "path-ssh",
+        "path-key-file",
+        "path-aws-config",
+        "path-tfstate",
+        "path-secrets-json",
+        "path-claude-config",
+        "path-codex-config",
+        "path-cursor-config",
+        "path-git-dir",
+        "pii-email"
+      ],
+      "expectedSeverityMin": "high",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["command.preflight", "prompt.submit", "command.output", "mcp.request"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Tests files-protected rule pack: commands accessing sensitive files, writing to agent config dirs"
+    },
+
+    {
+      "id": "cmd-safe",
+      "description": "Safe commands: ls, git status, git diff, npm test, npm run build, head, grep, find, wc, tsc, eslint, jest, pytest, go test, cargo test",
+      "category": "safe-commands",
+      "fixtureFile": "commands/safe-commands.txt",
+      "sampleSelector": "full-file",
+      "isClean": true,
+      "expectedFindingTypes": [],
+      "expectedRuleIds": [],
+      "expectedSeverityMin": null,
+      "applicableBoundaries": ["command.preflight", "prompt.submit", "command.output", "mcp.request"],
+      "mustBeHiddenWhenProtected": false,
+      "notes": "Negative test: none of these commands should trigger any rule"
+    },
+
+    {
+      "id": "crypto-jwt-tokens",
+      "description": "JWT tokens: HS256 and RS256 signed JWTs (eyJ... three-part dot-separated)",
+      "category": "crypto",
+      "fixtureFile": "crypto/fake-jwt-tokens.txt",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["jwt"],
+      "expectedRuleIds": [
+        "regex-jwt"
+      ],
+      "expectedSeverityMin": "high",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Tests JWT regex: eyJ base64 header.payload.signature format"
+    },
+
+    {
+      "id": "crypto-private-key",
+      "description": "PEM private key block (-----BEGIN PRIVATE KEY----- ... -----END PRIVATE KEY-----)",
+      "category": "crypto",
+      "fixtureFile": "crypto/fake-private-key.pem",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["private_key"],
+      "expectedRuleIds": [
+        "regex-private-key-block"
+      ],
+      "expectedSeverityMin": "critical",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Tests regex rule for PEM private key block detection"
+    },
+
+    {
+      "id": "git-credential-output",
+      "description": "Git credential helper output with password= lines and credential URLs with embedded user:pass",
+      "category": "vcs-git",
+      "fixtureFile": "git-files/git-credential-output.txt",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["database_credential", "hard_secret"],
+      "expectedRuleIds": [
+        "regex-git-credential-url",
+        "regex-git-credential-helper-output"
+      ],
+      "expectedSeverityMin": "high",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.diff", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Tests vcs-git rule pack: credential helper protocol output and HTTPS URLs with embedded credentials"
+    },
+
+    {
+      "id": "git-staged-secrets-diff",
+      "description": "Git diff with staged .env and secrets.json files containing AWS keys, OpenAI key, Stripe key, passwords, Anthropic key in added lines",
+      "category": "vcs-git",
+      "fixtureFile": "git-files/staged-secrets.diff",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["protected_path", "cloud_credential", "api_key", "hard_secret", "private_key"],
+      "expectedRuleIds": [
+        "path-dotenv",
+        "regex-aws-access-key",
+        "regex-aws-secret-key",
+        "webview-openai-key-paste",
+        "regex-stripe-secret-key",
+        "path-secrets-json",
+        "structured-password",
+        "regex-private-key-block",
+        "regex-anthropic-key",
+        "entropy-high",
+        "regex-openai-key",
+        "git-staged-dotenv",
+        "git-diff-api-key",
+        "git-staged-secrets-file"
+      ],
+      "expectedSeverityMin": "critical",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.diff", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Tests GitPublicationScanner: staged file detection plus diff-line pattern matching for multiple credential types"
+    },
+
+    {
+      "id": "pii-internal-network",
+      "description": "Internal network topology: RFC1918 IP addresses (10.x, 172.16.x, 192.168.x) and internal hostnames (*.internal, *.corp, *.cluster.local)",
+      "category": "topology-internal",
+      "fixtureFile": "pii-files/internal-network.txt",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["internal_topology"],
+      "expectedRuleIds": [
+        "topology-internal-ip",
+        "topology-internal-hostname"
+      ],
+      "expectedSeverityMin": "medium",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": false,
+      "notes": "Tests topology-internal rule pack: RFC1918 ranges and internal hostname suffixes; medium severity only"
+    },
+
+    {
+      "id": "pii-payment-data",
+      "description": "Payment data: credit card numbers (Visa, MC, Amex), SSNs, email addresses",
+      "category": "pii-financial",
+      "fixtureFile": "pii-files/payment-data.txt",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["pii"],
+      "expectedRuleIds": [
+        "pii-email",
+        "server-credit-card-in-payload",
+        "server-ssn-in-payload"
+      ],
+      "expectedSeverityMin": "high",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Credit card numbers in Visa (4111...), MasterCard (5500...), Amex (3782...) formats plus SSN and email"
+    },
+
+    {
+      "id": "pii-user-data",
+      "description": "PII: email addresses and Social Security Numbers",
+      "category": "pii-basic",
+      "fixtureFile": "pii-files/user-data.txt",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["pii"],
+      "expectedRuleIds": [
+        "pii-email",
+        "server-ssn-in-payload"
+      ],
+      "expectedSeverityMin": "high",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Tests PiiAndInternalTopologyScanner for basic PII types: email and SSN"
+    },
+
+    {
+      "id": "protected-paths",
+      "description": "References to protected file paths: .env, .ssh/id_rsa, .key, .pem, .p12, .pfx, .aws/, .azure/, .kube/config, terraform.tfstate, secrets.json, credentials.yaml, .claude/, .codex/, .cursor/, .git/",
+      "category": "files-protected",
+      "fixtureFile": "protected-paths/path-only-cases.txt",
+      "sampleSelector": "full-file",
+      "isClean": false,
+      "expectedFindingTypes": ["protected_path", "agent_control_file", "git_control_file"],
+      "expectedRuleIds": [
+        "path-dotenv",
+        "path-ssh",
+        "path-key-file",
+        "path-pem",
+        "path-p12",
+        "path-pfx",
+        "path-aws-config",
+        "path-azure-config",
+        "path-kube-config",
+        "path-tfstate",
+        "path-secrets-json",
+        "path-credentials",
+        "path-claude-config",
+        "path-codex-config",
+        "path-cursor-config",
+        "path-git-dir"
+      ],
+      "expectedSeverityMin": "high",
+      "minimumExpectedFindings": 1,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context", "command.output", "mcp.request", "git.publish", "diagnostic.export"],
+      "mustBeHiddenWhenProtected": true,
+      "notes": "Tests files-protected rule pack: path-only references to all sensitive file locations"
+    },
+
+    {
+      "id": "clean-benign-urls-and-hashes",
+      "description": "Public URLs, git commit hashes, formatted SHA-256 checksums, version strings, npm package specifiers - all benign content",
+      "category": "clean",
+      "fixtureFile": "clean/benign-urls-and-hashes.txt",
+      "sampleSelector": "full-file",
+      "isClean": true,
+      "expectedFindingTypes": [],
+      "expectedRuleIds": [],
+      "expectedSeverityMin": null,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context"],
+      "mustBeHiddenWhenProtected": false,
+      "notes": "Critical negative test: public URLs, formatted checksums, and version strings must not trigger false positives"
+    },
+
+    {
+      "id": "clean-normal-code",
+      "description": "Normal TypeScript code with interfaces, functions, constants, and fetch calls - no secrets",
+      "category": "clean",
+      "fixtureFile": "clean/normal-code.ts",
+      "sampleSelector": "full-file",
+      "isClean": true,
+      "expectedFindingTypes": [],
+      "expectedRuleIds": [],
+      "expectedSeverityMin": null,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context"],
+      "mustBeHiddenWhenProtected": false,
+      "notes": "Negative test: standard TypeScript code should not trigger any rules"
+    },
+
+    {
+      "id": "clean-public-config",
+      "description": "Public JSON config with non-sensitive keys: appName, version, port, logLevel, features, baseUrl, timeout",
+      "category": "clean",
+      "fixtureFile": "clean/public-config.json",
+      "sampleSelector": "full-file",
+      "isClean": true,
+      "expectedFindingTypes": [],
+      "expectedRuleIds": [],
+      "expectedSeverityMin": null,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context"],
+      "mustBeHiddenWhenProtected": false,
+      "notes": "Negative test: JSON config with only public/non-sensitive values"
+    },
+
+    {
+      "id": "clean-readme-text",
+      "description": "Normal readme text with project description, getting started steps, version history",
+      "category": "clean",
+      "fixtureFile": "clean/readme-text.txt",
+      "sampleSelector": "full-file",
+      "isClean": true,
+      "expectedFindingTypes": [],
+      "expectedRuleIds": [],
+      "expectedSeverityMin": null,
+      "applicableBoundaries": ["prompt.submit", "context.attach", "file.read_for_context"],
+      "mustBeHiddenWhenProtected": false,
+      "notes": "Negative test: plain English documentation text"
+    }
+  ],
+
+  "stats": {
+    "totalFixtureEntries": 26,
+    "dirtyFixtures": 21,
+    "cleanFixtures": 5,
+    "uniqueFixtureFiles": 26,
+    "boundariesCovered": 13
+  }
+}

@@ -1,0 +1,20 @@
+HTTP/1.1 200 OK
+Set-Cookie: JSESSIONID=DemoSessionId1234567890abcdefghij; Path=/; HttpOnly
+X-Api-Key: DemoXApiKeyForServerOutboundTesting1234567890
+
+{"response": {"client_secret": "DemoOAuthClientSecret1234567890abcdef1234567890"}}
+
+Server=db.example.com;Database=TestDB;User Id=admin;Password=DemoAdoNetPassword123;
+
+https://api.example.com/v1/data?token=DemoUrlTokenParam1234567890abcdef
+
+smtp://admin:DemoSmtpCreds123@mail.example.com:587
+
+INSERT INTO users (username, password) VALUES ('admin', 'DemoSqlLiteralSecret1234567890');
+
+-----BEGIN CERTIFICATE-----
+MIIEvQIBADANBgDemoCertificateMaterialForTestingPurposesOnlyNotReal
+-----END CERTIFICATE-----
+
+SSN: 123-45-6789
+Credit Card: 4111111111111111

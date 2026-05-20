@@ -1171,7 +1171,9 @@
     "lint": "eslint src --ext ts,tsx",
     "verify:installed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installed.ps1",
     "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1",
-    "git:push": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-push.ps1"
+    "git:push": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-push.ps1",
+    "demo:secret-protection": "tsx tests/secret-protection-demo/run-demo-test.ts",
+    "demo:secret-protection:report": "tsx tests/secret-protection-demo/generate-html-report.ts"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",
@@ -1183,6 +1185,7 @@
     "css-loader": "^6.9.0",
     "style-loader": "^3.3.0",
     "ts-loader": "^9.5.0",
+    "tsx": "^4.22.3",
     "typescript": "^5.3.0",
     "webpack": "^5.89.0",
     "webpack-cli": "^5.1.0"

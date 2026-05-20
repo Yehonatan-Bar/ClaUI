@@ -1,0 +1,13 @@
+Payment processing demo data:
+
+Customer: Demo User
+Card Number: 4111111111111111
+Expiry: 12/2030
+
+Customer: Test User
+Card Number: 5500000000000004
+SSN for verification: 111-22-3333
+
+Customer: Fixture User
+Card Number: 378282246310005
+Email: payments@billing.internal

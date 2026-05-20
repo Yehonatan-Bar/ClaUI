@@ -1,0 +1,15 @@
+databases:
+  primary:
+    password: DemoYamlPassword1234567890abcdef
+    connection_string: "postgresql://admin:DemoYamlPass123@db.example.com:5432/testdb"
+  redis:
+    token: DemoRedisTokenForYamlTesting1234567890
+    url: "redis://:DemoRedisPass@redis.example.com:6379"
+  mongodb:
+    credential: DemoMongoCredential1234567890abcdef
+    url: "mongodb://admin:DemoMongo123@mongo.example.com:27017/db"
+
+services:
+  api_key: DemoYamlApiKey1234567890abcdefghij
+  secret: DemoYamlSecret1234567890abcdefghijk
+  smtp_password: DemoSmtpPasswordInYaml1234567890

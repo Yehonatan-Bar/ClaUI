@@ -1,0 +1,19 @@
+{
+  "database": {
+    "host": "db.example.com",
+    "port": 5432,
+    "username": "admin",
+    "password": "DemoJsonPassword1234567890abcdef",
+    "connection_string": "Server=db.example.com;Database=TestDB;User Id=admin;Password=DemoConnectionPassword123;"
+  },
+  "api": {
+    "api_key": "DemoApiKeyInJsonConfig1234567890abcdef",
+    "secret": "DemoSecretInJsonConfig1234567890abcdef",
+    "token": "DemoTokenInJsonConfig1234567890abcdefgh",
+    "authorization": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJkZW1vIjoiY29uZmlnIn0.FakeSignatureDemo"
+  },
+  "oauth": {
+    "client_secret": "DemoOAuthClientSecret1234567890abcdef1234567890",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgDemoKeyForJsonConfig\n-----END PRIVATE KEY-----"
+  }
+}
