@@ -9866,3 +9866,286 @@ html, body, #root {
   font-size: 13px;
   opacity: 0.7;
 }
+
+/* Secret Protection */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+  padding: 2px 7px;
+  border: 1px solid var(--vscode-panel-border, rgba(128,128,128,0.24));
+  border-radius: 4px;
+  background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.08));
+  color: var(--vscode-foreground);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.status-badge--button {
+  cursor: pointer;
+}
+
+.status-badge--button:hover {
+  background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.14));
+}
+
+.status-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--vscode-descriptionForeground);
+}
+
+.status-badge--ok .status-badge-dot { background: #3fb950; }
+.status-badge--warn .status-badge-dot { background: #d29922; }
+.status-badge--error .status-badge-dot { background: #f85149; }
+.status-badge--muted .status-badge-dot { background: var(--vscode-descriptionForeground); }
+
+.status-badge-label {
+  font-weight: 700;
+}
+
+.status-badge-value {
+  color: var(--vscode-descriptionForeground);
+}
+
+.dlp-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.38);
+}
+
+.dlp-panel {
+  width: min(920px, 96vw);
+  max-height: min(760px, 92vh);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 8px;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  box-shadow: 0 16px 42px rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+
+.dlp-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.dlp-panel-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.dlp-panel-subtitle {
+  margin-top: 3px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.dlp-icon-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+}
+
+.dlp-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px 0;
+}
+
+.dlp-tab {
+  padding: 7px 11px;
+  border: 1px solid var(--vscode-panel-border);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--vscode-sideBar-background);
+  color: var(--vscode-foreground);
+  cursor: pointer;
+}
+
+.dlp-tab.active {
+  background: var(--vscode-editor-background);
+  font-weight: 700;
+}
+
+.dlp-panel-body,
+.audit-log-panel {
+  padding: 14px 16px 16px;
+  overflow: auto;
+}
+
+.dlp-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.dlp-setting-row {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.dlp-setting-row span,
+.manifest-grid span,
+.dlp-metric span {
+  color: var(--vscode-descriptionForeground);
+}
+
+.dlp-setting-row select,
+.dlp-setting-row input,
+.dlp-filter-row select {
+  min-height: 30px;
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+}
+
+.dlp-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.dlp-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  background: var(--vscode-sideBar-background);
+}
+
+.dlp-metric-row,
+.manifest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.dlp-metric,
+.manifest-grid div {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  background: var(--vscode-sideBar-background);
+}
+
+.dlp-filter-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.dlp-secondary-btn {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 4px;
+  background: var(--vscode-button-secondaryBackground, var(--vscode-toolbar-hoverBackground));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  cursor: pointer;
+}
+
+.dlp-error {
+  margin-bottom: 10px;
+  color: var(--vscode-errorForeground, #f85149);
+}
+
+.audit-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+}
+
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.audit-table th,
+.audit-table td {
+  padding: 8px 9px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.audit-table th {
+  position: sticky;
+  top: 0;
+  background: var(--vscode-sideBar-background);
+  z-index: 1;
+}
+
+.audit-empty {
+  color: var(--vscode-descriptionForeground);
+  text-align: center;
+}
+
+.audit-action {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.audit-action--block { color: #ffaba8; }
+.audit-action--redact { color: #f2cc60; }
+.audit-action--allow { color: #7ee787; }
+
+.manifest-boundaries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.manifest-boundaries span {
+  padding: 5px 8px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 999px;
+  background: var(--vscode-toolbar-hoverBackground);
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .dlp-panel-backdrop {
+    align-items: stretch;
+    padding: 8px;
+  }
+
+  .dlp-panel {
+    width: 100%;
+    max-height: none;
+  }
+
+  .dlp-settings-grid {
+    grid-template-columns: 1fr;
+  }
+}

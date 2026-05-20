@@ -141,9 +141,19 @@ Spawns commands with `shell: true`. Captures stdout/stderr with byte cap. Forwar
 
 ### Pre-Tool-Use Hooks
 
-**claudePreToolUse.ts**: Reads JSON from stdin (Claude hook protocol). Intercepts `Bash` tool only. Classifies command; if eligible, rewrites to `claui-run --claui-encoded-shell-command <base64url>`. Outputs `hookSpecificOutput` with `permissionDecision: 'allow'` and `updatedInput`.
+**claudePreToolUse.ts**: Reads JSON from stdin (Claude hook protocol). Intercepts `Bash` commands for Particle Accelerator routing and `mcp__*` tool calls for Secret Protection scanning. Eligible Bash commands are rewritten to `claui-run --claui-encoded-shell-command <base64url>` with `permissionDecision: 'allow'` and `updatedInput`; MCP requests are scanned before they leave the agent boundary.
 
-**codexPreToolUse.ts**: Same pattern but uses `permissionDecision: 'deny'` with retry instruction in the reason field (Codex re-attempts the command through `claui-run`).
+**codexPreToolUse.ts**: Uses the Codex deny/retry pattern for eligible Bash commands and also scans `mcp__*` tool arguments. Secret Protection findings are evaluated through `PolicyEngine` plus `ApprovalEngine`; blocked or approval-gated MCP requests are denied before execution. Loads active exceptions from `CLAUI_SECRET_PROTECTION_EXCEPTIONS_PATH` (JSON file shared with `SecretProtectionService`) and persists consumption (usedCount increment) back to the same file.
+
+## Secret Protection Integration
+
+Particle Accelerator remains local-only command compression, but it now carries Secret Protection state across the same extension/runtime boundary:
+
+- `ParticleAcceleratorEnvBuilder` passes `CLAUI_SECRET_PROTECTION`, mode, entropy, terminal-scan, MCP-scan, and exceptions-path env vars to agent processes and hook runtimes.
+- `claui-run` optionally runs `CompositeSecretScanner` after its legacy redactor and stores DLP summary metadata on traces.
+- `ParticleAcceleratorHookManager` installs both Bash and `mcp__*` pre-tool-use entries for Claude and Codex; hook installation is considered complete only when both entries exist.
+- Codex sessions append DLP redaction instructions through `CodexExecProcessManager` so `<REDACTED ... />` tokens are treated as intentional safe substitutes.
+- Audit events are written under `<globalStoragePath>/secret-protection/audit/`, separate from Particle Accelerator traces/raw logs.
 
 ## Webview Components
 
@@ -158,11 +168,15 @@ All in `src/webview/components/ParticleAccelerator/`.
 
 WebviewToExtension messages:
 - `particleAcceleratorGetStatus` / `particleAcceleratorSetEnabled` / `particleAcceleratorInstallHooks` / `particleAcceleratorUninstallHooks` / `particleAcceleratorClearData`
+- `secretProtectionGetStatus` / `secretProtectionSetSetting` / `secretProtectionGetAuditEvents` / `secretProtectionGetComplianceReport`
 
 ExtensionToWebview messages:
 - `particleAcceleratorStatus` / `particleAcceleratorTraceUpdate` / `particleAcceleratorAggregateUpdate` / `particleAcceleratorRecentTraces` / `particleAcceleratorError`
+- `secretProtectionStatus` / `secretProtectionAuditEvents` / `secretProtectionComplianceReport` / `secretProtectionError`
 
 Zustand store fields: `particleAcceleratorEnabled`, `particleAcceleratorStatus`, `particleAcceleratorAggregate` (full aggregate with 16 fields: totalCommands, failedCommands, totalRawBytes, totalFilteredBytes, totalEstimatedTokensSaved, avgCompressionRatio, avgDurationMs, totalRedactions, totalRawLines, totalFilteredLines, totalRawWords, totalFilteredWords, secretTypeBreakdown, topCommandFamilies, topFilters, providerBreakdown), `particleAcceleratorRecentTraces` (each trace includes rulesTriggered, rawLines, filteredLines), `particleAcceleratorError`. Setters: `addParticleAcceleratorTrace` (prepend + cap at 100), `setParticleAcceleratorRecentTraces` (batch replace from extension).
+
+Secret Protection store fields include `secretProtectionSettings`, `secretProtectionEnabled`, `secretProtectionMode`, `secretProtectionPanelOpen`, `secretProtectionPanelTab`, `secretProtectionAuditEvents`, `secretProtectionLastEvent`, `secretProtectionComplianceReport`, and loading/error state.
 
 ## Store Directory Layout
 
@@ -181,6 +195,14 @@ Zustand store fields: `particleAcceleratorEnabled`, `particleAcceleratorStatus`,
 |   +-- reports/          # Daily aggregate reports
 |   +-- config/           # Filter overrides
 +-- version.json          # Runtime version tracking
+```
+
+Secret Protection audit data is stored separately:
+
+```
+<globalStoragePath>/secret-protection/
++-- audit/
+|   +-- YYYY-MM-DD.jsonl  # Append-only audit events; no raw secret values
 ```
 
 ## Retention Policy
@@ -231,6 +253,13 @@ All settings under `claudeMirror.particleAccelerator.*`:
 | Shell Executor | `src/particle-accelerator-runtime/executeShellCommand.ts` |
 | Claude Hook | `src/particle-accelerator-runtime/hooks/claudePreToolUse.ts` |
 | Codex Hook | `src/particle-accelerator-runtime/hooks/codexPreToolUse.ts` |
+| DLP Approval Engine | `src/server/enforcement/ApprovalEngine.ts` |
+| DLP Exception Store | `src/server/enforcement/ExceptionStore.ts` |
+| DLP Audit Store | `src/shared/audit/AuditStore.ts` |
+| DLP Compliance Reporter | `src/shared/audit/ComplianceReporter.ts` |
+| DLP Status Badge | `src/webview/components/SecretProtectionStatusBadge.tsx` |
+| DLP Settings Panel | `src/webview/components/SettingsPanel.tsx` |
+| DLP Audit Panel | `src/webview/components/AuditLogPanel.tsx` |
 | Webpack Config | `webpack.config.js` (third config: `particle-accelerator-runtime`) |
 | StatusBar Badge | `src/webview/components/ParticleAccelerator/ParticleAcceleratorStatusBadge.tsx` |
 | Settings Panel | `src/webview/components/ParticleAccelerator/ParticleAcceleratorSettingsPanel.tsx` |

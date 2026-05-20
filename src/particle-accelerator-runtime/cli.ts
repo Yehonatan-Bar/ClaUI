@@ -383,7 +383,8 @@ async function main(): Promise<void> {
           }
         }
       } catch {
-        // Command scan failure; persist original command
+        // Persistence boundary: fail-closed — don't persist secrets on scan error
+        safeCommand = `[redacted: scan-error] ${commandFamily}`;
       }
     }
 

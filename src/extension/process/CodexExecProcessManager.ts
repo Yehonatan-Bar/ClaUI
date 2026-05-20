@@ -7,6 +7,7 @@ import { EventEmitter } from 'events';
 import type { CodexExecJsonEvent } from '../types/codex-exec-json';
 import { buildSanitizedEnv } from './envUtils';
 import { killProcessTree } from './killTree';
+import { buildCodexDlpInstructions } from '../../server/Codex';
 
 /**
  * Encode a JS string as a TOML basic string literal: a double-quoted form
@@ -99,29 +100,9 @@ export class CodexExecProcessManager extends EventEmitter {
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
       undefined;
 
-    const args = this.buildArgs({
-      threadId: options.threadId,
-      cwd,
-      model: selectedModel,
-      reasoningEffort: selectedReasoningEffort || undefined,
-      serviceTier: selectedServiceTier === 'fast' ? 'fast' : undefined,
-      permissionMode,
-      imagePaths: options.imagePaths,
-      forceReadOnlySandbox: options.forceReadOnlySandbox,
-      appendSystemPrompt: options.appendSystemPrompt,
-    });
-
-    this._cancelledByUser = false;
-    this.stdoutBuffer = '';
-    this.resetRunStats();
-    this.activeRunId = ++this.runSeq;
-    this.activeRunStartedAt = Date.now();
-
-    this.log(
-      `Codex turn #${this.activeRunId}: promptLen=${options.prompt.length} resume=${options.threadId ? 'yes' : 'no'} permission=${permissionMode} speed=${selectedServiceTier || 'default'} images=${options.imagePaths?.length ?? 0}`
-    );
-    this.log(`Spawning Codex: ${cliPath} ${args.join(' ')}`);
-    this.log(`CWD: ${cwd || '(none)'}`);
+    let appendSystemPrompt = this.secretProtectionEnabled
+      ? [options.appendSystemPrompt, buildCodexDlpInstructions()].filter(Boolean).join('\n\n')
+      : options.appendSystemPrompt;
 
     let env: NodeJS.ProcessEnv = buildSanitizedEnv();
 
@@ -136,7 +117,7 @@ export class CodexExecProcessManager extends EventEmitter {
           if (codexMode === 'instruction-only') {
             const acceleratorInstruction = 'When running Bash commands, prefer using `claui-run` from PATH to compress noisy output. ' +
               'Usage: claui-run -- <command>. It preserves exit codes and filters output for readability.';
-            args.push('-c', `instructions=${toTomlBasicString(acceleratorInstruction)}`);
+            appendSystemPrompt = [appendSystemPrompt, acceleratorInstruction].filter(Boolean).join('\n\n');
             this.log('Particle Accelerator instruction-only mode: appended claui-run instruction to Codex args');
           }
         }
@@ -148,7 +129,32 @@ export class CodexExecProcessManager extends EventEmitter {
     // Signal secret protection to the CLI process and hooks
     if (this.secretProtectionEnabled) {
       env.CLAUI_SECRET_PROTECTION = '1';
+      this.log('Secret Protection instruction metadata appended for Codex turn');
     }
+
+    const args = this.buildArgs({
+      threadId: options.threadId,
+      cwd,
+      model: selectedModel,
+      reasoningEffort: selectedReasoningEffort || undefined,
+      serviceTier: selectedServiceTier === 'fast' ? 'fast' : undefined,
+      permissionMode,
+      imagePaths: options.imagePaths,
+      forceReadOnlySandbox: options.forceReadOnlySandbox,
+      appendSystemPrompt,
+    });
+
+    this._cancelledByUser = false;
+    this.stdoutBuffer = '';
+    this.resetRunStats();
+    this.activeRunId = ++this.runSeq;
+    this.activeRunStartedAt = Date.now();
+
+    this.log(
+      `Codex turn #${this.activeRunId}: promptLen=${options.prompt.length} resume=${options.threadId ? 'yes' : 'no'} permission=${permissionMode} speed=${selectedServiceTier || 'default'} images=${options.imagePaths?.length ?? 0}`
+    );
+    this.log(`Spawning Codex: ${cliPath} ${args.join(' ')}`);
+    this.log(`CWD: ${cwd || '(none)'}`);
 
     const child = spawn(cliPath, args, {
       cwd,

@@ -131,6 +131,10 @@ export function useClaudeStream(): void {
     setWorkstreamMapError,
     setWorkstreamResumeState,
     setWorkstreamMapOpen,
+    setSecretProtectionStatus,
+    setSecretProtectionAuditEvents,
+    setSecretProtectionAuditError,
+    setSecretProtectionComplianceReport,
     // Multi-Participant
     setMpConnectionStatus,
     setMpSession,
@@ -302,6 +306,27 @@ export function useClaudeStream(): void {
           useAppStore.getState().setParticleAcceleratorError(lbErr.error);
           break;
         }
+
+        case 'secretProtectionStatus':
+          setSecretProtectionStatus({
+            enabled: msg.enabled,
+            settings: msg.settings,
+            auditCount: msg.auditCount,
+            lastEvent: msg.lastEvent,
+          });
+          break;
+
+        case 'secretProtectionAuditEvents':
+          setSecretProtectionAuditEvents(msg.events);
+          break;
+
+        case 'secretProtectionComplianceReport':
+          setSecretProtectionComplianceReport(msg.report);
+          break;
+
+        case 'secretProtectionError':
+          setSecretProtectionAuditError(msg.error);
+          break;
 
         case 'toggleMcpPanel':
           setMcpPanelOpen(msg.open ?? !useAppStore.getState().mcpPanelOpen);
@@ -1281,6 +1306,10 @@ export function useClaudeStream(): void {
     setWorkstreamMapError,
     setWorkstreamResumeState,
     setWorkstreamMapOpen,
+    setSecretProtectionStatus,
+    setSecretProtectionAuditEvents,
+    setSecretProtectionAuditError,
+    setSecretProtectionComplianceReport,
     // Multi-Participant
     setMpConnectionStatus,
     setMpSession,

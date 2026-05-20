@@ -22,6 +22,7 @@ import { DashboardPanel } from './components/Dashboard';
 import { SkillGenPanel, SkillGenOnboarding } from './components/SkillGen';
 import { BugReportPanel } from './components/BugReport';
 import { McpPanel } from './components/McpPanel';
+import { SettingsPanel } from './components/SettingsPanel';
 import { CodexConsultPanel } from './components/InputArea/CodexConsultPanel';
 import { TeamPanel, TeamStatusWidget } from './components/Teams';
 import { WorkstreamMapView } from './components/WorkstreamMap/WorkstreamMapView';
@@ -386,6 +387,7 @@ const ChatAppContent: React.FC = () => {
       {achievementsEnabled && <ShareCard />}
       {dashboardOpen && <DashboardPanel />}
       {mcpPanelOpen && <McpPanel />}
+      <SettingsPanel />
       {skillGenPanelOpen && <SkillGenPanel />}
       {bugReportPanelOpen && <BugReportPanel />}
       {teamPanelOpen && <TeamPanel />}

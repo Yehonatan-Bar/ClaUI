@@ -6,6 +6,10 @@ import { EntropyScanner } from './EntropyScanner';
 import { PathSensitivityClassifier } from './PathSensitivityClassifier';
 import { StructuredPayloadScanner } from './StructuredPayloadScanner';
 import { PiiAndInternalTopologyScanner } from './PiiAndInternalTopologyScanner';
+import { ExtensionOutboundScanner } from '../../../extension/scanners/ExtensionOutboundScanner';
+import { WebviewOutboundScanner } from '../../../webview/scanners/WebviewOutboundScanner';
+import { ServerOutboundScanner } from '../../../server/scanners/ServerOutboundScanner';
+import { GitPublicationScanner } from '../../scanners/GitPublicationScanner';
 import { RulePackDefinition } from '../rules/types';
 import { getEnabledRulePacks } from '../rules';
 
@@ -69,6 +73,23 @@ export class CompositeSecretScanner implements ISecretScanner {
 
     this.scanners.push(new StructuredPayloadScanner());
     this.scanners.push(new PiiAndInternalTopologyScanner());
+
+    // Boundary-specific specialized detectors (gated by their respective settings)
+    if (settings.scanTerminalOutput) {
+      this.scanners.push(new ExtensionOutboundScanner());
+    }
+
+    if (settings.scanPrompts) {
+      this.scanners.push(new WebviewOutboundScanner());
+    }
+
+    if (settings.scanMcp) {
+      this.scanners.push(new ServerOutboundScanner());
+    }
+
+    if (settings.scanGitPublication) {
+      this.scanners.push(new GitPublicationScanner());
+    }
   }
 
   scan(input: string, context?: ScanContext): ScanResult {

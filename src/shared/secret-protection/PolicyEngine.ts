@@ -206,6 +206,7 @@ export class PolicyEngine {
 
     const destCategory = categorizeDestination(destination.kind);
     const findingActions: Array<{ finding: DlpFinding; action: DlpAction }> = [];
+    const consumedExceptionIds: string[] = [];
 
     for (const finding of findings) {
       if (this.config.hardBlockRules.some(rule => finding.ruleId.includes(rule))) {
@@ -216,6 +217,9 @@ export class PolicyEngine {
       const exception = exceptions.find(e => isExceptionValid(e, finding, destination));
       if (exception) {
         findingActions.push({ finding, action: 'allow' });
+        if (!consumedExceptionIds.includes(exception.id)) {
+          consumedExceptionIds.push(exception.id);
+        }
         continue;
       }
 
@@ -265,6 +269,10 @@ export class PolicyEngine {
       overallAction, reason, findings,
       boundary, destination, contentHash, auditId, timestamp, sessionId, turnId,
     );
+
+    if (consumedExceptionIds.length > 0) {
+      decision.consumedExceptionIds = consumedExceptionIds;
+    }
 
     if (overallAction === 'require_approval') {
       const approvalFinding = findingActions.find(fa => fa.action === 'require_approval')?.finding ?? findings[0];

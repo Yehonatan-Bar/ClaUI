@@ -49,6 +49,10 @@ export function buildParticleAcceleratorAgentEnv(input: ParticleAcceleratorEnvIn
     env.CLAUI_SECRET_PROTECTION_MODE = input.secretProtection.mode;
     env.CLAUI_SECRET_PROTECTION_ENTROPY = input.secretProtection.enableEntropyScanner ? 'true' : 'false';
     env.CLAUI_SECRET_PROTECTION_SCAN_TERMINAL = input.secretProtection.scanTerminalOutput ? 'true' : 'false';
+    env.CLAUI_SECRET_PROTECTION_SCAN_MCP = input.secretProtection.scanMcp ? 'true' : 'false';
+    if (input.secretProtection.exceptionsPath) {
+      env.CLAUI_SECRET_PROTECTION_EXCEPTIONS_PATH = input.secretProtection.exceptionsPath;
+    }
   }
 
   // Remove external telemetry vars

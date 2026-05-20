@@ -47,6 +47,10 @@ import type {
 import type { AdventureBeat } from '../components/Vitals/adventure/types';
 import { deriveTurnHistoryFromMessages } from '../utils/turnVitals';
 import type { AchievementLang } from '../components/Achievements/achievementI18n';
+import type { AuditEvent, SecretProtectionSettings } from '../../shared/secret-protection/types';
+import type { ComplianceReport } from '../../shared/audit/ComplianceReporter';
+import { initialAuditUiState, prependAuditEvent } from '../store/auditSlice';
+import { initialSecretProtectionUiState } from '../store/dlpSettingsSlice';
 
 // --- Message types for the UI ---
 
@@ -500,6 +504,30 @@ export interface AppState {
   setBugReportMode: (mode: 'quick' | 'ai') => void;
   setBugReportContext: (context: BugReportContext | null) => void;
   bugReportReset: () => void;
+
+  // Secret Protection
+  secretProtectionEnabled: boolean;
+  secretProtectionSettings: SecretProtectionSettings;
+  secretProtectionAuditCount: number;
+  secretProtectionLastEvent: AuditEvent | null;
+  secretProtectionPanelOpen: boolean;
+  secretProtectionPanelTab: 'settings' | 'audit' | 'manifest';
+  secretProtectionAuditEvents: AuditEvent[];
+  secretProtectionAuditLoading: boolean;
+  secretProtectionAuditError: string | null;
+  secretProtectionComplianceReport: ComplianceReport | null;
+  setSecretProtectionStatus: (status: {
+    enabled: boolean;
+    settings: SecretProtectionSettings;
+    auditCount: number;
+    lastEvent: AuditEvent | null;
+  }) => void;
+  setSecretProtectionPanelOpen: (open: boolean, tab?: 'settings' | 'audit' | 'manifest') => void;
+  setSecretProtectionPanelTab: (tab: 'settings' | 'audit' | 'manifest') => void;
+  setSecretProtectionAuditEvents: (events: AuditEvent[]) => void;
+  setSecretProtectionAuditLoading: (loading: boolean) => void;
+  setSecretProtectionAuditError: (error: string | null) => void;
+  setSecretProtectionComplianceReport: (report: ComplianceReport | null) => void;
 
   // Token-Usage Ratio
   tokenRatioSamples: TokenUsageRatioSample[];
@@ -1196,6 +1224,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   bugReportPreviewFiles: [],
   bugReportError: null,
   bugReportContext: null,
+  ...initialSecretProtectionUiState,
+  ...initialAuditUiState,
   setBugReportPanelOpen: (open) => set({ bugReportPanelOpen: open }),
   setBugReportMode: (mode) => set({ bugReportMode: mode }),
   setBugReportContext: (context) => set({ bugReportContext: context }),
@@ -1210,6 +1240,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     bugReportError: null,
     bugReportContext: null,
   }),
+
+  setSecretProtectionStatus: (status) => set((state) => ({
+    secretProtectionEnabled: status.enabled,
+    secretProtectionSettings: status.settings,
+    secretProtectionAuditCount: status.auditCount,
+    secretProtectionLastEvent: status.lastEvent,
+    secretProtectionAuditEvents: prependAuditEvent(state.secretProtectionAuditEvents, status.lastEvent),
+    secretProtectionAuditError: null,
+  })),
+  setSecretProtectionPanelOpen: (open, tab) => set({
+    secretProtectionPanelOpen: open,
+    ...(tab ? { secretProtectionPanelTab: tab } : {}),
+  }),
+  setSecretProtectionPanelTab: (tab) => set({ secretProtectionPanelTab: tab }),
+  setSecretProtectionAuditEvents: (events) => set({
+    secretProtectionAuditEvents: events,
+    secretProtectionAuditLoading: false,
+    secretProtectionAuditError: null,
+  }),
+  setSecretProtectionAuditLoading: (loading) => set({ secretProtectionAuditLoading: loading }),
+  setSecretProtectionAuditError: (error) => set({
+    secretProtectionAuditError: error,
+    secretProtectionAuditLoading: false,
+  }),
+  setSecretProtectionComplianceReport: (report) => set({ secretProtectionComplianceReport: report }),
 
   // Token-Usage Ratio
   tokenRatioSamples: [],
@@ -2818,6 +2873,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       bugReportPreviewFiles: [],
       bugReportError: null,
       bugReportContext: null,
+      secretProtectionPanelOpen: false,
+      secretProtectionAuditLoading: false,
+      secretProtectionAuditError: null,
       isEnhancing: false,
       enhancerPopoverOpen: false,
       enhanceComparisonData: null,

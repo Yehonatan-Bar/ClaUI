@@ -215,10 +215,9 @@ export class WorkstreamClassifier {
       : '';
 
     const existingBlock = existingState?.workstreams.length
-      ? `\n\nExisting workstreams (preserve ids when sessions still belong):\n${existingState.workstreams.map(w => JSON.stringify({
+      ? `\n\nExisting workstreams (preserve ONLY the "id" field for continuity -- RE-GENERATE labels, goals, and types from scratch based on actual session content. Do NOT copy or anchor on the previous label):\n${existingState.workstreams.map(w => JSON.stringify({
           id: w.id,
-          label: w.label,
-          goal: w.goal,
+          previousLabel: w.label,
           type: w.type,
           status: w.status,
           sessionIds: w.sessionIds,
@@ -234,6 +233,10 @@ export class WorkstreamClassifier {
 
 A workstream is a coherent thread of work with a clear goal. Examples: "Add onboarding flow", "Fix session refresh bug", "Rewrite auth middleware".
 
+Field notes:
+- The "outcome" field reflects the SESSION's tool error rate (e.g., bash commands failing, file not found), NOT whether the feature or goal succeeded. A session with outcome "failed" just had many tool errors -- the developer may still have made good progress on the feature. Do NOT interpret session outcome as feature status.
+- The "source" field: "session" = interactive ClaUi session, "git_history" = inferred from git commits made by external tools (Codex, other CLIs)
+
 Rules:
 - Prefer fewer meaningful workstreams over many tiny ones
 - Do not merge unrelated work just because it happened nearby in time or shares the same branch
@@ -247,6 +250,12 @@ Rules:
 - Identify possible splits and merges between workstreams
 - Identify stale or abandoned work
 - For each workstream, identify current phase and next likely action
+
+Labeling rules:
+- Use type "bug_fix" ONLY when the primary goal is fixing broken/incorrect behavior. Adding new capabilities, improving, enhancing, or extending a feature is type "feature" even if the session had errors
+- Do NOT use words like "fix", "failure", "broken" in labels unless the work is genuinely about fixing a bug. Improving or building a feature is not a fix
+- Labels should describe the GOAL of the work (what is being built/improved), not the session's technical difficulties
+- When existing workstreams are provided, generate FRESH labels based on actual session content. The "previousLabel" is shown only for reference -- do NOT reuse it if it is inaccurate
 
 Sessions:
 ${sessionBlock}${clusterBlock}${existingBlock}${protectedBlock}

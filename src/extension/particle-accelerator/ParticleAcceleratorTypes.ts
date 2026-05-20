@@ -180,6 +180,8 @@ export interface ParticleAcceleratorEnvInput {
     mode: string;
     enableEntropyScanner: boolean;
     scanTerminalOutput: boolean;
+    scanMcp: boolean;
+    exceptionsPath?: string;
   };
 }
 

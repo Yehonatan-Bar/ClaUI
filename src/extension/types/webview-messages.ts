@@ -3,6 +3,9 @@
  */
 
 import type { ContentBlock } from './stream-json';
+import type { ComplianceReport } from '../../shared/audit/ComplianceReporter';
+import type { AuditEventFilter } from '../../shared/audit/AuditStore';
+import type { AuditEvent, SecretProtectionSettings } from '../../shared/secret-protection/types';
 import type {
   MPAgentProvider,
   MPApprovalDecisionPayload,
@@ -1058,7 +1061,11 @@ export type WebviewToExtensionMessage =
   | ParticleAcceleratorInstallHooksRequest
   | ParticleAcceleratorUninstallHooksRequest
   | ParticleAcceleratorOpenTraceRequest
-  | ParticleAcceleratorClearDataRequest;
+  | ParticleAcceleratorClearDataRequest
+  | SecretProtectionGetStatusRequest
+  | SecretProtectionSetSettingRequest
+  | SecretProtectionGetAuditEventsRequest
+  | SecretProtectionGetComplianceReportRequest;
 
 // --- Particle Accelerator (Webview -> Extension) ---
 export interface ParticleAcceleratorGetStatusRequest { type: 'particleAcceleratorGetStatus' }
@@ -1067,6 +1074,23 @@ export interface ParticleAcceleratorInstallHooksRequest { type: 'particleAcceler
 export interface ParticleAcceleratorUninstallHooksRequest { type: 'particleAcceleratorUninstallHooks'; provider: 'claude' | 'codex' | 'both' }
 export interface ParticleAcceleratorOpenTraceRequest { type: 'particleAcceleratorOpenTrace'; traceId: string }
 export interface ParticleAcceleratorClearDataRequest { type: 'particleAcceleratorClearData'; scope: 'workspace' | 'all' }
+
+// --- Secret Protection (Webview -> Extension) ---
+export interface SecretProtectionGetStatusRequest { type: 'secretProtectionGetStatus' }
+export interface SecretProtectionSetSettingRequest {
+  type: 'secretProtectionSetSetting';
+  key: keyof SecretProtectionSettings;
+  value: SecretProtectionSettings[keyof SecretProtectionSettings];
+}
+export interface SecretProtectionGetAuditEventsRequest {
+  type: 'secretProtectionGetAuditEvents';
+  filter?: AuditEventFilter;
+  limit?: number;
+}
+export interface SecretProtectionGetComplianceReportRequest {
+  type: 'secretProtectionGetComplianceReport';
+  filter?: AuditEventFilter;
+}
 
 export interface WebviewImageData {
   base64: string;
@@ -2575,7 +2599,11 @@ export type ExtensionToWebviewMessage =
   | ParticleAcceleratorTraceUpdateMessage
   | ParticleAcceleratorAggregateUpdateMessage
   | ParticleAcceleratorRecentTracesMessage
-  | ParticleAcceleratorErrorMessage;
+  | ParticleAcceleratorErrorMessage
+  | SecretProtectionStatusMessage
+  | SecretProtectionAuditEventsMessage
+  | SecretProtectionComplianceReportMessage
+  | SecretProtectionErrorMessage;
 
 // --- Particle Accelerator (Extension -> Webview) ---
 export interface ParticleAcceleratorStatusMessage {
@@ -2596,6 +2624,27 @@ export interface ParticleAcceleratorRecentTracesMessage {
 }
 export interface ParticleAcceleratorErrorMessage {
   type: 'particleAcceleratorError';
+  error: string;
+}
+
+// --- Secret Protection (Extension -> Webview) ---
+export interface SecretProtectionStatusMessage {
+  type: 'secretProtectionStatus';
+  enabled: boolean;
+  settings: SecretProtectionSettings;
+  auditCount: number;
+  lastEvent: AuditEvent | null;
+}
+export interface SecretProtectionAuditEventsMessage {
+  type: 'secretProtectionAuditEvents';
+  events: AuditEvent[];
+}
+export interface SecretProtectionComplianceReportMessage {
+  type: 'secretProtectionComplianceReport';
+  report: ComplianceReport;
+}
+export interface SecretProtectionErrorMessage {
+  type: 'secretProtectionError';
   error: string;
 }
 

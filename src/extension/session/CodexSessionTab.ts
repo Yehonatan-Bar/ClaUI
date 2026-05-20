@@ -319,6 +319,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
               mode: this.secretProtectionService.getSettings().mode,
               enableEntropyScanner: this.secretProtectionService.getSettings().enableEntropyScanner,
               scanTerminalOutput: this.secretProtectionService.getSettings().scanTerminalOutput,
+              scanMcp: this.secretProtectionService.getSettings().scanMcp,
+              exceptionsPath: this.secretProtectionService.getExceptionStorePath(),
             } : undefined,
           });
         };

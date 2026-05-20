@@ -148,6 +148,7 @@ export interface DlpDecision {
   redactedContent?: string;
   safeSummary?: string;
   approvalRequest?: ApprovalRequest;
+  consumedExceptionIds?: string[];
   audit: AuditEvent;
 }
 

@@ -1095,6 +1095,125 @@ export class MessageHandler {
   }
 
   /**
+   * Resolve a DLP decision into the text to send, or null to block.
+   * `require_approval` is fail-closed; approval flow handled via ExceptionStore on the broker.
+   */
+  private resolveDlpDecision(
+    decision: import('../../shared/secret-protection/types').DlpDecision,
+    composedText: string,
+  ): string | null {
+    switch (decision.action) {
+      case 'block':
+      case 'require_approval':
+        this.log(`[SecretProtection] Prompt ${decision.action}: ${decision.reason}`);
+        this.webview.postMessage({
+          type: 'error',
+          message: `Secret protection blocked this prompt: ${decision.reason}`,
+        });
+        return null;
+      case 'redact':
+        return decision.redactedContent ?? composedText;
+      case 'summarize_locally':
+        if (decision.safeSummary) { return decision.safeSummary; }
+        this.log(`[SecretProtection] Prompt blocked (summarize_locally, no safe summary): ${decision.reason}`);
+        this.webview.postMessage({
+          type: 'error',
+          message: `Secret protection blocked this prompt: ${decision.reason}`,
+        });
+        return null;
+      case 'warn':
+        this.log(`[SecretProtection] Prompt warning: ${decision.reason}`);
+        return composedText;
+      default:
+        return composedText;
+    }
+  }
+
+  /**
+   * Shared DLP-aware dispatch for deferred send paths (usage-limit queue, scheduled messages).
+   * Scans the final payload (text + handoff), handles all DLP actions, and only commits side
+   * effects (achievement, history, UI) after DLP approves.
+   */
+  private async dlpScanAndDispatch(
+    text: string,
+    images: WebviewImageData[],
+    onSuccess: () => void,
+    onError: (message: string) => void,
+  ): Promise<void> {
+    try {
+      const hasImages = images.length > 0;
+      const composedText = this.peekDeferredHandoffContext(text, { imageCount: images.length });
+
+      // DLP scan if enabled and scanPrompts setting is on
+      let textToSend = composedText;
+      let dlpRedacted = false;
+      if (this.secretProtectionService?.isEnabled() && this.secretProtectionService.getSettings().scanPrompts) {
+        const broker = this.secretProtectionService.getBroker();
+        if (broker) {
+          const resolved = this.resolveDlpDecision(
+            await broker.scanPromptSubmission(composedText),
+            composedText,
+          );
+          if (!resolved) { onSuccess(); return; }
+          textToSend = resolved;
+          dlpRedacted = textToSend !== composedText;
+        }
+      }
+
+      this.pendingHandoffPrompt = null;
+      if (text.trim()) {
+        this.achievementService.onUserPrompt(this.tabId, text);
+      }
+      const content: ContentBlock[] = [];
+      if (text) { content.push({ type: 'text', text }); }
+      for (const img of images) {
+        content.push({
+          type: 'image',
+          source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
+        } as ContentBlock);
+      }
+      this.postUserMessage(content, true);
+      if (hasImages) {
+        this.control.sendWithImages(textToSend, images);
+      } else {
+        this.control.sendText(textToSend);
+      }
+      this.webview.postMessage({ type: 'processBusy', busy: true });
+      this.triggerSessionNaming(text);
+      if (text.trim() && !dlpRedacted) {
+        void this.promptHistoryStore.addPrompt(text);
+      }
+      onSuccess();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  /**
+   * Build the composed payload text (user text + any staged handoff context) WITHOUT consuming
+   * the handoff. Used by DLP scanning so the scan runs on the final text that will reach the model,
+   * while preserving the handoff for retry if DLP blocks.
+   */
+  private peekDeferredHandoffContext(userText: string, opts?: { imageCount?: number }): string {
+    const staged = this.pendingHandoffPrompt;
+    if (!staged) {
+      return userText;
+    }
+    const trimmedUser = userText.trim();
+    const userPayload =
+      trimmedUser ||
+      ((opts?.imageCount ?? 0) > 0
+        ? '[User attached image(s) without additional text.]'
+        : '[User sent an empty message.]');
+    return [
+      'Context migrated from a previous provider session. Treat it as prior conversation history for this chat.',
+      staged,
+      'New user message:',
+      userPayload,
+    ].join('\n\n');
+  }
+
+  /**
    * Inject staged handoff context into the first outgoing user turn after provider switch.
    * The webview still shows only the user's raw text; this affects only the payload sent to CLI.
    */
@@ -1229,48 +1348,16 @@ export class MessageHandler {
     const queued = this.queuedUsagePrompt;
     const queuedImages = queued.images ?? [];
     const queuedText = queued.text;
-    try {
-      if (queuedText.trim()) {
-        this.achievementService.onUserPrompt(this.tabId, queuedText);
-      }
-      const content: ContentBlock[] = [];
-      if (queuedText) {
-        content.push({ type: 'text', text: queuedText });
-      }
-      for (const img of queuedImages) {
-        content.push({
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: img.mediaType,
-            data: img.base64,
-          },
-        } as ContentBlock);
-      }
-      this.postUserMessage(content, true);
-      if (queuedImages.length > 0) {
-        this.control.sendWithImages(
-          this.consumeDeferredHandoffContext(queuedText, { imageCount: queuedImages.length }),
-          queuedImages
-        );
-      } else {
-        this.control.sendText(this.consumeDeferredHandoffContext(queuedText));
-      }
-      this.webview.postMessage({ type: 'processBusy', busy: true });
-      this.triggerSessionNaming(queuedText);
-      if (queuedText.trim()) {
-        void this.promptHistoryStore.addPrompt(queuedText);
-      }
-      this.clearQueuedUsagePromptState(true);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.log(`[UsageLimitQueue] Queued prompt dispatch failed: ${message}`);
-      this.webview.postMessage({
-        type: 'error',
-        message: `Failed to auto-send queued prompt: ${message}`,
-      });
-      this.scheduleQueuedUsageDispatch(15_000);
-    }
+
+    void this.dlpScanAndDispatch(
+      queuedText, queuedImages,
+      () => this.clearQueuedUsagePromptState(true),
+      (message) => {
+        this.log(`[UsageLimitQueue] Queued prompt dispatch failed: ${message}`);
+        this.webview.postMessage({ type: 'error', message: `Failed to auto-send queued prompt: ${message}` });
+        this.scheduleQueuedUsageDispatch(15_000);
+      },
+    );
   }
 
   private queuePromptUntilUsageReset(text: string, images?: WebviewImageData[]): void {
@@ -1387,48 +1474,16 @@ export class MessageHandler {
     const queued = this.scheduledPrompt;
     const queuedImages = queued.images ?? [];
     const queuedText = queued.text;
-    try {
-      if (queuedText.trim()) {
-        this.achievementService.onUserPrompt(this.tabId, queuedText);
-      }
-      const content: ContentBlock[] = [];
-      if (queuedText) {
-        content.push({ type: 'text', text: queuedText });
-      }
-      for (const img of queuedImages) {
-        content.push({
-          type: 'image',
-          source: {
-            type: 'base64',
-            media_type: img.mediaType,
-            data: img.base64,
-          },
-        } as ContentBlock);
-      }
-      this.postUserMessage(content, true);
-      if (queuedImages.length > 0) {
-        this.control.sendWithImages(
-          this.consumeDeferredHandoffContext(queuedText, { imageCount: queuedImages.length }),
-          queuedImages
-        );
-      } else {
-        this.control.sendText(this.consumeDeferredHandoffContext(queuedText));
-      }
-      this.webview.postMessage({ type: 'processBusy', busy: true });
-      this.triggerSessionNaming(queuedText);
-      if (queuedText.trim()) {
-        void this.promptHistoryStore.addPrompt(queuedText);
-      }
-      this.clearScheduledPromptState(true);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.log(`[ScheduledMessage] Scheduled prompt dispatch failed: ${message}`);
-      this.webview.postMessage({
-        type: 'error',
-        message: `Failed to send scheduled message: ${message}`,
-      } as any);
-      this.schedulePromptDispatch(15_000);
-    }
+
+    void this.dlpScanAndDispatch(
+      queuedText, queuedImages,
+      () => this.clearScheduledPromptState(true),
+      (message) => {
+        this.log(`[ScheduledMessage] Scheduled prompt dispatch failed: ${message}`);
+        this.webview.postMessage({ type: 'error', message: `Failed to send scheduled message: ${message}` } as any);
+        this.schedulePromptDispatch(15_000);
+      },
+    );
   }
 
   private scheduleMessage(text: string, scheduledAtMs: number, images?: WebviewImageData[]): void {
@@ -1507,32 +1562,29 @@ export class MessageHandler {
           this.clearApprovalTracking();
           this.clearCodexConsultTimeout();
           this._codexConsultStartedAt = null;
-          this.achievementService.onUserPrompt(this.tabId, msg.text);
-          // DLP: scan prompt before sending to model
-          if (this.secretProtectionService?.isEnabled()) {
+          // DLP: scan the FINAL composed payload (including handoff context) before sending.
+          // Uses peek so handoff is preserved on block; consumed only after DLP approves.
+          if (this.secretProtectionService?.isEnabled() && this.secretProtectionService.getSettings().scanPrompts) {
             const broker = this.secretProtectionService.getBroker();
             if (broker) {
-              void broker.scanPromptSubmission(msg.text).then((decision) => {
-                if (decision.action === 'block') {
-                  this.log(`[SecretProtection] Prompt blocked: ${decision.reason}`);
-                  this.webview.postMessage({
-                    type: 'error',
-                    message: `Secret protection blocked this prompt: ${decision.reason}`,
-                  });
-                  return;
-                }
-                const textToSend = decision.action === 'redact' && decision.redactedContent
-                  ? decision.redactedContent
-                  : msg.text;
+              const composedText = this.peekDeferredHandoffContext(msg.text);
+              void broker.scanPromptSubmission(composedText).then((decision) => {
+                const resolved = this.resolveDlpDecision(decision, composedText);
+                if (!resolved) { return; }
+                this.pendingHandoffPrompt = null;
+                this.achievementService.onUserPrompt(this.tabId, msg.text);
                 this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock], true);
-                this.control.sendText(this.consumeDeferredHandoffContext(textToSend));
+                this.control.sendText(resolved);
                 this.webview.postMessage({ type: 'processBusy', busy: true });
                 this.triggerSessionNaming(msg.text);
-                void this.promptHistoryStore.addPrompt(msg.text);
+                if (decision.action !== 'redact' && decision.action !== 'summarize_locally') {
+                  void this.promptHistoryStore.addPrompt(msg.text);
+                }
               });
               break;
             }
           }
+          this.achievementService.onUserPrompt(this.tabId, msg.text);
           // Optimistic: show user message in UI immediately (before CLI echoes it back)
           this.postUserMessage([{ type: 'text', text: msg.text } as ContentBlock], true);
           this.control.sendText(this.consumeDeferredHandoffContext(msg.text));
@@ -1562,6 +1614,38 @@ export class MessageHandler {
           this.cancelExitPlanApproveResumeFallback();
           this.cancelPostApproveNudge();
           this.clearApprovalTracking();
+          // DLP: scan composed payload (text + handoff) even if msg.text is empty
+          // because handoff context may contain secrets
+          if (this.secretProtectionService?.isEnabled() && this.secretProtectionService.getSettings().scanPrompts) {
+            const broker = this.secretProtectionService.getBroker();
+            if (broker) {
+              const composedText = this.peekDeferredHandoffContext(msg.text, { imageCount: msg.images.length });
+              void broker.scanPromptSubmission(composedText).then((decision) => {
+                const resolved = this.resolveDlpDecision(decision, composedText);
+                if (!resolved) { return; }
+                this.pendingHandoffPrompt = null;
+                if (msg.text.trim()) {
+                  this.achievementService.onUserPrompt(this.tabId, msg.text);
+                }
+                const imgContent: ContentBlock[] = [];
+                if (msg.text) { imgContent.push({ type: 'text', text: msg.text }); }
+                for (const img of msg.images) {
+                  imgContent.push({
+                    type: 'image',
+                    source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
+                  } as ContentBlock);
+                }
+                this.postUserMessage(imgContent, true);
+                this.control.sendWithImages(resolved, msg.images);
+                this.webview.postMessage({ type: 'processBusy', busy: true });
+                this.triggerSessionNaming(msg.text);
+                if (msg.text.trim() && decision.action !== 'redact' && decision.action !== 'summarize_locally') {
+                  void this.promptHistoryStore.addPrompt(msg.text);
+                }
+              });
+              break;
+            }
+          }
           if (msg.text.trim()) {
             this.achievementService.onUserPrompt(this.tabId, msg.text);
           }
@@ -2343,6 +2427,9 @@ export class MessageHandler {
               this.logDir,
               apiKey,
             );
+            if (this.secretProtectionService) {
+              this.bugReportService.setSecretProtectionService(this.secretProtectionService);
+            }
             this.bugReportService.startAutoCollection(msg.context);
           })();
           break;
@@ -2833,7 +2920,7 @@ export class MessageHandler {
                 skipReplay: true,
                 cliPathOverride: this.getCliPathOverride(),
               })
-              .then(() => {
+              .then(async () => {
                 this.achievementService.onSessionStart(this.tabId);
                 this.log('Session resumed for edit-and-resend');
                 this.webview.postMessage({
@@ -2842,13 +2929,27 @@ export class MessageHandler {
                   model: this.processManager.configuredModel,
                   provider: this.getActiveProvider(),
                 });
-                // Send the edited message immediately - don't wait for system/init.
-                // The CLI in pipe mode only emits init AFTER receiving the first message,
-                // so waiting for init before sending would deadlock.
+                // DLP scan the edited text before sending - same gate as normal prompt flow
+                let textToSend = editedText;
+                if (this.secretProtectionService?.isEnabled() && this.secretProtectionService.getSettings().scanPrompts) {
+                  const broker = this.secretProtectionService.getBroker();
+                  if (broker) {
+                    const resolved = this.resolveDlpDecision(
+                      await broker.scanPromptSubmission(editedText),
+                      editedText,
+                    );
+                    if (!resolved) {
+                      this.webview.postMessage({ type: 'processBusy', busy: false });
+                      return;
+                    }
+                    textToSend = resolved;
+                  }
+                }
                 this.log(`Edit-and-resend: sending edited prompt`);
-                this.control.sendText(editedText);
-                // Don't rename the session tab - this is an edit, not a new conversation
-                void this.promptHistoryStore.addPrompt(editedText);
+                this.control.sendText(textToSend);
+                if (textToSend === editedText) {
+                  void this.promptHistoryStore.addPrompt(editedText);
+                }
               })
               .catch((err) => {
                 this.webview.postMessage({ type: 'processBusy', busy: false });
@@ -3295,6 +3396,22 @@ export class MessageHandler {
           void this.handleParticleAcceleratorClearData(msg.scope);
           break;
         }
+        case 'secretProtectionGetStatus': {
+          void this.sendSecretProtectionStatus();
+          break;
+        }
+        case 'secretProtectionSetSetting': {
+          void this.handleSecretProtectionSetSetting(msg.key, msg.value);
+          break;
+        }
+        case 'secretProtectionGetAuditEvents': {
+          void this.handleSecretProtectionGetAuditEvents(msg.filter, msg.limit);
+          break;
+        }
+        case 'secretProtectionGetComplianceReport': {
+          void this.handleSecretProtectionGetComplianceReport(msg.filter);
+          break;
+        }
 
         case 'ready':
           this.log('Webview ready');
@@ -3369,6 +3486,8 @@ export class MessageHandler {
           void this.refreshSchedulerApiKeys();
           // Send GitHub sync status
           this.sendGitHubSyncStatus();
+          // Send Secret Protection status/audit summary
+          void this.sendSecretProtectionStatus();
           // If process is already running, tell the webview
           if (this.processManager.isRunning && this.processManager.currentSessionId) {
             this.log('Sending existing session info to webview');
@@ -4086,8 +4205,8 @@ export class MessageHandler {
     });
   }
 
-  /** Execute the git push script */
-  private handleGitPush(): void {
+  /** Execute the git push script with DLP pre-scan */
+  private async handleGitPush(): Promise<void> {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const enabled = config.get<boolean>('gitPush.enabled', true);
 
@@ -4116,7 +4235,70 @@ export class MessageHandler {
       return;
     }
 
-    const path = require('path');
+    // DLP: scan tracked changes + untracked sensitive files before pushing
+    if (this.secretProtectionService?.isEnabled() && this.secretProtectionService.getSettings().scanGitPublication) {
+      const broker = this.secretProtectionService.getBroker();
+      if (broker) {
+        try {
+          const cp = require('child_process');
+          const execGit = (cmd: string): Promise<string> => new Promise((resolve, reject) => {
+            cp.exec(cmd, { cwd: workspaceRoot, maxBuffer: 1024 * 1024 }, (err: Error | null, stdout: string) => {
+              if (err) reject(err); else resolve(stdout);
+            });
+          });
+
+          const [diff, statusOutput] = await Promise.all([
+            execGit('git diff HEAD'),
+            execGit('git status --porcelain -uall'),
+          ]);
+
+          // Build synthetic diff for untracked files (lines starting with "??")
+          // Includes file content as added lines so content scanners can detect secrets
+          const untrackedLines = statusOutput.split('\n').filter(l => l.startsWith('?? '));
+          let untrackedDiff = '';
+          const fsModule = require('fs') as typeof import('fs');
+          const pathModule = require('path') as typeof import('path');
+          for (const line of untrackedLines) {
+            const filePath = line.slice(3).trim().replace(/^"(.*)"$/, '$1');
+            untrackedDiff += `diff --git a/${filePath} b/${filePath}\nnew file mode 100644\n--- /dev/null\n+++ b/${filePath}\n`;
+            try {
+              const absPath = pathModule.join(workspaceRoot, filePath);
+              const stat = fsModule.statSync(absPath);
+              if (stat.isFile() && stat.size < 256 * 1024) {
+                const fileContent = fsModule.readFileSync(absPath, 'utf8');
+                const contentLines = fileContent.split('\n').slice(0, 200);
+                untrackedDiff += `@@ -0,0 +1,${contentLines.length} @@\n` + contentLines.map((l: string) => '+' + l).join('\n') + '\n';
+              }
+            } catch {
+              // Can't read file content -- path-only detection still works
+            }
+          }
+
+          const fullDiff = diff + (untrackedDiff ? '\n' + untrackedDiff : '');
+          if (fullDiff.trim()) {
+            const decision = await broker.scanGitPublication(fullDiff, commitMessage);
+            if (decision.action === 'block' || decision.action === 'require_approval') {
+              this.log(`[SecretProtection] Git push blocked: ${decision.reason}`);
+              this.webview.postMessage({
+                type: 'gitPushResult',
+                success: false,
+                output: `Secret protection blocked this push: ${decision.reason}`,
+              });
+              return;
+            }
+          }
+        } catch (dlpErr) {
+          this.log(`[SecretProtection] Git diff scan error (fail-closed): ${dlpErr}`);
+          this.webview.postMessage({
+            type: 'gitPushResult',
+            success: false,
+            output: 'Secret protection scan failed (fail-closed). Please try again.',
+          });
+          return;
+        }
+      }
+    }
+
     const fullScriptPath = path.resolve(workspaceRoot, scriptPath);
     this.log(`Git push: running "${fullScriptPath}" with message "${commitMessage}"`);
 
@@ -5889,6 +6071,128 @@ export class MessageHandler {
     });
     this.log(`[ParticleAccelerator] Cleared data: ${result.deletedTraces} traces, ${result.deletedRawLogs} raw logs, ${result.deletedReports} reports`);
     this.webview.postMessage({ type: 'particleAcceleratorStatus', status: service!.getStatus() } as any);
+  }
+
+  private async sendSecretProtectionStatus(): Promise<void> {
+    const service = this.secretProtectionService;
+    if (!service) {
+      const settings = vscode.workspace.getConfiguration('claudeMirror.secretProtection');
+      this.webview.postMessage({
+        type: 'secretProtectionStatus',
+        enabled: false,
+        settings: {
+          enabled: settings.get<boolean>('enabled', false),
+          mode: settings.get<any>('mode', 'balanced'),
+          blockProtectedPaths: settings.get<boolean>('blockProtectedPaths', true),
+          scanPrompts: settings.get<boolean>('scanPrompts', true),
+          scanTerminalOutput: settings.get<boolean>('scanTerminalOutput', true),
+          scanGitPublication: settings.get<boolean>('scanGitPublication', true),
+          scanMcp: settings.get<boolean>('scanMcp', true),
+          requireBrowserCaptureApproval: settings.get<boolean>('requireBrowserCaptureApproval', true),
+          exceptionMaxMinutes: settings.get<number>('exceptionMaxMinutes', 30),
+          auditRetentionDays: settings.get<number>('auditRetentionDays', 90),
+          enableEntropyScanner: settings.get<boolean>('enableEntropyScanner', false),
+        },
+        auditCount: 0,
+        lastEvent: null,
+      } as any);
+      return;
+    }
+
+    try {
+      const events = await service.readAuditEvents(undefined, 1);
+      const report = await service.getComplianceReport();
+      this.webview.postMessage({
+        type: 'secretProtectionStatus',
+        enabled: service.isEnabled(),
+        settings: service.getSettings(),
+        auditCount: report.stats.totalEvents,
+        lastEvent: events[0] ?? null,
+      });
+    } catch (err) {
+      this.webview.postMessage({
+        type: 'secretProtectionError',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  private async handleSecretProtectionSetSetting(key: string, value: unknown): Promise<void> {
+    const allowed = new Set([
+      'enabled',
+      'mode',
+      'blockProtectedPaths',
+      'scanPrompts',
+      'scanTerminalOutput',
+      'scanGitPublication',
+      'scanMcp',
+      'requireBrowserCaptureApproval',
+      'exceptionMaxMinutes',
+      'auditRetentionDays',
+      'enableEntropyScanner',
+    ]);
+    if (!allowed.has(key)) {
+      this.webview.postMessage({ type: 'secretProtectionError', error: `Unknown Secret Protection setting: ${key}` });
+      return;
+    }
+
+    try {
+      if (this.secretProtectionService) {
+        await this.secretProtectionService.updateSetting(key as any, value as any);
+      } else {
+        await vscode.workspace
+          .getConfiguration('claudeMirror.secretProtection')
+          .update(key, value, vscode.ConfigurationTarget.Global);
+      }
+      await this.sendSecretProtectionStatus();
+    } catch (err) {
+      this.webview.postMessage({
+        type: 'secretProtectionError',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  private async handleSecretProtectionGetAuditEvents(
+    filter?: import('../../shared/audit/AuditStore').AuditEventFilter,
+    limit?: number,
+  ): Promise<void> {
+    const service = this.secretProtectionService;
+    if (!service) {
+      this.webview.postMessage({ type: 'secretProtectionAuditEvents', events: [] });
+      return;
+    }
+    try {
+      const events = await service.readAuditEvents(filter, limit ?? 100);
+      this.webview.postMessage({ type: 'secretProtectionAuditEvents', events });
+    } catch (err) {
+      this.webview.postMessage({
+        type: 'secretProtectionError',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  private async handleSecretProtectionGetComplianceReport(
+    filter?: import('../../shared/audit/AuditStore').AuditEventFilter,
+  ): Promise<void> {
+    const service = this.secretProtectionService;
+    if (!service) {
+      this.webview.postMessage({
+        type: 'secretProtectionError',
+        error: 'Secret Protection service is not initialized.',
+      });
+      return;
+    }
+    try {
+      const report = await service.getComplianceReport(filter);
+      this.webview.postMessage({ type: 'secretProtectionComplianceReport', report });
+    } catch (err) {
+      this.webview.postMessage({
+        type: 'secretProtectionError',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
 }

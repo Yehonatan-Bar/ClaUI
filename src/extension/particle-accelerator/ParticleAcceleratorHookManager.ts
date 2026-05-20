@@ -33,14 +33,22 @@ export class ParticleAcceleratorHookManager {
       await fs.promises.writeFile(backupFile, raw, 'utf8');
     }
 
-    // Build hook entry
-    const hookCommand = `node "${path.join(this.runtimePaths.hooksDir, 'claude-pre-tool-use.js')}" ${MANAGED_MARKER} claude-pre-tool-use`;
+    // Build hook entries: one for Bash interception (PA), one for MCP scanning (Secret Protection)
+    const hookScript = path.join(this.runtimePaths.hooksDir, 'claude-pre-tool-use.js');
 
-    const hookEntry = {
+    const bashHookEntry = {
       matcher: 'Bash',
       hooks: [{
         type: 'command',
-        command: hookCommand,
+        command: `node "${hookScript}" ${MANAGED_MARKER} claude-pre-tool-use`,
+      }],
+    };
+
+    const mcpHookEntry = {
+      matcher: 'mcp__*',
+      hooks: [{
+        type: 'command',
+        command: `node "${hookScript}" ${MANAGED_MARKER} claude-pre-tool-use-mcp`,
       }],
     };
 
@@ -49,15 +57,24 @@ export class ParticleAcceleratorHookManager {
     const hooks = data.hooks as Record<string, unknown[]>;
     if (!Array.isArray(hooks.PreToolUse)) hooks.PreToolUse = [];
 
-    // Don't duplicate
     const existing = hooks.PreToolUse as Array<Record<string, unknown>>;
-    const alreadyInstalled = existing.some(entry => {
-      const entryHooks = entry.hooks as Array<Record<string, string>> | undefined;
-      return entryHooks?.some(h => h.command?.includes(MANAGED_MARKER + ' claude-pre-tool-use'));
-    });
 
-    if (!alreadyInstalled) {
-      existing.push(hookEntry);
+    // Don't duplicate Bash hook
+    const bashInstalled = existing.some(entry => {
+      const entryHooks = entry.hooks as Array<Record<string, string>> | undefined;
+      return entryHooks?.some(h => h.command?.includes(MANAGED_MARKER + ' claude-pre-tool-use') && !h.command?.includes('-mcp'));
+    });
+    if (!bashInstalled) {
+      existing.push(bashHookEntry);
+    }
+
+    // Don't duplicate MCP hook
+    const mcpInstalled = existing.some(entry => {
+      const entryHooks = entry.hooks as Array<Record<string, string>> | undefined;
+      return entryHooks?.some(h => h.command?.includes(MANAGED_MARKER + ' claude-pre-tool-use-mcp'));
+    });
+    if (!mcpInstalled) {
+      existing.push(mcpHookEntry);
     }
 
     await fs.promises.writeFile(settingsFile, JSON.stringify(data, null, 2), 'utf8');
@@ -81,7 +98,10 @@ export class ParticleAcceleratorHookManager {
 
     hooks.PreToolUse = (hooks.PreToolUse as Array<Record<string, unknown>>).filter(entry => {
       const entryHooks = entry.hooks as Array<Record<string, string>> | undefined;
-      return !entryHooks?.some(h => h.command?.includes(MANAGED_MARKER + ' claude-pre-tool-use'));
+      return !entryHooks?.some(h =>
+        h.command?.includes(MANAGED_MARKER + ' claude-pre-tool-use') ||
+        h.command?.includes(MANAGED_MARKER + ' claude-pre-tool-use-mcp')
+      );
     });
 
     if (hooks.PreToolUse.length === 0) delete hooks.PreToolUse;
@@ -97,10 +117,15 @@ export class ParticleAcceleratorHookManager {
       const data = JSON.parse(raw);
       const hooks = data.hooks?.PreToolUse as Array<Record<string, unknown>> | undefined;
       if (!hooks) return false;
-      return hooks.some(entry => {
+      const hasBash = hooks.some(entry => {
         const entryHooks = entry.hooks as Array<Record<string, string>> | undefined;
-        return entryHooks?.some(h => h.command?.includes(MANAGED_MARKER + ' claude-pre-tool-use'));
+        return entryHooks?.some(h => h.command?.includes(MANAGED_MARKER + ' claude-pre-tool-use') && !h.command?.includes('-mcp'));
       });
+      const hasMcp = hooks.some(entry => {
+        const entryHooks = entry.hooks as Array<Record<string, string>> | undefined;
+        return entryHooks?.some(h => h.command?.includes(MANAGED_MARKER + ' claude-pre-tool-use-mcp'));
+      });
+      return hasBash && hasMcp;
     } catch {
       return false;
     }
@@ -128,13 +153,21 @@ export class ParticleAcceleratorHookManager {
       await fs.promises.writeFile(backupFile, raw, 'utf8');
     }
 
-    const hookCommand = `node "${path.join(this.runtimePaths.hooksDir, 'codex-pre-tool-use.js')}" ${MANAGED_MARKER} codex-pre-tool-use`;
+    const hookScript = path.join(this.runtimePaths.hooksDir, 'codex-pre-tool-use.js');
 
-    const hookEntry = {
+    const bashHookEntry = {
       matcher: 'Bash',
       hooks: [{
         type: 'command',
-        command: hookCommand,
+        command: `node "${hookScript}" ${MANAGED_MARKER} codex-pre-tool-use`,
+      }],
+    };
+
+    const mcpHookEntry = {
+      matcher: 'mcp__*',
+      hooks: [{
+        type: 'command',
+        command: `node "${hookScript}" ${MANAGED_MARKER} codex-pre-tool-use-mcp`,
       }],
     };
 
@@ -143,13 +176,21 @@ export class ParticleAcceleratorHookManager {
     if (!Array.isArray(hooks.PreToolUse)) hooks.PreToolUse = [];
 
     const existing = hooks.PreToolUse as Array<Record<string, unknown>>;
-    const alreadyInstalled = existing.some(entry => {
-      const entryHooks = entry.hooks as Array<Record<string, string>> | undefined;
-      return entryHooks?.some(h => h.command?.includes(MANAGED_MARKER + ' codex-pre-tool-use'));
-    });
 
-    if (!alreadyInstalled) {
-      existing.push(hookEntry);
+    const bashInstalled = existing.some(entry => {
+      const entryHooks = entry.hooks as Array<Record<string, string>> | undefined;
+      return entryHooks?.some(h => h.command?.includes(MANAGED_MARKER + ' codex-pre-tool-use') && !h.command?.includes('-mcp'));
+    });
+    if (!bashInstalled) {
+      existing.push(bashHookEntry);
+    }
+
+    const mcpInstalled = existing.some(entry => {
+      const entryHooks = entry.hooks as Array<Record<string, string>> | undefined;
+      return entryHooks?.some(h => h.command?.includes(MANAGED_MARKER + ' codex-pre-tool-use-mcp'));
+    });
+    if (!mcpInstalled) {
+      existing.push(mcpHookEntry);
     }
 
     await fs.promises.writeFile(hooksFile, JSON.stringify(data, null, 2), 'utf8');
@@ -173,7 +214,10 @@ export class ParticleAcceleratorHookManager {
 
     hooks.PreToolUse = (hooks.PreToolUse as Array<Record<string, unknown>>).filter(entry => {
       const entryHooks = entry.hooks as Array<Record<string, string>> | undefined;
-      return !entryHooks?.some(h => h.command?.includes(MANAGED_MARKER + ' codex-pre-tool-use'));
+      return !entryHooks?.some(h =>
+        h.command?.includes(MANAGED_MARKER + ' codex-pre-tool-use') ||
+        h.command?.includes(MANAGED_MARKER + ' codex-pre-tool-use-mcp')
+      );
     });
 
     if (hooks.PreToolUse.length === 0) delete hooks.PreToolUse;
@@ -189,10 +233,15 @@ export class ParticleAcceleratorHookManager {
       const data = JSON.parse(raw);
       const hooks = data.hooks?.PreToolUse as Array<Record<string, unknown>> | undefined;
       if (!hooks) return false;
-      return hooks.some(entry => {
+      const hasBash = hooks.some(entry => {
         const entryHooks = entry.hooks as Array<Record<string, string>> | undefined;
-        return entryHooks?.some(h => h.command?.includes(MANAGED_MARKER + ' codex-pre-tool-use'));
+        return entryHooks?.some(h => h.command?.includes(MANAGED_MARKER + ' codex-pre-tool-use') && !h.command?.includes('-mcp'));
       });
+      const hasMcp = hooks.some(entry => {
+        const entryHooks = entry.hooks as Array<Record<string, string>> | undefined;
+        return entryHooks?.some(h => h.command?.includes(MANAGED_MARKER + ' codex-pre-tool-use-mcp'));
+      });
+      return hasBash && hasMcp;
     } catch {
       return false;
     }

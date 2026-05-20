@@ -10,6 +10,7 @@ import { useStatusBarCollapse } from '../../hooks/useStatusBarCollapse';
 import { StatusBarGroupButton } from './StatusBarGroupButton';
 import { AIChip } from './AIChip';
 import { ParticleAcceleratorStatusBadge } from '../ParticleAccelerator/ParticleAcceleratorStatusBadge';
+import { SecretProtectionStatusBadge } from '../SecretProtectionStatusBadge';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 
 function formatDuration(durationMs: number): string {
@@ -915,6 +916,7 @@ export const StatusBar: React.FC<{
       </div>
 
       <div className="status-bar-right">
+        <SecretProtectionStatusBadge />
         <ParticleAcceleratorStatusBadge />
         {!hideClockFromBar && clockElement}
         {!hideMcpFromBar && mcpChip}

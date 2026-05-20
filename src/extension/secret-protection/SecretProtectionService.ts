@@ -8,10 +8,15 @@ import {
   SecretProtectionSettings,
 } from './SecretProtectionSettings';
 import { loadPolicy } from '../../shared/secret-protection/policySchema';
+import { AuditEvent, DlpException } from '../../shared/secret-protection/types';
+import { AuditEventFilter, AuditStore } from '../../shared/audit/AuditStore';
+import { ComplianceReport, ComplianceReporter } from '../../shared/audit/ComplianceReporter';
+import { ExceptionStore } from '../../server/enforcement/ExceptionStore';
 
 export class SecretProtectionService implements vscode.Disposable {
   private broker: SecretProtectionBroker | null = null;
   private persistenceGuard: SafePersistenceGuard | null = null;
+  private exceptionStore: ExceptionStore | null = null;
   private settings: SecretProtectionSettings;
   private auditStoreDir: string;
   private readonly disposables: vscode.Disposable[] = [];
@@ -79,6 +84,27 @@ export class SecretProtectionService implements vscode.Disposable {
     return this.settings;
   }
 
+  getAuditStoreDir(): string {
+    return this.auditStoreDir;
+  }
+
+  async readAuditEvents(filter?: AuditEventFilter, limit = 100): Promise<AuditEvent[]> {
+    return new AuditStore(this.auditStoreDir).read(filter, limit);
+  }
+
+  async getComplianceReport(filter?: AuditEventFilter): Promise<ComplianceReport> {
+    return new ComplianceReporter(new AuditStore(this.auditStoreDir)).generate(filter);
+  }
+
+  async updateSetting<K extends keyof SecretProtectionSettings>(
+    key: K,
+    value: SecretProtectionSettings[K],
+  ): Promise<void> {
+    await vscode.workspace
+      .getConfiguration('claudeMirror.secretProtection')
+      .update(String(key), value, vscode.ConfigurationTarget.Global);
+  }
+
   onDidChangeSettings(listener: (service: SecretProtectionService) => void): void {
     this.changeListeners.push(listener);
   }
@@ -89,6 +115,24 @@ export class SecretProtectionService implements vscode.Disposable {
     }
     this.broker = null;
     this.persistenceGuard = null;
+  }
+
+  async addException(exception: DlpException): Promise<void> {
+    if (this.broker) {
+      this.broker.addException(exception);
+    }
+    if (this.exceptionStore) {
+      await this.exceptionStore.add(exception);
+    }
+  }
+
+  async consumeException(exceptionId: string): Promise<DlpException | null> {
+    if (!this.exceptionStore) return null;
+    return this.exceptionStore.consume(exceptionId);
+  }
+
+  getExceptionStorePath(): string {
+    return path.join(this.auditStoreDir, 'exceptions.json');
   }
 
   private createBroker(): void {
@@ -105,12 +149,32 @@ export class SecretProtectionService implements vscode.Disposable {
         this.settings, policyConfig, this.auditStoreDir,
       );
       this.persistenceGuard = new SafePersistenceGuard(this.broker);
+
+      this.exceptionStore = new ExceptionStore(this.getExceptionStorePath());
+      this.broker.setOnExceptionConsumed((exceptionId) => {
+        void this.exceptionStore?.consume(exceptionId).catch(() => {});
+      });
+      void this.exceptionStore.listActive().then((active) => {
+        for (const ex of active) {
+          this.broker?.addException(ex);
+        }
+        if (active.length > 0) {
+          this.log(`[SecretProtection] Loaded ${active.length} active exception(s) from store`);
+        }
+      }).catch((err) => this.log(`[SecretProtection] Exception store load failed: ${err instanceof Error ? err.message : String(err)}`));
+
+      void this.exceptionStore.prune().catch(() => {});
+
+      void new AuditStore(this.auditStoreDir)
+        .prune(this.settings.auditRetentionDays)
+        .catch((err) => this.log(`[SecretProtection] Audit retention cleanup failed: ${err instanceof Error ? err.message : String(err)}`));
     } catch (err) {
       this.log(
         `[SecretProtection] Broker creation failed: ${err instanceof Error ? err.message : String(err)}`,
       );
       this.broker = null;
       this.persistenceGuard = null;
+      this.exceptionStore = null;
     }
   }
 }

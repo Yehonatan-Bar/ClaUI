@@ -18,6 +18,7 @@ export class SecretProtectionBroker {
   private readonly redactionEngine: RedactionEngine;
   private readonly auditWriter: AuditEventWriter;
   private readonly exceptions: DlpException[] = [];
+  private onExceptionConsumed: ((exceptionId: string) => void) | null = null;
 
   constructor(
     private readonly settings: SecretProtectionSettings,
@@ -99,8 +100,16 @@ export class SecretProtectionBroker {
     return this.scan(value, 'persistence.write', {});
   }
 
+  async scanDiagnosticExport(content: string, host?: string): Promise<DlpDecision> {
+    return this.scan(content, 'diagnostic.export', { host });
+  }
+
   addException(exception: DlpException): void {
     this.exceptions.push(exception);
+  }
+
+  setOnExceptionConsumed(callback: (exceptionId: string) => void): void {
+    this.onExceptionConsumed = callback;
   }
 
   getActiveExceptions(): DlpException[] {
@@ -132,10 +141,22 @@ export class SecretProtectionBroker {
         this.exceptions, contentHash, this.sessionId,
       );
 
+      if (decision.consumedExceptionIds?.length
+        && decision.action !== 'block'
+        && decision.action !== 'require_approval') {
+        for (const id of decision.consumedExceptionIds) {
+          const ex = this.exceptions.find(e => e.id === id);
+          if (ex) {
+            ex.usedCount++;
+            this.onExceptionConsumed?.(id);
+          }
+        }
+      }
+
       if (decision.action === 'redact' && scanResult.findings.length > 0) {
         const redactionResult = this.redactionEngine.redact(content, scanResult.findings);
         decision.redactedContent = redactionResult.redacted;
-        decision.audit.redactedBytes = Buffer.byteLength(redactionResult.redacted, 'utf8');
+        decision.audit.redactedBytes = redactionResult.replacedBytes;
         decision.audit.redactionCount = redactionResult.replacementCount;
       }
 
@@ -161,6 +182,10 @@ export class SecretProtectionBroker {
         redactedBytes: 0,
         redactionCount: 0,
       };
+
+      if (this.auditStoreDir) {
+        await this.auditWriter.writeEvent(errorAudit, this.auditStoreDir).catch(() => {});
+      }
 
       return {
         action: 'block',

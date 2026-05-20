@@ -2379,6 +2379,8 @@ export class SessionTab implements WebviewBridge {
               mode: spService.getSettings().mode,
               enableEntropyScanner: spService.getSettings().enableEntropyScanner,
               scanTerminalOutput: spService.getSettings().scanTerminalOutput,
+              scanMcp: spService.getSettings().scanMcp,
+              exceptionsPath: spService.getExceptionStorePath(),
             } : undefined,
           });
         };

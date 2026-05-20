@@ -85,7 +85,7 @@ All under `claudeMirror.secretProtection.*`:
 | `PathSensitivityClassifier.ts` | `path-sensitivity` | File path references classified by sensitivity. 6 finder patterns: absolute paths, tilde paths, relative paths, dot-prefixed names (`.env`, `.ssh/id_rsa`), bare filenames with sensitive extensions (`private.pem`, `server.key`, `cert.p12`), and specific sensitive filenames (`terraform.tfstate`, `secrets.json`, `credentials.json`). Critical/high/medium tiers |
 | `StructuredPayloadScanner.ts` | `structured-payload` | JSON (`"key": "value"`) and YAML (`key: value`) patterns where key names match sensitive patterns |
 | `PiiAndInternalTopologyScanner.ts` | `pii-topology` | Email (with false-positive filtering), RFC 1918 internal IPs (10.x, 172.16-31.x, 192.168.x), internal hostnames (*.internal, *.corp, *.cluster.local) |
-| `CompositeSecretScanner.ts` | `composite` | Orchestrates all 6 scanners. Auto-loads enabled rule packs via `getEnabledRulePacks()`. Deduplicates overlapping findings (highest severity wins). 100ms performance budget for inputs <= 128KB |
+| `CompositeSecretScanner.ts` | `composite` | Orchestrates all 10 scanners (6 core + 4 boundary-specific). Auto-loads enabled rule packs via `getEnabledRulePacks()`. Deduplicates overlapping findings (highest severity wins). 100ms performance budget for inputs <= 128KB |
 
 ### Rule Packs (`src/shared/secret-protection/rules/`)
 
@@ -112,9 +112,9 @@ All under `claudeMirror.secretProtection.*`:
 
 Replaces finding spans with structured `<REDACTED type="..." id="sec_..." />` tokens.
 
-- **`redact(text, findings)`**: Resolves overlapping spans by severity (highest wins), then replaces rightmost-first to preserve byte offsets. Returns `{ redacted, tokenMap, replacementCount }`.
-- **`redactChunked(chunk, findings)`**: Streaming mode with 200-char overlap buffer. Findings that fall in the overlap zone are automatically deferred (with byte-offset adjustment) for processing by `flush()`.
-- **`flush()`**: Applies deferred findings from previous `redactChunked()` calls to the remaining buffer. No arguments needed -- safe by default, no unredacted tail leak.
+- **`redact(text, findings)`**: Resolves overlapping spans by severity (highest wins), then replaces rightmost-first to preserve byte offsets. Returns `{ redacted, tokenMap, replacementCount, replacedBytes }`. `replacedBytes` is the sum of original secret byte spans (byteEnd - byteStart) for each resolved finding, used for accurate audit metrics.
+- **`redactChunked(chunk, findings)`**: Streaming mode with 200-char overlap buffer. Findings that fall in the overlap zone are automatically deferred (with byte-offset adjustment) for processing by `flush()`. Accumulates `replacedBytes` across chunks.
+- **`flush()`**: Applies deferred findings from previous `redactChunked()` calls to the remaining buffer. Returns accumulated `replacedBytes`. No arguments needed -- safe by default, no unredacted tail leak.
 
 ### CommandRiskClassifier (`src/shared/secret-protection/CommandRiskClassifier.ts`)
 
@@ -127,11 +127,14 @@ Replaces finding spans with structured `<REDACTED type="..." id="sec_..." />` to
 - `hardBlock = true` when `agent_control_write` + `shell_obfuscation` both detected
 - `requiresApproval = true` for severity >= high
 
-### AuditEventWriter (`src/shared/secret-protection/AuditEventWriter.ts`)
+### Audit Store and Compliance (`src/shared/audit/`)
 
-- **`writeEvent(event, storeDir)`**: Appends one JSON line to `storeDir/audit/YYYY-MM-DD.jsonl`. Creates directories as needed.
-- **`readEvents(storeDir, filter?, limit?)`**: Reads JSONL files newest-first, applies boundary/action/severity/date filters.
-- **`pruneOldEvents(storeDir, retentionDays)`**: Deletes JSONL files older than retention cutoff.
+- **`AuditStore.append(event)`**: Appends one JSON line to `storeDir/audit/YYYY-MM-DD.jsonl`. Creates directories as needed.
+- **`AuditStore.read(filter?, limit?)`**: Reads JSONL files newest-first, applies boundary/action/severity/date filters.
+- **`AuditStore.getStats(filter?)`**: Computes action, boundary, severity, redaction count, byte, and timestamp summaries.
+- **`AuditStore.prune(retentionDays)`**: Deletes JSONL files older than retention cutoff.
+- **`AuditEventWriter`**: Small facade over `AuditStore`; `src/shared/secret-protection/AuditEventWriter.ts` remains as a compatibility re-export.
+- **`ComplianceReporter.generate(filter?)`**: Builds SOC 2 CC6/CC7 and GDPR Article 32/5 evidence summaries without exposing raw secret values.
 
 ### DestinationClassifier (`src/shared/secret-protection/DestinationClassifier.ts`)
 
@@ -176,7 +179,7 @@ Mode-aware evaluation:
 - `balanced`: use decision matrix
 - `strict`: escalate to block for severity >= medium
 
-Checks hard-block rules, HMAC allowlist, and active exceptions before matrix lookup.
+Checks hard-block rules, HMAC allowlist, and active exceptions before matrix lookup. Tracks `consumedExceptionIds` on the returned `DlpDecision` so the caller (broker) can increment usage counts and persist consumption.
 
 ### SecretProtectionBroker (`src/extension/secret-protection/SecretProtectionBroker.ts`)
 
@@ -190,11 +193,15 @@ Central orchestrator with 8 boundary-specific scan methods:
 - `scanGitPublication(diff, commitMsg?, remoteName?)`
 - `scanPersistence(key, value)`
 
-Each method: `CompositeScanner.scan()` -> `PolicyEngine.evaluate()` -> `RedactionEngine.redact()` (if action=redact) -> `AuditEventWriter.writeEvent()` -> return `DlpDecision`
+Each method: `CompositeScanner.scan()` -> `PolicyEngine.evaluate()` -> consume exceptions -> `RedactionEngine.redact()` (if action=redact, sets `redactedBytes` from `replacedBytes`) -> `AuditEventWriter.writeEvent()` -> return `DlpDecision`
 
-**Fail-closed**: any scan error returns `{ action: 'block', reason: 'scan-error' }`.
+**Fail-closed**: any scan error returns `{ action: 'block', reason: 'scan-error' }` and writes an audit event (best-effort).
 
-Exception management: `addException(exception)`, `getActiveExceptions()`.
+Exception management:
+- `addException(exception)`: adds to in-memory list
+- `getActiveExceptions()`: returns non-expired, under-limit exceptions
+- `setOnExceptionConsumed(callback)`: registers callback fired when an exception is consumed during `scan()`
+- After `PolicyEngine.evaluate()`, the broker increments `usedCount` on consumed exceptions in memory and fires the `onExceptionConsumed` callback for each, enabling the `SecretProtectionService` to persist consumption to disk via `ExceptionStore`. Consumption is gated: exceptions are only consumed when the overall decision allows content through (`allow`, `redact`, `warn`, `summarize_locally`), NOT when the decision is `block` or `require_approval`.
 
 ### SecretProtectionService (`src/extension/secret-protection/SecretProtectionService.ts`)
 
@@ -202,8 +209,16 @@ Lifecycle management following `ParticleAcceleratorService` pattern:
 - Constructor: reads settings via `getSecretProtectionSettings()`
 - `initialize()`: loads policy, creates broker, subscribes to settings changes
 - `isEnabled()`: settings enabled AND broker created
-- `getBroker()` / `getSettings()`
+- `getBroker()` / `getSettings()` / `getAuditStoreDir()`
+- `readAuditEvents(filter?, limit?)`: reads audit events via `AuditStore`
+- `getComplianceReport(filter?)`: generates compliance report via `ComplianceReporter`
+- `updateSetting(key, value)`: writes to VS Code global config
+- `addException(exception)`: adds to broker in-memory list and persists to `ExceptionStore`
+- `consumeException(exceptionId)`: consumes from persistent `ExceptionStore`
+- `getExceptionStorePath()`: returns path to `exceptions.json` under audit store dir
 - `dispose()`: cleans up subscriptions
+
+**Exception lifecycle in `createBroker()`**: Creates `ExceptionStore`, loads active (non-expired, under-limit) exceptions into the broker, wires `onExceptionConsumed` callback to persist consumption, and prunes expired exceptions. `SessionTab` and `CodexSessionTab` pass `exceptionsPath` to `ParticleAcceleratorEnvBuilder` so the Codex hook runtime can read/write the same file.
 
 ### SafePersistenceGuard (`src/extension/secret-protection/guards/SafePersistenceGuard.ts`)
 
@@ -229,15 +244,72 @@ Wraps trace/log/report writes through the persistence boundary:
 - `CodexExecProcessManager.ts`: Same flag and env injection
 - `ParticleAcceleratorEnvBuilder.ts`: Passes `CLAUI_SECRET_PROTECTION_MODE` and `CLAUI_SECRET_PROTECTION_ENTROPY` when SP is enabled
 
-## Planned (Steps 4-5)
+## Boundary-Specific Scanners (Step 4)
 
-### Step 4: Boundary Modules + Hooks
-- ContextManifestBuilder + new hooks (postToolUse, userPromptSubmit)
-- GitPublicationScanner
-- ApprovalEngine + ExceptionStore
-- ProtectedPathGuard + Codex upgrades
+### Specialized Detectors (`src/extension/scanners/`, `src/webview/scanners/`, `src/server/scanners/`, `src/shared/scanners/`)
 
-### Step 5: UI + Tests + Documentation
-- Webview panels (OutboundManifest, AuditLog, Settings)
-- 14 test files
-- Backward compatibility verification
+| File | Scanner Name | Boundary | What it Detects | Gated By |
+|------|-------------|----------|-----------------|----------|
+| `src/extension/scanners/ExtensionOutboundScanner.ts` | `extension-outbound` | `context.attach`, `file.read_for_context`, `command.output` | Hardcoded passwords, connection strings, stack traces with internal paths, auth headers in logs, session token leaks, DB error message leaks | `scanTerminalOutput` |
+| `src/webview/scanners/WebviewOutboundScanner.ts` | `webview-outbound` | `prompt.submit` | Pasted API keys (OpenAI/Anthropic/AWS), private keys, JWTs, URLs with embedded credentials, webhook URLs, explicit secret disclosures, .env block pastes | `scanPrompts` |
+| `src/server/scanners/ServerOutboundScanner.ts` | `server-outbound` | `mcp.request`, `diagnostic.export` (wired); `mcp.response`, `telemetry.export` (scanner supports but no code path triggers yet) | DB connection strings (ADO.NET + URL), URL token params, session cookies, internal service credentials, SQL literal secrets, SMTP credentials, API key headers, OAuth client secrets, certificate material, SSN/credit card PII | `scanMcp` |
+| `src/shared/scanners/GitPublicationScanner.ts` | `git-publication` | `git.diff`, `git.publish` | Phase 1: Sensitive files being staged (.env, .pem, .key, .p12, .pfx, SSH keys, tfstate, secrets/credentials files, .keystore, .npmrc, .pypirc, .htpasswd -- including binary diffs). Phase 2: Secrets in added lines only (AWS keys, GitHub tokens, API keys, private keys, passwords, DB URLs, JWTs, Slack/Stripe tokens, webhook URLs) | `scanGitPublication` |
+
+All 4 scanners implement `ISecretScanner`, self-filter by `APPLICABLE_BOUNDARIES`, and are registered in `CompositeSecretScanner` gated by their respective VS Code settings.
+
+### Integration Wiring
+
+| Boundary | Integration Point | How |
+|----------|-------------------|-----|
+| Git publish | `MessageHandler.handleGitPush()`, `CodexMessageHandler.handleGitPush()` | Runs `git diff HEAD` + `git status --porcelain -uall` in parallel. For untracked files: reads file content (up to 256KB, first 200 lines) and builds synthetic diff with added lines so content scanners can detect secrets inside new files. Calls `broker.scanGitPublication()`, blocks if decision is `block`/`require_approval`. Gated by `scanGitPublication` setting. Fail-closed on scan error. |
+| MCP request | `claudePreToolUse.ts`, `codexPreToolUse.ts` (CLI hooks) | Intercepts tools matching `mcp__*` via a dedicated hook entry (separate from the Bash matcher). Gated by `CLAUI_SECRET_PROTECTION_SCAN_MCP` env var (passed from `ParticleAcceleratorEnvBuilder`). Scans args via `CompositeSecretScanner` at `mcp.request` boundary, denies if critical/high findings in balanced/strict mode. Runs independently of PA kill-switch. |
+| Diagnostic export | `BugReportService.submit()` | Scans assembled report content via `broker.scanDiagnosticExport()` before Formspree submission. Blocks or redacts as appropriate. ZIP attachment is built from the (potentially redacted) sections, not raw sources. `SecretProtectionService` wired via `setSecretProtectionService()` during `bugReportInit`. |
+| Prompt submit | `MessageHandler` (3 scan points), `CodexMessageHandler.dispatchPrompt()` | Scans composed payload (user text + handoff context) via `broker.scanPromptSubmission()`. Gated by `scanPrompts` setting. |
+| **Scanner support only** | `mcp.response`, `telemetry.export` | ServerOutboundScanner supports these boundaries, but no caller currently triggers scanning at these points. |
+
+### Hook Installation
+
+`ParticleAcceleratorHookManager` installs **two** `PreToolUse` hook entries per CLI:
+1. `matcher: 'Bash'` -- routes Bash commands through PA compression
+2. `matcher: 'mcp__*'` -- routes MCP tool calls through secret scanning
+
+Both hooks point to the same JS file; the tool name prefix determines which code path runs. `isClaudeHookInstalled()` / `isCodexHookInstalled()` require **both** entries to be present; an old installation with only the Bash hook will be detected as incomplete and reinstalled.
+
+### Env Vars Passed to Hook Runtime
+
+| Env Var | Source Setting | Purpose |
+|---------|---------------|---------|
+| `CLAUI_SECRET_PROTECTION` | `secretProtection.enabled` | Master kill-switch for all SP in hooks |
+| `CLAUI_SECRET_PROTECTION_MODE` | `secretProtection.mode` | Scan mode (balanced/strict/off) |
+| `CLAUI_SECRET_PROTECTION_ENTROPY` | `secretProtection.enableEntropyScanner` | Enable entropy-based detection |
+| `CLAUI_SECRET_PROTECTION_SCAN_TERMINAL` | `secretProtection.scanTerminalOutput` | Terminal output scanning |
+| `CLAUI_SECRET_PROTECTION_SCAN_MCP` | `secretProtection.scanMcp` | MCP tool argument scanning |
+| `CLAUI_SECRET_PROTECTION_EXCEPTIONS_PATH` | `SecretProtectionService.getExceptionStorePath()` | Path to exceptions.json for hook-runtime exception loading/consumption |
+
+## Audit and Enforcement UI (Step 5)
+
+### Webview UI
+
+- `SecretProtectionStatusBadge.tsx`: StatusBar badge showing enabled/mode/audit state and opening the panel.
+- `SettingsPanel.tsx`: Secret Protection overlay with Settings, Audit, and Manifest tabs.
+- `AuditLogPanel.tsx`: Interactive audit event table with action/severity filters plus compliance evidence summary.
+- `OutboundManifestPanel.ts`: Pure preview builder for guarded boundary names and the latest audit decision.
+- `StatusBadge.tsx`: Shared compact badge primitive used by the DLP status entry point.
+
+### State and Message Flow
+
+- `src/webview/store/auditSlice.ts` and `src/webview/store/dlpSettingsSlice.ts` define the DLP UI state defaults/helpers.
+- `src/webview/state/store.ts` owns `secretProtectionSettings`, status fields, audit events, last event, compliance report, panel tab/open state, loading, and errors.
+- `useClaudeStream.ts` handles `secretProtectionStatus`, `secretProtectionAuditEvents`, `secretProtectionComplianceReport`, and `secretProtectionError`.
+- `MessageHandler` and `CodexMessageHandler` handle `secretProtectionGetStatus`, `secretProtectionSetSetting`, `secretProtectionGetAuditEvents`, and `secretProtectionGetComplianceReport`.
+
+### Approval and Codex Enforcement
+
+- `src/server/enforcement/ApprovalEngine.ts` wraps DLP decisions with approval/allow/block semantics and strict-mode escalation. Exception override requires ALL findings to be covered (`findings.every()`), not just any one; partial coverage falls through to the baseDecision check. Returns `consumedExceptions: DlpException[]` with all unique matched exceptions (deduplicated by ID), so callers can consume every exception that contributed to the allow decision.
+- `src/server/enforcement/ExceptionStore.ts` persists temporary exceptions with expiry and max-use counters.
+- `src/particle-accelerator-runtime/hooks/codexPreToolUse.ts` evaluates MCP request findings through `PolicyEngine` and `ApprovalEngine` before tool execution. Loads active exceptions from `CLAUI_SECRET_PROTECTION_EXCEPTIONS_PATH` and persists consumption (usedCount increment) for all consumed exceptions (via `approval.consumedExceptions` array) back to the same file in a single write.
+- `src/server/Codex.ts` provides DLP redaction instructions appended to Codex sessions so redacted tokens are treated as intentional safe context.
+
+### Tests
+
+Step 5 adds 14 node:test files under `tests/unit`, `tests/integration`, and `tests/regression` covering scanner units, redaction, policy decisions, audit writer compatibility, approval engine behavior, git publication scanning, multi-way redaction, and backward-compatible import paths.

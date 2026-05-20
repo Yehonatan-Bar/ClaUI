@@ -4,6 +4,7 @@ export interface RedactionResult {
   redacted: string;
   tokenMap: Map<string, RedactionToken>;
   replacementCount: number;
+  replacedBytes: number;
 }
 
 const SEVERITY_RANK: Record<FindingSeverity, number> = {
@@ -19,6 +20,7 @@ export class RedactionEngine {
   private buffer = '';
   private chunkTokenMap = new Map<string, RedactionToken>();
   private chunkReplacementCount = 0;
+  private chunkReplacedBytes = 0;
   private deferredFindings: DlpFinding[] = [];
 
   redact(text: string, findings: DlpFinding[]): RedactionResult {
@@ -56,16 +58,18 @@ export class RedactionEngine {
 
     let result = text;
     let replacementCount = 0;
+    let replacedBytes = 0;
 
     for (const finding of resolved) {
       const start = finding.location.byteStart!;
       const end = finding.location.byteEnd!;
+      replacedBytes += (end - start);
       result = result.slice(0, start) + finding.redaction.text + result.slice(end);
       tokenMap.set(finding.redaction.stableId, finding.redaction);
       replacementCount++;
     }
 
-    return { redacted: result, tokenMap, replacementCount };
+    return { redacted: result, tokenMap, replacementCount, replacedBytes };
   }
 
   redactChunked(chunk: string, findings: DlpFinding[]): RedactionResult {
@@ -77,6 +81,7 @@ export class RedactionEngine {
         redacted: '',
         tokenMap: new Map(),
         replacementCount: 0,
+        replacedBytes: 0,
       };
     }
 
@@ -119,11 +124,13 @@ export class RedactionEngine {
       this.chunkTokenMap.set(id, token);
     }
     this.chunkReplacementCount += result.replacementCount;
+    this.chunkReplacedBytes += result.replacedBytes;
 
     return {
       redacted: result.redacted,
       tokenMap: new Map(this.chunkTokenMap),
       replacementCount: this.chunkReplacementCount,
+      replacedBytes: this.chunkReplacedBytes,
     };
   }
 
@@ -131,8 +138,9 @@ export class RedactionEngine {
     if (this.buffer.length === 0) {
       const tokenMap = new Map(this.chunkTokenMap);
       const count = this.chunkReplacementCount;
+      const bytes = this.chunkReplacedBytes;
       this.reset();
-      return { redacted: '', tokenMap, replacementCount: count };
+      return { redacted: '', tokenMap, replacementCount: count, replacedBytes: bytes };
     }
 
     const remaining = this.buffer;
@@ -152,18 +160,21 @@ export class RedactionEngine {
       this.chunkTokenMap.set(id, token);
     }
     this.chunkReplacementCount += tailResult.replacementCount;
+    this.chunkReplacedBytes += tailResult.replacedBytes;
 
     const tokenMap = new Map(this.chunkTokenMap);
     const count = this.chunkReplacementCount;
+    const bytes = this.chunkReplacedBytes;
     this.reset();
 
-    return { redacted: tailResult.redacted, tokenMap, replacementCount: count };
+    return { redacted: tailResult.redacted, tokenMap, replacementCount: count, replacedBytes: bytes };
   }
 
   private reset(): void {
     this.buffer = '';
     this.chunkTokenMap = new Map();
     this.chunkReplacementCount = 0;
+    this.chunkReplacedBytes = 0;
     this.deferredFindings = [];
   }
 }

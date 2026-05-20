@@ -88,6 +88,7 @@ export class BugReportService {
   private cliCaller: ClaudeCliCaller;
   private disposed = false;
   private context: BugReportContext | null = null;
+  private secretProtectionService: import('../secret-protection/SecretProtectionService').SecretProtectionService | null = null;
 
   constructor(
     bridge: WebviewBridge,
@@ -104,6 +105,10 @@ export class BugReportService {
     this.cliCaller = new ClaudeCliCaller();
     this.cliCaller.setLogger(log);
     if (apiKey) this.cliCaller.setApiKey(apiKey);
+  }
+
+  setSecretProtectionService(service: import('../secret-protection/SecretProtectionService').SecretProtectionService): void {
+    this.secretProtectionService = service;
   }
 
   // -----------------------------------------------------------------------
@@ -357,27 +362,72 @@ export class BugReportService {
       const totalChars = header.length + sections.reduce((sum, s) => sum + s.content.length, 0);
       this.log(`[BugReport] Report: ${totalChars} chars across ${sections.length} sections`);
 
-      // ----- Build ZIP (for multipart upload on paid plans) -----
-      const zip = new AdmZip();
-      if (this.diagnostics) {
-        zip.addFile('diagnostics.txt', Buffer.from(this.diagnostics.systemInfo, 'utf-8'));
-        zip.addFile('logs.txt', Buffer.from(this.diagnostics.recentLogs, 'utf-8'));
+      // ----- DLP scan before sending externally -----
+      if (this.secretProtectionService?.isEnabled()) {
+        const broker = this.secretProtectionService.getBroker();
+        if (broker) {
+          const fullContent = header + sections.map(s => s.content).join('\n');
+          const decision = await broker.scanDiagnosticExport(fullContent, 'formspree.io');
+          if (decision.action === 'block' || decision.action === 'require_approval') {
+            this.log(`[SecretProtection] Bug report blocked: ${decision.reason}`);
+            this.postStatus('error', undefined, `Secret protection blocked this report: ${decision.reason}`);
+            this.bridge.postMessage({
+              type: 'bugReportSubmitResult',
+              ok: false,
+              error: `Secret protection blocked this report: ${decision.reason}`,
+            });
+            return;
+          }
+          if (decision.action === 'redact' && decision.redactedContent) {
+            this.log(`[SecretProtection] Bug report redacted: ${decision.audit.redactionCount} redactions`);
+            // The redacted content is the full concatenated text (header + all sections).
+            // Re-split it back into sections by matching each section's separator line.
+            let remaining = decision.redactedContent;
+            const headerEnd = remaining.indexOf('\n---');
+            if (headerEnd >= 0) {
+              remaining = remaining.slice(headerEnd);
+            }
+            for (const section of sections) {
+              const sectionHeader = section.content.split('\n')[0];
+              const startIdx = remaining.indexOf(sectionHeader);
+              if (startIdx < 0) continue;
+              const afterStart = remaining.indexOf('\n---', startIdx + sectionHeader.length);
+              const sectionEnd = afterStart >= 0 ? afterStart : remaining.length;
+              section.content = remaining.slice(startIdx, sectionEnd) + '\n';
+            }
+          }
+        }
       }
-      if (this.context?.metadataText) {
+
+      // ----- Build ZIP from the (potentially redacted) sections -----
+      // The ZIP must use section content, NOT the raw source fields, because DLP
+      // redaction above only modifies sections. Using raw fields would leak secrets.
+      const zip = new AdmZip();
+      const sectionByName = new Map(sections.map(s => [s.name, s.content]));
+
+      if (sectionByName.has('diagnostics')) {
+        zip.addFile('diagnostics.txt', Buffer.from(sectionByName.get('diagnostics')!, 'utf-8'));
+      }
+      if (sectionByName.has('logs')) {
+        zip.addFile('logs.txt', Buffer.from(sectionByName.get('logs')!, 'utf-8'));
+      }
+      if (sectionByName.has('feature_context')) {
         zip.addFile(
-          this.context.source === 'mcp' ? 'mcp-context.txt' : 'feature-context.txt',
-          Buffer.from(this.context.metadataText, 'utf-8'),
+          this.context?.source === 'mcp' ? 'mcp-context.txt' : 'feature-context.txt',
+          Buffer.from(sectionByName.get('feature_context')!, 'utf-8'),
         );
       }
-      if (mode === 'quick' && description) {
-        zip.addFile('description.txt', Buffer.from(description, 'utf-8'));
+      if (sectionByName.has('description')) {
+        zip.addFile('description.txt', Buffer.from(sectionByName.get('description')!, 'utf-8'));
       }
-      if (mode === 'ai' && this.conversationHistory.length > 0) {
-        zip.addFile('conversation.json', Buffer.from(JSON.stringify(this.conversationHistory, null, 2), 'utf-8'));
+      if (sectionByName.has('conversation')) {
+        zip.addFile('conversation.json', Buffer.from(sectionByName.get('conversation')!, 'utf-8'));
       }
       for (let i = 0; i < this.scriptOutputs.length; i++) {
-        const s = this.scriptOutputs[i];
-        zip.addFile(`script_output_${i + 1}.txt`, Buffer.from(`$ ${s.command}\n\n${s.output}`, 'utf-8'));
+        const key = `script_${i + 1}`;
+        if (sectionByName.has(key)) {
+          zip.addFile(`script_output_${i + 1}.txt`, Buffer.from(sectionByName.get(key)!, 'utf-8'));
+        }
       }
       const zipBuffer = zip.toBuffer();
 

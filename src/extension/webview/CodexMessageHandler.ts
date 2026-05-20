@@ -424,36 +424,61 @@ export class CodexMessageHandler {
 
   private async dispatchPrompt(text: string, images?: WebviewImageData[], opts?: { steer?: boolean }): Promise<void> {
     const normalizedImages = images && images.length > 0 ? images : undefined;
-    if (text.trim()) {
-      this.achievementService.onUserPrompt(this.tabId, text);
-      void this.promptHistoryStore.addPrompt(text);
-    }
 
-    // DLP: scan prompt before sending to model
-    let textToSend = text;
-    if (this.secretProtectionService?.isEnabled()) {
+    // Build final payload (including handoff context) BEFORE scanning
+    const deferred = this.buildDeferredHandoffPayload(text, { imageCount: normalizedImages?.length ?? 0 });
+
+    // DLP: scan the FINAL composed payload (including handoff context)
+    // All side effects (achievement, history, UI) happen AFTER DLP approves.
+    let dlpRedacted = false;
+    if (this.secretProtectionService?.isEnabled() && this.secretProtectionService.getSettings().scanPrompts) {
       const broker = this.secretProtectionService.getBroker();
       if (broker) {
-        const decision = await broker.scanPromptSubmission(textToSend);
-        if (decision.action === 'block') {
-          this.log(`[SecretProtection] Prompt blocked: ${decision.reason}`);
-          this.postToWebview({
-            type: 'error',
-            message: `Secret protection blocked this prompt: ${decision.reason}`,
-          });
-          return;
-        }
-        if (decision.action === 'redact' && decision.redactedContent) {
-          textToSend = decision.redactedContent;
+        const decision = await broker.scanPromptSubmission(deferred.text);
+        switch (decision.action) {
+          case 'block':
+          case 'require_approval':
+            this.log(`[SecretProtection] Prompt ${decision.action}: ${decision.reason}`);
+            this.postToWebview({
+              type: 'error',
+              message: `Secret protection blocked this prompt: ${decision.reason}`,
+            });
+            return;
+          case 'redact':
+            if (decision.redactedContent) { deferred.text = decision.redactedContent; }
+            dlpRedacted = true;
+            break;
+          case 'summarize_locally':
+            if (decision.safeSummary) {
+              deferred.text = decision.safeSummary;
+            } else {
+              this.log(`[SecretProtection] Prompt blocked (summarize_locally, no safe summary): ${decision.reason}`);
+              this.postToWebview({
+                type: 'error',
+                message: `Secret protection blocked this prompt: ${decision.reason}`,
+              });
+              return;
+            }
+            dlpRedacted = true;
+            break;
+          case 'warn':
+            this.log(`[SecretProtection] Prompt warning: ${decision.reason}`);
+            break;
         }
       }
     }
 
+    // Side effects only after DLP approved
+    if (text.trim()) {
+      this.achievementService.onUserPrompt(this.tabId, text);
+      if (!dlpRedacted) {
+        void this.promptHistoryStore.addPrompt(text);
+      }
+    }
     const content = this.buildPromptContent(text, normalizedImages);
     this.postUserMessage(content, true);
     this.postToWebview({ type: 'processBusy', busy: true });
 
-    const deferred = this.buildDeferredHandoffPayload(textToSend, { imageCount: normalizedImages?.length ?? 0 });
     try {
       if (normalizedImages) {
         await this.session.sendWithImages(deferred.text, normalizedImages, { steer: !!opts?.steer });
@@ -552,6 +577,23 @@ export class CodexMessageHandler {
             });
           }
           break;
+
+        case 'secretProtectionGetStatus': {
+          void this.sendSecretProtectionStatus();
+          break;
+        }
+        case 'secretProtectionSetSetting': {
+          void this.handleSecretProtectionSetSetting(msg.key, msg.value);
+          break;
+        }
+        case 'secretProtectionGetAuditEvents': {
+          void this.handleSecretProtectionGetAuditEvents(msg.filter, msg.limit);
+          break;
+        }
+        case 'secretProtectionGetComplianceReport': {
+          void this.handleSecretProtectionGetComplianceReport(msg.filter);
+          break;
+        }
 
         case 'requestMemoryStream': {
           this.handleMemoryStreamRequest(msg.enabled, msg.intervalMs);
@@ -969,15 +1011,52 @@ export class CodexMessageHandler {
 
         case 'editAndResend':
           this.clearScheduledPromptState(true);
-          if (msg.text.trim()) {
-            void this.promptHistoryStore.addPrompt(msg.text);
-          }
-          void this.session
-            .clearSession()
-            .then(() => this.session.sendText(msg.text))
-            .catch((err) => {
+          void (async () => {
+            let textToSend = msg.text;
+            if (this.secretProtectionService?.isEnabled() && this.secretProtectionService.getSettings().scanPrompts) {
+              const broker = this.secretProtectionService.getBroker();
+              if (broker) {
+                const decision = await broker.scanPromptSubmission(msg.text);
+                switch (decision.action) {
+                  case 'block':
+                  case 'require_approval':
+                    this.log(`[SecretProtection] Edit-and-resend ${decision.action}: ${decision.reason}`);
+                    this.webview.postMessage({
+                      type: 'error',
+                      message: `Secret protection blocked this prompt: ${decision.reason}`,
+                    });
+                    return;
+                  case 'redact':
+                    if (decision.redactedContent) { textToSend = decision.redactedContent; }
+                    break;
+                  case 'summarize_locally':
+                    if (decision.safeSummary) {
+                      textToSend = decision.safeSummary;
+                    } else {
+                      this.log(`[SecretProtection] Edit-and-resend blocked (no safe summary): ${decision.reason}`);
+                      this.webview.postMessage({
+                        type: 'error',
+                        message: `Secret protection blocked this prompt: ${decision.reason}`,
+                      });
+                      return;
+                    }
+                    break;
+                  case 'warn':
+                    this.log(`[SecretProtection] Edit-and-resend warning: ${decision.reason}`);
+                    break;
+                }
+              }
+            }
+            if (textToSend.trim()) {
+              void this.promptHistoryStore.addPrompt(textToSend);
+            }
+            try {
+              await this.session.clearSession();
+              await this.session.sendText(textToSend);
+            } catch (err) {
               this.webview.postMessage({ type: 'error', message: `Edit-and-resend failed: ${this.errMsg(err)}` });
-            });
+            }
+          })();
           break;
 
         case 'openFeedback':
@@ -1037,6 +1116,9 @@ export class CodexMessageHandler {
               this.logDir,
               apiKey,
             );
+            if (this.secretProtectionService) {
+              this.bugReportService.setSecretProtectionService(this.secretProtectionService);
+            }
             this.bugReportService.startAutoCollection(msg.context);
           })();
           break;
@@ -1412,6 +1494,9 @@ export class CodexMessageHandler {
       if (e.affectsConfiguration('claudeMirror.tabs.layout')) {
         this.sendTabLayoutSetting();
       }
+      if (e.affectsConfiguration('claudeMirror.secretProtection')) {
+        void this.sendSecretProtectionStatus();
+      }
     });
   }
 
@@ -1428,6 +1513,7 @@ export class CodexMessageHandler {
     this.sendCodexServiceTierSetting();
     this.sendTabLayoutSetting();
     this.postScheduledMessageState();
+    void this.sendSecretProtectionStatus();
     void this.sendApiKeySetting();
   }
 
@@ -1490,6 +1576,125 @@ export class CodexMessageHandler {
       scriptPath: config.get<string>('gitPush.scriptPath', 'scripts/git-push.ps1'),
       commitMessageTemplate: config.get<string>('gitPush.commitMessageTemplate', '{sessionName}'),
     });
+  }
+
+  private async sendSecretProtectionStatus(): Promise<void> {
+    const service = this.secretProtectionService;
+    if (!service) {
+      const settings = vscode.workspace.getConfiguration('claudeMirror.secretProtection');
+      this.webview.postMessage({
+        type: 'secretProtectionStatus',
+        enabled: false,
+        settings: {
+          enabled: settings.get<boolean>('enabled', false),
+          mode: settings.get<any>('mode', 'balanced'),
+          blockProtectedPaths: settings.get<boolean>('blockProtectedPaths', true),
+          scanPrompts: settings.get<boolean>('scanPrompts', true),
+          scanTerminalOutput: settings.get<boolean>('scanTerminalOutput', true),
+          scanGitPublication: settings.get<boolean>('scanGitPublication', true),
+          scanMcp: settings.get<boolean>('scanMcp', true),
+          requireBrowserCaptureApproval: settings.get<boolean>('requireBrowserCaptureApproval', true),
+          exceptionMaxMinutes: settings.get<number>('exceptionMaxMinutes', 30),
+          auditRetentionDays: settings.get<number>('auditRetentionDays', 90),
+          enableEntropyScanner: settings.get<boolean>('enableEntropyScanner', false),
+        },
+        auditCount: 0,
+        lastEvent: null,
+      } as any);
+      return;
+    }
+
+    try {
+      const events = await service.readAuditEvents(undefined, 1);
+      const report = await service.getComplianceReport();
+      this.webview.postMessage({
+        type: 'secretProtectionStatus',
+        enabled: service.isEnabled(),
+        settings: service.getSettings(),
+        auditCount: report.stats.totalEvents,
+        lastEvent: events[0] ?? null,
+      });
+    } catch (err) {
+      this.webview.postMessage({
+        type: 'secretProtectionError',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  private async handleSecretProtectionSetSetting(key: string, value: unknown): Promise<void> {
+    const allowed = new Set([
+      'enabled',
+      'mode',
+      'blockProtectedPaths',
+      'scanPrompts',
+      'scanTerminalOutput',
+      'scanGitPublication',
+      'scanMcp',
+      'requireBrowserCaptureApproval',
+      'exceptionMaxMinutes',
+      'auditRetentionDays',
+      'enableEntropyScanner',
+    ]);
+    if (!allowed.has(key)) {
+      this.webview.postMessage({ type: 'secretProtectionError', error: `Unknown Secret Protection setting: ${key}` });
+      return;
+    }
+    try {
+      if (this.secretProtectionService) {
+        await this.secretProtectionService.updateSetting(key as any, value as any);
+      } else {
+        await vscode.workspace
+          .getConfiguration('claudeMirror.secretProtection')
+          .update(key, value, vscode.ConfigurationTarget.Global);
+      }
+      await this.sendSecretProtectionStatus();
+    } catch (err) {
+      this.webview.postMessage({
+        type: 'secretProtectionError',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  private async handleSecretProtectionGetAuditEvents(
+    filter?: import('../../shared/audit/AuditStore').AuditEventFilter,
+    limit?: number,
+  ): Promise<void> {
+    if (!this.secretProtectionService) {
+      this.webview.postMessage({ type: 'secretProtectionAuditEvents', events: [] });
+      return;
+    }
+    try {
+      const events = await this.secretProtectionService.readAuditEvents(filter, limit ?? 100);
+      this.webview.postMessage({ type: 'secretProtectionAuditEvents', events });
+    } catch (err) {
+      this.webview.postMessage({
+        type: 'secretProtectionError',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  private async handleSecretProtectionGetComplianceReport(
+    filter?: import('../../shared/audit/AuditStore').AuditEventFilter,
+  ): Promise<void> {
+    if (!this.secretProtectionService) {
+      this.webview.postMessage({
+        type: 'secretProtectionError',
+        error: 'Secret Protection service is not initialized.',
+      });
+      return;
+    }
+    try {
+      const report = await this.secretProtectionService.getComplianceReport(filter);
+      this.webview.postMessage({ type: 'secretProtectionComplianceReport', report });
+    } catch (err) {
+      this.webview.postMessage({
+        type: 'secretProtectionError',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   private sendCodexModelSetting(): void {
@@ -2055,7 +2260,7 @@ export class CodexMessageHandler {
     return existing ? vscode.Uri.file(existing) : undefined;
   }
 
-  private handleGitPush(): void {
+  private async handleGitPush(): Promise<void> {
     const config = vscode.workspace.getConfiguration('claudeMirror');
     const enabled = config.get<boolean>('gitPush.enabled', true);
 
@@ -2082,6 +2287,68 @@ export class CodexMessageHandler {
     const template = config.get<string>('gitPush.commitMessageTemplate', '{sessionName}');
     const commitMessage = template.replace('{sessionName}', 'Codex session');
     const fullScriptPath = path.resolve(workspaceRoot, scriptPath);
+
+    // DLP: scan tracked changes + untracked sensitive files before pushing
+    if (this.secretProtectionService?.isEnabled() && this.secretProtectionService.getSettings().scanGitPublication) {
+      const broker = this.secretProtectionService.getBroker();
+      if (broker) {
+        try {
+          const execGit = (cmd: string): Promise<string> => new Promise((resolve, reject) => {
+            exec(cmd, { cwd: workspaceRoot, maxBuffer: 1024 * 1024 }, (err, stdout) => {
+              if (err) reject(err); else resolve(stdout);
+            });
+          });
+
+          const [diff, statusOutput] = await Promise.all([
+            execGit('git diff HEAD'),
+            execGit('git status --porcelain -uall'),
+          ]);
+
+          // Build synthetic diff for untracked files with content
+          const untrackedLines = statusOutput.split('\n').filter(l => l.startsWith('?? '));
+          let untrackedDiff = '';
+          const fsModule = require('fs') as typeof import('fs');
+          const pathModule = require('path') as typeof import('path');
+          for (const line of untrackedLines) {
+            const filePath = line.slice(3).trim().replace(/^"(.*)"$/, '$1');
+            untrackedDiff += `diff --git a/${filePath} b/${filePath}\nnew file mode 100644\n--- /dev/null\n+++ b/${filePath}\n`;
+            try {
+              const absPath = pathModule.join(workspaceRoot, filePath);
+              const stat = fsModule.statSync(absPath);
+              if (stat.isFile() && stat.size < 256 * 1024) {
+                const fileContent = fsModule.readFileSync(absPath, 'utf8');
+                const contentLines = fileContent.split('\n').slice(0, 200);
+                untrackedDiff += `@@ -0,0 +1,${contentLines.length} @@\n` + contentLines.map((l: string) => '+' + l).join('\n') + '\n';
+              }
+            } catch {
+              // Can't read file content -- path-only detection still works
+            }
+          }
+
+          const fullDiff = diff + (untrackedDiff ? '\n' + untrackedDiff : '');
+          if (fullDiff.trim()) {
+            const decision = await broker.scanGitPublication(fullDiff, commitMessage);
+            if (decision.action === 'block' || decision.action === 'require_approval') {
+              this.log(`[SecretProtection] Git push blocked (Codex): ${decision.reason}`);
+              this.webview.postMessage({
+                type: 'gitPushResult',
+                success: false,
+                output: `Secret protection blocked this push: ${decision.reason}`,
+              });
+              return;
+            }
+          }
+        } catch (dlpErr) {
+          this.log(`[SecretProtection] Git diff scan error (fail-closed, Codex): ${dlpErr}`);
+          this.webview.postMessage({
+            type: 'gitPushResult',
+            success: false,
+            output: 'Secret protection scan failed (fail-closed). Please try again.',
+          });
+          return;
+        }
+      }
+    }
 
     this.log(`Git push (Codex): running "${fullScriptPath}" with message "${commitMessage}"`);
     execFile(
