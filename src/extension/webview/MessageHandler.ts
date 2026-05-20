@@ -1221,7 +1221,10 @@ export class MessageHandler {
           const decision = await broker.scanPromptSubmission(composedText);
           dlpMetadata = this.dlpMetadataFromDecision(decision);
           const resolved = this.resolveDlpDecision(decision, composedText);
-          if (!resolved) { onSuccess(); return; }
+          if (!resolved) {
+            onSuccess();
+            return;
+          }
           textToSend = resolved;
           dlpRedacted = textToSend !== composedText;
         }
