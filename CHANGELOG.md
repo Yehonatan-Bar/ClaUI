@@ -1,5 +1,108 @@
 # ClaUi - Changelog
 
+## v0.1.173 - 2026-05-24
+
+**Feature: Super Particle Accelerator (SPA) — hook-based secret write guard**
+
+- New security system that intercepts every AI agent write operation (Edit, Write, MultiEdit, Bash, MCP tool calls) and blocks attempts to write secrets into the codebase
+- Installs hooks into both Claude Code (`.claude/settings.json`) and Codex (`.codex/hooks.json`) that run before and after tool operations, scanning for secrets and blocking or auditing operations that contain them
+- **Three-layer architecture**: Runtime layer (standalone Node.js hook scripts, separate webpack target, no VS Code dependencies), Extension layer (lifecycle management, hook install/uninstall, env vars, audit reader, exception management), UI layer (React status badge and settings/audit panel in StatusBar)
+- **Deny-first policy engine** (`SecretWritePolicyEngine`) with 5 waterfall gates: Gate 0 (no findings -> allow), Gate 1 (all placeholders/low-confidence -> allow), Gate 2 (public/client path -> hard deny, no exceptions, ignores audit mode), Gate 3 (gitignored env file + `allowIgnoredEnvFiles` -> audit), Gate 4 (covered by valid exception -> audit), Default (deny or audit based on mode)
+- **Path classification** (`PathClassifier`): classifies file paths into 5 risk categories — `public-client-code`, `generated-public-artifact`, `server-code`, `local-secret-file`, `unknown-repository-file`. Public paths (`public/`, `dist/`, `build/`, `static/`, `client/`, `frontend/`, `web/`, `*.bundle.js`, `*.min.js`) are hard-denied with no exception bypass
+- **Git state scanning** (`GitStateScanner`): scans staged, unstaged, and untracked files; blocks `git add`/`commit`/`push` when secrets are detected; verifies `.env` files are actually gitignored via `git check-ignore` before allowing through Gate 3
+- **Baseline deduplication** (`BaselineStore`): per-session baseline JSON so Stop hook only reports new findings, not pre-existing secrets in the working tree
+- **Exception system** (`ExceptionLoader`, `SpaExceptionStore`): scoped temporary approvals with atomic write and `consumeMany` support
+- **Audit trail** (`AuditWriter`): JSONL audit files at `<storeDir>/audit/YYYY-MM-DD.jsonl` with safe redaction (max 25% revealed, capped at 8 chars, SHA-256 hash of raw value)
+- **Security properties**: Fail-closed on PreToolUse (timeouts/errors produce deny), fail-open on PostToolUse/Stop, large content truncation at 2MB (scanned, not skipped), configurable entropy threshold (default 4.2), SPA hooks ordered before PA hooks
+- **File-based runtime activation**: `runtime-enabled.json` enables mid-session toggling for tabs spawned before SPA was enabled — their env vars are fixed from spawn time but they discover the file-based settings as fallback
+- **Hook events**: PreToolUse (edit/write/bash/mcp, fail-closed), PermissionRequest (Codex Bash, fail-closed), PostToolUse (Bash output, audit-only, fail-open), Stop (working tree scan, baseline-filtered, fail-open)
+- Two entry points: `claude-spa.js` and `codex-spa.js`, built as a fourth webpack target (`super-particle-accelerator-runtime`)
+- 11 VS Code settings under `claudeMirror.superParticleAccelerator.*` (enabled, mode, scanEditTools, scanBashCommands, scanMcpTools, scanWorkingTreeOnStop, blockGitCommitPush, allowIgnoredEnvFiles, entropyThreshold, frontendPathGlobs, allowedSecretFileGlobs). Feature disabled by default
+- 77 tests across 10 test files: policy engine gates, path classification, scanner + redaction, JSONL audit writing, exception loading, baseline store, entropy threshold wiring, runtime settings, gitignore bypass security, large content truncation security
+- New files: 7 extension services in `src/extension/super-particle-accelerator/`, 8 runtime modules in `src/super-particle-accelerator-runtime/` (+ `hooks/`), 2 webview components, 1 shared types file
+- New detail doc: `Kingdom_of_Claudes_Beloved_MDs/SUPER_PARTICLE_ACCELERATOR.md`
+
+**Feature: Secret Protection Demo — comprehensive test suite for secret detection**
+
+- End-to-end demo test runner (`run-demo-test.ts`) that exercises all scanner, policy engine, and redaction layers against 15+ categorized fixture files
+- **Fixture categories**: code files (hardcoded secrets, config with credentials, connection strings, GCP service accounts), git files (staged secrets diffs, credential output), PII files (user data, payment data, internal network references), command files (exfiltration, risky, safe), clean files (benign URLs, normal code, public config, readme text), crypto (fake JWT tokens), protected paths
+- HTML report generator (`generate-html-report.ts`) produces a visual summary of all scan results with per-fixture breakdown, finding counts, and redaction samples
+- Test manifest (`fixtures/manifest.json`) with 621 lines defining expected findings per fixture for regression testing
+- `results/` directory with `.gitignore` for generated output
+
+---
+
+## v0.1.171 - 2026-05-22
+
+**Feature: Secret Protection Broker — multi-boundary DLP system**
+
+- Comprehensive data loss prevention layer that protects 13 boundaries where secrets can leak from an AI coding agent session: prompt submission, context attachment, file reads, command preflight/output, git diff/publish, MCP request/response, browser capture, persistence writes, telemetry/diagnostic export
+- **Destination-aware policy**: the correct action (block, redact, warn, allow) depends on the destination kind — 9 destination types: `local_agent`, `remote_model_provider`, `terminal_stdout_to_agent`, `local_disk`, `git_remote`, `mcp_server`, `browser_context`, `telemetry_backend`, `diagnostic_export`
+
+**6 scanners** (`src/shared/secret-protection/scanners/`):
+
+- `CompositeSecretScanner` — orchestrator that runs all sub-scanners and deduplicates findings
+- `RegexRuleScanner` — 14 rule packs covering AWS/Azure/GCP cloud secrets, GitHub/OpenAI/Anthropic/Slack/Stripe provider keys, private keys, git credentials, exfiltration commands, internal network topology, PII, protected paths
+- `EntropyScanner` — Shannon entropy analysis for high-entropy strings that may be secrets, with configurable threshold
+- `EnvValueScanner` — matches environment variable values against content
+- `PathSensitivityClassifier` — classifies file paths by sensitivity (`.env`, `.pem`, `.key`, `.ssh/`, `.aws/`)
+- `PiiAndInternalTopologyScanner` — detects internal hostnames, IP ranges, and personally identifiable information
+- `StructuredPayloadScanner` — detects secrets inside JSON, YAML, and structured payloads; includes browser capture detection for Codex sessions
+
+**Core engines**:
+
+- `PolicyEngine` — destination-aware decision matrix that maps (finding severity x destination trust tier) to action (block/redact/warn/allow)
+- `RedactionEngine` — produces structured `<REDACTED type="..." id="sec_xxxx" source="..." length="..." />` tokens with safe partial reveal
+- `AuditEventWriter` — append-only JSONL audit with no raw secret values (only hashes, rule IDs, counts)
+- `CommandRiskClassifier` — classifies shell commands into risk classes (network_upload, credential_discovery, data_exfiltration) with severity and approval requirements
+- `DestinationClassifier` — maps runtime context to destination kind and trust tier
+- `ApprovalEngine` — interactive approval flow for medium-risk operations with scoped temporary exceptions
+- `ComplianceReporter` — generates summary reports from audit log data
+
+**4 boundary scanners**:
+
+- `ExtensionOutboundScanner` — scans extension-to-model traffic (prompt assembly, context injection)
+- `ServerOutboundScanner` — scans server-side payloads (multi-participant session routing)
+- `GitPublicationScanner` — scans git diff/add/commit/push for secrets before publication to remotes
+- `WebviewOutboundScanner` — scans webview-originated content (browser captures, user prompt text)
+
+**UI surfaces**:
+
+- `SecretProtectionStatusBadge` in StatusBar showing DLP status
+- `SettingsPanel` with DLP mode selector (off/observe/balanced/strict) and boundary toggles
+- `AuditLogPanel` showing audit events with timeline and filtering
+- `OutboundManifestPanel` showing outbound content manifest
+- Message-level DLP badges: "Secrets" badge when `secretsDetected` is true, "Redacted" badge when `redactionApplied` is true, rendered on `MessageBubble`
+- Codex sessions receive DLP instructions explaining `<REDACTED ... />` tokens
+
+**Configuration**: 11 VS Code settings under `claudeMirror.secretProtection.*` (enabled, mode, blockProtectedPaths, scanPrompts, scanTerminalOutput, scanGitPublication, scanMcp, requireBrowserCaptureApproval, exceptionMaxMinutes, auditRetentionDays, enableEntropyScanner). Optional project-level policy at `.claui/secret-protection.policy.json`
+
+- 30+ tests across scanners, policy engine, redaction engine, audit writer, approval engine, Git publication, multi-way redaction, backward compatibility
+- New detail docs: `Kingdom_of_Claudes_Beloved_MDs/SECRET_PROTECTION_BROKER.md`, `Kingdom_of_Claudes_Beloved_MDs/DLP_SETUP.md`
+
+**Feature: Workstream Map — Git commit ingestor**
+
+- New `GitCommitIngestor` that reads recent git commits and feeds them into the Workstream Map classification pipeline, providing richer session-to-workstream mapping based on actual code changes
+
+**Improvement: Particle Accelerator hook enhancements**
+
+- PA pre-tool-use hooks for both Claude and Codex now integrate with the Secret Protection Broker, scanning tool arguments for secrets before allowing execution
+- Codex PermissionRequest hook added for Bash commands
+- Codex `codex exec` now receives DLP-related system instructions when Secret Protection is enabled
+
+**Improvement: Documentation archive reorganization**
+
+- Moved obsolete plan documents, duplicate folder copies, and completed implementation plans into `Kingdom_of_Claudes_Beloved_MDs/Archive/` with subdirectories for `duplicate-folders/`, `html-content/`, and `plans/`
+- Added `Archive/README.md` explaining the archive structure
+- Generated `DOCS_AUDIT_REPORT_2026-05-19.md` documenting the cleanup decisions
+
+**Improvement: Model display updates**
+
+- Claude model display labels updated: `claude-opus-4-6` renders as `Opus 4.6` (previously showed raw model ID)
+- Codex model selector and Smart Search view updated to use consistent display normalization
+
+---
+
 ## v0.1.167 - 2026-05-19
 
 **Feature: Vertical Tab Rail enhancements**

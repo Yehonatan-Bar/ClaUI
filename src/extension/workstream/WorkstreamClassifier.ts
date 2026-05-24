@@ -215,13 +215,9 @@ export class WorkstreamClassifier {
       : '';
 
     const existingBlock = existingState?.workstreams.length
-      ? `\n\nExisting workstreams (preserve ONLY the "id" field for continuity -- RE-GENERATE labels, goals, and types from scratch based on actual session content. Do NOT copy or anchor on the previous label):\n${existingState.workstreams.map(w => JSON.stringify({
+      ? `\n\nExisting workstreams (preserve ONLY the "id" field for continuity -- RE-GENERATE labels, goals, and types from scratch based on actual session content):\n${existingState.workstreams.map(w => JSON.stringify({
           id: w.id,
-          previousLabel: w.label,
-          type: w.type,
-          status: w.status,
           sessionIds: w.sessionIds,
-          confidence: w.confidence,
         })).join('\n')}`
       : '';
 
