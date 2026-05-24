@@ -1,0 +1,24 @@
+src/super-particle-accelerator-runtime/hooks/claudeSuperParticleAccelerator.ts:21:const MAX_SCAN_BYTES = 2 * 1024 * 1024;
+src/super-particle-accelerator-runtime/hooks/claudeSuperParticleAccelerator.ts:42:  if (markerIdx === -1 || markerIdx + 1 >= process.argv.length) {
+src/super-particle-accelerator-runtime/hooks/claudeSuperParticleAccelerator.ts:175:  if (!content || content.length > MAX_SCAN_BYTES) return allow();
+src/super-particle-accelerator-runtime/hooks/claudeSuperParticleAccelerator.ts:205:  if (decision.consumedExceptionIds.length > 0) {
+src/super-particle-accelerator-runtime/hooks/claudeSuperParticleAccelerator.ts:241:    if (allFindings.length > 0) {
+src/super-particle-accelerator-runtime/hooks/claudeSuperParticleAccelerator.ts:274:    if (findings.length > 0) {
+src/super-particle-accelerator-runtime/hooks/claudeSuperParticleAccelerator.ts:312:  if (!text || text.length > MAX_SCAN_BYTES) return allow();
+src/super-particle-accelerator-runtime/hooks/claudeSuperParticleAccelerator.ts:322:  if (findings.length === 0) return allow();
+src/super-particle-accelerator-runtime/hooks/claudeSuperParticleAccelerator.ts:395:    if (output.length > MAX_SCAN_BYTES) return allow();
+src/super-particle-accelerator-runtime/hooks/claudeSuperParticleAccelerator.ts:404:    if (findings.length > 0) {
+src/super-particle-accelerator-runtime/hooks/claudeSuperParticleAccelerator.ts:454:  if (newFindings.length === 0) {
+src/super-particle-accelerator-runtime/hooks/claudeSuperParticleAccelerator.ts:471:  if (decision.consumedExceptionIds.length > 0) {
+src/super-particle-accelerator-runtime/hooks/codexSuperParticleAccelerator.ts:20:const MAX_SCAN_BYTES = 2 * 1024 * 1024;
+src/super-particle-accelerator-runtime/hooks/codexSuperParticleAccelerator.ts:41:  if (markerIdx === -1 || markerIdx + 1 >= process.argv.length) {
+src/super-particle-accelerator-runtime/hooks/codexSuperParticleAccelerator.ts:190:    if (!content || content.length > MAX_SCAN_BYTES) return allow();
+src/super-particle-accelerator-runtime/hooks/codexSuperParticleAccelerator.ts:209:    if (decision.consumedExceptionIds.length > 0) exceptionLoader.consumeMany(decision.consumedExceptionIds);
+src/super-particle-accelerator-runtime/hooks/codexSuperParticleAccelerator.ts:230:      if (allFindings.length > 0) {
+src/super-particle-accelerator-runtime/hooks/codexSuperParticleAccelerator.ts:248:      if (findings.length > 0) {
+src/super-particle-accelerator-runtime/hooks/codexSuperParticleAccelerator.ts:267:    if (!text || text.length > MAX_SCAN_BYTES) return allow();
+src/super-particle-accelerator-runtime/hooks/codexSuperParticleAccelerator.ts:273:    if (findings.length === 0) return allow();
+src/super-particle-accelerator-runtime/hooks/codexSuperParticleAccelerator.ts:300:    if (output.length > MAX_SCAN_BYTES) return allow();
+src/super-particle-accelerator-runtime/hooks/codexSuperParticleAccelerator.ts:309:    if (findings.length > 0) {
+src/super-particle-accelerator-runtime/hooks/codexSuperParticleAccelerator.ts:359:  if (newFindings.length === 0) {
+src/super-particle-accelerator-runtime/hooks/codexSuperParticleAccelerator.ts:372:  if (decision.consumedExceptionIds.length > 0) {

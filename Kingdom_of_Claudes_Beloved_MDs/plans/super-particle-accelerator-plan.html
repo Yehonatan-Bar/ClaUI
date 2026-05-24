@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Particle Accelerator - Plan</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+            background: #0f1117;
+            color: #e0e0e0;
+            line-height: 1.7;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            padding: 40px 30px;
+            background: linear-gradient(135deg, #1a1d2e 0%, #0d1117 100%);
+            border: 1px solid #30363d;
+            border-radius: 16px;
+        }
+        .header h1 {
+            font-size: 2em;
+            color: #58a6ff;
+            margin-bottom: 12px;
+        }
+        .header .subtitle {
+            font-size: 1.1em;
+            color: #8b949e;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-top: 12px;
+        }
+        .badge-security { background: #1f3a2a; color: #3fb950; border: 1px solid #2d5a3a; }
+        .badge-new { background: #2a1f3a; color: #a371f7; border: 1px solid #3a2d5a; }
+
+        .section {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+        .section-header {
+            padding: 18px 24px;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .section-header .icon {
+            font-size: 1.4em;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+        }
+        .icon-bg { background: #1f3a2a; }
+        .icon-problem { background: #3a1f1f; }
+        .icon-solution { background: #1f2d3a; }
+        .icon-flow { background: #2a2a1f; }
+        .icon-scope { background: #2a1f3a; }
+        .icon-ui { background: #1f3a3a; }
+        .icon-risk { background: #3a2a1f; }
+        .icon-test { background: #1f3a2d; }
+
+        .section-header h2 {
+            font-size: 1.25em;
+            color: #e6edf3;
+        }
+        .section-body {
+            padding: 20px 24px;
+        }
+        .section-body p {
+            margin-bottom: 14px;
+            color: #c9d1d9;
+        }
+        .section-body ul {
+            padding-right: 20px;
+            margin-bottom: 14px;
+        }
+        .section-body li {
+            margin-bottom: 8px;
+            color: #c9d1d9;
+        }
+
+        .highlight-box {
+            background: #1c2333;
+            border-right: 4px solid #58a6ff;
+            padding: 16px 20px;
+            border-radius: 0 8px 8px 0;
+            margin: 16px 0;
+        }
+        .highlight-box.warning {
+            border-right-color: #d29922;
+            background: #2a2318;
+        }
+        .highlight-box.danger {
+            border-right-color: #f85149;
+            background: #2a1818;
+        }
+        .highlight-box.success {
+            border-right-color: #3fb950;
+            background: #1a2a1f;
+        }
+
+        .flow-diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 16px 0;
+        }
+        .flow-step {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .flow-number {
+            width: 32px;
+            height: 32px;
+            background: #1f6feb;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+            flex-shrink: 0;
+        }
+        .flow-text {
+            color: #c9d1d9;
+        }
+        .flow-arrow {
+            width: 32px;
+            text-align: center;
+            color: #484f58;
+            font-size: 1.2em;
+            flex-shrink: 0;
+        }
+
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin: 16px 0;
+        }
+        .col-card {
+            background: #1c2333;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .col-card h4 {
+            color: #58a6ff;
+            margin-bottom: 8px;
+            font-size: 1em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+        th {
+            background: #1c2333;
+            color: #58a6ff;
+            padding: 12px 16px;
+            text-align: right;
+            font-weight: 600;
+            border-bottom: 2px solid #30363d;
+        }
+        td {
+            padding: 10px 16px;
+            border-bottom: 1px solid #21262d;
+            color: #c9d1d9;
+        }
+        tr:hover td {
+            background: #1c2333;
+        }
+
+        .status-tag {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+        .tag-block { background: #3a1f1f; color: #f85149; }
+        .tag-allow { background: #1f3a2a; color: #3fb950; }
+        .tag-audit { background: #2a2a1f; color: #d29922; }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #484f58;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 640px) {
+            .two-col { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.5em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <h1>Super Particle Accelerator</h1>
+            <div class="subtitle">שכבת הגנה נוספת - מניעת חשיפת מפתחות וסודות בקוד על-ידי סוכני AI</div>
+            <div>
+                <span class="badge badge-security">אבטחת מידע</span>
+                <span class="badge badge-new">יכולת חדשה</span>
+            </div>
+        </div>
+
+        <!-- Background -->
+        <div class="section">
+            <div class="section-header">
+                <div class="icon icon-problem">!</div>
+                <h2>הרקע - מה קרה ולמה זה נדרש</h2>
+            </div>
+            <div class="section-body">
+                <p>בתקרית אבטחה שהתגלתה, מפתחות Google API (עבור שירותי Text-to-Speech ו-Gemini) הוטמעו ישירות בקוד שנשלח לדפדפן. סורקים אוטומטיים אספו את המפתחות החשופים, וההדלפה נמצאה גם בהיסטוריית ה-Git.</p>
+
+                <div class="highlight-box danger">
+                    <strong>הבעיה המרכזית:</strong> סוכני AI (כמו Claude ו-Codex) כותבים קוד בצורה אוטומטית, ובלי מנגנון בקרה הם עלולים להטמיע מפתחות ישירות בקבצי קוד ציבוריים - במיוחד בקוד צד-לקוח שנחשף לדפדפן.
+                </div>
+
+                <div class="highlight-box warning">
+                    <strong>הבהרה חשובה:</strong> התכונה הזו היא הגנה נוספת (Defense-in-Depth) ולא תחליף לארכיטקטורה נכונה. עדיין נדרש: שרת פרוקסי צד-שרת, הגבלות על מפתחות API, סריקות CI, סיבוב מפתחות ועוד.
+                </div>
+            </div>
+        </div>
+
+        <!-- What it does -->
+        <div class="section">
+            <div class="section-header">
+                <div class="icon icon-solution">*</div>
+                <h2>מה התכונה עושה</h2>
+            </div>
+            <div class="section-body">
+                <p>Super Particle Accelerator היא מערכת שמרת שמפקחת בזמן אמת על כל פעולת כתיבה של סוכני AI, ומונעת מהם לשתול מפתחות, טוקנים, סיסמאות או סודות אחרים בקוד המקור.</p>
+
+                <div class="two-col">
+                    <div class="col-card">
+                        <h4>מה נחסם</h4>
+                        <ul>
+                            <li>כתיבת מפתחות API לקבצי קוד</li>
+                            <li>הטמעת סודות בקוד צד-לקוח</li>
+                            <li>Commit או Push עם סודות</li>
+                            <li>פקודות שכותבות סודות לקבצים</li>
+                            <li>כלי MCP שמעבירים סודות</li>
+                        </ul>
+                    </div>
+                    <div class="col-card">
+                        <h4>מה מותר</h4>
+                        <ul>
+                            <li>כתיבה לקובץ .env.local (אם מוגדר ב-gitignore)</li>
+                            <li>שימוש ב-placeholders כמו "YOUR_KEY_HERE"</li>
+                            <li>קריאת קוד ופקודות read-only</li>
+                            <li>חריגים מוגדרים מראש (מוגבלים בזמן)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- How it works -->
+        <div class="section">
+            <div class="section-header">
+                <div class="icon icon-flow">~</div>
+                <h2>איך זה עובד - זרימת העבודה</h2>
+            </div>
+            <div class="section-body">
+                <p>המערכת מתערבת ב-5 נקודות מפתח בתהליך העבודה של הסוכן:</p>
+
+                <div class="flow-diagram">
+                    <div class="flow-step">
+                        <div class="flow-number">1</div>
+                        <div class="flow-text"><strong>לפני עריכת קובץ:</strong> סריקת התוכן המוצע לפני שהקובץ נכתב בפועל</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-arrow">|</div>
+                        <div></div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">2</div>
+                        <div class="flow-text"><strong>לפני פקודת Shell:</strong> בדיקה שהפקודה לא כותבת סוד ישירות לקובץ</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-arrow">|</div>
+                        <div></div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">3</div>
+                        <div class="flow-text"><strong>לפני Commit/Push:</strong> סריקת כל השינויים שעומדים להיכנס ל-Git</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-arrow">|</div>
+                        <div></div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">4</div>
+                        <div class="flow-text"><strong>לפני פעולות MCP:</strong> סריקת כלים חיצוניים שמבצעים כתיבה</div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-arrow">|</div>
+                        <div></div>
+                    </div>
+                    <div class="flow-step">
+                        <div class="flow-number">5</div>
+                        <div class="flow-text"><strong>בסיום תור (Stop):</strong> סריקה כוללת של כל הקבצים שהשתנו - רשת ביטחון אחרונה</div>
+                    </div>
+                </div>
+
+                <div class="highlight-box success">
+                    <strong>כשמזוהה סוד:</strong> הפעולה נחסמת, הסוכן מקבל הנחיות ברורות להעביר את המפתח לצד-שרת ולהשתמש בפרוקסי, ואירוע ביקורת נרשם (בלי הסוד עצמו).
+                </div>
+            </div>
+        </div>
+
+        <!-- Secret Types -->
+        <div class="section">
+            <div class="section-header">
+                <div class="icon icon-scope">?</div>
+                <h2>אילו סוגי סודות מזוהים</h2>
+            </div>
+            <div class="section-body">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>סוג הסוד</th>
+                            <th>דוגמה</th>
+                            <th>רמת סיכון</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>מפתחות Google API</td>
+                            <td>AIzaSy...</td>
+                            <td><span class="status-tag tag-block">קריטי</span></td>
+                        </tr>
+                        <tr>
+                            <td>מפתחות OpenAI</td>
+                            <td>sk-proj-...</td>
+                            <td><span class="status-tag tag-block">קריטי</span></td>
+                        </tr>
+                        <tr>
+                            <td>מפתחות Anthropic</td>
+                            <td>sk-ant-...</td>
+                            <td><span class="status-tag tag-block">קריטי</span></td>
+                        </tr>
+                        <tr>
+                            <td>טוקנים של GitHub</td>
+                            <td>ghp_... / github_pat_...</td>
+                            <td><span class="status-tag tag-block">קריטי</span></td>
+                        </tr>
+                        <tr>
+                            <td>מפתחות AWS</td>
+                            <td>AKIA...</td>
+                            <td><span class="status-tag tag-block">קריטי</span></td>
+                        </tr>
+                        <tr>
+                            <td>JWT טוקנים</td>
+                            <td>eyJ...</td>
+                            <td><span class="status-tag tag-block">גבוה</span></td>
+                        </tr>
+                        <tr>
+                            <td>מפתחות Azure</td>
+                            <td>connection strings</td>
+                            <td><span class="status-tag tag-block">גבוה</span></td>
+                        </tr>
+                        <tr>
+                            <td>מפתחות פרטיים</td>
+                            <td>-----BEGIN PRIVATE KEY-----</td>
+                            <td><span class="status-tag tag-block">קריטי</span></td>
+                        </tr>
+                        <tr>
+                            <td>כתובות מסד נתונים עם סיסמאות</td>
+                            <td>postgres://user:pass@...</td>
+                            <td><span class="status-tag tag-block">גבוה</span></td>
+                        </tr>
+                        <tr>
+                            <td>מחרוזות אנטרופיה גבוהה</td>
+                            <td>ערכים שנראים כמו סודות</td>
+                            <td><span class="status-tag tag-audit">בינוני</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Modes -->
+        <div class="section">
+            <div class="section-header">
+                <div class="icon icon-ui">#</div>
+                <h2>מצבי פעולה</h2>
+            </div>
+            <div class="section-body">
+                <div class="two-col">
+                    <div class="col-card">
+                        <h4>מצב חסימה (Block) - ברירת מחדל</h4>
+                        <ul>
+                            <li>חוסם פעולות שמכילות סודות</li>
+                            <li>הסוכן מקבל הנחיית תיקון</li>
+                            <li>הקובץ לא משתנה</li>
+                            <li>אירוע ביקורת נרשם</li>
+                        </ul>
+                    </div>
+                    <div class="col-card">
+                        <h4>מצב ביקורת (Audit)</h4>
+                        <ul>
+                            <li>לא חוסם - רק מתעד</li>
+                            <li>מתאים לתקופת הרצה ראשונית</li>
+                            <li>מאפשר להבין את היקף הבעיה</li>
+                            <li>כל אירוע נרשם לביקורת</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="highlight-box">
+                    <strong>המלצה:</strong> להתחיל במצב Audit למשך שבוע כדי להבין את היקף הזיהויים ולוודא שאין false positives, ואז לעבור למצב Block.
+                </div>
+            </div>
+        </div>
+
+        <!-- Coverage -->
+        <div class="section">
+            <div class="section-header">
+                <div class="icon icon-scope">+</div>
+                <h2>כיסוי - אילו סוכנים נתמכים</h2>
+            </div>
+            <div class="section-body">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>סוכן</th>
+                            <th>עריכת קבצים</th>
+                            <th>פקודות Shell</th>
+                            <th>Git</th>
+                            <th>כלי MCP</th>
+                            <th>סריקת סיום</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Claude Code</strong></td>
+                            <td><span class="status-tag tag-allow">V</span></td>
+                            <td><span class="status-tag tag-allow">V</span></td>
+                            <td><span class="status-tag tag-allow">V</span></td>
+                            <td><span class="status-tag tag-allow">V</span></td>
+                            <td><span class="status-tag tag-allow">V</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Codex</strong></td>
+                            <td><span class="status-tag tag-allow">V</span></td>
+                            <td><span class="status-tag tag-allow">V</span></td>
+                            <td><span class="status-tag tag-allow">V</span></td>
+                            <td><span class="status-tag tag-allow">V</span></td>
+                            <td><span class="status-tag tag-allow">V</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="highlight-box warning">
+                    <strong>מגבלה ידועה:</strong> התכונה מכסה את רוב נתיבי הכתיבה המוכרים, אך לא מבטיחה מניעה מוחלטת ב-100% מהמקרים. זו שכבת הגנה נוספת, לא תחליף לארכיטקטורה בטוחה.
+                </div>
+            </div>
+        </div>
+
+        <!-- User Experience -->
+        <div class="section">
+            <div class="section-header">
+                <div class="icon icon-ui">~</div>
+                <h2>חוויית המשתמש</h2>
+            </div>
+            <div class="section-body">
+                <p><strong>הפעלה:</strong> מתג נפרד בהגדרות התוסף, עצמאי לחלוטין מה-Particle Accelerator הקיים.</p>
+
+                <p><strong>סטטוסים שיוצגו:</strong></p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>סטטוס</th>
+                            <th>משמעות</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>מופעל - מגן על Claude ו-Codex</td>
+                            <td>הכל תקין, ההגנה פעילה</td>
+                        </tr>
+                        <tr>
+                            <td>מופעל - נדרש אישור ב-Codex</td>
+                            <td>ה-hooks של Codex דורשים אישור ידני</td>
+                        </tr>
+                        <tr>
+                            <td>מופעל - כיסוי חלקי</td>
+                            <td>חלק מה-hooks לא מותקנים</td>
+                        </tr>
+                        <tr>
+                            <td>מושבת</td>
+                            <td>התכונה כבויה - אין הגנה</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p><strong>מה הסוכן רואה כשנחסם:</strong></p>
+                <div class="highlight-box">
+                    הפעולה נחסמה על-ידי Super Particle Accelerator. זוהה מפתח API שעמד להיכתב לקובץ צד-לקוח. יש להעביר את המפתח למשתנה סביבה בצד השרת, ולחשוף רק נקודת קצה של פרוקסי לדפדפן.
+                </div>
+            </div>
+        </div>
+
+        <!-- Audit -->
+        <div class="section">
+            <div class="section-header">
+                <div class="icon icon-test">=</div>
+                <h2>ביקורת ותיעוד</h2>
+            </div>
+            <div class="section-body">
+                <p>כל אירוע (חסימה או זיהוי) נרשם בקובץ יומי מאובטח. כלל ברזל: <strong>הסוד עצמו אף פעם לא נשמר</strong> - רק גרסה מצונזרת ו-hash.</p>
+
+                <p>כל רשומת ביקורת מכילה:</p>
+                <ul>
+                    <li>מתי זה קרה</li>
+                    <li>איזה סוכן (Claude/Codex)</li>
+                    <li>איזה כלי ניסה לכתוב</li>
+                    <li>לאיזה קובץ</li>
+                    <li>סוג הסוד שזוהה</li>
+                    <li>האם נחסם או רק תועד</li>
+                    <li>תצוגה מצונזרת: AIzaSyA***xYz</li>
+                </ul>
+
+                <div class="highlight-box danger">
+                    <strong>כלל אבטחה קריטי:</strong> הסוד עצמו לא יופיע בשום מקום - לא ביומנים, לא בממשק, לא בהודעות לסוכן, לא בהיסטוריה. רק תצוגה מצונזרת וערך hash.
+                </div>
+            </div>
+        </div>
+
+        <!-- Exceptions -->
+        <div class="section">
+            <div class="section-header">
+                <div class="icon icon-risk">!</div>
+                <h2>חריגים מנוהלים</h2>
+            </div>
+            <div class="section-body">
+                <p>במקרים מוצדקים, ניתן ליצור חריגים מבוקרים. כל חריג חייב לעמוד בתנאים:</p>
+                <ul>
+                    <li><strong>מוגבל בזמן</strong> - תוקף שפג אוטומטית</li>
+                    <li><strong>מוגבל לקובץ ספציפי</strong> - לא חריג כללי</li>
+                    <li><strong>מוגבל לסוד ספציפי</strong> - לפי hash</li>
+                    <li><strong>עם הגבלת שימושים</strong> - מספר מקסימלי של פעמים</li>
+                    <li><strong>לא חל על קוד ציבורי</strong> - אלא אם אושר במפורש</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Performance -->
+        <div class="section">
+            <div class="section-header">
+                <div class="icon icon-flow">></div>
+                <h2>ביצועים והשפעה על זרימת עבודה</h2>
+            </div>
+            <div class="section-body">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>מדד</th>
+                            <th>יעד</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>זמן סריקה לעריכה קטנה</td>
+                            <td>פחות מ-300 מילישניות</td>
+                        </tr>
+                        <tr>
+                            <td>Timeout מקסימלי</td>
+                            <td>5 שניות</td>
+                        </tr>
+                        <tr>
+                            <td>גודל קלט מקסימלי לסריקה</td>
+                            <td>2MB לכל קריאה</td>
+                        </tr>
+                        <tr>
+                            <td>סריקת סיום תור</td>
+                            <td>עד 20MB של שינויים</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="highlight-box">
+                    <strong>עיקרון "כשל בטוח":</strong> אם הסורק נכשל, פעולות כתיבה נחסמות (עדיף לחסום בטעות מאשר לפספס סוד), אבל פעולות קריאה בלבד ממשיכות כרגיל.
+                </div>
+            </div>
+        </div>
+
+        <!-- What it doesn't replace -->
+        <div class="section">
+            <div class="section-header">
+                <div class="icon icon-risk">X</div>
+                <h2>מה התכונה לא מחליפה</h2>
+            </div>
+            <div class="section-body">
+                <p>חשוב להבין - זו שכבת הגנה נוספת. עדיין נדרשים:</p>
+                <ul>
+                    <li><strong>ארכיטקטורת פרוקסי צד-שרת</strong> - מפתחות חייבים להישאר בצד השרת</li>
+                    <li><strong>הגבלות על מפתחות API</strong> - הגבלת IP, referrer, scope</li>
+                    <li><strong>סריקות CI</strong> - gitleaks, truffleHog וכו'</li>
+                    <li><strong>Pre-commit hooks</strong> - שכבת הגנה ב-Git עצמו</li>
+                    <li><strong>התראות תקציב</strong> - לזיהוי שימוש חריג</li>
+                    <li><strong>סיבוב מפתחות</strong> - החלפה תקופתית</li>
+                    <li><strong>מפתחות עם הרשאות מינימליות</strong> - least-privilege</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="section">
+            <div class="section-header">
+                <div class="icon icon-bg">=</div>
+                <h2>סיכום</h2>
+            </div>
+            <div class="section-body">
+                <div class="highlight-box success">
+                    <strong>Super Particle Accelerator</strong> מוסיף שכבת הגנה אוטומטית שמונעת מסוכני AI לכתוב מפתחות וסודות לקוד. התכונה פועלת בשקיפות, לא משנה את זרימת העבודה הרגילה, ומספקת תיעוד מלא של כל אירוע - תוך שמירה קפדנית שהסודות עצמם לעולם לא נשמרים.
+                </div>
+
+                <p><strong>השלבים הבאים:</strong></p>
+                <ul>
+                    <li>פיתוח מנוע הסריקה וזיהוי הסודות</li>
+                    <li>בניית מנוע המדיניות (חסימה/אישור)</li>
+                    <li>התקנת hooks ב-Claude Code וב-Codex</li>
+                    <li>ממשק משתמש - מתג הפעלה וסטטוס</li>
+                    <li>מערכת ביקורת ותיעוד</li>
+                    <li>בדיקות מקיפות</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer">
+            Super Particle Accelerator - ClaUi Extension | 2026
+        </div>
+    </div>
+</body>
+</html>

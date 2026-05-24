@@ -871,6 +871,20 @@ export interface AppState {
   setParticleAcceleratorRecentTraces: (traces: AppState['particleAcceleratorRecentTraces']) => void;
   setParticleAcceleratorError: (error: string | null) => void;
 
+  // Super Particle Accelerator
+  superParticleAcceleratorEnabled: boolean;
+  superParticleAcceleratorMode: 'block' | 'audit';
+  superParticleAcceleratorStatus: string;
+  superParticleAcceleratorAuditEvents: Array<{ id: string; timestamp: string; provider: string; toolName: string; source: string; action: string; reason: string; filePath?: string; findings: Array<{ ruleId: string; type: string; severity: string; confidence: string; valueSha256: string; redactedPreview: string; line?: number }> }>;
+  superParticleAcceleratorLastEvent?: { action: string };
+  superParticleAcceleratorError?: string;
+  superParticleAcceleratorPanelOpen: boolean;
+  setSuperParticleAcceleratorPanelOpen: (open: boolean) => void;
+  setSuperParticleAcceleratorStatus: (status: string, enabled: boolean, mode: 'block' | 'audit') => void;
+  setSuperParticleAcceleratorAuditEvents: (events: AppState['superParticleAcceleratorAuditEvents']) => void;
+  setSuperParticleAcceleratorLastEvent: (event: { action: string }) => void;
+  setSuperParticleAcceleratorError: (error: string | undefined) => void;
+
   reset: () => void;
 }
 
@@ -2790,6 +2804,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   setParticleAcceleratorRecentTraces: (traces) => set({ particleAcceleratorRecentTraces: traces.slice(0, 100) }),
   setParticleAcceleratorError: (error) => set({ particleAcceleratorError: error }),
 
+  // Super Particle Accelerator
+  superParticleAcceleratorEnabled: false,
+  superParticleAcceleratorMode: 'block' as const,
+  superParticleAcceleratorStatus: 'disabled',
+  superParticleAcceleratorAuditEvents: [],
+  superParticleAcceleratorLastEvent: undefined,
+  superParticleAcceleratorError: undefined,
+  superParticleAcceleratorPanelOpen: false,
+  setSuperParticleAcceleratorPanelOpen: (open: boolean) => set({ superParticleAcceleratorPanelOpen: open }),
+  setSuperParticleAcceleratorStatus: (status: string, enabled: boolean, mode: 'block' | 'audit') => set({
+    superParticleAcceleratorStatus: status,
+    superParticleAcceleratorEnabled: enabled,
+    superParticleAcceleratorMode: mode,
+  }),
+  setSuperParticleAcceleratorAuditEvents: (events: AppState['superParticleAcceleratorAuditEvents']) => set({ superParticleAcceleratorAuditEvents: events }),
+  setSuperParticleAcceleratorLastEvent: (event: { action: string }) => set({ superParticleAcceleratorLastEvent: event }),
+  setSuperParticleAcceleratorError: (error: string | undefined) => set({ superParticleAcceleratorError: error }),
+
   reset: () =>
     set((state) => ({
       sessionId: null,
@@ -2894,6 +2926,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       secretProtectionPanelOpen: false,
       secretProtectionAuditLoading: false,
       secretProtectionAuditError: null,
+      superParticleAcceleratorPanelOpen: false,
       isEnhancing: false,
       enhancerPopoverOpen: false,
       enhanceComparisonData: null,

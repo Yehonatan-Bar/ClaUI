@@ -65,7 +65,10 @@ export class CompositeSecretScanner implements ISecretScanner {
 
     this.scanners.push(new EnvValueScanner());
     this.scanners.push(new RegexRuleScanner(packs));
-    this.scanners.push(new EntropyScanner({ enabled: settings.enableEntropyScanner }));
+    this.scanners.push(new EntropyScanner({
+      enabled: settings.enableEntropyScanner,
+      threshold: settings.entropyThreshold,
+    }));
 
     if (settings.blockProtectedPaths) {
       this.scanners.push(new PathSensitivityClassifier());

@@ -25,6 +25,7 @@ import { WorkstreamManager } from './workstream/WorkstreamManager';
 import { UserPortfolioManager } from './workstream/UserPortfolioManager';
 import { ParticleAcceleratorService } from './particle-accelerator/ParticleAcceleratorService';
 import { SecretProtectionService } from './secret-protection/SecretProtectionService';
+import { SuperParticleAcceleratorService } from './super-particle-accelerator/SuperParticleAcceleratorService';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -157,6 +158,11 @@ export function activate(context: vscode.ExtensionContext): void {
   void secretProtectionService.initialize();
   context.subscriptions.push(secretProtectionService);
 
+  // Create Super Particle Accelerator service (blocks AI agents from writing secrets)
+  const superParticleAcceleratorService = new SuperParticleAcceleratorService(context);
+  void superParticleAcceleratorService.initialize();
+  context.subscriptions.push(superParticleAcceleratorService);
+
   // Create the tab manager that owns all session tabs
   tabManager = new TabManager(
     context,
@@ -204,6 +210,8 @@ export function activate(context: vscode.ExtensionContext): void {
   tabManager.particleAcceleratorService = particleAcceleratorService;
   // Expose Secret Protection service to TabManager for DLP scanning
   tabManager.secretProtectionService = secretProtectionService;
+  // Expose Super Particle Accelerator service for secret write blocking
+  tabManager.superParticleAcceleratorService = superParticleAcceleratorService;
   // Propagate settings changes to all existing tabs at runtime
   secretProtectionService.onDidChangeSettings(() => {
     tabManager.refreshSecretProtectionForAllTabs();

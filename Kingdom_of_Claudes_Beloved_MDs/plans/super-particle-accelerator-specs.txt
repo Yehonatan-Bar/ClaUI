@@ -1,0 +1,978 @@
+---
+### super particle accelerator specs
+
+
+# Technical Specification: Secret Write Guard for Claude Code and Codex
+
+## 1. Background
+
+The extension currently has a Particle Accelerator feature that intercepts Bash commands from Claude/Codex, routes eligible commands through `claui-run`, redacts secrets from command output, compresses noisy output, preserves exit codes, and writes traces for analytics. 
+
+The security incident we want to prevent involved Google API keys being embedded in public client-side code. Specifically, Text-to-Speech and Gemini keys were present in browser-facing code before the migration to a server-side proxy. Automated scanners collected the exposed keys, and the leak was also later found in git history.  
+
+The correct architectural remediation is to keep API keys in server-side `.env` files, expose only a backend/proxy endpoint to the browser, and apply API/IP/referrer restrictions.  This new feature is not a replacement for that architecture. It is an additional local guardrail that prevents AI coding agents from writing secrets into source code, public assets, git commits, or deployable artifacts.
+
+## 2. Feature Name
+
+**Secret Write Guard**
+
+UI label:
+
+```text
+Secret Write Guard
+Extra protection: block AI agents from writing API keys or secrets into code.
+```
+
+Internal feature key:
+
+```ts
+secretWriteGuard
+```
+
+Suggested configuration namespace:
+
+```ts
+claudeMirror.secretWriteGuard.*
+```
+
+This feature must be independent from the existing Particle Accelerator toggle.
+
+## 3. Goal
+
+Prevent Claude Code and Codex from introducing API keys, tokens, credentials, or other secrets into repository files, especially client-side/public code, when the user is working through the AI coding agent.
+
+The feature must block the risky action before the secret reaches one of these places:
+
+```text
+- frontend/client-side source files
+- public/static assets
+- generated browser bundles
+- committed git history
+- MCP write operations
+- shell-created files
+- deploy/build artifacts
+```
+
+## 4. Non-Goals
+
+This feature does not guarantee absolute prevention in every possible tool path. Codex documentation explicitly describes `PreToolUse` as a guardrail rather than a complete enforcement boundary, because equivalent work may sometimes be performed through another supported path. ([OpenAI Developers][1])
+
+This feature also does not replace:
+
+```text
+- server-side proxy architecture
+- API key restrictions
+- CI secret scanning
+- pre-commit hooks such as gitleaks
+- cloud budget alerts
+- key rotation
+- least-privilege API keys
+```
+
+It should be implemented as defense-in-depth.
+
+## 5. UI Requirements
+
+### 5.1 Existing Toggle Must Remain Unchanged
+
+The current extension/Particle Accelerator toggle remains as-is.
+
+Do not overload the existing toggle.
+
+### 5.2 Add a Separate Toggle
+
+Add a new toggle in the settings UI:
+
+```text
+Secret Write Guard
+[ On / Off ]
+
+Extra protection: blocks Claude Code and Codex from writing detected secrets into code, git commits, MCP writes, and public assets.
+```
+
+Default:
+
+```ts
+enabled: false
+```
+
+When enabled:
+
+```text
+- Install/activate Secret Write Guard hooks for Claude Code.
+- Install/activate Secret Write Guard hooks for Codex.
+- Pass Secret Write Guard environment variables to agent processes.
+- Start writing Secret Write Guard audit events.
+```
+
+When disabled:
+
+```text
+- Do not block tool calls.
+- Do not scan working tree at Stop.
+- Do not add model-visible remediation messages.
+- Existing Particle Accelerator behavior must remain unchanged.
+```
+
+### 5.3 UI State
+
+Show these statuses:
+
+```ts
+type SecretWriteGuardStatus =
+  | "disabled"
+  | "enabled-hooks-installed"
+  | "enabled-hooks-missing"
+  | "enabled-trust-required"
+  | "enabled-partial-coverage"
+  | "error";
+```
+
+Display examples:
+
+```text
+Enabled — protecting Claude and Codex
+Enabled — Codex hook trust required
+Enabled — Claude hooks installed, Codex hooks missing
+Disabled
+```
+
+Codex hooks may require trust unless installed as managed hooks; Codex documentation says non-managed command hooks must be reviewed/trusted, while managed hooks are trusted by policy and cannot be disabled from the user hook browser. ([OpenAI Developers][1])
+
+## 6. Configuration
+
+Add these settings:
+
+```ts
+interface SecretWriteGuardSettings {
+  enabled: boolean; // default false
+  mode: "block" | "audit"; // default "block"
+  scanEditTools: boolean; // default true
+  scanBashCommands: boolean; // default true
+  scanMcpTools: boolean; // default true
+  scanWorkingTreeOnStop: boolean; // default true
+  blockGitCommitPush: boolean; // default true
+  allowIgnoredEnvFiles: boolean; // default true
+  entropyThreshold: number; // default 4.2
+  frontendPathGlobs: string[];
+  allowedSecretFileGlobs: string[];
+  customSecretRulesPath?: string;
+}
+```
+
+Recommended defaults:
+
+```json
+{
+  "claudeMirror.secretWriteGuard.enabled": false,
+  "claudeMirror.secretWriteGuard.mode": "block",
+  "claudeMirror.secretWriteGuard.scanEditTools": true,
+  "claudeMirror.secretWriteGuard.scanBashCommands": true,
+  "claudeMirror.secretWriteGuard.scanMcpTools": true,
+  "claudeMirror.secretWriteGuard.scanWorkingTreeOnStop": true,
+  "claudeMirror.secretWriteGuard.blockGitCommitPush": true,
+  "claudeMirror.secretWriteGuard.allowIgnoredEnvFiles": true,
+  "claudeMirror.secretWriteGuard.entropyThreshold": 4.2,
+  "claudeMirror.secretWriteGuard.frontendPathGlobs": [
+    "public/**",
+    "static/**",
+    "dist/**",
+    "build/**",
+    "client/**",
+    "frontend/**",
+    "web/**",
+    "src/**/*.html",
+    "src/**/*.tsx",
+    "src/**/*.jsx",
+    "src/**/*.js",
+    "src/**/*.ts"
+  ],
+  "claudeMirror.secretWriteGuard.allowedSecretFileGlobs": [
+    ".env.local",
+    ".env.*.local",
+    "*.local.env"
+  ]
+}
+```
+
+Important: `allowedSecretFileGlobs` are only allowed when `git check-ignore` confirms the file is ignored. If the file is tracked or not ignored, block.
+
+## 7. Architecture
+
+Add a new module:
+
+```text
+src/extension/secret-write-guard/
+src/secret-write-guard-runtime/
+```
+
+Recommended files:
+
+```text
+src/extension/secret-write-guard/SecretWriteGuardService.ts
+src/extension/secret-write-guard/SecretWriteGuardSettings.ts
+src/extension/secret-write-guard/SecretWriteGuardHookManager.ts
+src/extension/secret-write-guard/SecretWriteGuardEnvBuilder.ts
+src/extension/secret-write-guard/SecretWriteGuardTypes.ts
+src/extension/secret-write-guard/SecretWriteGuardAuditReader.ts
+
+src/secret-write-guard-runtime/cli.ts
+src/secret-write-guard-runtime/SecretScanner.ts
+src/secret-write-guard-runtime/PolicyEngine.ts
+src/secret-write-guard-runtime/GitStateScanner.ts
+src/secret-write-guard-runtime/PathClassifier.ts
+src/secret-write-guard-runtime/AuditWriter.ts
+src/secret-write-guard-runtime/hooks/claudeSecretWriteGuard.ts
+src/secret-write-guard-runtime/hooks/codexSecretWriteGuard.ts
+```
+
+If the existing Secret Protection implementation already has reusable primitives such as `CompositeSecretScanner`, `PolicyEngine`, `ApprovalEngine`, `ExceptionStore`, and `AuditStore`, reuse them instead of duplicating scanner and policy logic. The existing Particle Accelerator document already mentions Secret Protection integration, `CompositeSecretScanner`, policy/approval logic, MCP scanning, and audit files. 
+
+## 8. Hook Coverage
+
+### 8.1 Claude Code
+
+Claude Code hooks can match tool names such as `Bash`, `Edit|Write`, and `mcp__.*`; Claude’s hook documentation also shows that a hook can return `permissionDecision: "deny"` to block a tool call. ([Claude API Docs][2])
+
+Install Claude hooks for:
+
+```text
+PreToolUse: Edit|Write|MultiEdit
+PreToolUse: Bash
+PreToolUse: mcp__.*
+PostToolUse: Bash
+Stop: scan working tree once per turn
+```
+
+Claude documentation specifically notes that if a hook must see every file change, a Stop hook should scan the working tree once per turn, and for per-call coverage it should also match Bash and inspect modified/untracked files. ([Claude API Docs][3])
+
+Claude hook behavior:
+
+```ts
+if secretWriteGuard.enabled === false:
+  allow
+
+if tool is Edit/Write/MultiEdit:
+  scan proposed content / diff before write
+  deny if policy says block
+
+if tool is Bash:
+  scan command text
+  block direct secret-writing commands
+  block git commit/push if staged/worktree contains findings
+  optionally allow safe read-only commands
+
+if tool is mcp__.*:
+  scan tool arguments
+  deny write-like MCP calls that contain secrets
+
+on Stop:
+  scan git working tree and untracked files
+  report or block continuation if new secrets were introduced
+```
+
+### 8.2 Codex
+
+Codex `PreToolUse` can intercept Bash, file edits through `apply_patch`, and MCP tool calls. For file edits through `apply_patch`, matchers can use `apply_patch`, `Edit`, or `Write`. ([OpenAI Developers][1])
+
+Install Codex hooks for:
+
+```text
+PreToolUse: Bash
+PreToolUse: apply_patch
+PreToolUse: Edit|Write
+PreToolUse: mcp__.*
+PermissionRequest: Bash
+PostToolUse: Bash
+PostToolUse: apply_patch
+Stop: scan working tree once per turn
+```
+
+Codex blocking output should use:
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "Secret Write Guard blocked this action because it would write a detected secret into repository code."
+  }
+}
+```
+
+Codex documentation supports this deny shape for `PreToolUse`. ([OpenAI Developers][1])
+
+## 9. Secret Detection Engine
+
+Create or reuse a scanner with this interface:
+
+```ts
+export interface SecretScanner {
+  scanText(input: SecretScanInput): SecretScanResult;
+  scanDiff(input: SecretDiffScanInput): SecretScanResult;
+  scanFile(input: SecretFileScanInput): SecretScanResult;
+}
+```
+
+Types:
+
+```ts
+export interface SecretScanInput {
+  text: string;
+  source: "edit" | "bash-command" | "mcp-args" | "file" | "diff" | "staged-diff";
+  provider: "claude" | "codex";
+  toolName?: string;
+  filePath?: string;
+  cwd: string;
+  sessionId?: string;
+  turnId?: string;
+}
+
+export interface SecretFinding {
+  ruleId: string;
+  type:
+    | "google_api_key"
+    | "openai_api_key"
+    | "anthropic_api_key"
+    | "github_token"
+    | "aws_access_key"
+    | "jwt"
+    | "supabase_key"
+    | "azure_key"
+    | "private_key"
+    | "database_url"
+    | "generic_high_entropy_secret";
+
+  severity: "low" | "medium" | "high" | "critical";
+  confidence: "low" | "medium" | "high";
+  filePath?: string;
+  line?: number;
+  column?: number;
+
+  // Never store the raw secret.
+  redactedPreview: string;
+  valueSha256: string;
+}
+```
+
+Required scanner rules:
+
+```text
+- Google API keys
+- OpenAI API keys
+- Anthropic API keys
+- GitHub PATs and fine-grained tokens
+- AWS access keys
+- JWTs
+- Supabase anon/service-style keys
+- Azure keys / connection strings
+- Private key blocks
+- Database URLs with credentials
+- Generic high-entropy values assigned to key/token/secret/password variables
+```
+
+Scanner requirements:
+
+```text
+- Must scan added lines in diffs, not only full file contents.
+- Must scan string literals and environment-like assignments.
+- Must normalize common escaping: JSON strings, shell quotes, URL encoding.
+- Must not write raw secrets to traces, logs, audit files, UI, or model messages.
+- Must return redacted previews only.
+```
+
+Example redacted preview:
+
+```text
+AIzaSyA***************************xYz
+sk-proj-***************************AB
+```
+
+## 10. Policy Engine
+
+Create or extend:
+
+```ts
+export interface SecretWritePolicyEngine {
+  evaluate(input: SecretWritePolicyInput): SecretWritePolicyDecision;
+}
+```
+
+Types:
+
+```ts
+export interface SecretWritePolicyInput {
+  findings: SecretFinding[];
+  filePath?: string;
+  source: "edit" | "bash-command" | "mcp-args" | "file" | "diff" | "staged-diff";
+  provider: "claude" | "codex";
+  toolName?: string;
+  command?: string;
+  cwd: string;
+  gitInfo?: GitInfo;
+  settings: SecretWriteGuardSettings;
+}
+
+export interface SecretWritePolicyDecision {
+  action: "allow" | "deny" | "audit";
+  reason: string;
+  remediation?: string;
+  findings: SecretFinding[];
+}
+```
+
+### 10.1 Blocking Rules
+
+Block when any of these are true:
+
+```text
+1. A high-confidence secret is being written into a repository file.
+2. Any secret is being written into public/client-side code.
+3. Any secret is being written into generated browser artifacts such as dist/build/public/static.
+4. A git commit/push is attempted while staged changes contain secrets.
+5. An MCP write operation contains secrets.
+6. A shell command directly writes a detected secret into a file.
+7. A secret is written into an .env file that is not gitignored.
+8. A secret is written into any file under a webroot/public directory.
+```
+
+### 10.2 Allow Rules
+
+Allow when all of these are true:
+
+```text
+1. The detected value is not a real secret, or confidence is low.
+2. The finding is in an approved placeholder such as "YOUR_API_KEY_HERE".
+3. The file is an ignored local secret file, for example .env.local, and git check-ignore confirms it is ignored.
+4. A valid scoped exception exists for this exact finding hash, path, and rule ID.
+```
+
+### 10.3 Public/Client-Side Path Classifier
+
+Implement:
+
+```ts
+export interface PathClassifier {
+  classify(filePath: string, cwd: string): PathRisk;
+}
+
+export type PathRisk =
+  | "public-client-code"
+  | "generated-public-artifact"
+  | "server-code"
+  | "local-secret-file"
+  | "unknown-repository-file";
+```
+
+High-risk examples:
+
+```text
+public/**
+static/**
+dist/**
+build/**
+client/**
+frontend/**
+web/**
+*.html
+*.bundle.js
+*.min.js
+```
+
+Potentially high-risk examples:
+
+```text
+src/**/*.tsx
+src/**/*.jsx
+src/**/*.js
+src/**/*.ts
+```
+
+For frameworks where `src` can contain both server and client code, use heuristics:
+
+```text
+- If file contains "use client", classify as public-client-code.
+- If under Next.js app/api or pages/api, classify as server-code.
+- If under React/Vite/CRA frontend app, classify as public-client-code.
+- If uncertain and a real secret is found, deny by default.
+```
+
+## 11. Hook Runtime Behavior
+
+### 11.1 Edit / Write / apply_patch
+
+For proposed file edits:
+
+```text
+1. Read hook JSON from stdin.
+2. Extract target path and proposed content/patch.
+3. Build an added-content view:
+   - For full writes: scan full proposed content.
+   - For patches: scan added lines only.
+4. Run SecretScanner.
+5. Run PolicyEngine.
+6. If denied:
+   - Emit provider-specific deny JSON.
+   - Include remediation text.
+   - Write audit event without raw secret.
+7. If allowed:
+   - Exit 0 without modifying input.
+```
+
+### 11.2 Bash
+
+For Bash commands:
+
+```text
+1. Scan command text for inline secrets.
+2. Detect direct file-write commands:
+   - echo ... > file
+   - cat > file <<EOF
+   - tee file
+   - printf ... > file
+   - sed -i
+   - perl -pi
+   - node -e / python -c writing files
+3. If command writes a detected secret, deny before execution.
+4. If command is git add / git commit / git push:
+   - Run staged/worktree scan before allowing.
+   - Deny if staged or modified files contain new findings.
+5. If command is build/deploy:
+   - Scan relevant public artifacts after build in PostToolUse or Stop.
+```
+
+### 11.3 MCP Tools
+
+For MCP tools:
+
+```text
+1. Match mcp__.*.
+2. Scan all string arguments recursively.
+3. Classify operation as read-like or write-like.
+4. Deny write-like operation if arguments contain detected secrets.
+5. Audit read-like operations only when findings are detected.
+```
+
+### 11.4 Stop Hook
+
+The Stop hook must scan the working tree once per turn.
+
+Algorithm:
+
+```text
+1. Get changed files:
+   git status --porcelain
+2. Get staged diff:
+   git diff --cached --unified=0
+3. Get unstaged diff:
+   git diff --unified=0
+4. Include untracked text files under reasonable size cap.
+5. Scan added lines and new files.
+6. Compare against session baseline to avoid repeatedly blocking old findings.
+7. If new findings exist:
+   - In block mode: block continuation and send remediation to the agent.
+   - In audit mode: allow but record event.
+```
+
+## 12. Remediation Message to the Agent
+
+When blocked, the hook should provide a short model-visible message.
+
+Template:
+
+```text
+Secret Write Guard blocked this action.
+
+Reason:
+A detected {secretType} would be written to {filePath}, which is classified as {pathRisk}.
+
+Do not put API keys or credentials in client-side/public code.
+
+Required fix:
+- Move the secret to a server-side environment variable.
+- Expose a server-side proxy endpoint.
+- The browser/client should call the proxy, not the external API directly.
+- Use a placeholder in code, for example process.env.GOOGLE_API_KEY, without the raw value.
+- Ensure the secret file is gitignored.
+```
+
+For Google/Gemini/TTS-like cases:
+
+```text
+Use a server-side proxy for Gemini/TTS. Keep the Google API key in server-side .env only. The browser must call the proxy endpoint, not Google directly.
+```
+
+This matches the post-incident remediation where the keys were moved to a server-side proxy and kept only in server-side `.env`, never sent to the browser. 
+
+## 13. Audit Logging
+
+Write audit events here:
+
+```text
+<globalStoragePath>/secret-write-guard/audit/YYYY-MM-DD.jsonl
+```
+
+Audit event type:
+
+```ts
+export interface SecretWriteGuardAuditEvent {
+  id: string;
+  timestamp: string;
+  provider: "claude" | "codex";
+  sessionId?: string;
+  turnId?: string;
+  workspacePathHash: string;
+  toolName: string;
+  source: "edit" | "bash-command" | "mcp-args" | "file" | "diff" | "staged-diff";
+  action: "allow" | "deny" | "audit";
+  reason: string;
+  filePath?: string;
+  pathRisk?: PathRisk;
+  findings: Array<{
+    ruleId: string;
+    type: SecretFinding["type"];
+    severity: SecretFinding["severity"];
+    confidence: SecretFinding["confidence"];
+    valueSha256: string;
+    redactedPreview: string;
+    line?: number;
+  }>;
+}
+```
+
+Hard rule:
+
+```text
+Never store raw secret values in audit events, traces, raw logs, terminal output, or webview state.
+```
+
+The existing Particle Accelerator/Secret Protection design already separates secret-protection audit data from Particle Accelerator traces/raw logs. Keep that separation. 
+
+## 14. Webview Messages
+
+Add:
+
+```ts
+// Webview -> Extension
+"secretWriteGuardGetStatus"
+"secretWriteGuardSetEnabled"
+"secretWriteGuardSetMode"
+"secretWriteGuardGetAuditEvents"
+"secretWriteGuardCreateException"
+"secretWriteGuardDeleteException"
+
+// Extension -> Webview
+"secretWriteGuardStatus"
+"secretWriteGuardAuditEvents"
+"secretWriteGuardLastEvent"
+"secretWriteGuardError"
+```
+
+Add Zustand fields:
+
+```ts
+secretWriteGuardEnabled: boolean;
+secretWriteGuardMode: "block" | "audit";
+secretWriteGuardStatus: SecretWriteGuardStatus;
+secretWriteGuardAuditEvents: SecretWriteGuardAuditEvent[];
+secretWriteGuardLastEvent?: SecretWriteGuardAuditEvent;
+secretWriteGuardError?: string;
+```
+
+The existing webview already has Particle Accelerator and Secret Protection message/state patterns that can be mirrored. 
+
+## 15. Hook Installation
+
+Use a separate marker from Particle Accelerator:
+
+```text
+--claui-secret-write-guard-hook
+```
+
+Do not rely on the existing `--claui-managed-hook` marker alone.
+
+Claude locations:
+
+```text
+<workspace>/.claude/settings.json
+```
+
+Codex locations:
+
+```text
+<workspace>/.codex/hooks.json
+```
+
+The existing Particle Accelerator hook manager already installs Claude hooks into `.claude/settings.json` and Codex hooks into `.codex/hooks.json`, preserving settings and creating backups. Reuse that installation pattern, but keep Secret Write Guard hook entries separately identifiable. 
+
+Hook installation is complete only when all required entries exist:
+
+```text
+Claude:
+- PreToolUse Edit|Write|MultiEdit
+- PreToolUse Bash
+- PreToolUse mcp__.*
+- PostToolUse Bash
+- Stop
+
+Codex:
+- PreToolUse Bash
+- PreToolUse apply_patch / Edit|Write
+- PreToolUse mcp__.*
+- PermissionRequest Bash
+- PostToolUse Bash
+- PostToolUse apply_patch
+- Stop
+```
+
+## 16. Environment Variables
+
+Pass these to agent and hook runtimes:
+
+```text
+CLAUI_SECRET_WRITE_GUARD=1
+CLAUI_SECRET_WRITE_GUARD_MODE=block
+CLAUI_SECRET_WRITE_GUARD_STORE_DIR=<globalStoragePath>/secret-write-guard
+CLAUI_SECRET_WRITE_GUARD_EXCEPTIONS_PATH=<...>/exceptions.json
+CLAUI_SECRET_WRITE_GUARD_FRONTEND_GLOBS=<json>
+CLAUI_SECRET_WRITE_GUARD_ALLOWED_SECRET_GLOBS=<json>
+CLAUI_SECRET_WRITE_GUARD_ENTROPY_THRESHOLD=4.2
+```
+
+If reusing existing Secret Protection environment variables, keep the new feature-specific variables as overrides so the toggle remains independent.
+
+## 17. Exceptions
+
+Support scoped exceptions, but do not make them too broad.
+
+Exception type:
+
+```ts
+export interface SecretWriteGuardException {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  createdBy: "user";
+  ruleId: string;
+  valueSha256: string;
+  filePathGlob: string;
+  maxUses: number;
+  usedCount: number;
+  reason: string;
+}
+```
+
+Rules:
+
+```text
+- Exceptions must be time-limited.
+- Exceptions must be hash-scoped.
+- Exceptions must be path-scoped.
+- Exceptions must not contain raw secret values.
+- Exceptions must not apply to public/client-side paths unless explicitly allowed by a separate advanced setting.
+```
+
+## 18. Git Protection
+
+When `blockGitCommitPush` is enabled:
+
+Block these commands if staged or working tree findings exist:
+
+```text
+git add
+git commit
+git commit -a
+git push
+gh pr create
+npm run deploy
+pnpm deploy
+yarn deploy
+vercel deploy
+netlify deploy
+firebase deploy
+gcloud app deploy
+```
+
+Before allowing commit/push/deploy-like commands:
+
+```text
+1. Scan staged diff.
+2. Scan unstaged diff.
+3. Scan untracked files under size limit.
+4. Scan public build artifacts if they exist.
+5. Deny if new high-confidence findings exist.
+```
+
+The incident report notes that leaked keys were also found in git history, so git-stage and commit/push protection is required, not optional. 
+
+## 19. Performance Requirements
+
+```text
+- PreToolUse scan must normally complete under 300ms for small edits.
+- Hard timeout: 5 seconds per hook execution.
+- Max single text input scan size: 2 MB by default.
+- Max Stop hook scan: 20 MB of changed text by default.
+- Binary files must be skipped.
+- Large generated files should be scanned by chunks.
+- If scanner fails in block mode, fail closed for write operations and fail open for read-only operations.
+```
+
+Fail-closed cases:
+
+```text
+- Edit/Write/apply_patch with unreadable proposed content
+- Bash command that appears to write files but cannot be parsed
+- Git commit/push when staged diff cannot be read
+```
+
+Fail-open cases:
+
+```text
+- Read-only commands
+- Status/listing commands
+- Audit UI load failure
+```
+
+## 20. Acceptance Criteria
+
+### 20.1 Toggle Behavior
+
+```text
+Given the extension is installed
+When Secret Write Guard is off
+Then Claude/Codex behavior is unchanged
+
+Given Secret Write Guard is on
+Then the UI shows enabled status
+And hook status is shown separately for Claude and Codex
+And Particle Accelerator can remain off
+And Secret Write Guard still protects supported tool paths
+```
+
+### 20.2 Claude Edit/Write Blocking
+
+```text
+Given Secret Write Guard is enabled
+When Claude attempts to Write a frontend file containing a Google API key
+Then the hook denies the tool call
+And the file is not modified
+And the agent receives remediation instructions
+And an audit event is written without the raw key
+```
+
+### 20.3 Codex apply_patch Blocking
+
+```text
+Given Secret Write Guard is enabled
+When Codex attempts to apply_patch a file with a detected API key
+Then PreToolUse denies the tool call
+And Codex receives the deny reason
+And no raw secret is logged
+```
+
+### 20.4 Bash File Write Blocking
+
+```text
+Given Secret Write Guard is enabled
+When the agent runs:
+echo "API_KEY=AIza..." > src/config.js
+Then the Bash PreToolUse hook denies the command
+And the file is not created or modified
+```
+
+### 20.5 Stop Hook Catch
+
+```text
+Given an unsupported path creates a file containing a secret
+When the turn reaches Stop
+Then the Stop hook scans the working tree
+And blocks continuation in block mode
+And reports the exact file path and redacted finding
+```
+
+### 20.6 Git Commit/Push Blocking
+
+```text
+Given a secret exists in staged changes
+When the agent runs git commit or git push
+Then Secret Write Guard denies the command
+And instructs the agent to remove the secret and use server-side env/proxy instead
+```
+
+### 20.7 Safe `.env.local`
+
+```text
+Given the agent writes a real secret to .env.local
+And .env.local is gitignored
+And the file is outside public/webroot directories
+Then the action may be allowed
+And an audit event is written
+
+Given .env.local is not gitignored
+Then the action is denied
+```
+
+### 20.8 No Raw Secret Persistence
+
+```text
+Given a secret is detected
+Then raw secret value must not appear in:
+- audit JSONL
+- Particle Accelerator traces
+- raw logs
+- webview state
+- terminal output
+- model-visible message
+```
+
+## 21. Tests
+
+Add test files:
+
+```text
+tests/secret-write-guard/SecretScanner.test.ts
+tests/secret-write-guard/PolicyEngine.test.ts
+tests/secret-write-guard/PathClassifier.test.ts
+tests/secret-write-guard/GitStateScanner.test.ts
+tests/secret-write-guard/AuditWriter.test.ts
+tests/secret-write-guard/hooks/claudeSecretWriteGuard.test.ts
+tests/secret-write-guard/hooks/codexSecretWriteGuard.test.ts
+tests/secret-write-guard/SecretWriteGuardSettings.test.ts
+tests/secret-write-guard/SecretWriteGuardHookManager.test.ts
+tests/secret-write-guard/security/noRawSecretPersistence.test.ts
+```
+
+Minimum test cases:
+
+```text
+- Google API key in React/TSX file -> deny
+- Google API key in public HTML -> deny
+- OpenAI key in backend .env.local ignored by git -> allow/audit
+- OpenAI key in tracked .env -> deny
+- GitHub token in git staged diff -> deny commit
+- Secret in MCP write arguments -> deny
+- Placeholder "YOUR_API_KEY_HERE" -> allow
+- High-entropy random string in normal prose -> no false positive or low confidence
+- Raw secret never appears in audit output
+- Feature disabled -> no blocking
+```
+
+## 22. Developer Notes
+
+The main implementation risk is assuming that redacting terminal output is enough. It is not. The feature must scan the proposed file writes and diffs themselves.
+
+The required protection surface is:
+
+```text
+Edit/Write/apply_patch
+Bash writes
+MCP writes
+git commit/push/deploy
+Stop hook working-tree scan
+```
+
+The feature should be treated as an enforcement layer for supported agent paths, with clear UI language that it is “extra protection,” not a full replacement for proper server-side secret handling.
+
+[1]: https://developers.openai.com/codex/hooks "Hooks – Codex | OpenAI Developers"
+[2]: https://docs.anthropic.com/en/docs/claude-code/hooks "Hooks reference - Claude Code Docs"
+[3]: https://docs.anthropic.com/en/docs/claude-code/hooks-guide "Automate workflows with hooks - Claude Code Docs"

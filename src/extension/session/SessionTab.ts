@@ -177,6 +177,7 @@ export class SessionTab implements WebviewBridge {
   private particleAcceleratorService: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService | null = null;
   /** Secret Protection service reference for DLP scanning */
   private secretProtectionService: import('../secret-protection/SecretProtectionService').SecretProtectionService | null = null;
+  private superParticleAcceleratorService: import('../super-particle-accelerator/SuperParticleAcceleratorService').SuperParticleAcceleratorService | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -2393,6 +2394,14 @@ export class SessionTab implements WebviewBridge {
     this.secretProtectionService = service;
     this.messageHandler.setSecretProtectionService(service);
     this.processManager.secretProtectionEnabled = service.isEnabled();
+  }
+
+  /** Inject the shared SuperParticleAcceleratorService for secret write blocking */
+  setSuperParticleAcceleratorService(service: import('../super-particle-accelerator/SuperParticleAcceleratorService').SuperParticleAcceleratorService): void {
+    this.superParticleAcceleratorService = service;
+    this.messageHandler.setSuperParticleAcceleratorService(service);
+
+    this.processManager.superParticleAcceleratorEnvBuilder = () => service.buildAgentEnv();
   }
 
   /** Inject the SessionStore (forwarded to MessageHandler for workstream classification) */

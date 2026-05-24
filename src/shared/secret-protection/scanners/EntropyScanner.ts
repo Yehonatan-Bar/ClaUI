@@ -25,9 +25,11 @@ const TOKEN_SPLITTER = /[\s,;:=\[\]{}"'`<>()]+/;
 export class EntropyScanner implements ISecretScanner {
   readonly name = 'entropy';
   private readonly enabled: boolean;
+  private readonly threshold: number;
 
-  constructor(options?: { enabled?: boolean }) {
+  constructor(options?: { enabled?: boolean; threshold?: number }) {
     this.enabled = options?.enabled ?? false;
+    this.threshold = options?.threshold ?? ENTROPY_THRESHOLD;
   }
 
   scan(input: string, _context?: ScanContext): ScanResult {
@@ -64,7 +66,7 @@ export class EntropyScanner implements ISecretScanner {
         maxEntropy = shannonEntropy(token);
       }
 
-      if (maxEntropy <= ENTROPY_THRESHOLD) continue;
+      if (maxEntropy <= this.threshold) continue;
 
       const stableId = crypto
         .createHmac('sha256', 'claui-dlp')

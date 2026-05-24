@@ -337,6 +337,14 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.processManager.secretProtectionEnabled = service.isEnabled();
   }
 
+  /** Inject the shared SuperParticleAcceleratorService for secret write blocking */
+  setSuperParticleAcceleratorService(service: import('../super-particle-accelerator/SuperParticleAcceleratorService').SuperParticleAcceleratorService): void {
+    if ('setSuperParticleAcceleratorService' in this.messageHandler) {
+      (this.messageHandler as { setSuperParticleAcceleratorService: (s: typeof service) => void }).setSuperParticleAcceleratorService(service);
+    }
+    this.processManager.superParticleAcceleratorEnvBuilder = () => service.buildAgentEnv();
+  }
+
   /** Inject the SessionStore (forwarded to CodexMessageHandler for workstream classification). */
   setSessionStore(store: import('../session/SessionStore').SessionStore): void {
     this.messageHandler.setSessionStore(store);

@@ -31,3 +31,4 @@ Kingdom_of_Claudes_Beloved_MDs/plans/multi-participant-agent-session-implementat
 
 # MP server deployment scripts (local deployment aids)
 server/deploy/
+*.claui-backup-*

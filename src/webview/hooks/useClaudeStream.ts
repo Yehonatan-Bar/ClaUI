@@ -328,6 +328,27 @@ export function useClaudeStream(): void {
           setSecretProtectionAuditError(msg.error);
           break;
 
+        case 'superParticleAcceleratorStatus': {
+          const spaStatus = msg as { status: string; enabled: boolean; mode: 'block' | 'audit' };
+          useAppStore.getState().setSuperParticleAcceleratorStatus(spaStatus.status, spaStatus.enabled, spaStatus.mode);
+          break;
+        }
+        case 'superParticleAcceleratorAuditEvents': {
+          const spaEvents = msg as { events: ReturnType<typeof useAppStore.getState>['superParticleAcceleratorAuditEvents'] };
+          useAppStore.getState().setSuperParticleAcceleratorAuditEvents(spaEvents.events);
+          break;
+        }
+        case 'superParticleAcceleratorLastEvent': {
+          const spaLastEvent = msg as { event: { action: string } };
+          useAppStore.getState().setSuperParticleAcceleratorLastEvent(spaLastEvent.event);
+          break;
+        }
+        case 'superParticleAcceleratorError': {
+          const spaErr = msg as { error: string };
+          useAppStore.getState().setSuperParticleAcceleratorError(spaErr.error);
+          break;
+        }
+
         case 'toggleMcpPanel':
           setMcpPanelOpen(msg.open ?? !useAppStore.getState().mcpPanelOpen);
           if (msg.tab) {

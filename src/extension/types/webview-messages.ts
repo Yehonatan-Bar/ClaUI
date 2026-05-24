@@ -1065,7 +1065,21 @@ export type WebviewToExtensionMessage =
   | SecretProtectionGetStatusRequest
   | SecretProtectionSetSettingRequest
   | SecretProtectionGetAuditEventsRequest
-  | SecretProtectionGetComplianceReportRequest;
+  | SecretProtectionGetComplianceReportRequest
+  | SuperParticleAcceleratorGetStatusRequest
+  | SuperParticleAcceleratorSetEnabledRequest
+  | SuperParticleAcceleratorSetModeRequest
+  | SuperParticleAcceleratorGetAuditEventsRequest
+  | SuperParticleAcceleratorCreateExceptionRequest
+  | SuperParticleAcceleratorDeleteExceptionRequest;
+
+// --- Super Particle Accelerator (Webview -> Extension) ---
+export interface SuperParticleAcceleratorGetStatusRequest { type: 'superParticleAcceleratorGetStatus' }
+export interface SuperParticleAcceleratorSetEnabledRequest { type: 'superParticleAcceleratorSetEnabled'; enabled: boolean }
+export interface SuperParticleAcceleratorSetModeRequest { type: 'superParticleAcceleratorSetMode'; mode: 'block' | 'audit' }
+export interface SuperParticleAcceleratorGetAuditEventsRequest { type: 'superParticleAcceleratorGetAuditEvents'; limit?: number }
+export interface SuperParticleAcceleratorCreateExceptionRequest { type: 'superParticleAcceleratorCreateException'; exception: Record<string, unknown> }
+export interface SuperParticleAcceleratorDeleteExceptionRequest { type: 'superParticleAcceleratorDeleteException'; exceptionId: string }
 
 // --- Particle Accelerator (Webview -> Extension) ---
 export interface ParticleAcceleratorGetStatusRequest { type: 'particleAcceleratorGetStatus' }
@@ -2608,7 +2622,31 @@ export type ExtensionToWebviewMessage =
   | SecretProtectionStatusMessage
   | SecretProtectionAuditEventsMessage
   | SecretProtectionComplianceReportMessage
-  | SecretProtectionErrorMessage;
+  | SecretProtectionErrorMessage
+  | SuperParticleAcceleratorStatusMessage
+  | SuperParticleAcceleratorAuditEventsMessage
+  | SuperParticleAcceleratorLastEventMessage
+  | SuperParticleAcceleratorErrorMessage;
+
+// --- Super Particle Accelerator (Extension -> Webview) ---
+export interface SuperParticleAcceleratorStatusMessage {
+  type: 'superParticleAcceleratorStatus';
+  status: import('../../shared/super-particle-accelerator/types').SuperParticleAcceleratorStatus;
+  enabled: boolean;
+  mode: 'block' | 'audit';
+}
+export interface SuperParticleAcceleratorAuditEventsMessage {
+  type: 'superParticleAcceleratorAuditEvents';
+  events: import('../../shared/super-particle-accelerator/types').SuperParticleAcceleratorAuditEvent[];
+}
+export interface SuperParticleAcceleratorLastEventMessage {
+  type: 'superParticleAcceleratorLastEvent';
+  event: import('../../shared/super-particle-accelerator/types').SuperParticleAcceleratorAuditEvent;
+}
+export interface SuperParticleAcceleratorErrorMessage {
+  type: 'superParticleAcceleratorError';
+  error: string;
+}
 
 // --- Particle Accelerator (Extension -> Webview) ---
 export interface ParticleAcceleratorStatusMessage {

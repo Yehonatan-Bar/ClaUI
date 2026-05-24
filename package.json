@@ -887,6 +887,75 @@
           ],
           "description": "How Particle Accelerator integrates with Codex sessions."
         },
+        "claudeMirror.superParticleAccelerator.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Super Particle Accelerator: blocks AI agents from writing detected secrets into code, git commits, MCP writes, and public assets.",
+          "scope": "resource"
+        },
+        "claudeMirror.superParticleAccelerator.mode": {
+          "type": "string",
+          "enum": ["block", "audit"],
+          "default": "block",
+          "description": "block = deny write operations containing secrets. audit = log only, don't block.",
+          "scope": "resource"
+        },
+        "claudeMirror.superParticleAccelerator.scanEditTools": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scan Edit/Write/MultiEdit tool calls for secrets before files are modified.",
+          "scope": "resource"
+        },
+        "claudeMirror.superParticleAccelerator.scanBashCommands": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scan Bash commands for file-write operations and git commits containing secrets.",
+          "scope": "resource"
+        },
+        "claudeMirror.superParticleAccelerator.scanMcpTools": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scan MCP tool arguments for secrets in write-like operations.",
+          "scope": "resource"
+        },
+        "claudeMirror.superParticleAccelerator.scanWorkingTreeOnStop": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scan the git working tree at the end of each agent turn for newly introduced secrets.",
+          "scope": "resource"
+        },
+        "claudeMirror.superParticleAccelerator.blockGitCommitPush": {
+          "type": "boolean",
+          "default": true,
+          "description": "Block git commit, push, and deploy commands when staged or modified files contain secrets.",
+          "scope": "resource"
+        },
+        "claudeMirror.superParticleAccelerator.allowIgnoredEnvFiles": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow secrets in .env.local and similar files when they are gitignored and outside public directories.",
+          "scope": "resource"
+        },
+        "claudeMirror.superParticleAccelerator.entropyThreshold": {
+          "type": "number",
+          "default": 4.2,
+          "description": "Shannon entropy threshold for detecting high-entropy strings as potential secrets.",
+          "scope": "resource"
+        },
+        "claudeMirror.superParticleAccelerator.frontendPathGlobs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["public/**","static/**","dist/**","build/**","client/**","frontend/**","web/**","src/**/*.html","src/**/*.tsx","src/**/*.jsx","src/**/*.js","src/**/*.ts"],
+          "description": "Glob patterns for paths classified as frontend/client-side code.",
+          "scope": "resource"
+        },
+        "claudeMirror.superParticleAccelerator.allowedSecretFileGlobs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [".env.local", ".env.*.local", "*.local.env"],
+          "description": "Glob patterns for files where secrets are allowed (only when gitignored and outside public directories).",
+          "scope": "resource"
+        },
         "claudeMirror.secretProtection.enabled": {
           "type": "boolean",
           "default": false,

@@ -567,6 +567,13 @@ export class MessageHandler {
     this.secretProtectionService = service;
   }
 
+  /** Super Particle Accelerator service (shared instance, set after construction) */
+  private superParticleAcceleratorService: import('../super-particle-accelerator/SuperParticleAcceleratorService').SuperParticleAcceleratorService | null = null;
+
+  setSuperParticleAcceleratorService(service: import('../super-particle-accelerator/SuperParticleAcceleratorService').SuperParticleAcceleratorService): void {
+    this.superParticleAcceleratorService = service;
+  }
+
   /** Provide the SessionStore for accessing session metadata. */
   setSessionStore(store: import('../session/SessionStore').SessionStore): void {
     this.sessionStore = store;
@@ -3437,6 +3444,43 @@ export class MessageHandler {
           break;
         }
 
+        case 'superParticleAcceleratorGetStatus': {
+          void this.sendSuperParticleAcceleratorStatus();
+          break;
+        }
+        case 'superParticleAcceleratorSetEnabled': {
+          const newEnabled = (msg as { enabled: boolean }).enabled;
+          void vscode.workspace.getConfiguration('claudeMirror.superParticleAccelerator')
+            .update('enabled', newEnabled, vscode.ConfigurationTarget.Workspace)
+            .then(async () => {
+              if (this.superParticleAcceleratorService) {
+                await this.superParticleAcceleratorService.setEnabled(newEnabled);
+              }
+              void this.sendSuperParticleAcceleratorStatus();
+            });
+          break;
+        }
+        case 'superParticleAcceleratorSetMode': {
+          void vscode.workspace.getConfiguration('claudeMirror.superParticleAccelerator')
+            .update('mode', (msg as { mode: string }).mode, vscode.ConfigurationTarget.Workspace);
+          break;
+        }
+        case 'superParticleAcceleratorGetAuditEvents': {
+          void this.handleSuperParticleAcceleratorGetAuditEvents((msg as { limit?: number }).limit);
+          break;
+        }
+        case 'superParticleAcceleratorCreateException': {
+          const createMsg = msg as { exception: Record<string, unknown> };
+          if (this.superParticleAcceleratorService && createMsg.exception) {
+            this.superParticleAcceleratorService.createException(createMsg.exception as any);
+          }
+          break;
+        }
+        case 'superParticleAcceleratorDeleteException': {
+          this.superParticleAcceleratorService?.deleteException((msg as { exceptionId: string }).exceptionId);
+          break;
+        }
+
         case 'ready':
           this.log('Webview ready');
           // Send text display settings
@@ -6216,6 +6260,58 @@ export class MessageHandler {
         type: 'secretProtectionError',
         error: err instanceof Error ? err.message : String(err),
       });
+    }
+  }
+
+  // ---- Super Particle Accelerator handlers ----
+
+  private async sendSuperParticleAcceleratorStatus(): Promise<void> {
+    const service = this.superParticleAcceleratorService;
+    const settings = vscode.workspace.getConfiguration('claudeMirror.superParticleAccelerator');
+    const enabled = settings.get<boolean>('enabled', false);
+    const mode = settings.get<'block' | 'audit'>('mode', 'block');
+
+    if (!service) {
+      this.webview.postMessage({
+        type: 'superParticleAcceleratorStatus',
+        status: enabled ? 'enabled-hooks-missing' : 'disabled',
+        enabled,
+        mode,
+      } as any);
+      return;
+    }
+
+    try {
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const status = await service.getStatus(workspaceRoot);
+      this.webview.postMessage({
+        type: 'superParticleAcceleratorStatus',
+        status,
+        enabled: service.isEnabled(),
+        mode,
+      } as any);
+    } catch (err) {
+      this.webview.postMessage({
+        type: 'superParticleAcceleratorError',
+        error: err instanceof Error ? err.message : String(err),
+      } as any);
+    }
+  }
+
+  private async handleSuperParticleAcceleratorGetAuditEvents(limit?: number): Promise<void> {
+    const service = this.superParticleAcceleratorService;
+    if (!service) {
+      this.webview.postMessage({ type: 'superParticleAcceleratorAuditEvents', events: [] } as any);
+      return;
+    }
+    try {
+      const events = await service.getAuditEvents(limit);
+      this.webview.postMessage({ type: 'superParticleAcceleratorAuditEvents', events } as any);
+    } catch (err) {
+      this.webview.postMessage({
+        type: 'superParticleAcceleratorError',
+        error: err instanceof Error ? err.message : String(err),
+      } as any);
     }
   }
 

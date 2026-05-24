@@ -11,6 +11,7 @@ import { StatusBarGroupButton } from './StatusBarGroupButton';
 import { AIChip } from './AIChip';
 import { ParticleAcceleratorStatusBadge } from '../ParticleAccelerator/ParticleAcceleratorStatusBadge';
 import { SecretProtectionStatusBadge } from '../SecretProtectionStatusBadge';
+import { SuperParticleAcceleratorStatusBadge } from '../SuperParticleAccelerator/SuperParticleAcceleratorStatusBadge';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 
 function formatDuration(durationMs: number): string {
@@ -916,6 +917,7 @@ export const StatusBar: React.FC<{
       </div>
 
       <div className="status-bar-right">
+        <SuperParticleAcceleratorStatusBadge />
         <SecretProtectionStatusBadge />
         <ParticleAcceleratorStatusBadge />
         {!hideClockFromBar && clockElement}

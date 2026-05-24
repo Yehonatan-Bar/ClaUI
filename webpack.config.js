@@ -94,4 +94,38 @@ module.exports = [
     },
     devtool: 'nosources-source-map',
   },
+  // Super Particle Accelerator runtime (Node.js hooks, runs outside VS Code)
+  {
+    name: 'super-particle-accelerator-runtime',
+    target: 'node',
+    mode: 'none',
+    entry: {
+      'hooks/claude-spa': './src/super-particle-accelerator-runtime/hooks/claudeSuperParticleAccelerator.ts',
+      'hooks/codex-spa': './src/super-particle-accelerator-runtime/hooks/codexSuperParticleAccelerator.ts',
+    },
+    output: {
+      path: path.resolve(__dirname, 'dist', 'super-particle-accelerator-runtime'),
+      filename: '[name].js',
+      libraryTarget: 'commonjs2',
+    },
+    externals: {
+      vscode: 'commonjs vscode',
+    },
+    resolve: {
+      extensions: ['.ts', '.js'],
+    },
+    module: {
+      rules: [
+        {
+          test: /\.ts$/,
+          exclude: /node_modules/,
+          use: 'ts-loader',
+        },
+      ],
+    },
+    optimization: {
+      minimize: false,
+    },
+    devtool: 'nosources-source-map',
+  },
 ];

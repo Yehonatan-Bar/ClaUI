@@ -170,6 +170,13 @@ claude-code-mirror/
 |   |   |   +-- ParticleAcceleratorTraceReader.ts  #   Trace reading, aggregation, 3-tier retention cleanup
 |   |   |   +-- ParticleAcceleratorDailyReportGenerator.ts # Idempotent daily aggregate reports
 |   |   |   +-- ParticleAcceleratorHookManager.ts  #   Install/uninstall Claude & Codex hooks (Bash matcher for PA + mcp__* matcher for Secret Protection)
+|   |   +-- super-particle-accelerator/
+|   |   |   +-- SuperParticleAcceleratorService.ts  #   Top-level SPA service (lifecycle, hook install, env builder, exceptions)
+|   |   |   +-- SuperParticleAcceleratorHookManager.ts # Install/uninstall SPA hooks (PreToolUse/PermissionRequest/PostToolUse/Stop) for Claude & Codex
+|   |   |   +-- SuperParticleAcceleratorSettings.ts #   VS Code settings reader (claudeMirror.superParticleAccelerator.*)
+|   |   |   +-- SuperParticleAcceleratorEnvBuilder.ts # CLAUI_SPA_* env var builder
+|   |   |   +-- SuperParticleAcceleratorAuditReader.ts # JSONL audit event reader
+|   |   |   +-- SpaExceptionStore.ts               #   Exception CRUD with atomic writes
 |   |   +-- secret-protection/
 |   |   |   +-- SecretProtectionSettings.ts        #   VS Code settings reader (claudeMirror.secretProtection.*)
 |   |   |   +-- SecretProtectionService.ts         #   Top-level DLP service (lifecycle, broker creation, settings watcher, audit/report API)
@@ -208,6 +215,17 @@ claude-code-mirror/
 |   |   +-- hooks/
 |   |       +-- claudePreToolUse.ts       #   Claude pre-tool-use hook (rewrites Bash to claui-run, scans MCP tool args)
 |   |       +-- codexPreToolUse.ts        #   Codex pre-tool-use hook (deny + retry pattern, scans MCP tool args)
+|   +-- super-particle-accelerator-runtime/ # SPA hook scripts (separate webpack target, no VS Code deps)
+|   |   +-- SecretWritePolicyEngine.ts    #   Deny-first waterfall policy (5 gates)
+|   |   +-- PathClassifier.ts            #   File path -> risk level classification
+|   |   +-- SecretScanner.ts             #   Secret detection with safe redaction
+|   |   +-- GitStateScanner.ts           #   Git diff/staged/unstaged/untracked + isGitIgnored
+|   |   +-- AuditWriter.ts              #   JSONL audit files
+|   |   +-- ExceptionLoader.ts          #   Exception persistence + consumeMany
+|   |   +-- BaselineStore.ts            #   Per-session baseline for Stop dedup
+|   |   +-- hooks/
+|   |       +-- claudeSuperParticleAccelerator.ts # Claude SPA hook (PreToolUse/PostToolUse/Stop)
+|   |       +-- codexSuperParticleAccelerator.ts  # Codex SPA hook (PreToolUse/PermissionRequest/PostToolUse/Stop)
 |   +-- shared/                           # Cross-boundary modules (imported by both extension and runtime)
 |   |   +-- audit/
 |   |       +-- AuditStore.ts             #   Date-partitioned JSONL audit backend with filters, stats, retention cleanup
@@ -710,6 +728,9 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **Secret Protection Demo Test Harness** -- Comprehensive evidence-producing test suite for the Secret Protection Broker covering all 13 DLP boundaries, all rule packs, and all enforcement modes. Wired boundaries execute through `SecretProtectionBroker`; `git.diff`, `mcp.response`, and `telemetry.export` are recorded as scanner-only. 26 fixtures (21 dirty, 5 clean) include rule-aligned `minimumExpectedFindings`, expected rule IDs/finding types, severity floors, and clean negative cases. Outputs include `demo-results.json`, `live-evidence.json`, `screenshot-manifest.json`, audit JSONL, no-regression clean workflow proxy evidence, policy decision matrix, acceptance failures, and a generated HTML report.
 > Detail: `tests/secret-protection-demo/DEMO_GUIDE.md`
 
+**Super Particle Accelerator (SPA)** -- Hook-based secret write guard that intercepts every AI agent write operation (Edit, Write, Bash file-writes, MCP writes, git commit/push) and blocks any attempt to write API keys, tokens, credentials, or other secrets into the codebase. Runs as Claude Code and Codex hooks (PreToolUse, PermissionRequest, PostToolUse, Stop). Architecture: deny-first waterfall policy engine with 5 gates (no findings, placeholder filter, public-path hard deny, gitignored env file audit, exception matching). PathClassifier maps files to risk levels (public-client-code, generated-public-artifact, server-code, local-secret-file, unknown-repository-file). GitStateScanner verifies gitignore status and scans staged/unstaged/untracked files. Per-session baselines prevent blocking pre-existing secrets in Stop hook. Extension-side: SuperParticleAcceleratorService manages lifecycle and hook installation, SuperParticleAcceleratorHookManager installs SPA hooks BEFORE PA hooks with per-matcher status verification, SuperParticleAcceleratorEnvBuilder always injects CLAUI_SPA_STORE_DIR (even when disabled) for file-based mid-session activation via `runtime-enabled.json`. UI: StatusBadge in StatusBar, modal SPA panel with enable toggle, mode selector, audit event viewer. Configurable via `claudeMirror.superParticleAccelerator.*` (11 settings).
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/SUPER_PARTICLE_ACCELERATOR.md`
+
 **Workstream Map** -- Subway-map style visualization that groups sessions into logical workstreams (coherent threads of work with a goal, status, and history). AI-powered classification pipeline: scoped to open-tab sessions + last 3 days, heuristic pre-clustering (git branch, file overlap Jaccard, temporal proximity), then Sonnet classification via stdin-piped CLI call. Explicit external folder import lets the user enter a folder path and digest supported documents (`md/txt/json/yaml/html/xml/docx`, capped) into a dashed `external_folder` workstream with source-file evidence; normal reclassification preserves those imported workstreams. Stations represent meaningful events (milestones, decisions, blockers, discoveries). SVG deterministic lane layout with visual encodings for status, confidence, type. Layers: Current State, Resume View, Plan Overlay, Resolve Mode. Backend: `WorkstreamManager` orchestrator + 14 service classes. Frontend includes `UserPortfolioView`, `PortfolioProjectMap`, `ProjectMapView`, and shared SVG primitives. Claude and Codex tabs both route Workstream Map/Portfolio messages through the shared manager. Includes **User Portfolio View** (cross-project): `UserPortfolioManager` + `UserPortfolioStore` use `globalState` for cross-workspace persistence; project health scoring (healthy/needs_attention/blocked/stale), cross-project resume recommendations, path validation for deleted projects, and a stacked full-map overview that renders every cached project workstream with simple project separators. Portfolio auto-open is suppressed for unclassified current workspaces so the empty Project Map remains available for first classification. Commands: `claudeMirror.openWorkstreamMap`, `claudeMirror.openWorkstreamPortfolio`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP.md`
 
@@ -793,6 +814,17 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 | `claudeMirror.secretProtection.exceptionMaxMinutes` | `30` | Max duration for temporary DLP exceptions (1-1440) |
 | `claudeMirror.secretProtection.auditRetentionDays` | `90` | Days to retain DLP audit logs (1-365) |
 | `claudeMirror.secretProtection.enableEntropyScanner` | `false` | Enable experimental entropy-based secret detection |
+| `claudeMirror.superParticleAccelerator.enabled` | `false` | Enable SPA hook-based secret write guard |
+| `claudeMirror.superParticleAccelerator.mode` | `"block"` | Mode: block (deny writes) or audit (log only) |
+| `claudeMirror.superParticleAccelerator.scanEditTools` | `true` | Scan Edit/Write/MultiEdit tool operations |
+| `claudeMirror.superParticleAccelerator.scanBashCommands` | `true` | Scan Bash commands for secrets and git guards |
+| `claudeMirror.superParticleAccelerator.scanMcpTools` | `true` | Scan MCP tool arguments |
+| `claudeMirror.superParticleAccelerator.scanWorkingTreeOnStop` | `true` | Scan working tree on session Stop |
+| `claudeMirror.superParticleAccelerator.blockGitCommitPush` | `true` | Block git add/commit/push with secrets |
+| `claudeMirror.superParticleAccelerator.allowIgnoredEnvFiles` | `true` | Allow gitignored .env files (audit only) |
+| `claudeMirror.superParticleAccelerator.entropyThreshold` | `4.2` | Entropy threshold for secret detection |
+| `claudeMirror.superParticleAccelerator.frontendPathGlobs` | see package.json | Glob patterns for frontend/client paths |
+| `claudeMirror.superParticleAccelerator.allowedSecretFileGlobs` | see package.json | Glob patterns for allowed env files |
 
 ---
 

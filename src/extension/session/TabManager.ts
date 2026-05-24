@@ -82,6 +82,9 @@ export class TabManager {
   /** Shared Secret Protection service, injected after construction */
   secretProtectionService: import('../secret-protection/SecretProtectionService').SecretProtectionService | null = null;
 
+  /** Shared Super Particle Accelerator service, injected after construction */
+  superParticleAcceleratorService: import('../super-particle-accelerator/SuperParticleAcceleratorService').SuperParticleAcceleratorService | null = null;
+
   private readonly snapshotStore: OpenTabsSnapshotStore;
   private readonly snapshotEntries = new Map<string, OpenTabSnapshotEntry>();
   private snapshotDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -350,6 +353,9 @@ export class TabManager {
     if (this.secretProtectionService) {
       tab.setSecretProtectionService(this.secretProtectionService);
     }
+    if (this.superParticleAcceleratorService) {
+      tab.setSuperParticleAcceleratorService(this.superParticleAcceleratorService);
+    }
     tab.setSessionStore(this.sessionStore);
     tab.setOpenTabSessionIdsGetter(() => this.getOpenTabSessionIds());
     this.seedSnapshotEntry(tab);
@@ -411,6 +417,9 @@ export class TabManager {
     }
     if (this.secretProtectionService) {
       tab.setSecretProtectionService(this.secretProtectionService);
+    }
+    if (this.superParticleAcceleratorService) {
+      tab.setSuperParticleAcceleratorService(this.superParticleAcceleratorService);
     }
     tab.setSessionStore(this.sessionStore);
     tab.setOpenTabSessionIdsGetter(() => this.getOpenTabSessionIds());

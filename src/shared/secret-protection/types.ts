@@ -264,6 +264,7 @@ export interface SecretProtectionSettings {
   exceptionMaxMinutes: number;
   auditRetentionDays: number;
   enableEntropyScanner: boolean;
+  entropyThreshold?: number;
 }
 
 // --- Policy Config ---

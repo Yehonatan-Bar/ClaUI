@@ -5,9 +5,9 @@ import { AuditLogPanel } from './AuditLogPanel';
 import { buildOutboundManifestPreview } from '../panels/OutboundManifestPanel';
 import type { SecretProtectionSettings } from '../../shared/secret-protection/types';
 
-type ToggleKey = {
+type ToggleKey = NonNullable<{
   [K in keyof SecretProtectionSettings]: SecretProtectionSettings[K] extends boolean ? K : never;
-}[keyof SecretProtectionSettings];
+}[keyof SecretProtectionSettings]>;
 
 const TOGGLES: Array<{ key: ToggleKey; label: string }> = [
   { key: 'enabled', label: 'Enabled' },
