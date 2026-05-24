@@ -2,6 +2,33 @@
   "hooks": {
     "PreToolUse": [
       {
+        "matcher": "Edit|Write|MultiEdit|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"c:\\Users\\yoni.bar\\AppData\\Roaming\\Code\\User\\globalStorage\\jhonbar.claude-code-mirror\\super-particle-accelerator\\runtime\\hooks\\codex-spa.js\" --claui-spa-hook PreToolUse"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"c:\\Users\\yoni.bar\\AppData\\Roaming\\Code\\User\\globalStorage\\jhonbar.claude-code-mirror\\super-particle-accelerator\\runtime\\hooks\\codex-spa.js\" --claui-spa-hook PreToolUse"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"c:\\Users\\yoni.bar\\AppData\\Roaming\\Code\\User\\globalStorage\\jhonbar.claude-code-mirror\\super-particle-accelerator\\runtime\\hooks\\codex-spa.js\" --claui-spa-hook PreToolUse"
+          }
+        ]
+      },
+      {
         "matcher": "Bash",
         "hooks": [
           {
@@ -16,6 +43,39 @@
           {
             "type": "command",
             "command": "node \"c:\\Users\\yoni.bar\\AppData\\Roaming\\Code\\User\\globalStorage\\jhonbar.claude-code-mirror\\particle-accelerator\\runtime\\hooks\\codex-pre-tool-use.js\" --claui-managed-hook codex-pre-tool-use-mcp"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"c:\\Users\\yoni.bar\\AppData\\Roaming\\Code\\User\\globalStorage\\jhonbar.claude-code-mirror\\super-particle-accelerator\\runtime\\hooks\\codex-spa.js\" --claui-spa-hook PermissionRequest"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"c:\\Users\\yoni.bar\\AppData\\Roaming\\Code\\User\\globalStorage\\jhonbar.claude-code-mirror\\super-particle-accelerator\\runtime\\hooks\\codex-spa.js\" --claui-spa-hook PostToolUse"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"c:\\Users\\yoni.bar\\AppData\\Roaming\\Code\\User\\globalStorage\\jhonbar.claude-code-mirror\\super-particle-accelerator\\runtime\\hooks\\codex-spa.js\" --claui-spa-hook Stop"
           }
         ]
       }
