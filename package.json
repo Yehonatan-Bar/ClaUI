@@ -2,7 +2,7 @@
   "name": "claude-code-mirror",
   "displayName": "ClaUi",
   "description": "The full IDE experience for Claude Code - multi-tab sessions, analytics, achievements, dual providers, prompt enhancement, and deep customization",
-  "version": "0.1.173",
+  "version": "0.1.174",
   "publisher": "JhonBar",
   "icon": "images/icon.png",
   "engines": {
@@ -895,7 +895,10 @@
         },
         "claudeMirror.superParticleAccelerator.mode": {
           "type": "string",
-          "enum": ["block", "audit"],
+          "enum": [
+            "block",
+            "audit"
+          ],
           "default": "block",
           "description": "block = deny write operations containing secrets. audit = log only, don't block.",
           "scope": "resource"
@@ -944,15 +947,36 @@
         },
         "claudeMirror.superParticleAccelerator.frontendPathGlobs": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["public/**","static/**","dist/**","build/**","client/**","frontend/**","web/**","src/**/*.html","src/**/*.tsx","src/**/*.jsx","src/**/*.js","src/**/*.ts"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "public/**",
+            "static/**",
+            "dist/**",
+            "build/**",
+            "client/**",
+            "frontend/**",
+            "web/**",
+            "src/**/*.html",
+            "src/**/*.tsx",
+            "src/**/*.jsx",
+            "src/**/*.js",
+            "src/**/*.ts"
+          ],
           "description": "Glob patterns for paths classified as frontend/client-side code.",
           "scope": "resource"
         },
         "claudeMirror.superParticleAccelerator.allowedSecretFileGlobs": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": [".env.local", ".env.*.local", "*.local.env"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            ".env.local",
+            ".env.*.local",
+            "*.local.env"
+          ],
           "description": "Glob patterns for files where secrets are allowed (only when gitignored and outside public directories).",
           "scope": "resource"
         },
