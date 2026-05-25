@@ -50,14 +50,32 @@ export const SuperParticleAcceleratorPanel: React.FC = () => {
                 code, git commits, MCP writes, and public assets.
               </span>
             </label>
-            <button
-              className={`spa-toggle-button ${enabled ? 'spa-toggle-on' : 'spa-toggle-off'}`}
-              onClick={() =>
-                postToExtension({ type: 'superParticleAcceleratorSetEnabled', enabled: !enabled } as any)
-              }
-            >
-              {enabled ? 'Enabled' : 'Disabled'}
-            </button>
+            {!enabled && (
+              <div className="spa-toggle-actions">
+                <span className="spa-disabled-hint">Currently disabled</span>
+                <button
+                  className="spa-toggle-button spa-toggle-enable"
+                  onClick={() =>
+                    postToExtension({ type: 'superParticleAcceleratorSetEnabled', enabled: true } as any)
+                  }
+                >
+                  Enable
+                </button>
+              </div>
+            )}
+            {enabled && (
+              <div className="spa-toggle-actions">
+                <span className="spa-enabled-hint">Enabled</span>
+                <button
+                  className="spa-toggle-button spa-toggle-disable"
+                  onClick={() =>
+                    postToExtension({ type: 'superParticleAcceleratorSetEnabled', enabled: false } as any)
+                  }
+                >
+                  Disable
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="spa-status-row">

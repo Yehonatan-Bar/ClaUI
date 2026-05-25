@@ -637,8 +637,30 @@ Mac users: Replace `Ctrl` with `Cmd` for all shortcuts.
 
 ---
 
+## 39. Super Particle Accelerator (SPA) — Secret Write Guard
+
+- **Hook-based secret interception** - Installs hooks into Claude Code (`.claude/settings.json`) and Codex (`.codex/hooks.json`) that intercept every AI agent write operation (Edit, Write, MultiEdit, Bash, MCP tool calls) and block attempts to write secrets into the codebase
+- **Deny-first policy engine** - 5-gate waterfall: no findings (allow), placeholders/low-confidence (allow), public/client path (hard deny, no exceptions), gitignored env file (audit), exception match (audit), default (deny or audit)
+- **Path classification** - Files classified into 5 risk levels: `public-client-code`, `generated-public-artifact`, `server-code`, `local-secret-file`, `unknown-repository-file`. Public paths (`public/`, `dist/`, `build/`, `static/`, `client/`, `frontend/`, `web/`, `*.bundle.js`, `*.min.js`) are hard-denied with no exception bypass
+- **Git state scanning** - Scans staged, unstaged, and untracked files; blocks `git add`/`commit`/`push` when secrets detected; verifies `.env` files are actually gitignored via `git check-ignore`
+- **Two modes** - `block` (deny writes) and `audit` (log only). Gate 2 (public paths) always denies regardless of mode
+- **Fail-closed on writes** - PreToolUse timeouts/errors produce `deny`. PostToolUse/Stop are fail-open
+- **Baseline deduplication** - Per-session baseline so Stop hook only reports new findings, not pre-existing secrets
+- **Exception system** - Scoped temporary approvals with atomic write, max-use limits, and expiry
+- **Audit trail** - JSONL audit files with safe redaction (max 25% revealed, capped at 8 chars, SHA-256 hash)
+- **File-based mid-session activation** - `runtime-enabled.json` enables toggling SPA on for tabs already running (their env vars are fixed from spawn time)
+- **Hook events** - PreToolUse (edit/bash/mcp), PermissionRequest (Codex Bash), PostToolUse (Bash output), Stop (working tree scan)
+- **UI** - StatusBar badge (SPA On/Off/Warn), settings/audit panel with enable toggle, mode selector, and recent audit events
+- **Configurable entropy threshold** - Default 4.2 (more sensitive than Secret Protection's 4.5)
+- **SPA hooks ordered before PA hooks** - Ensures secret scanning runs before output filtering
+- 11 VS Code settings under `claudeMirror.superParticleAccelerator.*`
+- 77 tests across 10 test files covering policy engine, path classification, scanning, audit, exceptions, baselines, entropy, runtime settings, and security regression
+- See `Kingdom_of_Claudes_Beloved_MDs/SUPER_PARTICLE_ACCELERATOR.md` for details
+
+---
+
 ## Summary
 
-**38 major feature categories comprising approximately 180+ individual capabilities.**
+**39 major feature categories comprising approximately 200+ individual capabilities.**
 
-ClaUi transforms the Claude Code CLI into a full-featured visual IDE experience with multi-tab sessions, analytics, gamification, AI-powered prompt enhancement, dual provider support (Claude + Codex), social features, and deep customization.
+ClaUi transforms the Claude Code CLI into a full-featured visual IDE experience with multi-tab sessions, analytics, gamification, AI-powered prompt enhancement, dual provider support (Claude + Codex), social features, security (secret write guard), and deep customization.

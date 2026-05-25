@@ -2,6 +2,8 @@
 
 Multi-boundary, destination-aware DLP broker that protects 9+ boundaries where secrets can leak from an AI coding agent session.
 
+**See also:** [[SUPER_PARTICLE_ACCELERATOR]] (write-operation secret blocking) and [[PARTICLE_ACCELERATOR]] (terminal-output redaction).
+
 ## Architecture
 
 The Secret Protection Broker extends Particle Accelerator's terminal-output-only redaction into a comprehensive system. The core insight: the same secret can leak through any boundary, and the correct action depends on the **destination** (local disk vs. remote model vs. Git remote vs. MCP server).

@@ -114,8 +114,8 @@ Status values: `enabled-hooks-installed` (all hooks present, SPA before PA), `en
 
 ### Tests (77 total)
 - `tests/super-particle-accelerator/SecretWritePolicyEngine.test.ts` - Policy engine gate tests (14 tests)
-- `tests/super-particle-accelerator/PathClassifier.test.ts` - Path classification tests (13 tests)
-- `tests/super-particle-accelerator/SecretScanner.test.ts` - Scanner and redaction tests (6 tests)
+- `tests/super-particle-accelerator/PathClassifier.test.ts` - Path classification tests (15 tests)
+- `tests/super-particle-accelerator/SecretScanner.test.ts` - Scanner and redaction tests (7 tests)
 - `tests/super-particle-accelerator/AuditWriter.test.ts` - JSONL audit file writing (3 tests)
 - `tests/super-particle-accelerator/ExceptionLoader.test.ts` - Exception loading, filtering, atomic consumption (6 tests)
 - `tests/super-particle-accelerator/BaselineStore.test.ts` - Baseline save/load, filterNew, path sanitization (5 tests)
@@ -123,6 +123,15 @@ Status values: `enabled-hooks-installed` (all hooks present, SPA before PA), `en
 - `tests/super-particle-accelerator/hooks/runtimeSettings.test.ts` - Runtime settings file-based activation + simpleGlobMatch globstar tests (12 tests)
 - `tests/super-particle-accelerator/security/gitignoreBypass.test.ts` - Security regression tests (5 tests)
 - `tests/super-particle-accelerator/security/largContentBypass.test.ts` - Large content truncation verification (5 tests)
+
+### SPA Capability Demo
+Standalone demonstration script that runs realistic scenarios through the compiled SPA hook to showcase all types of secret leaks it prevents.
+
+**Location:** `tests/super-particle-accelerator/spa-capability-demo.ts`  
+**Usage:** `npx tsx tests/super-particle-accelerator/spa-capability-demo.ts`  
+**Output:** Generates `spa-capability-demo-report.html` with evidence and scenario breakdown
+
+This is not a test suite file — it is an executable harness for capability verification that validates SPA's detection and blocking across realistic secret scenarios.
 
 ## Configuration
 
@@ -161,3 +170,9 @@ Used in `PathClassifier` and `SecretWritePolicyEngine` for glob pattern matching
 3. Each tab's process manager gets env vars via `buildSpaEnv()`
 4. `MessageHandler` handles webview messages for status, toggle, mode, audit, exceptions
 5. Hooks run as subprocess scripts (`node claude-spa.js --claui-spa-hook PreToolUse`), read JSON from stdin, write deny/allow JSON to stdout
+
+## Related Security Features
+
+**[[PARTICLE_ACCELERATOR]]** — Complimentary terminal-output filtering for Bash command output. Redacts secrets from logs after execution. SPA blocks secrets at the write point; Particle Accelerator filters them from console output.
+
+**[[SECRET_PROTECTION_BROKER]]** — Comprehensive multi-boundary DLP that scans 13+ boundaries (prompts, context, MCP, git, telemetry). SPA focuses specifically on write operations; Secret Protection Broker handles a broader set of data flows and destinations.

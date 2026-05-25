@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>Email Draft - SPA Security</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 2rem;
+    line-height: 1.8;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  .email-box {
+    background: #16213e;
+    border: 1px solid #0f3460;
+    border-radius: 10px;
+    padding: 2rem;
+  }
+  .field { margin-bottom: 0.5rem; color: #8b949e; font-size: 0.9rem; }
+  .field strong { color: #58a6ff; }
+  hr { border: none; border-top: 1px solid #0f3460; margin: 1rem 0; }
+  .body-text { font-size: 1rem; line-height: 2; }
+  .highlight { background: #2d1b1b; border-right: 3px solid #f85149; padding: 0.8rem 1rem; margin: 1rem 0; border-radius: 4px; }
+  .solution { background: #1b2d1b; border-right: 3px solid #3fb950; padding: 0.8rem 1rem; margin: 1rem 0; border-radius: 4px; }
+  .note { font-size: 0.85rem; color: #8b949e; margin-top: 1.5rem; }
+</style>
+</head>
+<body>
+
+<div class="email-box">
+  <div class="field"><strong>נושא:</strong> הגנה מפני דליפת מפתחות API לקוד צד-לקוח - כלי SPA</div>
+  <div class="field"><strong>מצורף:</strong> spa-capability-demo-report.html</div>
+  <hr>
+
+  <div class="body-text">
+
+    <p>שלום,</p>
+
+    <p>בעקבות אירוע האבטחה מ-14.05 שבו מפתח Google API דלף מקוד צד-לקוח פומבי וגרם לחיובי הונאה של כ-170,000 שקלים, פיתחתי כלי הגנה שמונע את הסוג הזה של דליפה באופן אוטומטי.</p>
+
+    <div class="highlight">
+      <strong>הבעיה שהיתה:</strong> מפתחות API היו מוטמעים בקוד HTML/JavaScript שנגיש מהדפדפן. בוטים אוטומטיים סרקו את האתרים, מצאו את המפתחות, וניצלו אותם לקריאות API בתשלום.
+    </div>
+
+    <div class="solution">
+      <strong>הפתרון - Super Particle Accelerator (SPA):</strong> הכלי יושב בתוך סביבת הפיתוח (ClaUi) ומיירט כל פעולת כתיבה של סוכן AI. ברגע שהוא מזהה מפתח API, סיסמה, טוקן, או כל סוד אחר - הוא חוסם את הכתיבה לפני שהיא מתבצעת.
+    </div>
+
+    <p><strong>מה הכלי עושה בפועל:</strong></p>
+    <ul>
+      <li>סורק כל קובץ שסוכן AI מנסה לכתוב או לערוך</li>
+      <li>מזהה מפתחות של Google, OpenAI, AWS, GitHub, Stripe, Slack, Azure ועוד</li>
+      <li>חוסם חסימה קשיחה כל ניסיון לשים סוד בקוד צד-לקוח (public, dist, build, frontend) - ללא אפשרות לעקוף</li>
+      <li>חוסם פקודות git push / commit כשיש סודות בקבצים</li>
+      <li>חוסם שליחת סודות דרך כלים חיצוניים (Slack, email, GitHub Issues)</li>
+      <li>מנחה את הסוכן לתקן: "העבר את הסוד למשתנה סביבה בצד שרת, חשוף proxy endpoint"</li>
+    </ul>
+
+    <p><strong>תוצאות הניסוי (מצורף):</strong></p>
+    <p>הרצתי 27 תרחישים עם מפתחות דמה - כולל תרחיש זהה לאירוע שלנו (מפתח Google API בדף HTML ציבורי). הכלי חסם 23 ניסיונות דליפה והעביר 4 פעולות בטוחות. 27 מתוך 27 תרחישים עברו כצפוי.</p>
+
+    <p>הדוח המצורף מפרט כל תרחיש, מה נחסם, ולמה.</p>
+
+    <p class="note">הערה: הכלי מגן על פעולות של סוכני AI (Claude, Codex). להגנה על מפתחים אנושיים כבר מותקן gitleaks כ-pre-commit hook - יחד זה נותן כיסוי מלא.</p>
+
+    <p>בברכה,<br>ארתור</p>
+
+  </div>
+</div>
+
+</body>
+</html>

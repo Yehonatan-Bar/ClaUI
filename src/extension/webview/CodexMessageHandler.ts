@@ -464,8 +464,22 @@ export class CodexMessageHandler {
       this.describeImageCaptures(images, composedText),
     );
     switch (decision.action) {
+      case 'require_approval': {
+        this.log(`[SecretProtection] Browser capture requires approval: ${decision.reason}`);
+        const choice = await vscode.window.showWarningMessage(
+          `Secret Protection: Image capture requires approval before sending to the model.`,
+          { modal: true, detail: decision.approvalRequest?.description ?? decision.reason },
+          'Send Anyway',
+          'Remove Image',
+        );
+        if (choice === 'Send Anyway') {
+          this.log(`[SecretProtection] User approved browser capture`);
+          return true;
+        }
+        this.log(`[SecretProtection] User declined browser capture`);
+        return false;
+      }
       case 'block':
-      case 'require_approval':
         this.log(`[SecretProtection] Browser capture ${decision.action}: ${decision.reason}`);
         this.postToWebview({
           type: 'error',

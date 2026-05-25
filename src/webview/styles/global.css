@@ -10185,6 +10185,24 @@ html, body, #root {
 .spa-toggle-label { display: flex; flex-direction: column; gap: 2px; }
 .spa-toggle-description { font-size: 11px; color: var(--vscode-descriptionForeground); }
 
+.spa-toggle-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.spa-disabled-hint {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.spa-enabled-hint {
+  font-size: 11px;
+  color: #3fb950;
+  font-weight: 600;
+}
+
 .spa-toggle-button {
   padding: 4px 12px;
   border-radius: 3px;
@@ -10192,13 +10210,19 @@ html, body, #root {
   font-size: 12px;
   cursor: pointer;
 }
-.spa-toggle-on {
+
+.spa-toggle-enable {
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
 }
-.spa-toggle-off {
+
+.spa-toggle-disable {
   background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
+}
+.spa-toggle-disable:hover {
+  background: rgba(248, 81, 73, 0.2);
+  color: #f85149;
 }
 
 .spa-status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }

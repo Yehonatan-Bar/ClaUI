@@ -1845,12 +1845,22 @@ export const SuperParticleAcceleratorPanel: React.FC = () => {
                 detected secrets into code, git commits, MCP writes, and public assets.
               </span>
             </label>
-            <button
-              className={`spa-toggle-button ${enabled ? 'spa-toggle-on' : 'spa-toggle-off'}`}
-              onClick={() => postToExtension({ type: 'superParticleAcceleratorSetEnabled', enabled: !enabled })}
-            >
-              {enabled ? 'Enabled' : 'Disabled'}
-            </button>
+            <div className="spa-toggle-group">
+              <button
+                className={`spa-toggle-button ${enabled ? 'spa-toggle-active' : 'spa-toggle-action'}`}
+                onClick={() => { if (!enabled) postToExtension({ type: 'superParticleAcceleratorSetEnabled', enabled: true }); }}
+                disabled={enabled}
+              >
+                {enabled ? 'Enabled' : 'Enable'}
+              </button>
+              <button
+                className={`spa-toggle-button ${!enabled ? 'spa-toggle-active' : 'spa-toggle-action'}`}
+                onClick={() => { if (enabled) postToExtension({ type: 'superParticleAcceleratorSetEnabled', enabled: false }); }}
+                disabled={!enabled}
+              >
+                {enabled ? 'Disable' : 'Disabled'}
+              </button>
+            </div>
           </div>
 
           {/* Status indicator */}
@@ -1962,20 +1972,30 @@ Add to `src/webview/styles/global.css`:
 .spa-toggle-label { display: flex; flex-direction: column; gap: 2px; }
 .spa-toggle-description { font-size: 11px; color: var(--vscode-descriptionForeground); }
 
+.spa-toggle-group {
+  display: flex;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--vscode-button-border, var(--vscode-panel-border));
+}
 .spa-toggle-button {
   padding: 4px 12px;
-  border-radius: 3px;
-  border: 1px solid var(--vscode-button-border, transparent);
+  border: none;
   font-size: 12px;
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
-.spa-toggle-on {
+.spa-toggle-button:disabled { cursor: default; }
+.spa-toggle-active {
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
 }
-.spa-toggle-off {
+.spa-toggle-action {
   background: var(--vscode-button-secondaryBackground);
   color: var(--vscode-button-secondaryForeground);
+}
+.spa-toggle-action:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground);
 }
 
 .spa-status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }

@@ -2,6 +2,8 @@
 
 Local-only command output compressor for ClaUi. Intercepts Bash commands from coding agents (Claude/Codex), routes eligible commands through a `claui-run` CLI, redacts secrets, filters and compresses noisy output, preserves exit codes, and writes trace files for analytics.
 
+**See also:** [[SUPER_PARTICLE_ACCELERATOR]] (write-operation secret blocking) and [[SECRET_PROTECTION_BROKER]] (comprehensive boundary DLP).
+
 ## Architecture
 
 ```
