@@ -1,8 +1,7 @@
 import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 import type { ContentBlock } from '../types/stream-json';
 import type { SerializedChatMessage } from '../types/webview-messages';
+import { findSessionJsonlPath } from './sessionPathResolver';
 
 /**
  * Reads conversation history from Claude Code's local session storage.
@@ -12,18 +11,14 @@ import type { SerializedChatMessage } from '../types/webview-messages';
  * Multiple entries share the same message ID and must be merged to reconstruct the full message.
  */
 export class ConversationReader {
-  private readonly claudeDir: string;
-
-  constructor(private readonly log: (msg: string) => void = () => {}) {
-    this.claudeDir = path.join(os.homedir(), '.claude');
-  }
+  constructor(private readonly log: (msg: string) => void = () => {}) {}
 
   /**
    * Read conversation messages for a given session ID.
    * Returns messages formatted for the webview.
    */
   readSession(sessionId: string, workspacePath?: string): SerializedChatMessage[] {
-    const jsonlPath = this.findSessionFile(sessionId, workspacePath);
+    const jsonlPath = findSessionJsonlPath(sessionId, workspacePath);
     if (!jsonlPath) {
       this.log(`[ConversationReader] No JSONL file found for session ${sessionId}`);
       return [];
@@ -177,49 +172,4 @@ export class ConversationReader {
     assistantOrder.length = 0;
   }
 
-  /**
-   * Find the JSONL file for a session ID.
-   * Tries the expected project directory first, then scans all projects.
-   */
-  private findSessionFile(sessionId: string, workspacePath?: string): string | null {
-    const projectsDir = path.join(this.claudeDir, 'projects');
-    if (!fs.existsSync(projectsDir)) {
-      return null;
-    }
-
-    const fileName = `${sessionId}.jsonl`;
-
-    // If workspace path is provided, try the expected project directory
-    if (workspacePath) {
-      // Claude's directory naming: replace :, \, / with -
-      const dirName = workspacePath.replace(/[:\\/]/g, '-');
-      const expectedPath = path.join(projectsDir, dirName, fileName);
-      if (fs.existsSync(expectedPath)) {
-        return expectedPath;
-      }
-
-      // Try with toggled drive letter case (Windows inconsistency)
-      const ch = dirName.charAt(0);
-      const altDirName = (ch === ch.toLowerCase() ? ch.toUpperCase() : ch.toLowerCase()) + dirName.slice(1);
-      const altPath = path.join(projectsDir, altDirName, fileName);
-      if (fs.existsSync(altPath)) {
-        return altPath;
-      }
-    }
-
-    // Fallback: scan all project directories
-    try {
-      const dirs = fs.readdirSync(projectsDir);
-      for (const dir of dirs) {
-        const candidatePath = path.join(projectsDir, dir, fileName);
-        if (fs.existsSync(candidatePath)) {
-          return candidatePath;
-        }
-      }
-    } catch {
-      // Directory listing failed
-    }
-
-    return null;
-  }
 }

@@ -1,4 +1,4 @@
-import * as vscode from 'vscode';
+﻿import * as vscode from 'vscode';
 import { ChildProcess, spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import type { CliOutputEvent, CliInputMessage } from '../types/stream-json';
@@ -57,6 +57,9 @@ export class ClaudeProcessManager extends EventEmitter {
 
   /** Optional Super Particle Accelerator env builder; set by SessionTab */
   superParticleAcceleratorEnvBuilder: ((baseEnv: NodeJS.ProcessEnv) => Record<string, string | undefined>) | null = null;
+
+  /** Optional Workspace Access Guard env builder; set by SessionTab */
+  workspaceAccessGuardEnvBuilder: (() => Record<string, string>) | null = null;
 
   /** Whether secret protection DLP scanning is active; set by SessionTab */
   secretProtectionEnabled = false;
@@ -157,6 +160,16 @@ export class ClaudeProcessManager extends EventEmitter {
         this.log('Particle Accelerator env injected');
       } catch (err) {
         this.log(`Particle Accelerator env injection failed: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
+    // Inject Workspace Access Guard environment (runs before SPA)
+    if (this.workspaceAccessGuardEnvBuilder) {
+      try {
+        env = { ...env, ...this.workspaceAccessGuardEnvBuilder() };
+        this.log('Workspace Access Guard env injected');
+      } catch (err) {
+        this.log(`Workspace Access Guard env injection failed: ${err instanceof Error ? err.message : err}`);
       }
     }
 

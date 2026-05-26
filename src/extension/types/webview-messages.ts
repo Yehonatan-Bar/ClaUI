@@ -1071,7 +1071,19 @@ export type WebviewToExtensionMessage =
   | SuperParticleAcceleratorSetModeRequest
   | SuperParticleAcceleratorGetAuditEventsRequest
   | SuperParticleAcceleratorCreateExceptionRequest
-  | SuperParticleAcceleratorDeleteExceptionRequest;
+  | SuperParticleAcceleratorDeleteExceptionRequest
+  | WorkspaceAccessGuardGetStatusRequest
+  | WorkspaceAccessGuardSetEnabledRequest
+  | WorkspaceAccessGuardSetModeRequest
+  | WorkspaceAccessGuardGetAllowedRootsRequest
+  | WorkspaceAccessGuardPickAllowedRootsRequest
+  | WorkspaceAccessGuardAddAllowedRootsRequest
+  | WorkspaceAccessGuardRemoveAllowedRootRequest
+  | WorkspaceAccessGuardAddCurrentWorkspaceRequest
+  | WorkspaceAccessGuardGetOrgPolicyStatusRequest
+  | WorkspaceAccessGuardGetAuditEventsRequest
+  | WorkspaceAccessGuardTestPathRequest
+  | WorkspaceAccessGuardTestCommandRequest;
 
 // --- Super Particle Accelerator (Webview -> Extension) ---
 export interface SuperParticleAcceleratorGetStatusRequest { type: 'superParticleAcceleratorGetStatus' }
@@ -1080,6 +1092,20 @@ export interface SuperParticleAcceleratorSetModeRequest { type: 'superParticleAc
 export interface SuperParticleAcceleratorGetAuditEventsRequest { type: 'superParticleAcceleratorGetAuditEvents'; limit?: number }
 export interface SuperParticleAcceleratorCreateExceptionRequest { type: 'superParticleAcceleratorCreateException'; exception: Record<string, unknown> }
 export interface SuperParticleAcceleratorDeleteExceptionRequest { type: 'superParticleAcceleratorDeleteException'; exceptionId: string }
+
+// --- Workspace Access Guard (Webview -> Extension) ---
+export interface WorkspaceAccessGuardGetStatusRequest { type: 'workspaceAccessGuardGetStatus' }
+export interface WorkspaceAccessGuardSetEnabledRequest { type: 'workspaceAccessGuardSetEnabled'; enabled: boolean }
+export interface WorkspaceAccessGuardSetModeRequest { type: 'workspaceAccessGuardSetMode'; mode: 'block' | 'audit' }
+export interface WorkspaceAccessGuardGetAllowedRootsRequest { type: 'workspaceAccessGuardGetAllowedRoots' }
+export interface WorkspaceAccessGuardPickAllowedRootsRequest { type: 'workspaceAccessGuardPickAllowedRoots' }
+export interface WorkspaceAccessGuardAddAllowedRootsRequest { type: 'workspaceAccessGuardAddAllowedRoots'; roots: string[] }
+export interface WorkspaceAccessGuardRemoveAllowedRootRequest { type: 'workspaceAccessGuardRemoveAllowedRoot'; root: string }
+export interface WorkspaceAccessGuardAddCurrentWorkspaceRequest { type: 'workspaceAccessGuardAddCurrentWorkspace' }
+export interface WorkspaceAccessGuardGetOrgPolicyStatusRequest { type: 'workspaceAccessGuardGetOrgPolicyStatus' }
+export interface WorkspaceAccessGuardGetAuditEventsRequest { type: 'workspaceAccessGuardGetAuditEvents'; limit?: number }
+export interface WorkspaceAccessGuardTestPathRequest { type: 'workspaceAccessGuardTestPath'; value: string }
+export interface WorkspaceAccessGuardTestCommandRequest { type: 'workspaceAccessGuardTestCommand'; command: string; cwd?: string }
 
 // --- Particle Accelerator (Webview -> Extension) ---
 export interface ParticleAcceleratorGetStatusRequest { type: 'particleAcceleratorGetStatus' }
@@ -2626,7 +2652,13 @@ export type ExtensionToWebviewMessage =
   | SuperParticleAcceleratorStatusMessage
   | SuperParticleAcceleratorAuditEventsMessage
   | SuperParticleAcceleratorLastEventMessage
-  | SuperParticleAcceleratorErrorMessage;
+  | SuperParticleAcceleratorErrorMessage
+  | WorkspaceAccessGuardStatusMessage
+  | WorkspaceAccessGuardAllowedRootsMessage
+  | WorkspaceAccessGuardOrgPolicyStatusMessage
+  | WorkspaceAccessGuardAuditEventsMessage
+  | WorkspaceAccessGuardTestResultMessage
+  | WorkspaceAccessGuardErrorMessage;
 
 // --- Super Particle Accelerator (Extension -> Webview) ---
 export interface SuperParticleAcceleratorStatusMessage {
@@ -2645,6 +2677,36 @@ export interface SuperParticleAcceleratorLastEventMessage {
 }
 export interface SuperParticleAcceleratorErrorMessage {
   type: 'superParticleAcceleratorError';
+  error: string;
+}
+
+// --- Workspace Access Guard (Extension -> Webview) ---
+export interface WorkspaceAccessGuardStatusMessage {
+  type: 'workspaceAccessGuardStatus';
+  status: {
+    enabled: boolean;
+    mode: 'block' | 'audit';
+    hookStatus: string;
+  };
+}
+export interface WorkspaceAccessGuardAllowedRootsMessage {
+  type: 'workspaceAccessGuardAllowedRoots';
+  roots: import('../../shared/workspace-access-guard/types').WorkspaceAccessAllowedRootView[];
+}
+export interface WorkspaceAccessGuardOrgPolicyStatusMessage {
+  type: 'workspaceAccessGuardOrgPolicyStatus';
+  status: import('../../shared/workspace-access-guard/types').WorkspaceAccessOrgPolicyStatus;
+}
+export interface WorkspaceAccessGuardAuditEventsMessage {
+  type: 'workspaceAccessGuardAuditEvents';
+  events: import('../../shared/workspace-access-guard/types').WorkspaceAccessAuditEvent[];
+}
+export interface WorkspaceAccessGuardTestResultMessage {
+  type: 'workspaceAccessGuardTestResult';
+  result: import('../../shared/workspace-access-guard/types').WorkspaceAccessDecision;
+}
+export interface WorkspaceAccessGuardErrorMessage {
+  type: 'workspaceAccessGuardError';
   error: string;
 }
 

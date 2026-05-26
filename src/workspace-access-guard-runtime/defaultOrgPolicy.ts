@@ -1,0 +1,48 @@
+import { WorkspaceAccessOrgPolicy } from '../shared/workspace-access-guard/types';
+
+export const DEFAULT_ORG_POLICY: WorkspaceAccessOrgPolicy = {
+  schemaVersion: 1,
+  policyName: 'ClaUi Workspace Access Guard - Windows Enterprise Defaults',
+  policyId: 'claui-wag-windows-defaults-v1',
+  updatedAt: '2026-05-25T00:00:00.000Z',
+  updatedBy: 'ClaUi built-in defaults',
+  mode: 'block',
+  deniedRoots: [
+    { id: 'win-cred-local', description: 'Windows Credential Manager local store', path: '%LOCALAPPDATA%\\Microsoft\\Credentials\\**', enabled: true, severity: 'critical', category: 'windows-credentials' },
+    { id: 'win-cred-roaming', description: 'Windows Credential Manager roaming store', path: '%APPDATA%\\Microsoft\\Credentials\\**', enabled: true, severity: 'critical', category: 'windows-credentials' },
+    { id: 'win-protect', description: 'Windows DPAPI Protect folder', path: '%APPDATA%\\Microsoft\\Protect\\**', enabled: true, severity: 'critical', category: 'windows-credentials' },
+    { id: 'ssh-dir', description: 'User SSH directory', path: '%USERPROFILE%\\.ssh\\**', enabled: true, severity: 'critical', category: 'ssh-keys' },
+    { id: 'gnupg-dir', description: 'GPG private keys and trust database', path: '%USERPROFILE%\\.gnupg\\**', enabled: true, severity: 'high', category: 'application-secrets' },
+    { id: 'aws-dir', description: 'AWS CLI configuration', path: '%USERPROFILE%\\.aws\\**', enabled: true, severity: 'critical', category: 'cloud-credentials' },
+    { id: 'azure-dir', description: 'Azure CLI configuration', path: '%USERPROFILE%\\.azure\\**', enabled: true, severity: 'critical', category: 'cloud-credentials' },
+    { id: 'gcloud-dir', description: 'Google Cloud SDK configuration', path: '%APPDATA%\\gcloud\\**', enabled: true, severity: 'critical', category: 'cloud-credentials' },
+    { id: 'kube-dir', description: 'Kubernetes kubeconfig', path: '%USERPROFILE%\\.kube\\**', enabled: true, severity: 'critical', category: 'kubernetes-credentials' },
+    { id: 'docker-dir', description: 'Docker config and registry auth', path: '%USERPROFILE%\\.docker\\**', enabled: true, severity: 'high', category: 'application-secrets' },
+    { id: 'git-cred-file', description: 'Git credential helper plaintext file', path: '%USERPROFILE%\\.git-credentials', enabled: true, severity: 'critical', category: 'git-credentials' },
+    { id: 'npmrc-file', description: 'User npm token file', path: '%USERPROFILE%\\.npmrc', enabled: true, severity: 'high', category: 'application-secrets' },
+    { id: 'pypirc-file', description: 'User PyPI config file', path: '%USERPROFILE%\\.pypirc', enabled: true, severity: 'high', category: 'application-secrets' },
+    { id: 'chrome-profile', description: 'Chrome browser profile data', path: '%LOCALAPPDATA%\\Google\\Chrome\\User Data\\**', enabled: true, severity: 'critical', category: 'browser-profile' },
+    { id: 'edge-profile', description: 'Edge browser profile data', path: '%LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\**', enabled: true, severity: 'critical', category: 'browser-profile' },
+    { id: 'firefox-profile', description: 'Firefox browser profile data', path: '%APPDATA%\\Mozilla\\Firefox\\Profiles\\**', enabled: true, severity: 'critical', category: 'browser-profile' },
+    { id: 'ps-history', description: 'PowerShell command history', path: '%APPDATA%\\Microsoft\\Windows\\PowerShell\\PSReadLine\\**', enabled: true, severity: 'medium', category: 'shell-history' },
+    { id: 'claude-history', description: 'Claude local conversation history', path: '%USERPROFILE%\\.claude\\**', enabled: true, severity: 'high', category: 'ai-agent-history' },
+    { id: 'codex-history', description: 'Codex local session history', path: '%USERPROFILE%\\.codex\\**', enabled: true, severity: 'high', category: 'ai-agent-history' },
+    { id: 'vscode-global-storage', description: 'VS Code extension global storage', path: '%APPDATA%\\Code\\User\\globalStorage\\**', enabled: true, severity: 'high', category: 'application-secrets' },
+  ],
+  broadRootRules: {
+    denyWholeUserProfile: true,
+    denyWholeUsersFolder: true,
+    denyDriveRoot: true,
+    warnOnDocumentsDesktopDownloads: true,
+  },
+  commandRules: {
+    denyRecursiveSearchOutsideAllowedRoots: true,
+    denyFileReadOutsideAllowedRoots: true,
+    denyFileWriteOutsideAllowedRoots: true,
+    denyUnknownFileAccessCommands: true,
+  },
+  ui: {
+    supportContact: 'Security team',
+    helpUrl: '',
+  },
+};

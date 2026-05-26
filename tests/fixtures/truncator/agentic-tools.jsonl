@@ -1,0 +1,15 @@
+{"type":"queue-operation","operation":"enqueue","sessionId":"test-session-2"}
+{"type":"queue-operation","operation":"dequeue","sessionId":"test-session-2"}
+{"type":"attachment","name":"project-context","sessionId":"test-session-2"}
+{"type":"user","message":{"role":"user","content":"read file.txt"},"sessionId":"test-session-2"}
+{"type":"last-prompt","sessionId":"test-session-2"}
+{"type":"assistant","message":{"id":"msg_01","role":"assistant","content":[{"type":"text","text":"Let me read that file."},{"type":"tool_use","id":"toolu_01","name":"Read","input":{"path":"file.txt"}}]},"sessionId":"test-session-2"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01","content":"file contents here"}]},"sessionId":"test-session-2"}
+{"type":"assistant","message":{"id":"msg_02","role":"assistant","content":[{"type":"text","text":"Now I'll edit it."},{"type":"tool_use","id":"toolu_02","name":"Edit","input":{"path":"file.txt","content":"new"}}]},"sessionId":"test-session-2"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_02","content":"file edited"}]},"sessionId":"test-session-2"}
+{"type":"assistant","message":{"id":"msg_03","role":"assistant","content":[{"type":"text","text":"Done! I've read and edited file.txt."}]},"sessionId":"test-session-2"}
+{"type":"queue-operation","operation":"enqueue","sessionId":"test-session-2"}
+{"type":"queue-operation","operation":"dequeue","sessionId":"test-session-2"}
+{"type":"user","message":{"role":"user","content":"next question"},"sessionId":"test-session-2"}
+{"type":"last-prompt","sessionId":"test-session-2"}
+{"type":"assistant","message":{"id":"msg_04","role":"assistant","content":[{"type":"text","text":"Sure, what would you like to know?"}]},"sessionId":"test-session-2"}

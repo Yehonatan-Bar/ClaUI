@@ -7,6 +7,7 @@ import type { SessionStore } from './session/SessionStore';
 import type { ProviderId, SerializedChatMessage } from './types/webview-messages';
 import { openHtmlPreviewPanel } from './webview/HtmlPreviewPanel';
 import { MultiParticipantSessionTab } from './multiparticipant/MultiParticipantSessionTab';
+import { SessionTruncator } from './session/SessionTruncator';
 
 function collectUrisFromArgs(args: unknown[]): vscode.Uri[] {
   const uris: vscode.Uri[] = [];
@@ -792,6 +793,33 @@ export function registerCommands(
         const tab = tabManager.createTabForProvider(sourceProvider);
         try {
           tab.setForkInit({ promptText, messages: messages || [] });
+
+          // Fork at index 0: start a fresh session (no history to keep)
+          if (forkMessageIndex === 0) {
+            log('Fork at index 0: starting fresh session');
+            await tab.startSession();
+            return;
+          }
+
+          // Attempt truncated fork for Claude provider
+          if (sourceProvider === 'claude') {
+            const truncator = new SessionTruncator((msg) => log(msg));
+            const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            const result = truncator.truncateSession(sessionId, forkMessageIndex, workspacePath);
+
+            if (result) {
+              log(`Truncated fork: newSession=${result.newSessionId}, msgs=${result.uiMessagesKept}, lines=${result.linesWritten}`);
+              await tab.startSession({
+                resume: result.newSessionId,
+                skipReplay: true,
+                truncatedFork: true,
+              });
+              return;
+            }
+            log('Truncation failed, falling back to full fork');
+          }
+
+          // Fallback: original full-copy fork
           await tab.startSession({ resume: sessionId, fork: true });
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err);

@@ -1,0 +1,14 @@
+{"type":"queue-operation","operation":"enqueue","sessionId":"test-session-6"}
+{"type":"queue-operation","operation":"dequeue","sessionId":"test-session-6"}
+{"type":"user","message":{"role":"user","content":"start"},"sessionId":"test-session-6"}
+{"type":"last-prompt","sessionId":"test-session-6"}
+{"type":"assistant","message":{"id":"msg_01","role":"assistant","content":[{"type":"text","text":"ok let me work on that"},{"type":"tool_use","id":"toolu_01","name":"Read","input":{"path":"a.txt"}}]},"sessionId":"test-session-6"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01","content":"contents of a"}]},"sessionId":"test-session-6"}
+{"type":"assistant","message":{"id":"msg_02","role":"assistant","content":[{"type":"text","text":"done reading"}]},"sessionId":"test-session-6"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"skill injection"}]},"isMeta":true,"sessionId":"test-session-6"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_99","content":"stale tool result"}]},"sessionId":"test-session-6"}
+{"type":"queue-operation","operation":"enqueue","sessionId":"test-session-6"}
+{"type":"queue-operation","operation":"dequeue","sessionId":"test-session-6"}
+{"type":"user","message":{"role":"user","content":"next topic"},"sessionId":"test-session-6"}
+{"type":"last-prompt","sessionId":"test-session-6"}
+{"type":"assistant","message":{"id":"msg_03","role":"assistant","content":[{"type":"text","text":"sure, what about?"}]},"sessionId":"test-session-6"}

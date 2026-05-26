@@ -980,6 +980,99 @@
           "description": "Glob patterns for files where secrets are allowed (only when gitignored and outside public directories).",
           "scope": "resource"
         },
+        "claudeMirror.workspaceAccessGuard.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Workspace Access Guard: hook-based filesystem boundary enforcement for Claude Code and Codex sessions.",
+          "scope": "resource"
+        },
+        "claudeMirror.workspaceAccessGuard.mode": {
+          "type": "string",
+          "enum": [
+            "block",
+            "audit"
+          ],
+          "default": "block",
+          "description": "block = deny file operations outside approved folders or inside denied roots. audit = log decisions without blocking.",
+          "scope": "resource"
+        },
+        "claudeMirror.workspaceAccessGuard.userAllowedRoots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional user-approved folder roots that Claude/Codex may access. Nested files and folders are allowed unless denied by organization policy.",
+          "scope": "resource"
+        },
+        "claudeMirror.workspaceAccessGuard.autoAllowWorkspaceFolders": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically treat open VS Code workspace folders as allowed roots for WAG policy evaluation.",
+          "scope": "resource"
+        },
+        "claudeMirror.workspaceAccessGuard.orgPolicyPath": {
+          "type": "string",
+          "default": "C:\\ProgramData\\ClaUi\\workspace-access-guard.policy.json",
+          "description": "Path to the organization WAG policy JSON file. Built-in Windows enterprise defaults are used when the file is missing or invalid.",
+          "scope": "resource"
+        },
+        "claudeMirror.workspaceAccessGuard.scanBashCommands": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scan Bash/shell commands for file path access before execution.",
+          "scope": "resource"
+        },
+        "claudeMirror.workspaceAccessGuard.scanFileTools": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scan direct file tools such as Read, Grep, Glob, LS, Edit, Write, MultiEdit, NotebookEdit, and apply_patch when hook support is available.",
+          "scope": "resource"
+        },
+        "claudeMirror.workspaceAccessGuard.scanMcpTools": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scan MCP tool arguments for filesystem paths before execution.",
+          "scope": "resource"
+        },
+        "claudeMirror.workspaceAccessGuard.blockOutsideAllowedRoots": {
+          "type": "boolean",
+          "default": true,
+          "description": "Block access to paths outside all user-approved roots.",
+          "scope": "resource"
+        },
+        "claudeMirror.workspaceAccessGuard.blockDeniedRoots": {
+          "type": "boolean",
+          "default": true,
+          "description": "Block access to organization-denied roots such as credential stores, browser profiles, SSH keys, and cloud config folders.",
+          "scope": "resource"
+        },
+        "claudeMirror.workspaceAccessGuard.warnOnBroadAllowedRoots": {
+          "type": "boolean",
+          "default": true,
+          "description": "Warn when a broad root such as a drive root, whole user profile, Documents, Desktop, or Downloads is added.",
+          "scope": "resource"
+        },
+        "claudeMirror.workspaceAccessGuard.denyUnresolvedSymlinkTargets": {
+          "type": "boolean",
+          "default": true,
+          "description": "Deny paths that traverse an unresolved symlink or junction target.",
+          "scope": "resource"
+        },
+        "claudeMirror.workspaceAccessGuard.denyUnknownFileAccessCommands": {
+          "type": "boolean",
+          "default": true,
+          "description": "Block unrecognized commands that may access files when the command cannot be safely classified.",
+          "scope": "resource"
+        },
+        "claudeMirror.workspaceAccessGuard.auditRetentionDays": {
+          "type": "number",
+          "default": 90,
+          "minimum": 1,
+          "maximum": 365,
+          "description": "Retention window in days for Workspace Access Guard audit logs.",
+          "scope": "resource"
+        },
         "claudeMirror.secretProtection.enabled": {
           "type": "boolean",
           "default": false,

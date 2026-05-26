@@ -349,6 +349,37 @@ export function useClaudeStream(): void {
           break;
         }
 
+        case 'workspaceAccessGuardStatus': {
+          const wagStatus = msg as { status: { enabled: boolean; mode: 'block' | 'audit'; hookStatus: string } };
+          useAppStore.getState().setWorkspaceAccessGuardStatus(wagStatus.status);
+          break;
+        }
+        case 'workspaceAccessGuardAllowedRoots': {
+          const wagRoots = msg as { roots: ReturnType<typeof useAppStore.getState>['workspaceAccessGuardAllowedRoots'] };
+          useAppStore.getState().setWorkspaceAccessGuardAllowedRoots(wagRoots.roots);
+          break;
+        }
+        case 'workspaceAccessGuardOrgPolicyStatus': {
+          const wagPolicy = msg as { status: NonNullable<ReturnType<typeof useAppStore.getState>['workspaceAccessGuardOrgPolicyStatus']> };
+          useAppStore.getState().setWorkspaceAccessGuardOrgPolicyStatus(wagPolicy.status);
+          break;
+        }
+        case 'workspaceAccessGuardAuditEvents': {
+          const wagEvents = msg as { events: ReturnType<typeof useAppStore.getState>['workspaceAccessGuardAuditEvents'] };
+          useAppStore.getState().setWorkspaceAccessGuardAuditEvents(wagEvents.events);
+          break;
+        }
+        case 'workspaceAccessGuardTestResult': {
+          const wagResult = msg as { result: NonNullable<ReturnType<typeof useAppStore.getState>['workspaceAccessGuardTestResult']> };
+          useAppStore.getState().setWorkspaceAccessGuardTestResult(wagResult.result);
+          break;
+        }
+        case 'workspaceAccessGuardError': {
+          const wagErr = msg as { error: string };
+          useAppStore.getState().setWorkspaceAccessGuardError(wagErr.error);
+          break;
+        }
+
         case 'toggleMcpPanel':
           setMcpPanelOpen(msg.open ?? !useAppStore.getState().mcpPanelOpen);
           if (msg.tab) {

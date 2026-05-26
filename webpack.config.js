@@ -128,4 +128,38 @@ module.exports = [
     },
     devtool: 'nosources-source-map',
   },
+  // Workspace Access Guard runtime (Node.js hooks, runs outside VS Code)
+  {
+    name: 'workspace-access-guard-runtime',
+    target: 'node',
+    mode: 'none',
+    entry: {
+      'hooks/claude-wag': './src/workspace-access-guard-runtime/hooks/claudeWorkspaceAccessGuard.ts',
+      'hooks/codex-wag': './src/workspace-access-guard-runtime/hooks/codexWorkspaceAccessGuard.ts',
+    },
+    output: {
+      path: path.resolve(__dirname, 'dist', 'workspace-access-guard-runtime'),
+      filename: '[name].js',
+      libraryTarget: 'commonjs2',
+    },
+    externals: {
+      vscode: 'commonjs vscode',
+    },
+    resolve: {
+      extensions: ['.ts', '.js'],
+    },
+    module: {
+      rules: [
+        {
+          test: /\.ts$/,
+          exclude: /node_modules/,
+          use: 'ts-loader',
+        },
+      ],
+    },
+    optimization: {
+      minimize: false,
+    },
+    devtool: 'nosources-source-map',
+  },
 ];

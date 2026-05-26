@@ -1,4 +1,4 @@
-import * as vscode from 'vscode';
+﻿import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -71,6 +71,9 @@ export class CodexExecProcessManager extends EventEmitter {
   /** Optional Super Particle Accelerator env builder; set by SessionTab */
   superParticleAcceleratorEnvBuilder: ((baseEnv: NodeJS.ProcessEnv) => Record<string, string | undefined>) | null = null;
 
+  /** Optional Workspace Access Guard env builder; set by SessionTab */
+  workspaceAccessGuardEnvBuilder: (() => Record<string, string>) | null = null;
+
   /** Whether secret protection DLP scanning is active; set by CodexSessionTab */
   secretProtectionEnabled = false;
 
@@ -126,6 +129,16 @@ export class CodexExecProcessManager extends EventEmitter {
         }
       } catch (err) {
         this.log(`Particle Accelerator env injection failed: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
+    // Inject Workspace Access Guard environment (runs before SPA)
+    if (this.workspaceAccessGuardEnvBuilder) {
+      try {
+        env = { ...env, ...this.workspaceAccessGuardEnvBuilder() };
+        this.log('Workspace Access Guard env injected for Codex turn');
+      } catch (err) {
+        this.log(`Workspace Access Guard env injection failed: ${err instanceof Error ? err.message : err}`);
       }
     }
 

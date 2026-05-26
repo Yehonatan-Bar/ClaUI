@@ -574,6 +574,13 @@ export class MessageHandler {
     this.superParticleAcceleratorService = service;
   }
 
+  /** Workspace Access Guard service (shared instance, set after construction) */
+  private workspaceAccessGuardService: import('../workspace-access-guard/WorkspaceAccessGuardService').WorkspaceAccessGuardService | null = null;
+
+  setWorkspaceAccessGuardService(service: import('../workspace-access-guard/WorkspaceAccessGuardService').WorkspaceAccessGuardService): void {
+    this.workspaceAccessGuardService = service;
+  }
+
   /** Provide the SessionStore for accessing session metadata. */
   setSessionStore(store: import('../session/SessionStore').SessionStore): void {
     this.sessionStore = store;
@@ -3495,6 +3502,96 @@ export class MessageHandler {
           break;
         }
 
+        // Workspace Access Guard
+        case 'workspaceAccessGuardGetStatus': {
+          void this.sendWorkspaceAccessGuardStatus();
+          break;
+        }
+        case 'workspaceAccessGuardSetEnabled': {
+          const wagEnabled = (msg as { enabled: boolean }).enabled;
+          void vscode.workspace.getConfiguration('claudeMirror.workspaceAccessGuard')
+            .update('enabled', wagEnabled, vscode.ConfigurationTarget.Workspace)
+            .then(async () => {
+              if (this.workspaceAccessGuardService) {
+                await this.workspaceAccessGuardService.setEnabled(wagEnabled);
+              }
+              void this.sendWorkspaceAccessGuardStatus();
+            });
+          break;
+        }
+        case 'workspaceAccessGuardSetMode': {
+          void vscode.workspace.getConfiguration('claudeMirror.workspaceAccessGuard')
+            .update('mode', (msg as { mode: string }).mode, vscode.ConfigurationTarget.Workspace)
+            .then(() => this.sendWorkspaceAccessGuardStatus());
+          break;
+        }
+        case 'workspaceAccessGuardGetAllowedRoots': {
+          void this.sendWorkspaceAccessGuardAllowedRoots();
+          break;
+        }
+        case 'workspaceAccessGuardPickAllowedRoots': {
+          if (this.workspaceAccessGuardService) {
+            void vscode.window.showOpenDialog({
+              canSelectFolders: true,
+              canSelectFiles: false,
+              canSelectMany: true,
+              openLabel: 'Add allowed folders',
+            }).then(uris => {
+              if (!uris || uris.length === 0 || !this.workspaceAccessGuardService) return;
+              this.workspaceAccessGuardService.addAllowedRoots(uris.map(uri => uri.fsPath));
+              void this.sendWorkspaceAccessGuardAllowedRoots();
+            });
+          }
+          break;
+        }
+        case 'workspaceAccessGuardAddAllowedRoots': {
+          const addMsg = msg as { roots: string[] };
+          if (this.workspaceAccessGuardService && addMsg.roots) {
+            this.workspaceAccessGuardService.addAllowedRoots(addMsg.roots);
+            void this.sendWorkspaceAccessGuardAllowedRoots();
+          }
+          break;
+        }
+        case 'workspaceAccessGuardRemoveAllowedRoot': {
+          const removeMsg = msg as { root: string };
+          if (this.workspaceAccessGuardService && removeMsg.root) {
+            this.workspaceAccessGuardService.removeAllowedRoot(removeMsg.root);
+            void this.sendWorkspaceAccessGuardAllowedRoots();
+          }
+          break;
+        }
+        case 'workspaceAccessGuardAddCurrentWorkspace': {
+          if (this.workspaceAccessGuardService) {
+            this.workspaceAccessGuardService.addCurrentWorkspace();
+            void this.sendWorkspaceAccessGuardAllowedRoots();
+          }
+          break;
+        }
+        case 'workspaceAccessGuardGetOrgPolicyStatus': {
+          void this.sendWorkspaceAccessGuardOrgPolicyStatus();
+          break;
+        }
+        case 'workspaceAccessGuardGetAuditEvents': {
+          void this.handleWorkspaceAccessGuardGetAuditEvents((msg as { limit?: number }).limit);
+          break;
+        }
+        case 'workspaceAccessGuardTestPath': {
+          const testPathMsg = msg as { value: string };
+          if (this.workspaceAccessGuardService && testPathMsg.value) {
+            const result = this.workspaceAccessGuardService.testPath(testPathMsg.value);
+            this.webview.postMessage({ type: 'workspaceAccessGuardTestResult', result });
+          }
+          break;
+        }
+        case 'workspaceAccessGuardTestCommand': {
+          const testCmdMsg = msg as { command: string; cwd?: string };
+          if (this.workspaceAccessGuardService && testCmdMsg.command) {
+            const result = this.workspaceAccessGuardService.testCommand(testCmdMsg.command, testCmdMsg.cwd);
+            this.webview.postMessage({ type: 'workspaceAccessGuardTestResult', result });
+          }
+          break;
+        }
+
         case 'ready':
           this.log('Webview ready');
           // Send text display settings
@@ -6324,6 +6421,66 @@ export class MessageHandler {
     } catch (err) {
       this.webview.postMessage({
         type: 'superParticleAcceleratorError',
+        error: err instanceof Error ? err.message : String(err),
+      } as any);
+    }
+  }
+
+  private async sendWorkspaceAccessGuardStatus(): Promise<void> {
+    const service = this.workspaceAccessGuardService;
+    const settings = vscode.workspace.getConfiguration('claudeMirror.workspaceAccessGuard');
+    const enabled = settings.get<boolean>('enabled', false);
+    const mode = settings.get<'block' | 'audit'>('mode', 'block');
+
+    if (!service) {
+      this.webview.postMessage({
+        type: 'workspaceAccessGuardStatus',
+        status: { enabled, mode, hookStatus: enabled ? 'enabled-hooks-missing' : 'disabled' },
+      } as any);
+      return;
+    }
+
+    try {
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const hookStatus = await service.getStatus(workspaceRoot);
+      this.webview.postMessage({
+        type: 'workspaceAccessGuardStatus',
+        status: { enabled: service.isEnabled(), mode, hookStatus },
+      } as any);
+    } catch (err) {
+      this.webview.postMessage({
+        type: 'workspaceAccessGuardError',
+        error: err instanceof Error ? err.message : String(err),
+      } as any);
+    }
+  }
+
+  private async sendWorkspaceAccessGuardAllowedRoots(): Promise<void> {
+    const service = this.workspaceAccessGuardService;
+    if (!service) return;
+    const roots = service.getAllowedRoots();
+    this.webview.postMessage({ type: 'workspaceAccessGuardAllowedRoots', roots } as any);
+  }
+
+  private async sendWorkspaceAccessGuardOrgPolicyStatus(): Promise<void> {
+    const service = this.workspaceAccessGuardService;
+    if (!service) return;
+    const status = service.getOrgPolicyStatus();
+    this.webview.postMessage({ type: 'workspaceAccessGuardOrgPolicyStatus', status } as any);
+  }
+
+  private async handleWorkspaceAccessGuardGetAuditEvents(limit?: number): Promise<void> {
+    const service = this.workspaceAccessGuardService;
+    if (!service) {
+      this.webview.postMessage({ type: 'workspaceAccessGuardAuditEvents', events: [] } as any);
+      return;
+    }
+    try {
+      const events = await service.getAuditEvents(limit);
+      this.webview.postMessage({ type: 'workspaceAccessGuardAuditEvents', events } as any);
+    } catch (err) {
+      this.webview.postMessage({
+        type: 'workspaceAccessGuardError',
         error: err instanceof Error ? err.message : String(err),
       } as any);
     }

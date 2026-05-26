@@ -27,24 +27,6 @@
             "command": "node \"c:\\Users\\yoni.bar\\AppData\\Roaming\\Code\\User\\globalStorage\\jhonbar.claude-code-mirror\\super-particle-accelerator\\runtime\\hooks\\claude-spa.js\" --claui-spa-hook PreToolUse"
           }
         ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"c:\\Users\\yoni.bar\\AppData\\Roaming\\Code\\User\\globalStorage\\jhonbar.claude-code-mirror\\particle-accelerator\\runtime\\hooks\\claude-pre-tool-use.js\" --claui-managed-hook claude-pre-tool-use"
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"c:\\Users\\yoni.bar\\AppData\\Roaming\\Code\\User\\globalStorage\\jhonbar.claude-code-mirror\\particle-accelerator\\runtime\\hooks\\claude-pre-tool-use.js\" --claui-managed-hook claude-pre-tool-use-mcp"
-          }
-        ]
       }
     ],
     "PostToolUse": [

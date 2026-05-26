@@ -49,6 +49,12 @@ import type { AdventureBeat } from '../components/Vitals/adventure/types';
 import { deriveTurnHistoryFromMessages } from '../utils/turnVitals';
 import type { AchievementLang } from '../components/Achievements/achievementI18n';
 import type { AuditEvent, SecretProtectionSettings } from '../../shared/secret-protection/types';
+import type {
+  WorkspaceAccessAllowedRootView,
+  WorkspaceAccessAuditEvent,
+  WorkspaceAccessDecision,
+  WorkspaceAccessOrgPolicyStatus,
+} from '../../shared/workspace-access-guard/types';
 import type { ComplianceReport } from '../../shared/audit/ComplianceReporter';
 import { initialAuditUiState, prependAuditEvent } from '../store/auditSlice';
 import { initialSecretProtectionUiState } from '../store/dlpSettingsSlice';
@@ -884,6 +890,22 @@ export interface AppState {
   setSuperParticleAcceleratorAuditEvents: (events: AppState['superParticleAcceleratorAuditEvents']) => void;
   setSuperParticleAcceleratorLastEvent: (event: { action: string }) => void;
   setSuperParticleAcceleratorError: (error: string | undefined) => void;
+
+  // Workspace Access Guard
+  workspaceAccessGuardEnabled: boolean;
+  workspaceAccessGuardMode: 'block' | 'audit';
+  workspaceAccessGuardStatus: string;
+  workspaceAccessGuardAllowedRoots: WorkspaceAccessAllowedRootView[];
+  workspaceAccessGuardOrgPolicyStatus: WorkspaceAccessOrgPolicyStatus | null;
+  workspaceAccessGuardAuditEvents: WorkspaceAccessAuditEvent[];
+  workspaceAccessGuardTestResult: WorkspaceAccessDecision | null;
+  workspaceAccessGuardError: string | null;
+  setWorkspaceAccessGuardStatus: (status: { enabled: boolean; mode: 'block' | 'audit'; hookStatus: string }) => void;
+  setWorkspaceAccessGuardAllowedRoots: (roots: WorkspaceAccessAllowedRootView[]) => void;
+  setWorkspaceAccessGuardOrgPolicyStatus: (status: WorkspaceAccessOrgPolicyStatus) => void;
+  setWorkspaceAccessGuardAuditEvents: (events: WorkspaceAccessAuditEvent[]) => void;
+  setWorkspaceAccessGuardTestResult: (result: WorkspaceAccessDecision | null) => void;
+  setWorkspaceAccessGuardError: (error: string | null) => void;
 
   reset: () => void;
 }
@@ -2821,6 +2843,27 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSuperParticleAcceleratorAuditEvents: (events: AppState['superParticleAcceleratorAuditEvents']) => set({ superParticleAcceleratorAuditEvents: events }),
   setSuperParticleAcceleratorLastEvent: (event: { action: string }) => set({ superParticleAcceleratorLastEvent: event }),
   setSuperParticleAcceleratorError: (error: string | undefined) => set({ superParticleAcceleratorError: error }),
+
+  // Workspace Access Guard
+  workspaceAccessGuardEnabled: false,
+  workspaceAccessGuardMode: 'block' as const,
+  workspaceAccessGuardStatus: 'disabled',
+  workspaceAccessGuardAllowedRoots: [],
+  workspaceAccessGuardOrgPolicyStatus: null,
+  workspaceAccessGuardAuditEvents: [],
+  workspaceAccessGuardTestResult: null,
+  workspaceAccessGuardError: null,
+  setWorkspaceAccessGuardStatus: (status) => set({
+    workspaceAccessGuardEnabled: status.enabled,
+    workspaceAccessGuardMode: status.mode,
+    workspaceAccessGuardStatus: status.hookStatus,
+    workspaceAccessGuardError: null,
+  }),
+  setWorkspaceAccessGuardAllowedRoots: (roots) => set({ workspaceAccessGuardAllowedRoots: roots }),
+  setWorkspaceAccessGuardOrgPolicyStatus: (status) => set({ workspaceAccessGuardOrgPolicyStatus: status }),
+  setWorkspaceAccessGuardAuditEvents: (events) => set({ workspaceAccessGuardAuditEvents: events.slice(0, 100) }),
+  setWorkspaceAccessGuardTestResult: (result) => set({ workspaceAccessGuardTestResult: result }),
+  setWorkspaceAccessGuardError: (error) => set({ workspaceAccessGuardError: error }),
 
   reset: () =>
     set((state) => ({

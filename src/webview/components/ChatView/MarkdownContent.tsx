@@ -21,7 +21,13 @@ renderer.link = function ({ href, title, text }) {
 };
 
 renderer.codespan = function ({ text }) {
-  return `<code class="md-inline-code">${text}</code>`;
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  return `<code class="md-inline-code">${escaped}</code>`;
 };
 
 marked.use({ renderer });

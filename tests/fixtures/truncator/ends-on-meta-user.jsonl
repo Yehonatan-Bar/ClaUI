@@ -1,0 +1,12 @@
+{"type":"queue-operation","operation":"enqueue","sessionId":"test-session-5"}
+{"type":"queue-operation","operation":"dequeue","sessionId":"test-session-5"}
+{"type":"user","message":{"role":"user","content":"hello"},"sessionId":"test-session-5"}
+{"type":"last-prompt","sessionId":"test-session-5"}
+{"type":"assistant","message":{"id":"msg_01","role":"assistant","content":[{"type":"text","text":"hi there"}]},"sessionId":"test-session-5"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"skill body"}]},"isMeta":true,"sessionId":"test-session-5"}
+{"type":"assistant","message":{"id":"msg_02","role":"assistant","content":[{"type":"text","text":"skill processed"}]},"sessionId":"test-session-5"}
+{"type":"queue-operation","operation":"enqueue","sessionId":"test-session-5"}
+{"type":"queue-operation","operation":"dequeue","sessionId":"test-session-5"}
+{"type":"user","message":{"role":"user","content":"follow up"},"sessionId":"test-session-5"}
+{"type":"last-prompt","sessionId":"test-session-5"}
+{"type":"assistant","message":{"id":"msg_03","role":"assistant","content":[{"type":"text","text":"here's my answer"}]},"sessionId":"test-session-5"}

@@ -1,0 +1,16 @@
+{"type":"queue-operation","operation":"enqueue","sessionId":"test-session-1"}
+{"type":"queue-operation","operation":"dequeue","sessionId":"test-session-1"}
+{"type":"attachment","name":"project-context","sessionId":"test-session-1"}
+{"type":"user","message":{"role":"user","content":"hello"},"sessionId":"test-session-1"}
+{"type":"last-prompt","sessionId":"test-session-1"}
+{"type":"assistant","message":{"id":"msg_01","role":"assistant","content":[{"type":"text","text":"hi there"}]},"sessionId":"test-session-1"}
+{"type":"queue-operation","operation":"enqueue","sessionId":"test-session-1"}
+{"type":"queue-operation","operation":"dequeue","sessionId":"test-session-1"}
+{"type":"user","message":{"role":"user","content":"tell me a joke"},"sessionId":"test-session-1"}
+{"type":"last-prompt","sessionId":"test-session-1"}
+{"type":"assistant","message":{"id":"msg_02","role":"assistant","content":[{"type":"text","text":"why did the chicken cross the road?"}]},"sessionId":"test-session-1"}
+{"type":"queue-operation","operation":"enqueue","sessionId":"test-session-1"}
+{"type":"queue-operation","operation":"dequeue","sessionId":"test-session-1"}
+{"type":"user","message":{"role":"user","content":"another one"},"sessionId":"test-session-1"}
+{"type":"last-prompt","sessionId":"test-session-1"}
+{"type":"assistant","message":{"id":"msg_03","role":"assistant","content":[{"type":"text","text":"knock knock..."}]},"sessionId":"test-session-1"}

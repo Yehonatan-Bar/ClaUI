@@ -178,6 +178,7 @@ export class SessionTab implements WebviewBridge {
   /** Secret Protection service reference for DLP scanning */
   private secretProtectionService: import('../secret-protection/SecretProtectionService').SecretProtectionService | null = null;
   private superParticleAcceleratorService: import('../super-particle-accelerator/SuperParticleAcceleratorService').SuperParticleAcceleratorService | null = null;
+  private workspaceAccessGuardService: import('../workspace-access-guard/WorkspaceAccessGuardService').WorkspaceAccessGuardService | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -907,7 +908,7 @@ export class SessionTab implements WebviewBridge {
   }
 
   /** Start a new CLI session in this tab (Claude by default, Happy when overridden) */
-  async startSession(options?: { resume?: string; fork?: boolean; cwd?: string; model?: string }): Promise<void> {
+  async startSession(options?: { resume?: string; fork?: boolean; skipReplay?: boolean; truncatedFork?: boolean; cwd?: string; model?: string }): Promise<void> {
     this.messageHandler.resetTransientStateForHostLifecycle(
       options?.resume
         ? 'SessionTab.startSession(resume)'
@@ -964,7 +965,7 @@ export class SessionTab implements WebviewBridge {
     }
 
     // Load conversation history only for resume (fork sends its own via forkInit).
-    if (options?.resume && !options?.fork) {
+    if (options?.resume && !options?.fork && !options?.truncatedFork) {
       this.loadAndSendConversationHistory(options.resume);
     }
   }
@@ -2402,6 +2403,12 @@ export class SessionTab implements WebviewBridge {
     this.messageHandler.setSuperParticleAcceleratorService(service);
 
     this.processManager.superParticleAcceleratorEnvBuilder = () => service.buildAgentEnv();
+  }
+
+  /** Inject the shared WorkspaceAccessGuardService for filesystem boundary enforcement */
+  setWorkspaceAccessGuardService(service: import('../workspace-access-guard/WorkspaceAccessGuardService').WorkspaceAccessGuardService): void {
+    this.messageHandler.setWorkspaceAccessGuardService(service);
+    this.processManager.workspaceAccessGuardEnvBuilder = () => service.buildAgentEnv();
   }
 
   /** Inject the SessionStore (forwarded to MessageHandler for workstream classification) */

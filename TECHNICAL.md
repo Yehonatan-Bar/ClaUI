@@ -94,7 +94,8 @@ claude-code-mirror/
 |   |   |   +-- SessionDiscovery.ts       #   Discover all Claude sessions from ~/.claude/projects/ filesystem
 |   |   |   +-- ChatSearchService.ts      #   Cross-session text search via raw JSONL string matching
 |   |   |   +-- CheckpointManager.ts      #   Per-session file change checkpoint for revert/redo
-|   |   |   +-- SessionFork.ts            #   Phase 3 stub (rewind)
+|   |   |   +-- SessionTruncator.ts       #   Truncates JSONL for forked sessions (reduces API context)
+|   |   |   +-- sessionPathResolver.ts    #   Shared utility to find session JSONL files
 |   |   +-- multiparticipant/              #   Multi-participant shared session (Phase 0-2, Tracks A-D)
 |   |   |   +-- MultiParticipantProtocol.ts #  Client-server WebSocket message types, including A2A/typing/file/rename contracts
 |   |   |   +-- MultiParticipantClient.ts  #   WebSocket client connecting to coordination server
@@ -177,6 +178,14 @@ claude-code-mirror/
 |   |   |   +-- SuperParticleAcceleratorEnvBuilder.ts # CLAUI_SPA_* env var builder
 |   |   |   +-- SuperParticleAcceleratorAuditReader.ts # JSONL audit event reader
 |   |   |   +-- SpaExceptionStore.ts               #   Exception CRUD with atomic writes
+|   |   +-- workspace-access-guard/
+|   |   |   +-- WorkspaceAccessGuardService.ts    #   Top-level WAG service (lifecycle, hook install, env builder, policy/audit API)
+|   |   |   +-- WorkspaceAccessGuardHookManager.ts # Installs Claude/Codex WAG hooks before SPA/PA hooks
+|   |   |   +-- WorkspaceAccessGuardSettings.ts   #   VS Code settings reader (claudeMirror.workspaceAccessGuard.*)
+|   |   |   +-- WorkspaceAccessGuardEnvBuilder.ts # CLAUI_WORKSPACE_ACCESS_GUARD_* env var builder
+|   |   |   +-- WorkspaceAccessGuardAuditReader.ts # JSONL audit event reader
+|   |   |   +-- UserAllowedRootsStore.ts          #   Atomic user-approved root persistence
+|   |   |   +-- OrgPolicyLoader.ts                #   Organization policy loader/watcher with built-in fallback
 |   |   +-- secret-protection/
 |   |   |   +-- SecretProtectionSettings.ts        #   VS Code settings reader (claudeMirror.secretProtection.*)
 |   |   |   +-- SecretProtectionService.ts         #   Top-level DLP service (lifecycle, broker creation, settings watcher, audit/report API)
@@ -226,11 +235,23 @@ claude-code-mirror/
 |   |   +-- hooks/
 |   |       +-- claudeSuperParticleAccelerator.ts # Claude SPA hook (PreToolUse/PostToolUse/Stop)
 |   |       +-- codexSuperParticleAccelerator.ts  # Codex SPA hook (PreToolUse/PermissionRequest/PostToolUse/Stop)
+|   +-- workspace-access-guard-runtime/ # WAG hook scripts (separate webpack target, no VS Code deps)
+|   |   +-- PathNormalizer.ts            #   Windows/Git Bash/WSL/env/tilde/relative path normalization + containment
+|   |   +-- CommandPathExtractor.ts      #   Shell command tokenizer and path/access-kind extractor
+|   |   +-- ToolPathExtractor.ts         #   Direct tool/MCP path extraction
+|   |   +-- PathPolicyEngine.ts          #   User allowed roots + org denied roots policy evaluation
+|   |   +-- AuditWriter.ts               #   WAG JSONL audit writer
+|   |   +-- defaultOrgPolicy.ts          #   Built-in Windows enterprise denied-root policy
+|   |   +-- hooks/
+|   |       +-- claudeWorkspaceAccessGuard.ts # Claude WAG hook (PreToolUse)
+|   |       +-- codexWorkspaceAccessGuard.ts  # Codex WAG hook (PreToolUse/PermissionRequest)
 |   +-- shared/                           # Cross-boundary modules (imported by both extension and runtime)
 |   |   +-- audit/
 |   |       +-- AuditStore.ts             #   Date-partitioned JSONL audit backend with filters, stats, retention cleanup
 |   |       +-- AuditEventWriter.ts       #   Audit writer facade over AuditStore
 |   |       +-- ComplianceReporter.ts     #   SOC 2 / GDPR evidence report generator from audit events
+|   |   +-- workspace-access-guard/
+|   |       +-- types.ts                  #   WAG decisions, settings, policy, status, audit, and hook types
 |   |   +-- secret-protection/
 |   |       +-- types.ts                  #   Core DLP types: DlpEvent, DlpDestination, DlpFinding, RedactionToken, PolicyConfig, etc.
 |   |       +-- policySchema.ts           #   Policy loader + validator (.claui/secret-protection.policy.json)
@@ -620,6 +641,9 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **ConversationReader** - Reads full conversation history from Claude Code's local session storage (`~/.claude/projects/<project-hash>/<session-id>.jsonl`). When resuming a session, the CLI in pipe mode waits for user input before replaying messages. ConversationReader bypasses this by reading the JSONL file directly, merging partial assistant entries by message ID, filtering out tool_result and thinking blocks, and sending the conversation to the webview for immediate display. Used by `SessionTab.startSession()` during resume (not fork).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
+**SessionTruncator** - Truncates JSONL session files for fork-with-context-reduction. When a user forks a conversation at message N, creates a new JSONL file containing only messages 0..N-1 (plus metadata). Classifies JSONL lines (real user, tool_result user, isMeta user, assistant, metadata), maps them to UI message indices mirroring ConversationReader's logic, determines the cut point, extends forward through agentic tool_use loops to avoid dangling tool_use blocks, and ensures the truncated file ends with an assistant message. The fork command uses `--resume <truncated-id>` (no `--fork-session`) so the CLI loads only the truncated context. Falls back to the original full-fork behavior on any failure. Path resolution uses the shared `sessionPathResolver` utility.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/FORK_CONTEXT_TRUNCATION_SPEC.md`
+
 **SessionDiscovery** - Scans `~/.claude/projects/` filesystem to discover all Claude Code sessions on disk, including sessions created outside ClaUi. Provides `discoverAll()` (all workspaces) and `discoverForWorkspace()` (current only). Extracts first user prompt from JSONL files (first 16KB scan). Two-step QuickPick: scope selection then session picker with relative time and file size. Keybinding: `Ctrl+Alt+D`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_DISCOVERY.md`
 
@@ -731,6 +755,9 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **Super Particle Accelerator (SPA)** -- Hook-based secret write guard that intercepts every AI agent write operation (Edit, Write, Bash file-writes, MCP writes, git commit/push) and blocks any attempt to write API keys, tokens, credentials, or other secrets into the codebase. Runs as Claude Code and Codex hooks (PreToolUse, PermissionRequest, PostToolUse, Stop). Architecture: deny-first waterfall policy engine with 5 gates (no findings, placeholder filter, public-path hard deny, gitignored env file audit, exception matching). PathClassifier maps files to risk levels (public-client-code, generated-public-artifact, server-code, local-secret-file, unknown-repository-file). GitStateScanner verifies gitignore status and scans staged/unstaged/untracked files. Per-session baselines prevent blocking pre-existing secrets in Stop hook. Extension-side: SuperParticleAcceleratorService manages lifecycle and hook installation, SuperParticleAcceleratorHookManager installs SPA hooks BEFORE PA hooks with per-matcher status verification, SuperParticleAcceleratorEnvBuilder always injects CLAUI_SPA_STORE_DIR (even when disabled) for file-based mid-session activation via `runtime-enabled.json`. UI: StatusBadge in StatusBar, modal SPA panel with enable toggle, mode selector, audit event viewer. Configurable via `claudeMirror.superParticleAccelerator.*` (11 settings).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SUPER_PARTICLE_ACCELERATOR.md`
 
+**Workspace Access Guard (WAG)** -- Hook-based filesystem boundary enforcer that prevents AI coding agents (Claude Code and Codex) from reading, writing, or searching files outside user-approved working folders or inside organization-denied folders (credential stores, browser profiles, SSH keys, cloud configs). Claude coverage uses PreToolUse hooks; Codex coverage uses PreToolUse hooks plus a Bash PermissionRequest hook. WAG entries are installed BEFORE SPA and PA hooks. Architecture: Windows path normalizer handles Git Bash `/c/`, WSL `/mnt/c/`, `%ENV%`, `$ENV`, `~`, relative paths, and symlinks/junctions; segment-aware containment uses `path.win32.relative()` (not prefix matching); command parser tokenizes Bash commands and classifies 10 access kinds (recursive-file-read, file-write, git-operation, network-or-exfiltration, unknown-file-access, etc.); two-layer policy: user-allowed roots + organization-denied roots (deny always wins), including wildcard denied roots and deny-by-default when no allowed roots exist. Runtime hooks load the complete `runtime-enabled.json` settings snapshot and apply env overrides for hook-time toggles; direct file tool requests with no parseable path fail closed. Organization policy loads from `C:\ProgramData\ClaUi\workspace-access-guard.policy.json` with 20 built-in Windows denied roots as fallback. JSONL audit logging records denied/audit decisions without file contents. Extension-side: `WorkspaceAccessGuardService` manages lifecycle, hook installation, user roots store, org policy loader, test helpers, and env injection through `SessionTab`/`CodexSessionTab` process managers. UI: Dashboard Tools tab card for enable/mode, allowed roots, org policy status, audit preview, and path/command testing. Configurable via `claudeMirror.workspaceAccessGuard.*` (14 settings). Tests: `tests/workspace-access-guard/*`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/WORKSPACE_ACCESS_GUARD.md`
+
 **Workstream Map** -- Subway-map style visualization that groups sessions into logical workstreams (coherent threads of work with a goal, status, and history). AI-powered classification pipeline: scoped to open-tab sessions + last 3 days, heuristic pre-clustering (git branch, file overlap Jaccard, temporal proximity), then Sonnet classification via stdin-piped CLI call. Explicit external folder import lets the user enter a folder path and digest supported documents (`md/txt/json/yaml/html/xml/docx`, capped) into a dashed `external_folder` workstream with source-file evidence; normal reclassification preserves those imported workstreams. Stations represent meaningful events (milestones, decisions, blockers, discoveries). SVG deterministic lane layout with visual encodings for status, confidence, type. Layers: Current State, Resume View, Plan Overlay, Resolve Mode. Backend: `WorkstreamManager` orchestrator + 14 service classes. Frontend includes `UserPortfolioView`, `PortfolioProjectMap`, `ProjectMapView`, and shared SVG primitives. Claude and Codex tabs both route Workstream Map/Portfolio messages through the shared manager. Includes **User Portfolio View** (cross-project): `UserPortfolioManager` + `UserPortfolioStore` use `globalState` for cross-workspace persistence; project health scoring (healthy/needs_attention/blocked/stale), cross-project resume recommendations, path validation for deleted projects, and a stacked full-map overview that renders every cached project workstream with simple project separators. Portfolio auto-open is suppressed for unclassified current workspaces so the empty Project Map remains available for first classification. Commands: `claudeMirror.openWorkstreamMap`, `claudeMirror.openWorkstreamPortfolio`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP.md`
 
@@ -825,6 +852,20 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 | `claudeMirror.superParticleAccelerator.entropyThreshold` | `4.2` | Entropy threshold for secret detection |
 | `claudeMirror.superParticleAccelerator.frontendPathGlobs` | see package.json | Glob patterns for frontend/client paths |
 | `claudeMirror.superParticleAccelerator.allowedSecretFileGlobs` | see package.json | Glob patterns for allowed env files |
+| `claudeMirror.workspaceAccessGuard.enabled` | `false` | Enable Workspace Access Guard filesystem boundary enforcement |
+| `claudeMirror.workspaceAccessGuard.mode` | `"block"` | Mode: block (deny access) or audit (log only) |
+| `claudeMirror.workspaceAccessGuard.userAllowedRoots` | `[]` | Additional user-approved folder roots for WAG |
+| `claudeMirror.workspaceAccessGuard.autoAllowWorkspaceFolders` | `true` | Auto-allow VS Code workspace folders as allowed roots |
+| `claudeMirror.workspaceAccessGuard.orgPolicyPath` | `"C:\\ProgramData\\ClaUi\\workspace-access-guard.policy.json"` | Organization WAG policy file path |
+| `claudeMirror.workspaceAccessGuard.scanBashCommands` | `true` | Scan Bash commands for file path access |
+| `claudeMirror.workspaceAccessGuard.scanFileTools` | `true` | Scan Read/Grep/Glob/Edit/Write tool paths |
+| `claudeMirror.workspaceAccessGuard.scanMcpTools` | `true` | Scan MCP tool arguments for paths |
+| `claudeMirror.workspaceAccessGuard.blockOutsideAllowedRoots` | `true` | Block paths outside allowed roots |
+| `claudeMirror.workspaceAccessGuard.blockDeniedRoots` | `true` | Block paths inside organization denied roots |
+| `claudeMirror.workspaceAccessGuard.warnOnBroadAllowedRoots` | `true` | Warn on broad allowed roots such as drive/user profile folders |
+| `claudeMirror.workspaceAccessGuard.denyUnresolvedSymlinkTargets` | `true` | Deny unresolved symlink/junction target traversal |
+| `claudeMirror.workspaceAccessGuard.denyUnknownFileAccessCommands` | `true` | Block unrecognized commands with potential file access |
+| `claudeMirror.workspaceAccessGuard.auditRetentionDays` | `90` | Retention window setting for WAG audit logs (1-365) |
 
 ---
 
@@ -1071,7 +1112,7 @@ npm install -g @vscode/vsce
 | **1. Core Chat** | Done | Process management, stream parsing, React chat UI |
 | **1.5 Multi-Tab** | Done | Multiple parallel sessions in separate VS Code tabs (SessionTab + TabManager) |
 | **2. Terminal Mirror** | Stub | PseudoTerminal mirroring same session |
-| **3. Sessions** | Partial | Multi-tab sessions (done), resume (done), fork from message (done), conversation history (done), rewind (stub) |
+| **3. Sessions** | Partial | Multi-tab sessions (done), resume (done), fork from message with context truncation (done), conversation history (done), rewind (stub) |
 | **4. Input** | Partial | File picker + Explorer send-path + keyboard shortcut (done), send-while-busy interrupt (done), image paste via Ctrl+V (done), RTL enhancements (done), editable prompts (done) |
 | **5. Accounts** | Stub | Multi-account, compact mode, cost tracking |
 | **6. Polish** | Pending | Virtualized scrolling, error recovery, theming |

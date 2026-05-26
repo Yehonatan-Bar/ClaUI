@@ -26,6 +26,7 @@ import { UserPortfolioManager } from './workstream/UserPortfolioManager';
 import { ParticleAcceleratorService } from './particle-accelerator/ParticleAcceleratorService';
 import { SecretProtectionService } from './secret-protection/SecretProtectionService';
 import { SuperParticleAcceleratorService } from './super-particle-accelerator/SuperParticleAcceleratorService';
+import { WorkspaceAccessGuardService } from './workspace-access-guard/WorkspaceAccessGuardService';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -163,6 +164,11 @@ export function activate(context: vscode.ExtensionContext): void {
   void superParticleAcceleratorService.initialize();
   context.subscriptions.push(superParticleAcceleratorService);
 
+  // Create Workspace Access Guard service (filesystem boundary enforcement)
+  const workspaceAccessGuardService = new WorkspaceAccessGuardService(context);
+  void workspaceAccessGuardService.initialize();
+  context.subscriptions.push(workspaceAccessGuardService);
+
   // Create the tab manager that owns all session tabs
   tabManager = new TabManager(
     context,
@@ -212,6 +218,8 @@ export function activate(context: vscode.ExtensionContext): void {
   tabManager.secretProtectionService = secretProtectionService;
   // Expose Super Particle Accelerator service for secret write blocking
   tabManager.superParticleAcceleratorService = superParticleAcceleratorService;
+  // Expose Workspace Access Guard service for filesystem boundary enforcement
+  tabManager.workspaceAccessGuardService = workspaceAccessGuardService;
   // Propagate settings changes to all existing tabs at runtime
   secretProtectionService.onDidChangeSettings(() => {
     tabManager.refreshSecretProtectionForAllTabs();

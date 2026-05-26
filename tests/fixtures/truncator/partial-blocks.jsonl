@@ -1,0 +1,14 @@
+{"type":"queue-operation","operation":"enqueue","sessionId":"test-session-4"}
+{"type":"queue-operation","operation":"dequeue","sessionId":"test-session-4"}
+{"type":"user","message":{"role":"user","content":"explain something"},"sessionId":"test-session-4"}
+{"type":"last-prompt","sessionId":"test-session-4"}
+{"type":"assistant","message":{"id":"msg_01","role":"assistant","content":[{"type":"text","text":"First part"}]},"sessionId":"test-session-4"}
+{"type":"assistant","message":{"id":"msg_01","role":"assistant","content":[{"type":"text","text":"First part"},{"type":"text","text":" of the explanation."}]},"sessionId":"test-session-4"}
+{"type":"assistant","message":{"id":"msg_01","role":"assistant","content":[{"type":"text","text":"First part"},{"type":"text","text":" of the explanation."},{"type":"tool_use","id":"toolu_01","name":"Read","input":{"path":"doc.md"}}]},"sessionId":"test-session-4"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01","content":"doc contents"}]},"sessionId":"test-session-4"}
+{"type":"assistant","message":{"id":"msg_02","role":"assistant","content":[{"type":"text","text":"Here is the full explanation."}]},"sessionId":"test-session-4"}
+{"type":"queue-operation","operation":"enqueue","sessionId":"test-session-4"}
+{"type":"queue-operation","operation":"dequeue","sessionId":"test-session-4"}
+{"type":"user","message":{"role":"user","content":"thanks"},"sessionId":"test-session-4"}
+{"type":"last-prompt","sessionId":"test-session-4"}
+{"type":"assistant","message":{"id":"msg_03","role":"assistant","content":[{"type":"text","text":"You're welcome!"}]},"sessionId":"test-session-4"}

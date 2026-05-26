@@ -1,4 +1,4 @@
-import * as vscode from 'vscode';
+﻿import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { exec, execSync } from 'child_process';
@@ -343,6 +343,13 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       (this.messageHandler as { setSuperParticleAcceleratorService: (s: typeof service) => void }).setSuperParticleAcceleratorService(service);
     }
     this.processManager.superParticleAcceleratorEnvBuilder = () => service.buildAgentEnv();
+  }
+
+  setWorkspaceAccessGuardService(service: import('../workspace-access-guard/WorkspaceAccessGuardService').WorkspaceAccessGuardService): void {
+    if ('setWorkspaceAccessGuardService' in this.messageHandler) {
+      (this.messageHandler as { setWorkspaceAccessGuardService: (s: typeof service) => void }).setWorkspaceAccessGuardService(service);
+    }
+    this.processManager.workspaceAccessGuardEnvBuilder = () => service.buildAgentEnv();
   }
 
   /** Inject the SessionStore (forwarded to CodexMessageHandler for workstream classification). */
