@@ -1479,7 +1479,21 @@ export const InputArea: React.FC = () => {
               <img
                 src={`data:${img.mediaType};base64,${img.base64}`}
                 alt={`Pasted image ${i + 1}`}
-                onClick={() => useAppStore.getState().setLightboxImageSrc(`data:${img.mediaType};base64,${img.base64}`)}
+                onClick={() => {
+                  const store = useAppStore.getState();
+                  const idx = i;
+                  store.setLightboxOnSave((dataUri: string) => {
+                    const match = dataUri.match(/^data:(image\/\w+);base64,(.+)$/);
+                    if (match) {
+                      setPendingImages((prev) => {
+                        const next = [...prev];
+                        next[idx] = { base64: match[2], mediaType: match[1] as WebviewImageData['mediaType'] };
+                        return next;
+                      });
+                    }
+                  });
+                  store.setLightboxImageSrc(`data:${img.mediaType};base64,${img.base64}`);
+                }}
               />
               <button
                 className="pending-image-remove"

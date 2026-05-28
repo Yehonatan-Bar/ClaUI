@@ -148,8 +148,6 @@ export const ImageLightbox: React.FC = () => {
   const lightboxImageSrc = useAppStore((s) => s.lightboxImageSrc);
   const setLightboxImageSrc = useAppStore((s) => s.setLightboxImageSrc);
 
-  const close = useCallback(() => setLightboxImageSrc(null), [setLightboxImageSrc]);
-
   const [tool, setTool] = useState<Tool>('pencil');
   const [color, setColor] = useState<string>(COLORS[0]);
   const [shapes, setShapes] = useState<Shape[]>([]);
@@ -158,6 +156,53 @@ export const ImageLightbox: React.FC = () => {
   const [toast, setToast] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const toastTimerRef = useRef<number | null>(null);
+  const shapesRef = useRef<Shape[]>([]);
+  shapesRef.current = shapes;
+
+  const close = useCallback(() => {
+    const currentShapes = shapesRef.current;
+    const onSave = useAppStore.getState().lightboxOnSave;
+    if (onSave && currentShapes.length > 0) {
+      const img = imgRef.current;
+      if (img && img.complete) {
+        const w = img.naturalWidth || img.offsetWidth;
+        const h = img.naturalHeight || img.offsetHeight;
+        if (w && h) {
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            try { ctx.drawImage(img, 0, 0, w, h); } catch { /* noop */ }
+            ctx.lineWidth = STROKE_WIDTH;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            for (const s of currentShapes) {
+              ctx.strokeStyle = s.color;
+              ctx.fillStyle = s.color;
+              if (s.type === 'pencil') {
+                if (s.points.length === 0) continue;
+                ctx.beginPath();
+                ctx.moveTo(s.points[0][0] * w, s.points[0][1] * h);
+                for (let i = 1; i < s.points.length; i++) {
+                  ctx.lineTo(s.points[i][0] * w, s.points[i][1] * h);
+                }
+                ctx.stroke();
+              } else if (s.type === 'rect') {
+                ctx.strokeRect(s.x1 * w, s.y1 * h, (s.x2 - s.x1) * w, (s.y2 - s.y1) * h);
+              } else {
+                drawArrow(ctx, s.x1 * w, s.y1 * h, s.x2 * w, s.y2 * h);
+              }
+            }
+            const dataUri = canvas.toDataURL('image/png');
+            onSave(dataUri);
+          }
+        }
+      }
+    }
+    useAppStore.getState().setLightboxOnSave(null);
+    setLightboxImageSrc(null);
+  }, [setLightboxImageSrc]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);

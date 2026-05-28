@@ -599,6 +599,8 @@ export interface AppState {
   // Image Lightbox
   lightboxImageSrc: string | null;
   setLightboxImageSrc: (src: string | null) => void;
+  lightboxOnSave: ((dataUri: string) => void) | null;
+  setLightboxOnSave: (cb: ((dataUri: string) => void) | null) => void;
 
   // Actions
   setSession: (sessionId: string, model: string, tabKind?: 'chat' | 'search' | 'multiparticipant') => void;
@@ -1402,6 +1404,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Image Lightbox
   lightboxImageSrc: null,
   setLightboxImageSrc: (src) => set({ lightboxImageSrc: src }),
+  lightboxOnSave: null,
+  setLightboxOnSave: (cb) => set({ lightboxOnSave: cb }),
 
   // Actions
   setSession: (sessionId, model, tabKind) =>
