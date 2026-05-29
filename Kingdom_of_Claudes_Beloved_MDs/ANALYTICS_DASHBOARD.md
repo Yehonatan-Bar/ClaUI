@@ -76,6 +76,7 @@ A full-screen overlay dashboard inside the chat webview with three modes: **Sess
 - Auto-refresh toggle with configurable interval
 - Period tabs are fixed (`5 Hours`, `24 Hours`, `7 Days`, `14 Days`, `30 Days`, `2 Months`) and remain visible even when the API omits some buckets
 - Selecting a period with no returned bucket shows an explicit empty-state message instead of hiding the tab
+- Utilization is computed server-side, so the values are agnostic to the active model (incl. Opus 4.8), effort level, and fast mode -- the cost of those controls is already reflected in the percentages the API returns
 
 ## User Mode (3 Tabs)
 
@@ -269,7 +270,7 @@ Correlates two independent data streams -- token counts (from CLI result events)
 
 ### Cost Weighting
 
-Different token types have vastly different API costs. Raw token sums are inaccurate for correlation with usage %. The tracker applies cost weights (identical across Opus and Sonnet):
+Different token types have vastly different API costs. Raw token sums are inaccurate for correlation with usage %. The tracker applies per-token-TYPE cost weights. The relative structure is identical across Opus (incl. 4.8), Sonnet, and Haiku:
 
 | Token Type | Weight | Rationale |
 |---|---|---|
@@ -279,6 +280,14 @@ Different token types have vastly different API costs. Raw token sums are inaccu
 | Cache Read | 0.1x | $0.50/$5 (90% cheaper than input) |
 
 Formula: `weightedTokens = input*1.0 + output*5.0 + cacheCreation*1.25 + cacheRead*0.1`
+
+### Interaction with Model, Effort, and Fast Mode
+
+The two consumer-facing usage features behave as follows under the model controls (see `CLAUDE_MODEL_CONTROLS.md`):
+
+- **Opus 4.8** -- No special handling required. `normalizeModelCategory()` matches any model ID containing `opus` (via `.includes('opus')`), so `claude-opus-4-8` accumulates into the `opus` per-model buckets exactly like prior Opus versions. The Anthropic usage API also rolls Opus 4.8 spend into the existing `*_opus` buckets server-side, so the usage-remaining widget needs no change.
+- **Effort levels** -- Higher effort produces more thinking output, which the CLI reports as `output_tokens`. These are captured automatically and weighted 5x like any output. Effort therefore raises token VOLUME (faster quota burn in absolute terms) but does not distort the per-token-type weighting, so `tokensPerPercent` stays meaningful.
+- **Fast mode** -- Fast mode adds an absolute per-token price premium that the per-token-type weights do NOT model. The premium is absorbed by the server-side utilization signal: a fast-mode turn consumes more quota for the same tokens, so `tokensPerPercent` naturally dips while fast mode is active. This is correct behavior (it reflects the real "quota burn rate"). Per-fast-mode bucketing is infeasible because the usage API only separates buckets by period + model, not fast-vs-normal, and there is no published premium multiplier to apply locally.
 
 ### Core Module: `TokenUsageRatioTracker`
 

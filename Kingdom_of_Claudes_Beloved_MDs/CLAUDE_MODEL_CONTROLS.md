@@ -361,3 +361,20 @@ changes.
   include the full settings set.
 - The fast-mode overlay file is shared across tabs (single path in global
   storage); it only ever contains `{"fastMode":true}`, so concurrent reads are safe.
+
+## Impact on usage tracking
+
+The two consumer usage features are largely insulated from these controls:
+
+- The **usage-remaining widget** (`UsageWidget` / `UsageFetcher`) reads
+  server-computed utilization from the Anthropic OAuth usage API, so model
+  (incl. Opus 4.8), effort, and fast-mode cost are already baked into the
+  percentages it shows — no client-side adjustment.
+- The **Token Ratio dashboard** (`TokenUsageRatioTracker`) buckets per model
+  category, so Opus 4.8 maps to `opus` automatically. Effort raises token volume
+  but not the per-token-type weights. Fast mode's per-token price premium is not
+  modeled in the weights; it surfaces as a lower `tokensPerPercent` (quota burns
+  faster) via the server utilization signal.
+
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ANALYTICS_DASHBOARD.md`
+> (section "Interaction with Model, Effort, and Fast Mode")

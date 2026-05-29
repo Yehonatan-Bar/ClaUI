@@ -6,9 +6,15 @@ import type {
 } from '../types/webview-messages';
 
 /**
- * Cost weights relative to base input price.
- * Identical across Opus and Sonnet (same multiplier structure).
- * Input=$1x, Output=$5x, CacheWrite(5-min)=$1.25x, CacheRead=$0.1x
+ * Cost weights relative to base input price (per-token-TYPE multipliers).
+ * The ratio structure is identical across Opus (incl. 4.8), Sonnet, and Haiku:
+ * Input=1x, Output=5x, CacheWrite(5-min)=1.25x, CacheRead=0.1x.
+ *
+ * These model the RELATIVE cost of each token type, not absolute price.
+ * Fast mode adds an absolute per-token premium that is NOT modeled here; its
+ * effect is absorbed by the server-side utilization signal, so a fast-mode turn
+ * consumes more quota for the same tokens (tokensPerPercent dips). Effort levels
+ * only change token VOLUME (more thinking output), not these weights.
  */
 const COST_WEIGHTS = {
   input: 1.0,

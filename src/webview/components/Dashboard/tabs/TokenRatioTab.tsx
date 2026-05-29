@@ -464,6 +464,11 @@ export const TokenRatioTab: React.FC = () => {
         <span style={{ color: DASH_COLORS.text }}>Input=1x</span>
         {', '}
         <span style={{ color: DASH_COLORS.text }}>Cache Read=0.1x</span>
+        <span style={{ display: 'block', marginTop: 6, opacity: 0.85 }}>
+          Buckets are per-model (Opus/Sonnet/Haiku). Fast mode raises real cost per
+          token, so the same tokens burn quota faster -- expect tok/1% to dip while it
+          is active. Effort changes token volume, not the weights.
+        </span>
       </div>
 
       {/* Baseline notice */}
