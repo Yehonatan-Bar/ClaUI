@@ -223,8 +223,11 @@ export class MessageHandler {
   /** Guard: last turnIndex for which result was handled (prevents double-fire if both
    *  the demux listener AND the direct wireProcessEvents path deliver the same result) */
   private lastResultHandledTurnIndex = -1;
-  /** Thinking effort level detected from system init or content blocks */
+  /** Thinking effort level detected from system init or content blocks (reset per message) */
   private currentThinkingEffort: string | null = null;
+  /** Session-level effort (from CLI init or user config); persists across messages so
+   *  the per-message badge reflects the actual effort instead of a hardcoded default */
+  private sessionThinkingEffort: string | null = null;
   /** Separate timer for post-approve nudge, decoupled from approval cycle state so it
    *  won't be cancelled by result-handler cleanup or markApprovalCycleResumeObserved. */
   private postApproveNudgeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -4654,10 +4657,21 @@ export class MessageHandler {
       'init',
       (event: SystemInitEvent) => {
         this.log(`system/init received: session=${event.session_id}, model=${event.model}`);
-        // Capture thinking effort from system init if available
+        // Capture thinking effort from system init if available, otherwise fall
+        // back to the configured effort level so the per-message badge reflects
+        // the actual effort instead of a hardcoded default.
         if (event.thinking_effort) {
           this.currentThinkingEffort = event.thinking_effort;
+          this.sessionThinkingEffort = event.thinking_effort;
           this.log(`system/init thinking_effort=${event.thinking_effort}`);
+        } else {
+          const configuredEffort = vscode.workspace
+            .getConfiguration('claudeMirror')
+            .get<string>('effortLevel', '');
+          // Reset to the configured value (or null) so a new session never inherits
+          // a stale effort level from a previous session.
+          this.sessionThinkingEffort = configuredEffort || null;
+          this.log(`system/init no thinking_effort; configured effortLevel=${configuredEffort || '(none)'}`);
         }
         // Update webview with real session info from CLI init event
         this.webview.postMessage({
@@ -4920,10 +4934,13 @@ export class MessageHandler {
             this.lastAssistantInputTokens = totalAssistInput;
           }
         }
-        // Detect thinking effort from content blocks (presence of 'thinking' type blocks)
+        // Detect thinking effort from content blocks (presence of 'thinking' type blocks).
+        // When thinking happened but no explicit per-message effort was reported, label
+        // it with the session-level effort (from CLI init or user config) so the badge
+        // reflects the actual selected level instead of a hardcoded default.
         const hasThinkingBlocks = event.message.content.some((b: any) => b.type === 'thinking');
         if (hasThinkingBlocks && !this.currentThinkingEffort) {
-          this.currentThinkingEffort = 'high';
+          this.currentThinkingEffort = this.sessionThinkingEffort || 'high';
         }
         const effortForMessage = this.currentThinkingEffort || this.demux.getThinkingEffort() || undefined;
         this.log(`-> webview: assistantMessage id=${event.message.id} blocks=[${blockTypes}] usage=${JSON.stringify(event.message.usage)} thinkingEffort=${effortForMessage}`);
@@ -5017,11 +5034,15 @@ export class MessageHandler {
     this.demux.on(
       'thinkingDetected',
       (data: { effort: string }) => {
-        this.log(`-> webview: thinkingDetected effort=${data.effort}`);
-        this.currentThinkingEffort = data.effort;
+        // The demux reports a generic 'high' when it sees thinking blocks without an
+        // explicit level. Prefer the session-level effort (from CLI init or user
+        // config) so the live badge reflects the actually selected level.
+        const effort = this.sessionThinkingEffort || data.effort;
+        this.log(`-> webview: thinkingDetected effort=${effort} (raw=${data.effort})`);
+        this.currentThinkingEffort = effort;
         this.webview.postMessage({
           type: 'thinkingEffortUpdate',
-          effort: data.effort,
+          effort,
         });
       }
     );

@@ -7692,6 +7692,16 @@ html, body, #root {
   color: #ff9800;
 }
 
+.thinking-effort-xhigh {
+  background: color-mix(in srgb, #ff5722 22%, transparent);
+  color: #ff5722;
+}
+
+.thinking-effort-max {
+  background: color-mix(in srgb, #f44336 25%, transparent);
+  color: #f44336;
+}
+
 .dlp-message-badge {
   display: inline-block;
   margin-left: 8px;

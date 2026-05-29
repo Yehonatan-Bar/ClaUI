@@ -1,6 +1,6 @@
 # Claude Model Controls (Model, Thinking Effort, Fast Mode)
 
-Snapshot: 2026-05-29
+Snapshot: 2026-05-29 (effort badge label resolution)
 
 This document covers the three Claude-side controls exposed in the AI chip's
 model area:
@@ -202,6 +202,44 @@ Effort is **not** passed as a per-call option by any current caller, so it is
 always sourced from config and therefore applies on the next session start
 (including the fresh restart performed by a model switch).
 
+### Per-message effort badge (chat display)
+
+Each assistant message can render a small badge next to its header showing the
+thinking effort that was actually used for that turn (e.g. `Opus 4.8` + `high`).
+The badge label must reflect the real selected level, including `xhigh` / `max`,
+rather than a hardcoded default.
+
+`MessageHandler` tracks two fields for this:
+
+| Field | Scope | Source |
+|-------|-------|--------|
+| `currentThinkingEffort` | per message (reset on every `messageStart`) | explicit per-message signal, else session effort |
+| `sessionThinkingEffort` | per session (persists across messages) | CLI `system/init` `thinking_effort`, else configured `claudeMirror.effortLevel` |
+
+Resolution logic:
+
+- On `system/init`: if the event carries `thinking_effort`, both fields are set
+  to it. Otherwise `sessionThinkingEffort` is reset to the configured
+  `effortLevel` (or `null`), so a new session never inherits a stale level.
+- On `assistantMessage`: if the message contains `thinking` blocks but no
+  explicit per-message effort was captured, the badge is labeled with
+  `sessionThinkingEffort || 'high'` (the `'high'` is a last-resort fallback only
+  when nothing else is known).
+- On `thinkingDetected` (live streaming): the demux reports a generic `'high'`
+  when it sees thinking blocks without a level; `MessageHandler` overrides it
+  with `sessionThinkingEffort` when available before posting
+  `thinkingEffortUpdate`.
+
+The effort string flows to the webview as `thinkingEffort` on `assistantMessage`
+(persisted badge) and as `thinkingEffortUpdate` (live badge). The webview applies
+it verbatim as a dynamic CSS class, so any level renders without code changes:
+
+- Persisted badge: `MessageBubble.tsx` -> `thinking-effort-badge thinking-effort-<level>`
+- Live badge: `MessageList.tsx` -> adds `thinking-effort-live` (pulse animation)
+- Styles: `.thinking-effort-{low,medium,high,xhigh,max}` in `global.css` with
+  escalating intensity (green -> yellow -> orange -> deep orange -> red); unknown
+  values fall back to the neutral `.thinking-effort-badge` base style.
+
 ### Note on `ultracode`
 
 `ultracode` (Claude Code's xhigh + dynamic-workflow session mode) is a
@@ -332,7 +370,8 @@ changes.
   `SetModelRequest`/`ModelSettingMessage`, `SetClaudeEffortRequest`/`ClaudeEffortSettingMessage`,
   `SetClaudeFastModeRequest`/`ClaudeFastModeSettingMessage` (+ union entries)
 - `src/extension/webview/MessageHandler.ts` — `setModel`/`setClaudeEffort`/`setClaudeFastMode`
-  cases, `sendModelSetting`/`sendClaudeEffortSetting`/`sendClaudeFastModeSetting`, `ready` + config watch
+  cases, `sendModelSetting`/`sendClaudeEffortSetting`/`sendClaudeFastModeSetting`, `ready` + config watch;
+  `currentThinkingEffort`/`sessionThinkingEffort` fields + badge-label resolution (init / assistantMessage / thinkingDetected handlers)
 - `src/extension/process/ClaudeProcessManager.ts` — `ProcessStartOptions`
   (`model`, `effortLevel`, `fastMode`), `--model`/`--effort`/`--settings` assembly,
   `writeFastModeSettingsFile()`
@@ -345,7 +384,10 @@ changes.
 - `src/webview/components/ModelSelector/ClaudeEffortSelector.tsx`
 - `src/webview/components/ModelSelector/ClaudeFastModeSelector.tsx`
 - `src/webview/components/StatusBar/AIChip.tsx` — hosts the selectors + `↯` indicator + immediate model display
-- `src/webview/styles/global.css` — `.ai-chip-fast` indicator style
+- `src/webview/components/ChatView/MessageBubble.tsx` — per-message effort badge
+- `src/webview/components/ChatView/MessageList.tsx` — live (streaming) effort badge
+- `src/webview/styles/global.css` — `.ai-chip-fast` indicator style;
+  `.thinking-effort-{badge,low,medium,high,xhigh,max,live}` badge styles
 
 ---
 
