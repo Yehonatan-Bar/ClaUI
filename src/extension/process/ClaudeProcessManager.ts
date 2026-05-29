@@ -1,4 +1,6 @@
 ﻿import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ChildProcess, spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import type { CliOutputEvent, CliInputMessage } from '../types/stream-json';
@@ -11,6 +13,8 @@ export interface ProcessStartOptions {
   fork?: boolean;
   cwd?: string;
   model?: string;
+  effortLevel?: string;
+  fastMode?: boolean;
   cliPathOverride?: string;
   permissionMode?: 'full-access' | 'supervised';
   /** When true, omit --replay-user-messages so a resumed session does not
@@ -73,6 +77,23 @@ export class ClaudeProcessManager extends EventEmitter {
     this.log = logger;
   }
 
+  /**
+   * Write a minimal settings overlay file enabling fast mode, returning its
+   * absolute path (or null on failure). Passed to the CLI via `--settings`.
+   */
+  private writeFastModeSettingsFile(): string | null {
+    try {
+      const dir = this.context.globalStorageUri.fsPath;
+      fs.mkdirSync(dir, { recursive: true });
+      const settingsPath = path.join(dir, 'claude-fast-mode-settings.json');
+      fs.writeFileSync(settingsPath, JSON.stringify({ fastMode: true }), 'utf8');
+      return settingsPath;
+    } catch (err) {
+      this.log(`Failed to write fast mode settings file: ${err instanceof Error ? err.message : err}`);
+      return null;
+    }
+  }
+
   async start(options?: ProcessStartOptions): Promise<void> {
     if (this.process) {
       this.log('Stopping existing process before restart');
@@ -126,6 +147,24 @@ export class ClaudeProcessManager extends EventEmitter {
     const selectedModel = rawModel && !rawModel.includes('(') ? rawModel : '';
     if (selectedModel) {
       args.push('--model', selectedModel);
+    }
+
+    const effortLevel = options?.effortLevel ||
+      vscode.workspace.getConfiguration('claudeMirror').get<string>('effortLevel', '');
+    if (effortLevel) {
+      args.push('--effort', effortLevel);
+    }
+
+    // Fast mode: applied via a --settings overlay file (no dedicated CLI flag
+    // exists). The path is quoted because the CLI is spawned through a shell;
+    // a JSON-string value would be mangled by cmd.exe, but a quoted path is not.
+    const fastMode = options?.fastMode ??
+      vscode.workspace.getConfiguration('claudeMirror').get<boolean>('fastMode', false);
+    if (fastMode) {
+      const settingsPath = this.writeFastModeSettingsFile();
+      if (settingsPath) {
+        args.push('--settings', `"${settingsPath}"`);
+      }
     }
 
     if (options?.resume) {

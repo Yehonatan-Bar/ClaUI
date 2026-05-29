@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { ContentBlock } from '../../extension/types/stream-json';
 import type {
   BugReportContext,
+  ClaudeEffortLevel,
   CodexReasoningEffort,
   CodexServiceTier,
   DlpMessageMetadata,
@@ -154,6 +155,8 @@ export interface AppState {
   selectedProvider: ProviderId;
   providerCapabilities: ProviderCapabilities;
   selectedModel: string;  // model chosen by user for next session
+  selectedClaudeEffort: ClaudeEffortLevel;
+  selectedClaudeFastMode: boolean;
   selectedCodexReasoningEffort: CodexReasoningEffort;
   selectedCodexServiceTier: CodexServiceTier;
   codexModelOptions: CodexModelOption[];
@@ -676,6 +679,8 @@ export interface AppState {
   setProviderCapabilities: (capabilities: ProviderCapabilities) => void;
   setResuming: (resuming: boolean) => void;
   setSelectedModel: (model: string) => void;
+  setSelectedClaudeEffort: (effort: ClaudeEffortLevel) => void;
+  setSelectedClaudeFastMode: (fastMode: boolean) => void;
   setSelectedCodexReasoningEffort: (effort: CodexReasoningEffort) => void;
   setSelectedCodexServiceTier: (serviceTier: CodexServiceTier) => void;
   setCodexModelOptions: (options: CodexModelOption[]) => void;
@@ -1060,6 +1065,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedProvider: 'claude',
   providerCapabilities: { ...DEFAULT_PROVIDER_CAPABILITIES },
   selectedModel: '',
+  selectedClaudeEffort: '' as ClaudeEffortLevel,
+  selectedClaudeFastMode: false,
   selectedCodexReasoningEffort: '',
   selectedCodexServiceTier: '',
   codexModelOptions: [],
@@ -2008,6 +2015,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setResuming: (resuming) => set({ isResuming: resuming }),
 
   setSelectedModel: (model) => set({ selectedModel: model }),
+
+  setSelectedClaudeEffort: (effort) => set({ selectedClaudeEffort: effort }),
+
+  setSelectedClaudeFastMode: (fastMode) => set({ selectedClaudeFastMode: fastMode }),
 
   setSelectedCodexReasoningEffort: (effort) => set({ selectedCodexReasoningEffort: effort }),
 

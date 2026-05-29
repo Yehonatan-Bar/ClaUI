@@ -32,6 +32,7 @@ export type HandoffStage =
   | 'failed';
 export type CodexReasoningEffort = '' | 'none' | 'low' | 'medium' | 'high' | 'xhigh';
 export type CodexServiceTier = '' | 'fast';
+export type ClaudeEffortLevel = '' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export interface CodexModelOption {
   label: string;
   value: string;
@@ -251,6 +252,16 @@ export interface ClearSessionRequest {
 export interface SetModelRequest {
   type: 'setModel';
   model: string;
+}
+
+export interface SetClaudeEffortRequest {
+  type: 'setClaudeEffort';
+  effort: ClaudeEffortLevel;
+}
+
+export interface SetClaudeFastModeRequest {
+  type: 'setClaudeFastMode';
+  fastMode: boolean;
 }
 
 export interface SetProviderRequest {
@@ -916,6 +927,8 @@ export type WebviewToExtensionMessage =
   | PickFilesRequest
   | ClearSessionRequest
   | SetModelRequest
+  | SetClaudeEffortRequest
+  | SetClaudeFastModeRequest
   | SetProviderRequest
   | OpenProviderTabRequest
   | OpenMultiParticipantRequest
@@ -1364,6 +1377,16 @@ export interface TypingThemeSettingMessage {
 export interface ModelSettingMessage {
   type: 'modelSetting';
   model: string;
+}
+
+export interface ClaudeEffortSettingMessage {
+  type: 'claudeEffortSetting';
+  effort: ClaudeEffortLevel;
+}
+
+export interface ClaudeFastModeSettingMessage {
+  type: 'claudeFastModeSetting';
+  fastMode: boolean;
 }
 
 export interface ProviderSettingMessage {
@@ -2521,6 +2544,8 @@ export type ExtensionToWebviewMessage =
   | TextSettingsMessage
   | TypingThemeSettingMessage
   | ModelSettingMessage
+  | ClaudeEffortSettingMessage
+  | ClaudeFastModeSettingMessage
   | ProviderSettingMessage
   | ProviderCapabilitiesMessage
   | HandoffProgressMessage

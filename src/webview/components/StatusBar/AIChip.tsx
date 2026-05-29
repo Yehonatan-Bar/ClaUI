@@ -4,6 +4,8 @@ import { ModelSelector } from '../ModelSelector/ModelSelector';
 import { CodexModelSelector } from '../ModelSelector/CodexModelSelector';
 import { CodexReasoningEffortSelector } from '../ModelSelector/CodexReasoningEffortSelector';
 import { CodexServiceTierSelector } from '../ModelSelector/CodexServiceTierSelector';
+import { ClaudeEffortSelector } from '../ModelSelector/ClaudeEffortSelector';
+import { ClaudeFastModeSelector } from '../ModelSelector/ClaudeFastModeSelector';
 import { PermissionModeSelector } from '../PermissionModeSelector/PermissionModeSelector';
 import type { ProviderId } from '../../../extension/types/webview-messages';
 import { postToExtension } from '../../hooks/useClaudeStream';
@@ -45,6 +47,8 @@ export const AIChip: React.FC<AIChipProps> = ({ isOpen, onToggle, displayMode = 
     isBusy,
     isConnected,
     model,
+    selectedModel,
+    selectedClaudeFastMode,
     handoffStage,
   } = useAppStore();
 
@@ -61,6 +65,8 @@ export const AIChip: React.FC<AIChipProps> = ({ isOpen, onToggle, displayMode = 
 
   const isCodexUi = provider === 'codex' || !providerCapabilities.supportsPermissionModeSelector;
   const modelSelectorElement = isCodexUi ? <CodexModelSelector /> : <ModelSelector />;
+  const claudeEffortSelectorElement = !isCodexUi ? <ClaudeEffortSelector /> : null;
+  const claudeFastModeSelectorElement = !isCodexUi ? <ClaudeFastModeSelector /> : null;
   const codexReasoningSelectorElement = isCodexUi ? <CodexReasoningEffortSelector /> : null;
   const codexServiceTierSelectorElement = isCodexUi ? <CodexServiceTierSelector /> : null;
   const permissionSelectorElement = providerCapabilities.supportsPermissionModeSelector
@@ -70,9 +76,10 @@ export const AIChip: React.FC<AIChipProps> = ({ isOpen, onToggle, displayMode = 
   const currentProvider = provider ?? selectedProvider ?? 'claude';
   const providerColor = PROVIDER_COLORS[currentProvider] || PROVIDER_COLORS.claude;
 
-  // Shorten model name for compact display
-  const modelDisplayName = getClaudeModelLabel(model);
-  const shortModelName = getClaudeModelCompactLabel(model);
+  // Show selected model immediately; fall back to CLI-reported model
+  const displayModel = selectedModel || model;
+  const modelDisplayName = getClaudeModelLabel(displayModel);
+  const shortModelName = getClaudeModelCompactLabel(displayModel);
 
   const isCleanProviderShortcut = (targetProvider: ProviderId): boolean =>
     targetProvider === 'claude' || targetProvider === 'codex';
@@ -136,6 +143,11 @@ export const AIChip: React.FC<AIChipProps> = ({ isOpen, onToggle, displayMode = 
             {displayMode === 'compact' ? shortModelName : modelDisplayName}
           </span>
         )}
+        {!isCodexUi && selectedClaudeFastMode && (
+          <span className="ai-chip-fast" data-tooltip="Fast mode enabled (~2.5x output speed)">
+            {'↯'}
+          </span>
+        )}
         {displayMode === 'full' && permissionSelectorElement && (
           <span className="ai-chip-perm">{permLabel}</span>
         )}
@@ -162,6 +174,16 @@ export const AIChip: React.FC<AIChipProps> = ({ isOpen, onToggle, displayMode = 
           <div className="ai-chip-dropdown-control">
             {modelSelectorElement}
           </div>
+          {claudeEffortSelectorElement && (
+            <div className="ai-chip-dropdown-control">
+              {claudeEffortSelectorElement}
+            </div>
+          )}
+          {claudeFastModeSelectorElement && (
+            <div className="ai-chip-dropdown-control">
+              {claudeFastModeSelectorElement}
+            </div>
+          )}
           {codexReasoningSelectorElement && (
             <div className="ai-chip-dropdown-control">
               {codexReasoningSelectorElement}
@@ -189,6 +211,14 @@ export const AIChip: React.FC<AIChipProps> = ({ isOpen, onToggle, displayMode = 
               </button>
             </>
           )}
+          <div className="ai-chip-dropdown-sep" />
+          <button
+            className="ai-chip-dropdown-item upgrade-btn"
+            onClick={() => postToExtension({ type: 'openTerminal', command: 'claude update' })}
+            data-tooltip="Open a terminal and run 'claude update' to upgrade Claude Code CLI"
+          >
+            Upgrade CLI
+          </button>
         </div>
       )}
     </div>

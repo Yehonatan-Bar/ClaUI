@@ -441,6 +441,7 @@
           "default": "",
           "enum": [
             "",
+            "claude-opus-4-8",
             "claude-opus-4-7",
             "claude-sonnet-4-6",
             "claude-sonnet-4-5-20250929",
@@ -449,6 +450,7 @@
           ],
           "enumDescriptions": [
             "Default (CLI default)",
+            "Claude Opus 4.8",
             "Claude Opus 4.7",
             "Claude Sonnet 4.6",
             "Claude Sonnet 4.5",
@@ -456,6 +458,32 @@
             "Claude Haiku 4.5"
           ],
           "description": "Claude model to use for new sessions. Leave empty to use CLI default."
+        },
+        "claudeMirror.effortLevel": {
+          "type": "string",
+          "default": "",
+          "enum": [
+            "",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "enumDescriptions": [
+            "Default (model default - High for Opus 4.8)",
+            "Low - efficient, minimal token usage",
+            "Medium - balanced cost/quality",
+            "High - default for Opus 4.8",
+            "Extra High - recommended for coding tasks",
+            "Max - maximum capability, highest token usage"
+          ],
+          "description": "Claude thinking effort level. Controls how deeply the model reasons. Leave empty for model default."
+        },
+        "claudeMirror.fastMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Claude Fast mode: ~2.5x faster output on Opus models (4.8/4.7/4.6). Costs more and has no effect on Sonnet/Haiku. Applies when the next session starts."
         },
         "claudeMirror.permissionMode": {
           "type": "string",

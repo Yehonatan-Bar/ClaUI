@@ -1936,6 +1936,16 @@ export class MessageHandler {
           }
           break;
 
+        case 'setClaudeEffort':
+          this.log(`Setting Claude effort level to: "${msg.effort}"`);
+          vscode.workspace.getConfiguration('claudeMirror').update('effortLevel', msg.effort, true);
+          break;
+
+        case 'setClaudeFastMode':
+          this.log(`Setting Claude fast mode to: ${msg.fastMode}`);
+          vscode.workspace.getConfiguration('claudeMirror').update('fastMode', msg.fastMode, true);
+          break;
+
         case 'setProvider':
           this.log(`Setting provider to: "${msg.provider}"`);
           if (msg.provider !== 'claude') {
@@ -3600,6 +3610,10 @@ export class MessageHandler {
           this.sendTypingThemeSetting();
           // Send model setting
           this.sendModelSetting();
+          // Send Claude effort level setting
+          this.sendClaudeEffortSetting();
+          // Send Claude fast mode setting
+          this.sendClaudeFastModeSetting();
           // Send default provider setting for new sessions
           this.sendProviderSetting();
           // Send current tab/provider capability flags for UI gating
@@ -3969,6 +3983,26 @@ export class MessageHandler {
     this.webview.postMessage({
       type: 'modelSetting',
       model,
+    });
+  }
+
+  private sendClaudeEffortSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const effort = config.get<string>('effortLevel', '') as import('../types/webview-messages').ClaudeEffortLevel;
+    this.log(`Sending Claude effort setting: "${effort}"`);
+    this.webview.postMessage({
+      type: 'claudeEffortSetting',
+      effort,
+    });
+  }
+
+  private sendClaudeFastModeSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const fastMode = config.get<boolean>('fastMode', false);
+    this.log(`Sending Claude fast mode setting: ${fastMode}`);
+    this.webview.postMessage({
+      type: 'claudeFastModeSetting',
+      fastMode,
     });
   }
 
@@ -4515,6 +4549,12 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.model')) {
         this.sendModelSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.effortLevel')) {
+        this.sendClaudeEffortSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.fastMode')) {
+        this.sendClaudeFastModeSetting();
       }
       if (e.affectsConfiguration('claudeMirror.provider')) {
         this.log('Configuration changed: claudeMirror.provider');

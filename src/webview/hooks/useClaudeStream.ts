@@ -38,6 +38,8 @@ export function useClaudeStream(): void {
     setSelectedProvider,
     setProviderCapabilities,
     setSelectedModel,
+    setSelectedClaudeEffort,
+    setSelectedClaudeFastMode,
     setSelectedCodexReasoningEffort,
     setSelectedCodexServiceTier,
     setCodexModelOptions,
@@ -615,6 +617,14 @@ export function useClaudeStream(): void {
 
         case 'modelSetting':
           setSelectedModel(msg.model);
+          break;
+
+        case 'claudeEffortSetting':
+          setSelectedClaudeEffort(msg.effort);
+          break;
+
+        case 'claudeFastModeSetting':
+          setSelectedClaudeFastMode(msg.fastMode);
           break;
 
         case 'providerSetting':
@@ -1291,6 +1301,8 @@ export function useClaudeStream(): void {
     setSelectedProvider,
     setProviderCapabilities,
     setSelectedModel,
+    setSelectedClaudeEffort,
+    setSelectedClaudeFastMode,
     setSelectedCodexReasoningEffort,
     setSelectedCodexServiceTier,
     setCodexModelOptions,

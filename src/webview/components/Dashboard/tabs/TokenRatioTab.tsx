@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 import { useAppStore } from '../../../state/store';
 import { postToExtension } from '../../../hooks/useClaudeStream';
 import { DASH_COLORS, formatTokens } from '../dashboardUtils';
@@ -47,20 +47,25 @@ function parseBucketModelLabel(bucket: string, prefix: string): string {
   return bucket;
 }
 
+const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 function formatDate(ts: number): string {
   const d = new Date(ts);
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' +
+  const day = SHORT_DAYS[d.getDay()];
+  return day + ' ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' +
     d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatShortTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const d = new Date(ts);
+  return SHORT_DAYS[d.getDay()] + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatAxisTick(ts: number, rangeMs: number): string {
-  // Short ranges: show time only. Longer ranges: show date.
-  if (rangeMs <= 24 * 60 * 60 * 1000) return formatShortTime(ts);
-  return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  const d = new Date(ts);
+  const day = SHORT_DAYS[d.getDay()];
+  if (rangeMs <= 24 * 60 * 60 * 1000) return day + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return day + ' ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 function getTrendArrow(trend: TokenRatioBucketSummary['trend']): string {
@@ -150,6 +155,27 @@ function buildChartData(
   return { data, modelLabels: Array.from(modelLabelsSet) };
 }
 
+/** Collect unique sample timestamps for the overlay (deduped by timestamp) */
+function getSampleTimestamps(
+  samples: TokenUsageRatioSample[],
+  quotaPrefix: string,
+  rangeMs: number,
+): Array<{ timestamp: number; isBaseline: boolean }> {
+  const cutoff = Date.now() - rangeMs;
+  const seen = new Map<number, boolean>();
+  for (const s of samples) {
+    if (s.timestamp < cutoff) continue;
+    if (s.bucket !== quotaPrefix && !s.bucket.startsWith(quotaPrefix + '_')) continue;
+    const prev = seen.get(s.timestamp);
+    if (prev === undefined) {
+      seen.set(s.timestamp, s.tokensPerPercent === null);
+    } else if (prev && s.tokensPerPercent !== null) {
+      seen.set(s.timestamp, false);
+    }
+  }
+  return Array.from(seen.entries()).map(([timestamp, isBaseline]) => ({ timestamp, isBaseline }));
+}
+
 /** Filter recent samples for the table */
 function getRecentSamples(
   samples: TokenUsageRatioSample[],
@@ -181,8 +207,11 @@ const QuotaPanel: React.FC<{
     s => s.bucket === quotaPrefix || s.bucket.startsWith(quotaPrefix + '_')
   );
 
+  const [showSampleOverlay, setShowSampleOverlay] = React.useState(false);
+
   const { data: chartData, modelLabels } = buildChartData(samples, quotaPrefix, selectedRange.ms);
   const recentSamples = getRecentSamples(samples, quotaPrefix, selectedRange.ms, 30);
+  const sampleTimestamps = getSampleTimestamps(samples, quotaPrefix, selectedRange.ms);
 
   const hasSamples = windowSummaries.length > 0;
   const hasChartData = chartData.length > 1;
@@ -231,11 +260,30 @@ const QuotaPanel: React.FC<{
           borderRadius: 8,
           padding: '16px 12px',
         }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: DASH_COLORS.text, marginBottom: 12, paddingLeft: 8 }}>
-            Weighted Tokens per 1%
-            <span style={{ fontWeight: 400, color: DASH_COLORS.textMuted, marginLeft: 8 }}>
-              ({selectedRange.label})
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, paddingLeft: 8, paddingRight: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: DASH_COLORS.text }}>
+              Weighted Tokens per 1%
+              <span style={{ fontWeight: 400, color: DASH_COLORS.textMuted, marginLeft: 8 }}>
+                ({selectedRange.label})
+              </span>
+            </div>
+            <button
+              onClick={() => setShowSampleOverlay(v => !v)}
+              style={{
+                background: showSampleOverlay ? DASH_COLORS.blue : 'rgba(88, 166, 255, 0.12)',
+                border: `1px solid ${DASH_COLORS.blue}`,
+                color: showSampleOverlay ? '#fff' : DASH_COLORS.blue,
+                borderRadius: 6,
+                padding: '5px 14px',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                transition: 'all 0.15s ease',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {showSampleOverlay ? '|| Sample Points' : '|> Sample Points'}
+            </button>
           </div>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={chartData}>
@@ -266,6 +314,17 @@ const QuotaPanel: React.FC<{
                 formatter={(value: number | undefined) => [formatTokens(value ?? 0), '']}
               />
               {modelLabels.length > 1 && <Legend wrapperStyle={{ fontSize: 11 }} />}
+              {showSampleOverlay && sampleTimestamps.map((st, i) => (
+                <ReferenceLine
+                  key={`sp-${i}`}
+                  x={st.timestamp}
+                  stroke={st.isBaseline ? DASH_COLORS.amber : DASH_COLORS.blue}
+                  strokeDasharray={st.isBaseline ? '4 4' : '3 6'}
+                  strokeOpacity={0.6}
+                  strokeWidth={1.5}
+                  label={undefined}
+                />
+              ))}
               {modelLabels.map(ml => (
                 <Line
                   key={ml}
@@ -279,6 +338,18 @@ const QuotaPanel: React.FC<{
               ))}
             </LineChart>
           </ResponsiveContainer>
+          {showSampleOverlay && (
+            <div style={{ display: 'flex', gap: 16, paddingLeft: 8, paddingTop: 6, fontSize: 10, color: DASH_COLORS.textMuted }}>
+              <span>
+                <span style={{ display: 'inline-block', width: 16, borderTop: `2px dashed ${DASH_COLORS.blue}`, marginRight: 4, verticalAlign: 'middle' }} />
+                Sample ({sampleTimestamps.filter(s => !s.isBaseline).length})
+              </span>
+              <span>
+                <span style={{ display: 'inline-block', width: 16, borderTop: `2px dashed ${DASH_COLORS.amber}`, marginRight: 4, verticalAlign: 'middle' }} />
+                Baseline ({sampleTimestamps.filter(s => s.isBaseline).length})
+              </span>
+            </div>
+          )}
         </div>
       )}
 
