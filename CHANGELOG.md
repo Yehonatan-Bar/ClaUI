@@ -1,5 +1,46 @@
 # ClaUi - Changelog
 
+## v0.1.180 - 2026-05-29
+
+**Feature: Claude Opus 4.8 model support**
+
+- Added `claude-opus-4-8` as a first-class option in the status-bar model selector and the `claudeMirror.model` enum, rendered as **Opus 4.8**
+- Model display normalization (`claudeModelDisplay.ts`) now infers labels generically from the model id (e.g. `claude-opus-4-8` -> `Opus 4.8`), so the AI chip, assistant message badges, and dashboard metadata render correctly even without an explicit table entry
+- Selecting a model id directly in `settings.json` that is not in the option list surfaces a synthetic `Custom (<label>)` entry so the dropdown can still display the active selection
+- Live model switching preserved: at session start the process restarts **fresh** with the new model; mid-session it stops and **resumes** (`--resume <id> --model <id>`) so the conversation is retained. A switch also re-reads the current effort/fast-mode config
+
+**Fix: Model selection reflects immediately in the AI chip**
+
+- Picking a model now updates the chip instantly instead of waiting for the CLI to report it on the next turn. The chip resolves `displayModel = selectedModel || model` (optimistic user choice first, CLI-reported model as fallback)
+
+**Feature: Claude thinking effort levels**
+
+- New `Effort` dropdown (`ClaudeEffortSelector.tsx`) directly below the model selector in the AI chip, with levels `Default / Low / Medium / High / Extra High / Max`
+- Maps to the Claude CLI `--effort <level>` flag (verified on CLI v2.1.152+); `Default` (`""`) passes no flag and uses the model default (High for Opus 4.8)
+- New setting `claudeMirror.effortLevel` (string enum, default `""`). Effort is always sourced from config, so it applies on the next session start (including the fresh restart performed by a model switch)
+- New message types: `setClaudeEffort` (webview -> extension), `claudeEffortSetting` (extension -> webview). Store state `selectedClaudeEffort`
+- `ultracode` (Claude Code's session-only xhigh + dynamic-workflow mode) is intentionally **not** modeled as an effort level — only the persistent `--effort` levels are surfaced
+
+**Feature: Claude Fast mode**
+
+- New `Speed` selector (`ClaudeFastModeSelector.tsx`) in the AI chip (Claude tabs only) with options `Default` and `Fast`, mirroring the existing Codex Speed selector
+- Fast mode delivers ~2.5x faster output on Opus models (4.8/4.7/4.6) at higher cost; it has no effect on Sonnet/Haiku (the UI does not block selecting it there)
+- New setting `claudeMirror.fastMode` (boolean, default `false`). Applies when the next session starts
+- Applied by writing a small settings overlay file (`{"fastMode":true}`) to global storage and passing it as `--settings "<path>"`. A quoted file path is used rather than an inline JSON string because, on Windows `cmd.exe` via `shell: true`, the JSON string gets mangled (quotes stripped) while a quoted path survives intact
+- A lightning indicator (`↯`) appears in the AI chip while fast mode is active, with a "Fast mode enabled (~2.5x output speed)" tooltip
+- New message types: `setClaudeFastMode` (webview -> extension), `claudeFastModeSetting` (extension -> webview). Store state `selectedClaudeFastMode`
+- New detail doc consolidating all three controls: `Kingdom_of_Claudes_Beloved_MDs/CLAUDE_MODEL_CONTROLS.md`
+
+**Improvement: Usage tracking verified and clarified under the new model controls**
+
+- Confirmed the **usage-remaining widget** (`UsageWidget` / `UsageFetcher`) is unaffected: utilization is computed server-side by the Anthropic OAuth usage API, so Opus 4.8, effort, and fast-mode cost are already reflected in the percentages it shows. Opus 4.8 spend rolls into the existing `*_opus` buckets
+- Confirmed the **Token Ratio dashboard** (`TokenUsageRatioTracker`) handles Opus 4.8 with no change — `normalizeModelCategory()` matches via `.includes('opus')`, so 4.8 lands in the `opus` per-model buckets. Effort is captured automatically as output tokens (weighted 5x); it raises volume, not the weight structure
+- Documented that fast mode's per-token price premium is not modeled in the cost weights — it is absorbed by the server utilization signal, so `tokensPerPercent` correctly dips while fast mode is active (quota burns faster). Per-fast-mode bucketing is infeasible since the usage API only splits buckets by period + model
+- Updated the `COST_WEIGHTS` comment in `TokenUsageRatioTracker.ts` and added a one-line interpretation note to the Token Ratio tab's cost-weight info box so the metric is read correctly when effort/fast mode are active
+- Updated detail docs: `ANALYTICS_DASHBOARD.md` (new "Interaction with Model, Effort, and Fast Mode" section + usage-tab note) and `CLAUDE_MODEL_CONTROLS.md` (new "Impact on usage tracking" cross-reference)
+
+---
+
 ## v0.1.173 - 2026-05-24
 
 **Feature: Super Particle Accelerator (SPA) — hook-based secret write guard**
