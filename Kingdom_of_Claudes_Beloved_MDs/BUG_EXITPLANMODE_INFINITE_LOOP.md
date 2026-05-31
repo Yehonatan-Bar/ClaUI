@@ -25,15 +25,29 @@ The plan approval bar (4 CLI-matching options) and AskUserQuestion interactive c
 
 ---
 
-## Current Architecture
+## Important: this describes the SUPERVISED-mode fallback
+
+In **full-access** mode, `AskUserQuestion`/`ExitPlanMode` now go through the CLI's
+`can_use_tool` control protocol, which gives a true synchronous pause and injects the
+user's real answer. That path replaces everything below and does **not** use the
+stream-detection + nudge machinery this document describes.
+
+> Authoritative mechanism: `Kingdom_of_Claudes_Beloved_MDs/CONTROL_PROTOCOL_PERMISSIONS.md`
+
+The machinery below still runs in **supervised** mode (where the control protocol is not
+enabled). `notifyPlanApprovalRequired` returns immediately when
+`ClaudeProcessManager.controlProtocolActive` is `true`, so the two paths never run at once.
+
+---
+
+## Architecture (supervised mode)
 
 ### Why the CLI auto-approves
 
-ClaUI spawns the CLI with permission settings that auto-approve all tools:
-- **Full-access mode** (`ClaudeProcessManager.ts:70`): `--permission-mode bypassPermissions`
-- **Supervised mode** (`ClaudeProcessManager.ts:73-74`): `--allowedTools` list that includes both `AskUserQuestion` and `ExitPlanMode`
-
-This means the CLI NEVER pauses for plan approval or user questions. The model calls the tool, the CLI auto-approves, and the model continues immediately.
+In supervised mode ClaUI spawns the CLI with `--allowedTools` listing a read-only tool set
+that includes both `AskUserQuestion` and `ExitPlanMode`, so the CLI auto-approves them and
+never pauses. The model calls the tool, the CLI auto-approves, and the model continues
+immediately. (Full-access mode does pause -- via the control protocol -- see the note above.)
 
 ### How ClaUI shows approval UI anyway
 

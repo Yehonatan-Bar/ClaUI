@@ -1614,6 +1614,17 @@ export class SessionTab implements WebviewBridge {
       tabLog(`CLI raw: ${text}`);
     });
 
+    // Control protocol: the CLI blocked on an always-"ask" tool
+    // (AskUserQuestion/ExitPlanMode). Hand it to MessageHandler, which shows the
+    // approval bar and later calls processManager.respondPermission().
+    this.processManager.on(
+      'permissionRequest',
+      (req: import('../process/ClaudeProcessManager').PermissionRequestPayload) => {
+        tabLog(`CLI permissionRequest: tool=${req.toolName} requestId=${req.requestId}`);
+        this.messageHandler.handlePermissionRequest(req);
+      },
+    );
+
     this.processManager.on('exit', (info: { code: number | null; signal: string | null }) => {
       tabLog(`Process exited: code=${info.code}, signal=${info.signal}`);
 

@@ -576,9 +576,9 @@ export const InputArea: React.FC = () => {
       });
       setPendingApproval(null);
     } else if (pendingApproval && trimmed && pendingImages.length === 0) {
-      // ExitPlanMode: the CLI already auto-approved and the model is implementing.
-      // Don't route as feedback (it would be silently dropped). Instead, clear the
-      // approval bar and send as a regular message to redirect the model.
+      // Non-AskUserQuestion approval (ExitPlanMode) with typed text: clear the bar and
+      // send as a regular message. The backend turns this into plan feedback when a
+      // permission request is pending, or an ordinary follow-up message otherwise.
       setPendingApproval(null);
       markSessionPromptSent();
       postToExtension({ type: 'sendMessage', text: trimmed });

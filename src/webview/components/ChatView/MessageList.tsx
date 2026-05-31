@@ -8,6 +8,24 @@ import { BtwContextMenu } from './BtwContextMenu';
 import { BtwPopup } from './BtwPopup';
 
 /**
+ * If the right-clicked element is (inside) a hyperlink, return its URL.
+ * Two link representations exist: markdown anchors (a.md-link, real URL in
+ * data-href) and bare URL spans (.url-link, URL in data-url or, for the
+ * React-rendered variant in code blocks/tool results, the text content).
+ * Returns null for non-link targets (e.g. plain text, file-path links).
+ */
+function extractLinkUrl(target: HTMLElement): string | null {
+  const linkEl = target.closest('a.md-link, .url-link') as HTMLElement | null;
+  if (!linkEl) return null;
+  if (linkEl.matches('a.md-link')) {
+    const href = (linkEl as HTMLAnchorElement).dataset.href || linkEl.getAttribute('href') || '';
+    return href.trim() || null;
+  }
+  const url = (linkEl.dataset.url || linkEl.textContent || '').trim();
+  return url || null;
+}
+
+/**
  * Scrollable list of chat messages with auto-scroll behavior.
  * Displays completed messages and current streaming content.
  */
@@ -21,7 +39,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
   const containerRef = useRef<HTMLDivElement>(null);
   const userScrolledUp = useRef(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; messageId: string | null; hasSelection: boolean } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; messageId: string | null; hasSelection: boolean; linkUrl: string | null } | null>(null);
 
   // Auto-scroll to bottom on new content, unless user has scrolled up
   useEffect(() => {
@@ -90,12 +108,21 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
     if (state.messages.length === 0) return; // no context to BTW about
 
     e.preventDefault();
-    const messageEl = (e.target as HTMLElement).closest('[data-message-id]');
+    const targetEl = e.target as HTMLElement;
+    const messageEl = targetEl.closest('[data-message-id]');
     const messageId = messageEl?.getAttribute('data-message-id') ?? null;
     const selection = window.getSelection();
     const hasSelection = !!selection && selection.toString().trim().length > 0;
-    setContextMenu({ x: e.clientX, y: e.clientY, messageId, hasSelection });
+    const linkUrl = extractLinkUrl(targetEl);
+    setContextMenu({ x: e.clientX, y: e.clientY, messageId, hasSelection, linkUrl });
   }, []);
+
+  /** Context menu "Copy link" click: copy the right-clicked link's URL */
+  const handleCopyLink = useCallback(() => {
+    if (!contextMenu?.linkUrl) return;
+    postToExtension({ type: 'copyToClipboard', text: contextMenu.linkUrl });
+    setContextMenu(null);
+  }, [contextMenu]);
 
   /** Context menu "btw" click: open the popup */
   const handleBtwClick = useCallback(() => {
@@ -259,6 +286,8 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
           x={contextMenu.x}
           y={contextMenu.y}
           hasSelection={contextMenu.hasSelection}
+          linkUrl={contextMenu.linkUrl}
+          onCopyLink={handleCopyLink}
           onBtwClick={handleBtwClick}
           onClose={() => setContextMenu(null)}
         />

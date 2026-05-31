@@ -3,7 +3,17 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ChildProcess, spawn } from 'child_process';
 import { EventEmitter } from 'events';
-import type { CliOutputEvent, CliInputMessage } from '../types/stream-json';
+import type { CliOutputEvent, CliInputMessage, PermissionResult } from '../types/stream-json';
+
+/** Payload emitted on 'permissionRequest' when the CLI blocks on an always-"ask"
+ *  tool (AskUserQuestion / ExitPlanMode). The host must eventually call
+ *  respondPermission(requestId, ...) or the CLI stays blocked. */
+export interface PermissionRequestPayload {
+  requestId: string;
+  toolName: string;
+  input: Record<string, unknown>;
+  toolUseId?: string;
+}
 import { McpSecretsService } from '../mcp/McpSecretsService';
 import { buildClaudeCliEnv, getStoredApiKey } from './envUtils';
 import { killProcessTree } from './killTree';
@@ -51,9 +61,19 @@ export class ClaudeProcessManager extends EventEmitter {
   private _cancelledByUser = false;
   private startModel = '';
   private startCwd = '';
+  /** True when this session was spawned with --permission-prompt-tool stdio, so
+   *  AskUserQuestion/ExitPlanMode round-trip through the can_use_tool control
+   *  protocol. Consumers (MessageHandler) gate the legacy stream-detection path
+   *  on this so the two never fight over the approval bar. */
+  private controlProtocolEnabled = false;
 
   get configuredModel(): string {
     return this.startModel;
+  }
+
+  /** Whether the can_use_tool control protocol is active for the running session. */
+  get controlProtocolActive(): boolean {
+    return this.controlProtocolEnabled;
   }
 
   /** Optional Particle Accelerator env builder; set by SessionTab when feature is enabled */
@@ -120,13 +140,24 @@ export class ClaudeProcessManager extends EventEmitter {
       args.push('--replay-user-messages');
     }
 
+    // Reset before each (re)start; only the full-access branch re-enables it.
+    this.controlProtocolEnabled = false;
+
     // Smart Search: explicit allowedTools list overrides permission-mode handling.
     // Forces the supervised branch (no bypassPermissions) so the agent stays read-only.
     if (options?.allowedTools && options.allowedTools.length > 0) {
       args.push('--allowedTools', options.allowedTools.join(','));
     } else if (permissionMode === 'full-access') {
-      // Full Access: bypass all permission checks so tools run without approval
+      // Full Access: bypass all permission checks so tools run without approval.
       args.push('--permission-mode', 'bypassPermissions');
+      // ...but AskUserQuestion/ExitPlanMode always return "ask" from checkPermissions,
+      // so under plain bypassPermissions they collapse into an "Answer questions?"
+      // error and the model proceeds without a real answer. Routing permission asks
+      // through stdio makes the CLI emit a can_use_tool control_request and block
+      // until we respond, turning those tools into a true synchronous pause. Every
+      // other tool is still auto-bypassed by the CLI and never reaches our handler.
+      args.push('--permission-prompt-tool', 'stdio');
+      this.controlProtocolEnabled = true;
     } else if (permissionMode === 'supervised') {
       // Supervised: restrict to read-only tools via --allowedTools
       args.push(
@@ -264,6 +295,13 @@ export class ClaudeProcessManager extends EventEmitter {
         this.process = null;
       }
     });
+
+    // Activate the control protocol: the CLI will only emit can_use_tool requests
+    // after this handshake. Sent as the first stdin line so it is processed before
+    // the caller's first user message (the CLI reads stdin FIFO).
+    if (this.controlProtocolEnabled) {
+      this.sendInitialize();
+    }
   }
 
   /** Parse stdout as newline-delimited JSON */
@@ -279,7 +317,18 @@ export class ClaudeProcessManager extends EventEmitter {
         continue;
       }
       try {
-        const event = JSON.parse(trimmed) as CliOutputEvent;
+        const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+        // Control protocol round-trips (can_use_tool requests, handshake replies)
+        // are handled here and must NOT flow into the demux/store pipeline.
+        if (parsed.type === 'control_request') {
+          this.handleIncomingControlRequest(parsed);
+          continue;
+        }
+        if (parsed.type === 'control_response') {
+          this.log(`control_response (reply to host): ${trimmed.slice(0, 160)}`);
+          continue;
+        }
+        const event = parsed as unknown as CliOutputEvent;
         if (event.type === 'system' && event.subtype === 'init') {
           this.sessionId = event.session_id;
         }
@@ -326,6 +375,64 @@ export class ClaudeProcessManager extends EventEmitter {
   sendUserMessage(text: string): void {
     this.log(`sendUserMessage: ${text.length} chars`);
     this.send({ type: 'user', message: { role: 'user', content: text } });
+  }
+
+  /** Activate the control protocol. Without this handshake the CLI never emits
+   *  can_use_tool requests, so AskUserQuestion/ExitPlanMode would silently fail. */
+  private sendInitialize(): void {
+    try {
+      this.send({
+        type: 'control_request',
+        request_id: `claui-init-${Date.now()}`,
+        request: { subtype: 'initialize', hooks: {} },
+      });
+      this.log('Control protocol: sent initialize handshake');
+    } catch (err) {
+      this.log(`Control protocol: initialize handshake failed: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  /** Route an incoming control_request from the CLI. The only subtype produced
+   *  under our flags is can_use_tool (for AskUserQuestion/ExitPlanMode). */
+  private handleIncomingControlRequest(req: Record<string, unknown>): void {
+    const request = (req.request ?? {}) as Record<string, unknown>;
+    const subtype = request.subtype as string | undefined;
+    const requestId = req.request_id as string | undefined;
+
+    if (subtype === 'can_use_tool' && requestId) {
+      const toolName = (request.tool_name as string) ?? '';
+      const input = (request.input as Record<string, unknown>) ?? {};
+      const toolUseId = request.tool_use_id as string | undefined;
+      this.log(`Control protocol: can_use_tool tool=${toolName} requestId=${requestId}`);
+      if (toolName === 'AskUserQuestion' || toolName === 'ExitPlanMode') {
+        // Defer to the UI; the CLI stays blocked until respondPermission() is called.
+        const payload: PermissionRequestPayload = { requestId, toolName, input, toolUseId };
+        this.emit('permissionRequest', payload);
+      } else {
+        // Under bypassPermissions only always-"ask" tools reach us; allow anything else.
+        this.respondPermission(requestId, { behavior: 'allow', updatedInput: input });
+      }
+      return;
+    }
+
+    // Unknown subtype: reply so the CLI is never left blocked waiting on us.
+    this.log(`Control protocol: unhandled control_request subtype=${subtype}`);
+    if (requestId) {
+      this.respondPermission(requestId, {
+        behavior: 'deny',
+        message: `Unsupported control request: ${subtype}`,
+      });
+    }
+  }
+
+  /** Resolve a pending can_use_tool request. Allow injects updatedInput (for
+   *  AskUserQuestion this carries the user's answers); deny carries a message. */
+  respondPermission(requestId: string, result: PermissionResult): void {
+    this.send({
+      type: 'control_response',
+      response: { subtype: 'success', request_id: requestId, response: result },
+    });
+    this.log(`Control protocol: respondPermission requestId=${requestId} behavior=${result.behavior}`);
   }
 
   /** Request context compaction */

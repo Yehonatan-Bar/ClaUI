@@ -4,6 +4,8 @@ interface BtwContextMenuProps {
   x: number;
   y: number;
   hasSelection: boolean;
+  linkUrl: string | null;
+  onCopyLink: () => void;
   onBtwClick: () => void;
   onClose: () => void;
 }
@@ -12,11 +14,11 @@ interface BtwContextMenuProps {
  * Floating context menu with clipboard actions and a "btw..." side-thought item.
  * Appears at the right-click coordinates and closes on outside click or Escape.
  */
-export const BtwContextMenu: React.FC<BtwContextMenuProps> = ({ x, y, hasSelection, onBtwClick, onClose }) => {
+export const BtwContextMenu: React.FC<BtwContextMenuProps> = ({ x, y, hasSelection, linkUrl, onCopyLink, onBtwClick, onClose }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Estimate menu height based on number of items
-  const itemCount = hasSelection ? 3 : 2; // Copy (if selection) + Paste + separator + btw
+  const itemCount = (linkUrl ? 1 : 0) + (hasSelection ? 1 : 0) + 2; // Copy link (if link) + Copy (if selection) + Paste + btw
   const estimatedHeight = itemCount * 32 + 12; // items + separator + padding
 
   // Viewport edge detection: flip menu if near edge
@@ -83,6 +85,11 @@ export const BtwContextMenu: React.FC<BtwContextMenuProps> = ({ x, y, hasSelecti
         ref={menuRef}
         style={{ left: adjustedPosition.left, top: adjustedPosition.top }}
       >
+        {linkUrl && (
+          <button className="btw-context-menu-item" onClick={onCopyLink}>
+            העתק קישור
+          </button>
+        )}
         {hasSelection && (
           <button className="btw-context-menu-item" onClick={handleCopy}>
             Copy

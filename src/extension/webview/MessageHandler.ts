@@ -50,7 +50,9 @@ import type {
   ResultSuccess,
   ResultError,
   ContentBlock,
+  PermissionResult,
 } from '../types/stream-json';
+import type { PermissionRequestPayload } from '../process/ClaudeProcessManager';
 import type { DlpDecision } from '../../shared/secret-protection/types';
 
 /**
@@ -185,6 +187,11 @@ export class MessageHandler {
   private pendingApprovalTool: string | null = null;
   /** Set after user responds to approval - suppresses stale re-notifications from late events */
   private approvalResponseProcessed = false;
+  /** Control-protocol can_use_tool request the CLI is currently blocked on
+   *  (AskUserQuestion/ExitPlanMode). While set, the CLI will not advance until we
+   *  call processManager.respondPermission(); every user action that resolves the
+   *  approval bar must route through here instead of injecting a user message. */
+  private pendingPermissionRequest: PermissionRequestPayload | null = null;
   /** Last known input_tokens from AssistantMessage (always present, unlike ResultSuccess.usage) */
   private lastAssistantInputTokens = 0;
   /** Timestamp of last automatic usage data refresh (to throttle API calls) */
@@ -1622,6 +1629,7 @@ export class MessageHandler {
 
       switch (msg.type) {
         case 'sendMessage':
+          if (this.resolvePermissionFromText(msg.text)) { break; }
           if (this.usageLimitActive && this.getActiveProvider() === 'claude') {
             this.queuePromptUntilUsageReset(msg.text);
             break;
@@ -1701,6 +1709,7 @@ export class MessageHandler {
           break;
 
         case 'sendMessageWithImages': {
+          if (this.resolvePermissionFromText(msg.text)) { break; }
           if (this.usageLimitActive && this.getActiveProvider() === 'claude') {
             this.queuePromptUntilUsageReset(msg.text, msg.images);
             break;
@@ -2738,6 +2747,7 @@ export class MessageHandler {
         case 'planApprovalResponse':
           this.log(`Plan approval response: action=${msg.action} toolName=${msg.toolName || '(none)'} pendingTool=${this.pendingApprovalTool || '(none)'}`);
           this.logApprovalState('planApprovalResponse-entry');
+          if (this.resolvePermissionFromApproval(msg)) { break; }
           {
           const sendApprovalText = (text: string, context: string): boolean => {
             try {
@@ -5678,6 +5688,12 @@ export class MessageHandler {
 
   /** Notify webview that user approval is required for a plan/question tool */
   private notifyPlanApprovalRequired(toolName: string): void {
+    // When the control protocol is active, can_use_tool (handlePermissionRequest)
+    // is the authoritative trigger. Skip the legacy stream-detection path so the
+    // two never double-show or fight over suppression state.
+    if (this.processManager.controlProtocolActive) {
+      return;
+    }
     if (this.pendingApprovalTool === toolName) {
       return;
     }
@@ -5743,6 +5759,102 @@ export class MessageHandler {
       type: 'planApprovalRequired',
       toolName,
     });
+  }
+
+  handlePermissionRequest(req: PermissionRequestPayload): void {
+    this.log(`[Permission] can_use_tool received: tool=${req.toolName} requestId=${req.requestId}`);
+    this.pendingPermissionRequest = req;
+    this.pendingApprovalTool = req.toolName;
+    this.approvalResponseProcessed = false;
+    const norm = req.toolName.trim().toLowerCase();
+    if (norm === 'exitplanmode' || norm.endsWith('.exitplanmode')) {
+      this.exitPlanModeBarActive = true;
+    }
+    this.webview.postMessage({ type: 'processBusy', busy: false });
+    const pendingDetail = this.serializeToolInput(req.input);
+    this.webview.postMessage({ type: 'planApprovalRequired', toolName: req.toolName, planText: pendingDetail });
+  }
+
+  private resolvePermissionFromApproval(msg: { action: string; feedback?: string; selectedOptions?: string[] }): boolean {
+    const req = this.pendingPermissionRequest;
+    if (!req) { return false; }
+    const norm = req.toolName.trim().toLowerCase();
+    const isExitPlanMode = norm === 'exitplanmode' || norm.endsWith('.exitplanmode');
+    let result: PermissionResult;
+    if (msg.action === 'reject') {
+      result = { behavior: 'deny', message: 'The user rejected this plan. Revise it based on their feedback and present an updated plan before proceeding.' };
+    } else if (msg.action === 'feedback') {
+      const fb = (msg.feedback || '').trim();
+      result = { behavior: 'deny', message: fb || 'The user requested changes. Revise the plan accordingly before proceeding.' };
+    } else if (msg.action === 'questionAnswer') {
+      const answers = this.buildQuestionAnswers(req.input, msg.selectedOptions, msg.feedback);
+      result = { behavior: 'allow', updatedInput: { ...req.input, answers } };
+    } else {
+      result = { behavior: 'allow', updatedInput: req.input };
+      if (msg.action === 'approveClearBypass') {
+        this.compactPending = true;
+        try { this.control.compact(); } catch (err) { const errorText = err instanceof Error ? err.message : String(err); this.log(`[Permission] compact request failed: ${errorText}`); }
+      } else if (msg.action === 'approveManual') {
+        vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', 'supervised', true);
+        this.webview.postMessage({ type: 'permissionModeSetting', mode: 'supervised' });
+      }
+    }
+    this.finishPermission(result, isExitPlanMode);
+    return true;
+  }
+
+  private resolvePermissionFromText(text: string): boolean {
+    const req = this.pendingPermissionRequest;
+    if (!req) { return false; }
+    const trimmed = (text || '').trim();
+    if (!trimmed) { return false; }
+    const norm = req.toolName.trim().toLowerCase();
+    const isAsk = norm === 'askuserquestion' || norm.endsWith('.askuserquestion');
+    const isExitPlanMode = norm === 'exitplanmode' || norm.endsWith('.exitplanmode');
+    this.postUserMessage([{ type: 'text', text: trimmed } as ContentBlock], true);
+    let result: PermissionResult;
+    if (isAsk) {
+      const answers = this.buildQuestionAnswers(req.input, [trimmed], trimmed);
+      result = { behavior: 'allow', updatedInput: { ...req.input, answers } };
+    } else {
+      result = { behavior: 'deny', message: trimmed };
+    }
+    this.finishPermission(result, isExitPlanMode);
+    return true;
+  }
+
+  private buildQuestionAnswers(input: Record<string, unknown>, selected?: string[], fallback?: string): Record<string, string> {
+    const answers: Record<string, string> = {};
+    const rawQuestions = (input as { questions?: unknown }).questions;
+    const questions = Array.isArray(rawQuestions) ? rawQuestions : [];
+    const chosen = (selected && selected.length > 0) ? selected.join(', ') : (fallback || '').trim();
+    questions.forEach((q: unknown, idx: number) => {
+      const question = q as { question?: unknown; options?: unknown };
+      const qText = typeof question?.question === 'string' ? question.question : `question_${idx}`;
+      if (idx === 0 && chosen) { answers[qText] = chosen; return; }
+      const options = Array.isArray(question?.options) ? question.options : [];
+      const firstOption = options[0] as { label?: unknown } | undefined;
+      answers[qText] = typeof firstOption?.label === 'string' ? firstOption.label : chosen;
+    });
+    return answers;
+  }
+
+  private finishPermission(result: PermissionResult, isExitPlanMode: boolean): void {
+    const req = this.pendingPermissionRequest;
+    if (!req) { return; }
+    this.pendingPermissionRequest = null;
+    this.approvalResponseProcessed = true;
+    if (isExitPlanMode) { this.exitPlanModeBarActive = false; }
+    this.clearApprovalTracking();
+    try {
+      this.processManager.respondPermission(req.requestId, result);
+      this.log(`[Permission] responded requestId=${req.requestId} behavior=${result.behavior}`);
+    } catch (err) {
+      const errorText = err instanceof Error ? err.message : String(err);
+      this.log(`[Permission] respondPermission failed: ${errorText}`);
+      this.webview.postMessage({ type: 'error', message: `Failed to deliver your response to Claude: ${errorText}` });
+    }
+    this.webview.postMessage({ type: 'processBusy', busy: true });
   }
 
   /** Wire activity summarizer callback to forward summaries to webview and SessionTab */

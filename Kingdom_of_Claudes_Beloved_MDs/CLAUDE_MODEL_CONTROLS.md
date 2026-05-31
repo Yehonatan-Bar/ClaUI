@@ -235,10 +235,29 @@ The effort string flows to the webview as `thinkingEffort` on `assistantMessage`
 it verbatim as a dynamic CSS class, so any level renders without code changes:
 
 - Persisted badge: `MessageBubble.tsx` -> `thinking-effort-badge thinking-effort-<level>`
-- Live badge: `MessageList.tsx` -> adds `thinking-effort-live` (pulse animation)
+- Live badge: `MessageList.tsx` -> adds `thinking-effort-live`
 - Styles: `.thinking-effort-{low,medium,high,xhigh,max}` in `global.css` with
   escalating intensity (green -> yellow -> orange -> deep orange -> red); unknown
   values fall back to the neutral `.thinking-effort-badge` base style.
+
+High-intensity animation for `xhigh` / `max` — two phases:
+
+- **Live (streaming):** while the model is actively thinking, the **live** badge
+  animates dramatically — `xhigh` crackles like an electric spark
+  (`thinking-effort-spark`: pulsing box-shadow + text-shadow glow) and `max`
+  surges like an energy blast (`thinking-effort-blast`: flowing red/orange
+  gradient + strong glow). Scoped to the compound selectors
+  `.thinking-effort-xhigh.thinking-effort-live` / `.thinking-effort-max.thinking-effort-live`
+  (highest specificity, so they win over the base glow below while live).
+- **Settled (completed):** once the turn ends and `thinking-effort-live` is
+  removed, the badge falls back to its base rule, which carries a **slow, gentle
+  glow** (`thinking-effort-glow-xhigh` 3.2s / `thinking-effort-glow-max` 2.8s — a
+  soft box-shadow that rises and fades). So the badge "starts hot and calms
+  down" rather than freezing or going fully static.
+
+All four animations are disabled under `@media (prefers-reduced-motion: reduce)`
+(the bold color remains). Lower levels (`low`/`medium`/`high`) have no persistent
+glow and use only the generic `thinking-effort-pulse` opacity pulse while live.
 
 ### Note on `ultracode`
 

@@ -705,12 +705,17 @@ export function useClaudeStream(): void {
           break;
 
         case 'planApprovalRequired': {
-          // Extract plan text from streaming blocks before finalizing
-          const currentState = useAppStore.getState();
-          const planBlock = currentState.streamingBlocks.find(
-            b => b.type === 'tool_use' && (b.toolName === 'ExitPlanMode' || b.toolName === 'AskUserQuestion')
-          );
-          const planText = planBlock?.partialJson || '';
+          // Control-protocol path passes planText explicitly: its can_use_tool request
+          // arrives after messageStop cleared streamingBlocks. Legacy path has no
+          // planText, so fall back to extracting it from the streaming tool_use block.
+          let planText = msg.planText ?? '';
+          if (!planText) {
+            const currentState = useAppStore.getState();
+            const planBlock = currentState.streamingBlocks.find(
+              b => b.type === 'tool_use' && (b.toolName === 'ExitPlanMode' || b.toolName === 'AskUserQuestion')
+            );
+            planText = planBlock?.partialJson || '';
+          }
 
           // Finalize the streaming message so it appears in chat history
           finalizeStreamingMessage();

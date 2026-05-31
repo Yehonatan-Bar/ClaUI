@@ -211,4 +211,72 @@ export interface ControlRequest {
   };
 }
 
-export type CliInputMessage = UserInputMessage | ControlRequest;
+/**
+ * Handshake that activates the SDK control protocol for this session. Sent once
+ * after spawn. Pairing it with the `--permission-prompt-tool stdio` flag makes
+ * the CLI route tools whose checkPermissions returns "ask" (AskUserQuestion,
+ * ExitPlanMode) back to us as can_use_tool requests instead of silently failing.
+ */
+export interface InitializeControlRequest {
+  type: 'control_request';
+  request_id: string;
+  request: {
+    subtype: 'initialize';
+    hooks?: Record<string, unknown>;
+  };
+}
+
+/** Decision returned to the CLI for a can_use_tool request. */
+export type PermissionResult =
+  | { behavior: 'allow'; updatedInput: Record<string, unknown> }
+  | { behavior: 'deny'; message: string };
+
+/** Our reply to a CLI can_use_tool control_request. */
+export interface ControlResponseMessage {
+  type: 'control_response';
+  response: {
+    subtype: 'success';
+    request_id: string;
+    response: PermissionResult;
+  };
+}
+
+export type CliInputMessage =
+  | UserInputMessage
+  | ControlRequest
+  | InitializeControlRequest
+  | ControlResponseMessage;
+
+// --- Control protocol messages received FROM the CLI ---
+
+/**
+ * CLI asks whether a tool may run, because that tool's checkPermissions returned
+ * "ask". Under our flags only AskUserQuestion/ExitPlanMode reach us this way; we
+ * defer those to the UI and reply with a control_response. Every other tool is
+ * auto-bypassed by the CLI and never produces this request.
+ */
+export interface CanUseToolRequest {
+  type: 'control_request';
+  request_id: string;
+  request: {
+    subtype: 'can_use_tool';
+    tool_name: string;
+    display_name?: string;
+    input: Record<string, unknown>;
+    tool_use_id?: string;
+    description?: string;
+    permission_suggestions?: unknown;
+    blocked_path?: string;
+  };
+}
+
+/** CLI's reply to one of our control_requests (initialize/compact/cancel). */
+export interface IncomingControlResponse {
+  type: 'control_response';
+  response: {
+    subtype: 'success' | 'error';
+    request_id: string;
+    response?: Record<string, unknown>;
+    error?: string;
+  };
+}

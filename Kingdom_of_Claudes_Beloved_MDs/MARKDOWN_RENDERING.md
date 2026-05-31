@@ -67,6 +67,10 @@ parseTextWithCodeBlocks(text)   [MessageBubble.tsx]
 
 4. **Bare URLs** - Detected post-render by `linkifyTextNodes()` using `URL_REGEX`. Wrapped in `<span class="url-link">`. Click opens in browser.
 
+### Right-click: Copy Link
+
+Right-clicking a URL link in the chat opens the shared chat context menu (`BtwContextMenu`) with an extra **"העתק קישור"** (Copy Link) item above the usual Copy/Paste/btw items. `MessageList.handleContextMenu()` resolves the clicked link via `extractLinkUrl()`, which reads the URL from `a.md-link` (`data-href`/`href`) or `.url-link` spans (`data-url`, falling back to text content for the code-block/tool-result variant rendered by `filePathLinks.tsx`). The item appears only when the right-clicked target is a URL link; bare file-path links (`file-path-link`) are excluded. Selecting it copies the URL by posting `copyToClipboard` to the extension host, which writes it via `vscode.env.clipboard` (handled in both `MessageHandler` and `CodexMessageHandler`).
+
 ### `openFile` Target Parsing (extension-side)
 
 `openFile` requests from the webview are normalized in both `MessageHandler` (Claude tabs) and `CodexMessageHandler` (Codex tabs) before opening:

@@ -7695,11 +7695,25 @@ html, body, #root {
 .thinking-effort-xhigh {
   background: color-mix(in srgb, #ff5722 22%, transparent);
   color: #ff5722;
+  /* Once the turn is done the badge settles into a slow, gentle glow
+     (the dramatic live animation is in the compound selector below). */
+  animation: thinking-effort-glow-xhigh 3.2s ease-in-out infinite;
 }
 
 .thinking-effort-max {
   background: color-mix(in srgb, #f44336 25%, transparent);
   color: #f44336;
+  animation: thinking-effort-glow-max 2.8s ease-in-out infinite;
+}
+
+@keyframes thinking-effort-glow-xhigh {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, #ff5722 0%, transparent); }
+  50% { box-shadow: 0 0 6px 0 color-mix(in srgb, #ff5722 45%, transparent); }
+}
+
+@keyframes thinking-effort-glow-max {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, #f44336 0%, transparent); }
+  50% { box-shadow: 0 0 7px 0 color-mix(in srgb, #f44336 50%, transparent); }
 }
 
 .dlp-message-badge {
@@ -7729,6 +7743,65 @@ html, body, #root {
 @keyframes thinking-effort-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+/* High-intensity live badges: while the model is actively thinking, xhigh
+   crackles like an electric spark and max surges like an energy blast. The
+   effect is intentionally limited to the live (streaming) badge so completed
+   messages keep a bold but static badge (no wall of moving badges in long
+   chats). Compound selectors override the generic .thinking-effort-live pulse. */
+.thinking-effort-xhigh.thinking-effort-live {
+  animation: thinking-effort-spark 3.3s ease-in-out infinite;
+}
+
+@keyframes thinking-effort-spark {
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, #ff5722 0%, transparent);
+    text-shadow: none;
+  }
+  45% {
+    box-shadow: 0 0 8px 1px color-mix(in srgb, #ff5722 65%, transparent);
+    text-shadow: 0 0 4px color-mix(in srgb, #ff5722 80%, transparent);
+  }
+  55% {
+    box-shadow: 0 0 5px 1px color-mix(in srgb, #ff8a65 70%, transparent);
+    text-shadow: 0 0 6px color-mix(in srgb, #ff8a65 85%, transparent);
+  }
+}
+
+.thinking-effort-max.thinking-effort-live {
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, #f44336 30%, transparent),
+    color-mix(in srgb, #ff9800 38%, transparent),
+    color-mix(in srgb, #f44336 30%, transparent)
+  );
+  background-size: 200% 100%;
+  animation: thinking-effort-blast 4.2s linear infinite;
+}
+
+@keyframes thinking-effort-blast {
+  0% {
+    background-position: 150% 0;
+    box-shadow: 0 0 4px 0 color-mix(in srgb, #f44336 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 13px 2px color-mix(in srgb, #ff5722 72%, transparent);
+  }
+  100% {
+    background-position: -50% 0;
+    box-shadow: 0 0 4px 0 color-mix(in srgb, #f44336 40%, transparent);
+  }
+}
+
+/* Respect reduced-motion: keep the bold color, drop all animation. */
+@media (prefers-reduced-motion: reduce) {
+  .thinking-effort-xhigh,
+  .thinking-effort-max,
+  .thinking-effort-xhigh.thinking-effort-live,
+  .thinking-effort-max.thinking-effort-live {
+    animation: none;
+  }
 }
 
 /* ========================================================

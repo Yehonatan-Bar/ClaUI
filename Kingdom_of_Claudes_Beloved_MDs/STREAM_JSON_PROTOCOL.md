@@ -341,6 +341,81 @@ Send control commands.
 
 ---
 
+## Control Protocol (can_use_tool)
+
+In **full-access** mode ClaUi adds `--permission-prompt-tool stdio` (alongside
+`--permission-mode bypassPermissions`). This makes the CLI route permission asks for
+`AskUserQuestion` and `ExitPlanMode` through the bidirectional control protocol, turning
+those tools into a true synchronous pause. Every other tool is still auto-bypassed by the
+CLI and never reaches the host. The protocol is **not** used in supervised mode.
+
+> Full mechanism + decision mapping: `Kingdom_of_Claudes_Beloved_MDs/CONTROL_PROTOCOL_PERMISSIONS.md`
+
+### initialize handshake (stdin)
+
+The CLI only emits `can_use_tool` requests after this handshake, sent as the first stdin
+line right after spawn:
+
+```json
+{
+  "type": "control_request",
+  "request_id": "claui-init-1716900000000",
+  "request": { "subtype": "initialize", "hooks": {} }
+}
+```
+
+### can_use_tool request (stdout)
+
+When the model calls `AskUserQuestion`/`ExitPlanMode`, the CLI emits this and **blocks**
+until ClaUi replies with a matching `control_response`:
+
+```json
+{
+  "type": "control_request",
+  "request_id": "req-789",
+  "request": {
+    "subtype": "can_use_tool",
+    "tool_name": "AskUserQuestion",
+    "tool_use_id": "toolu_123",
+    "input": { "questions": [ { "question": "...", "options": [ { "label": "..." } ] } ] }
+  }
+}
+```
+
+### control_response (stdin)
+
+ClaUi replies referencing the same `request_id`. The `response` field is a
+`PermissionResult` -- either an allow (with the possibly-modified tool input) or a deny
+(with a reason the model uses to revise):
+
+```json
+{
+  "type": "control_response",
+  "response": {
+    "subtype": "success",
+    "request_id": "req-789",
+    "response": { "behavior": "allow", "updatedInput": { "answers": { "Which option?": "Option A" } } }
+  }
+}
+```
+
+```json
+{
+  "type": "control_response",
+  "response": {
+    "subtype": "success",
+    "request_id": "req-789",
+    "response": { "behavior": "deny", "message": "The user requested changes: ..." }
+  }
+}
+```
+
+For `AskUserQuestion`, an allow carries the user's answer under `updatedInput.answers` as a
+`{ [questionText]: answerLabel }` map. For `ExitPlanMode`, an allow simply lets the model
+exit plan mode and continue.
+
+---
+
 ## Event Sequence (Typical Turn)
 
 A typical request-response cycle produces events in this order:

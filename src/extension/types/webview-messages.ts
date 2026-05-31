@@ -1428,6 +1428,10 @@ export interface CodexModelOptionsMessage {
 export interface PlanApprovalRequiredMessage {
   type: 'planApprovalRequired';
   toolName: string;
+  // Present only on the control-protocol path (handlePermissionRequest), where the
+  // can_use_tool request arrives after messageStop has cleared streamingBlocks, so
+  // the plan/question detail cannot be recovered from the stream and is passed here.
+  planText?: string;
 }
 
 export interface PlanApprovalDismissedMessage {
