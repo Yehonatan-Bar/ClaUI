@@ -8,21 +8,23 @@ import { BtwContextMenu } from './BtwContextMenu';
 import { BtwPopup } from './BtwPopup';
 
 /**
- * If the right-clicked element is (inside) a hyperlink, return its URL.
- * Two link representations exist: markdown anchors (a.md-link, real URL in
- * data-href) and bare URL spans (.url-link, URL in data-url or, for the
- * React-rendered variant in code blocks/tool results, the text content).
- * Returns null for non-link targets (e.g. plain text, file-path links).
+ * If the right-clicked element is (inside) a clickable link, return its target
+ * (a web URL or a file path). Covers markdown anchors (a.md-link, target in
+ * data-href), URL spans (.url-link, data-url), and file-path links
+ * (.file-path-link, data-path). All fall back to the element's text content —
+ * the React-rendered variants in code blocks / tool results carry no dataset.
+ * Returns null for non-link targets (plain text, etc.).
  */
 function extractLinkUrl(target: HTMLElement): string | null {
-  const linkEl = target.closest('a.md-link, .url-link') as HTMLElement | null;
+  const linkEl = target.closest('a.md-link, .url-link, .file-path-link, a[href]') as HTMLElement | null;
   if (!linkEl) return null;
-  if (linkEl.matches('a.md-link')) {
-    const href = (linkEl as HTMLAnchorElement).dataset.href || linkEl.getAttribute('href') || '';
+  if (linkEl.tagName === 'A') {
+    const anchor = linkEl as HTMLAnchorElement;
+    const href = anchor.dataset.href || anchor.getAttribute('href') || anchor.textContent || '';
     return href.trim() || null;
   }
-  const url = (linkEl.dataset.url || linkEl.textContent || '').trim();
-  return url || null;
+  const value = (linkEl.dataset.url || linkEl.dataset.path || linkEl.textContent || '').trim();
+  return value || null;
 }
 
 /**

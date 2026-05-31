@@ -87,7 +87,7 @@ export const BtwContextMenu: React.FC<BtwContextMenuProps> = ({ x, y, hasSelecti
       >
         {linkUrl && (
           <button className="btw-context-menu-item" onClick={onCopyLink}>
-            העתק קישור
+            Copy link
           </button>
         )}
         {hasSelection && (
