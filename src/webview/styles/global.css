@@ -1688,6 +1688,111 @@ html, body, #root {
   cursor: not-allowed;
 }
 
+/* Custom Snippet Panel */
+.custom-snippet-panel {
+  margin-bottom: 8px;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--vscode-editor-background);
+}
+
+.custom-snippet-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--vscode-sideBarSectionHeader-background, #252526);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vscode-editor-foreground);
+}
+
+.custom-snippet-panel-title {
+  font-size: 12px;
+}
+
+.custom-snippet-panel-close {
+  background: none;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.custom-snippet-panel-close:hover {
+  color: var(--vscode-editor-foreground);
+}
+
+.custom-snippet-panel-hint {
+  padding: 6px 10px 0;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.custom-snippet-config-textarea {
+  display: block;
+  width: calc(100% - 20px);
+  margin: 6px 10px;
+  min-height: 48px;
+  padding: 6px 10px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12px;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.custom-snippet-config-textarea:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+.custom-snippet-panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 0 10px 10px;
+}
+
+.custom-snippet-config-clear {
+  padding: 6px 12px;
+  background: none;
+  color: var(--vscode-descriptionForeground);
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.custom-snippet-config-clear:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+
+.custom-snippet-config-save {
+  padding: 6px 12px;
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.custom-snippet-config-save:hover {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
 /* --- Codex Consultation Panel --- */
 
 .codex-consult-panel {
@@ -2049,6 +2154,54 @@ html, body, #root {
 }
 
 .status-bar-git-config-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+
+/* Custom snippet button group in status bar */
+.status-bar-snippet-group {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.status-bar-snippet-btn {
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-radius: 3px 0 0 3px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-bar-snippet-btn.not-configured {
+  opacity: 0.6;
+}
+
+.status-bar-snippet-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-editor-foreground);
+}
+
+.status-bar-snippet-config-btn {
+  background: none;
+  border: 1px solid var(--vscode-panel-border, #333);
+  border-left: none;
+  border-radius: 0 3px 3px 0;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  padding: 1px 4px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.status-bar-snippet-config-btn:hover {
   background: var(--vscode-toolbar-hoverBackground);
   color: var(--vscode-editor-foreground);
 }

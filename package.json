@@ -523,6 +523,11 @@
           "default": "{sessionName}",
           "description": "Commit message template. Use {sessionName} for the current tab name."
         },
+        "claudeMirror.customSnippet.text": {
+          "type": "string",
+          "default": "",
+          "description": "Custom text snippet inserted into the input box when clicking the snippet button in the status bar Tools group."
+        },
         "claudeMirror.translationLanguage": {
           "type": "string",
           "default": "Hebrew",

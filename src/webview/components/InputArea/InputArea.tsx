@@ -3,6 +3,7 @@ import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { detectRtl, isLikelyEnglish } from '../../hooks/useRtlDetection';
 import { GitPushPanel } from './GitPushPanel';
+import { CustomSnippetPanel } from './CustomSnippetPanel';
 import { FileMentionPopup } from './FileMentionPopup';
 import { useFileMention } from '../../hooks/useFileMention';
 import type { WebviewImageData } from '../../../extension/types/webview-messages';
@@ -98,6 +99,8 @@ export const InputArea: React.FC = () => {
     setGitPushResult,
     gitPushConfigPanelOpen,
     setGitPushConfigPanelOpen,
+    customSnippetConfigPanelOpen,
+    setCustomSnippetConfigPanelOpen,
     markSessionPromptSent,
     isEnhancing,
     autoEnhanceEnabled,
@@ -1142,6 +1145,35 @@ export const InputArea: React.FC = () => {
     return () => window.removeEventListener('fork-set-input', handler);
   }, [undoMgr]);
 
+  // Listen for custom snippet insertion (from the status bar snippet button).
+  // Inserts at the current cursor position, preserving text on either side.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const snippet = (e as CustomEvent<string>).detail;
+      if (typeof snippet !== 'string' || snippet.length === 0) return;
+      const el = textareaRef.current;
+      setText((prev) => {
+        const start = el?.selectionStart ?? prev.length;
+        const end = el?.selectionEnd ?? prev.length;
+        const next = prev.slice(0, start) + snippet + prev.slice(end);
+        const caret = start + snippet.length;
+        undoMgr.push(next, caret);
+        requestAnimationFrame(() => {
+          const target = textareaRef.current;
+          if (target) {
+            target.style.height = 'auto';
+            target.style.height = Math.min(target.scrollHeight, 200) + 'px';
+            target.focus();
+            target.selectionStart = target.selectionEnd = caret;
+          }
+        });
+        return next;
+      });
+    };
+    window.addEventListener('claui-insert-snippet', handler);
+    return () => window.removeEventListener('claui-insert-snippet', handler);
+  }, [undoMgr]);
+
   // Listen for prompt enhancement results
   useEffect(() => {
     const handler = (e: Event) => {
@@ -1306,6 +1338,11 @@ export const InputArea: React.FC = () => {
   // Request git push settings on mount
   useEffect(() => {
     postToExtension({ type: 'getGitPushSettings' });
+  }, []);
+
+  // Request custom snippet text on mount
+  useEffect(() => {
+    postToExtension({ type: 'getCustomSnippet' });
   }, []);
 
   // Focus textarea when component mounts
@@ -1517,6 +1554,11 @@ export const InputArea: React.FC = () => {
       {/* Git push config panel */}
       {gitPushConfigPanelOpen && (
         <GitPushPanel onClose={() => setGitPushConfigPanelOpen(false)} />
+      )}
+
+      {/* Custom snippet config panel */}
+      {customSnippetConfigPanelOpen && (
+        <CustomSnippetPanel onClose={() => setCustomSnippetConfigPanelOpen(false)} />
       )}
 
       {/* Prompt enhancement comparison panel */}

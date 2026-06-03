@@ -1021,6 +1021,17 @@ export class CodexMessageHandler {
           this.sendGitPushSettings();
           break;
 
+        case 'setCustomSnippet':
+          vscode.workspace
+            .getConfiguration('claudeMirror')
+            .update('customSnippet.text', msg.text, true);
+          this.webview.postMessage({ type: 'customSnippetSettings', text: msg.text });
+          break;
+
+        case 'getCustomSnippet':
+          this.sendCustomSnippetSettings();
+          break;
+
         case 'forkFromMessage':
           this.log(
             `Codex fork from message: sessionId=${msg.sessionId}, index=${msg.forkMessageIndex}, historyLen=${msg.messages?.length ?? 0}`
@@ -1570,6 +1581,9 @@ export class CodexMessageHandler {
       if (e.affectsConfiguration('claudeMirror.gitPush')) {
         this.sendGitPushSettings();
       }
+      if (e.affectsConfiguration('claudeMirror.customSnippet')) {
+        this.sendCustomSnippetSettings();
+      }
       if (e.affectsConfiguration('claudeMirror.codex.model')) {
         this.sendCodexModelSetting();
       }
@@ -1595,6 +1609,7 @@ export class CodexMessageHandler {
     this.sendProviderCapabilities();
     this.sendPermissionModeSetting();
     this.sendGitPushSettings();
+    this.sendCustomSnippetSettings();
     this.sendCodexModelSetting();
     this.sendCodexModelOptions();
     this.sendCodexReasoningEffortSetting();
@@ -1664,6 +1679,13 @@ export class CodexMessageHandler {
       scriptPath: config.get<string>('gitPush.scriptPath', 'scripts/git-push.ps1'),
       commitMessageTemplate: config.get<string>('gitPush.commitMessageTemplate', '{sessionName}'),
     });
+  }
+
+  private sendCustomSnippetSettings(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const text = config.get<string>('customSnippet.text', '');
+    this.log(`Sending custom snippet settings: length=${text.length}`);
+    this.webview.postMessage({ type: 'customSnippetSettings', text });
   }
 
   private async sendSecretProtectionStatus(): Promise<void> {

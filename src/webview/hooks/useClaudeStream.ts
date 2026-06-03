@@ -55,6 +55,7 @@ export function useClaudeStream(): void {
     setGitPushSettings,
     setGitPushResult,
     setGitPushRunning,
+    setCustomSnippetText,
     setForkInit,
     setTranslation,
     setTranslating,
@@ -745,6 +746,10 @@ export function useClaudeStream(): void {
           });
           break;
 
+        case 'customSnippetSettings':
+          setCustomSnippetText(msg.text);
+          break;
+
         case 'forkInit':
           // Populate the store with conversation history from the original tab
           if (msg.messages && msg.messages.length > 0) {
@@ -1323,6 +1328,7 @@ export function useClaudeStream(): void {
     setGitPushSettings,
     setGitPushResult,
     setGitPushRunning,
+    setCustomSnippetText,
     setForkInit,
     setTranslation,
     setTranslating,

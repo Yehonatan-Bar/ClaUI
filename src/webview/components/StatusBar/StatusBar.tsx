@@ -47,6 +47,8 @@ export const StatusBar: React.FC<{
     gitPushRunning,
     setGitPushRunning,
     setGitPushConfigPanelOpen,
+    customSnippetText,
+    setCustomSnippetConfigPanelOpen,
     achievementsEnabled,
     achievementProfile,
     achievementLanguage,
@@ -267,6 +269,18 @@ export const StatusBar: React.FC<{
 
   const handleToggleGitConfig = () => {
     setGitPushConfigPanelOpen(!useAppStore.getState().gitPushConfigPanelOpen);
+  };
+
+  const handleInsertSnippet = () => {
+    if (!customSnippetText) {
+      setCustomSnippetConfigPanelOpen(true);
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('claui-insert-snippet', { detail: customSnippetText }));
+  };
+
+  const handleToggleSnippetConfig = () => {
+    setCustomSnippetConfigPanelOpen(!useAppStore.getState().customSnippetConfigPanelOpen);
   };
 
   const handleAchievements = () => {
@@ -594,6 +608,35 @@ export const StatusBar: React.FC<{
     </div>
   );
 
+  const snippetLabel = (() => {
+    if (!customSnippetText) return 'Snippet';
+    const oneLine = customSnippetText.replace(/\s+/g, ' ').trim();
+    return oneLine.length > 16 ? oneLine.slice(0, 16) + '...' : oneLine;
+  })();
+
+  const snippetGroup = (
+    <div className="status-bar-snippet-group">
+      <button
+        className={`status-bar-snippet-btn ${customSnippetText ? '' : 'not-configured'}`}
+        onClick={handleInsertSnippet}
+        data-tooltip={
+          customSnippetText
+            ? `Insert snippet at cursor: ${customSnippetText.slice(0, 60)}${customSnippetText.length > 60 ? '...' : ''}`
+            : 'Custom snippet (click to set it up)'
+        }
+      >
+        {snippetLabel}
+      </button>
+      <button
+        className="status-bar-snippet-config-btn"
+        onClick={handleToggleSnippetConfig}
+        data-tooltip="Edit custom snippet text"
+      >
+        *
+      </button>
+    </div>
+  );
+
   const toolsItems = (
     <>
       {hideMcpFromBar && mcpChip && (
@@ -604,6 +647,9 @@ export const StatusBar: React.FC<{
       {hideMcpFromBar && mcpChip && <div className="status-bar-group-dropdown-separator" />}
       <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
         {gitGroup}
+      </div>
+      <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
+        {snippetGroup}
       </div>
       {isConnected && showCodexConsult && (
         <button className="status-bar-group-dropdown-item" onClick={() => setCodexConsultPanelOpen(true)} data-tooltip="Consult Codex GPT expert">

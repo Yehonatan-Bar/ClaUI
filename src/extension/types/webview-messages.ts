@@ -442,6 +442,15 @@ export interface GetGitPushSettingsRequest {
   type: 'getGitPushSettings';
 }
 
+export interface SetCustomSnippetRequest {
+  type: 'setCustomSnippet';
+  text: string;
+}
+
+export interface GetCustomSnippetRequest {
+  type: 'getCustomSnippet';
+}
+
 export interface TranslateMessageRequest {
   type: 'translateMessage';
   messageId: string;
@@ -962,6 +971,8 @@ export type WebviewToExtensionMessage =
   | GitPushRequest
   | GitPushConfigRequest
   | GetGitPushSettingsRequest
+  | SetCustomSnippetRequest
+  | GetCustomSnippetRequest
   | TranslateMessageRequest
   | FileSearchRequest
   | SetAchievementsEnabledRequest
@@ -1472,6 +1483,11 @@ export interface GitPushSettingsMessage {
   enabled: boolean;
   scriptPath: string;
   commitMessageTemplate: string;
+}
+
+export interface CustomSnippetSettingsMessage {
+  type: 'customSnippetSettings';
+  text: string;
 }
 
 export interface ForkInitMessage {
@@ -2564,6 +2580,7 @@ export type ExtensionToWebviewMessage =
   | PermissionModeSettingMessage
   | GitPushResultMessage
   | GitPushSettingsMessage
+  | CustomSnippetSettingsMessage
   | ForkInitMessage
   | ConversationHistoryMessage
   | TranslationResultMessage

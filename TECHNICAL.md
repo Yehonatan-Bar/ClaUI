@@ -325,6 +325,7 @@ claude-code-mirror/
 |       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt/steer, usage-limit queue mode, scheduled messages, image paste, @ file mentions, ultrathink button, prompt navigation arrows
 |       |   |   +-- FileMentionPopup.tsx  #   Autocomplete popup for @ file mentions
 |       |   |   +-- GitPushPanel.tsx      #   Config panel for git push (status, ask Claude to configure)
+|       |   |   +-- CustomSnippetPanel.tsx #  Config panel for the custom snippet button (text, Save, Clear)
 |       |   |   +-- CodexConsultPanel.tsx #   Input panel for Codex GPT expert consultation
 |       |   +-- ModelSelector/
 |       |   |   +-- ModelSelector.tsx          #   Claude model dropdown (Opus 4.8/4.7/4.6, Sonnet 4.6/4.5, Haiku 4.5)
@@ -489,6 +490,7 @@ claude-code-mirror/
     +-- CLAUDE_AUTH_LOGIN_LOGOUT.md      #   Claude CLI account login/logout/status integration
     +-- CLAUDE_MODEL_CONTROLS.md         #   Claude model (incl. Opus 4.8), thinking effort, and fast mode controls
     +-- CODEX_FAST_MODE.md              #   Codex Fast mode selector + CLI service tier override
+    +-- CUSTOM_SNIPPET_BUTTON.md         #   Configurable text snippet button that injects text into the input
     +-- DRAG_AND_DROP_CHALLENGE.md        #   Why drag-and-drop is blocked, workarounds
     +-- DOUBLE_CLICK_FOCUS_FIX_2026-03.md #   Focus hardening for click reliability + rollback guide
     +-- FILE_LOGGER.md                    #   File-based logging with rotation and rename
@@ -632,6 +634,9 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **GitPushButton** - One-click git add/commit/push via the `scripts/git-push.ps1` PowerShell script. The "Git" button in InputArea executes the script with the session tab name as commit message. A companion gear button opens a configuration panel where users can ask Claude to set up or modify the git push settings (`claudeMirror.gitPush.*`). If not configured (enabled=false), clicking the Git button opens the config panel instead. Results appear as auto-dismissing toast notifications.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/GIT_PUSH_BUTTON.md`
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+
+**CustomSnippetButton** - A user-configurable text snippet button in the status bar `Tools` group (next to Git). The user saves any text via a simple config panel (gear button); clicking the snippet button injects that text into the chat input box at the current cursor position (`claui-insert-snippet` window event). Text persists as the global setting `claudeMirror.customSnippet.text`. When empty, the button shows `Snippet` and clicking opens the config panel.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/CUSTOM_SNIPPET_BUTTON.md`
 
 **Ultrathink Button & Glow** - Brain icon button in the input area with a 3-state cycle (off -> single -> locked -> off), plus a separate lock button rendered directly above it as a shortcut to toggle `locked` mode. Single mode prepends "ultrathink" for one prompt then resets. Locked mode auto-prepends on every prompt and highlights both the brain button and the lock button. On activation, plays one of 4 random CSS animations. The word "ultrathink" displays with an animated rainbow glow effect in chat messages.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ULTRATHINK_BUTTON.md`

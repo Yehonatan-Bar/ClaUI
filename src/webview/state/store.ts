@@ -231,6 +231,10 @@ export interface AppState {
   gitPushConfigPanelOpen: boolean;
   gitPushRunning: boolean;
 
+  // Custom snippet (status bar Tools button -> inject text into input)
+  customSnippetText: string;
+  customSnippetConfigPanelOpen: boolean;
+
   // Fork state (set when a forked tab receives forkInit from extension)
   forkInit: { promptText: string } | null;
 
@@ -699,6 +703,8 @@ export interface AppState {
   setGitPushResult: (result: { success: boolean; output: string } | null) => void;
   setGitPushConfigPanelOpen: (open: boolean) => void;
   setGitPushRunning: (running: boolean) => void;
+  setCustomSnippetText: (text: string) => void;
+  setCustomSnippetConfigPanelOpen: (open: boolean) => void;
   setForkInit: (init: { promptText: string } | null) => void;
   setBtwPopup: (popup: { contextMessageId: string | null; mode: 'compose' | 'chat' } | null) => void;
   // BTW background session actions
@@ -1105,6 +1111,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   gitPushResult: null,
   gitPushConfigPanelOpen: false,
   gitPushRunning: false,
+  customSnippetText: '',
+  customSnippetConfigPanelOpen: false,
   forkInit: null,
   btwPopup: null,
   btwSession: null,
@@ -2076,6 +2084,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setGitPushResult: (result) => set({ gitPushResult: result }),
   setGitPushConfigPanelOpen: (open) => set({ gitPushConfigPanelOpen: open }),
   setGitPushRunning: (running) => set({ gitPushRunning: running }),
+  setCustomSnippetText: (text) => set({ customSnippetText: text }),
+  setCustomSnippetConfigPanelOpen: (open) => set({ customSnippetConfigPanelOpen: open }),
   setForkInit: (init) => set({ forkInit: init }),
   setBtwPopup: (popup) => set({ btwPopup: popup }),
 
@@ -2925,6 +2935,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       gitPushResult: null,
       gitPushConfigPanelOpen: false,
       gitPushRunning: false,
+      customSnippetConfigPanelOpen: false,
       forkInit: null,
       btwPopup: null,
       btwSession: null,

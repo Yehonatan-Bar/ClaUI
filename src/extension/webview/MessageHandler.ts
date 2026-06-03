@@ -3136,6 +3136,15 @@ export class MessageHandler {
           this.sendGitPushSettings();
           break;
 
+        case 'setCustomSnippet':
+          vscode.workspace.getConfiguration('claudeMirror').update('customSnippet.text', msg.text, true);
+          this.webview.postMessage({ type: 'customSnippetSettings', text: msg.text });
+          break;
+
+        case 'getCustomSnippet':
+          this.sendCustomSnippetSettings();
+          break;
+
         case 'setAchievementsEnabled':
           vscode.workspace.getConfiguration('claudeMirror').update('achievements.enabled', msg.enabled, true);
           break;
@@ -3635,6 +3644,8 @@ export class MessageHandler {
           this.sendPermissionModeSetting();
           // Send git push settings
           this.sendGitPushSettings();
+          // Send custom snippet text
+          this.sendCustomSnippetSettings();
           // Send ultrathink mode (project-level)
           this.sendUltrathinkModeSetting();
           // Goal state is tab-scoped (lives in webview Zustand store only)
@@ -4061,6 +4072,17 @@ export class MessageHandler {
       enabled,
       scriptPath,
       commitMessageTemplate,
+    });
+  }
+
+  /** Read the custom snippet text from VS Code config and send to webview */
+  private sendCustomSnippetSettings(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const text = config.get<string>('customSnippet.text', '');
+    this.log(`Sending custom snippet settings: length=${text.length}`);
+    this.webview.postMessage({
+      type: 'customSnippetSettings',
+      text,
     });
   }
 
@@ -4581,6 +4603,9 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.gitPush')) {
         this.sendGitPushSettings();
+      }
+      if (e.affectsConfiguration('claudeMirror.customSnippet')) {
+        this.sendCustomSnippetSettings();
       }
       if (e.affectsConfiguration('claudeMirror.sessionVitals')) {
         this.sendVitalsSetting();
