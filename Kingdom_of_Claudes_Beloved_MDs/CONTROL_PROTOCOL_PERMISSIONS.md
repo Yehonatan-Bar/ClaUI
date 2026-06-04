@@ -138,6 +138,9 @@ bar or its suppression flags.
 - `src/webview/hooks/useClaudeStream.ts` -- prefers `msg.planText` for the approval bar.
 - `src/webview/components/ChatView/PlanApprovalBar.tsx`,
   `src/webview/components/InputArea/InputArea.tsx` -- the approval / question UI and typed-text routing.
+  The question bar runs `detectRtl()` over the question text plus every option label/description;
+  if any Hebrew/Arabic is present it sets `dir="rtl"` on the bar so the whole question UI is
+  right-aligned (overrides for the hard-coded physical styles live in `src/webview/styles/rtl.css`).
 
 ## How to verify
 

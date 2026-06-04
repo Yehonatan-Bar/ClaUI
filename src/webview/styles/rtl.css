@@ -74,3 +74,21 @@
   margin-left: 0;
   margin-right: 8px;
 }
+
+/* Question bar (AskUserQuestion) RTL: right-align text, flip chip/desc margins.
+   The dir="rtl" attribute already reverses the option flex rows and inline flow;
+   these rules override physical properties that don't auto-flip. */
+[dir="rtl"] .question-title,
+[dir="rtl"] .question-option-btn {
+  text-align: right;
+}
+
+[dir="rtl"] .question-header {
+  margin-right: 0;
+  margin-left: 8px;
+}
+
+[dir="rtl"] .question-option-desc {
+  margin-left: 0;
+  margin-right: 4px;
+}

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
+import { detectRtl } from '../../hooks/useRtlDetection';
 
 /** Parsed question option from AskUserQuestion tool input */
 interface QuestionOption {
@@ -85,6 +86,17 @@ export const PlanApprovalBar: React.FC = () => {
     () => (isQuestion && pendingApproval ? parseQuestionData(pendingApproval.planText) : null),
     [isQuestion, pendingApproval]
   );
+
+  // Hebrew/Arabic anywhere in the question or its options flips the whole bar to RTL
+  const isQuestionRtl = useMemo(() => {
+    if (!questionData) return false;
+    const parts = [
+      questionData.question,
+      questionData.header || '',
+      ...questionData.options.flatMap(o => [o.label, o.description || '']),
+    ];
+    return detectRtl(parts.join(' '));
+  }, [questionData]);
 
   const allowedPrompts = useMemo(
     () => (!isQuestion && pendingApproval ? parseAllowedPrompts(pendingApproval.planText) : []),
@@ -220,7 +232,7 @@ export const PlanApprovalBar: React.FC = () => {
   // --- Render question UI ---
   if (isQuestion && questionData) {
     return (
-      <div className="plan-approval-bar question-bar">
+      <div className="plan-approval-bar question-bar" dir={isQuestionRtl ? 'rtl' : 'ltr'}>
         <div className="question-title">
           {questionData.header && (
             <span className="question-header">{questionData.header}</span>
