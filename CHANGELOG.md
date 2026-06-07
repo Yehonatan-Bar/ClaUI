@@ -1,5 +1,49 @@
 # ClaUi - Changelog
 
+## v0.1.186 - 2026-06-07
+
+**Feature: Git Worktree support -- parallel sessions in isolated checkouts, merged back from a guided wizard**
+
+- A git worktree is an isolated checkout of the same repository on its own branch, sharing one repo history. ClaUi can now **create, run sessions in, merge, and remove** worktrees, so several Claude/Codex sessions can edit code in parallel -- each in its own directory and branch -- instead of fighting over the single workspace root
+- **Launch mechanism**: ClaUi runs `git worktree add` **itself** and spawns the session with `cwd` = the worktree path (reusing the per-session `cwd` option the process managers already accept). It does **not** rely on the Claude CLI `--worktree` flag -- a worktree is just another checkout, so headless `claude -p --output-format stream-json` and Codex `-C <cwd>` behave identically
+- **CLI-compatible conventions** so CLI- and ClaUi-created worktrees share one list: container dir `.claude/worktrees/<name>/`, branch `worktree-<name>`, base ref `origin/HEAD` (falls back to local `HEAD`)
+
+**Worktrees Dashboard** (`WorktreePanel.tsx`)
+
+- Full-screen GitHub-dark overlay opened from **StatusBar -> Session -> Worktrees** (or the `claudeMirror.openWorktreePanel` command); Esc closes, Refresh re-reads
+- One card per worktree (main first) showing branch badge, HEAD sha, lock/missing state, path, the **sessions running on it** (slot-color dot + provider badge + busy/idle + Open), and card actions: New session here, Open folder, **Merge** (non-main/non-detached cards), Remove
+- **Session<->worktree mapping** joins `git worktree list --porcelain` against the live tab list using realpath-normalized paths (`fs.realpathSync.native` + trailing-separator strip + lowercase on Windows), so the join survives drive-letter case, 8.3 short names, junctions, and trailing slashes; tabs with no explicit worktree map to the main worktree
+- Each tab **persists its `worktreePath`** and re-applies it on every re-spawn (model-switch restart/resume, silent resume, crash escalation) and across window reloads, so a session never silently jumps back to the main repo
+- Session rows sit tight -- the Open button now follows the busy/idle status directly instead of being pushed to the far edge of the row -- and each row **highlights on hover** for clearer affordance
+
+**Merge Wizard -- guided and fully reversible** (`MergeWizard.tsx`)
+
+- Staged modal that merges a worktree branch (**source**) into a **target** branch; the merge runs in whatever checkout holds the target, switching the clean main checkout to the target only with explicit approval
+- Three strategies: **Merge commit** (`--no-ff`), **Squash** (`--squash` + commit), **Fast-forward** (`--ff-only`, disabled when behind). **Rebase is intentionally excluded** -- it would rewrite a branch a live session may still be committing to. The merge operates on a captured source sha so a concurrent commit cannot change what is merged mid-flight
+- **Stage A (Review)**: ahead/behind, collapsible commit list, automatic conflict **prediction** via `git merge-tree --write-tree` (git >= 2.38), plus warnings for uncommitted source changes (inline "Commit them first"), main-checkout switch, already-merged, and behind > 0
+- **Stage B (Conflict)**: resolution happens in the editor -- Open conflicted files / Abort / Complete (Complete re-checks there are no unmerged files first)
+- **Stage C (Result)**: **Undo** is the non-destructive `git revert` by default; a guarded **"Discard (rewrite history)"** appears only when the commit is provably unpushed (`merge-base --is-ancestor` against a fetched `@{upstream}`)
+- **Persistent merge-in-progress bar**: a paused merge (a present `MERGE_HEAD`, or unmerged files with no merge/cherry-pick/revert/rebase state) is detected on every list and can be **Resolved** or **Aborted** even after a window reload
+- The wizard never runs git itself -- it posts requests and renders the `MergePreview`/`MergeResult` the extension computes
+
+**Safety**
+
+- All git work runs via `execFile('git', [args], { cwd })` -- never shell strings (injection-safe); create, remove, and every merge mutation are serialized through one in-flight op lock to avoid git index races
+- **Remove** is disabled for the main worktree and for any worktree with a live session (close it first; disposing the tab kills its CLI process tree); a dirty/untracked worktree returns `requiresForce` and shows a confirm dialog, so changes are never silently destroyed
+
+**Settings (`claudeMirror.worktree.*`)**
+
+- `enabled` (true), `directory` (`.claude/worktrees`), `branchPrefix` (`worktree-`), `baseBranch` (`origin/HEAD`), `copyIncludeFile` (true -- copies `.worktreeinclude` entries such as `.env` into new worktrees), `defaultMergeStrategy` (`merge`), `removeAfterMerge` (false), `confirmMergeIntoProtected` (true -- extra confirm when merging into `main`/`master`)
+
+**Commands**
+
+- `claudeMirror.openWorktreePanel` -- ClaUi: Worktrees Dashboard
+- `claudeMirror.createWorktreeSession` -- ClaUi: New Worktree Session (a path arg launches directly; no arg opens the dashboard)
+
+- New detail doc: `Kingdom_of_Claudes_Beloved_MDs/WORKTREE_SUPPORT.md`
+
+---
+
 ## v0.1.180 - 2026-05-29
 
 **Feature: Claude Opus 4.8 model support**
