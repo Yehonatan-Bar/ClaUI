@@ -3,6 +3,12 @@
  */
 
 import type { ContentBlock } from './stream-json';
+import type {
+  WorktreeWithSessions,
+  WorktreeActionResult,
+  MergePreview,
+  MergeResult,
+} from '../worktree/worktreeTypes';
 import type { ComplianceReport } from '../../shared/audit/ComplianceReporter';
 import type { AuditEventFilter } from '../../shared/audit/AuditStore';
 import type { AuditEvent, SecretProtectionSettings } from '../../shared/secret-protection/types';
@@ -440,6 +446,110 @@ export interface GitPushConfigRequest {
 
 export interface GetGitPushSettingsRequest {
   type: 'getGitPushSettings';
+}
+
+/** Request the joined list of worktrees + the sessions running on each. */
+export interface GetWorktreeListRequest {
+  type: 'getWorktreeList';
+}
+
+/** Create a new worktree; optionally auto-start a session inside it. */
+export interface CreateWorktreeRequest {
+  type: 'createWorktree';
+  name: string;
+  baseBranch?: string;
+  startSession: boolean;
+}
+
+/** Start a new session inside an existing worktree directory. */
+export interface CreateWorktreeSessionRequest {
+  type: 'createWorktreeSession';
+  worktreePath: string;
+}
+
+/** Remove a worktree; `force` discards dirty/untracked changes. */
+export interface RemoveWorktreeRequest {
+  type: 'removeWorktree';
+  worktreePath: string;
+  force?: boolean;
+}
+
+/** Reveal a worktree directory in the OS file explorer. */
+export interface OpenWorktreeFolderRequest {
+  type: 'openWorktreeFolder';
+  worktreePath: string;
+}
+
+/** Focus the tab whose session runs in a given worktree. */
+export interface FocusWorktreeSessionRequest {
+  type: 'focusWorktreeSession';
+  tabId: string;
+}
+
+/** List local branches (target dropdown in the merge wizard). */
+export interface ListBranchesRequest {
+  type: 'listBranches';
+}
+
+/** Read-only "merge <source> into <target>" analysis for the wizard. */
+export interface GetMergePreviewRequest {
+  type: 'getMergePreview';
+  sourcePath: string;
+  targetBranch?: string;
+}
+
+/** Commit everything in the source worktree before merging it. */
+export interface CommitWorktreeRequest {
+  type: 'commitWorktree';
+  worktreePath: string;
+  message: string;
+  /** The wizard's current target, so a fresh preview can be returned post-commit. */
+  targetBranch?: string;
+}
+
+/** Run a merge of the source worktree's branch into a target branch. */
+export interface PerformMergeRequest {
+  type: 'performMerge';
+  sourcePath: string;
+  targetBranch: string;
+  strategy: 'merge' | 'squash' | 'ff';
+  commitMessage?: string;
+  allowMainSwitch: boolean;
+  removeAfter: boolean;
+  pushAfter: boolean;
+}
+
+/** Abort a paused merge sitting in a worktree. */
+export interface AbortMergeRequest {
+  type: 'abortMerge';
+  targetPath: string;
+  squash: boolean;
+}
+
+/** Finalize a merge once conflicts are resolved. */
+export interface CompleteMergeRequest {
+  type: 'completeMerge';
+  targetPath: string;
+  squash: boolean;
+  message?: string;
+  preSha?: string;
+}
+
+/** Undo a completed merge (revert by default, guarded discard when unpushed). */
+export interface UndoMergeRequest {
+  type: 'undoMerge';
+  targetPath: string;
+  mode: 'revert' | 'discard';
+  strategy: 'merge' | 'squash' | 'ff';
+  newSha: string;
+  preSha?: string;
+}
+
+/** Open conflicted files in the editor so the user can resolve them. */
+export interface OpenConflictFilesRequest {
+  type: 'openConflictFiles';
+  targetPath: string;
+  files: string[];
 }
 
 export interface SetCustomSnippetRequest {
@@ -971,6 +1081,20 @@ export type WebviewToExtensionMessage =
   | GitPushRequest
   | GitPushConfigRequest
   | GetGitPushSettingsRequest
+  | GetWorktreeListRequest
+  | CreateWorktreeRequest
+  | CreateWorktreeSessionRequest
+  | RemoveWorktreeRequest
+  | OpenWorktreeFolderRequest
+  | FocusWorktreeSessionRequest
+  | ListBranchesRequest
+  | GetMergePreviewRequest
+  | CommitWorktreeRequest
+  | PerformMergeRequest
+  | AbortMergeRequest
+  | CompleteMergeRequest
+  | UndoMergeRequest
+  | OpenConflictFilesRequest
   | SetCustomSnippetRequest
   | GetCustomSnippetRequest
   | TranslateMessageRequest
@@ -1483,6 +1607,50 @@ export interface GitPushSettingsMessage {
   enabled: boolean;
   scriptPath: string;
   commitMessageTemplate: string;
+}
+
+/** The joined worktree + sessions list for the dashboard. */
+export interface WorktreeListMessage {
+  type: 'worktreeList';
+  worktrees: WorktreeWithSessions[];
+  /** True when the workspace is a git repo; false disables create/remove in the UI. */
+  isGitRepo: boolean;
+}
+
+/** Result of a create/remove/commit worktree mutation. */
+export interface WorktreeActionResultMessage extends WorktreeActionResult {
+  type: 'worktreeActionResult';
+  /** Which action produced this result, so the UI can route the toast/dialog. */
+  action: 'create' | 'remove' | 'commit';
+}
+
+/** Local branches for the merge wizard target dropdown. */
+export interface BranchListMessage {
+  type: 'branchList';
+  branches: string[];
+}
+
+/** Read-only merge analysis for the wizard's Review stage. */
+export interface MergePreviewMessage {
+  type: 'mergePreview';
+  preview: MergePreview;
+  /** Strategy pre-selected in the wizard (from settings). */
+  defaultStrategy: 'merge' | 'squash' | 'ff';
+  /** Default state of the "remove worktree after merge" checkbox. */
+  removeAfterDefault: boolean;
+  /** Whether to show an extra confirm when merging into a protected branch. */
+  confirmIntoProtected: boolean;
+}
+
+/** Outcome of a merge / complete / abort / undo, routed by `result.action`. */
+export interface MergeResultMessage {
+  type: 'mergeResult';
+  result: MergeResult;
+}
+
+/** Command-palette / StatusBar request to open the worktree dashboard overlay. */
+export interface OpenWorktreePanelMessage {
+  type: 'openWorktreePanel';
 }
 
 export interface CustomSnippetSettingsMessage {
@@ -2580,6 +2748,12 @@ export type ExtensionToWebviewMessage =
   | PermissionModeSettingMessage
   | GitPushResultMessage
   | GitPushSettingsMessage
+  | WorktreeListMessage
+  | WorktreeActionResultMessage
+  | BranchListMessage
+  | MergePreviewMessage
+  | MergeResultMessage
+  | OpenWorktreePanelMessage
   | CustomSnippetSettingsMessage
   | ForkInitMessage
   | ConversationHistoryMessage

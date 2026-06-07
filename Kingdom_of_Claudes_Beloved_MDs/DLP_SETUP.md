@@ -25,7 +25,7 @@ Modes:
 | `balanced` | Block or redact high-risk secrets at remote/public boundaries; warn on lower-risk findings. |
 | `strict` | Escalate medium-or-higher findings to block at enforced boundaries. |
 
-The webview StatusBar shows the Secret Protection badge when status is available. Click it to open the Settings, Audit, and Manifest tabs.
+The webview StatusBar's Tools menu shows the Secret Protection badge under the "Protection" section when status is available. Click it to open the Settings, Audit, and Manifest tabs.
 
 ## Project Policy
 

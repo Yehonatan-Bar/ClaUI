@@ -27,6 +27,7 @@ import {
 import type { ProcessMemorySampler } from '../process/ProcessMemorySampler';
 import type { TabGroupStore } from './TabGroupStore';
 import { MultiParticipantSessionTab } from '../multiparticipant/MultiParticipantSessionTab';
+import { WorktreeController } from '../worktree/WorktreeController';
 
 /** Distinct colors for tab header bars, cycling through the palette */
 const TAB_COLORS = [
@@ -57,6 +58,8 @@ export interface TabSummary {
   orderInGroup?: number;
   slotColor: string;
   isBusy: boolean;
+  /** Absolute worktree path this tab's session runs in, or null for the primary worktree. */
+  worktreePath: string | null;
 }
 
 /**
@@ -87,6 +90,9 @@ export class TabManager {
 
   /** Shared Workspace Access Guard service, injected after construction */
   workspaceAccessGuardService: import('../workspace-access-guard/WorkspaceAccessGuardService').WorkspaceAccessGuardService | null = null;
+
+  /** Bridges the git worktree service with the live tab list (built in the constructor). */
+  private readonly worktreeController: WorktreeController;
 
   private readonly snapshotStore: OpenTabsSnapshotStore;
   private readonly snapshotEntries = new Map<string, OpenTabSnapshotEntry>();
@@ -139,6 +145,18 @@ export class TabManager {
     );
 
     this.snapshotStore = new OpenTabsSnapshotStore(context.workspaceState);
+
+    this.worktreeController = new WorktreeController(
+      {
+        listTabs: () => this.listTabs(),
+        createWorktreeTab: (worktreePath, provider) =>
+          this.createWorktreeTab(worktreePath, provider),
+        focusTab: (tabId) => this.focusTab(tabId),
+        closeTab: (tabId) => this.closeTab(tabId),
+        broadcastTabsState: () => this.broadcastTabsState(),
+      },
+      this.log,
+    );
 
     if (this.tabGroupStore) {
       // Forward group changes (rename/recolor/move/delete) so the TreeView refreshes.
@@ -202,6 +220,8 @@ export class TabManager {
         orderInGroup: entry?.orderInGroup,
         slotColor: this.tabSlotColors.get(tab.id) ?? TAB_COLORS[0],
         isBusy: (tab as { isBusyState?: () => boolean }).isBusyState?.() ?? false,
+        worktreePath:
+          (tab as { getWorktreePath?: () => string | null }).getWorktreePath?.() ?? null,
       });
     }
     return out;
@@ -298,6 +318,28 @@ export class TabManager {
     return this.createClaudeTab(viewColumnOverride);
   }
 
+  /** Create a tab whose CLI session runs inside the given worktree directory.
+   *  The worktree path is persisted on the tab + snapshot so it survives every
+   *  re-spawn and window reload, then the session is started in that tree. */
+  async createWorktreeTab(
+    worktreePath: string,
+    provider: ProviderId = 'claude',
+    viewColumnOverride?: vscode.ViewColumn,
+  ): Promise<SessionTab | CodexSessionTab> {
+    const tab = this.createTabForProvider(provider, viewColumnOverride);
+    (tab as { setWorktreePath?: (p: string | null) => void }).setWorktreePath?.(worktreePath);
+    // Persist the worktree on the (already-seeded) snapshot entry.
+    const entry = this.snapshotEntries.get(tab.id);
+    if (entry) {
+      entry.worktreePath = worktreePath;
+      entry.savedAt = new Date().toISOString();
+      this.schedulePersistSnapshot();
+    }
+    await tab.startSession({ cwd: worktreePath });
+    this.broadcastTabsState();
+    return tab;
+  }
+
   /** Create a new Claude tab */
   createClaudeTab(viewColumnOverride?: vscode.ViewColumn): SessionTab {
     const tabNumber = this.nextTabNumber++;
@@ -362,6 +404,7 @@ export class TabManager {
     if (this.workspaceAccessGuardService) {
       tab.setWorkspaceAccessGuardService(this.workspaceAccessGuardService);
     }
+    tab.setWorktreeController(this.worktreeController);
     tab.setSessionStore(this.sessionStore);
     tab.setOpenTabSessionIdsGetter(() => this.getOpenTabSessionIds());
     this.seedSnapshotEntry(tab);
@@ -430,6 +473,7 @@ export class TabManager {
     if (this.workspaceAccessGuardService) {
       tab.setWorkspaceAccessGuardService(this.workspaceAccessGuardService);
     }
+    tab.setWorktreeController(this.worktreeController);
     tab.setSessionStore(this.sessionStore);
     tab.setOpenTabSessionIdsGetter(() => this.getOpenTabSessionIds());
     this.seedSnapshotEntry(tab);
@@ -1084,6 +1128,8 @@ export class TabManager {
       provider: tab.getProvider() as ProviderId,
       sessionId: tab.sessionId ?? '',
       workspacePath: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+      worktreePath:
+        (tab as { getWorktreePath?: () => string | null }).getWorktreePath?.() ?? undefined,
       savedAt: new Date().toISOString(),
     };
     this.snapshotEntries.set(tab.id, entry);
@@ -1317,6 +1363,14 @@ export class TabManager {
                 tab.setCliPathOverride(chosenPath);
               }
 
+              // Re-apply the worktree so the restored session spawns in the same
+              // tree (must run before resume/lazy-wake so getEffectiveCwd sees it).
+              if (entry.worktreePath) {
+                (tab as { setWorktreePath?: (p: string | null) => void }).setWorktreePath?.(
+                  entry.worktreePath,
+                );
+              }
+
               const isActive =
                 !!snapshot.activeSessionId && entry.sessionId === snapshot.activeSessionId;
 
@@ -1432,6 +1486,9 @@ export class TabManager {
         cliPathOverride:
           tab instanceof SessionTab ? (tab.getCliPathOverride() ?? undefined) : undefined,
         workspacePath: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+        worktreePath:
+          (tab as { getWorktreePath?: () => string | null }).getWorktreePath?.() ??
+          original?.worktreePath,
         savedAt: new Date().toISOString(),
         customName: original?.customName,
         groupId: original?.groupId,

@@ -293,7 +293,7 @@ Both hooks point to the same JS file; the tool name prefix determines which code
 
 ### Webview UI
 
-- `SecretProtectionStatusBadge.tsx`: StatusBar badge showing enabled/mode/audit state and opening the panel.
+- `SecretProtectionStatusBadge.tsx`: StatusBar badge (rendered inside the Tools dropdown menu under the "Protection" section) showing enabled/mode/audit state and opening the panel.
 - `SettingsPanel.tsx`: Secret Protection overlay with Settings, Audit, and Manifest tabs.
 - `AuditLogPanel.tsx`: Interactive audit event table with action/severity filters plus compliance evidence summary.
 - `OutboundManifestPanel.ts`: Pure preview builder for guarded boundary names and the latest audit decision.

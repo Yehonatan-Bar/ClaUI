@@ -141,6 +141,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private forceReadOnlySandbox: boolean = false;
   /** Smart Search: cwd override (so transcripts under $HOME are reachable). */
   private cwdOverride: string | null = null;
+  /** Worktree this tab's session runs in (absolute path). Null = primary/main worktree. */
+  private worktreePath: string | null = null;
   /** Particle Accelerator service reference for context file lifecycle */
   private particleAcceleratorService: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService | null = null;
   /** Secret Protection service reference for DLP scanning */
@@ -278,6 +280,17 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     return 'codex';
   }
 
+  /** Set the worktree this tab's session runs in. Call before startSession; it
+   *  feeds sessionCwd and therefore persists across every Codex re-spawn. */
+  setWorktreePath(pathOrNull: string | null): void {
+    this.worktreePath = pathOrNull;
+  }
+
+  /** Absolute worktree path for this tab, or null when it runs in the primary worktree. */
+  getWorktreePath(): string | null {
+    return this.worktreePath;
+  }
+
   /** Stage one-time handoff context to inject on the first user message in this tab. */
   setPendingHandoffPrompt(prompt: string): void {
     this.messageHandler.setPendingHandoffPrompt(prompt);
@@ -286,6 +299,13 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   /** Inject the shared WorkstreamManager (forwarded to CodexMessageHandler). */
   setWorkstreamManager(manager: import('../workstream/WorkstreamManager').WorkstreamManager): void {
     this.messageHandler.setWorkstreamManager(manager);
+  }
+
+  /** Inject the shared WorktreeController (forwarded to CodexMessageHandler). */
+  setWorktreeController(controller: import('../worktree/WorktreeController').WorktreeController): void {
+    if ('setWorktreeController' in this.messageHandler) {
+      (this.messageHandler as { setWorktreeController: (c: typeof controller) => void }).setWorktreeController(controller);
+    }
   }
 
   /** Inject the shared ParticleAcceleratorService (forwarded to CodexMessageHandler + process manager env builder). */
@@ -400,6 +420,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
 
     this.sessionCwd =
       options?.cwd ||
+      this.worktreePath ||
       this.cwdOverride ||
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
       this.sessionCwd;

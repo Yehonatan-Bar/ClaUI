@@ -566,6 +566,121 @@ export class MessageHandler {
     this.workstreamManager = manager;
   }
 
+  /** Shared worktree controller (set after construction by TabManager). */
+  private worktreeController: import('../worktree/WorktreeController').WorktreeController | null = null;
+
+  setWorktreeController(controller: import('../worktree/WorktreeController').WorktreeController): void {
+    this.worktreeController = controller;
+  }
+
+  /** Build + post the joined worktree/sessions list to this tab's webview. */
+  private async handleGetWorktreeList(): Promise<void> {
+    if (!this.worktreeController) { return; }
+    try {
+      const list = await this.worktreeController.buildList();
+      this.webview.postMessage(list);
+    } catch (e) {
+      this.log(`[Worktree] list failed: ${e instanceof Error ? e.message : String(e)}`);
+      this.webview.postMessage({ type: 'worktreeList', worktrees: [], isGitRepo: false });
+    }
+  }
+
+  private async handleCreateWorktree(msg: {
+    name: string;
+    baseBranch?: string;
+    startSession: boolean;
+  }): Promise<void> {
+    if (!this.worktreeController) { return; }
+    const result = await this.worktreeController.create({
+      name: msg.name,
+      baseBranch: msg.baseBranch,
+      startSession: msg.startSession,
+    });
+    this.webview.postMessage(result);
+    await this.handleGetWorktreeList();
+  }
+
+  private async handleCreateWorktreeSession(worktreePath: string): Promise<void> {
+    if (!this.worktreeController) { return; }
+    await this.worktreeController.createSession(worktreePath);
+    await this.handleGetWorktreeList();
+  }
+
+  private async handleRemoveWorktree(worktreePath: string, force: boolean): Promise<void> {
+    if (!this.worktreeController) { return; }
+    const result = await this.worktreeController.remove(worktreePath, force);
+    this.webview.postMessage(result);
+    await this.handleGetWorktreeList();
+  }
+
+  private async handleListBranches(): Promise<void> {
+    if (!this.worktreeController) { return; }
+    this.webview.postMessage(await this.worktreeController.listBranches());
+  }
+
+  private async handleGetMergePreview(sourcePath: string, targetBranch?: string): Promise<void> {
+    if (!this.worktreeController) { return; }
+    this.webview.postMessage(await this.worktreeController.previewMerge(sourcePath, targetBranch));
+  }
+
+  private async handleCommitWorktree(worktreePath: string, message: string, targetBranch?: string): Promise<void> {
+    if (!this.worktreeController) { return; }
+    const result = await this.worktreeController.commitSource(worktreePath, message);
+    this.webview.postMessage(result);
+    await this.handleGetWorktreeList();
+    // Committing changed the source branch; refresh the wizard's preview.
+    if (result.success) {
+      this.webview.postMessage(await this.worktreeController.previewMerge(worktreePath, targetBranch));
+    }
+  }
+
+  private async handlePerformMerge(req: {
+    sourcePath: string;
+    targetBranch: string;
+    strategy: 'merge' | 'squash' | 'ff';
+    commitMessage?: string;
+    allowMainSwitch: boolean;
+    removeAfter: boolean;
+    pushAfter: boolean;
+  }): Promise<void> {
+    if (!this.worktreeController) { return; }
+    const result = await this.worktreeController.performMerge(req);
+    this.webview.postMessage(result);
+    await this.handleGetWorktreeList();
+  }
+
+  private async handleAbortMerge(targetPath: string, squash: boolean): Promise<void> {
+    if (!this.worktreeController) { return; }
+    const result = await this.worktreeController.abortMerge(targetPath, squash);
+    this.webview.postMessage(result);
+    await this.handleGetWorktreeList();
+  }
+
+  private async handleCompleteMerge(
+    targetPath: string,
+    opts: { squash: boolean; message?: string; preSha?: string },
+  ): Promise<void> {
+    if (!this.worktreeController) { return; }
+    const result = await this.worktreeController.completeMerge(targetPath, opts);
+    this.webview.postMessage(result);
+    await this.handleGetWorktreeList();
+  }
+
+  private async handleUndoMerge(
+    targetPath: string,
+    opts: { mode: 'revert' | 'discard'; strategy: 'merge' | 'squash' | 'ff'; newSha: string; preSha?: string },
+  ): Promise<void> {
+    if (!this.worktreeController) { return; }
+    const result = await this.worktreeController.undoMerge(targetPath, opts);
+    this.webview.postMessage(result);
+    await this.handleGetWorktreeList();
+  }
+
+  private async handleOpenConflictFiles(targetPath: string, files: string[]): Promise<void> {
+    if (!this.worktreeController) { return; }
+    await this.worktreeController.openConflictFiles(targetPath, files);
+  }
+
   setParticleAcceleratorService(service: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService): void {
     this.particleAcceleratorService = service;
   }
@@ -3134,6 +3249,71 @@ export class MessageHandler {
 
         case 'getGitPushSettings':
           this.sendGitPushSettings();
+          break;
+
+        case 'getWorktreeList':
+          void this.handleGetWorktreeList();
+          break;
+
+        case 'createWorktree':
+          void this.handleCreateWorktree(msg);
+          break;
+
+        case 'createWorktreeSession':
+          void this.handleCreateWorktreeSession(msg.worktreePath);
+          break;
+
+        case 'removeWorktree':
+          void this.handleRemoveWorktree(msg.worktreePath, !!msg.force);
+          break;
+
+        case 'openWorktreeFolder':
+          void this.worktreeController?.openFolder(msg.worktreePath);
+          break;
+
+        case 'focusWorktreeSession':
+          this.worktreeController?.focusSession(msg.tabId);
+          break;
+
+        case 'listBranches':
+          void this.handleListBranches();
+          break;
+
+        case 'getMergePreview':
+          void this.handleGetMergePreview(msg.sourcePath, msg.targetBranch);
+          break;
+
+        case 'commitWorktree':
+          void this.handleCommitWorktree(msg.worktreePath, msg.message, msg.targetBranch);
+          break;
+
+        case 'performMerge':
+          void this.handlePerformMerge(msg);
+          break;
+
+        case 'abortMerge':
+          void this.handleAbortMerge(msg.targetPath, msg.squash);
+          break;
+
+        case 'completeMerge':
+          void this.handleCompleteMerge(msg.targetPath, {
+            squash: msg.squash,
+            message: msg.message,
+            preSha: msg.preSha,
+          });
+          break;
+
+        case 'undoMerge':
+          void this.handleUndoMerge(msg.targetPath, {
+            mode: msg.mode,
+            strategy: msg.strategy,
+            newSha: msg.newSha,
+            preSha: msg.preSha,
+          });
+          break;
+
+        case 'openConflictFiles':
+          void this.handleOpenConflictFiles(msg.targetPath, msg.files);
           break;
 
         case 'setCustomSnippet':

@@ -782,6 +782,30 @@ export function registerCommands(
       log('Opened MCP panel in active ClaUi tab');
     }),
 
+    // Open the worktree dashboard overlay on the active tab (creates one if none)
+    vscode.commands.registerCommand('claudeMirror.openWorktreePanel', () => {
+      const tab = tabManager.getOrCreateTab();
+      tab.reveal();
+      tab.postMessage({ type: 'openWorktreePanel' });
+      log('Opened worktree panel in active ClaUi tab');
+    }),
+
+    // Start a fresh session inside a worktree. With a path arg it launches
+    // directly; without one it surfaces the dashboard so the user can pick.
+    vscode.commands.registerCommand(
+      'claudeMirror.createWorktreeSession',
+      async (worktreePath?: string) => {
+        if (typeof worktreePath === 'string' && worktreePath.length > 0) {
+          await tabManager.createWorktreeTab(worktreePath, 'claude');
+          log(`Started worktree session in ${worktreePath}`);
+          return;
+        }
+        const tab = tabManager.getOrCreateTab();
+        tab.reveal();
+        tab.postMessage({ type: 'openWorktreePanel' });
+      }
+    ),
+
     // Fork conversation from a specific message (opens a new tab)
     vscode.commands.registerCommand(
       'claudeMirror.forkFromMessage',

@@ -17,7 +17,21 @@ import type {
   ProviderId,
   TypingTheme,
   WebviewTabSummary,
+  WorktreeActionResultMessage,
 } from '../../extension/types/webview-messages';
+import type {
+  WorktreeWithSessions,
+  MergePreview,
+  MergeResult,
+  MergeStrategy,
+} from '../../extension/worktree/worktreeTypes';
+
+/** Settings-driven defaults that ride along with each merge preview. */
+export interface MergeDefaults {
+  defaultStrategy: MergeStrategy;
+  removeAfterMerge: boolean;
+  confirmIntoProtected: boolean;
+}
 import type {
   AchievementAwardPayload,
   AchievementGoalPayload,
@@ -485,6 +499,28 @@ export interface AppState {
   // Codex Consultation
   codexConsultPanelOpen: boolean;
   setCodexConsultPanelOpen: (open: boolean) => void;
+
+  // Worktree dashboard
+  worktreePanelOpen: boolean;
+  worktreeList: WorktreeWithSessions[];
+  worktreeIsGitRepo: boolean;
+  /** Last create/remove/commit result, consumed by the panel for toasts + force-confirm. */
+  worktreeActionResult: WorktreeActionResultMessage | null;
+  /** Local branches for the merge wizard target dropdown. */
+  mergeBranches: string[];
+  /** Latest merge preview for the wizard's Review stage. */
+  mergePreview: MergePreview | null;
+  /** Latest merge / complete / abort / undo outcome for the wizard. */
+  mergeResult: MergeResult | null;
+  /** Settings-driven wizard defaults that arrive with each preview. */
+  mergeDefaults: MergeDefaults | null;
+  setWorktreePanelOpen: (open: boolean) => void;
+  setWorktreeList: (worktrees: WorktreeWithSessions[], isGitRepo: boolean) => void;
+  setWorktreeActionResult: (result: WorktreeActionResultMessage | null) => void;
+  setMergeBranches: (branches: string[]) => void;
+  setMergePreview: (preview: MergePreview | null) => void;
+  setMergeResult: (result: MergeResult | null) => void;
+  setMergeDefaults: (defaults: MergeDefaults | null) => void;
 
   // Active Skill indicator (accumulated across session, pills persist)
   sessionSkills: string[];
@@ -1261,6 +1297,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Codex Consultation
   codexConsultPanelOpen: false,
   setCodexConsultPanelOpen: (open) => set({ codexConsultPanelOpen: open }),
+
+  // Worktree dashboard
+  worktreePanelOpen: false,
+  worktreeList: [],
+  worktreeIsGitRepo: false,
+  worktreeActionResult: null,
+  mergeBranches: [],
+  mergePreview: null,
+  mergeResult: null,
+  mergeDefaults: null,
+  setWorktreePanelOpen: (open) => set({ worktreePanelOpen: open }),
+  setWorktreeList: (worktrees, isGitRepo) =>
+    set({ worktreeList: worktrees, worktreeIsGitRepo: isGitRepo }),
+  setWorktreeActionResult: (result) => set({ worktreeActionResult: result }),
+  setMergeBranches: (branches) => set({ mergeBranches: branches }),
+  setMergePreview: (preview) => set({ mergePreview: preview }),
+  setMergeResult: (result) => set({ mergeResult: result }),
+  setMergeDefaults: (defaults) => set({ mergeDefaults: defaults }),
 
   // Active Skill indicator (accumulated across session)
   sessionSkills: [],
@@ -2976,6 +3030,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Note: githubSyncStatus and communityFriends persist across resets
       friendActionPending: false,
       codexConsultPanelOpen: false,
+      // Worktree dashboard: close on session reset (data re-fetched on open)
+      worktreePanelOpen: false,
+      worktreeList: [],
+      worktreeIsGitRepo: false,
+      worktreeActionResult: null,
+      mergeBranches: [],
+      mergePreview: null,
+      mergeResult: null,
+      mergeDefaults: null,
       // Agent Teams: clear on session reset
       teamActive: false,
       teamName: null,

@@ -109,7 +109,7 @@ Status values: `enabled-hooks-installed` (all hooks present, SPA before PA), `en
 - `src/shared/super-particle-accelerator/types.ts` - All shared interfaces and type unions
 
 ### Webview
-- `src/webview/components/SuperParticleAccelerator/SuperParticleAcceleratorStatusBadge.tsx` - StatusBar badge
+- `src/webview/components/SuperParticleAccelerator/SuperParticleAcceleratorStatusBadge.tsx` - StatusBar badge, rendered inside the Tools dropdown menu under the "Protection" section
 - `src/webview/components/SuperParticleAccelerator/SuperParticleAcceleratorPanel.tsx` - Settings/audit panel
 
 ### Tests (77 total)

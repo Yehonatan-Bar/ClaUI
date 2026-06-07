@@ -161,6 +161,11 @@ claude-code-mirror/
 |   |   |   +-- ExternalWorkFolderIngestor.ts # Explicit folder import for external docs as workstreams
 |   |   |   +-- UserPortfolioStore.ts     #   Cross-project portfolio persistence (globalState, max 30 projects)
 |   |   |   +-- UserPortfolioManager.ts   #   Portfolio orchestrator: health scoring, resume algorithm, path validation
+|   |   +-- worktree/                      # Git worktree support (create/run/merge/remove + dashboard join)
+|   |   |   +-- worktreeTypes.ts           #   Wire/domain types (WorktreeInfo, MergePreview/Result/Options, WorktreeWithSessions)
+|   |   |   +-- WorktreeService.ts         #   All git ops via execFile (list/create/remove, merge engine, realpath join)
+|   |   |   +-- WorktreeSettings.ts        #   Reads claudeMirror.worktree.* settings
+|   |   |   +-- WorktreeController.ts      #   Bridges WorktreeService with the live tab list (join + merge mutations)
 |   |   +-- particle-accelerator/
 |   |   |   +-- ParticleAcceleratorTypes.ts        #   Shared types, version constants, settings interface
 |   |   |   +-- ParticleAcceleratorSettings.ts     #   VS Code settings reader (claudeMirror.particleAccelerator.*)
@@ -301,7 +306,7 @@ claude-code-mirror/
 |       |   +-- useOutsideClick.ts      #   Centralized outside-click manager for all dropdowns/popovers
 |       +-- components/
 |       |   +-- StatusBadge.tsx           #   Shared compact status badge primitive
-|       |   +-- SecretProtectionStatusBadge.tsx # StatusBar DLP badge and audit/settings panel launcher
+|       |   +-- SecretProtectionStatusBadge.tsx # StatusBar Tools-menu DLP badge (Protection section) and audit/settings panel launcher
 |       |   +-- SettingsPanel.tsx         #   Secret Protection settings/audit/manifest overlay
 |       |   +-- AuditLogPanel.tsx         #   Interactive audit log and compliance evidence viewer
 |       |   +-- ChatView/
@@ -446,6 +451,11 @@ claude-code-mirror/
 |       |   |   +-- layout.ts               #   Deterministic lane-based SVG layout algorithm
 |       |   |   +-- visualEncoding.ts        #   Status colors, shapes, sizes, line styles
 |       |   |   +-- animations.ts            #   CSS keyframe definitions
+|       |   +-- Worktree/
+|       |   |   +-- WorktreePanel.tsx         #   Full-screen worktree dashboard (cards + sessions + create/merge/remove)
+|       |   |   +-- MergeWizard.tsx           #   Staged merge modal (review/conflict/result) with abort + undo
+|       |   |   +-- worktreeColors.ts         #   GitHub-dark palette + provider badge colors/labels
+|       |   |   +-- index.ts                  #   Re-export
 |       |   +-- ParticleAccelerator/
 |       |   |   +-- ParticleAcceleratorStatusBadge.tsx  # StatusBar badge (green/red dot + summary text)
 |       |   |   +-- ParticleAcceleratorSettingsPanel.tsx # Toggle, hook management, status info
@@ -514,6 +524,7 @@ claude-code-mirror/
     +-- USAGE_LIMIT_DEFERRED_SEND_PLAN.md #   Archived execution plan
     +-- SKILL_GENERATION.md             #   Auto skill generation from SR-PTD docs
     +-- WORKSTREAM_MAP.md               #   Workstream map feature (classification, visualization, editing)
+    +-- WORKTREE_SUPPORT.md             #   Git worktree create/run/merge/remove + dashboard (session<->worktree join)
 ```
 
 ---
@@ -764,7 +775,7 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **Secret Protection Demo Test Harness** -- Comprehensive evidence-producing test suite for the Secret Protection Broker covering all 13 DLP boundaries, all rule packs, and all enforcement modes. Wired boundaries execute through `SecretProtectionBroker`; `git.diff`, `mcp.response`, and `telemetry.export` are recorded as scanner-only. 26 fixtures (21 dirty, 5 clean) include rule-aligned `minimumExpectedFindings`, expected rule IDs/finding types, severity floors, and clean negative cases. Outputs include `demo-results.json`, `live-evidence.json`, `screenshot-manifest.json`, audit JSONL, no-regression clean workflow proxy evidence, policy decision matrix, acceptance failures, and a generated HTML report.
 > Detail: `tests/secret-protection-demo/DEMO_GUIDE.md`
 
-**Super Particle Accelerator (SPA)** -- Hook-based secret write guard that intercepts every AI agent write operation (Edit, Write, Bash file-writes, MCP writes, git commit/push) and blocks any attempt to write API keys, tokens, credentials, or other secrets into the codebase. Runs as Claude Code and Codex hooks (PreToolUse, PermissionRequest, PostToolUse, Stop). Architecture: deny-first waterfall policy engine with 5 gates (no findings, placeholder filter, public-path hard deny, gitignored env file audit, exception matching). PathClassifier maps files to risk levels (public-client-code, generated-public-artifact, server-code, local-secret-file, unknown-repository-file). GitStateScanner verifies gitignore status and scans staged/unstaged/untracked files. Per-session baselines prevent blocking pre-existing secrets in Stop hook. Extension-side: SuperParticleAcceleratorService manages lifecycle and hook installation, SuperParticleAcceleratorHookManager installs SPA hooks BEFORE PA hooks with per-matcher status verification, SuperParticleAcceleratorEnvBuilder always injects CLAUI_SPA_STORE_DIR (even when disabled) for file-based mid-session activation via `runtime-enabled.json`. UI: StatusBadge in StatusBar, modal SPA panel with enable toggle, mode selector, audit event viewer. Configurable via `claudeMirror.superParticleAccelerator.*` (11 settings).
+**Super Particle Accelerator (SPA)** -- Hook-based secret write guard that intercepts every AI agent write operation (Edit, Write, Bash file-writes, MCP writes, git commit/push) and blocks any attempt to write API keys, tokens, credentials, or other secrets into the codebase. Runs as Claude Code and Codex hooks (PreToolUse, PermissionRequest, PostToolUse, Stop). Architecture: deny-first waterfall policy engine with 5 gates (no findings, placeholder filter, public-path hard deny, gitignored env file audit, exception matching). PathClassifier maps files to risk levels (public-client-code, generated-public-artifact, server-code, local-secret-file, unknown-repository-file). GitStateScanner verifies gitignore status and scans staged/unstaged/untracked files. Per-session baselines prevent blocking pre-existing secrets in Stop hook. Extension-side: SuperParticleAcceleratorService manages lifecycle and hook installation, SuperParticleAcceleratorHookManager installs SPA hooks BEFORE PA hooks with per-matcher status verification, SuperParticleAcceleratorEnvBuilder always injects CLAUI_SPA_STORE_DIR (even when disabled) for file-based mid-session activation via `runtime-enabled.json`. UI: StatusBadge in the StatusBar Tools menu (Protection section), modal SPA panel with enable toggle, mode selector, audit event viewer. Configurable via `claudeMirror.superParticleAccelerator.*` (11 settings).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SUPER_PARTICLE_ACCELERATOR.md`
 
 **Workspace Access Guard (WAG)** -- Hook-based filesystem boundary enforcer that prevents AI coding agents (Claude Code and Codex) from reading, writing, or searching files outside user-approved working folders or inside organization-denied folders (credential stores, browser profiles, SSH keys, cloud configs). Claude coverage uses PreToolUse hooks; Codex coverage uses PreToolUse hooks plus a Bash PermissionRequest hook. WAG entries are installed BEFORE SPA and PA hooks. Architecture: Windows path normalizer handles Git Bash `/c/`, WSL `/mnt/c/`, `%ENV%`, `$ENV`, `~`, relative paths, and symlinks/junctions; segment-aware containment uses `path.win32.relative()` (not prefix matching); command parser tokenizes Bash commands and classifies 10 access kinds (recursive-file-read, file-write, git-operation, network-or-exfiltration, unknown-file-access, etc.); two-layer policy: user-allowed roots + organization-denied roots (deny always wins), including wildcard denied roots and deny-by-default when no allowed roots exist. Runtime hooks load the complete `runtime-enabled.json` settings snapshot and apply env overrides for hook-time toggles; direct file tool requests with no parseable path fail closed. Organization policy loads from `C:\ProgramData\ClaUi\workspace-access-guard.policy.json` with 20 built-in Windows denied roots as fallback. JSONL audit logging records denied/audit decisions without file contents. Extension-side: `WorkspaceAccessGuardService` manages lifecycle, hook installation, user roots store, org policy loader, test helpers, and env injection through `SessionTab`/`CodexSessionTab` process managers. UI: Dashboard Tools tab card for enable/mode, allowed roots, org policy status, audit preview, and path/command testing. Configurable via `claudeMirror.workspaceAccessGuard.*` (14 settings). Tests: `tests/workspace-access-guard/*`.
@@ -772,6 +783,9 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 
 **Workstream Map** -- Subway-map style visualization that groups sessions into logical workstreams (coherent threads of work with a goal, status, and history). AI-powered classification pipeline: scoped to open-tab sessions + last 3 days, heuristic pre-clustering (git branch, file overlap Jaccard, temporal proximity), then Sonnet classification via stdin-piped CLI call. Explicit external folder import lets the user enter a folder path and digest supported documents (`md/txt/json/yaml/html/xml/docx`, capped) into a dashed `external_folder` workstream with source-file evidence; normal reclassification preserves those imported workstreams. Stations represent meaningful events (milestones, decisions, blockers, discoveries). SVG deterministic lane layout with visual encodings for status, confidence, type. Layers: Current State, Resume View, Plan Overlay, Resolve Mode. Backend: `WorkstreamManager` orchestrator + 14 service classes. Frontend includes `UserPortfolioView`, `PortfolioProjectMap`, `ProjectMapView`, and shared SVG primitives. Claude and Codex tabs both route Workstream Map/Portfolio messages through the shared manager. Includes **User Portfolio View** (cross-project): `UserPortfolioManager` + `UserPortfolioStore` use `globalState` for cross-workspace persistence; project health scoring (healthy/needs_attention/blocked/stale), cross-project resume recommendations, path validation for deleted projects, and a stacked full-map overview that renders every cached project workstream with simple project separators. Portfolio auto-open is suppressed for unclassified current workspaces so the empty Project Map remains available for first classification. Commands: `claudeMirror.openWorkstreamMap`, `claudeMirror.openWorkstreamPortfolio`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP.md`
+
+**Worktree Support** -- Lets a user create, run, merge, and remove git worktrees (isolated checkouts on their own branch) so several sessions edit code in parallel without fighting over the same files. ClaUi runs `git worktree add` itself and spawns the session with `cwd` = the worktree path (no dependency on the CLI `--worktree` flag); the worktree path is persisted per tab and threaded through every re-spawn and window-reload so a session never silently jumps back to the main repo. A full-screen dashboard (StatusBar -> Session -> Worktrees, or the `claudeMirror.openWorktreePanel` command) joins `git worktree list` against the live tab list using realpath-normalized paths and shows each worktree card with the sessions running on it. A guided **merge wizard** integrates a worktree's branch into a target branch with conflict prediction (`git merge-tree`), merge/squash/fast-forward strategies (rebase intentionally excluded), an editor-based conflict-resolution loop with real **abort**, optional remove/push-after, and a one-click **undo** (non-destructive revert by default; guarded history-rewrite only when provably unpushed). A persistent in-progress bar resumes or aborts a paused merge even after a reload. Backend: `WorktreeService` (all git via injection-safe `execFile`), `WorktreeController` (session<->worktree join + merge mutations), `WorktreeSettings`. Create auto-starts a session via an opt-out checkbox; remove is blocked for the main worktree and for cards with a live session, and prompts before discarding dirty changes. Configurable via `claudeMirror.worktree.*` (8 settings). Commands: `claudeMirror.openWorktreePanel`, `claudeMirror.createWorktreeSession`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/WORKTREE_SUPPORT.md`
 
 ---
 
@@ -815,6 +829,14 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 | `claudeMirror.gitPush.enabled` | `true` | Whether git push is configured and ready to use via the Git button |
 | `claudeMirror.gitPush.scriptPath` | `"scripts/git-push.ps1"` | Path to the git push script (relative to workspace root) |
 | `claudeMirror.gitPush.commitMessageTemplate` | `"{sessionName}"` | Commit message template ({sessionName} = tab name) |
+| `claudeMirror.worktree.enabled` | `true` | Enable the git worktree dashboard (create/run/remove sessions in isolated worktrees) |
+| `claudeMirror.worktree.directory` | `".claude/worktrees"` | Directory (relative to repo root) for new worktrees; mirrors the Claude CLI convention |
+| `claudeMirror.worktree.branchPrefix` | `"worktree-"` | Prefix for branches created with a new worktree (branch = prefix + name) |
+| `claudeMirror.worktree.baseBranch` | `"origin/HEAD"` | Default base ref for new worktrees; falls back to current HEAD when unresolved |
+| `claudeMirror.worktree.copyIncludeFile` | `true` | Copy `.worktreeinclude` entries (e.g. `.env`) into each newly created worktree |
+| `claudeMirror.worktree.defaultMergeStrategy` | `"merge"` | Strategy pre-selected in the merge wizard (`merge`/`squash`/`ff`) |
+| `claudeMirror.worktree.removeAfterMerge` | `false` | Default state of "remove worktree after a successful merge" |
+| `claudeMirror.worktree.confirmMergeIntoProtected` | `true` | Extra confirm step when the merge target is `main`/`master` |
 | `claudeMirror.srPtdAutoInject` | `true` | Automatically inject SR-PTD instructions into project CLAUDE.md and install sr-ptd-skill |
 | `claudeMirror.skillGen.enabled` | `true` | Enable auto skill generation feature (toggleable via gear icon in UI) |
 | `claudeMirror.skillGen.threshold` | `5` | Number of new SR-PTD docs to trigger generation (1-50) |

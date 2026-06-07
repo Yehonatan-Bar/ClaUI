@@ -173,6 +173,8 @@ export class SessionTab implements WebviewBridge {
   private allowedTools: string[] | null = null;
   /** Smart Search: cwd override (so transcripts under $HOME are reachable). */
   private cwdOverride: string | null = null;
+  /** Worktree this tab's session runs in (absolute path). Null = primary/main worktree (workspace root). */
+  private worktreePath: string | null = null;
   /** Particle Accelerator service reference for context file lifecycle */
   private particleAcceleratorService: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService | null = null;
   /** Secret Protection service reference for DLP scanning */
@@ -477,6 +479,7 @@ export class SessionTab implements WebviewBridge {
       try {
         await this.processManager.start({
           model,
+          cwd: this.getEffectiveCwd(),
           cliPathOverride: this.cliPathOverride ?? undefined,
         });
         this.log(`[Tab ${this.tabNumber}] Session restarted fresh with model "${model}"`);
@@ -504,6 +507,7 @@ export class SessionTab implements WebviewBridge {
       await this.processManager.start({
         resume: sessionToResume,
         model,
+        cwd: this.getEffectiveCwd(),
         cliPathOverride: this.cliPathOverride ?? undefined,
       });
       this.log(`[Tab ${this.tabNumber}] Session resumed with model "${model}"`);
@@ -689,6 +693,7 @@ export class SessionTab implements WebviewBridge {
       await this.processManager.start({
         resume: sid,
         skipReplay: true,
+        cwd: this.getEffectiveCwd(),
         cliPathOverride: this.cliPathOverride ?? undefined,
         appendSystemPrompt: this.appendSystemPrompt ?? undefined,
         allowedTools: this.allowedTools ?? undefined,
@@ -853,6 +858,7 @@ export class SessionTab implements WebviewBridge {
             try {
               await this.processManager.start({
                 resume: sid,
+                cwd: this.getEffectiveCwd(),
                 cliPathOverride: this.cliPathOverride ?? undefined,
               });
             } catch {
@@ -887,6 +893,25 @@ export class SessionTab implements WebviewBridge {
     this.cliPathOverride = pathOrNull;
   }
 
+  /** Set the worktree this tab's session runs in. Call before startSession so it
+   *  takes effect on the first spawn; it then persists across every re-spawn
+   *  (model switch, silent resume, crash restart) so the session never silently
+   *  jumps back to the main repo. */
+  setWorktreePath(pathOrNull: string | null): void {
+    this.worktreePath = pathOrNull;
+  }
+
+  /** Absolute worktree path for this tab, or null when it runs in the primary worktree. */
+  getWorktreePath(): string | null {
+    return this.worktreePath;
+  }
+
+  /** Effective spawn cwd: worktree first, then a Smart Search override, else the
+   *  workspace root (resolved inside ClaudeProcessManager when undefined). */
+  private getEffectiveCwd(): string | undefined {
+    return this.worktreePath ?? this.cwdOverride ?? undefined;
+  }
+
   /** Tab kind ('chat' default, 'search' for Smart Search tabs). */
   getTabKind(): 'chat' | 'search' {
     return this.kind;
@@ -919,7 +944,7 @@ export class SessionTab implements WebviewBridge {
     this.claudeCliMissingDetected = false;
     this.happyAuthDetected = false;
     this.resumeTargetMissingDetected = false;
-    const effectiveCwd = options?.cwd ?? this.cwdOverride ?? undefined;
+    const effectiveCwd = options?.cwd ?? this.getEffectiveCwd();
 
     // Create Particle Accelerator context file before spawning CLI (env vars reference it)
     if (this.particleAcceleratorService?.isEnabled()) {
@@ -2362,6 +2387,11 @@ export class SessionTab implements WebviewBridge {
   /** Inject the shared WorkstreamManager (forwarded to MessageHandler) */
   setWorkstreamManager(manager: import('../workstream/WorkstreamManager').WorkstreamManager): void {
     this.messageHandler.setWorkstreamManager(manager);
+  }
+
+  /** Inject the shared WorktreeController (forwarded to MessageHandler) */
+  setWorktreeController(controller: import('../worktree/WorktreeController').WorktreeController): void {
+    this.messageHandler.setWorktreeController(controller);
   }
 
   /** Inject the shared ParticleAcceleratorService (forwarded to MessageHandler + process manager env builder) */

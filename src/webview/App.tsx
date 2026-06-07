@@ -27,6 +27,7 @@ import { SuperParticleAcceleratorPanel } from './components/SuperParticleAcceler
 import { CodexConsultPanel } from './components/InputArea/CodexConsultPanel';
 import { TeamPanel, TeamStatusWidget } from './components/Teams';
 import { WorkstreamMapView } from './components/WorkstreamMap/WorkstreamMapView';
+import { WorktreePanel } from './components/Worktree';
 import { postToExtension } from './hooks/useClaudeStream';
 import { detectRtl } from './hooks/useRtlDetection';
 import { deriveTurnHistoryFromMessages } from './utils/turnVitals';
@@ -262,6 +263,7 @@ const ChatAppContent: React.FC = () => {
     teamActive,
     teamPanelOpen,
     workstreamMapOpen,
+    worktreePanelOpen,
     currentThinkingEffort,
     chatSearchOpen,
     activitySummaryDismissed,
@@ -394,6 +396,7 @@ const ChatAppContent: React.FC = () => {
       {bugReportPanelOpen && <BugReportPanel />}
       {teamPanelOpen && <TeamPanel />}
       {workstreamMapOpen && <WorkstreamMapView />}
+      {worktreePanelOpen && <WorktreePanel />}
 
       {/* Error banner / setup guidance */}
       {lastError && (isClaudeCliMissingError ? (

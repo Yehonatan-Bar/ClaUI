@@ -568,6 +568,9 @@ export const StatusBar: React.FC<{
       <button className="status-bar-group-dropdown-item" onClick={() => useAppStore.getState().setWorkstreamMapOpen(true)} data-tooltip="Workstream Map">
         Workstream Map
       </button>
+      <button className="status-bar-group-dropdown-item" onClick={() => { useAppStore.getState().setWorktreePanelOpen(true); closeAllGroups(); }} data-tooltip="Git worktrees dashboard: see every worktree and the sessions running on each">
+        Worktrees
+      </button>
       {teamActive && (
         <button className="status-bar-group-dropdown-item" onClick={() => useAppStore.getState().setTeamPanelOpen(true)} data-tooltip="Agent Teams Panel">
           Teams
@@ -639,6 +642,18 @@ export const StatusBar: React.FC<{
 
   const toolsItems = (
     <>
+      <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" style={{ fontWeight: 600, opacity: 0.7 }}>
+        Protection
+      </div>
+      <div
+        className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static"
+        onClick={() => closeAllGroups()}
+        style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}
+      >
+        <SuperParticleAcceleratorStatusBadge />
+        <SecretProtectionStatusBadge />
+      </div>
+      <div className="status-bar-group-dropdown-separator" />
       {hideMcpFromBar && mcpChip && (
         <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
           {mcpChip}
@@ -963,8 +978,6 @@ export const StatusBar: React.FC<{
       </div>
 
       <div className="status-bar-right">
-        <SuperParticleAcceleratorStatusBadge />
-        <SecretProtectionStatusBadge />
         <ParticleAcceleratorStatusBadge />
         {!hideClockFromBar && clockElement}
         {!hideMcpFromBar && mcpChip}

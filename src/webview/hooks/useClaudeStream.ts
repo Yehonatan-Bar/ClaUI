@@ -85,6 +85,13 @@ export function useClaudeStream(): void {
     setMcpLastOperation,
     setMcpTemplates,
     setMcpDiffPreview,
+    setWorktreePanelOpen,
+    setWorktreeList,
+    setWorktreeActionResult,
+    setMergeBranches,
+    setMergePreview,
+    setMergeResult,
+    setMergeDefaults,
     setProjectSessions,
     setIsEnhancing,
     setPromptEnhancerSettings,
@@ -388,6 +395,35 @@ export function useClaudeStream(): void {
           if (msg.tab) {
             setMcpSelectedTab(msg.tab);
           }
+          break;
+
+        case 'openWorktreePanel':
+          setWorktreePanelOpen(true);
+          break;
+
+        case 'worktreeList':
+          setWorktreeList(msg.worktrees, msg.isGitRepo);
+          break;
+
+        case 'worktreeActionResult':
+          setWorktreeActionResult(msg);
+          break;
+
+        case 'branchList':
+          setMergeBranches(msg.branches);
+          break;
+
+        case 'mergePreview':
+          setMergePreview(msg.preview);
+          setMergeDefaults({
+            defaultStrategy: msg.defaultStrategy,
+            removeAfterMerge: msg.removeAfterDefault,
+            confirmIntoProtected: msg.confirmIntoProtected,
+          });
+          break;
+
+        case 'mergeResult':
+          setMergeResult(msg.result);
           break;
 
         case 'mcpInventory':
@@ -1358,6 +1394,13 @@ export function useClaudeStream(): void {
     setMcpLastOperation,
     setMcpTemplates,
     setMcpDiffPreview,
+    setWorktreePanelOpen,
+    setWorktreeList,
+    setWorktreeActionResult,
+    setMergeBranches,
+    setMergePreview,
+    setMergeResult,
+    setMergeDefaults,
     setProjectSessions,
     setIsEnhancing,
     setPromptEnhancerSettings,
