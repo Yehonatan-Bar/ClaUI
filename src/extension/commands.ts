@@ -806,6 +806,41 @@ export function registerCommands(
       }
     ),
 
+    // Move the active Claude session into another worktree: relocate its
+    // transcript into that tree's CLI project folder, then kill + resume the
+    // CLI with the worktree as its new cwd. Idle Claude sessions only.
+    vscode.commands.registerCommand('claudeMirror.moveSessionToWorktree', async () => {
+      const prep = await tabManager.prepareSessionMove();
+      if (!prep.ok) {
+        vscode.window.showWarningMessage(prep.reason);
+        return;
+      }
+
+      const items = prep.targets.map((target) => ({
+        label: `${target.isMain ? '$(home)' : '$(git-branch)'} ${target.branch ?? '(detached)'}${target.isMain ? ' (main)' : ''}`,
+        description: target.path,
+        targetPath: target.path,
+      }));
+
+      const picked = await vscode.window.showQuickPick(items, {
+        title: 'Move Session to Worktree',
+        placeHolder: 'Pick the worktree this session should continue in',
+        matchOnDescription: true,
+        ignoreFocusOut: true,
+      });
+      if (!picked) {
+        return;
+      }
+
+      const result = await tabManager.moveActiveSessionToWorktree(picked.targetPath);
+      if (result.ok) {
+        vscode.window.showInformationMessage(`Session moved to ${picked.targetPath}.`);
+        log(`Moved active session to worktree ${picked.targetPath}`);
+      } else {
+        vscode.window.showErrorMessage(result.reason);
+      }
+    }),
+
     // Fork conversation from a specific message (opens a new tab)
     vscode.commands.registerCommand(
       'claudeMirror.forkFromMessage',

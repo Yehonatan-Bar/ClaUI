@@ -150,6 +150,10 @@
         "title": "ClaUi: New Worktree Session"
       },
       {
+        "command": "claudeMirror.moveSessionToWorktree",
+        "title": "ClaUi: Move Current Session to Worktree"
+      },
+      {
         "command": "claudeMirror.authenticateHappy",
         "title": "ClaUi: Authenticate Happy Coder"
       },

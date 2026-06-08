@@ -51,10 +51,11 @@ Each tab persists its `worktreePath`. This path must be re-applied on **every** 
 
 ### Wiring
 
-- `src/extension/session/TabManager.ts` -- Instantiates one `WorktreeController` in the constructor and injects it into every tab via `tab.setWorktreeController(...)` in `createClaudeTab`/`createCodexTab` (and therefore `createRemoteTab` and restore, which route through them). Exposes `createWorktreeTab(worktreePath, provider?, viewColumnOverride?)`, persists `worktreePath` on the snapshot, then `startSession({ cwd: worktreePath })`. `listTabs()` and `seedSnapshotEntry()` carry `worktreePath`.
+- `src/extension/session/TabManager.ts` -- Instantiates one `WorktreeController` in the constructor and injects it into every tab via `tab.setWorktreeController(...)` in `createClaudeTab`/`createCodexTab` (and therefore `createRemoteTab` and restore, which route through them). Exposes `createWorktreeTab(worktreePath, provider?, viewColumnOverride?)`, persists `worktreePath` on the snapshot, then `startSession({ cwd: worktreePath })`. `listTabs()` and `seedSnapshotEntry()` carry `worktreePath`. Also exposes `prepareSessionMove()` / `moveActiveSessionToWorktree(targetPath)` for relocating an existing Claude session into a worktree (see below).
 - `src/extension/session/SessionTab.ts` / `CodexSessionTab.ts` -- `setWorktreePath()`/`getWorktreePath()`, `getEffectiveCwd()` (Claude) / `sessionCwd` resolution (Codex), and `setWorktreeController()` forwarders to their message handler.
 - `src/extension/webview/MessageHandler.ts` and `CodexMessageHandler.ts` -- `setWorktreeController()` + handlers (`handleGetWorktreeList`, `handleCreateWorktree`, `handleCreateWorktreeSession`, `handleRemoveWorktree`) plus the merge handlers (`handleListBranches`, `handleGetMergePreview`, `handleCommitWorktree`, `handlePerformMerge`, `handleAbortMerge`, `handleCompleteMerge`, `handleUndoMerge`, `handleOpenConflictFiles`) and their switch cases; mutations re-post the list to refresh the dashboard, and a successful commit also re-posts a fresh merge preview.
-- `src/extension/commands.ts` -- `claudeMirror.openWorktreePanel` (reveals the active tab and posts `openWorktreePanel`) and `claudeMirror.createWorktreeSession` (launches directly when given a path arg, else opens the panel).
+- `src/extension/commands.ts` -- `claudeMirror.openWorktreePanel` (reveals the active tab and posts `openWorktreePanel`), `claudeMirror.createWorktreeSession` (launches directly when given a path arg, else opens the panel), and `claudeMirror.moveSessionToWorktree` (QuickPick of target worktrees -> `tabManager.moveActiveSessionToWorktree`).
+- `src/extension/session/sessionPathResolver.ts` -- `findSessionJsonlPath()` plus the move helpers `claudeProjectDirName()` and `relocateSessionTranscript()` (see "Move an existing session into a worktree" below).
 
 ### Webview (browser)
 
@@ -89,6 +90,16 @@ The wizard merges a worktree's branch (**source**) into a **target** branch. All
 - **Undo a completed merge** -- default is the non-destructive `git revert` (`-m 1` for a merge commit), which adds an inverse commit. A destructive `git reset --keep <preSha>` is offered **only** when the commit is provably unpushed: resolve `@{upstream}`, `git fetch`, then `git merge-base --is-ancestor <newSha> @{upstream}` must exit 1 (`canDiscard`). No upstream => discard is hidden.
 - **In-progress detection (`mergeInProgress`)** -- `listWorktrees` flags each worktree: a present `MERGE_HEAD` => `'merge'`; unmerged files with no `MERGE_HEAD`/`CHERRY_PICK_HEAD`/`REVERT_HEAD`/rebase dir => `'squash'`. This drives the persistent in-progress bar so a paused merge can always be resumed or aborted, even after a window reload.
 
+## Move an existing session into a worktree (prototype)
+
+A running **Claude** session can be relocated into another worktree without losing its conversation: ClaUi copies the session transcript into the target tree's CLI project folder, then kills and `--resume`s the CLI with that worktree as its new `cwd`. From that point on, every change the session makes lands in that worktree.
+
+- **Why a copy + respawn** -- a process's `cwd` is immutable, and the Claude CLI scopes `--resume <id>` lookup to the *current* directory's project folder under `~/.claude/projects/`. So the move first relocates the transcript, then respawns the CLI (the same kill + resume path ClaUi already uses for model-switch, silent-resume, and crash recovery).
+- **Transcript relocation (`src/extension/session/sessionPathResolver.ts`)** -- `relocateSessionTranscript(sessionId, targetCwd, sourceWorkspacePath?)` finds the source `.jsonl` (via `findSessionJsonlPath`, which falls back to a global project-folder scan) and copies it to `~/.claude/projects/<encoded-targetCwd>/<id>.jsonl`. The target folder name comes from `claudeProjectDirName()`, which replaces `:` `\` `/` and `.` with `-` -- the CLI's exact encoding (it collapses dots too, unlike the more lenient lookup transform). Copy, not move, so the original survives; an identical source/target path is a no-op.
+- **Orchestration (`src/extension/session/TabManager.ts`)** -- `prepareSessionMove()` validates that the active tab is an **idle** Claude `SessionTab` with a real session id, then lists candidate worktrees (`WorktreeController.buildList()` minus the current tree and any detached worktree). `moveActiveSessionToWorktree(targetPath)` re-validates, relocates the transcript, persists the new `worktreePath` on the tab + snapshot entry, then `startSession({ resume: sessionId, cwd: targetPath })`.
+- **Scope & guards** -- Claude-only (`instanceof SessionTab`; Codex and multi-participant tabs are excluded, since the move relies on the Claude kill+`--resume` flow); refused while the session is busy (never killed mid-turn); refused if the session has not started yet. Uncommitted changes do **not** follow the move (worktrees keep separate working trees) -- commit or stash first if you need them in the target tree.
+- **Entry point** -- the `claudeMirror.moveSessionToWorktree` command (Command Palette: "ClaUi: Move Current Session to Worktree") opens a native VS Code QuickPick of target worktrees (main shown with `$(home)`, others with `$(git-branch)` + branch). No webview surface -- this prototype is command + QuickPick only.
+
 ## Settings (`claudeMirror.worktree.*`)
 
 | Setting | Default | Purpose |
@@ -106,6 +117,7 @@ The wizard merges a worktree's branch (**source**) into a **target** branch. All
 
 - `claudeMirror.openWorktreePanel` -- ClaUi: Worktrees Dashboard.
 - `claudeMirror.createWorktreeSession` -- ClaUi: New Worktree Session (path arg launches directly; no arg opens the dashboard).
+- `claudeMirror.moveSessionToWorktree` -- ClaUi: Move Current Session to Worktree (QuickPick of target worktrees; idle Claude sessions only).
 
 Primary entry point: StatusBar -> Session -> **Worktrees**.
 
@@ -118,3 +130,4 @@ Primary entry point: StatusBar -> Session -> **Worktrees**.
 - A clean prediction can still fail the real merge on Windows (files locked by a live session, case-only collisions); this surfaces as an error with Abort available.
 - Push-after-merge uses a plain `git push` of the target checkout; if no upstream/remote is configured the step is a no-op surfaced as a note on the result.
 - The dashboard reflects the worktrees of the first workspace folder; multi-root workspaces use folder index 0.
+- Moving a session into a worktree relocates only the conversation transcript, not uncommitted working-tree changes (worktrees keep separate working trees); commit or stash before moving if those changes must come along. The move is Claude-only and refused while the session is busy.

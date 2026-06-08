@@ -4,6 +4,7 @@ import * as os from 'os';
 import { SessionTab } from './SessionTab';
 import { CodexSessionTab } from './CodexSessionTab';
 import { buildSmartSearchPrompt } from './SmartSearchPrompt';
+import { relocateSessionTranscript } from './sessionPathResolver';
 import { findWorkingCodexCliCandidates, pickPreferredCodexCliCandidate } from '../process/CodexCliDetector';
 import type { SessionStore } from './SessionStore';
 import type { ProjectAnalyticsStore } from './ProjectAnalyticsStore';
@@ -61,6 +62,18 @@ export interface TabSummary {
   /** Absolute worktree path this tab's session runs in, or null for the primary worktree. */
   worktreePath: string | null;
 }
+
+/** A worktree the active session could be moved into (for the move-session picker). */
+export interface MoveTarget {
+  path: string;
+  branch: string | null;
+  isMain: boolean;
+}
+
+/** Result of validating + planning a session move (refusal carries a friendly reason). */
+export type PrepareSessionMoveResult =
+  | { ok: true; sessionId: string; currentCwd: string; targets: MoveTarget[] }
+  | { ok: false; reason: string };
 
 /**
  * Manages all open SessionTab instances.
@@ -338,6 +351,99 @@ export class TabManager {
     await tab.startSession({ cwd: worktreePath });
     this.broadcastTabsState();
     return tab;
+  }
+
+  // ---- move an existing session into a worktree (prototype) ----
+
+  /** Case-insensitive absolute-path key, trailing separators stripped (Windows-friendly). */
+  private normalizeFsPath(p: string): string {
+    return path.resolve(p).replace(/[\\/]+$/, '').toLowerCase();
+  }
+
+  /**
+   * Validate that the active tab is an idle Claude session and compute the
+   * worktrees it could move into. Returns a refusal reason (rather than throwing)
+   * so the command layer can surface a friendly warning. Claude-only by design:
+   * the move kills and `--resume`s the CLI, which only Claude's SessionTab does.
+   */
+  async prepareSessionMove(): Promise<PrepareSessionMoveResult> {
+    const tab = this.getActiveTab();
+    if (!(tab instanceof SessionTab)) {
+      return { ok: false, reason: 'Only Claude sessions can be moved to a worktree.' };
+    }
+    if (tab.isBusyState()) {
+      return { ok: false, reason: 'The session is busy. Wait for the current turn to finish, then try again.' };
+    }
+    const sessionId = tab.sessionId;
+    if (!sessionId || sessionId === 'pending') {
+      return { ok: false, reason: 'The session has not started yet, so there is nothing to move.' };
+    }
+
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const currentCwd = tab.getWorktreePath() ?? root ?? process.cwd();
+    const currentKey = this.normalizeFsPath(currentCwd);
+
+    const list = await this.worktreeController.buildList();
+    if (!list.isGitRepo) {
+      return { ok: false, reason: 'This workspace is not a git repository, so there are no worktrees to move into.' };
+    }
+
+    const targets: MoveTarget[] = list.worktrees
+      .filter((w) => !w.isDetached && this.normalizeFsPath(w.path) !== currentKey)
+      .map((w) => ({ path: w.path, branch: w.branch, isMain: w.isMain }));
+
+    if (targets.length === 0) {
+      return { ok: false, reason: 'No other worktree is available. Create one from the Worktrees dashboard first.' };
+    }
+
+    return { ok: true, sessionId, currentCwd, targets };
+  }
+
+  /**
+   * Relocate the active session's transcript into the target worktree's CLI
+   * project folder, then re-point the tab there and respawn the CLI with
+   * `--resume <id>` and the new cwd. The transcript copy is what lets the CLI
+   * find the session under the new directory (its `--resume` lookup is cwd-scoped).
+   */
+  async moveActiveSessionToWorktree(
+    targetWorktreePath: string,
+  ): Promise<{ ok: true } | { ok: false; reason: string }> {
+    const tab = this.getActiveTab();
+    if (!(tab instanceof SessionTab)) {
+      return { ok: false, reason: 'Only Claude sessions can be moved to a worktree.' };
+    }
+    if (tab.isBusyState()) {
+      return { ok: false, reason: 'The session is busy. Wait for the current turn to finish, then try again.' };
+    }
+    const sessionId = tab.sessionId;
+    if (!sessionId || sessionId === 'pending') {
+      return { ok: false, reason: 'The session has not started yet, so there is nothing to move.' };
+    }
+
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const sourceCwd = tab.getWorktreePath() ?? root;
+
+    const relocated = relocateSessionTranscript(sessionId, targetWorktreePath, sourceCwd);
+    if (!relocated.ok) {
+      return { ok: false, reason: `Could not relocate the session transcript: ${relocated.error}` };
+    }
+
+    // Persist the new worktree on the tab + snapshot before the respawn so it
+    // survives the kill+resume and any later window reload.
+    tab.setWorktreePath(targetWorktreePath);
+    const entry = this.snapshotEntries.get(tab.id);
+    if (entry) {
+      entry.worktreePath = targetWorktreePath;
+      entry.savedAt = new Date().toISOString();
+      this.schedulePersistSnapshot();
+    }
+
+    this.log(
+      `[MoveSession] moving session ${sessionId} into ${targetWorktreePath} (transcript copied to ${relocated.targetPath})`,
+    );
+    await tab.startSession({ resume: sessionId, cwd: targetWorktreePath });
+    this.broadcastTabsState();
+    return { ok: true };
   }
 
   /** Create a new Claude tab */
