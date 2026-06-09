@@ -3,6 +3,7 @@ import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { detectRtl } from '../../hooks/useRtlDetection';
 import { WT_COLORS } from './worktreeColors';
+import { MergeAssistantChat } from './MergeAssistantChat';
 import type { WorktreeWithSessions, MergeStrategy } from '../../../extension/worktree/worktreeTypes';
 
 /**
@@ -154,6 +155,11 @@ export const MergeWizard: React.FC<{
   const defaults = useAppStore((s) => s.mergeDefaults);
   const setMergePreview = useAppStore((s) => s.setMergePreview);
   const setMergeResult = useAppStore((s) => s.setMergeResult);
+  const mergeAssistant = useAppStore((s) => s.mergeAssistant);
+  const mergeConflictFiles = useAppStore((s) => s.mergeConflictFiles);
+  const initMergeAssistant = useAppStore((s) => s.initMergeAssistant);
+  const clearMergeAssistant = useAppStore((s) => s.clearMergeAssistant);
+  const clearMergeConflicts = useAppStore((s) => s.clearMergeConflicts);
 
   const [targetBranch, setTargetBranch] = useState<string>('');
   const [strategy, setStrategy] = useState<MergeStrategy>('merge');
@@ -224,6 +230,42 @@ export const MergeWizard: React.FC<{
       onClose();
     }
   }, [result, onClose]);
+
+  // Guarantee the merge-assistant CLI process is killed when the wizard closes,
+  // even if the user never finalized through Abort/Complete. Safe no-op when no
+  // assistant was started.
+  useEffect(() => {
+    return () => {
+      postToExtension({ type: 'stopMergeAssistant' });
+      clearMergeAssistant();
+      // Drop the cached unmerged lists so a later wizard for the same target
+      // path can't read a stale list and wrongly gate its Complete button.
+      clearMergeConflicts();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Manual conflict resolution (editing the files outside the assistant) emits
+  // no refresh, so the cached unmerged list can stay non-empty and keep Complete
+  // disabled within the same wizard. While parked in the conflict stage with the
+  // assistant idle and conflicts still cached, poll the backend so manual edits
+  // unblock Complete. VS Code webview iframes don't fire focus/visibility events
+  // reliably, so a short self-terminating poll is the robust trigger: it stops
+  // once the list empties (cache -> []) or the assistant takes over (busy, which
+  // posts its own refresh on the next idle).
+  useEffect(() => {
+    const targetPath = result?.targetPath;
+    const inConflict = result?.phase === 'conflict' && result.action !== 'abort';
+    const cached = targetPath ? mergeConflictFiles[targetPath] : undefined;
+    const assistantBusy = mergeAssistant?.isBusy ?? false;
+    if (!targetPath || !inConflict || assistantBusy || !cached || cached.length === 0) {
+      return;
+    }
+    const id = window.setInterval(() => {
+      postToExtension({ type: 'refreshMergeConflicts', targetPath });
+    }, 2500);
+    return () => window.clearInterval(id);
+  }, [result?.targetPath, result?.phase, result?.action, mergeConflictFiles, mergeAssistant?.isBusy]);
 
   const changeTarget = (next: string) => {
     setTargetBranch(next);
@@ -299,9 +341,20 @@ export const MergeWizard: React.FC<{
 
   const squashFlag = (result?.strategy ?? effectiveStrategy) === 'squash';
 
+  // Conflict stage: prefer the freshly re-read unmerged list (posted after the
+  // assistant edits + stages files) over the stale list from the merge result.
+  const refreshedConflicts = result?.targetPath ? mergeConflictFiles[result.targetPath] : undefined;
+  const liveConflicts = refreshedConflicts ?? result?.conflictFiles ?? [];
+  // Complete is gated while the assistant is busy and until the refreshed list
+  // is empty. Before any refresh it keeps the original behavior (enabled).
+  const completeDisabled =
+    busy ||
+    (mergeAssistant?.isBusy ?? false) ||
+    (refreshedConflicts !== undefined && refreshedConflicts.length > 0);
+
   const openConflicts = () => {
-    if (!result?.targetPath || !result.conflictFiles?.length) return;
-    postToExtension({ type: 'openConflictFiles', targetPath: result.targetPath, files: result.conflictFiles });
+    if (!result?.targetPath || !liveConflicts.length) return;
+    postToExtension({ type: 'openConflictFiles', targetPath: result.targetPath, files: liveConflicts });
   };
   const abort = () => {
     if (!result?.targetPath) return;
@@ -318,6 +371,47 @@ export const MergeWizard: React.FC<{
       message: squashFlag ? squashMessage.trim() || undefined : undefined,
       preSha: result.preSha,
     });
+  };
+
+  // Opt-in: spin up the fresh merge-focused Claude session for this conflict.
+  const startAssistant = () => {
+    if (!result?.targetPath) return;
+    initMergeAssistant();
+    postToExtension({
+      type: 'startMergeAssistant',
+      targetPath: result.targetPath,
+      conflictFiles: liveConflicts,
+      // On resume `source` IS the target checkout (source.branch is the target
+      // branch, not the merge source, which isn't recorded). Send empty and let
+      // the assistant read MERGE_HEAD/MERGE_MSG instead of mislabeling it.
+      sourceBranch: resume ? '' : (source.branch ?? ''),
+      targetBranch: result.targetBranch || targetBranch || '',
+    });
+  };
+
+  // Kill-before-teardown: stop the assistant first (so no tool call is mid-flight
+  // when the index changes), then run the finalize action. A short timeout backs
+  // up the deterministic `mergeAssistantSessionEnded` signal.
+  const stopAssistantThen = (proceed: () => void) => {
+    setBusy(true);
+    if (!mergeAssistant) {
+      proceed();
+      return;
+    }
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      window.removeEventListener('message', onMsg);
+      clearMergeAssistant();
+      proceed();
+    };
+    const onMsg = (e: MessageEvent) => {
+      if (e.data?.type === 'mergeAssistantSessionEnded') finish();
+    };
+    window.addEventListener('message', onMsg);
+    postToExtension({ type: 'stopMergeAssistant' });
+    window.setTimeout(finish, 1500);
   };
   const undo = (mode: 'revert' | 'discard') => {
     if (!result?.targetPath || !result.newSha) return;
@@ -408,25 +502,56 @@ export const MergeWizard: React.FC<{
           /* ---------- STAGE B: conflict ---------- */
           <>
             <div style={body}>
-              <StatusCard
-                tone="amber"
-                title={`Merge paused - conflicts in ${result?.conflictFiles?.length ?? 0} file${(result?.conflictFiles?.length ?? 0) === 1 ? '' : 's'}`}
-              >
-                {result?.conflictFiles?.length ? <FileList files={result.conflictFiles} /> : null}
-              </StatusCard>
+              {liveConflicts.length > 0 ? (
+                <StatusCard
+                  tone="amber"
+                  title={`Merge paused - conflicts in ${liveConflicts.length} file${liveConflicts.length === 1 ? '' : 's'}`}
+                >
+                  <FileList files={liveConflicts} />
+                </StatusCard>
+              ) : (
+                <StatusCard tone="green" title="All conflicts resolved - ready to complete the merge." />
+              )}
               <div style={{ fontSize: 12, color: WT_COLORS.textDim, lineHeight: 1.5 }}>
                 Resolve the conflicts in the editor, then Complete the merge. Or Abort to restore the target branch
                 exactly as it was before.
               </div>
+
+              {mergeAssistant ? (
+                <MergeAssistantChat targetPath={result?.targetPath ?? ''} />
+              ) : (
+                <button
+                  onClick={startAssistant}
+                  style={{
+                    ...ghostBtn(),
+                    marginTop: 12,
+                    width: '100%',
+                    borderColor: WT_COLORS.accent,
+                    color: WT_COLORS.accent,
+                    fontWeight: 600,
+                  }}
+                >
+                  Ask Claude to help resolve
+                </button>
+              )}
             </div>
             <div style={footer}>
-              <button onClick={openConflicts} disabled={!result?.conflictFiles?.length} style={ghostBtn(!result?.conflictFiles?.length)}>
+              <button onClick={openConflicts} disabled={!liveConflicts.length} style={ghostBtn(!liveConflicts.length)}>
                 Open conflicted files
               </button>
-              <button onClick={abort} disabled={busy} style={{ ...ghostBtn(busy), color: WT_COLORS.red, borderColor: 'rgba(248,81,73,0.4)' }}>
+              <button
+                onClick={() => stopAssistantThen(abort)}
+                disabled={busy}
+                style={{ ...ghostBtn(busy), color: WT_COLORS.red, borderColor: 'rgba(248,81,73,0.4)' }}
+              >
                 Abort merge
               </button>
-              <button onClick={complete} disabled={busy} style={{ ...ghostBtn(busy), background: WT_COLORS.green, color: '#0d1117', border: 'none', fontWeight: 600 }}>
+              <button
+                onClick={() => stopAssistantThen(complete)}
+                disabled={completeDisabled}
+                data-tooltip={mergeAssistant?.isBusy ? 'Wait for Claude to finish' : liveConflicts.length ? 'Resolve all conflicts first' : undefined}
+                style={{ ...ghostBtn(completeDisabled), background: completeDisabled ? WT_COLORS.cardBorder : WT_COLORS.green, color: completeDisabled ? WT_COLORS.textDim : '#0d1117', border: 'none', fontWeight: 600 }}
+              >
                 Complete merge
               </button>
             </div>

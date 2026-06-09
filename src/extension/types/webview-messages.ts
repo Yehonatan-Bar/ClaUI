@@ -552,6 +552,33 @@ export interface OpenConflictFilesRequest {
   files: string[];
 }
 
+/** Start a fresh, merge-focused Claude session seeded with the conflict file list. */
+export interface StartMergeAssistantRequest {
+  type: 'startMergeAssistant';
+  /** Target checkout where the conflict markers and unmerged index actually live. */
+  targetPath: string;
+  conflictFiles: string[];
+  sourceBranch: string;
+  targetBranch: string;
+}
+
+/** Send a user turn to the running merge assistant. */
+export interface SendMergeAssistantMessageRequest {
+  type: 'sendMergeAssistantMessage';
+  text: string;
+}
+
+/** Stop (kill) the merge assistant before any merge teardown. */
+export interface StopMergeAssistantRequest {
+  type: 'stopMergeAssistant';
+}
+
+/** Re-read the unmerged paths from git after the assistant acts. */
+export interface RefreshMergeConflictsRequest {
+  type: 'refreshMergeConflicts';
+  targetPath: string;
+}
+
 export interface SetCustomSnippetRequest {
   type: 'setCustomSnippet';
   text: string;
@@ -1095,6 +1122,10 @@ export type WebviewToExtensionMessage =
   | CompleteMergeRequest
   | UndoMergeRequest
   | OpenConflictFilesRequest
+  | StartMergeAssistantRequest
+  | SendMergeAssistantMessageRequest
+  | StopMergeAssistantRequest
+  | RefreshMergeConflictsRequest
   | SetCustomSnippetRequest
   | GetCustomSnippetRequest
   | TranslateMessageRequest
@@ -1329,6 +1360,10 @@ export interface SessionStartedMessage {
   provider?: ProviderId;
   /** 'chat' (default), 'search' for Smart Search tabs, or 'multiparticipant'. */
   tabKind?: 'chat' | 'search' | 'multiparticipant';
+  /** Absolute worktree path when the session runs in a non-primary worktree, else null. */
+  worktreePath?: string | null;
+  /** Basename of worktreePath, shown as the in-chat worktree indicator, else null. */
+  worktreeName?: string | null;
 }
 
 export interface SessionEndedMessage {
@@ -2518,6 +2553,55 @@ export interface BtwSessionEndedMessage {
   error?: string;
 }
 
+// --- Merge Conflict Assistant (Extension -> Webview) ---
+
+export interface MergeAssistantUserMessageMessage {
+  type: 'mergeAssistantUserMessage';
+  content: ContentBlock[];
+}
+
+export interface MergeAssistantMessageStartMessage {
+  type: 'mergeAssistantMessageStart';
+  messageId: string;
+}
+
+export interface MergeAssistantStreamingTextMessage {
+  type: 'mergeAssistantStreamingText';
+  blockIndex: number;
+  text: string;
+}
+
+/** Compact activity line so the user can see what Claude is doing to their files. */
+export interface MergeAssistantToolUseMessage {
+  type: 'mergeAssistantToolUse';
+  blockIndex: number;
+  toolName: string;
+  summary: string;
+}
+
+export interface MergeAssistantAssistantMessageMessage {
+  type: 'mergeAssistantAssistantMessage';
+  messageId: string;
+  content: ContentBlock[];
+  model?: string;
+}
+
+export interface MergeAssistantResultMessage {
+  type: 'mergeAssistantResult';
+}
+
+export interface MergeAssistantSessionEndedMessage {
+  type: 'mergeAssistantSessionEnded';
+  error?: string;
+}
+
+/** Fresh unmerged-path list re-read from git after the assistant acts. */
+export interface MergeConflictsRefreshedMessage {
+  type: 'mergeConflictsRefreshed';
+  targetPath: string;
+  conflictFiles: string[];
+}
+
 // --- Checkpoint Types ---
 
 export interface CheckpointFileEntry {
@@ -2826,6 +2910,14 @@ export type ExtensionToWebviewMessage =
   | BtwMessageStopMessage
   | BtwResultMessage
   | BtwSessionEndedMessage
+  | MergeAssistantUserMessageMessage
+  | MergeAssistantMessageStartMessage
+  | MergeAssistantStreamingTextMessage
+  | MergeAssistantToolUseMessage
+  | MergeAssistantAssistantMessageMessage
+  | MergeAssistantResultMessage
+  | MergeAssistantSessionEndedMessage
+  | MergeConflictsRefreshedMessage
   | ChatSearchProjectResultMessage
   | CheckpointStateMessage
   | CheckpointResultMessage

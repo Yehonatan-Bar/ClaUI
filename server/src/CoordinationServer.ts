@@ -937,6 +937,15 @@ export class CoordinationServer {
 
         const route = routeMessage(event.fullText, room.participants);
 
+        // When the runner separated narration from the final answer, route the
+        // answer alone to strip its addressing prefix for a clean display body.
+        let answerBody: string | null = null;
+        let thinkingBody: string | null = null;
+        if (event.answerText && event.thinkingText) {
+          answerBody = routeMessage(event.answerText, room.participants).parsedBody;
+          thinkingBody = event.thinkingText;
+        }
+
         const seq = room.session.nextSeq++;
         const responseMessage: Message = {
           messageId: uuid(),
@@ -947,6 +956,8 @@ export class CoordinationServer {
           rawBody: event.fullText,
           parsedBody: route.parsedBody,
           routePrefix: route.routePrefix,
+          answerBody,
+          thinkingBody,
           createdAt: new Date().toISOString(),
           displayNameSnapshot: agent.displayName,
           deliveryId: null,

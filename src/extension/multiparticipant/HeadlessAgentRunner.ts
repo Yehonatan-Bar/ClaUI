@@ -43,6 +43,8 @@ export class HeadlessAgentRunner extends EventEmitter {
   private activeDeliveryId: string | null = null;
   private responseText = '';
   private assistantTextFallback = '';
+  private thinkingTextParts: string[] = [];
+  private answerTextParts: string[] = [];
   private firstTokenSent = false;
   private disposed = false;
 
@@ -209,6 +211,13 @@ export class HeadlessAgentRunner extends EventEmitter {
         const msgText = textParts.join('\n');
         if (this.assistantTextFallback) this.assistantTextFallback += '\n';
         this.assistantTextFallback += msgText;
+        // Bucket by stop_reason: messages that end in a tool call are interleaved
+        // narration ("thoughts"); the final (non-tool_use) message is the answer.
+        if (event.message.stop_reason === 'tool_use') {
+          this.thinkingTextParts.push(msgText);
+        } else {
+          this.answerTextParts.push(msgText);
+        }
         this.log(`[HeadlessRunner] assistantMessage text: ${msgText.slice(0, 100)}...`);
       }
     });
@@ -232,8 +241,18 @@ export class HeadlessAgentRunner extends EventEmitter {
       if (!this.responseText && this.assistantTextFallback) {
         this.log(`[HeadlessRunner] Using assistantMessage fallback (${this.assistantTextFallback.length} chars)`);
       }
-      this.log(`[HeadlessRunner] Completing delivery ${this.activeDeliveryId}: streamingText=${this.responseText.length} chars, fallbackText=${this.assistantTextFallback.length} chars, finalText=${fullText.length} chars`);
-      this.emitAgentEvent(this.activeDeliveryId, { kind: 'completed', fullText });
+      // Separate interleaved narration ("thoughts") from the final answer so the
+      // UI can present them distinctly. Only split when both parts exist.
+      const answerText = this.answerTextParts.join('\n\n').trim();
+      const thinkingText = this.thinkingTextParts.join('\n\n').trim();
+      const hasSplit = answerText.length > 0 && thinkingText.length > 0;
+      this.log(`[HeadlessRunner] Completing delivery ${this.activeDeliveryId}: streamingText=${this.responseText.length} chars, fallbackText=${this.assistantTextFallback.length} chars, finalText=${fullText.length} chars, split=${hasSplit} (answer=${answerText.length}, thinking=${thinkingText.length})`);
+      this.emitAgentEvent(this.activeDeliveryId, {
+        kind: 'completed',
+        fullText,
+        answerText: hasSplit ? answerText : undefined,
+        thinkingText: hasSplit ? thinkingText : undefined,
+      });
       this.activeDeliveryId = null;
     });
   }
@@ -256,6 +275,8 @@ export class HeadlessAgentRunner extends EventEmitter {
     this.activeDeliveryId = deliveryId;
     this.responseText = '';
     this.assistantTextFallback = '';
+    this.thinkingTextParts = [];
+    this.answerTextParts = [];
     this.firstTokenSent = false;
     this.fileTracker.startTurn(deliveryId);
 
@@ -303,6 +324,8 @@ export class HeadlessAgentRunner extends EventEmitter {
     this.activeDeliveryId = deliveryId;
     this.responseText = '';
     this.assistantTextFallback = '';
+    this.thinkingTextParts = [];
+    this.answerTextParts = [];
     this.firstTokenSent = false;
     this.fileTracker.startTurn(deliveryId);
     await this.fileTracker.takeSnapshotBefore();

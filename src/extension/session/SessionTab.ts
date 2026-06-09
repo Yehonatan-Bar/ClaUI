@@ -41,6 +41,7 @@ import type {
 } from '../types/webview-messages';
 import type { HandoffProvider, HandoffSourceSnapshot } from './handoff/HandoffTypes';
 import { BackgroundSession } from './BackgroundSession';
+import { MergeAssistantSession, type MergeAssistantStartOptions } from './MergeAssistantSession';
 
 export interface SessionTabCallbacks {
   onClosed: (tabId: string) => void;
@@ -165,6 +166,15 @@ export class SessionTab implements WebviewBridge {
   private assistantReplyWaiters: Array<(ok: boolean) => void> = [];
   /** Background session for the "btw" side-conversation overlay */
   private btwSession: BackgroundSession | null = null;
+  /** Fresh, merge-focused session for the Merge Wizard's conflict assistant */
+  private mergeAssistant: MergeAssistantSession | null = null;
+  /**
+   * Epoch for the merge-assistant slot, bumped each time a new assistant starts.
+   * A close captures the current epoch; its terminal `mergeAssistantSessionEnded`
+   * fires only if the epoch is still current, so a slow exit from an older
+   * assistant cannot finalize the merge for a newer one (restart race).
+   */
+  private mergeAssistantGeneration = 0;
   /** Smart Search: tab kind (default 'chat'). When 'search', spawn flags are altered. */
   private kind: 'chat' | 'search' = 'chat';
   /** Smart Search: appended to the agent system prompt at spawn time. */
@@ -374,7 +384,7 @@ export class SessionTab implements WebviewBridge {
     }
     const outbound =
       msg.type === 'sessionStarted'
-        ? { ...msg, provider: this.getProvider(), tabKind: this.kind }
+        ? { ...msg, provider: this.getProvider(), tabKind: this.kind, ...this.worktreeDisplay() }
         : msg;
     // Intercept processBusy messages to update the tab title indicator
     if (outbound.type === 'processBusy') {
@@ -906,6 +916,24 @@ export class SessionTab implements WebviewBridge {
     return this.worktreePath;
   }
 
+  /** Worktree identity stamped onto every `sessionStarted` post (see postMessage)
+   *  to drive the in-chat indicator. Returns nulls when the session runs in the
+   *  primary worktree (no path set, or the path resolves to the workspace root)
+   *  so the webview suppresses the chip; otherwise the absolute path plus its
+   *  basename for display. */
+  private worktreeDisplay(): { worktreePath: string | null; worktreeName: string | null } {
+    const worktreePath = this.worktreePath;
+    if (!worktreePath) {
+      return { worktreePath: null, worktreeName: null };
+    }
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const normalizePath = (p: string) => path.resolve(p).replace(/[\\/]+$/, '').toLowerCase();
+    if (workspaceRoot && normalizePath(workspaceRoot) === normalizePath(worktreePath)) {
+      return { worktreePath: null, worktreeName: null };
+    }
+    return { worktreePath, worktreeName: path.basename(worktreePath) };
+  }
+
   /** Effective spawn cwd: worktree first, then a Smart Search override, else the
    *  workspace root (resolved inside ClaudeProcessManager when undefined). */
   private getEffectiveCwd(): string | undefined {
@@ -1139,6 +1167,7 @@ export class SessionTab implements WebviewBridge {
       void this.particleAcceleratorService.getContextStore()?.disposeContext(this.id).catch(() => {});
     }
     this.closeBtwSession();
+    this.closeMergeAssistant();
     this.processManager.stop();
     this.fileLogger?.dispose();
     this.panel.dispose();
@@ -1251,6 +1280,136 @@ export class SessionTab implements WebviewBridge {
       this.btwSession.dispose();
       this.btwSession = null;
     }
+  }
+
+  // --- Merge Conflict Assistant ---
+
+  /** Start a fresh, merge-focused session seeded with the conflict file list. */
+  startMergeAssistant(opts: MergeAssistantStartOptions): void {
+    // Close any existing merge assistant first
+    this.closeMergeAssistant();
+
+    this.mergeAssistantGeneration++;
+    this.log(`[Tab ${this.tabNumber}] Starting merge assistant in ${opts.targetCwd}`);
+    this.mergeAssistant = new MergeAssistantSession(
+      this.context,
+      (msg) => this.log(`[Tab ${this.tabNumber}] ${msg}`),
+    );
+    this.wireMergeAssistantEvents();
+
+    this.mergeAssistant.start(opts).catch((err: unknown) => {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      this.log(`[Tab ${this.tabNumber}] merge assistant start failed: ${errMsg}`);
+      this.closeMergeAssistant();
+    });
+  }
+
+  /** Wire demux events from the merge assistant to the webview. */
+  private wireMergeAssistantEvents(): void {
+    if (!this.mergeAssistant) { return; }
+    const ma = this.mergeAssistant;
+
+    const tabLog = (msg: string) => this.log(`[Tab ${this.tabNumber}] [Merge->WV] ${msg}`);
+
+    ma.on('userMessage', (data: { message: { content: unknown } }) => {
+      const rawContent = data.message?.content;
+      const content = Array.isArray(rawContent)
+        ? rawContent
+        : typeof rawContent === 'string'
+          ? [{ type: 'text' as const, text: rawContent }]
+          : [];
+      tabLog('mergeAssistantUserMessage');
+      this.postMessage({ type: 'mergeAssistantUserMessage', content });
+    });
+
+    ma.on('messageStart', (data: { messageId: string }) => {
+      tabLog(`mergeAssistantMessageStart msgId=${data.messageId}`);
+      this.postMessage({ type: 'mergeAssistantMessageStart', messageId: data.messageId });
+    });
+
+    ma.on('textDelta', (data: { blockIndex: number; text: string }) => {
+      this.postMessage({
+        type: 'mergeAssistantStreamingText',
+        blockIndex: data.blockIndex,
+        text: data.text,
+      });
+    });
+
+    ma.on('toolUseStart', (data: { blockIndex: number; toolName: string }) => {
+      tabLog(`mergeAssistantToolUse ${data.toolName} @${data.blockIndex}`);
+      this.postMessage({
+        type: 'mergeAssistantToolUse',
+        blockIndex: data.blockIndex,
+        toolName: data.toolName,
+        summary: describeToolActivity(data.toolName),
+      });
+    });
+
+    ma.on('assistantMessage', (data: { message: { id: string; content: unknown[]; model?: string } }) => {
+      const msg = data.message;
+      const contentLen = Array.isArray(msg?.content) ? msg.content.length : 0;
+      tabLog(`mergeAssistantAssistantMessage msgId=${msg?.id} contentBlocks=${contentLen}`);
+      this.postMessage({
+        type: 'mergeAssistantAssistantMessage',
+        messageId: msg?.id,
+        content: Array.isArray(msg?.content) ? msg.content as any : [],
+        model: msg?.model,
+      });
+    });
+
+    ma.on('result', () => {
+      tabLog('mergeAssistantResult');
+      this.postMessage({ type: 'mergeAssistantResult' });
+    });
+
+    ma.on('ended', (data?: { error?: string; code?: number }) => {
+      // Drop a natural-end signal from an assistant that is no longer the
+      // current slot, so it cannot clobber a newer one (restart race).
+      if (this.mergeAssistant !== ma) { return; }
+      tabLog(`mergeAssistantSessionEnded error=${data?.error} code=${data?.code}`);
+      this.postMessage({ type: 'mergeAssistantSessionEnded', error: data?.error });
+      this.mergeAssistant = null;
+    });
+
+    // A Node EventEmitter 'error' with no listener throws. Give it one so a CLI
+    // spawn/runtime failure surfaces to the webview instead of crashing the host.
+    ma.on('error', (err: Error) => {
+      tabLog(`mergeAssistantError ${err?.message}`);
+      if (this.mergeAssistant === ma) {
+        this.mergeAssistant = null;
+        this.postMessage({ type: 'mergeAssistantSessionEnded', error: err?.message ?? 'merge assistant error' });
+        ma.dispose();
+      }
+    });
+  }
+
+  /** Send a follow-up message in the merge assistant. */
+  sendMergeAssistantMessage(text: string): void {
+    if (!this.mergeAssistant) {
+      this.log(`[Tab ${this.tabNumber}] Cannot send merge-assistant message: no active session.`);
+      return;
+    }
+    this.mergeAssistant.sendMessage(text);
+  }
+
+  /**
+   * Close and dispose the merge assistant (kill-before-teardown). The
+   * `mergeAssistantSessionEnded` signal is posted only after the CLI process has
+   * truly exited (dispose waits for the real 'exit'), so the webview never
+   * finalizes the merge while the assistant could still touch the index. If a
+   * newer assistant has been started meanwhile, the stale termination is dropped.
+   */
+  closeMergeAssistant(): void {
+    if (!this.mergeAssistant) { return; }
+    const ma = this.mergeAssistant;
+    const gen = this.mergeAssistantGeneration;
+    this.mergeAssistant = null;
+    this.log(`[Tab ${this.tabNumber}] Closing merge assistant (awaiting real exit).`);
+    ma.dispose(() => {
+      if (gen === this.mergeAssistantGeneration && this.mergeAssistant === null) {
+        this.postMessage({ type: 'mergeAssistantSessionEnded' });
+      }
+    });
   }
 
   private resolveAssistantReplyWaiters(ok: boolean): void {
@@ -2555,5 +2714,24 @@ export class SessionTab implements WebviewBridge {
       // Panel may have been disposed between our flag check and the actual call
       this.disposed = true;
     }
+  }
+}
+
+/**
+ * Human label for the live merge-assistant activity line.
+ * The tool input (file path / command) is not yet available at toolUseStart,
+ * so this is tool-name based; the detailed line renders later from the
+ * assistant message's tool_use blocks.
+ */
+export function describeToolActivity(toolName: string): string {
+  switch (toolName) {
+    case 'Read': return 'Reading a file';
+    case 'Edit':
+    case 'MultiEdit': return 'Editing a file';
+    case 'Write': return 'Writing a file';
+    case 'Bash': return 'Running a command';
+    case 'Grep': return 'Searching';
+    case 'Glob': return 'Looking for files';
+    default: return toolName;
   }
 }

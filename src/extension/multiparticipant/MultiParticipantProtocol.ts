@@ -51,6 +51,10 @@ export interface MPMessage {
   rawBody: string;
   parsedBody: string;
   routePrefix: string | null;
+  /** Agent's final answer with any addressing prefix stripped (split from narration). */
+  answerBody?: string | null;
+  /** Agent's interleaved narration ("thoughts"), shown distinctly from the answer. */
+  thinkingBody?: string | null;
   createdAt: string;
   displayNameSnapshot: string;
   deliveryId: string | null;
@@ -182,7 +186,7 @@ export type AgentEventPayload =
   | { kind: 'started' }
   | { kind: 'firstToken' }
   | { kind: 'textDelta'; text: string }
-  | { kind: 'completed'; fullText: string }
+  | { kind: 'completed'; fullText: string; answerText?: string; thinkingText?: string }
   | { kind: 'failed'; error: string }
   | { kind: 'interrupted'; interruptedByDeliveryId: string };
 

@@ -4,6 +4,7 @@ import { postToExtension } from '../../hooks/useClaudeStream';
 import type { MPMessage } from './mpTypes';
 import { getParticipantColor, DELIVERY_STATUS_COLORS, KIND_BADGE_COLORS } from './mpColors';
 import { detectRtl } from '../../hooks/useRtlDetection';
+import { MarkdownContent } from '../ChatView/MarkdownContent';
 
 interface MpMessageBubbleProps {
   message: MPMessage;
@@ -32,6 +33,7 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
   const reactions = useAppStore((s) => s.mpReactions[message.messageId]);
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [thoughtsOpen, setThoughtsOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -121,6 +123,12 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
   const displayBody = message.routePrefix ? `${message.routePrefix}, ${message.parsedBody}` : message.parsedBody;
   const isRtl = detectRtl(displayBody);
   const isStreamingRtl = streamingText ? detectRtl(streamingText) : isRtl;
+
+  // When the runner split narration from the answer, show the clean answer as the
+  // main body and the narration ("thoughts") in a separate, collapsed section.
+  const hasThinking = !!message.thinkingBody && message.thinkingBody.trim().length > 0;
+  const answerBody = message.answerBody?.trim() ? message.answerBody : undefined;
+  const mainText = answerBody ?? displayBody;
 
   return (
     <div
@@ -265,19 +273,54 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
         </button>
       )}
 
-      {/* Message content */}
+      {/* Agent "thoughts" (interleaved narration) - distinct from the answer, collapsed by default */}
+      {hasThinking && (
+        <div style={{ marginTop: 2 }}>
+          <button
+            onClick={() => setThoughtsOpen((o) => !o)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              fontSize: 11,
+              fontStyle: 'italic',
+              color: '#8b949e',
+            }}
+            title={thoughtsOpen ? 'Hide thoughts' : 'Show thoughts'}
+          >
+            <span>{thoughtsOpen ? '▾' : '▸'}</span>
+            <span>Thoughts</span>
+          </button>
+          {thoughtsOpen && (
+            <div
+              style={{
+                marginTop: 4,
+                paddingInlineStart: 8,
+                borderInlineStart: '2px solid rgba(139, 148, 158, 0.3)',
+                opacity: 0.7,
+                fontSize: 12,
+              }}
+            >
+              <MarkdownContent text={message.thinkingBody!.trim()} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Message content (final answer) rendered as markdown */}
       <div
         style={{
           fontSize: 13,
           lineHeight: 1.5,
           color: 'var(--vscode-editor-foreground, #e6edf3)',
-          whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
-          direction: isRtl ? 'rtl' : 'ltr',
-          textAlign: isRtl ? 'right' : 'left',
         }}
       >
-        {displayBody}
+        <MarkdownContent text={mainText} />
       </div>
 
       {/* Streaming text overlay */}

@@ -849,7 +849,7 @@ export class WorktreeService {
   }
 
   /** Distinct paths with unmerged (conflict) index entries. */
-  private async getUnmergedFiles(cwd: string): Promise<string[]> {
+  async getUnmergedFiles(cwd: string): Promise<string[]> {
     const res = await this.gitResult(['ls-files', '-u', '-z'], cwd);
     if (!res.ok) {
       return [];

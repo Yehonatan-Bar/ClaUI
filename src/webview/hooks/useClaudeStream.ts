@@ -14,6 +14,7 @@ const vscodeApi = (window as any).acquireVsCodeApi?.();
 export function useClaudeStream(): void {
   const {
     setSession,
+    setSessionWorktree,
     endSession,
     addUserMessage,
     addAssistantMessage,
@@ -131,6 +132,12 @@ export function useClaudeStream(): void {
     handleBtwMessageStop,
     handleBtwResult,
     clearBtwSession,
+    handleMergeAssistantMessageStart,
+    handleMergeAssistantStreamingText,
+    addMergeAssistantToolUse,
+    addMergeAssistantAssistantMessage,
+    handleMergeAssistantResult,
+    setMergeConflictFiles,
     markStreamingMessageInterrupted,
     recordDeferredMessage,
     clearDeferredMessage,
@@ -207,6 +214,13 @@ export function useClaudeStream(): void {
         case 'sessionStarted':
           setProvider(msg.provider ?? 'claude');
           setSession(msg.sessionId, msg.model, msg.tabKind ?? 'chat');
+          // Must run AFTER setSession: a brand-new/pending->real transition resets
+          // session state (clearing sessionWorktree), so set the indicator last.
+          setSessionWorktree(
+            msg.worktreePath && msg.worktreeName
+              ? { path: msg.worktreePath, name: msg.worktreeName }
+              : null,
+          );
           if (msg.isResume) {
             setResuming(true);
           }
@@ -1217,6 +1231,40 @@ export function useClaudeStream(): void {
           handleBtwResult();
           break;
 
+        // --- Merge Conflict Assistant events ---
+        case 'mergeAssistantUserMessage':
+          // Skip CLI echo - user messages are added optimistically in MergeAssistantChat
+          break;
+
+        case 'mergeAssistantMessageStart':
+          handleMergeAssistantMessageStart(msg.messageId);
+          break;
+
+        case 'mergeAssistantStreamingText':
+          handleMergeAssistantStreamingText(msg.blockIndex, msg.text);
+          break;
+
+        case 'mergeAssistantToolUse':
+          addMergeAssistantToolUse(msg.blockIndex, msg.toolName, msg.summary);
+          break;
+
+        case 'mergeAssistantAssistantMessage':
+          addMergeAssistantAssistantMessage(msg.messageId, msg.content, msg.model);
+          break;
+
+        case 'mergeAssistantResult':
+          handleMergeAssistantResult();
+          break;
+
+        case 'mergeAssistantSessionEnded':
+          // Keep the conversation visible; just mark it not busy.
+          handleMergeAssistantResult();
+          break;
+
+        case 'mergeConflictsRefreshed':
+          setMergeConflictFiles(msg.targetPath, msg.conflictFiles);
+          break;
+
         case 'chatSearchProjectResults':
           useAppStore.getState().setChatSearchProjectResults(msg.results, msg.requestId);
           break;
@@ -1434,6 +1482,12 @@ export function useClaudeStream(): void {
     handleBtwMessageStop,
     handleBtwResult,
     clearBtwSession,
+    handleMergeAssistantMessageStart,
+    handleMergeAssistantStreamingText,
+    addMergeAssistantToolUse,
+    addMergeAssistantAssistantMessage,
+    handleMergeAssistantResult,
+    setMergeConflictFiles,
     setWorkstreamMapData,
     setWorkstreamMapClassifying,
     setWorkstreamMapError,

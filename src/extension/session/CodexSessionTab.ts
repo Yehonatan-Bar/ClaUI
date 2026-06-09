@@ -9,12 +9,14 @@ import { CodexMessageHandler, type CodexSessionController } from '../webview/Cod
 import { buildWebviewHtml } from '../webview/WebviewProvider';
 import { CodexConversationReader } from './CodexConversationReader';
 import { CodexBackgroundSession } from './CodexBackgroundSession';
+import { MergeAssistantSession, type MergeAssistantStartOptions } from './MergeAssistantSession';
 import { CodexSessionNamer } from './CodexSessionNamer';
 import { SessionSummarizer } from './SessionSummarizer';
 import { MessageTranslator } from './MessageTranslator';
 import { FileLogger } from './FileLogger';
 import type { WebviewBridge } from '../webview/MessageHandler';
 import type { SessionTabCallbacks } from './SessionTab';
+import { describeToolActivity } from './SessionTab';
 import type { SessionStore } from './SessionStore';
 import type { ProjectAnalyticsStore } from './ProjectAnalyticsStore';
 import type { PromptHistoryStore } from './PromptHistoryStore';
@@ -104,6 +106,15 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private silentResumeArmedFlag = false;
   /** Background session for the "btw" side-conversation overlay */
   private btwSession: CodexBackgroundSession | null = null;
+  /** Merge Wizard's conflict assistant. Always Claude, even on a Codex tab. */
+  private mergeAssistant: MergeAssistantSession | null = null;
+  /**
+   * Epoch for the merge-assistant slot, bumped each time a new assistant starts.
+   * A close captures the current epoch; its terminal `mergeAssistantSessionEnded`
+   * fires only if the epoch is still current, so a slow exit from an older
+   * assistant cannot finalize the merge for a newer one (restart race).
+   */
+  private mergeAssistantGeneration = 0;
   private turnDiagSeq = 0;
   private turnDiagHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private activeTurnDiag: {
@@ -240,7 +251,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     // branch into Smart Search view on receipt.
     const outbound: ExtensionToWebviewMessage =
       msg.type === 'sessionStarted'
-        ? { ...msg, provider: 'codex', tabKind: this.kind }
+        ? { ...msg, provider: 'codex', tabKind: this.kind, ...this.worktreeDisplay() }
         : msg;
     if (outbound.type === 'assistantMessage') {
       this.resolveAssistantReplyWaiters(true);
@@ -289,6 +300,24 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   /** Absolute worktree path for this tab, or null when it runs in the primary worktree. */
   getWorktreePath(): string | null {
     return this.worktreePath;
+  }
+
+  /** Worktree identity stamped onto every `sessionStarted` post (see postMessage)
+   *  to drive the in-chat indicator. Returns nulls when the session runs in the
+   *  primary worktree (no path set, or the path resolves to the workspace root)
+   *  so the webview suppresses the chip; otherwise the absolute path plus its
+   *  basename for display. */
+  private worktreeDisplay(): { worktreePath: string | null; worktreeName: string | null } {
+    const worktreePath = this.worktreePath;
+    if (!worktreePath) {
+      return { worktreePath: null, worktreeName: null };
+    }
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const normalizePath = (p: string) => path.resolve(p).replace(/[\\/]+$/, '').toLowerCase();
+    if (workspaceRoot && normalizePath(workspaceRoot) === normalizePath(worktreePath)) {
+      return { worktreePath: null, worktreeName: null };
+    }
+    return { worktreePath, worktreeName: path.basename(worktreePath) };
   }
 
   /** Stage one-time handoff context to inject on the first user message in this tab. */
@@ -563,6 +592,123 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.log(`[Codex Tab ${this.tabNumber}] Closing btw session.`);
     this.btwSession.dispose();
     this.btwSession = null;
+  }
+
+  // --- Merge Conflict Assistant (always Claude, even on a Codex tab) ---
+
+  /** Start a fresh, merge-focused Claude session seeded with the conflict file list. */
+  startMergeAssistant(opts: MergeAssistantStartOptions): void {
+    this.closeMergeAssistant();
+
+    this.mergeAssistantGeneration++;
+    this.log(`[Codex Tab ${this.tabNumber}] Starting merge assistant in ${opts.targetCwd}`);
+    this.mergeAssistant = new MergeAssistantSession(
+      this.context,
+      (msg) => this.log(`[Codex Tab ${this.tabNumber}] ${msg}`),
+    );
+    this.wireMergeAssistantEvents();
+
+    this.mergeAssistant.start(opts).catch((err: unknown) => {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      this.log(`[Codex Tab ${this.tabNumber}] merge assistant start failed: ${errMsg}`);
+      this.closeMergeAssistant();
+    });
+  }
+
+  /** Send a follow-up message in the merge assistant. */
+  sendMergeAssistantMessage(text: string): void {
+    if (!this.mergeAssistant) {
+      this.log(`[Codex Tab ${this.tabNumber}] Cannot send merge-assistant message: no active session.`);
+      return;
+    }
+    this.mergeAssistant.sendMessage(text);
+  }
+
+  /**
+   * Close and dispose the merge assistant (kill-before-teardown). The
+   * `mergeAssistantSessionEnded` signal is posted only after the CLI process has
+   * truly exited (dispose waits for the real 'exit'), so the webview never
+   * finalizes the merge while the assistant could still touch the index. If a
+   * newer assistant has been started meanwhile, the stale termination is dropped.
+   */
+  closeMergeAssistant(): void {
+    if (!this.mergeAssistant) { return; }
+    const ma = this.mergeAssistant;
+    const gen = this.mergeAssistantGeneration;
+    this.mergeAssistant = null;
+    this.log(`[Codex Tab ${this.tabNumber}] Closing merge assistant (awaiting real exit).`);
+    ma.dispose(() => {
+      if (gen === this.mergeAssistantGeneration && this.mergeAssistant === null) {
+        this.postMessage({ type: 'mergeAssistantSessionEnded' });
+      }
+    });
+  }
+
+  /** Wire merge-assistant demux events to the webview. */
+  private wireMergeAssistantEvents(): void {
+    if (!this.mergeAssistant) { return; }
+    const ma = this.mergeAssistant;
+    const tabLog = (msg: string) => this.log(`[Codex Tab ${this.tabNumber}] [Merge->WV] ${msg}`);
+
+    ma.on('userMessage', (data: { message: { content: unknown } }) => {
+      const rawContent = data.message?.content;
+      const content = Array.isArray(rawContent)
+        ? (rawContent as ContentBlock[])
+        : typeof rawContent === 'string'
+          ? [{ type: 'text' as const, text: rawContent }]
+          : [];
+      tabLog('mergeAssistantUserMessage');
+      this.postMessage({ type: 'mergeAssistantUserMessage', content });
+    });
+
+    ma.on('messageStart', (data: { messageId: string }) => {
+      this.postMessage({ type: 'mergeAssistantMessageStart', messageId: data.messageId });
+    });
+
+    ma.on('textDelta', (data: { blockIndex: number; text: string }) => {
+      this.postMessage({ type: 'mergeAssistantStreamingText', blockIndex: data.blockIndex, text: data.text });
+    });
+
+    ma.on('toolUseStart', (data: { blockIndex: number; toolName: string }) => {
+      this.postMessage({
+        type: 'mergeAssistantToolUse',
+        blockIndex: data.blockIndex,
+        toolName: data.toolName,
+        summary: describeToolActivity(data.toolName),
+      });
+    });
+
+    ma.on('assistantMessage', (data: { message: { id: string; content: unknown[]; model?: string } }) => {
+      const msg = data.message;
+      const content = Array.isArray(msg?.content) ? (msg.content as ContentBlock[]) : [];
+      tabLog(`mergeAssistantAssistantMessage msgId=${msg?.id} contentBlocks=${content.length}`);
+      this.postMessage({ type: 'mergeAssistantAssistantMessage', messageId: msg?.id, content, model: msg?.model });
+    });
+
+    ma.on('result', () => {
+      tabLog('mergeAssistantResult');
+      this.postMessage({ type: 'mergeAssistantResult' });
+    });
+
+    ma.on('ended', (data?: { error?: string; code?: number }) => {
+      // Drop a natural-end signal from an assistant that is no longer the
+      // current slot, so it cannot clobber a newer one (restart race).
+      if (this.mergeAssistant !== ma) { return; }
+      tabLog(`mergeAssistantSessionEnded error=${data?.error} code=${data?.code}`);
+      this.postMessage({ type: 'mergeAssistantSessionEnded', error: data?.error });
+      this.mergeAssistant = null;
+    });
+
+    // A Node EventEmitter 'error' with no listener throws. Give it one so a CLI
+    // spawn/runtime failure surfaces to the webview instead of crashing the host.
+    ma.on('error', (err: Error) => {
+      tabLog(`mergeAssistantError ${err?.message}`);
+      if (this.mergeAssistant === ma) {
+        this.mergeAssistant = null;
+        this.postMessage({ type: 'mergeAssistantSessionEnded', error: err?.message ?? 'merge assistant error' });
+        ma.dispose();
+      }
+    });
   }
 
   /** Wire Codex BTW session events and relay them to the webview. */
@@ -870,6 +1016,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       this.log(`[Codex Tab ${this.tabNumber}] [Summarizer] dispose-branch failure: ${err instanceof Error ? err.message : String(err)}`),
     );
     this.closeBtwSession();
+    this.closeMergeAssistant();
     this.processManager.stop();
     this.achievementService.onSessionEnd(this.id);
     this.achievementService.unregisterTab(this.id);
@@ -1367,6 +1514,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         this.windowStateSubscription = null;
         this.saveProjectAnalytics();
         this.closeBtwSession();
+        this.closeMergeAssistant();
         this.processManager.stop();
         this.achievementService.onSessionEnd(this.id);
         this.achievementService.unregisterTab(this.id);

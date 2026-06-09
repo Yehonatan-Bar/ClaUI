@@ -82,6 +82,12 @@ export interface WebviewBridge {
   sendBtwMessage?(text: string): void;
   /** Close the active btw session */
   closeBtwSession?(): void;
+  /** Start a fresh, merge-focused assistant seeded with the conflict file list */
+  startMergeAssistant?(opts: { targetCwd: string; conflictFiles: string[]; sourceBranch: string; targetBranch: string }): void;
+  /** Send a follow-up message in the active merge assistant */
+  sendMergeAssistantMessage?(text: string): void;
+  /** Close/kill the active merge assistant (kill-before-teardown) */
+  closeMergeAssistant?(): void;
   /** Trigger end-of-session summarization on demand (e.g. from the stop button).
    *  The handler captures the current sessionId synchronously so this can be called
    *  immediately before processManager.stop() resets it. Fire-and-forget. */
@@ -679,6 +685,12 @@ export class MessageHandler {
   private async handleOpenConflictFiles(targetPath: string, files: string[]): Promise<void> {
     if (!this.worktreeController) { return; }
     await this.worktreeController.openConflictFiles(targetPath, files);
+  }
+
+  private async handleRefreshMergeConflicts(targetPath: string): Promise<void> {
+    if (!this.worktreeController) { return; }
+    const conflictFiles = await this.worktreeController.refreshConflicts(targetPath);
+    this.webview.postMessage({ type: 'mergeConflictsRefreshed', targetPath, conflictFiles });
   }
 
   setParticleAcceleratorService(service: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService): void {
@@ -3026,6 +3038,30 @@ export class MessageHandler {
         case 'closeBtwSession':
           this.log('Closing btw session.');
           this.webview.closeBtwSession?.();
+          break;
+
+        case 'startMergeAssistant':
+          this.log(`Starting merge assistant for ${msg.targetPath} (${msg.conflictFiles.length} files).`);
+          this.webview.startMergeAssistant?.({
+            targetCwd: msg.targetPath,
+            conflictFiles: msg.conflictFiles,
+            sourceBranch: msg.sourceBranch,
+            targetBranch: msg.targetBranch,
+          });
+          break;
+
+        case 'sendMergeAssistantMessage':
+          this.log(`Sending merge-assistant message: ${msg.text.slice(0, 60)}...`);
+          this.webview.sendMergeAssistantMessage?.(msg.text);
+          break;
+
+        case 'stopMergeAssistant':
+          this.log('Stopping merge assistant.');
+          this.webview.closeMergeAssistant?.();
+          break;
+
+        case 'refreshMergeConflicts':
+          void this.handleRefreshMergeConflicts(msg.targetPath);
           break;
 
         case 'chatSearchProject':

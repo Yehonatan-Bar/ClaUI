@@ -48,6 +48,9 @@ export interface CodexSessionController {
   startBtwSession?(promptText: string): void;
   sendBtwMessage?(text: string): void;
   closeBtwSession?(): void;
+  startMergeAssistant?(opts: { targetCwd: string; conflictFiles: string[]; sourceBranch: string; targetBranch: string }): void;
+  sendMergeAssistantMessage?(text: string): void;
+  closeMergeAssistant?(): void;
 }
 
 function codexTurnCategory(hasCommands: boolean): TurnCategory {
@@ -265,6 +268,12 @@ export class CodexMessageHandler {
   private async handleOpenConflictFiles(targetPath: string, files: string[]): Promise<void> {
     if (!this.worktreeController) { return; }
     await this.worktreeController.openConflictFiles(targetPath, files);
+  }
+
+  private async handleRefreshMergeConflicts(targetPath: string): Promise<void> {
+    if (!this.worktreeController) { return; }
+    const conflictFiles = await this.worktreeController.refreshConflicts(targetPath);
+    this.webview.postMessage({ type: 'mergeConflictsRefreshed', targetPath, conflictFiles });
   }
 
   /** Provide the SessionStore for accessing session metadata. */
@@ -1238,6 +1247,30 @@ export class CodexMessageHandler {
         case 'closeBtwSession':
           this.log('Closing Codex btw session.');
           this.session.closeBtwSession?.();
+          break;
+
+        case 'startMergeAssistant':
+          this.log(`Starting merge assistant for ${msg.targetPath} (${msg.conflictFiles.length} files).`);
+          this.session.startMergeAssistant?.({
+            targetCwd: msg.targetPath,
+            conflictFiles: msg.conflictFiles,
+            sourceBranch: msg.sourceBranch,
+            targetBranch: msg.targetBranch,
+          });
+          break;
+
+        case 'sendMergeAssistantMessage':
+          this.log(`Sending merge-assistant message: ${msg.text.slice(0, 60)}...`);
+          this.session.sendMergeAssistantMessage?.(msg.text);
+          break;
+
+        case 'stopMergeAssistant':
+          this.log('Stopping merge assistant.');
+          this.session.closeMergeAssistant?.();
+          break;
+
+        case 'refreshMergeConflicts':
+          void this.handleRefreshMergeConflicts(msg.targetPath);
           break;
 
         case 'compact':

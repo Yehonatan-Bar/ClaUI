@@ -263,6 +263,16 @@ export interface AppState {
     isBusy: boolean;
   } | null;
 
+  // Merge Conflict Assistant session state (embedded in the Merge Wizard's Stage B)
+  mergeAssistant: {
+    messages: ChatMessage[];
+    streamingMessageId: string | null;
+    streamingBlocks: StreamingBlock[];
+    isBusy: boolean;
+  } | null;
+  // Latest refreshed unmerged-path list, keyed by target checkout path
+  mergeConflictFiles: Record<string, string[]>;
+
   // Translation state
   translationLanguage: string;
   translations: Record<string, string>;
@@ -522,6 +532,10 @@ export interface AppState {
   setMergeResult: (result: MergeResult | null) => void;
   setMergeDefaults: (defaults: MergeDefaults | null) => void;
 
+  /** Worktree the active session runs in, shown as an in-chat indicator. Null in the primary worktree. */
+  sessionWorktree: { path: string; name: string } | null;
+  setSessionWorktree: (worktree: { path: string; name: string } | null) => void;
+
   // Active Skill indicator (accumulated across session, pills persist)
   sessionSkills: string[];
   addSessionSkill: (name: string) => void;
@@ -752,6 +766,17 @@ export interface AppState {
   handleBtwMessageStop: () => void;
   handleBtwResult: () => void;
   clearBtwSession: () => void;
+  // Merge Conflict Assistant actions
+  initMergeAssistant: () => void;
+  addMergeAssistantUserMessage: (content: ContentBlock[]) => void;
+  handleMergeAssistantMessageStart: (messageId: string) => void;
+  handleMergeAssistantStreamingText: (blockIndex: number, text: string) => void;
+  addMergeAssistantToolUse: (blockIndex: number, toolName: string, summary: string) => void;
+  addMergeAssistantAssistantMessage: (messageId: string, content: ContentBlock[], model?: string) => void;
+  handleMergeAssistantResult: () => void;
+  clearMergeAssistant: () => void;
+  setMergeConflictFiles: (targetPath: string, files: string[]) => void;
+  clearMergeConflicts: () => void;
   setTranslationLanguage: (language: string) => void;
   setTranslation: (messageId: string, translatedText: string) => void;
   setTranslating: (messageId: string, translating: boolean) => void;
@@ -1152,6 +1177,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   forkInit: null,
   btwPopup: null,
   btwSession: null,
+  mergeAssistant: null,
+  mergeConflictFiles: {},
   translationLanguage: 'Hebrew',
   translations: {},
   translatingMessageIds: new Set(),
@@ -1315,6 +1342,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setMergePreview: (preview) => set({ mergePreview: preview }),
   setMergeResult: (result) => set({ mergeResult: result }),
   setMergeDefaults: (defaults) => set({ mergeDefaults: defaults }),
+
+  // Session worktree indicator
+  sessionWorktree: null,
+  setSessionWorktree: (worktree) => set({ sessionWorktree: worktree }),
 
   // Active Skill indicator (accumulated across session)
   sessionSkills: [],
@@ -2238,6 +2269,117 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearBtwSession: () => set({ btwSession: null, btwPopup: null }),
 
+  initMergeAssistant: () => set((state) => {
+    if (state.mergeAssistant) { return {}; }
+    return {
+      mergeAssistant: {
+        messages: [],
+        streamingMessageId: null,
+        streamingBlocks: [],
+        isBusy: true,
+      },
+    };
+  }),
+
+  addMergeAssistantUserMessage: (content) => set((state) => {
+    if (!state.mergeAssistant) { return {}; }
+    const normalizedContent: ContentBlock[] = typeof content === 'string'
+      ? [{ type: 'text', text: content as string }]
+      : content;
+    const newMsg: ChatMessage = {
+      id: `merge-user-${Date.now()}`,
+      role: 'user',
+      content: normalizedContent,
+      timestamp: Date.now(),
+    };
+    return {
+      mergeAssistant: {
+        ...state.mergeAssistant,
+        messages: [...state.mergeAssistant.messages, newMsg],
+        isBusy: true,
+      },
+    };
+  }),
+
+  handleMergeAssistantMessageStart: (messageId) => set((state) => {
+    if (!state.mergeAssistant) { return {}; }
+    return {
+      mergeAssistant: {
+        ...state.mergeAssistant,
+        streamingMessageId: messageId,
+        streamingBlocks: [],
+        isBusy: true,
+      },
+    };
+  }),
+
+  handleMergeAssistantStreamingText: (blockIndex, text) => set((state) => {
+    if (!state.mergeAssistant) { return {}; }
+    const blocks = [...state.mergeAssistant.streamingBlocks];
+    const existing = blocks.find((b) => b.blockIndex === blockIndex);
+    if (existing) {
+      existing.text += text;
+    } else {
+      blocks.push({ blockIndex, type: 'text', text, toolName: undefined, partialJson: undefined });
+    }
+    return {
+      mergeAssistant: { ...state.mergeAssistant, streamingBlocks: blocks },
+    };
+  }),
+
+  addMergeAssistantToolUse: (blockIndex, toolName, summary) => set((state) => {
+    if (!state.mergeAssistant) { return {}; }
+    const blocks = [...state.mergeAssistant.streamingBlocks];
+    const existing = blocks.find((b) => b.blockIndex === blockIndex);
+    if (existing) {
+      existing.type = 'tool_use';
+      existing.toolName = toolName;
+      existing.text = summary;
+    } else {
+      blocks.push({ blockIndex, type: 'tool_use', text: summary, toolName, partialJson: undefined });
+    }
+    return {
+      mergeAssistant: { ...state.mergeAssistant, streamingBlocks: blocks, isBusy: true },
+    };
+  }),
+
+  addMergeAssistantAssistantMessage: (messageId, content, model) => set((state) => {
+    if (!state.mergeAssistant) { return {}; }
+    const newMsg: ChatMessage = {
+      id: messageId,
+      role: 'assistant',
+      content,
+      model,
+      timestamp: Date.now(),
+    };
+    return {
+      mergeAssistant: {
+        ...state.mergeAssistant,
+        messages: [...state.mergeAssistant.messages, newMsg],
+        streamingMessageId: null,
+        streamingBlocks: [],
+      },
+    };
+  }),
+
+  handleMergeAssistantResult: () => set((state) => {
+    if (!state.mergeAssistant) { return {}; }
+    return {
+      mergeAssistant: { ...state.mergeAssistant, isBusy: false },
+    };
+  }),
+
+  clearMergeAssistant: () => set({ mergeAssistant: null }),
+
+  setMergeConflictFiles: (targetPath, files) => set((state) => ({
+    mergeConflictFiles: { ...state.mergeConflictFiles, [targetPath]: files },
+  })),
+
+  // Drop every cached unmerged list. Kept separate from clearMergeAssistant
+  // because stopAssistantThen clears the assistant while the cache must persist
+  // (the Complete gate reads it); only the wizard unmount clears the cache.
+  clearMergeConflicts: () => set({ mergeConflictFiles: {} }),
+
   setTranslationLanguage: (language) =>
     set((state) => {
       if (state.translationLanguage === language) {
@@ -2993,6 +3135,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       forkInit: null,
       btwPopup: null,
       btwSession: null,
+      mergeAssistant: null,
+      mergeConflictFiles: {},
       translations: {},
       translatingMessageIds: new Set(),
       showingTranslation: new Set(),
@@ -3039,6 +3183,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       mergePreview: null,
       mergeResult: null,
       mergeDefaults: null,
+      // Session worktree indicator: cleared here, repopulated by the next sessionStarted
+      sessionWorktree: null,
       // Agent Teams: clear on session reset
       teamActive: false,
       teamName: null,

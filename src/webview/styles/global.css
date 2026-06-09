@@ -2327,6 +2327,35 @@ html, body, #root {
   flex-shrink: 1;
 }
 
+/* Worktree indicator chip: marks a session running inside a non-primary worktree */
+.status-bar-worktree-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  max-width: 160px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #3fb950;
+  background: rgba(63, 185, 80, 0.12);
+  border: 1px solid rgba(63, 185, 80, 0.35);
+  cursor: default;
+  user-select: none;
+}
+
+.status-bar-worktree-chip svg {
+  flex-shrink: 0;
+  opacity: 0.95;
+}
+
+.status-bar-worktree-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .status-bar-right {
   display: flex;
   align-items: center;

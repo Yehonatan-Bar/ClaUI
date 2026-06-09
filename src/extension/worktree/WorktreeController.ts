@@ -337,6 +337,15 @@ export class WorktreeController {
     }
   }
 
+  /** Re-read the current unmerged (conflict) paths from git after the assistant acts. */
+  async refreshConflicts(targetPath: string): Promise<string[]> {
+    const svc = this.service();
+    if (!svc) {
+      return [];
+    }
+    return svc.getUnmergedFiles(targetPath);
+  }
+
   private noWorkspace(action: MergeResult['action']): MergeResult {
     return {
       action,
