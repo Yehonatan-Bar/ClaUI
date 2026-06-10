@@ -27,7 +27,19 @@ export function getModelMaxContext(model: string): number {
   if (lower.includes('gpt-3.5')) {
     return 16_385;
   }
-  // All current Claude models (claude-3.x, claude-opus-4-6, claude-sonnet-4-6, etc.)
+  // Claude models with a 1M-token context window (per the Claude Code v2.1.170
+  // model table): Fable 5, Opus 4.6/4.7/4.8, and Sonnet 4.6.
+  const oneMillionContextModels = [
+    'claude-fable-5',
+    'claude-opus-4-6',
+    'claude-opus-4-7',
+    'claude-opus-4-8',
+    'claude-sonnet-4-6',
+  ];
+  if (oneMillionContextModels.some((id) => lower.startsWith(id))) {
+    return 1_000_000;
+  }
+  // All other Claude models (claude-3.x, Sonnet 4.5, Haiku 4.5, Mythos 5, etc.)
   return 200_000;
 }
 

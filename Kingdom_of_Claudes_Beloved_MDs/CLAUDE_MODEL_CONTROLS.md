@@ -1,11 +1,11 @@
 # Claude Model Controls (Model, Thinking Effort, Fast Mode)
 
-Snapshot: 2026-05-29 (effort badge label resolution)
+Snapshot: 2026-06-10 (Fable 5 model added)
 
 This document covers the three Claude-side controls exposed in the AI chip's
 model area:
 
-1. **Model selection** (including Opus 4.8)
+1. **Model selection** (including Fable 5)
 2. **Thinking effort level** (`--effort`)
 3. **Fast mode** (`--settings` overlay)
 
@@ -58,7 +58,7 @@ Relevant shared files:
 
 ---
 
-## 1. Model selection (including Opus 4.8)
+## 1. Model selection (including Fable 5)
 
 ### User surface
 
@@ -74,16 +74,31 @@ and mirrored in the `claudeMirror.model` enum in `package.json`:
 | Label | Model id (`--model` value) |
 |-------|----------------------------|
 | Default | `""` (CLI default) |
+| Fable 5 | `claude-fable-5` |
 | Opus 4.8 | `claude-opus-4-8` |
 | Opus 4.7 | `claude-opus-4-7` |
 | Sonnet 4.6 | `claude-sonnet-4-6` |
 | Sonnet 4.5 | `claude-sonnet-4-5-20250929` |
 | Opus 4.6 | `claude-opus-4-6` |
 | Haiku 4.5 | `claude-haiku-4-5-20251001` |
+| Mythos 5 (Blocked for peasants) | `claude-mythos-5` |
 
 If `selectedModel` is a value not present in the list (e.g. a model id typed
 directly into `settings.json`), `ModelSelector` appends a synthetic
 `Custom (<label>)` option so the dropdown can display the current selection.
+
+Fable 5 (alias `fable`, full id `claude-fable-5`) is listed first; Mythos 5
+(`claude-mythos-5`) is a specialized/preview model listed last — it has no entry
+in the CLI's general model/pricing table and ships a `claude-mythos-preview`
+variant, so it is surfaced for selection but is not a general-availability
+lineup model.
+
+**Context windows are not uniform.** `getModelMaxContext()` in
+`src/webview/utils/modelContextLimits.ts` returns `1_000_000` for the 1M-context
+models — Fable 5, Opus 4.6/4.7/4.8, and Sonnet 4.6 — and `200_000` for everything
+else (Sonnet 4.5, Haiku 4.5, Mythos 5, and older Claude models), so the
+context-usage gauge scales correctly. `inferClaudeModelLabel()` also treats
+`fable` and `mythos` as known families.
 
 ### Message flow
 

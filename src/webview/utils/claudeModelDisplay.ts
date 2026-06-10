@@ -5,16 +5,18 @@ export interface ClaudeModelOption {
 
 export const CLAUDE_MODEL_OPTIONS: ClaudeModelOption[] = [
   { label: 'Default', value: '' },
+  { label: 'Fable 5', value: 'claude-fable-5' },
   { label: 'Opus 4.8', value: 'claude-opus-4-8' },
   { label: 'Opus 4.7', value: 'claude-opus-4-7' },
   { label: 'Sonnet 4.6', value: 'claude-sonnet-4-6' },
   { label: 'Sonnet 4.5', value: 'claude-sonnet-4-5-20250929' },
   { label: 'Opus 4.6', value: 'claude-opus-4-6' },
   { label: 'Haiku 4.5', value: 'claude-haiku-4-5-20251001' },
+  { label: 'Mythos 5 (Blocked for peasants)', value: 'claude-mythos-5' },
 ];
 
 const STATUS_VALUES = new Set(['connected', 'unknown']);
-const CLAUDE_FAMILIES = new Set(['opus', 'sonnet', 'haiku']);
+const CLAUDE_FAMILIES = new Set(['opus', 'sonnet', 'haiku', 'fable', 'mythos']);
 
 function inferClaudeModelLabel(model: string): string | null {
   const lower = model.toLowerCase();

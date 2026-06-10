@@ -41,6 +41,10 @@ export class MultiParticipantSessionTab {
   private pendingMessages: ExtensionToWebviewMessage[] = [];
   private disposed = false;
   private dialogMode: 'create' | 'join' = 'join';
+  /** Last successful connect parameters, reused to recover if rejoin is rejected. */
+  private lastConnectParams: { humanName: string; agentName: string; agentProvider: 'claude' | 'codex'; password?: string; mode: 'create' | 'join' } | null = null;
+  /** True once we have entered the room at least once; prevents a recovery reconnect from re-creating an existing room. */
+  private hasJoinedOnce = false;
 
   constructor(
     tabId: string,
@@ -83,6 +87,13 @@ export class MultiParticipantSessionTab {
     this.panel.onDidChangeViewState(() => {
       if (this.panel.visible) {
         this.callbacks.onFocused(this.tabId);
+        // If the socket died while the tab sat in the background (machine sleep,
+        // network drop, server restart), retry now instead of waiting for the
+        // backoff timer -- the user is looking at the tab and expects it live.
+        if (this.session && !this.client.isConnected) {
+          this.log('[MPTab] Tab refocused while disconnected -- forcing reconnect');
+          this.client.reconnectNow();
+        }
       }
     });
 
@@ -103,6 +114,7 @@ export class MultiParticipantSessionTab {
     this.sessionNumber = sessionNumber ?? 0;
     this.sessionName = sessionName ?? '';
     this.client.setSessionNumber(this.sessionNumber);
+    this.lastConnectParams = { humanName, agentName, agentProvider, password, mode };
 
     if (this.sessionName) {
       this.panel.title = this.sessionName;
@@ -125,7 +137,7 @@ export class MultiParticipantSessionTab {
         this.log('[MPTab] Reconnected, attempting rejoin');
         this.client.sendRejoin();
         this.client.send({ type: 'agentStatus', status: 'online' });
-      } else if (mode === 'create') {
+      } else if (mode === 'create' && !this.hasJoinedOnce) {
         this.log('[MPTab] Connected to server, creating session');
         const createMsg: { type: 'createSession'; sessionNumber: number; sessionName: string; humanName: string; agentName: string; agentProvider: 'claude' | 'codex'; agentModel?: string; password?: string } = {
           type: 'createSession', sessionNumber: this.sessionNumber, sessionName: this.sessionName || `Session ${this.sessionNumber}`, humanName, agentName, agentProvider,
@@ -466,8 +478,9 @@ export class MultiParticipantSessionTab {
           this.handleRejoinAccepted(msg);
           break;
         case 'rejoinRejected':
-          this.log(`[MPTab] Rejoin rejected: ${msg.reason}, will need fresh join`);
+          this.log(`[MPTab] Rejoin rejected: ${msg.reason} -- falling back to a fresh join`);
           this.postToWebview({ type: 'mpError', code: 'rejoin_rejected', message: msg.reason });
+          this.attemptFreshJoinAfterRejoinRejected();
           break;
         case 'joinRejected':
           this.log(`[MPTab] Join rejected: ${msg.reason}`);
@@ -491,6 +504,7 @@ export class MultiParticipantSessionTab {
     this.session = msg.session;
     this.participants = msg.participants;
     this.transcript = msg.transcript;
+    this.hasJoinedOnce = true;
 
     if (this.session.sessionNumber != null) {
       this.sessionNumber = this.session.sessionNumber;
@@ -526,6 +540,7 @@ export class MultiParticipantSessionTab {
   private handleRejoinAccepted(msg: Extract<ServerToClientMessage, { type: 'rejoinAccepted' }>): void {
     this.session = msg.session;
     this.participants = msg.participants;
+    this.hasJoinedOnce = true;
     if (this.session.sessionNumber != null) {
       this.sessionNumber = this.session.sessionNumber;
     }
@@ -535,6 +550,21 @@ export class MultiParticipantSessionTab {
     this.panel.title = this.session.name;
     this.sendFullState();
     this.log(`[MPTab] Rejoin accepted: room ${this.sessionNumber}, ${msg.deltaTranscript.length} new messages since seq ${msg.lastSeenSeq}`);
+  }
+
+  /**
+   * The server could not restore our prior participant IDs (room was reset, or
+   * we were pruned). Clear the stale identity and force a full reconnect; the
+   * connect flow then re-enters the room via its join path (using the original
+   * credentials captured in the connect closure), and the full transcript
+   * arrives via sessionState -- instead of sitting connected-but-roomless.
+   */
+  private attemptFreshJoinAfterRejoinRejected(): void {
+    if (this.disposed) return;
+    this.humanParticipantId = null;
+    this.agentParticipantId = null;
+    this.log('[MPTab] Cleared stale identity after rejoin rejection; reconnecting to re-enter the room');
+    this.client.forceReconnect();
   }
 
   private handleNewMessage(message: MPMessage): void {

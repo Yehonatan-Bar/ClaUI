@@ -12,7 +12,6 @@ export interface MultiParticipantClientEvents {
 
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
-const RECONNECT_MAX_ATTEMPTS = 20;
 const PING_TIMEOUT_MS = 15000;
 
 export class MultiParticipantClient extends EventEmitter {
@@ -155,25 +154,68 @@ export class MultiParticipantClient extends EventEmitter {
   }
 
   private scheduleReconnect(): void {
-    if (this.reconnectAttempt >= RECONNECT_MAX_ATTEMPTS) {
-      this.log(`Max reconnect attempts (${RECONNECT_MAX_ATTEMPTS}) reached, giving up`);
-      return;
-    }
+    if (this.reconnectTimer) return; // already scheduled
 
+    // Retry indefinitely while the tab is open. A collaborative session must
+    // survive long idle gaps (overnight, machine sleep, server restarts). The
+    // previous hard cap of 20 attempts (~9 min of backoff) meant any outage
+    // longer than that left the tab permanently dead with no way back.
     const jitter = Math.random() * 0.3 + 0.85;
+    const cappedExponent = Math.min(this.reconnectAttempt, 6); // 2^6*1s caps at the max delay anyway
     const delayMs = Math.min(
-      RECONNECT_BASE_MS * Math.pow(2, this.reconnectAttempt) * jitter,
+      RECONNECT_BASE_MS * Math.pow(2, cappedExponent) * jitter,
       RECONNECT_MAX_MS,
     );
     this.reconnectAttempt++;
 
-    this.log(`Reconnecting in ${Math.round(delayMs)}ms (attempt ${this.reconnectAttempt}/${RECONNECT_MAX_ATTEMPTS})`);
+    this.log(`Reconnecting in ${Math.round(delayMs)}ms (attempt ${this.reconnectAttempt})`);
     this.emit('reconnecting', this.reconnectAttempt, Math.round(delayMs));
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.doConnect();
     }, delayMs);
+  }
+
+  /**
+   * Force an immediate reconnect attempt, bypassing backoff. Used when the tab
+   * is refocused (likely after the machine woke) or on explicit user action, so
+   * recovery is instant instead of waiting up to the max backoff window.
+   */
+  reconnectNow(): void {
+    if (this.intentionalClose) return;
+    if (this.isConnected) return;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.reconnectAttempt = 0;
+    this.autoReconnect = true;
+    this.log('Forcing immediate reconnect');
+    this.doConnect();
+  }
+
+  /**
+   * Drop the current socket (even if open) and reconnect from scratch. Used to
+   * re-enter a room after the server rejects a rejoin, so the connect flow runs
+   * its create/join path again instead of re-sending the dead rejoin.
+   */
+  forceReconnect(): void {
+    if (this.intentionalClose) return;
+    this.reconnectAttempt = 0;
+    this.autoReconnect = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.ws) {
+      this.ws.removeAllListeners();
+      try { this.ws.close(); } catch { /* ignore */ }
+      this.ws = null;
+    }
+    this.clearPingTimer();
+    this.log('Forcing full reconnect (dropping current socket)');
+    this.doConnect();
   }
 
   sendRejoin(): void {

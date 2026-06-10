@@ -10,6 +10,13 @@ import type { AssistantMessage, ResultSuccess, ResultError } from '../types/stre
 
 const STEER_CANCEL_TIMEOUT_MS = 8000;
 
+// Auto-restart for the persistent Claude process when it dies during a long
+// idle (token refresh, OS reaping, sleep). Bounded so a CLI that genuinely
+// can't start (e.g. expired auth) doesn't spin forever.
+const CLAUDE_RESTART_MAX_ATTEMPTS = 10;
+const CLAUDE_RESTART_BASE_MS = 2000;
+const CLAUDE_RESTART_MAX_MS = 30000;
+
 export interface HeadlessAgentRunnerEvents {
   agentEvent: [deliveryId: string, event: AgentEventPayload];
   fileChanges: [deliveryId: string, changes: MPFileChange[], source: MPFileChangeReportSource];
@@ -47,6 +54,8 @@ export class HeadlessAgentRunner extends EventEmitter {
   private answerTextParts: string[] = [];
   private firstTokenSent = false;
   private disposed = false;
+  private claudeRestartAttempts = 0;
+  private claudeRestartTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     provider: 'claude' | 'codex',
@@ -99,8 +108,16 @@ export class HeadlessAgentRunner extends EventEmitter {
     return this.codexProcess?.isTurnRunning ?? false;
   }
 
+  getProvider(): 'claude' | 'codex' {
+    return this.provider;
+  }
+
   dispose(): void {
     this.disposed = true;
+    if (this.claudeRestartTimer) {
+      clearTimeout(this.claudeRestartTimer);
+      this.claudeRestartTimer = null;
+    }
     this.fileTracker.removeAllListeners();
     if (this.provider === 'claude') {
       this.claudeProcess?.stop();
@@ -148,6 +165,8 @@ export class HeadlessAgentRunner extends EventEmitter {
         this.activeDeliveryId = null;
       }
       this.emit('processStopped');
+      // Recover the agent instead of leaving it dead until the tab is reopened.
+      this.scheduleClaudeRestart();
     });
 
     this.claudeProcess.on('error', (err) => {
@@ -165,8 +184,35 @@ export class HeadlessAgentRunner extends EventEmitter {
       permissionMode: 'full-access',
     });
     this.claudeReady = true;
+    this.claudeRestartAttempts = 0;
     this.emit('processStarted');
     this.log('[HeadlessRunner] Claude process started');
+  }
+
+  /** Restart the persistent Claude process after an unexpected exit, with backoff. */
+  private scheduleClaudeRestart(): void {
+    if (this.disposed || this.provider !== 'claude') return;
+    if (this.claudeRestartTimer) return;
+    if (this.claudeRestartAttempts >= CLAUDE_RESTART_MAX_ATTEMPTS) {
+      this.log(`[HeadlessRunner] Claude auto-restart gave up after ${CLAUDE_RESTART_MAX_ATTEMPTS} attempts; agent stays offline until the tab is reopened`);
+      return;
+    }
+    const attempt = this.claudeRestartAttempts++;
+    const delay = Math.min(CLAUDE_RESTART_BASE_MS * Math.pow(2, Math.min(attempt, 4)), CLAUDE_RESTART_MAX_MS);
+    this.log(`[HeadlessRunner] Scheduling Claude restart in ${delay}ms (attempt ${attempt + 1}/${CLAUDE_RESTART_MAX_ATTEMPTS})`);
+    this.claudeRestartTimer = setTimeout(() => {
+      this.claudeRestartTimer = null;
+      if (this.disposed) return;
+      // Detach the dead process/demux before standing up a fresh pair.
+      this.claudeProcess?.removeAllListeners();
+      this.claudeDemux?.removeAllListeners();
+      this.claudeProcess = null;
+      this.claudeDemux = null;
+      this.startClaude().catch((err) => {
+        this.log(`[HeadlessRunner] Claude restart failed: ${err instanceof Error ? err.message : String(err)}`);
+        this.scheduleClaudeRestart();
+      });
+    }, delay);
   }
 
   private wireClaudeDemuxEvents(): void {

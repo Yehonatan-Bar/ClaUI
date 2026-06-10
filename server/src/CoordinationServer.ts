@@ -71,6 +71,8 @@ export class CoordinationServer {
   private guardService: GuardService;
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private tokenAuthenticatedSockets = new WeakSet<WebSocket>();
+  /** Per-socket missed-pong counter for liveness detection (reaping zombies). */
+  private socketStrikes: WeakMap<WebSocket, number> = new WeakMap();
   private config: ServerConfig;
   private log: (msg: string) => void;
 
@@ -216,11 +218,24 @@ export class CoordinationServer {
 
     this.wss.on('connection', (ws, req) => this.handleConnection(ws, req));
 
+    // Liveness sweep: ping every 10s AND reap sockets that stopped answering.
+    // Without this, a half-open connection (client sleep, network drop, crash
+    // with no TCP FIN) stays readyState===OPEN forever, the owning agent looks
+    // "online", and prompts routed to it vanish -> the session goes unresponsive.
     this.pingInterval = setInterval(() => {
       for (const [ws] of this.clients) {
-        if (ws.readyState === WebSocket.OPEN) {
-          this.sendToClient(ws, { type: 'ping' });
+        if (ws.readyState !== WebSocket.OPEN) continue;
+        const strikes = (this.socketStrikes.get(ws) ?? 0) + 1;
+        if (strikes >= 3) {
+          // ~30s with no pong on either channel -> treat as dead.
+          this.log('Reaping unresponsive client (no pong for ~30s)');
+          this.socketStrikes.delete(ws);
+          try { ws.terminate(); } catch { /* ignore */ }
+          continue;
         }
+        this.socketStrikes.set(ws, strikes);
+        this.sendToClient(ws, { type: 'ping' });
+        try { ws.ping(); } catch { /* ignore */ }
       }
     }, 10000);
   }
@@ -256,6 +271,12 @@ export class CoordinationServer {
       }
     }
     this.log('New WebSocket connection' + (this.tokenAuthenticatedSockets.has(ws) ? ' (token-auth)' : ''));
+
+    // Liveness: seed strike counter, enable OS-level TCP keepalive, and reset
+    // strikes on protocol-level pongs (the ws lib auto-answers our ws.ping()).
+    this.socketStrikes.set(ws, 0);
+    try { req?.socket?.setKeepAlive?.(true, 30000); } catch { /* ignore */ }
+    ws.on('pong', () => { this.socketStrikes.set(ws, 0); });
 
     ws.on('message', (data) => {
       try {
@@ -321,6 +342,7 @@ export class CoordinationServer {
         this.handleResetSession(ws);
         break;
       case 'pong':
+        this.socketStrikes.set(ws, 0);
         break;
     }
   }
@@ -535,6 +557,8 @@ export class CoordinationServer {
     const client = this.clients.get(ws);
     if (!client) return;
 
+    this.socketStrikes.delete(ws);
+
     const room = this.rooms.get(client.sessionNumber);
     if (!room) {
       this.clients.delete(ws);
@@ -544,20 +568,52 @@ export class CoordinationServer {
     const human = room.participants.find(p => p.participantId === client.humanParticipantId);
     const agent = room.participants.find(p => p.participantId === client.agentParticipantId);
 
+    // Mark participants OFFLINE (do NOT remove). An unexpected disconnect is
+    // almost always transient (sleep, network blip, server restart); keeping the
+    // participant entry lets the owner rejoin by ID and restore identity + the
+    // missed transcript. Explicit leave (handleLeave) is what actually removes.
     if (human) {
-      this.broadcastToRoomExcept(room, ws, { type: 'participantLeft', participantId: human.participantId });
-      room.persistence?.append('leave', { participantId: human.participantId });
+      human.status = 'offline';
+      this.broadcastToRoomExcept(room, ws, { type: 'participantStatusChange', participantId: human.participantId, status: 'offline' });
+      room.persistence?.append('pstat', { participantId: human.participantId, status: 'offline' });
     }
     if (agent) {
-      this.broadcastToRoomExcept(room, ws, { type: 'participantLeft', participantId: agent.participantId });
-      room.persistence?.append('leave', { participantId: agent.participantId });
+      agent.status = 'offline';
+      this.broadcastToRoomExcept(room, ws, { type: 'participantStatusChange', participantId: agent.participantId, status: 'offline' });
+      room.persistence?.append('pstat', { participantId: agent.participantId, status: 'offline' });
+      // The owner that was driving this agent is gone; any delivery still in
+      // flight will never complete. Fail it now so the UI doesn't hang forever.
+      this.failInFlightDeliveriesForAgent(room, agent);
     }
 
-    room.participants = room.participants.filter(
-      p => p.participantId !== client.humanParticipantId && p.participantId !== client.agentParticipantId
-    );
     this.clients.delete(ws);
-    this.log(`[Room ${client.sessionNumber}] Disconnected: ${human?.displayName || 'unknown'} (participants remaining: ${room.participants.length})`);
+    this.log(`[Room ${client.sessionNumber}] Disconnected: ${human?.displayName || 'unknown'} (marked offline, participants: ${room.participants.length})`);
+  }
+
+  /** Mark every non-terminal delivery for an agent as failed (owner vanished). */
+  private failInFlightDeliveriesForAgent(room: SessionRoom, agent: Participant): void {
+    for (const delivery of room.deliveries.values()) {
+      if (delivery.agentParticipantId !== agent.participantId) continue;
+      if (delivery.status === 'completed' || delivery.status === 'failed' ||
+          delivery.status === 'interrupted' || delivery.status === 'not_delivered') {
+        continue;
+      }
+      delivery.status = 'failed';
+      delivery.errorText = 'Agent disconnected before completing';
+      delivery.completedAt = new Date().toISOString();
+      this.flushStreamingBuffer(room, delivery.deliveryId);
+      room.persistence?.append('dlv', delivery);
+      this.broadcastToRoom(room, {
+        type: 'deliveryStatusUpdate',
+        deliveryId: delivery.deliveryId,
+        agentParticipantId: agent.participantId,
+        agentDisplayName: agent.displayName,
+        status: 'failed',
+        errorText: 'Agent disconnected before completing',
+      });
+      this.cleanupFileTrackerForDelivery(room, delivery.deliveryId);
+      this.log(`[Room ${room.session.sessionNumber}] Failed in-flight delivery ${delivery.deliveryId}: owner disconnected`);
+    }
   }
 
   // -- Reset Session --

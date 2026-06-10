@@ -334,7 +334,7 @@ claude-code-mirror/
 |       |   |   +-- CustomSnippetPanel.tsx #  Config panel for the custom snippet button (text, Save, Clear)
 |       |   |   +-- CodexConsultPanel.tsx #   Input panel for Codex GPT expert consultation
 |       |   +-- ModelSelector/
-|       |   |   +-- ModelSelector.tsx          #   Claude model dropdown (Opus 4.8/4.7/4.6, Sonnet 4.6/4.5, Haiku 4.5)
+|       |   |   +-- ModelSelector.tsx          #   Claude model dropdown (Fable 5, Opus 4.8/4.7/4.6, Sonnet 4.6/4.5, Haiku 4.5, Mythos 5)
 |       |   |   +-- ClaudeEffortSelector.tsx   #   Claude thinking effort dropdown (Low/Medium/High/XHigh/Max)
 |       |   |   +-- ClaudeFastModeSelector.tsx  #   Claude Speed dropdown (Default / Fast, Opus only)
 |       |   |   +-- CodexModelSelector.tsx     #   Codex model dropdown (dynamic cache + fallback options)
@@ -500,7 +500,7 @@ claude-code-mirror/
     +-- ACTIVITY_SUMMARIZER.md            #   Periodic activity summary via Haiku
     +-- ADVENTURE_WIDGET.md              #   Pixel-art dungeon crawler session visualizer
     +-- CLAUDE_AUTH_LOGIN_LOGOUT.md      #   Claude CLI account login/logout/status integration
-    +-- CLAUDE_MODEL_CONTROLS.md         #   Claude model (incl. Opus 4.8), thinking effort, and fast mode controls
+    +-- CLAUDE_MODEL_CONTROLS.md         #   Claude model (incl. Fable 5), thinking effort, and fast mode controls
     +-- CODEX_FAST_MODE.md              #   Codex Fast mode selector + CLI service tier override
     +-- CUSTOM_SNIPPET_BUTTON.md         #   Configurable text snippet button that injects text into the input
     +-- DRAG_AND_DROP_CHALLENGE.md        #   Why drag-and-drop is blocked, workarounds
@@ -637,7 +637,7 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **TextSettingsBar** - In-webview UI for adjusting chat text font size, font family, and typing personality theme. Supports Hebrew-friendly font presets and four rendering themes: Terminal Hacker, Retro, Zen, and Neo Zen. Settings are stored in Zustand and synced from VS Code configuration on startup and on change. (Per-message LTR alignment override is a separate per-message button on each MessageBubble — see `MARKDOWN_RENDERING.md`.)
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**ModelSelector / Codex Selectors** - Dropdowns in the AI chip for choosing provider-specific model behavior. Claude uses `ModelSelector` for Opus/Sonnet/Haiku/CLI default and live-switches via `SessionTab.switchModel()`, plus `ClaudeEffortSelector` (thinking effort -> `--effort`) and `ClaudeFastModeSelector` (Speed -> `--settings` overlay), which persist to `claudeMirror.effortLevel` and `claudeMirror.fastMode` and apply on the next session start. Codex uses `CodexModelSelector`, `CodexReasoningEffortSelector`, and `CodexServiceTierSelector`; values persist to `claudeMirror.codex.model`, `claudeMirror.codex.reasoningEffort`, and `claudeMirror.codex.serviceTier`, then apply on the next `codex exec` turn. The Codex Speed selector passes Fast mode as `-c service_tier="fast" -c features.fast_mode=true` when selected. Shows the currently active runtime model label when connected; `claudeModelDisplay.ts` maps IDs like `claude-opus-4-7` to `Opus 4.7` in the AI chip, message badges, and dashboard metadata.
+**ModelSelector / Codex Selectors** - Dropdowns in the AI chip for choosing provider-specific model behavior. Claude uses `ModelSelector` for Fable/Opus/Sonnet/Haiku/Mythos/CLI default and live-switches via `SessionTab.switchModel()`, plus `ClaudeEffortSelector` (thinking effort -> `--effort`) and `ClaudeFastModeSelector` (Speed -> `--settings` overlay), which persist to `claudeMirror.effortLevel` and `claudeMirror.fastMode` and apply on the next session start. Codex uses `CodexModelSelector`, `CodexReasoningEffortSelector`, and `CodexServiceTierSelector`; values persist to `claudeMirror.codex.model`, `claudeMirror.codex.reasoningEffort`, and `claudeMirror.codex.serviceTier`, then apply on the next `codex exec` turn. The Codex Speed selector passes Fast mode as `-c service_tier="fast" -c features.fast_mode=true` when selected. Shows the currently active runtime model label when connected; `claudeModelDisplay.ts` maps IDs like `claude-opus-4-7` to `Opus 4.7` in the AI chip, message badges, and dashboard metadata.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CLAUDE_MODEL_CONTROLS.md`
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_FAST_MODE.md`
@@ -805,7 +805,7 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 | `claudeMirror.autoNameSessions` | `true` | Auto-generate tab names from first message (Claude: Haiku, Codex: one-shot codex exec) |
 | `claudeMirror.activitySummary` | `true` | Periodically summarize tool activity in busy indicator via Haiku |
 | `claudeMirror.activitySummaryThreshold` | `3` | Tool uses before triggering an activity summary (1-10) |
-| `claudeMirror.model` | `""` | Claude model to use for new sessions (empty = CLI default; choices include Opus 4.8/4.7/4.6, Sonnet 4.6/4.5, Haiku 4.5) |
+| `claudeMirror.model` | `""` | Claude model to use for new sessions (empty = CLI default; choices include Fable 5, Opus 4.8/4.7/4.6, Sonnet 4.6/4.5, Haiku 4.5, Mythos 5) |
 | `claudeMirror.effortLevel` | `""` | Claude thinking effort level (empty = model default; choices: low/medium/high/xhigh/max) |
 | `claudeMirror.fastMode` | `false` | Claude Fast mode: ~2.5x faster output on Opus (4.8/4.7/4.6), costs more, no effect on Sonnet/Haiku; applied via a `--settings` overlay on next session start |
 | `claudeMirror.permissionMode` | `"full-access"` | Permission mode: "full-access" (all tools) or "supervised" (read-only tools only) |

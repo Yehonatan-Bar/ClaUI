@@ -73,6 +73,19 @@ export class AgentBridge {
         },
       });
     });
+
+    // Agent process lifecycle -> server participant status, so the server stops
+    // routing prompts into a dead agent and resumes once it recovers. Claude
+    // only: Codex spawns a fresh process per turn, so its exits are normal.
+    this.runner.on('processStopped', () => {
+      if (this.runner.getProvider() !== 'claude') return;
+      this.log('[AgentBridge] Claude stopped, marking agent offline');
+      this.client.send({ type: 'agentStatus', status: 'offline' });
+    });
+    this.runner.on('processStarted', () => {
+      this.log('[AgentBridge] Claude started, marking agent online');
+      this.client.send({ type: 'agentStatus', status: 'online' });
+    });
   }
 
   private handleDeliverPrompt(
