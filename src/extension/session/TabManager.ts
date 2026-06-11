@@ -14,6 +14,11 @@ import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import type { TokenUsageRatioTracker } from './TokenUsageRatioTracker';
 import type { SkillUsageTracker } from '../skillgen/SkillUsageTracker';
+import {
+  ClaudeAccountProfileStore,
+  DEFAULT_CLAUDE_ACCOUNT_PROFILE_ID,
+  type ClaudeAccountProfile,
+} from '../auth/ClaudeAccountProfileStore';
 import { HandoffContextBuilder } from './handoff/HandoffContextBuilder';
 import { HandoffPromptComposer } from './handoff/HandoffPromptComposer';
 import { HandoffArtifactStore } from './handoff/HandoffArtifactStore';
@@ -61,6 +66,8 @@ export interface TabSummary {
   isBusy: boolean;
   /** Absolute worktree path this tab's session runs in, or null for the primary worktree. */
   worktreePath: string | null;
+  claudeAccountProfileId: string | null;
+  claudeAccountProfileLabel: string | null;
 }
 
 /** A worktree the active session could be moved into (for the move-session picker). */
@@ -108,6 +115,7 @@ export class TabManager {
   private readonly worktreeController: WorktreeController;
 
   private readonly snapshotStore: OpenTabsSnapshotStore;
+  private readonly accountProfileStore: ClaudeAccountProfileStore;
   private readonly snapshotEntries = new Map<string, OpenTabSnapshotEntry>();
   private snapshotDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isRestoringSnapshot = false;
@@ -158,6 +166,7 @@ export class TabManager {
     );
 
     this.snapshotStore = new OpenTabsSnapshotStore(context.workspaceState);
+    this.accountProfileStore = new ClaudeAccountProfileStore(context.globalState, context.globalStorageUri);
 
     this.worktreeController = new WorktreeController(
       {
@@ -218,6 +227,29 @@ export class TabManager {
     return this.tabGroupStore;
   }
 
+  getClaudeAccountProfileStore(): ClaudeAccountProfileStore {
+    return this.accountProfileStore;
+  }
+
+  applyClaudeAccountProfile(tab: SessionTab, profile: ClaudeAccountProfile | null): void {
+    const effective = profile?.isDefault ? null : profile;
+    if (effective) {
+      this.accountProfileStore.ensureDirectoryExists(effective);
+    }
+    tab.setClaudeAccountProfile(effective);
+    const entry = this.snapshotEntries.get(tab.id);
+    if (entry) {
+      entry.claudeAccountProfileId = effective?.id;
+      entry.savedAt = new Date().toISOString();
+      this.schedulePersistSnapshot();
+    }
+    if (effective?.id) {
+      void this.accountProfileStore.markUsed(effective.id);
+    }
+    this.treeChangeEmitter.fire();
+    this.broadcastTabsState();
+  }
+
   listTabs(): TabSummary[] {
     const out: TabSummary[] = [];
     for (const tab of this.tabs.values()) {
@@ -235,6 +267,10 @@ export class TabManager {
         isBusy: (tab as { isBusyState?: () => boolean }).isBusyState?.() ?? false,
         worktreePath:
           (tab as { getWorktreePath?: () => string | null }).getWorktreePath?.() ?? null,
+        claudeAccountProfileId:
+          tab instanceof SessionTab ? tab.getClaudeAccountProfileId() : null,
+        claudeAccountProfileLabel:
+          tab instanceof SessionTab ? tab.getClaudeAccountProfile()?.label ?? null : null,
       });
     }
     return out;
@@ -423,7 +459,12 @@ export class TabManager {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const sourceCwd = tab.getWorktreePath() ?? root;
 
-    const relocated = relocateSessionTranscript(sessionId, targetWorktreePath, sourceCwd);
+    const relocated = relocateSessionTranscript(
+      sessionId,
+      targetWorktreePath,
+      sourceCwd,
+      tab.getClaudeConfigDir() ?? undefined,
+    );
     if (!relocated.ok) {
       return { ok: false, reason: `Could not relocate the session transcript: ${relocated.error}` };
     }
@@ -509,6 +550,12 @@ export class TabManager {
     }
     if (this.workspaceAccessGuardService) {
       tab.setWorkspaceAccessGuardService(this.workspaceAccessGuardService);
+    }
+    const currentProfile = this.accountProfileStore.getCurrentProfile();
+    if (!currentProfile.isDefault) {
+      this.accountProfileStore.ensureDirectoryExists(currentProfile);
+      tab.setClaudeAccountProfile(currentProfile);
+      void this.accountProfileStore.markUsed(currentProfile.id);
     }
     tab.setWorktreeController(this.worktreeController);
     tab.setSessionStore(this.sessionStore);
@@ -597,11 +644,13 @@ export class TabManager {
       .getConfiguration('claudeMirror')
       .get<string>('happy.cliPath', 'happy');
     tab.setCliPathOverride(happyCliPath);
+    tab.setClaudeAccountProfile(null);
     // Upgrade the just-seeded entry now that provider/cliPath are known.
     const entry = this.snapshotEntries.get(tab.id);
     if (entry) {
       entry.provider = 'remote';
       entry.cliPathOverride = happyCliPath;
+      entry.claudeAccountProfileId = undefined;
       this.schedulePersistSnapshot();
     }
     this.log(`Happy provider tab created: ${tab.id} cliPath=${happyCliPath}`);
@@ -915,6 +964,108 @@ export class TabManager {
     }
   }
 
+  async handoffClaudeAccount(request: {
+    sourceTabId?: string;
+    targetProfileId: string;
+    keepSourceOpen?: boolean;
+  }): Promise<{ targetTabId: string; artifactPath?: string }> {
+    const sourceTab = request.sourceTabId ? this.getTabById(request.sourceTabId) : this.getActiveTab();
+    if (!sourceTab) {
+      throw new Error('No source tab found for Claude account handoff.');
+    }
+    if (!(sourceTab instanceof SessionTab) || sourceTab.getProvider() !== 'claude') {
+      throw new Error('Claude account handoff requires an active Claude Code tab.');
+    }
+
+    const enabled = vscode.workspace.getConfiguration('claudeMirror').get<boolean>('handoff.enabled', true);
+    if (!enabled) {
+      throw new Error('Context handoff is disabled by settings (claudeMirror.handoff.enabled=false).');
+    }
+    if (sourceTab.isBusyState()) {
+      throw new Error('Finish or stop the current turn before switching Claude accounts with context.');
+    }
+    if (this.handoffLocks.has(sourceTab.id)) {
+      throw new Error('A handoff is already in progress for this tab.');
+    }
+
+    const targetProfile = this.accountProfileStore.getProfile(request.targetProfileId);
+    if (!targetProfile) {
+      throw new Error(`Claude account profile not found: ${request.targetProfileId}`);
+    }
+    const sourceProfileId = sourceTab.getClaudeAccountProfileId() ?? DEFAULT_CLAUDE_ACCOUNT_PROFILE_ID;
+    if (sourceProfileId === targetProfile.id) {
+      throw new Error('Source and target Claude account profiles are identical.');
+    }
+
+    const now = Date.now();
+    const lastAt = this.handoffLastByTab.get(sourceTab.id) ?? 0;
+    if (now - lastAt < HANDOFF_COOLDOWN_MS) {
+      throw new Error('Please wait a moment before switching accounts again.');
+    }
+
+    this.handoffLocks.add(sourceTab.id);
+    const keepSourceOpen = request.keepSourceOpen ?? true;
+    let artifactPath: string | undefined;
+
+    try {
+      this.log(
+        `[AccountHandoff] start tab=${sourceTab.id} sourceProfile=${sourceProfileId} targetProfile=${targetProfile.id}`,
+      );
+      const sourceSnapshot = await sourceTab.collectHandoffSnapshot();
+      sourceSnapshot.accountProfileId = sourceProfileId;
+      sourceSnapshot.accountProfileLabel =
+        sourceTab.getClaudeAccountProfile()?.label ?? this.accountProfileStore.getDefaultProfile().label;
+
+      const startedAt = Date.now();
+      const result = await this.handoffOrchestrator.run({
+        source: sourceSnapshot,
+        targetProvider: 'claude',
+        targetAccountProfileId: targetProfile.id,
+        targetAccountProfileLabel: targetProfile.label,
+        createTargetTab: () => {
+          const targetTab = this.createClaudeTab();
+          this.applyClaudeAccountProfile(targetTab, targetProfile);
+          return this.wrapHandoffTargetRuntime(targetTab);
+        },
+        onProgress: (update) => {
+          const durationMs = Date.now() - startedAt;
+          this.log(
+            `[AccountHandoff] stage=${update.stage} tab=${sourceTab.id} ` +
+              `sourceProfile=${sourceProfileId} targetProfile=${targetProfile.id} durationMs=${durationMs}`,
+          );
+          sourceTab.postMessage({
+            type: 'handoffProgress',
+            ...update,
+          });
+        },
+      });
+
+      artifactPath = result.artifact?.markdownPath ?? result.artifact?.jsonPath;
+      await this.linkHandoffMetadata({
+        sourceSessionId: sourceSnapshot.sessionId,
+        sourceProvider: 'claude',
+        sourceTabId: sourceTab.id,
+        sourceClaudeAccountProfileId: sourceProfileId,
+        targetSessionId: result.targetSessionId,
+        targetProvider: 'claude',
+        targetTabId: result.targetTabId,
+        targetClaudeAccountProfileId: targetProfile.id,
+        artifactPath,
+      });
+
+      this.handoffLastByTab.set(sourceTab.id, Date.now());
+      this.handoffLastByTab.set(result.targetTabId, Date.now());
+
+      if (!keepSourceOpen) {
+        this.closeTab(sourceTab.id);
+      }
+
+      return { targetTabId: result.targetTabId, artifactPath };
+    } finally {
+      this.handoffLocks.delete(sourceTab.id);
+    }
+  }
+
   /** Dispose all tabs (used during extension deactivation) */
   async closeAllTabs(): Promise<void> {
     // Set the shutdown guard FIRST so the disposal cascade (panel.onDidDispose
@@ -1140,9 +1291,11 @@ export class TabManager {
     sourceSessionId?: string;
     sourceProvider: HandoffProvider;
     sourceTabId: string;
+    sourceClaudeAccountProfileId?: string;
     targetSessionId?: string;
     targetProvider: HandoffProvider;
     targetTabId: string;
+    targetClaudeAccountProfileId?: string;
     artifactPath?: string;
   }): Promise<void> {
     const completedAt = new Date().toISOString();
@@ -1154,6 +1307,7 @@ export class TabManager {
           ...existing,
           handoffTargetTabId: args.targetTabId,
           handoffTargetProvider: args.targetProvider,
+          handoffTargetClaudeAccountProfileId: args.targetClaudeAccountProfileId,
           handoffArtifactPath: args.artifactPath,
           handoffCompletedAt: completedAt,
         });
@@ -1167,6 +1321,7 @@ export class TabManager {
           ...existing,
           handoffSourceTabId: args.sourceTabId,
           handoffSourceProvider: args.sourceProvider,
+          handoffSourceClaudeAccountProfileId: args.sourceClaudeAccountProfileId,
           handoffArtifactPath: args.artifactPath,
           handoffCompletedAt: completedAt,
         });
@@ -1236,6 +1391,8 @@ export class TabManager {
       workspacePath: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
       worktreePath:
         (tab as { getWorktreePath?: () => string | null }).getWorktreePath?.() ?? undefined,
+      claudeAccountProfileId:
+        tab instanceof SessionTab ? tab.getClaudeAccountProfileId() ?? undefined : undefined,
       savedAt: new Date().toISOString(),
     };
     this.snapshotEntries.set(tab.id, entry);
@@ -1269,6 +1426,9 @@ export class TabManager {
     }
     entry.provider = provider;
     entry.cliPathOverride = cliPathOverride ?? undefined;
+    if (provider !== 'claude') {
+      entry.claudeAccountProfileId = undefined;
+    }
     entry.savedAt = new Date().toISOString();
     this.schedulePersistSnapshot();
     this.applyEffectiveTabIcon(tabId);
@@ -1459,6 +1619,23 @@ export class TabManager {
                 this.log(`[OpenTabsSnapshot] Pinning subsequent restored tabs to column ${restoreColumn}`);
               }
 
+              if (entry.provider === 'claude' && tab instanceof SessionTab) {
+                const requestedProfileId =
+                  entry.claudeAccountProfileId ?? DEFAULT_CLAUDE_ACCOUNT_PROFILE_ID;
+                const profile = this.accountProfileStore.getProfile(requestedProfileId);
+                if (profile) {
+                  this.applyClaudeAccountProfile(tab, profile);
+                } else {
+                  this.applyClaudeAccountProfile(tab, this.accountProfileStore.getDefaultProfile());
+                  this.log(
+                    `[OpenTabsSnapshot] Claude account profile missing during restore: ${requestedProfileId}; using Default`,
+                  );
+                  void vscode.window.showWarningMessage(
+                    `Claude account profile "${requestedProfileId}" no longer exists. Restored that tab with Default instead.`,
+                  );
+                }
+              }
+
               // For remote (Happy) tabs, prefer the live setting over the
               // snapshot value in case the user has since moved the CLI.
               if (entry.provider === 'remote' && tab instanceof SessionTab) {
@@ -1595,6 +1772,10 @@ export class TabManager {
         worktreePath:
           (tab as { getWorktreePath?: () => string | null }).getWorktreePath?.() ??
           original?.worktreePath,
+        claudeAccountProfileId:
+          tab instanceof SessionTab
+            ? tab.getClaudeAccountProfileId() ?? original?.claudeAccountProfileId
+            : undefined,
         savedAt: new Date().toISOString(),
         customName: original?.customName,
         groupId: original?.groupId,

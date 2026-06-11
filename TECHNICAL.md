@@ -118,6 +118,7 @@ claude-code-mirror/
 |   |   |   +-- McpSecretsService.ts     #   SecretStorage registry for MCP placeholders + process env injection
 |   |   +-- auth/
 |   |   |   +-- AuthManager.ts           #   Claude CLI auth status/login/logout helpers
+|   |   |   +-- ClaudeAccountProfileStore.ts # Global Claude account profile CRUD + CLAUDE_CONFIG_DIR resolution
 |   |   +-- skillgen/
 |   |   |   +-- SkillGenStore.ts          #   Document ledger persistence (globalState)
 |   |   |   +-- SkillGenService.ts        #   Main orchestrator (scan, preflight, lock, pipeline, dedup, install)
@@ -533,10 +534,10 @@ claude-code-mirror/
 
 ## Component Index
 
-**SessionTab** - Bundles all per-tab resources (process, demux, control, message handler, webview panel) and wires them together. Each tab is fully independent with its own CLI process. Generates a colored SVG icon for the VS Code tab bar and supports tab renaming via a hover button. Supports per-tab CLI override (`cliPathOverride`) so Happy provider sessions can reuse the same pipeline while spawning `happy` instead of `claude`. Exposes `getCliPathOverride()` and `getProvider()` via `WebviewBridge`, stamps `sessionStarted` with the active provider, and persists provider-aware metadata/analytics (`claude` vs `remote`). Detects missing CLI binaries and Happy auth-required stderr patterns, suppresses known non-fatal CLI stderr notices (for example `Using Claude Code v... from npm`), and sends targeted guidance to the webview instead of generic noise. Focus behavior is hardened: window-focus events no longer call `panel.reveal()`, `focusInput` is delayed/throttled, and diagnostic logs capture schedule/suppress/post decisions.
+**SessionTab** - Bundles all per-tab resources (process, demux, control, message handler, webview panel) and wires them together. Each tab is fully independent with its own CLI process. Generates a colored SVG icon for the VS Code tab bar and supports tab renaming via a hover button. Supports per-tab CLI override (`cliPathOverride`) so Happy provider sessions can reuse the same pipeline while spawning `happy` instead of `claude`. Claude tabs also store a per-tab Claude account profile (`claudeAccountProfileId` + `claudeConfigDir`) and thread it through start, model switch, MCP restart, silent crash resume, cancel auto-resume, BTW sessions, merge assistant sessions, conversation replay, and end-of-session summarization. Exposes `getCliPathOverride()`, `getProvider()`, and Claude account getters via `WebviewBridge`, stamps `sessionStarted` with provider/account metadata, and persists provider/account-aware metadata/analytics. Detects missing CLI binaries and Happy auth-required stderr patterns, suppresses known non-fatal CLI stderr notices (for example `Using Claude Code v... from npm`), and sends targeted guidance to the webview instead of generic noise. Focus behavior is hardened: window-focus events no longer call `panel.reveal()`, `focusInput` is delayed/throttled, and diagnostic logs capture schedule/suppress/post decisions.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**TabManager** - Manages all SessionTab instances. Tracks the active (focused) tab, provides create/close/closeAll methods, shares a single status bar item, assigns distinct colors from an 8-color palette, and groups tabs in the same editor column. Owns the open-tabs snapshot: listens to `onSessionIdAssigned` / `onNameChanged` / focus / close callbacks, writes a debounced per-workspace snapshot to `workspaceState`, and exposes `restoreFromSnapshot()` for startup restoration.
+**TabManager** - Manages all SessionTab instances. Tracks the active (focused) tab, provides create/close/closeAll methods, shares a single status bar item, assigns distinct colors from an 8-color palette, and groups tabs in the same editor column. Owns `ClaudeAccountProfileStore`, applies the current Claude account profile to new Claude tabs, persists `claudeAccountProfileId` in the open-tabs snapshot, restores tabs with their saved profile, and implements `handoffClaudeAccount(...)` for Claude-to-Claude account context handoff. Owns the open-tabs snapshot: listens to `onSessionIdAssigned` / `onNameChanged` / focus / close callbacks, writes a debounced per-workspace snapshot to `workspaceState`, and exposes `restoreFromSnapshot()` for startup restoration.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Session Restore on Startup** - Optional feature (setting `claudeMirror.restoreSessionsOnStartup`, default true). When enabled, automatically reopens all ClaUi tabs (Claude / Codex / Happy) that were open when VS Code last closed. Snapshot is stored per-workspace in `workspaceState`, capped by configurable setting `claudeMirror.restoreSessionsMaxTabs` (default 15, range 1–50), and restored serially with a progress notification. Tab selection prioritizes **most-recently focused tabs** (`lastFocusedAt` field) when truncating, and guarantees the **active tab is always included** even if it would fall outside the limit. Unrestored tabs are preserved as `preserved-{sessionId}` entries (up to 50 total) so users can manually reopen them later without losing metadata. Only the originally-active tab eagerly spawns its CLI process; the rest are restored as **lazy panels** that spawn their CLI on first user focus, keeping memory and CPU low when many tabs are restored but only a few are actively used. Tab order is preserved via `tabOrder` field assigned at shutdown. A sticky `restoreInProgress` flag in `workspaceState` acts as a **crash-loop breaker**: if a previous restore did not finish cleanly, auto-restore is skipped and a `Restore now` button is offered. Smart Search tabs are restored fresh (no resume): the snapshot keeps `tabKind='search'` + `searchModel`, and the restore branch calls `configureSearchMode` + `startSession({ cwd: $HOME })` instead of the resume path.
@@ -564,10 +565,12 @@ claude-code-mirror/
 **ClaUiSidebarViewProvider** - Provides the Activity Bar sidebar launcher view (`claui.sidebarLauncher`) and forwards button clicks from the sidebar webview to existing extension commands (start session, history, discovery, logs). This gives ClaUi a dedicated left-side VS Code icon without moving the main chat UI into the sidebar.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ACTIVITY_BAR_LAUNCHER.md`
 
-**AuthManager** - Claude account auth helper for the extension host. Reads `.claude/.credentials.json` presence (legacy stub behavior) and now runs `claude auth status --json` / `claude auth logout` via `execFile` with a 10s timeout. Returns normalized `{ loggedIn, email, subscriptionType }` to `MessageHandler`, which forwards status to the webview and triggers logout refresh.
+**AuthManager** - Claude account auth helper for the extension host. Reads `.credentials.json` presence (legacy stub behavior) and runs `claude auth status --json` / `claude auth logout` via `execFile` with a 10s timeout. Calls are profile-aware: non-default Claude account profiles inject `CLAUDE_CONFIG_DIR`, while the Default profile keeps normal `~/.claude` behavior. Returns normalized `{ loggedIn, email, subscriptionType }` to `MessageHandler`, which forwards status to the webview and triggers logout refresh.
+
+**ClaudeAccountProfileStore** - GlobalState-backed profile registry for multiple Claude Code accounts. Stores `{ id, label, configDir, createdAt, lastUsedAt }`, provides built-in `Default`, creates per-profile config dirs under `<globalStorageUri>/claude-profiles/<profile-id>`, tracks the current profile for new Claude tabs, and resolves/ensures config dirs without editing `.credentials.json`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CLAUDE_AUTH_LOGIN_LOGOUT.md`
 
-**ClaudeProcessManager** - Spawns the Claude CLI child process with stream-json flags, handles stdin/stdout piping, process lifecycle, and crash detection. Uses the shared `killProcessTree()` utility on Windows to kill the entire process tree (required because `shell: true` creates a cmd.exe wrapper that SIGTERM alone cannot penetrate). Reads the user's API key from SecretStorage before each spawn and passes it via `buildClaudeCliEnv()`. Instantiated per-tab by SessionTab.
+**ClaudeProcessManager** - Spawns the Claude CLI child process with stream-json flags, handles stdin/stdout piping, process lifecycle, and crash detection. Uses the shared `killProcessTree()` utility on Windows to kill the entire process tree (required because `shell: true` creates a cmd.exe wrapper that SIGTERM alone cannot penetrate). Reads the user's API key from SecretStorage before each spawn and passes it via `buildClaudeCliEnv()`. Accepts optional `claudeConfigDir` / `claudeAccountProfileId` start options and injects `CLAUDE_CONFIG_DIR` for non-default account profiles, logging only profile ids and shortened paths. Instantiated per-tab by SessionTab.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Process Tree Kill (`killTree.ts`)** - Shared utility for cross-platform child process tree termination. On Windows, uses `taskkill /F /T /PID` to kill the cmd.exe wrapper AND all descendant processes. On Unix, uses standard `SIGTERM`. Used by all 13 CLI spawn points: `ClaudeProcessManager`, `CodexExecProcessManager`, `SessionNamer`, `CodexSessionNamer`, `ActivitySummarizer`, `VisualProgressProcessor`, `MessageTranslator`, `TurnAnalyzer`, `PromptEnhancer`, `PromptTranslator`, `ClaudeCliCaller`, `AchievementInsightAnalyzer`, `PythonPhaseRunner`.
@@ -662,7 +665,7 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **SessionStore** - Persists session metadata (ID, name, model, timestamps, first prompt) in VS Code `globalState`. The History command (`Ctrl+Shift+H`) first shows a source picker with two options: "Extension Sessions" (ClaUi-only sessions from SessionStore) and "All Sessions" (delegates to SessionDiscovery for disk-wide scan including CLI sessions). Extension Sessions shows session name, model, relative time, and first prompt line. Preserves existing names when sessions are resumed. Capped at 100 entries, sorted by most recently active. `claudeMirror.showHistory` now includes request-scoped diagnostics (`[showHistory#N] ...`) and an in-flight guard to prevent overlapping quick-pick flows.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**ConversationReader** - Reads full conversation history from Claude Code's local session storage (`~/.claude/projects/<project-hash>/<session-id>.jsonl`). When resuming a session, the CLI in pipe mode waits for user input before replaying messages. ConversationReader bypasses this by reading the JSONL file directly, merging partial assistant entries by message ID, filtering out tool_result and thinking blocks, and sending the conversation to the webview for immediate display. Used by `SessionTab.startSession()` during resume (not fork).
+**ConversationReader** - Reads full conversation history from Claude Code's local session storage (`<Claude config dir>/projects/<project-hash>/<session-id>.jsonl`, defaulting to `~/.claude`). When resuming a session, the CLI in pipe mode waits for user input before replaying messages. ConversationReader bypasses this by reading the JSONL file directly, merging partial assistant entries by message ID, filtering out tool_result and thinking blocks, and sending the conversation to the webview for immediate display. Used by `SessionTab.startSession()` during resume (not fork).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **SessionTruncator** - Truncates JSONL session files for fork-with-context-reduction. When a user forks a conversation at message N, creates a new JSONL file containing only messages 0..N-1 (plus metadata). Classifies JSONL lines (real user, tool_result user, isMeta user, assistant, metadata), maps them to UI message indices mirroring ConversationReader's logic, determines the cut point, extends forward through agentic tool_use loops to avoid dangling tool_use blocks, and ensures the truncated file ends with an assistant message. The fork command uses `--resume <truncated-id>` (no `--fork-session`) so the CLI loads only the truncated context. Falls back to the original full-fork behavior on any failure. Path resolution uses the shared `sessionPathResolver` utility.
@@ -857,6 +860,7 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 | `claudeMirror.teams.pollIntervalMs` | `2000` | Polling interval for team file watching (ms) |
 | `claudeMirror.sessionEndSummary` | `true` | Generate a 1-3 sentence summary at the end of every session (Haiku, with Codex low-reasoning fallback). Stored on the session and shown on hover in the Sessions TreeView. |
 | `claudeMirror.tabs.indicateGroupOnTitle` | `false` | When a tab belongs to a folder, also prefix its native tab title with a colored bar character (opt-in). |
+| `claudeMirror.claudeAccounts.experimentalTrueResume` | `false` | Reserved feature flag for future cross-account true resume; current implementation uses context handoff. |
 | `claudeMirror.smartSearch.defaultModel` | `"claude-sonnet-4-6"` | Default model used when `claudeMirror.smartSearch.open` is invoked from the command palette without a `model` argument. |
 | `claudeMirror.smartSearch.allowBash` | `true` | Allow the Smart Search agent to use Bash (ripgrep). Disable to restrict the agent to Read + Glob + Grep only. |
 | `claudeMirror.particleAccelerator.enabled` | `false` | Enable Particle Accelerator command output compression |
@@ -1156,6 +1160,59 @@ npm install -g @vscode/vsce
 | **6. Polish** | Pending | Virtualized scrolling, error recovery, theming |
 
 ---
+
+## 2026-06-11 - Claude Account Profiles
+
+### New Components
+
+- `src/extension/auth/ClaudeAccountProfileStore.ts`
+  - GlobalState-backed Claude account profile CRUD, current-profile tracking, and config-dir creation under `<globalStorageUri>/claude-profiles/<profile-id>`.
+- `Kingdom_of_Claudes_Beloved_MDs/CLAUDE_ACCOUNT_PROFILES.md`
+  - Detail doc for multi-account behavior, handoff, storage, and security notes.
+
+### Updated Components
+
+- `src/extension/process/ClaudeProcessManager.ts`
+  - Added `claudeConfigDir` / `claudeAccountProfileId` start options and injects `CLAUDE_CONFIG_DIR` for non-default profiles.
+- `src/extension/auth/AuthManager.ts`
+  - Auth status/logout are profile-aware and run with `CLAUDE_CONFIG_DIR` when supplied.
+- `src/extension/session/SessionTab.ts`
+  - Stores Claude account profile per tab and threads it through CLI start/restart/resume paths, auth status, conversation replay, BTW sessions, merge assistant sessions, and summary generation.
+- `src/extension/session/TabManager.ts`
+  - Applies current profile to new Claude tabs, persists/restores `claudeAccountProfileId`, handles deleted profiles gracefully, and adds Claude account context handoff.
+- `src/extension/session/OpenTabsSnapshot.ts`
+  - Adds `claudeAccountProfileId` to restored tab snapshots.
+- `src/extension/session/SessionStore.ts`
+  - Adds Claude account profile metadata for sessions and handoff links.
+- `src/extension/session/sessionPathResolver.ts`, `ConversationReader.ts`, `SessionTruncator.ts`, `SessionDiscovery.ts`, `SessionSummarizer.ts`
+  - Accept optional `claudeConfigDir` and default to `~/.claude` when omitted.
+- `src/extension/process/UsageFetcher.ts`
+  - Reads OAuth credentials from the selected profile config dir.
+- `src/extension/session/handoff/*`
+  - Capsule supports optional source/target account profile metadata.
+- `src/extension/commands.ts`
+  - Adds account management, login/logout, new-tab-with-account, and account handoff commands.
+
+### Manifest/Settings Delta
+
+Added commands:
+
+- `claudeMirror.claudeAccounts.manage`
+- `claudeMirror.claudeAccounts.login`
+- `claudeMirror.claudeAccounts.logout`
+- `claudeMirror.newClaudeTabWithAccount`
+- `claudeMirror.switchClaudeAccountWithContext`
+
+Added setting:
+
+- `claudeMirror.claudeAccounts.experimentalTrueResume` (default `false`, reserved for future true resume).
+
+### Behavior Notes
+
+- ClaUi never edits `.credentials.json` manually.
+- `Default` profile keeps historical behavior with no `CLAUDE_CONFIG_DIR`.
+- Non-default profiles isolate Claude CLI auth/config under extension global storage.
+- MVP account switching uses context handoff into a new Claude tab; true cross-account `--resume` is not active yet.
 
 ## 2026-03-05 - Provider Handoff (Claude Code <-> Codex) Mid-Session
 

@@ -89,6 +89,8 @@ export class HandoffContextBuilder {
   buildCapsule(args: {
     source: HandoffSourceSnapshot;
     targetProvider: HandoffProvider;
+    targetAccountProfileId?: string;
+    targetAccountProfileLabel?: string;
     turnBudget?: number;
     perTurnTextBudget?: number;
   }): HandoffCapsule {
@@ -175,10 +177,14 @@ export class HandoffContextBuilder {
         provider: source.provider,
         tabId: source.tabId,
         sessionId: source.sessionId,
+        accountProfileId: source.accountProfileId,
+        accountProfileLabel: source.accountProfileLabel,
         createdAtIso: source.createdAtIso,
       },
       target: {
         provider: args.targetProvider,
+        accountProfileId: args.targetAccountProfileId,
+        accountProfileLabel: args.targetAccountProfileLabel,
       },
       workspace: {
         cwd,

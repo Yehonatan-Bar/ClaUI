@@ -28,10 +28,14 @@ export interface HandoffCapsule {
     provider: HandoffProvider;
     tabId: string;
     sessionId?: string;
+    accountProfileId?: string;
+    accountProfileLabel?: string;
     createdAtIso: string;
   };
   target: {
     provider: HandoffProvider;
+    accountProfileId?: string;
+    accountProfileLabel?: string;
   };
   workspace: {
     cwd?: string;
@@ -58,6 +62,8 @@ export interface HandoffSourceSnapshot {
   provider: HandoffProvider;
   tabId: string;
   sessionId?: string;
+  accountProfileId?: string;
+  accountProfileLabel?: string;
   cwd?: string;
   repoRoot?: string;
   branch?: string;

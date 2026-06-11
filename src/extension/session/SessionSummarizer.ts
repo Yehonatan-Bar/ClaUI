@@ -19,6 +19,7 @@ export interface SummarizeArgs {
   cliPathOverride?: string;
   /** Used by Codex transcript discovery and CLI cwd. */
   workspacePath?: string;
+  claudeConfigDir?: string;
 }
 
 export interface SummarizeResult {
@@ -53,7 +54,7 @@ export class SessionSummarizer {
 
     const prompt = this.buildPrompt(transcript.text);
 
-    const haiku = await this.runHaiku(prompt);
+    const haiku = await this.runHaiku(prompt, args.claudeConfigDir);
     if (haiku) {
       return { text: haiku, source: 'haiku' };
     }
@@ -74,7 +75,7 @@ export class SessionSummarizer {
       messages = args.fallbackMessages;
     } else if (args.provider === 'claude') {
       const reader = new ConversationReader((m) => this.log(`[Summarizer/CR] ${m}`));
-      messages = reader.readSession(args.sessionId, args.workspacePath);
+      messages = reader.readSession(args.sessionId, args.workspacePath, args.claudeConfigDir);
     } else {
       // Codex transcripts live elsewhere; if a fallback list isn't provided, we currently
       // can't reliably read them. Caller should supply messages for Codex tabs.
@@ -148,13 +149,16 @@ export class SessionSummarizer {
 
   // ---------- Haiku (primary) ----------
 
-  private runHaiku(prompt: string): Promise<string | null> {
+  private runHaiku(prompt: string, claudeConfigDir?: string): Promise<string | null> {
     return new Promise<string | null>((resolve) => {
       const config = vscode.workspace.getConfiguration('claudeMirror');
       const cliPath = config.get<string>('cliPath', 'claude');
       const analysisModel = config.get<string>('analysisModel', 'claude-haiku-4-5-20251001');
       const args = ['-p', '--model', analysisModel];
       const env = buildClaudeCliEnv();
+      if (claudeConfigDir?.trim()) {
+        env.CLAUDE_CONFIG_DIR = claudeConfigDir;
+      }
 
       let stdout = '';
       let settled = false;

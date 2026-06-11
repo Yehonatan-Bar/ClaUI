@@ -106,7 +106,8 @@ export class UsageFetcher {
   // this fetcher reads the OAuth token directly instead.
   constructor(
     private readonly cliPath: string,
-    private readonly apiKey: string | undefined
+    private readonly apiKey: string | undefined,
+    private readonly claudeConfigDir?: string
   ) {}
 
   async fetch(): Promise<UsageFetchResult> {
@@ -143,7 +144,7 @@ export class UsageFetcher {
   /** Read the OAuth access token from ~/.claude/.credentials.json */
   private readAccessToken(): string | undefined {
     try {
-      const credsPath = join(homedir(), '.claude', '.credentials.json');
+      const credsPath = join(this.claudeConfigDir?.trim() || join(homedir(), '.claude'), '.credentials.json');
       const raw = readFileSync(credsPath, 'utf8');
       const creds: OAuthCredentials = JSON.parse(raw);
       return creds.claudeAiOauth?.accessToken;

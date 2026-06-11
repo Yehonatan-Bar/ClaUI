@@ -26,6 +26,7 @@ import { buildWebviewHtml } from '../webview/WebviewProvider';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import type { TokenUsageRatioTracker } from './TokenUsageRatioTracker';
 import { AuthManager } from '../auth/AuthManager';
+import type { ClaudeAccountProfile } from '../auth/ClaudeAccountProfileStore';
 import { TeamWatcher } from '../teams/TeamWatcher';
 import { TeamDetector } from '../teams/TeamDetector';
 import { TeamActions } from '../teams/TeamActions';
@@ -185,6 +186,9 @@ export class SessionTab implements WebviewBridge {
   private cwdOverride: string | null = null;
   /** Worktree this tab's session runs in (absolute path). Null = primary/main worktree (workspace root). */
   private worktreePath: string | null = null;
+  private claudeAccountProfile: ClaudeAccountProfile | null = null;
+  private claudeAccountProfileId: string | null = null;
+  private claudeConfigDir: string | null = null;
   /** Particle Accelerator service reference for context file lifecycle */
   private particleAcceleratorService: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService | null = null;
   /** Secret Protection service reference for DLP scanning */
@@ -426,6 +430,32 @@ export class SessionTab implements WebviewBridge {
     return this.cliPathOverride;
   }
 
+  setClaudeAccountProfile(profile: ClaudeAccountProfile | null): void {
+    if (!profile || profile.isDefault || !profile.configDir.trim()) {
+      this.claudeAccountProfile = null;
+      this.claudeAccountProfileId = null;
+      this.claudeConfigDir = null;
+      this.messageHandler.refreshClaudeAuthStatus();
+      return;
+    }
+    this.claudeAccountProfile = profile;
+    this.claudeAccountProfileId = profile.id;
+    this.claudeConfigDir = profile.configDir;
+    this.messageHandler.refreshClaudeAuthStatus();
+  }
+
+  getClaudeAccountProfile(): ClaudeAccountProfile | null {
+    return this.claudeAccountProfile;
+  }
+
+  getClaudeAccountProfileId(): string | null {
+    return this.claudeAccountProfileId;
+  }
+
+  getClaudeConfigDir(): string | null {
+    return this.claudeConfigDir;
+  }
+
   isBusyState(): boolean {
     return this.isBusy;
   }
@@ -439,7 +469,7 @@ export class SessionTab implements WebviewBridge {
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const sessionId = this.processManager.currentSessionId || undefined;
     const reader = new ConversationReader((msg) => this.log(`[Tab ${this.tabNumber}] ${msg}`));
-    const messages = sessionId ? reader.readSession(sessionId, workspacePath) : [];
+    const messages = sessionId ? reader.readSession(sessionId, workspacePath, this.claudeConfigDir ?? undefined) : [];
     const repoRoot = this.detectGitRepoRoot(workspacePath);
     const branch = this.detectGitBranch(repoRoot || workspacePath);
 
@@ -447,6 +477,8 @@ export class SessionTab implements WebviewBridge {
       provider: provider as HandoffProvider,
       tabId: this.id,
       sessionId,
+      accountProfileId: this.claudeAccountProfileId ?? undefined,
+      accountProfileLabel: this.claudeAccountProfile?.label,
       cwd: workspacePath,
       repoRoot,
       branch,
@@ -491,6 +523,7 @@ export class SessionTab implements WebviewBridge {
           model,
           cwd: this.getEffectiveCwd(),
           cliPathOverride: this.cliPathOverride ?? undefined,
+          ...this.claudeAccountProcessOptions(),
         });
         this.log(`[Tab ${this.tabNumber}] Session restarted fresh with model "${model}"`);
         this.postMessage({ type: 'processBusy', busy: false });
@@ -519,6 +552,7 @@ export class SessionTab implements WebviewBridge {
         model,
         cwd: this.getEffectiveCwd(),
         cliPathOverride: this.cliPathOverride ?? undefined,
+        ...this.claudeAccountProcessOptions(),
       });
       this.log(`[Tab ${this.tabNumber}] Session resumed with model "${model}"`);
       this.postMessage({ type: 'processBusy', busy: false });
@@ -565,6 +599,7 @@ export class SessionTab implements WebviewBridge {
         cliPathOverride: this.cliPathOverride ?? undefined,
         appendSystemPrompt: this.appendSystemPrompt ?? undefined,
         allowedTools: this.allowedTools ?? undefined,
+        ...this.claudeAccountProcessOptions(),
       });
       // In pipe mode the CLI emits system/init only after the first stdin
       // message, so re-seed the id now to avoid a null-session window.
@@ -759,6 +794,7 @@ export class SessionTab implements WebviewBridge {
         cliPathOverride: this.cliPathOverride ?? undefined,
         appendSystemPrompt: this.appendSystemPrompt ?? undefined,
         allowedTools: this.allowedTools ?? undefined,
+        ...this.claudeAccountProcessOptions(),
       });
       this.log(
         `[Tab ${this.tabNumber}] [SilentResume] start() resolved in ${Date.now() - startTs}ms; ` +
@@ -922,6 +958,7 @@ export class SessionTab implements WebviewBridge {
                 resume: sid,
                 cwd: this.getEffectiveCwd(),
                 cliPathOverride: this.cliPathOverride ?? undefined,
+                ...this.claudeAccountProcessOptions(),
               });
             } catch {
               vscode.window.showErrorMessage(
@@ -992,6 +1029,19 @@ export class SessionTab implements WebviewBridge {
     return this.worktreePath ?? this.cwdOverride ?? undefined;
   }
 
+  private claudeAccountProcessOptions(): {
+    claudeConfigDir?: string;
+    claudeAccountProfileId?: string;
+  } {
+    if (!this.claudeConfigDir) {
+      return {};
+    }
+    return {
+      claudeConfigDir: this.claudeConfigDir,
+      claudeAccountProfileId: this.claudeAccountProfileId ?? undefined,
+    };
+  }
+
   /** Tab kind ('chat' default, 'search' for Smart Search tabs). */
   getTabKind(): 'chat' | 'search' {
     return this.kind;
@@ -1041,6 +1091,7 @@ export class SessionTab implements WebviewBridge {
       cliPathOverride: this.cliPathOverride ?? undefined,
       appendSystemPrompt: this.appendSystemPrompt ?? undefined,
       allowedTools: this.allowedTools ?? undefined,
+      ...this.claudeAccountProcessOptions(),
     });
     this.achievementService.onSessionStart(this.id);
     this.postMessage({
@@ -1050,6 +1101,8 @@ export class SessionTab implements WebviewBridge {
       isResume: !!options?.resume,
       provider: this.getProvider(),
       tabKind: this.kind,
+      claudeAccountProfileId: this.claudeAccountProfileId,
+      claudeAccountProfileLabel: this.claudeAccountProfile?.label ?? null,
     });
 
     // If this is a fork, send the conversation history and prompt text
@@ -1092,7 +1145,7 @@ export class SessionTab implements WebviewBridge {
     const tabLog = this.log;
     const reader = new ConversationReader((msg) => tabLog(`[Tab ${this.tabNumber}] ${msg}`));
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const messages = reader.readSession(sessionId, workspacePath);
+    const messages = reader.readSession(sessionId, workspacePath, this.claudeConfigDir ?? undefined);
 
     // Seed the process manager with the resumed id so features that need it
     // before the CLI emits system/init (e.g. edit-and-resend) don't see null.
@@ -1243,6 +1296,7 @@ export class SessionTab implements WebviewBridge {
     this.btwSession = new BackgroundSession(
       this.context,
       (msg) => this.log(`[Tab ${this.tabNumber}] ${msg}`),
+      this.claudeAccountProcessOptions(),
     );
     this.wireBtwSessionEvents();
     this.log(`[Tab ${this.tabNumber}] [BTW->WV] btwSessionStarted`);
@@ -1349,7 +1403,10 @@ export class SessionTab implements WebviewBridge {
     );
     this.wireMergeAssistantEvents();
 
-    this.mergeAssistant.start(opts).catch((err: unknown) => {
+    this.mergeAssistant.start({
+      ...opts,
+      ...this.claudeAccountProcessOptions(),
+    }).catch((err: unknown) => {
       const errMsg = err instanceof Error ? err.message : String(err);
       this.log(`[Tab ${this.tabNumber}] merge assistant start failed: ${errMsg}`);
       this.closeMergeAssistant();
@@ -1532,6 +1589,7 @@ export class SessionTab implements WebviewBridge {
       lastActiveAt: new Date().toISOString(),
       firstPrompt: this.firstPrompt || existing?.firstPrompt,
       workspacePath: existing?.workspacePath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+      claudeAccountProfileId: this.claudeAccountProfileId ?? undefined,
     });
   }
 
@@ -1882,6 +1940,7 @@ export class SessionTab implements WebviewBridge {
             .start({
               resume: sessionToResume,
               cliPathOverride: this.cliPathOverride ?? undefined,
+              ...this.claudeAccountProcessOptions(),
             })
             .then(() => {
               tabLog('Session auto-resumed after cancel');
@@ -2020,6 +2079,7 @@ export class SessionTab implements WebviewBridge {
                   await this.processManager.start({
                     resume: currentSessionId,
                     cliPathOverride: this.cliPathOverride ?? undefined,
+                    ...this.claudeAccountProcessOptions(),
                   });
                 } catch {
                   vscode.window.showErrorMessage(
@@ -2263,6 +2323,7 @@ export class SessionTab implements WebviewBridge {
         provider: 'claude',
         cliPathOverride: this.cliPathOverride ?? undefined,
         workspacePath: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+        claudeConfigDir: this.claudeConfigDir ?? undefined,
       });
       if (!result) {
         this.log('[Summarizer] No summary produced (transient — flag stays unset for retry)');
@@ -2686,7 +2747,8 @@ export class SessionTab implements WebviewBridge {
   private recoverTeamForSession(sessionId: string): void {
     try {
       const homeDir = process.env.USERPROFILE || process.env.HOME || '';
-      const teamsDir = require('path').join(homeDir, '.claude', 'teams');
+      const claudeDir = this.claudeConfigDir || require('path').join(homeDir, '.claude');
+      const teamsDir = require('path').join(claudeDir, 'teams');
       const fs = require('fs') as typeof import('fs');
       if (!fs.existsSync(teamsDir)) return;
 

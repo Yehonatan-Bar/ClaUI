@@ -2,7 +2,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
-const CLAUDE_DIR = path.join(os.homedir(), '.claude');
+function resolveClaudeDir(claudeConfigDir?: string): string {
+  return claudeConfigDir?.trim() || path.join(os.homedir(), '.claude');
+}
 
 /**
  * Find the JSONL file for a session ID.
@@ -11,8 +13,9 @@ const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 export function findSessionJsonlPath(
   sessionId: string,
   workspacePath?: string,
+  claudeConfigDir?: string,
 ): string | null {
-  const projectsDir = path.join(CLAUDE_DIR, 'projects');
+  const projectsDir = path.join(resolveClaudeDir(claudeConfigDir), 'projects');
   if (!fs.existsSync(projectsDir)) {
     return null;
   }
@@ -76,13 +79,14 @@ export function relocateSessionTranscript(
   sessionId: string,
   targetCwd: string,
   sourceWorkspacePath?: string,
+  claudeConfigDir?: string,
 ): { ok: true; targetPath: string } | { ok: false; error: string } {
-  const src = findSessionJsonlPath(sessionId, sourceWorkspacePath);
+  const src = findSessionJsonlPath(sessionId, sourceWorkspacePath, claudeConfigDir);
   if (!src) {
     return { ok: false, error: `Session transcript not found for ${sessionId}.` };
   }
 
-  const destDir = path.join(CLAUDE_DIR, 'projects', claudeProjectDirName(targetCwd));
+  const destDir = path.join(resolveClaudeDir(claudeConfigDir), 'projects', claudeProjectDirName(targetCwd));
   const destPath = path.join(destDir, `${sessionId}.jsonl`);
 
   // Already in the right place (e.g. moving to a worktree that encodes identically).

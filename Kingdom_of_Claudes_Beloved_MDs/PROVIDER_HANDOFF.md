@@ -45,6 +45,12 @@ Allow switching providers mid-session while preserving practical task continuity
 - Command palette: `ClaUi: Carry Codex Session to Claude Code`
 - Generic command remains available: `ClaUi: Switch Provider (Carry Context)`
 
+## Related: Claude Account Handoff
+
+Claude account switching uses a separate command, `ClaUi: Switch Claude Account (Carry Context)`, because the provider remains `claude` while the target `CLAUDE_CONFIG_DIR` changes. The provider handoff guard that rejects identical source/target providers remains unchanged.
+
+Details: `CLAUDE_ACCOUNT_PROFILES.md`.
+
 ## Main Files
 
 - `src/extension/session/handoff/HandoffTypes.ts`

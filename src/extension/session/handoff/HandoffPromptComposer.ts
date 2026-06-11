@@ -22,6 +22,8 @@ export class HandoffPromptComposer {
     const blockers = capsule.task.blockers.length > 0 ? capsule.task.blockers.join(' | ') : 'None listed';
     const nextSteps = capsule.task.nextSteps.length > 0 ? capsule.task.nextSteps.join(' | ') : 'Confirm next action from current files.';
     const files = capsule.touchedFiles.length > 0 ? capsule.touchedFiles.join(', ') : 'Not explicitly captured';
+    const sourceAccount = capsule.source.accountProfileLabel || capsule.source.accountProfileId;
+    const targetAccount = capsule.target.accountProfileLabel || capsule.target.accountProfileId;
 
     return [
       'Handoff context from a previous provider session.',
@@ -33,6 +35,9 @@ export class HandoffPromptComposer {
       `- Blockers: ${blockers}`,
       `- Next steps from previous context: ${nextSteps}`,
       `- Recently touched files: ${files}`,
+      sourceAccount || targetAccount
+        ? `- Claude account profile: ${sourceAccount || 'default'} -> ${targetAccount || 'default'}`
+        : '',
       '',
       'Handoff Capsule JSON (source of truth, may be truncated to fit budget):',
       '```json',

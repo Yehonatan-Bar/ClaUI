@@ -162,6 +162,26 @@
         "title": "ClaUi: Switch Provider (Carry Context)"
       },
       {
+        "command": "claudeMirror.switchClaudeAccountWithContext",
+        "title": "ClaUi: Switch Claude Account (Carry Context)"
+      },
+      {
+        "command": "claudeMirror.newClaudeTabWithAccount",
+        "title": "ClaUi: New Claude Tab With Account"
+      },
+      {
+        "command": "claudeMirror.claudeAccounts.manage",
+        "title": "ClaUi: Manage Claude Accounts"
+      },
+      {
+        "command": "claudeMirror.claudeAccounts.login",
+        "title": "ClaUi: Claude Account Login"
+      },
+      {
+        "command": "claudeMirror.claudeAccounts.logout",
+        "title": "ClaUi: Claude Account Logout"
+      },
+      {
         "command": "claudeMirror.carryCodexToClaudeCode",
         "title": "ClaUi: Carry Codex Session to Claude Code"
       },
@@ -269,6 +289,11 @@
           "type": "boolean",
           "default": true,
           "description": "Persist handoff artifacts (JSON + Markdown) under ClaUi managed logs for debugging and replay."
+        },
+        "claudeMirror.claudeAccounts.experimentalTrueResume": {
+          "type": "boolean",
+          "default": false,
+          "description": "Experimental: attempt true Claude session resume across account profiles by copying the transcript to the target CLAUDE_CONFIG_DIR before falling back to context handoff. Currently reserved for future implementation."
         },
         "claudeMirror.smartSearch.defaultModel": {
           "type": "string",
@@ -1365,6 +1390,21 @@
         },
         {
           "command": "claudeMirror.switchProviderWithContext"
+        },
+        {
+          "command": "claudeMirror.switchClaudeAccountWithContext"
+        },
+        {
+          "command": "claudeMirror.newClaudeTabWithAccount"
+        },
+        {
+          "command": "claudeMirror.claudeAccounts.manage"
+        },
+        {
+          "command": "claudeMirror.claudeAccounts.login"
+        },
+        {
+          "command": "claudeMirror.claudeAccounts.logout"
         },
         {
           "command": "claudeMirror.tabs.focus",

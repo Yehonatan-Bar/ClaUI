@@ -28,6 +28,8 @@ export class HandoffOrchestrator {
   async run(params: {
     source: HandoffSourceSnapshot;
     targetProvider: HandoffProvider;
+    targetAccountProfileId?: string;
+    targetAccountProfileLabel?: string;
     createTargetTab: (provider: HandoffProvider) => HandoffTargetRuntime;
     onProgress: (update: HandoffProgressUpdate) => void;
   }): Promise<HandoffRunResult> {
@@ -49,6 +51,8 @@ export class HandoffOrchestrator {
       const capsule = this.contextBuilder.buildCapsule({
         source: params.source,
         targetProvider: params.targetProvider,
+        targetAccountProfileId: params.targetAccountProfileId,
+        targetAccountProfileLabel: params.targetAccountProfileLabel,
       });
 
       prompt = this.promptComposer.compose(capsule);

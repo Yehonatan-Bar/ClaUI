@@ -1364,6 +1364,8 @@ export interface SessionStartedMessage {
   worktreePath?: string | null;
   /** Basename of worktreePath, shown as the in-chat worktree indicator, else null. */
   worktreeName?: string | null;
+  claudeAccountProfileId?: string | null;
+  claudeAccountProfileLabel?: string | null;
 }
 
 export interface SessionEndedMessage {
@@ -1894,6 +1896,8 @@ export interface WebviewTabSummary {
   orderInGroup?: number;
   slotColor: string;
   isBusy?: boolean;
+  claudeAccountProfileId?: string | null;
+  claudeAccountProfileLabel?: string | null;
 }
 
 export interface TabListMessage {

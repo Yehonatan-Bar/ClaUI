@@ -3,11 +3,17 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import type { TabManager } from './session/TabManager';
+import { SessionTab } from './session/SessionTab';
 import type { SessionStore } from './session/SessionStore';
 import type { ProviderId, SerializedChatMessage } from './types/webview-messages';
 import { openHtmlPreviewPanel } from './webview/HtmlPreviewPanel';
 import { MultiParticipantSessionTab } from './multiparticipant/MultiParticipantSessionTab';
 import { SessionTruncator } from './session/SessionTruncator';
+import { AuthManager } from './auth/AuthManager';
+import {
+  DEFAULT_CLAUDE_ACCOUNT_PROFILE_ID,
+  type ClaudeAccountProfile,
+} from './auth/ClaudeAccountProfileStore';
 
 function collectUrisFromArgs(args: unknown[]): vscode.Uri[] {
   const uris: vscode.Uri[] = [];
@@ -40,6 +46,14 @@ function formatRelativeTime(isoDate: string): string {
   if (diffHr < 24) return `${diffHr}h ago`;
   if (diffDay < 7) return `${diffDay}d ago`;
   return new Date(isoDate).toLocaleDateString();
+}
+
+function quoteTerminalArg(value: string): string {
+  const trimmed = (value || 'claude').trim() || 'claude';
+  if (!/[\s"'&|<>^]/.test(trimmed)) {
+    return trimmed;
+  }
+  return `"${trimmed.replace(/"/g, '\\"')}"`;
 }
 
 /** Plan mode prompt template for CLAUDE.md injection */
@@ -162,6 +176,141 @@ export function registerCommands(
     provider === 'codex' ? 'Codex' : provider === 'remote' ? 'Happy' : 'Claude';
   const handoffProviderLabel = (provider: ProviderId | 'claude' | 'codex'): string =>
     provider === 'claude' ? 'Claude Code' : providerLabel(provider);
+  const claudeProfileStore = tabManager.getClaudeAccountProfileStore();
+  const authManager = new AuthManager();
+
+  const profileLabel = (profile: ClaudeAccountProfile): string =>
+    profile.isDefault ? 'Default' : profile.label;
+
+  const pickClaudeProfile = async (
+    placeHolder: string,
+    opts?: { includeDefault?: boolean; excludeProfileId?: string | null }
+  ): Promise<ClaudeAccountProfile | undefined> => {
+    const includeDefault = opts?.includeDefault ?? true;
+    const profiles = claudeProfileStore
+      .list()
+      .filter((profile) => includeDefault || !profile.isDefault)
+      .filter((profile) => profile.id !== opts?.excludeProfileId);
+    const items = profiles.map((profile) => ({
+      label: `${profile.isDefault ? '$(home) ' : '$(account) '}${profileLabel(profile)}`,
+      description: profile.isDefault ? 'Uses the normal Claude CLI config' : `profileId=${profile.id}`,
+      detail: profile.lastUsedAt ? `Last used: ${formatRelativeTime(profile.lastUsedAt)}` : undefined,
+      profile,
+    }));
+    const picked = await vscode.window.showQuickPick(items, {
+      placeHolder,
+      matchOnDescription: true,
+      matchOnDetail: true,
+      ignoreFocusOut: true,
+    });
+    return picked?.profile;
+  };
+
+  const profileForSession = (sessionId: string | undefined): ClaudeAccountProfile => {
+    const profileId = sessionId ? sessionStore.getSession(sessionId)?.claudeAccountProfileId : undefined;
+    return claudeProfileStore.getProfile(profileId) ?? claudeProfileStore.getDefaultProfile();
+  };
+
+  const applyProfileToTab = (tab: unknown, profile: ClaudeAccountProfile): void => {
+    if (tab instanceof SessionTab) {
+      tabManager.applyClaudeAccountProfile(tab, profile);
+    }
+  };
+
+  const createClaudeProfile = async (): Promise<ClaudeAccountProfile | undefined> => {
+    const label = await vscode.window.showInputBox({
+      prompt: 'Claude account profile name',
+      placeHolder: 'Work, Personal, Client A...',
+      ignoreFocusOut: true,
+      validateInput: (value) => value.trim() ? undefined : 'Profile name is required.',
+    });
+    if (!label) {
+      return undefined;
+    }
+    const profile = await claudeProfileStore.create(label);
+    vscode.window.showInformationMessage(`Claude account profile created: ${profile.label}`);
+    return profile;
+  };
+
+  const openClaudeLoginForProfile = async (profile: ClaudeAccountProfile): Promise<void> => {
+    const cliPath = vscode.workspace.getConfiguration('claudeMirror').get<string>('cliPath', 'claude');
+    const configDir = claudeProfileStore.resolveConfigDir(profile);
+    const terminal = vscode.window.createTerminal({
+      name: `Claude Login: ${profileLabel(profile)}`,
+      env: configDir ? { CLAUDE_CONFIG_DIR: configDir } : undefined,
+    });
+    terminal.show();
+    terminal.sendText(`${quoteTerminalArg(cliPath)} auth login`, true);
+    await claudeProfileStore.markUsed(profile.id);
+    log(`Opened Claude login terminal for profileId=${profile.id}`);
+  };
+
+  const logoutClaudeProfile = async (profile: ClaudeAccountProfile): Promise<void> => {
+    const cliPath = vscode.workspace.getConfiguration('claudeMirror').get<string>('cliPath', 'claude');
+    const ok = await authManager.logout(cliPath, profile);
+    if (ok) {
+      vscode.window.showInformationMessage(`Logged out Claude profile: ${profileLabel(profile)}`);
+      log(`Claude logout succeeded for profileId=${profile.id}`);
+    } else {
+      vscode.window.showErrorMessage(`Claude logout failed for profile: ${profileLabel(profile)}`);
+      log(`Claude logout failed for profileId=${profile.id}`);
+    }
+  };
+
+  const startClaudeTabWithProfile = async (profile: ClaudeAccountProfile): Promise<void> => {
+    const tab = tabManager.createClaudeTab();
+    tabManager.applyClaudeAccountProfile(tab, profile);
+    await tab.startSession();
+    await claudeProfileStore.markUsed(profile.id);
+    log(`New Claude tab started with profileId=${profile.id}`);
+  };
+
+  const runAccountHandoff = async (args?: {
+    sourceTabId?: string;
+    targetProfileId?: string;
+    keepSourceOpen?: boolean;
+  }): Promise<void> => {
+    const sourceTab = args?.sourceTabId ? tabManager.getTabById(args.sourceTabId) : tabManager.getActiveTab();
+    if (!sourceTab) {
+      vscode.window.showWarningMessage('No active Claude tab for account handoff.');
+      return;
+    }
+    if (!(sourceTab instanceof SessionTab) || sourceTab.getProvider() !== 'claude') {
+      vscode.window.showWarningMessage('Switch Account With Context requires an active Claude Code tab.');
+      return;
+    }
+    if (sourceTab.isBusyState()) {
+      vscode.window.showWarningMessage('Finish or stop the current turn before switching Claude accounts.');
+      return;
+    }
+
+    const sourceProfileId = sourceTab.getClaudeAccountProfileId() ?? DEFAULT_CLAUDE_ACCOUNT_PROFILE_ID;
+    let targetProfile = args?.targetProfileId ? claudeProfileStore.getProfile(args.targetProfileId) : undefined;
+    if (!targetProfile) {
+      targetProfile = await pickClaudeProfile('Switch this Claude session to account profile...', {
+        includeDefault: true,
+        excludeProfileId: sourceProfileId,
+      });
+    }
+    if (!targetProfile) {
+      return;
+    }
+
+    try {
+      const result = await tabManager.handoffClaudeAccount({
+        sourceTabId: sourceTab.id,
+        targetProfileId: targetProfile.id,
+        keepSourceOpen: args?.keepSourceOpen ?? true,
+      });
+      const artifactHint = result.artifactPath ? ` Artifact: ${result.artifactPath}` : '';
+      vscode.window.showInformationMessage(
+        `Claude account handoff completed: ${profileLabel(targetProfile)}.${artifactHint}`
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      vscode.window.showErrorMessage(`Claude account handoff failed: ${message}`);
+    }
+  };
   const runProviderHandoff = async (
     args?: { sourceTabId?: string; targetProvider?: 'claude' | 'codex'; keepSourceOpen?: boolean },
     options?: { requireSourceProvider?: 'claude' | 'codex' }
@@ -243,6 +392,141 @@ export function registerCommands(
         vscode.window.showErrorMessage(
           `Failed to start ${provider === 'codex' ? 'Codex' : provider === 'remote' ? 'Happy' : 'Claude'} session: ${errorMessage}`
         );
+      }
+    }),
+
+    vscode.commands.registerCommand('claudeMirror.newClaudeTabWithAccount', async () => {
+      const profile = await pickClaudeProfile('New Claude tab with account profile...');
+      if (!profile) {
+        return;
+      }
+      try {
+        await startClaudeTabWithProfile(profile);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        vscode.window.showErrorMessage(`Failed to start Claude tab with account: ${message}`);
+      }
+    }),
+
+    vscode.commands.registerCommand('claudeMirror.switchClaudeAccountWithContext', async (args?: {
+      sourceTabId?: string;
+      targetProfileId?: string;
+      keepSourceOpen?: boolean;
+    }) => {
+      await runAccountHandoff(args);
+    }),
+
+    vscode.commands.registerCommand('claudeMirror.claudeAccounts.login', async () => {
+      const profile = await pickClaudeProfile('Login to Claude account profile...');
+      if (profile) {
+        await openClaudeLoginForProfile(profile);
+      }
+    }),
+
+    vscode.commands.registerCommand('claudeMirror.claudeAccounts.logout', async () => {
+      const profile = await pickClaudeProfile('Logout Claude account profile...');
+      if (profile) {
+        await logoutClaudeProfile(profile);
+      }
+    }),
+
+    vscode.commands.registerCommand('claudeMirror.claudeAccounts.manage', async () => {
+      const action = await vscode.window.showQuickPick(
+        [
+          { label: '$(add) Create Profile', action: 'create' as const },
+          { label: '$(play) New Claude Tab With Account', action: 'newTab' as const },
+          { label: '$(sign-in) Login Profile', action: 'login' as const },
+          { label: '$(sign-out) Logout Profile', action: 'logout' as const },
+          { label: '$(check) Set Profile For New Claude Tabs', action: 'setCurrent' as const },
+          { label: '$(edit) Rename Profile', action: 'rename' as const },
+          { label: '$(trash) Delete Profile', action: 'delete' as const },
+        ],
+        { placeHolder: 'Manage Claude account profiles', ignoreFocusOut: true },
+      );
+      if (!action) {
+        return;
+      }
+
+      if (action.action === 'create') {
+        const created = await createClaudeProfile();
+        if (created) {
+          const login = await vscode.window.showInformationMessage(
+            `Created Claude profile "${created.label}". Login now?`,
+            'Login',
+            'Later',
+          );
+          if (login === 'Login') {
+            await openClaudeLoginForProfile(created);
+          }
+        }
+        return;
+      }
+
+      if (action.action === 'newTab') {
+        const profile = await pickClaudeProfile('New Claude tab with account profile...');
+        if (profile) {
+          await startClaudeTabWithProfile(profile);
+        }
+        return;
+      }
+
+      if (action.action === 'login') {
+        const profile = await pickClaudeProfile('Login to Claude account profile...');
+        if (profile) {
+          await openClaudeLoginForProfile(profile);
+        }
+        return;
+      }
+
+      if (action.action === 'logout') {
+        const profile = await pickClaudeProfile('Logout Claude account profile...');
+        if (profile) {
+          await logoutClaudeProfile(profile);
+        }
+        return;
+      }
+
+      if (action.action === 'setCurrent') {
+        const profile = await pickClaudeProfile('Use this profile for new Claude tabs...');
+        if (profile) {
+          await claudeProfileStore.setCurrentProfileId(profile.id);
+          vscode.window.showInformationMessage(`New Claude tabs will use: ${profileLabel(profile)}`);
+        }
+        return;
+      }
+
+      if (action.action === 'rename') {
+        const profile = await pickClaudeProfile('Rename Claude account profile...', { includeDefault: false });
+        if (!profile) {
+          return;
+        }
+        const label = await vscode.window.showInputBox({
+          prompt: `Rename Claude account profile "${profile.label}"`,
+          value: profile.label,
+          ignoreFocusOut: true,
+          validateInput: (value) => value.trim() ? undefined : 'Profile name is required.',
+        });
+        if (label) {
+          const renamed = await claudeProfileStore.rename(profile.id, label);
+          vscode.window.showInformationMessage(`Renamed Claude profile to: ${renamed.label}`);
+        }
+        return;
+      }
+
+      if (action.action === 'delete') {
+        const profile = await pickClaudeProfile('Delete Claude account profile...', { includeDefault: false });
+        if (!profile) {
+          return;
+        }
+        const confirm = await vscode.window.showWarningMessage(
+          `Delete Claude profile "${profile.label}"? Credentials on disk are not deleted automatically.`,
+          { modal: true },
+          'Delete',
+        );
+        if (confirm === 'Delete') {
+          await claudeProfileStore.delete(profile.id);
+          vscode.window.showInformationMessage(`Deleted Claude profile: ${profile.label}`);
+        }
       }
     }),
 
@@ -373,6 +657,9 @@ export function registerCommands(
         const stored = sessionStore.getSession(sessionId);
         const provider = stored?.provider ?? providerHint ?? getConfiguredProvider();
         const tab = tabManager.createTabForProvider(provider);
+        if (provider === 'claude') {
+          applyProfileToTab(tab, profileForSession(sessionId));
+        }
         try {
           await tab.startSession({ resume: sessionId });
         } catch (err) {
@@ -501,6 +788,9 @@ export function registerCommands(
         log(`[showHistory#${runId}] session selected id=${picked.sessionId} provider=${picked.provider} after ${Date.now() - sessionPickStartedAt}ms`);
         log(`Resuming ${picked.provider} session from history: ${picked.sessionId}`);
         const tab = tabManager.createTabForProvider(picked.provider);
+        if (picked.provider === 'claude') {
+          applyProfileToTab(tab, profileForSession(picked.sessionId));
+        }
         try {
           await tab.startSession({ resume: picked.sessionId });
         } catch (err) {
@@ -845,11 +1135,16 @@ export function registerCommands(
     vscode.commands.registerCommand(
       'claudeMirror.forkFromMessage',
       async (sessionId: string, forkMessageIndex: number, promptText: string, messages: SerializedChatMessage[]) => {
-        const sourceProvider = sessionStore.getSession(sessionId)?.provider ?? 'claude';
+        const sourceMetadata = sessionStore.getSession(sessionId);
+        const sourceProvider = sourceMetadata?.provider ?? 'claude';
+        const sourceProfile = profileForSession(sessionId);
         log(
           `Forking ${sourceProvider} session ${sessionId} from message index ${forkMessageIndex}, historyLen=${messages?.length ?? 0}`
         );
         const tab = tabManager.createTabForProvider(sourceProvider);
+        if (sourceProvider === 'claude') {
+          applyProfileToTab(tab, sourceProfile);
+        }
         try {
           tab.setForkInit({ promptText, messages: messages || [] });
 
@@ -864,7 +1159,12 @@ export function registerCommands(
           if (sourceProvider === 'claude') {
             const truncator = new SessionTruncator((msg) => log(msg));
             const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-            const result = truncator.truncateSession(sessionId, forkMessageIndex, workspacePath);
+            const result = truncator.truncateSession(
+              sessionId,
+              forkMessageIndex,
+              workspacePath,
+              claudeProfileStore.resolveConfigDir(sourceProfile),
+            );
 
             if (result) {
               log(`Truncated fork: newSession=${result.newSessionId}, msgs=${result.uiMessagesKept}, lines=${result.linesWritten}`);

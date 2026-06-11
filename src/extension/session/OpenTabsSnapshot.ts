@@ -17,6 +17,8 @@ export interface OpenTabSnapshotEntry {
   tabKind?: 'chat' | 'search';
   /** Absolute worktree path this tab's session runs in. Undefined = primary/main worktree. */
   worktreePath?: string;
+  /** Claude account profile id for this tab. Undefined = Default profile (~/.claude). */
+  claudeAccountProfileId?: string;
   /** Model selected for a Smart Search tab (used to re-spawn the agent on restore). */
   searchModel?: string;
   /** ISO timestamp — when the tab was last focused (used to pick most-recent tabs on truncation). */

@@ -20,6 +20,7 @@ import type { TokenUsageRatioTracker } from '../session/TokenUsageRatioTracker';
 import type { CheckpointManager } from '../session/CheckpointManager';
 import { parseUsageLimitError } from '../process/usageLimitParser';
 import { AuthManager } from '../auth/AuthManager';
+import type { ClaudeAccountProfile } from '../auth/ClaudeAccountProfileStore';
 import { BugReportService } from '../feedback/BugReportService';
 import { McpCliService } from '../mcp/McpCliService';
 import { McpConfigService } from '../mcp/McpConfigService';
@@ -79,6 +80,8 @@ export interface WebviewBridge {
   setCliPathOverride?(pathOrNull: string | null): void;
   /** Provider currently routed by this tab */
   getProvider?(): ProviderId;
+  getClaudeAccountProfile?(): ClaudeAccountProfile | null;
+  getClaudeConfigDir?(): string | null;
   /** Start a btw background session (fork from current, send first message) */
   startBtwSession?(promptText: string): void;
   /** Send a follow-up message in the active btw session */
@@ -563,6 +566,10 @@ export class MessageHandler {
   /** Provide Claude auth manager for login/logout/status actions */
   setAuthManager(manager: AuthManager): void {
     this.authManager = manager;
+  }
+
+  refreshClaudeAuthStatus(): void {
+    void this.sendClaudeAuthStatus();
   }
 
   /** Provide the shared memory sampler (used by the dashboard memory tab). */
@@ -1160,7 +1167,10 @@ export class MessageHandler {
     }
 
     try {
-      const status = await this.authManager.getAuthStatus(this.getClaudeCliPath());
+      const status = await this.authManager.getAuthStatus(
+        this.getClaudeCliPath(),
+        this.webview.getClaudeAccountProfile?.() ?? null,
+      );
       this.webview.postMessage({ type: 'claudeAuthStatus', ...status });
     } catch (err) {
       this.log(`Failed to get Claude auth status: ${err}`);
@@ -3231,8 +3241,10 @@ export class MessageHandler {
 
         case 'claudeAuthLogin': {
           const cliPath = this.getClaudeCliPath();
-          this.log(`Opening Claude login terminal (cliPath="${cliPath}")`);
-          const terminal = vscode.window.createTerminal({ name: 'Claude Login' });
+          const profile = this.webview.getClaudeAccountProfile?.() ?? null;
+          const env = profile?.configDir ? { CLAUDE_CONFIG_DIR: profile.configDir } : undefined;
+          this.log(`Opening Claude login terminal (cliPath="${cliPath}", profileId=${profile?.id ?? 'default'})`);
+          const terminal = vscode.window.createTerminal({ name: 'Claude Login', env });
           terminal.show();
           terminal.sendText(`${this.quoteTerminalArg(cliPath)} auth login`, true);
           break;
@@ -3240,9 +3252,10 @@ export class MessageHandler {
 
         case 'claudeAuthLogout': {
           const cliPath = this.getClaudeCliPath();
-          this.log(`Running Claude logout (cliPath="${cliPath}")`);
+          const profile = this.webview.getClaudeAccountProfile?.() ?? null;
+          this.log(`Running Claude logout (cliPath="${cliPath}", profileId=${profile?.id ?? 'default'})`);
           void (async () => {
-            const ok = this.authManager ? await this.authManager.logout(cliPath) : false;
+            const ok = this.authManager ? await this.authManager.logout(cliPath, profile) : false;
             if (!ok) {
               this.webview.postMessage({
                 type: 'error',
@@ -4480,7 +4493,7 @@ export class MessageHandler {
     const { UsageFetcher } = await import('../process/UsageFetcher');
     const cliPath = vscode.workspace.getConfiguration('claudeMirror').get<string>('cliPath', 'claude');
     const apiKey = await this.getApiKey();
-    const fetcher = new UsageFetcher(cliPath, apiKey);
+    const fetcher = new UsageFetcher(cliPath, apiKey, this.webview.getClaudeConfigDir?.() ?? undefined);
     const result = await fetcher.fetch();
     this.log(`Usage fetch result: ${result.stats.length} stats, error=${result.error ?? 'none'}`);
     // Diagnostic: log raw API response once to see which period buckets Anthropic returns.
@@ -4503,7 +4516,7 @@ export class MessageHandler {
       const { UsageFetcher } = await import('../process/UsageFetcher');
       const cliPath = vscode.workspace.getConfiguration('claudeMirror').get<string>('cliPath', 'claude');
       const apiKey = await this.getApiKey();
-      const fetcher = new UsageFetcher(cliPath, apiKey);
+      const fetcher = new UsageFetcher(cliPath, apiKey, this.webview.getClaudeConfigDir?.() ?? undefined);
       const result = await fetcher.fetch();
       if (result.stats.length > 0) {
         this.tokenRatioTracker.createSamples(result.stats);

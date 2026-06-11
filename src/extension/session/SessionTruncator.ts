@@ -31,9 +31,10 @@ export class SessionTruncator {
   truncateSession(
     originalSessionId: string,
     forkMessageIndex: number,
-    workspacePath?: string
+    workspacePath?: string,
+    claudeConfigDir?: string
   ): TruncationResult | null {
-    const jsonlPath = findSessionJsonlPath(originalSessionId, workspacePath);
+    const jsonlPath = findSessionJsonlPath(originalSessionId, workspacePath, claudeConfigDir);
     if (!jsonlPath) {
       this.log(`[SessionTruncator] JSONL not found for ${originalSessionId}`);
       return null;

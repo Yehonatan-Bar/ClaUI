@@ -36,6 +36,10 @@ export interface ProcessStartOptions {
    *  When set, takes precedence over the supervised-mode default list and
    *  forces the supervised branch (no bypassPermissions). */
   allowedTools?: string[];
+  /** Claude account profile config root. When set, passed as CLAUDE_CONFIG_DIR. */
+  claudeConfigDir?: string;
+  /** Non-secret profile id used only for diagnostics/persistence. */
+  claudeAccountProfileId?: string;
 }
 
 export interface ProcessExitInfo {
@@ -222,6 +226,14 @@ export class ClaudeProcessManager extends EventEmitter {
     const mcpSecretEnv = await new McpSecretsService(this.context.secrets).getInjectedEnv();
     let env = { ...buildClaudeCliEnv(apiKey), ...mcpSecretEnv };
     this.log(`Env: hasAnthropicKey=${!!apiKey} mcpSecretVars=${Object.keys(mcpSecretEnv).length}`);
+
+    if (options?.claudeConfigDir) {
+      env.CLAUDE_CONFIG_DIR = options.claudeConfigDir;
+      this.log(
+        `Claude account profile env: profileId=${options.claudeAccountProfileId ?? '(unknown)'} ` +
+          `CLAUDE_CONFIG_DIR=${this.compactConfigDirForLog(options.claudeConfigDir)}`,
+      );
+    }
 
     // Inject Particle Accelerator environment if available
     if (this.particleAcceleratorEnvBuilder) {
@@ -515,5 +527,14 @@ export class ClaudeProcessManager extends EventEmitter {
   /** Whether the last exit was triggered by a user cancel */
   get cancelledByUser(): boolean {
     return this._cancelledByUser;
+  }
+
+  private compactConfigDirForLog(configDir: string): string {
+    const profilesRoot = path.join(this.context.globalStorageUri.fsPath, 'claude-profiles');
+    const relative = path.relative(profilesRoot, configDir);
+    if (relative && !relative.startsWith('..') && !path.isAbsolute(relative)) {
+      return `<globalStorage>/claude-profiles/${relative.replace(/\\/g, '/')}`;
+    }
+    return configDir;
   }
 }

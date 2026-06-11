@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { execFile } from 'child_process';
+import type { ClaudeAccountProfile } from './ClaudeAccountProfileStore';
 
 /**
  * Phase 5 stub: Reads credentials and manages account switching.
@@ -33,6 +34,10 @@ export class AuthManager {
     return fs.existsSync(this.credentialsPath);
   }
 
+  hasCredentialsFor(profile?: ClaudeAccountProfile | null): boolean {
+    return fs.existsSync(this.getCredentialsPath(profile));
+  }
+
   /** List available credential profiles (Phase 5 implementation pending) */
   async listProfiles(): Promise<CredentialProfile[]> {
     // Phase 5: Parse .credentials.json and return profiles
@@ -44,9 +49,9 @@ export class AuthManager {
     // Phase 5: Switch active credentials
   }
 
-  async getAuthStatus(cliPath: string): Promise<AuthStatus> {
+  async getAuthStatus(cliPath: string, profile?: ClaudeAccountProfile | null): Promise<AuthStatus> {
     try {
-      const stdout = await this.execClaudeAuthCommand(cliPath, ['auth', 'status', '--json']);
+      const stdout = await this.execClaudeAuthCommand(cliPath, ['auth', 'status', '--json'], profile);
       const parsed = JSON.parse(stdout) as unknown;
       return this.parseAuthStatus(parsed);
     } catch {
@@ -54,22 +59,32 @@ export class AuthManager {
     }
   }
 
-  async logout(cliPath: string): Promise<boolean> {
+  async logout(cliPath: string, profile?: ClaudeAccountProfile | null): Promise<boolean> {
     try {
-      await this.execClaudeAuthCommand(cliPath, ['auth', 'logout']);
+      await this.execClaudeAuthCommand(cliPath, ['auth', 'logout'], profile);
       return true;
     } catch {
       return false;
     }
   }
 
-  private execClaudeAuthCommand(cliPath: string, args: string[]): Promise<string> {
+  private execClaudeAuthCommand(
+    cliPath: string,
+    args: string[],
+    profile?: ClaudeAccountProfile | null
+  ): Promise<string> {
     const command = (cliPath || 'claude').trim() || 'claude';
+    const env = { ...process.env };
+    const configDir = this.resolveConfigDir(profile);
+    if (configDir) {
+      env.CLAUDE_CONFIG_DIR = configDir;
+    }
     return new Promise((resolve, reject) => {
       execFile(
         command,
         args,
         {
+          env,
           timeout: 10_000,
           windowsHide: true,
           shell: process.platform === 'win32',
@@ -84,6 +99,17 @@ export class AuthManager {
         }
       );
     });
+  }
+
+  private getCredentialsPath(profile?: ClaudeAccountProfile | null): string {
+    return path.join(this.resolveConfigDir(profile) || path.join(os.homedir(), '.claude'), '.credentials.json');
+  }
+
+  private resolveConfigDir(profile?: ClaudeAccountProfile | null): string | undefined {
+    if (!profile || profile.isDefault || !profile.configDir.trim()) {
+      return undefined;
+    }
+    return profile.configDir;
   }
 
   private parseAuthStatus(value: unknown): AuthStatus {

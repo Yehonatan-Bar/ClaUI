@@ -5,7 +5,7 @@ import { findSessionJsonlPath } from './sessionPathResolver';
 
 /**
  * Reads conversation history from Claude Code's local session storage.
- * Sessions are stored as JSONL files in ~/.claude/projects/<project-hash>/<session-id>.jsonl
+ * Sessions are stored as JSONL files in <Claude config dir>/projects/<project-hash>/<session-id>.jsonl
  *
  * Each JSONL entry with type 'assistant' contains a single content block (partial message).
  * Multiple entries share the same message ID and must be merged to reconstruct the full message.
@@ -17,8 +17,8 @@ export class ConversationReader {
    * Read conversation messages for a given session ID.
    * Returns messages formatted for the webview.
    */
-  readSession(sessionId: string, workspacePath?: string): SerializedChatMessage[] {
-    const jsonlPath = findSessionJsonlPath(sessionId, workspacePath);
+  readSession(sessionId: string, workspacePath?: string, claudeConfigDir?: string): SerializedChatMessage[] {
+    const jsonlPath = findSessionJsonlPath(sessionId, workspacePath, claudeConfigDir);
     if (!jsonlPath) {
       this.log(`[ConversationReader] No JSONL file found for session ${sessionId}`);
       return [];

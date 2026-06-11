@@ -32,6 +32,7 @@ export class BackgroundSession extends EventEmitter {
   constructor(
     private readonly context: vscode.ExtensionContext,
     logger?: (msg: string) => void,
+    private readonly claudeAccount?: { claudeConfigDir?: string; claudeAccountProfileId?: string },
   ) {
     super();
     this.log = logger ?? (() => {});
@@ -98,7 +99,12 @@ export class BackgroundSession extends EventEmitter {
    */
   async startFork(sessionId: string, promptText: string): Promise<void> {
     this.log(`[BtwSession] Starting fork from session ${sessionId}`);
-    await this.processManager.start({ resume: sessionId, fork: true });
+    await this.processManager.start({
+      resume: sessionId,
+      fork: true,
+      claudeConfigDir: this.claudeAccount?.claudeConfigDir,
+      claudeAccountProfileId: this.claudeAccount?.claudeAccountProfileId,
+    });
     this.log(`[BtwSession] Fork process spawned, sending first message immediately...`);
     this.emit('ready');
 

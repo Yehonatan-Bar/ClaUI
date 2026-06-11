@@ -11,10 +11,13 @@ export interface SessionMetadata {
   lastActiveAt: string; // ISO date string
   firstPrompt?: string; // First line of the user's first message
   workspacePath?: string; // Workspace folder path when the session was created
+  claudeAccountProfileId?: string;
   handoffSourceTabId?: string;
   handoffSourceProvider?: ProviderId;
+  handoffSourceClaudeAccountProfileId?: string;
   handoffTargetTabId?: string;
   handoffTargetProvider?: ProviderId;
+  handoffTargetClaudeAccountProfileId?: string;
   handoffArtifactPath?: string;
   handoffCompletedAt?: string;
   /** End-of-session AI-generated summary (1-3 sentences) shown on hover. */

@@ -15,6 +15,8 @@ export interface MergeAssistantStartOptions {
   sourceBranch: string;
   /** Branch receiving the merge (the checkout we are sitting on). */
   targetBranch: string;
+  claudeConfigDir?: string;
+  claudeAccountProfileId?: string;
 }
 
 /**
@@ -116,6 +118,8 @@ export class MergeAssistantSession extends EventEmitter {
       cwd: targetCwd,
       permissionMode: 'full-access',
       appendSystemPrompt: buildMergeSystemPrompt(sourceBranch, targetBranch),
+      claudeConfigDir: options.claudeConfigDir,
+      claudeAccountProfileId: options.claudeAccountProfileId,
     });
     this.emit('ready');
 

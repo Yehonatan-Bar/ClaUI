@@ -26,8 +26,8 @@ const MAX_PROMPT_LENGTH = 150;
 export class SessionDiscovery {
   private readonly projectsDir: string;
 
-  constructor() {
-    this.projectsDir = path.join(os.homedir(), '.claude', 'projects');
+  constructor(claudeConfigDir?: string) {
+    this.projectsDir = path.join(claudeConfigDir?.trim() || path.join(os.homedir(), '.claude'), 'projects');
   }
 
   /** Discover all sessions across all workspaces, sorted by mtime (newest first) */
