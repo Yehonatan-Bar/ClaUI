@@ -242,6 +242,23 @@ export const InputArea: React.FC = () => {
     }
   }, [userMessages, scrollToUserPrompt]);
 
+  // --- Conversation edge jumps (scroll chat to the very start / very end) ---
+  const jumpToConversationStart = useCallback(() => {
+    const container = document.querySelector('.message-list');
+    if (!container) return;
+    container.scrollTo({ top: 0, behavior: 'smooth' });
+    // Sync prompt nav so a following "next" moves from the first prompt
+    promptNavIndexRef.current = userMessages.length > 0 ? 0 : null;
+  }, [userMessages]);
+
+  const jumpToConversationEnd = useCallback(() => {
+    const container = document.querySelector('.message-list');
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    // Reset prompt nav so a following "previous" starts from the last prompt
+    promptNavIndexRef.current = null;
+  }, []);
+
   // Reset nav index when messages change (new message sent)
   useEffect(() => {
     promptNavIndexRef.current = null;
@@ -1866,6 +1883,15 @@ export const InputArea: React.FC = () => {
           <div className="send-column">
           <div className="prompt-nav-buttons">
             <button
+              className="prompt-nav-btn prompt-nav-btn-edge"
+              onClick={jumpToConversationStart}
+              disabled={messages.length === 0}
+              data-tooltip="Jump to start of conversation"
+            >
+              <span>{'\u25B2'}</span>
+              <span>{'\u25B2'}</span>
+            </button>
+            <button
               className="prompt-nav-btn"
               onClick={navigatePromptUp}
               disabled={userMessages.length === 0}
@@ -1880,6 +1906,15 @@ export const InputArea: React.FC = () => {
               data-tooltip="Next user prompt"
             >
               {'\u25BC'}
+            </button>
+            <button
+              className="prompt-nav-btn prompt-nav-btn-edge"
+              onClick={jumpToConversationEnd}
+              disabled={messages.length === 0}
+              data-tooltip="Jump to end of conversation"
+            >
+              <span>{'\u25BC'}</span>
+              <span>{'\u25BC'}</span>
             </button>
           </div>
           <div className="send-button-group" ref={sendGroupRef}>

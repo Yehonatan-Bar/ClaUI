@@ -328,7 +328,7 @@ claude-code-mirror/
 |       |   |   +-- MarkdownContent.tsx  #   Markdown rendering with sanitization and link detection
 |       |   |   +-- filePathLinks.tsx   #   Clickable file path and URL detection and rendering
 |       |   +-- InputArea/
-|       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt/steer, usage-limit queue mode, scheduled messages, image paste, @ file mentions, ultrathink button, prompt navigation arrows
+|       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt/steer, usage-limit queue mode, scheduled messages, image paste, @ file mentions, ultrathink button, prompt navigation arrows + conversation edge jumps
 |       |   |   +-- FileMentionPopup.tsx  #   Autocomplete popup for @ file mentions
 |       |   |   +-- GitPushPanel.tsx      #   Config panel for git push (status, ask Claude to configure)
 |       |   |   +-- CustomSnippetPanel.tsx #  Config panel for the custom snippet button (text, Save, Clear)
@@ -654,7 +654,7 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **Ultrathink Button & Glow** - Brain icon button in the input area with a 3-state cycle (off -> single -> locked -> off), plus a separate lock button rendered directly above it as a shortcut to toggle `locked` mode. Single mode prepends "ultrathink" for one prompt then resets. Locked mode auto-prepends on every prompt and highlights both the brain button and the lock button. On activation, plays one of 4 random CSS animations. The word "ultrathink" displays with an animated rainbow glow effect in chat messages.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ULTRATHINK_BUTTON.md`
 
-**Prompt Navigation Arrows** - Up/down arrow buttons above the Send button that scroll the chat view to the previous/next user prompt. Filters messages by `role === 'user'`, tracks an index ref, and uses `data-message-id` DOM queries with `scrollIntoView({ behavior: 'smooth', block: 'center' })`. Navigation index resets when new messages arrive.
+**Prompt Navigation Arrows** - Four buttons above the Send button: double-triangle edge-jump buttons scroll the chat to the very start/end of the conversation (smooth `scrollTo` on `.message-list`), and single up/down arrows scroll to the previous/next user prompt. Prompt navigation filters messages by `role === 'user'`, tracks an index ref, and uses `data-message-id` DOM queries with `scrollIntoView({ behavior: 'smooth', block: 'center' })`. Edge jumps sync the index (start -> first prompt, end -> reset); the index also resets when new messages arrive.
 
 **Clear Session** - Button in the input area that resets all UI state (messages, cost, streaming) and restarts the CLI process. Sends `clearSession` message to the extension, which stops the current process and spawns a new one.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`

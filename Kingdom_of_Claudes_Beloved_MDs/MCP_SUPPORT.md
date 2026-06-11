@@ -155,6 +155,32 @@ After successful mutations ClaUi:
    - **Failure**: banner turns red with error message; button re-enables for retry
    - Banner auto-dismisses when `system_init` refreshes inventory with `pendingRestartCount: 0`
 
+### Session restart (`mcpRestartSession`)
+
+The restart preserves the live conversation. `MessageHandler.handleMcpRestartSession`
+delegates to `SessionTab.restartWithCurrentSession()` (exposed via the optional
+`WebviewBridge.restartWithCurrentSession` method), which:
+
+- captures the current session id, suppresses the next process-exit handling,
+  posts `processBusy: true`, and stops the CLI process tree
+- clears any armed lazy-wake / silent-resume state so a later focus event
+  cannot double-spawn the CLI
+- respawns with `--resume <sessionId>` plus `skipReplay` (the webview already
+  holds the full history, so replay would duplicate messages), preserving the
+  tab's `cwd`, current model, `cliPathOverride`, `appendSystemPrompt`, and
+  `allowedTools`
+- re-seeds the session id into the process manager (in pipe mode the CLI emits
+  `system/init` only after the first stdin message, so without seeding the id
+  would be null until the next user message)
+- posts `processBusy: false` so the user can keep chatting immediately
+- on spawn failure: clears busy, posts an `error` toast and
+  `sessionEnded reason=crashed`, and rethrows so the dispatcher posts a failed
+  `mcpOperationResult`
+
+After a successful restart `MessageHandler` clears pending mutations and the
+stale runtime server list, then refreshes the merged inventory so the restart
+banner dismisses without waiting for the next `system_init`.
+
 ## Webview State
 
 `src/webview/state/store.ts` now separates:

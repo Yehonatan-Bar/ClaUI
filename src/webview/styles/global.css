@@ -5826,6 +5826,17 @@ html, body, #root {
   cursor: not-allowed;
 }
 
+/* Edge-jump buttons render two stacked triangles (a "double triangle" glyph) */
+.prompt-nav-btn-edge {
+  width: 24px;
+  flex-direction: column;
+  font-size: 8px;
+}
+
+.prompt-nav-btn-edge span {
+  line-height: 0.7;
+}
+
 .send-button-group {
   display: flex;
   position: relative;

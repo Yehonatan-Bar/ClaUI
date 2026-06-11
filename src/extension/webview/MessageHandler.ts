@@ -68,6 +68,9 @@ export interface WebviewBridge {
   setSuppressNextExit?(suppress: boolean): void;
   /** Switch the running session to a different model (stop + resume with new --model flag) */
   switchModel?(model: string): Promise<void>;
+  /** Restart the CLI process while preserving the live conversation (stop + --resume).
+   *  Used by the MCP panel so config changes load without losing the chat. */
+  restartWithCurrentSession?(): Promise<void>;
   /** Save project analytics immediately (called before session clear/reset to avoid data loss) */
   saveProjectAnalyticsNow?(): void;
   /** Optional per-tab CLI override (e.g. Happy provider uses `happy` instead of `claude`) */
@@ -1074,25 +1077,24 @@ export class MessageHandler {
       return;
     }
 
-    const sessionId = this.processManager.currentSessionId;
-    if (!sessionId) {
+    if (!this.webview.restartWithCurrentSession) {
       this.postMcpOperationResult({
         success: false,
         operation: 'restartSession',
-        error: 'No running Claude session is available to restart.',
+        error: 'This tab does not support in-place session restart.',
       });
       return;
     }
 
-    this.webview.setSuppressNextExit?.(true);
-    this.webview.postMessage({ type: 'processBusy', busy: true });
-    this.processManager.stop();
-    await this.processManager.start({
-      resume: sessionId,
-      cliPathOverride: this.getCliPathOverride(),
-    });
+    // Delegate to SessionTab so the restart preserves the conversation:
+    // stop + --resume with skipReplay (no duplicated history), session id
+    // re-seeded, busy state cleared once the new process is up. Throws when
+    // no session id is known yet; the dispatcher posts the failure result.
+    await this.webview.restartWithCurrentSession();
+
     this.pendingMcpMutations = [];
     this.currentRuntimeMcpServers = [];
+    await this.refreshMcpInventory();
     this.postMcpOperationResult({
       success: true,
       operation: 'restartSession',

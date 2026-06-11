@@ -530,6 +530,58 @@ export class SessionTab implements WebviewBridge {
     }
   }
 
+  /** Restart the CLI process while preserving the live conversation (stop +
+   *  --resume). Used by the MCP panel "Restart session now" action so updated
+   *  MCP config is loaded without losing the chat. Mirrors switchModel()'s
+   *  stop+resume cycle: skipReplay keeps the webview history intact (no
+   *  duplicated messages) and the session id is re-seeded so features that
+   *  read it before the next system/init (snapshots, a second restart,
+   *  crash recovery) keep working. Throws when no session id is known yet. */
+  async restartWithCurrentSession(): Promise<void> {
+    const sessionToResume = this.processManager.currentSessionId;
+    if (!sessionToResume) {
+      throw new Error('No running Claude session is available to restart.');
+    }
+
+    this.log(`[Tab ${this.tabNumber}] Restarting session ${sessionToResume} to reload MCP config`);
+    this.suppressNextExit = true;
+    this.postMessage({ type: 'processBusy', busy: true });
+    this.processManager.stop();
+
+    // This restart supersedes any armed lazy-wake / silent-resume cycle for
+    // this tab; clear them so a later focus event cannot double-spawn the CLI.
+    this.lazyWakeArmed = false;
+    this.silentResumeArmedFlag = false;
+    this.silentResumeInFlight = false;
+    this.pendingResumeSessionId = null;
+    this.clearSilentResumeTimers();
+
+    try {
+      await this.processManager.start({
+        resume: sessionToResume,
+        skipReplay: true,
+        model: this.currentModel || undefined,
+        cwd: this.getEffectiveCwd(),
+        cliPathOverride: this.cliPathOverride ?? undefined,
+        appendSystemPrompt: this.appendSystemPrompt ?? undefined,
+        allowedTools: this.allowedTools ?? undefined,
+      });
+      // In pipe mode the CLI emits system/init only after the first stdin
+      // message, so re-seed the id now to avoid a null-session window.
+      this.processManager.seedSessionId(sessionToResume);
+      this.postMessage({ type: 'processBusy', busy: false });
+      this.flushSilentResumeQueue();
+      this.log(`[Tab ${this.tabNumber}] Session ${sessionToResume} resumed after MCP restart`);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      this.log(`[Tab ${this.tabNumber}] Failed to restart session for MCP reload: ${errMsg}`);
+      this.postMessage({ type: 'processBusy', busy: false });
+      this.postMessage({ type: 'error', message: `Failed to restart session: ${errMsg}` });
+      this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+      throw err instanceof Error ? err : new Error(errMsg);
+    }
+  }
+
   // --- Public API ---
 
   /** Set fork initialization data (must be called before startSession) */
