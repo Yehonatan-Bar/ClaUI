@@ -35,9 +35,9 @@ export class HandoffPromptComposer {
       `- Blockers: ${blockers}`,
       `- Next steps from previous context: ${nextSteps}`,
       `- Recently touched files: ${files}`,
-      sourceAccount || targetAccount
-        ? `- Claude account profile: ${sourceAccount || 'default'} -> ${targetAccount || 'default'}`
-        : '',
+      ...(sourceAccount || targetAccount
+        ? [`- Claude account profile: ${sourceAccount || 'default'} -> ${targetAccount || 'default'}`]
+        : []),
       '',
       'Handoff Capsule JSON (source of truth, may be truncated to fit budget):',
       '```json',

@@ -12,9 +12,15 @@ export const RTL_LANGUAGES = new Set(['Hebrew', 'Arabic']);
  */
 export class MessageTranslator {
   private log: (msg: string) => void = () => {};
+  private claudeConfigDirProvider: () => string | undefined = () => undefined;
 
   setLogger(logger: (msg: string) => void): void {
     this.log = logger;
+  }
+
+  /** Resolved at spawn time so per-tab Claude account profile changes apply. */
+  setClaudeConfigDirProvider(provider: () => string | undefined): void {
+    this.claudeConfigDirProvider = provider;
   }
 
   /**
@@ -48,7 +54,7 @@ export class MessageTranslator {
 
     const args = ['-p', '--model', 'claude-sonnet-4-6'];
 
-    const env = buildClaudeCliEnv(apiKey);
+    const env = buildClaudeCliEnv(apiKey, this.claudeConfigDirProvider());
 
     // Scale timeout with text length: 45s base + 10s per 1000 chars, capped at 120s
     const timeoutMs = Math.min(45_000 + Math.ceil(textContent.length / 1000) * 10_000, 120_000);

@@ -39,11 +39,16 @@ export function buildSanitizedEnv(): NodeJS.ProcessEnv {
  * then injects the user's explicitly configured API key if provided.
  *
  * @param apiKey - The user's API key from SecretStorage, or undefined
+ * @param claudeConfigDir - Claude account profile config root; when set,
+ *   passed as CLAUDE_CONFIG_DIR so the CLI uses that profile's credentials
  */
-export function buildClaudeCliEnv(apiKey?: string): NodeJS.ProcessEnv {
+export function buildClaudeCliEnv(apiKey?: string, claudeConfigDir?: string): NodeJS.ProcessEnv {
   const env = buildSanitizedEnv();
   if (apiKey) {
     env.ANTHROPIC_API_KEY = apiKey;
+  }
+  if (claudeConfigDir?.trim()) {
+    env.CLAUDE_CONFIG_DIR = claudeConfigDir;
   }
   return env;
 }

@@ -43,9 +43,15 @@ export class ActivitySummarizer {
   private summaryCallback: ((summary: ActivitySummary) => void) | null = null;
 
   private apiKey: string | undefined;
+  private claudeConfigDirProvider: () => string | undefined = () => undefined;
 
   setApiKey(key: string | undefined): void {
     this.apiKey = key;
+  }
+
+  /** Resolved at spawn time so per-tab Claude account profile changes apply. */
+  setClaudeConfigDirProvider(provider: () => string | undefined): void {
+    this.claudeConfigDirProvider = provider;
   }
 
   constructor(options?: { threshold?: number; debounceMs?: number; timeoutMs?: number }) {
@@ -170,7 +176,7 @@ export class ActivitySummarizer {
       .get<string>('analysisModel', 'claude-haiku-4-5-20251001');
     const args = ['-p', '--model', analysisModel];
 
-    const env = buildClaudeCliEnv(this.apiKey);
+    const env = buildClaudeCliEnv(this.apiKey, this.claudeConfigDirProvider());
 
     this.log(`[ActivitySummarizer] Spawning Haiku with ${toolNames.length} tools`);
 

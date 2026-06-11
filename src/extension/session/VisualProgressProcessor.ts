@@ -127,12 +127,19 @@ export class VisualProgressProcessor {
   /** Maps blockIndex -> cardId for enrichment at blockStop */
   private blockToCardId = new Map<number, { cardId: string; toolName: string }>();
 
+  private claudeConfigDirProvider: () => string | undefined = () => undefined;
+
   setLogger(logger: (msg: string) => void): void {
     this.log = logger;
   }
 
   setPostMessage(fn: (msg: unknown) => void): void {
     this.postMessage = fn;
+  }
+
+  /** Resolved at spawn time so per-tab Claude account profile changes apply. */
+  setClaudeConfigDirProvider(provider: () => string | undefined): void {
+    this.claudeConfigDirProvider = provider;
   }
 
   /** Update context from assistant streaming text */
@@ -308,7 +315,7 @@ export class VisualProgressProcessor {
       `Reply with ONLY the description, nothing else.`;
 
     const args = ['-p', '--model', 'claude-haiku-4-5-20251001'];
-    const env = buildClaudeCliEnv();
+    const env = buildClaudeCliEnv(undefined, this.claudeConfigDirProvider());
 
     return new Promise<void>((resolve) => {
       let stdout = '';

@@ -48,6 +48,7 @@ The manage command supports create, rename, delete, set current profile for new 
 - `ClaudeAccountProfileStore` owns profile CRUD and directory creation.
 - `SessionTab` stores the selected profile per tab and threads it through every Claude respawn path.
 - `ClaudeProcessManager` injects `CLAUDE_CONFIG_DIR` only when the tab uses a non-default profile.
+- Per-tab one-shot CLI helpers (session naming, message translation, prompt enhancement, prompt translation, turn analysis, activity summaries, Visual Progress descriptions) receive a config-dir provider from `SessionTab` and spawn with the tab's `CLAUDE_CONFIG_DIR` via `buildClaudeCliEnv(apiKey, claudeConfigDir)`. The provider is resolved at spawn time, so a profile applied after tab creation (handoff target, snapshot restore) is picked up automatically.
 - `AuthManager` runs `claude auth status --json` and `claude auth logout` with the selected profile env.
 - Login opens a VS Code terminal with `CLAUDE_CONFIG_DIR` set for the selected profile.
 - `OpenTabsSnapshot` stores `claudeAccountProfileId`, so restore-on-startup returns a tab to the same account.
@@ -74,7 +75,13 @@ Claude transcript lookup accepts an optional `claudeConfigDir`:
 const claudeDir = claudeConfigDir || path.join(os.homedir(), '.claude');
 ```
 
-This applies to conversation replay, truncation/forking, worktree transcript relocation, session discovery, end-of-session summarization, and usage fetching.
+This applies to conversation replay, truncation/forking, worktree transcript relocation, end-of-session summarization, and usage fetching. `SessionDiscovery` also accepts the parameter, but the disk-wide flows that use it (`ClaUi: Discover All Sessions`, chat search) currently scan only the default `~/.claude` (see Known Limitations).
+
+## Known Limitations
+
+- **Disk-wide discovery and chat search are default-account only.** `ClaUi: Discover All Sessions` and the cross-session chat search construct `SessionDiscovery` without a config dir, so sessions created under non-default profiles do not appear there. Resuming from ClaUi history (SessionStore metadata) does apply the saved profile.
+- **Global CLI services use the default account.** Achievement insights (`AchievementInsightAnalyzer`) and the skill generation pipeline (`ClaudeCliCaller`) are not tied to a tab and spawn against the normal `~/.claude` account.
+- **Deleted profile restore loses the transcript.** Restoring a tab whose profile was deleted falls back to `Default`, but the original transcript stays in the deleted profile's config dir, so the resumed session starts without prior history.
 
 ## Experimental True Resume
 

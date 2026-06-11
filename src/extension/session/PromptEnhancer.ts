@@ -33,9 +33,15 @@ The user's prompt to enhance:
  */
 export class PromptEnhancer {
   private log: (msg: string) => void = () => {};
+  private claudeConfigDirProvider: () => string | undefined = () => undefined;
 
   setLogger(logger: (msg: string) => void): void {
     this.log = logger;
+  }
+
+  /** Resolved at spawn time so per-tab Claude account profile changes apply. */
+  setClaudeConfigDirProvider(provider: () => string | undefined): void {
+    this.claudeConfigDirProvider = provider;
   }
 
   /**
@@ -56,7 +62,7 @@ export class PromptEnhancer {
 
     const args = ['-p', '--model', enhancerModel];
 
-    const env = buildClaudeCliEnv(apiKey);
+    const env = buildClaudeCliEnv(apiKey, this.claudeConfigDirProvider());
 
     this.log(`[PromptEnhancer] Spawning CLI with model=${enhancerModel} (${truncated.length} chars, original=${rawPrompt.length} chars)`);
 

@@ -10,9 +10,15 @@ import { killProcessTree } from '../process/killTree';
  */
 export class SessionNamer {
   private log: (msg: string) => void = () => {};
+  private claudeConfigDirProvider: () => string | undefined = () => undefined;
 
   setLogger(logger: (msg: string) => void): void {
     this.log = logger;
+  }
+
+  /** Resolved at spawn time so per-tab Claude account profile changes apply. */
+  setClaudeConfigDirProvider(provider: () => string | undefined): void {
+    this.claudeConfigDirProvider = provider;
   }
 
   /**
@@ -41,7 +47,7 @@ export class SessionNamer {
       '--model', analysisModel,
     ];
 
-    const env = buildClaudeCliEnv(apiKey);
+    const env = buildClaudeCliEnv(apiKey, this.claudeConfigDirProvider());
 
     this.log(`SessionNamer: spawning "${cliPath}" with args: ${JSON.stringify(args)}`);
     this.log(`SessionNamer: first message (${truncatedMessage.length} chars): "${truncatedMessage.slice(0, 80)}..."`);

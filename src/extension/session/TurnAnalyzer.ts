@@ -28,9 +28,15 @@ export class TurnAnalyzer {
   private maxPerSession = 30;
   private callback: ((messageId: string, semantics: TurnSemantics) => void) | null = null;
   private apiKey: string | undefined;
+  private claudeConfigDirProvider: () => string | undefined = () => undefined;
 
   setApiKey(key: string | undefined): void {
     this.apiKey = key;
+  }
+
+  /** Resolved at spawn time so per-tab Claude account profile changes apply. */
+  setClaudeConfigDirProvider(provider: () => string | undefined): void {
+    this.claudeConfigDirProvider = provider;
   }
 
   setLogger(logger: (msg: string) => void): void {
@@ -149,7 +155,7 @@ export class TurnAnalyzer {
 
     const args = ['-p', '--model', analysisModel];
 
-    const env = buildClaudeCliEnv(this.apiKey);
+    const env = buildClaudeCliEnv(this.apiKey, this.claudeConfigDirProvider());
 
     this.log(`[TurnAnalyzer] Spawning analysis for messageId=${input.messageId}`);
 

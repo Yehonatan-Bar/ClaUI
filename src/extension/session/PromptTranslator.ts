@@ -33,9 +33,15 @@ Text to translate:
  */
 export class PromptTranslator {
   private log: (msg: string) => void = () => {};
+  private claudeConfigDirProvider: () => string | undefined = () => undefined;
 
   setLogger(logger: (msg: string) => void): void {
     this.log = logger;
+  }
+
+  /** Resolved at spawn time so per-tab Claude account profile changes apply. */
+  setClaudeConfigDirProvider(provider: () => string | undefined): void {
+    this.claudeConfigDirProvider = provider;
   }
 
   /**
@@ -55,7 +61,7 @@ export class PromptTranslator {
 
     const args = ['-p', '--model', model];
 
-    const env = buildClaudeCliEnv(apiKey);
+    const env = buildClaudeCliEnv(apiKey, this.claudeConfigDirProvider());
 
     this.log(`[PromptTranslator] Spawning CLI with model=${model} (${truncated.length} chars, original=${rawPrompt.length} chars)`);
 

@@ -275,9 +275,14 @@ export class SessionTab implements WebviewBridge {
     checkpointMgr.setWorkspaceRoot(vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath ?? '');
     this.messageHandler.setCheckpointManager(checkpointMgr);
 
+    // One-shot CLI helpers must spawn with this tab's Claude account profile;
+    // resolved at spawn time so later profile changes (handoff/restore) apply.
+    const claudeConfigDirProvider = (): string | undefined => this.claudeConfigDir ?? undefined;
+
     // Wire auto-naming: Haiku generates a short title from the first message
     const sessionNamer = new SessionNamer();
     sessionNamer.setLogger(tabLog);
+    sessionNamer.setClaudeConfigDirProvider(claudeConfigDirProvider);
     this.messageHandler.setSessionNamer(sessionNamer);
     this.messageHandler.onSessionNameGenerated((name) => {
       tabLog(`[SessionNaming] Callback received name="${name}", disposed=${this.disposed}`);
@@ -304,9 +309,13 @@ export class SessionTab implements WebviewBridge {
     const summaryThreshold = config.get<number>('activitySummaryThreshold', 3);
     const activitySummarizer = new ActivitySummarizer({ threshold: summaryThreshold });
     activitySummarizer.setLogger(tabLog);
+    activitySummarizer
+      .setClaudeConfigDirProvider(claudeConfigDirProvider);
     this.messageHandler.setActivitySummarizer(activitySummarizer);
     // Wire Visual Progress Mode processor
     const vpmProcessor = new VisualProgressProcessor();
+    vpmProcessor
+      .setClaudeConfigDirProvider(claudeConfigDirProvider);
     this.messageHandler.setVpmProcessor(vpmProcessor);
 
     this.messageHandler.onActivitySummaryGenerated((summary) => {
@@ -325,6 +334,7 @@ export class SessionTab implements WebviewBridge {
     // Wire message translator for Hebrew translation feature
     const messageTranslator = new MessageTranslator();
     messageTranslator.setLogger(tabLog);
+    messageTranslator.setClaudeConfigDirProvider(claudeConfigDirProvider);
     this.messageHandler.setMessageTranslator(messageTranslator);
 
     // Wire adventure interpreter for dungeon crawler beat generation
@@ -335,16 +345,22 @@ export class SessionTab implements WebviewBridge {
     // Wire turn analyzer for semantic analysis (dashboard insights)
     const turnAnalyzer = new TurnAnalyzer();
     turnAnalyzer.setLogger(tabLog);
+    turnAnalyzer
+      .setClaudeConfigDirProvider(claudeConfigDirProvider);
     this.messageHandler.setTurnAnalyzer(turnAnalyzer);
 
     // Wire prompt enhancer for AI-powered prompt improvement
     const promptEnhancer = new PromptEnhancer();
     promptEnhancer.setLogger(tabLog);
+    promptEnhancer
+      .setClaudeConfigDirProvider(claudeConfigDirProvider);
     this.messageHandler.setPromptEnhancer(promptEnhancer);
 
     // Wire prompt translator for translating prompts to English
     const promptTranslator = new PromptTranslator();
     promptTranslator.setLogger(tabLog);
+    promptTranslator
+      .setClaudeConfigDirProvider(claudeConfigDirProvider);
     this.messageHandler.setPromptTranslator(promptTranslator);
 
     // Create webview panel in the specified column
