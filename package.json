@@ -484,13 +484,15 @@
             "terminal-hacker",
             "retro",
             "zen",
-            "neo-zen"
+            "neo-zen",
+            "clarity"
           ],
           "enumDescriptions": [
             "Terminal Hacker - Green on black with typewriter-style streaming",
             "Retro - Pixel-inspired typography with CRT scanline atmosphere",
             "Zen - Minimal styling with calm, soft animations",
-            "Neo Zen - Zen-inspired calm with subtle futuristic blue-cyan accents"
+            "Neo Zen - Zen-inspired calm with subtle futuristic blue-cyan accents",
+            "Clarity - High-contrast: color-coded your input vs Claude's output, process steps dimmed, final answer highlighted"
           ],
           "description": "Visual personality theme for response rendering in the chat webview."
         },
@@ -527,6 +529,7 @@
           "type": "string",
           "default": "",
           "enum": [
+            "claude-mythos-5",
             "",
             "claude-fable-5",
             "claude-opus-4-8",
@@ -534,10 +537,10 @@
             "claude-sonnet-4-6",
             "claude-sonnet-4-5-20250929",
             "claude-opus-4-6",
-            "claude-haiku-4-5-20251001",
-            "claude-mythos-5"
+            "claude-haiku-4-5-20251001"
           ],
           "enumDescriptions": [
+            "Claude Mythos 5 (Blocked)",
             "Default (CLI default)",
             "Claude Fable 5 (Blocked)",
             "Claude Opus 4.8",
@@ -545,8 +548,7 @@
             "Claude Sonnet 4.6",
             "Claude Sonnet 4.5",
             "Claude Opus 4.6",
-            "Claude Haiku 4.5",
-            "Claude Mythos 5 (Blocked)"
+            "Claude Haiku 4.5"
           ],
           "description": "Claude model to use for new sessions. Leave empty to use CLI default."
         },

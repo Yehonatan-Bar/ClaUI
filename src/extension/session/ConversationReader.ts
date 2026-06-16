@@ -89,6 +89,7 @@ export class ConversationReader {
             role: 'assistant',
             content: userVisible,
             timestamp: Date.now() - 1000000 + messages.length * 100,
+            synthetic: true,
           });
           continue;
         }

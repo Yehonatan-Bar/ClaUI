@@ -1,5 +1,40 @@
 # ClaUi - Changelog
 
+## v0.1.194 - 2026-06-16
+
+**Feature: Auto-review -- automatic Claude<->Codex review loop that runs after every work turn until there is no blocking bug**
+
+- After Claude finishes a piece of work, ClaUi automatically runs a closed review loop: Claude (the developer) writes a clean handover, a native Codex session (the reviewer) reads the actual code read-only and judges it, a lightweight Haiku classifier decides the verdict, and if a blocking bug is found the feedback goes back to Claude and the cycle repeats -- until Codex approves "no blocking bug" or a round cap is hit. The whole run streams live into a panel and can be stopped at any time
+- **Three roles + orchestrator**: Developer = the live `SessionTab` Claude process (prompts are injected and the final turn text is captured); Reviewer = `CodexReviewerSession`; Classifier = `ReviewVerdictClassifier` (one-shot Haiku); Orchestrator = `ReviewLoopOrchestrator` (state machine, round counter, stop, transcript events)
+- **Reviewer = native Codex, not the MCP "Consult Codex" path**: runs `codex exec` with a persistent thread across rounds so it accumulates review context, `--sandbox read-only` over the whole workspace, and inspects the changed code directly. Defaults to **GPT-5.5, reasoning effort xhigh (extra high), Codex fast mode**; per-turn model/effort/tier overrides flow through `CodexExecProcessManager.runTurn`, so the reviewer is independent of any Codex tab's global settings
+- **Clean handover contract**: the developer is told to output ONLY the document between `===CLAUI_HANDOVER_BEGIN===` and `===CLAUI_HANDOVER_END===`; `extractHandover()` returns only the inner text (and returns null when a closed marker block is absent, so the loop retries once then errors) -- no preamble or unmarked text ever reaches Codex
+- **Explicit reviewer task**: before it is sent to Codex the handover is wrapped by `buildReviewerPrompt()`, which states the reviewer's role IN THE MESSAGE itself (review the work, read the real code, judge it, return a verdict) instead of relying only on the separate Codex `instructions` channel
+- **Verdict = blocking bugs only**: the reviewer approves unless there is a defect that breaks correctness, crashes, loses data, or opens a security hole -- style, naming, and non-blocking nits never trigger a change request. It must end with exactly one bare line, `VERDICT: APPROVED` or `VERDICT: CHANGES_REQUESTED`; `parseVerdictLine()` reads the last non-empty line exactly (rejecting lookalikes such as `UNAPPROVED` and trailing text), the Haiku model is consulted only when that line is missing/ambiguous, and any classifier failure conservatively counts as "changes requested" so the loop never falsely declares success
+- **Trigger (`autoStart`, default on)**: the loop auto-starts after a user-initiated, successful turn **that used at least one tool** (a per-turn `usedTools` flag set on the demux `toolUseStart` event) -- pure text-only Q&A turns are skipped, so casual chat never triggers a Codex review. It never chains off the loop's own injected turns
+- **Resume robustness**: if the Claude process already exited (e.g. at session end), the loop resumes it (`--resume`, skip-replay) before injecting the handover instead of bailing with "no active session"; the reviewer only needs the workspace path, not a live Claude session id
+- **Stop conditions**: approval, the round cap, the Stop button, the user sending a manual message (a soft stop that detaches the capture without cancelling the live process, so the user's message is never lost), a per-turn timeout, or tab disposal. The Codex reviewer and Haiku classifier subprocesses are killed on stop
+
+**UI**
+
+- **Review Loop panel**: a live transcript above the input area showing the current phase, a "Round N / M" counter, a Stop button while running, and per-round entries (message to reviewer, reviewer reply, verdict). It auto-opens whenever a review event arrives
+- **Auto-review toggle**: a sliding switch in the StatusBar Tools group is the primary on/off control; it flips `claudeMirror.reviewLoop.autoStart`, persists to config, and is wired like the `usageWidget` toggle (echoed back + pushed on the webview ready burst + forwarded on `onDidChangeConfiguration`)
+- **Conditional manual button**: a **"Run Review Now"** button appears in the same group only when Auto-review is off, since when it is on the loop already runs after each work turn
+
+**Settings (`claudeMirror.reviewLoop.*`)**
+
+- `autoStart` (true), `maxRounds` (5, clamped 1-20), `reviewerModel` (`gpt-5.5`; empty falls back to `codex.model` then the Codex default), `reviewerReasoningEffort` (`xhigh`), `reviewerServiceTier` (`fast`), `classifierModel` (`claude-haiku-4-5-20251001`), `turnTimeoutMs` (300000)
+
+**Tests**
+
+- `tests/review-loop/reviewLoopPrompts.test.ts` covers the pure functions (handover marker enforcement, exact verdict-line parsing including `UNAPPROVED`/trailing-text/quoted-token cases, conservative classifier parsing, and the reviewer-prompt shape) via `npm run test:review-loop` (Node's built-in test runner through tsx)
+
+**Implementation Notes:**
+
+- The SPA (Super Particle Accelerator) Guard entropy-high rule false-positived on `LONG_CONSTANT.length`-style tokens during development (its tokenizer does not split on `.`, so e.g. `HANDOVER_BEGIN.length` scanned as one 16+ char token just over the entropy threshold). Worked around by using intermediate locals / string ops and short barrel import paths
+- New detail doc: `Kingdom_of_Claudes_Beloved_MDs/REVIEW_LOOP.md`
+
+---
+
 ## v0.1.193 - 2026-06-11
 
 **Feature: Claude Account Profiles -- multiple Claude Code accounts side by side**

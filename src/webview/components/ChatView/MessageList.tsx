@@ -243,7 +243,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
       {streamingMessageId && streamingBlocks.length > 0 && (
         <div className="message message-assistant">
           <div className="message-role">
-            Assistant
+            <span className="message-role-name">Assistant</span>
             <span className="message-timestamp">
               {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>

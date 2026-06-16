@@ -113,6 +113,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   const messageToolCount = useMemo(() => contentBlocks.filter(b => b.type === 'tool_use').length, [contentBlocks]);
   const shouldShowSummaryMode = summaryModeEnabled && !isUser && messageToolCount > 0;
 
+  // Final-answer detection. Mirrors the Auto-review / Review Loop rule in
+  // SessionTab.wireTurnCaptureEvents (stop_reason !== 'tool_use'): an assistant
+  // message that carries text and no tool_use blocks is the turn's final answer,
+  // as opposed to the interim narration that accompanies tool calls. Used by the
+  // Clarity theme to visually separate "the process" from "the final answer".
+  //
+  // Exclude CLI-injected synthetic content (skill bodies, sub-agent dispatch
+  // context, system reminders). The CLI routes these as assistant-role text with
+  // no tool_use blocks, so the rule above would otherwise mislabel them as final
+  // answers. They carry an explicit `synthetic` flag (live + restored history);
+  // the id-prefix check is a defensive fallback for any unflagged path.
+  const isSyntheticContent =
+    message.synthetic === true
+    || message.id.startsWith('synthetic-')
+    || message.id.startsWith('history-synthetic-');
+  const isFinalAnswer = !isUser && !isSyntheticContent && messageToolCount === 0 && !!textContent;
+
   // Chat Search: highlight matching messages
   const isSearchActive = useAppStore((s) => s.chatSearchOpen && s.chatSearchScope === 'session');
   const isSearchMatch = useAppStore((s) => s.chatSearchOpen && s.chatSearchMatchIds.includes(message.id));
@@ -257,7 +274,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
   };
 
   return (
-    <div className={`message ${isUser ? 'message-user' : 'message-assistant'}${isSearchMatch ? ' search-match' : ''}${isCurrentSearchMatch ? ' search-current-match' : ''}${isInRevertedRange ? ' message-reverted' : ''}`} data-message-id={message.id} style={vitalsBorderStyle}>
+    <div className={`message ${isUser ? 'message-user' : 'message-assistant'}${isFinalAnswer ? ' message-final-answer' : ''}${isSearchMatch ? ' search-match' : ''}${isCurrentSearchMatch ? ' search-current-match' : ''}${isInRevertedRange ? ' message-reverted' : ''}`} data-message-id={message.id} style={vitalsBorderStyle}>
       {vitalsBorderStyle && (
         <div
           className="intensity-border-zone"
@@ -265,7 +282,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
         />
       )}
       <div className="message-role">
-        {isUser ? 'You' : 'Assistant'}
+        <span className="message-role-name">{isUser ? 'You' : 'Assistant'}</span>
+        {isFinalAnswer && (
+          <span
+            className="final-answer-badge"
+            data-tooltip="התשובה הסופית של קלוד לפנייה זו (לא שלב ביניים בתהליך)"
+          >
+            תשובה סופית
+          </span>
+        )}
         {message.timestamp && (
           <span className="message-timestamp">
             {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

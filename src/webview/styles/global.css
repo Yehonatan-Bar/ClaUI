@@ -378,6 +378,101 @@ html, body, #root {
   box-shadow: 0 0 6px color-mix(in srgb, var(--vscode-editorCursor-foreground) 42%, transparent);
 }
 
+/* Clarity: high-contrast separation of your input, Claude's process, and the final
+   answer. Keeps the user's base VS Code palette but adds strong semantic accents so
+   the three are impossible to confuse. */
+.app-container.theme-clarity {
+  --theme-chat-font-family: 'Segoe UI', 'Calibri', sans-serif;
+  --clarity-user-accent: #3b82f6;       /* blue   = your input */
+  --clarity-assistant-accent: #a855f7;  /* purple = Claude's output */
+  --clarity-answer-accent: #22c55e;     /* green  = the final answer */
+}
+
+.theme-clarity .message,
+.theme-clarity .tool-use-block {
+  transition: opacity 160ms ease, border-color 200ms ease, background-color 200ms ease;
+}
+
+/* Role labels become bold, color-coded chips so YOU vs ASSISTANT reads at a glance */
+.theme-clarity .message-role-name {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-weight: 700;
+  color: #ffffff;
+}
+.theme-clarity .message-user .message-role-name {
+  background: var(--clarity-user-accent);
+}
+.theme-clarity .message-assistant .message-role-name {
+  background: var(--clarity-assistant-accent);
+}
+
+/* Your input: distinct blue card with a strong left rail */
+.theme-clarity .message-user {
+  background: color-mix(in srgb, var(--clarity-user-accent) 13%, var(--vscode-editor-background));
+  border: 1px solid color-mix(in srgb, var(--clarity-user-accent) 40%, transparent);
+  border-left: 4px solid var(--clarity-user-accent);
+  border-radius: 10px;
+}
+
+/* Claude's output (working/narration): its own purple-tinted surface */
+.theme-clarity .message-assistant {
+  background: color-mix(in srgb, var(--clarity-assistant-accent) 6%, var(--vscode-editor-background));
+  border: 1px solid color-mix(in srgb, var(--clarity-assistant-accent) 24%, transparent);
+  border-left: 4px solid color-mix(in srgb, var(--clarity-assistant-accent) 72%, transparent);
+  border-radius: 10px;
+}
+
+/* The process: tool steps inside Claude's output are visually recessed and
+   reveal on hover, so the eye treats them as secondary to the prose */
+.theme-clarity .message-assistant .tool-use-block {
+  opacity: 0.66;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--vscode-panel-border, #333) 70%, transparent);
+  background: color-mix(in srgb, var(--vscode-editor-background) 90%, transparent);
+}
+.theme-clarity .message-assistant .tool-use-block:hover,
+.theme-clarity .message-assistant .tool-use-block:focus-within {
+  opacity: 1;
+}
+.theme-clarity .message-assistant .tool-use-header {
+  font-weight: 500;
+  background: color-mix(in srgb, var(--vscode-sideBarSectionHeader-background, #252526) 60%, transparent);
+}
+
+/* The final answer: a prominent green card that stands apart from the process.
+   The compound selector keeps these rules above the generic .message-assistant ones. */
+.theme-clarity .message-assistant.message-final-answer {
+  background: color-mix(in srgb, var(--clarity-answer-accent) 10%, var(--vscode-editor-background));
+  border: 1px solid color-mix(in srgb, var(--clarity-answer-accent) 42%, transparent);
+  border-left: 4px solid var(--clarity-answer-accent);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--clarity-answer-accent) 16%, transparent),
+    0 6px 18px rgba(0, 0, 0, 0.12);
+}
+.theme-clarity .message-assistant.message-final-answer .message-role-name {
+  background: var(--clarity-answer-accent);
+}
+
+/* "Final answer" badge: hidden everywhere by default, revealed only in Clarity */
+.final-answer-badge {
+  display: none;
+}
+.theme-clarity .final-answer-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: normal;
+  text-transform: none;
+  color: #ffffff;
+  background: var(--clarity-answer-accent);
+}
+
 /* Spacer pushes input to bottom when no messages exist */
 .chat-spacer {
   flex: 1;
@@ -3428,6 +3523,35 @@ html, body, #root {
 
 .status-bar-autoreview-label {
   white-space: nowrap;
+}
+
+.status-bar-autoreview-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-bar-autoreview-session-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 3px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  line-height: 0;
+}
+
+.status-bar-autoreview-session-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.2));
+  color: var(--vscode-editor-foreground);
+}
+
+/* Engaged = auto-review skipped for this session. */
+.status-bar-autoreview-session-btn.off {
+  color: var(--vscode-charts-orange, #d18616);
 }
 
 .review-loop-toggle {

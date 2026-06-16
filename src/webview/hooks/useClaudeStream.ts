@@ -126,6 +126,7 @@ export function useClaudeStream(): void {
     incrementSessionToolCount,
     applyReviewLoopEvent,
     setReviewLoopAutoStart,
+    setReviewLoopSessionEnabled,
     initBtwSession,
     addBtwUserMessage,
     handleBtwMessageStart,
@@ -813,6 +814,7 @@ export function useClaudeStream(): void {
               timestamp: m.timestamp,
               thinkingEffort: m.thinkingEffort,
               source: m.source,
+              synthetic: m.synthetic,
             }));
             useAppStore.setState({
               messages: hydratedMessages,
@@ -836,6 +838,7 @@ export function useClaudeStream(): void {
               timestamp: m.timestamp,
               thinkingEffort: m.thinkingEffort,
               source: m.source,
+              synthetic: m.synthetic,
             }));
             useAppStore.setState({
               messages: hydratedMessages,
@@ -1242,6 +1245,10 @@ export function useClaudeStream(): void {
           setReviewLoopAutoStart(msg.enabled);
           break;
 
+        case 'reviewLoopSessionEnabledSetting':
+          setReviewLoopSessionEnabled(msg.enabled);
+          break;
+
         // --- Merge Conflict Assistant events ---
         case 'mergeAssistantUserMessage':
           // Skip CLI echo - user messages are added optimistically in MergeAssistantChat
@@ -1487,6 +1494,7 @@ export function useClaudeStream(): void {
     addWriteOldContent,
     applyReviewLoopEvent,
     setReviewLoopAutoStart,
+    setReviewLoopSessionEnabled,
     initBtwSession,
     addBtwUserMessage,
     handleBtwMessageStart,

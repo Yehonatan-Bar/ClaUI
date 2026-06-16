@@ -96,6 +96,10 @@ export interface ChatMessage {
   // Silent crash resume: assistant turn was cut off mid-stream by a CLI crash.
   // Renders a muted "(message ended unexpectedly)" footer in the bubble.
   interrupted?: boolean;
+  // CLI-injected synthetic content (skill bodies, sub-agent dispatch context,
+  // system reminders) is stored as an assistant-role message but is part of the
+  // tool/process flow, NOT a real answer. Excluded from final-answer detection.
+  synthetic?: boolean;
 }
 
 export interface StreamingBlock {
@@ -524,6 +528,8 @@ export interface AppState {
   resetReviewLoop: () => void;
   reviewLoopAutoStart: boolean;
   setReviewLoopAutoStart: (enabled: boolean) => void;
+  reviewLoopSessionEnabled: boolean;
+  setReviewLoopSessionEnabled: (enabled: boolean) => void;
 
   // Worktree dashboard
   worktreePanelOpen: boolean;
@@ -1378,6 +1384,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
   reviewLoopAutoStart: true,
   setReviewLoopAutoStart: (enabled) => set({ reviewLoopAutoStart: enabled }),
+  reviewLoopSessionEnabled: true,
+  setReviewLoopSessionEnabled: (enabled) => set({ reviewLoopSessionEnabled: enabled }),
 
   // Worktree dashboard
   worktreePanelOpen: false,
@@ -1734,6 +1742,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           role: 'assistant' as const,
           content: normalizedContent,
           timestamp: Date.now(),
+          synthetic: true,
         },
       ],
     }));

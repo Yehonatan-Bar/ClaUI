@@ -77,6 +77,8 @@ export const StatusBar: React.FC<{
     resetReviewLoop,
     reviewLoopAutoStart,
     setReviewLoopAutoStart,
+    reviewLoopSessionEnabled,
+    setReviewLoopSessionEnabled,
     setPromptHistoryPanelOpen,
     usageStats,
     usageFetchedAt,
@@ -690,26 +692,45 @@ export const StatusBar: React.FC<{
         </button>
       )}
       {isConnected && showCodexConsult && (
-        <div
-          className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static status-bar-autoreview-row"
-          data-tooltip="Auto-start the review loop after each work turn (Claude used a tool)"
-        >
+        <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static status-bar-autoreview-row">
           <span id="autoreview-label" className="status-bar-autoreview-label">Auto-review</span>
-          <label className="review-loop-toggle">
-            <input
-              type="checkbox"
-              role="switch"
-              aria-label="Auto-review"
-              aria-labelledby="autoreview-label"
-              checked={reviewLoopAutoStart}
-              onChange={() => {
-                const next = !reviewLoopAutoStart;
-                setReviewLoopAutoStart(next);
-                postToExtension({ type: 'setReviewLoopAutoStart', enabled: next });
+          <span className="status-bar-autoreview-controls">
+            <label
+              className="review-loop-toggle"
+              data-tooltip="Auto-start the review loop after each work turn — global default for all sessions."
+            >
+              <input
+                type="checkbox"
+                role="switch"
+                aria-label="Auto-review (global default)"
+                aria-labelledby="autoreview-label"
+                checked={reviewLoopAutoStart}
+                onChange={() => {
+                  const next = !reviewLoopAutoStart;
+                  setReviewLoopAutoStart(next);
+                  postToExtension({ type: 'setReviewLoopAutoStart', enabled: next });
+                }}
+              />
+              <span className="review-loop-toggle-slider" />
+            </label>
+            <button
+              type="button"
+              className={`status-bar-autoreview-session-btn ${reviewLoopSessionEnabled ? '' : 'off'}`}
+              aria-label="Skip auto-review for this session"
+              aria-pressed={!reviewLoopSessionEnabled}
+              onClick={() => {
+                const next = !reviewLoopSessionEnabled;
+                setReviewLoopSessionEnabled(next);
+                postToExtension({ type: 'setReviewLoopSessionEnabled', enabled: next });
               }}
-            />
-            <span className="review-loop-toggle-slider" />
-          </label>
+              data-tooltip="Skip auto-review for THIS session only — turn off for a simple task. Does not affect other sessions or the global default."
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                <circle cx="8" cy="8" r="6.2" />
+                <line x1="3.6" y1="3.6" x2="12.4" y2="12.4" />
+              </svg>
+            </button>
+          </span>
         </div>
       )}
       <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={goalRef}>

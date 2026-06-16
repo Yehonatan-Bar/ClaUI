@@ -127,6 +127,26 @@ toggle: `setReviewLoopAutoStart` (webview->extension) updates the config and
 echoes back `reviewLoopAutoStartSetting`, which the extension also pushes once on
 the webview `ready` burst so the toggle reflects the persisted value.
 
+Beside the global toggle, on the same row, is a compact **circle-slash icon button**
+(`.status-bar-autoreview-session-btn`, an inline SVG since the webview has no codicons)
+— a per-tab override for a simple task that does not need review. It turns amber when
+engaged (this session skipped) and carries its own tooltip. It is in-memory and
+tab-local: `setReviewLoopSessionEnabled`
+(webview->extension) flips `SessionTab.reviewLoopEnabledThisSession`, which
+`maybeAutoStartReviewLoop()` checks (auto-review fires only when BOTH the global
+`autoStart` is on AND this session flag is true; the deferred 400 ms callback
+re-checks both, so flipping the toggle during that window still cancels the
+pending start). Turning it off also stops any loop currently running on the tab.
+It is NOT persisted and does NOT touch the global setting or other tabs.
+
+The extension is the source of truth for this flag: the flag is changed ONLY by
+the user's explicit toggle. On the webview `ready` event `SessionTab` does NOT
+reset the flag — it instead PUSHES the current value (`reviewLoopSessionEnabledSetting`)
+so the StatusBar toggle reflects reality after a (re)load. (Resetting on `ready`
+was a bug: `ready` re-fires mid-session — e.g. on a new session's first turn — and
+silently re-enabled a session the user had turned off, so "This session: Off" still
+ran the loop. A fresh `SessionTab` still defaults to enabled via its field initializer.)
+
 ## Reviewer Scope
 
 The reviewer runs read-only over the whole workspace (worktree root when the tab

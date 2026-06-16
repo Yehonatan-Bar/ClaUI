@@ -19,6 +19,7 @@ const THEME_PRESETS: Array<{ label: string; value: TypingTheme }> = [
   { label: 'Retro', value: 'retro' },
   { label: 'Zen', value: 'zen' },
   { label: 'Neo Zen', value: 'neo-zen' },
+  { label: 'Clarity', value: 'clarity' },
 ];
 
 /**

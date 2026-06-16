@@ -176,6 +176,9 @@ export class SessionTab implements WebviewBridge {
   private btwSession: BackgroundSession | null = null;
   /** Automatic Claude<->Codex review loop orchestrator (null when idle). */
   private reviewLoop: ReviewLoopOrchestrator | null = null;
+  /** Per-session override: when false, auto-review is suppressed for THIS tab only
+   *  (in-memory; does not affect the global setting or other tabs). Resets on reload. */
+  private reviewLoopEnabledThisSession = true;
   /** Headless Codex reviewer backing the review loop (kept across rounds). */
   private reviewerSession: CodexReviewerSession | null = null;
   /** When set, the next finished turn's final assistant text is captured (review loop). */
@@ -1616,6 +1619,17 @@ export class SessionTab implements WebviewBridge {
     this.reviewLoop?.stop();
   }
 
+  /** Per-session override: enable/disable auto-review for THIS tab only. In-memory;
+   *  never touches the global setting or other tabs. Turning it off also stops any
+   *  loop currently running on this tab. */
+  setReviewLoopSessionEnabled(enabled: boolean): void {
+    this.reviewLoopEnabledThisSession = enabled;
+    this.log(`[Tab ${this.tabNumber}] Auto-review ${enabled ? 'enabled' : 'disabled'} for this session.`);
+    if (!enabled) {
+      this.reviewLoop?.stop('Auto-review disabled for this session.');
+    }
+  }
+
   /** Called when the user sends a manual message; stops any running review loop. */
   notifyUserActivity(): void {
     // A user-initiated turn is starting; mark it so the next completed turn can
@@ -1653,6 +1667,10 @@ export class SessionTab implements WebviewBridge {
     if (wasCapturingTurn || !userInitiated || !usedTools) {
       return;
     }
+    // Per-session opt-out (e.g. a simple task that does not need review).
+    if (!this.reviewLoopEnabledThisSession) {
+      return;
+    }
     if (this.disposed || this.reviewLoop?.isRunning) {
       return;
     }
@@ -1676,6 +1694,17 @@ export class SessionTab implements WebviewBridge {
     // Defer so the just-finished turn fully settles before we inject the handover prompt.
     setTimeout(() => {
       if (this.disposed || this.reviewLoop?.isRunning || this.isBusy) {
+        return;
+      }
+      // Re-validate the gates at fire time: the user may have flipped "This session"
+      // off (or toggled the global Auto-review) during the 400 ms window.
+      if (!this.reviewLoopEnabledThisSession) {
+        return;
+      }
+      const stillAutoStart = vscode.workspace
+        .getConfiguration('claudeMirror.reviewLoop')
+        .get<boolean>('autoStart', true);
+      if (!stillAutoStart) {
         return;
       }
       this.log(`[Tab ${this.tabNumber}] Auto-starting review loop (reviewLoop.autoStart).`);
@@ -2010,6 +2039,13 @@ export class SessionTab implements WebviewBridge {
       if (message.type === 'ready') {
         this.isWebviewReady = true;
         this.flushPendingMessages();
+        // The per-session auto-review override lives in-memory on this tab and the
+        // extension is its source of truth. Push the current value so the StatusBar
+        // toggle reflects it after any (re)load WITHOUT mutating the flag here.
+        // Resetting it on 'ready' would silently re-enable a session the user turned
+        // off whenever 'ready' fires again mid-session (e.g. on a new session's first
+        // turn) — that was the bug where "This session: Off" still ran the loop.
+        this.postMessage({ type: 'reviewLoopSessionEnabledSetting', enabled: this.reviewLoopEnabledThisSession });
       }
       this.messageCallback?.(message as WebviewToExtensionMessage);
     });

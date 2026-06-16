@@ -26,7 +26,7 @@ import type {
   MPTypingState,
 } from '../multiparticipant/MultiParticipantProtocol';
 
-export type TypingTheme = 'terminal-hacker' | 'retro' | 'zen' | 'neo-zen';
+export type TypingTheme = 'terminal-hacker' | 'retro' | 'zen' | 'neo-zen' | 'clarity';
 export type ProviderId = 'claude' | 'codex' | 'remote';
 export type HandoffStage =
   | 'idle'
@@ -908,6 +908,12 @@ export interface SetReviewLoopAutoStartRequest {
   enabled: boolean;
 }
 
+/** Per-session override: enable/disable auto-review for the current tab only. */
+export interface SetReviewLoopSessionEnabledRequest {
+  type: 'setReviewLoopSessionEnabled';
+  enabled: boolean;
+}
+
 export interface SetApiKeyRequest {
   type: 'setApiKey';
   apiKey: string;  // empty string = clear the key
@@ -1283,7 +1289,8 @@ export type WebviewToExtensionMessage =
   | WorkspaceAccessGuardTestCommandRequest
   | ReviewLoopStartRequest
   | ReviewLoopStopRequest
-  | SetReviewLoopAutoStartRequest;
+  | SetReviewLoopAutoStartRequest
+  | SetReviewLoopSessionEnabledRequest;
 
 // --- Super Particle Accelerator (Webview -> Extension) ---
 export interface SuperParticleAcceleratorGetStatusRequest { type: 'superParticleAcceleratorGetStatus' }
@@ -2682,6 +2689,9 @@ export interface SerializedChatMessage {
   timestamp: number;
   thinkingEffort?: string;
   source?: 'input' | 'auto-prompt';
+  /** CLI-injected synthetic content (skill bodies, system reminders) restored as
+   *  an assistant message; part of the tool/process flow, not a real answer. */
+  synthetic?: boolean;
 }
 
 // --- Multi-Participant (Extension -> Webview) ---
@@ -2843,6 +2853,11 @@ export interface ReviewLoopEventMessage {
 
 export interface ReviewLoopAutoStartSettingMessage {
   type: 'reviewLoopAutoStartSetting';
+  enabled: boolean;
+}
+
+export interface ReviewLoopSessionEnabledSettingMessage {
+  type: 'reviewLoopSessionEnabledSetting';
   enabled: boolean;
 }
 
@@ -3030,7 +3045,8 @@ export type ExtensionToWebviewMessage =
   | WorkspaceAccessGuardTestResultMessage
   | WorkspaceAccessGuardErrorMessage
   | ReviewLoopEventMessage
-  | ReviewLoopAutoStartSettingMessage;
+  | ReviewLoopAutoStartSettingMessage
+  | ReviewLoopSessionEnabledSettingMessage;
 
 // --- Super Particle Accelerator (Extension -> Webview) ---
 export interface SuperParticleAcceleratorStatusMessage {

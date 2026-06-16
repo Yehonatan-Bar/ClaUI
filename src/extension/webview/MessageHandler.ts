@@ -94,6 +94,8 @@ export interface WebviewBridge {
   stopReviewLoop?(): void;
   /** Notify the tab the user took a manual action (stops any running review loop). */
   notifyUserActivity?(): void;
+  /** Enable/disable auto-review for the current session only (per-tab, in-memory). */
+  setReviewLoopSessionEnabled?(enabled: boolean): void;
   /** Start a fresh, merge-focused assistant seeded with the conflict file list */
   startMergeAssistant?(opts: { targetCwd: string; conflictFiles: string[]; sourceBranch: string; targetBranch: string }): void;
   /** Send a follow-up message in the active merge assistant */
@@ -3075,6 +3077,11 @@ export class MessageHandler {
         case 'reviewLoopStop':
           this.log('Review loop stop requested.');
           this.webview.stopReviewLoop?.();
+          break;
+
+        case 'setReviewLoopSessionEnabled':
+          this.log(`Review loop session-enabled set: ${msg.enabled}`);
+          this.webview.setReviewLoopSessionEnabled?.(msg.enabled);
           break;
 
         case 'startMergeAssistant':

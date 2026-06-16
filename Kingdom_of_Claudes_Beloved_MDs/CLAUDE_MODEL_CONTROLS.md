@@ -66,6 +66,25 @@ The `Model` dropdown (`ModelSelector.tsx`) lives at the top of the AI chip
 dropdown for Claude tabs. When connected, the currently active runtime model
 label is shown next to the dropdown and as its tooltip (`Active: <label>`).
 
+**Default-resolution hint.** Because the `Default` option passes no `--model`
+flag and lets the CLI choose (see "CLI argument" below), `ModelSelector`
+surfaces which model `Default` actually resolved to. This only applies when
+`Default` is the active selection (`!selectedModel`) — with a specific model
+chosen, the CLI-reported `model` merely echoes that explicit choice, so it would
+not describe the default. When `Default` is selected:
+
+- **Tooltip** (`data-tooltip` on the `<select>`): once connected,
+  `Default: Claude CLI is running <label>`; before a session resolves,
+  `Default: Claude CLI picks the model (resolved once the session starts)`.
+- **Inline option label:** once connected, the `Default` option text becomes
+  `Default (<label>)` (e.g. `Default (Opus 4.8)`) so the resolved model is
+  visible in the open dropdown, where native `<option>` elements cannot render
+  the CSS `data-tooltip`.
+
+Both derive from `resolvedDefaultLabel = isDefaultSelected && isConnected ?
+activeModelLabel : null`, where `activeModelLabel` is the CLI-reported runtime
+model (`model`) passed through `getClaudeModelLabel()`.
+
 ### Options
 
 Defined once in `src/webview/utils/claudeModelDisplay.ts` (`CLAUDE_MODEL_OPTIONS`)
@@ -73,6 +92,7 @@ and mirrored in the `claudeMirror.model` enum in `package.json`:
 
 | Label | Model id (`--model` value) |
 |-------|----------------------------|
+| Mythos 5 (Blocked) | `claude-mythos-5` |
 | Default | `""` (CLI default) |
 | Fable 5 (Blocked) | `claude-fable-5` |
 | Opus 4.8 | `claude-opus-4-8` |
@@ -81,17 +101,16 @@ and mirrored in the `claudeMirror.model` enum in `package.json`:
 | Sonnet 4.5 | `claude-sonnet-4-5-20250929` |
 | Opus 4.6 | `claude-opus-4-6` |
 | Haiku 4.5 | `claude-haiku-4-5-20251001` |
-| Mythos 5 (Blocked) | `claude-mythos-5` |
 
 If `selectedModel` is a value not present in the list (e.g. a model id typed
 directly into `settings.json`), `ModelSelector` appends a synthetic
 `Custom (<label>)` option so the dropdown can display the current selection.
 
-Fable 5 (alias `fable`, full id `claude-fable-5`) is listed first; Mythos 5
-(`claude-mythos-5`) is a specialized/preview model listed last — it has no entry
-in the CLI's general model/pricing table and ships a `claude-mythos-preview`
-variant, so it is surfaced for selection but is not a general-availability
-lineup model.
+Mythos 5 (`claude-mythos-5`) is listed first (at the top of the dropdown, above
+`Default`). It is a specialized/preview model — it has no entry in the CLI's
+general model/pricing table and ships a `claude-mythos-preview` variant, so it is
+surfaced for selection but is not a general-availability lineup model. Fable 5
+(alias `fable`, full id `claude-fable-5`) follows after `Default`.
 
 **Context windows are not uniform.** `getModelMaxContext()` in
 `src/webview/utils/modelContextLimits.ts` returns `1_000_000` for the 1M-context
