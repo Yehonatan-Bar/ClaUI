@@ -285,6 +285,56 @@
           "default": true,
           "description": "Enable cross-provider session handoff (Claude Code <-> Codex) with context capsule transfer."
         },
+        "claudeMirror.reviewLoop.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start the Claude<->Codex review loop after each user-initiated Claude turn completes (sendMessage / images / edit-and-resend). On by default; set to false to start the loop only manually from the StatusBar 'Review Loop' button."
+        },
+        "claudeMirror.reviewLoop.maxRounds": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Maximum review rounds before the loop stops and returns the open feedback to you."
+        },
+        "claudeMirror.reviewLoop.reviewerModel": {
+          "type": "string",
+          "default": "gpt-5.5",
+          "description": "Codex model id used by the review-loop reviewer (e.g. gpt-5.5, gpt-5.4). Empty = fall back to claudeMirror.codex.model, then the Codex CLI default."
+        },
+        "claudeMirror.reviewLoop.reviewerReasoningEffort": {
+          "type": "string",
+          "default": "xhigh",
+          "enum": [
+            "",
+            "none",
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "description": "Reasoning effort for the review-loop reviewer (xhigh = extra high). Empty = fall back to claudeMirror.codex.reasoningEffort."
+        },
+        "claudeMirror.reviewLoop.reviewerServiceTier": {
+          "type": "string",
+          "default": "fast",
+          "enum": [
+            "",
+            "fast"
+          ],
+          "description": "Service tier for the review-loop reviewer ('fast' = Codex fast mode). Empty = fall back to claudeMirror.codex.serviceTier."
+        },
+        "claudeMirror.reviewLoop.classifierModel": {
+          "type": "string",
+          "default": "claude-haiku-4-5-20251001",
+          "description": "Claude model id used by the lightweight verdict classifier."
+        },
+        "claudeMirror.reviewLoop.turnTimeoutMs": {
+          "type": "number",
+          "default": 300000,
+          "minimum": 30000,
+          "description": "Per-turn timeout (ms) for both the developer turn and the Codex reviewer turn."
+        },
         "claudeMirror.handoff.storeArtifacts": {
           "type": "boolean",
           "default": true,
@@ -489,14 +539,14 @@
           ],
           "enumDescriptions": [
             "Default (CLI default)",
-            "Claude Fable 5",
+            "Claude Fable 5 (Blocked)",
             "Claude Opus 4.8",
             "Claude Opus 4.7",
             "Claude Sonnet 4.6",
             "Claude Sonnet 4.5",
             "Claude Opus 4.6",
             "Claude Haiku 4.5",
-            "Claude Mythos 5 (Blocked for peasants)"
+            "Claude Mythos 5 (Blocked)"
           ],
           "description": "Claude model to use for new sessions. Leave empty to use CLI default."
         },
@@ -767,13 +817,13 @@
         },
         "claudeMirror.srPtdAutoInject": {
           "type": "boolean",
-          "default": true,
-          "description": "Automatically inject SR-PTD documentation instructions into the project CLAUDE.md and install the sr-ptd-skill"
+          "default": false,
+          "description": "Opt-in: inject SR-PTD documentation instructions into the project CLAUDE.md and install the sr-ptd-skill. Off by default; enabled when the user opts into SkillDocs."
         },
         "claudeMirror.skillGen.enabled": {
           "type": "boolean",
-          "default": true,
-          "description": "Enable automatic skill generation from SR-PTD documents"
+          "default": false,
+          "description": "Opt-in: enable automatic skill generation from SR-PTD documents. Off by default; the user enables it via the SkillDocs onboarding or the settings toggle."
         },
         "claudeMirror.skillGen.threshold": {
           "type": "number",
@@ -1500,6 +1550,7 @@
     "build": "webpack --mode production",
     "watch": "webpack --mode development --watch",
     "lint": "eslint src --ext ts,tsx",
+    "test:review-loop": "node --import tsx --test tests/review-loop/reviewLoopPrompts.test.ts",
     "verify:installed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installed.ps1",
     "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1",
     "git:push": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-push.ps1",

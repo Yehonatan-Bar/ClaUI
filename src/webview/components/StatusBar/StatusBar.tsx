@@ -73,6 +73,10 @@ export const StatusBar: React.FC<{
     provider,
     providerCapabilities,
     setCodexConsultPanelOpen,
+    setReviewLoopPanelOpen,
+    resetReviewLoop,
+    reviewLoopAutoStart,
+    setReviewLoopAutoStart,
     setPromptHistoryPanelOpen,
     usageStats,
     usageFetchedAt,
@@ -671,6 +675,42 @@ export const StatusBar: React.FC<{
         <button className="status-bar-group-dropdown-item" onClick={() => setCodexConsultPanelOpen(true)} data-tooltip="Consult Codex GPT expert">
           Consult Codex
         </button>
+      )}
+      {isConnected && showCodexConsult && !reviewLoopAutoStart && (
+        <button
+          className="status-bar-group-dropdown-item"
+          onClick={() => {
+            resetReviewLoop();
+            setReviewLoopPanelOpen(true);
+            postToExtension({ type: 'reviewLoopStart' });
+          }}
+          data-tooltip="Run a Claude + Codex review now (Auto-review is off)"
+        >
+          Run Review Now
+        </button>
+      )}
+      {isConnected && showCodexConsult && (
+        <div
+          className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static status-bar-autoreview-row"
+          data-tooltip="Auto-start the review loop after each work turn (Claude used a tool)"
+        >
+          <span id="autoreview-label" className="status-bar-autoreview-label">Auto-review</span>
+          <label className="review-loop-toggle">
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label="Auto-review"
+              aria-labelledby="autoreview-label"
+              checked={reviewLoopAutoStart}
+              onChange={() => {
+                const next = !reviewLoopAutoStart;
+                setReviewLoopAutoStart(next);
+                postToExtension({ type: 'setReviewLoopAutoStart', enabled: next });
+              }}
+            />
+            <span className="review-loop-toggle-slider" />
+          </label>
+        </div>
       )}
       <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={goalRef}>
         <button

@@ -74,14 +74,14 @@ and mirrored in the `claudeMirror.model` enum in `package.json`:
 | Label | Model id (`--model` value) |
 |-------|----------------------------|
 | Default | `""` (CLI default) |
-| Fable 5 | `claude-fable-5` |
+| Fable 5 (Blocked) | `claude-fable-5` |
 | Opus 4.8 | `claude-opus-4-8` |
 | Opus 4.7 | `claude-opus-4-7` |
 | Sonnet 4.6 | `claude-sonnet-4-6` |
 | Sonnet 4.5 | `claude-sonnet-4-5-20250929` |
 | Opus 4.6 | `claude-opus-4-6` |
 | Haiku 4.5 | `claude-haiku-4-5-20251001` |
-| Mythos 5 (Blocked for peasants) | `claude-mythos-5` |
+| Mythos 5 (Blocked) | `claude-mythos-5` |
 
 If `selectedModel` is a value not present in the list (e.g. a model id typed
 directly into `settings.json`), `ModelSelector` appends a synthetic

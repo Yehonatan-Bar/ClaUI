@@ -43,6 +43,13 @@ import type {
 import type { HandoffProvider, HandoffSourceSnapshot } from './handoff/HandoffTypes';
 import { BackgroundSession } from './BackgroundSession';
 import { MergeAssistantSession, type MergeAssistantStartOptions } from './MergeAssistantSession';
+import {
+  ReviewLoopOrchestrator,
+  CodexReviewerSession,
+  ReviewVerdictClassifier,
+  DEFAULT_REVIEW_LOOP_CONFIG,
+  type ReviewLoopConfig,
+} from '../review-loop';
 
 export interface SessionTabCallbacks {
   onClosed: (tabId: string) => void;
@@ -167,6 +174,22 @@ export class SessionTab implements WebviewBridge {
   private assistantReplyWaiters: Array<(ok: boolean) => void> = [];
   /** Background session for the "btw" side-conversation overlay */
   private btwSession: BackgroundSession | null = null;
+  /** Automatic Claude<->Codex review loop orchestrator (null when idle). */
+  private reviewLoop: ReviewLoopOrchestrator | null = null;
+  /** Headless Codex reviewer backing the review loop (kept across rounds). */
+  private reviewerSession: CodexReviewerSession | null = null;
+  /** When set, the next finished turn's final assistant text is captured (review loop). */
+  private turnCapture: {
+    answerParts: string[];
+    fallbackParts: string[];
+    timer: ReturnType<typeof setTimeout>;
+    resolve: (text: string) => void;
+    reject: (err: Error) => void;
+  } | null = null;
+  /** True when the next finished turn was started by a user message (drives review-loop auto-start). */
+  private pendingUserTurn = false;
+  /** True when the current turn used at least one tool (auto-start skips tool-less text-only turns). */
+  private pendingTurnUsedTools = false;
   /** Fresh, merge-focused session for the Merge Wizard's conflict assistant */
   private mergeAssistant: MergeAssistantSession | null = null;
   /**
@@ -390,6 +413,7 @@ export class SessionTab implements WebviewBridge {
     this.wireProcessEvents(tabLog);
     this.wireDemuxStatusBar();
     this.wireDemuxSessionStore(tabLog);
+    this.wireTurnCaptureEvents();
     this.messageHandler.initialize();
 
     // Move the new tab to the rightmost position in its editor group
@@ -1287,6 +1311,8 @@ export class SessionTab implements WebviewBridge {
     if (this.particleAcceleratorService?.isEnabled()) {
       void this.particleAcceleratorService.getContextStore()?.disposeContext(this.id).catch(() => {});
     }
+    this.reviewLoop?.stop('Tab closed.');
+    this.closeReviewLoop();
     this.closeBtwSession();
     this.closeMergeAssistant();
     this.processManager.stop();
@@ -1402,6 +1428,259 @@ export class SessionTab implements WebviewBridge {
       this.btwSession.dispose();
       this.btwSession = null;
     }
+  }
+
+  // --- Review Loop (automatic Claude<->Codex review) ---
+
+  /**
+   * Inject a prompt into the live session and resolve with the final assistant
+   * text of that turn. Used by the review loop to capture the developer's handover.
+   */
+  captureNextTurn(prompt: string, timeoutMs: number): Promise<string> {
+    if (this.disposed) {
+      return Promise.reject(new Error('Tab is disposed.'));
+    }
+    if (this.turnCapture) {
+      return Promise.reject(new Error('A turn capture is already in progress.'));
+    }
+    if (!this.processManager.isRunning) {
+      return Promise.reject(new Error('No running session to capture a turn from.'));
+    }
+    return new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.failTurnCapture(new Error('Developer turn timed out.'));
+      }, timeoutMs);
+      this.turnCapture = { answerParts: [], fallbackParts: [], timer, resolve, reject };
+      try {
+        this.control.sendText(prompt);
+        this.postMessage({ type: 'processBusy', busy: true });
+      } catch (err) {
+        this.failTurnCapture(err instanceof Error ? err : new Error(String(err)));
+      }
+    });
+  }
+
+  /** Accumulate assistant text for an in-flight turn capture (mirrors HeadlessAgentRunner). */
+  private wireTurnCaptureEvents(): void {
+    // Track whether the current turn used any tool, so auto-start can skip
+    // pure text-only Q&A turns (nothing was done, so nothing to review).
+    this.demux.on('toolUseStart', () => {
+      this.pendingTurnUsedTools = true;
+    });
+    this.demux.on('assistantMessage', (event: AssistantMessage) => {
+      const capture = this.turnCapture;
+      if (!capture) {
+        return;
+      }
+      const blocks = Array.isArray(event.message?.content) ? event.message.content : [];
+      const textParts = blocks
+        .filter((block) => block.type === 'text' && typeof block.text === 'string' && block.text)
+        .map((block) => block.text as string);
+      if (textParts.length === 0) {
+        return;
+      }
+      const joined = textParts.join('\n');
+      capture.fallbackParts.push(joined);
+      // The final, non-tool_use message is the answer; tool_use messages are interim narration.
+      if (event.message?.stop_reason !== 'tool_use') {
+        capture.answerParts.push(joined);
+      }
+    });
+  }
+
+  private resolveTurnCapture(): void {
+    const capture = this.turnCapture;
+    if (!capture) {
+      return;
+    }
+    this.turnCapture = null;
+    clearTimeout(capture.timer);
+    const answer = capture.answerParts.join('\n\n').trim();
+    const fallback = capture.fallbackParts.join('\n\n').trim();
+    capture.resolve(answer || fallback);
+  }
+
+  private failTurnCapture(err: Error): void {
+    const capture = this.turnCapture;
+    if (!capture) {
+      return;
+    }
+    this.turnCapture = null;
+    clearTimeout(capture.timer);
+    capture.reject(err);
+  }
+
+  /** Read review-loop configuration from settings. */
+  private getReviewLoopConfig(): ReviewLoopConfig {
+    const config = vscode.workspace.getConfiguration('claudeMirror.reviewLoop');
+    const defaults = DEFAULT_REVIEW_LOOP_CONFIG;
+    return {
+      maxRounds: Math.max(1, Math.min(20, config.get<number>('maxRounds', defaults.maxRounds))),
+      reviewerModel: config.get<string>('reviewerModel', defaults.reviewerModel),
+      reviewerReasoningEffort: config.get<string>('reviewerReasoningEffort', defaults.reviewerReasoningEffort),
+      reviewerServiceTier: config.get<string>('reviewerServiceTier', defaults.reviewerServiceTier),
+      classifierModel: config.get<string>('classifierModel', defaults.classifierModel),
+      turnTimeoutMs: Math.max(30_000, config.get<number>('turnTimeoutMs', defaults.turnTimeoutMs)),
+    };
+  }
+
+  /** Start the automatic Claude<->Codex review loop on this tab. Resumes the
+   *  Claude session if its process has exited (e.g. at session end) so the loop
+   *  can always ask the developer for a handover instead of bailing. */
+  async startReviewLoop(): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
+    if (this.reviewLoop?.isRunning) {
+      this.log(`[Tab ${this.tabNumber}] Review loop already running.`);
+      return;
+    }
+    if (this.isBusy) {
+      this.postMessage({
+        type: 'reviewLoopEvent',
+        event: { kind: 'error', round: 0, text: 'Session is busy. Wait for the current turn to finish before starting a review.' },
+      });
+      return;
+    }
+
+    // The Codex reviewer reads the workspace by path, but the developer (handover
+    // and fixes) needs a live Claude CLI. If the process exited, resume it.
+    if (!this.processManager.isRunning) {
+      const sid = this.processManager.currentSessionId ?? this.lastKnownSessionId;
+      if (!sid) {
+        this.postMessage({ type: 'reviewLoopEvent', event: { kind: 'error', round: 0, text: 'No session to review yet — send a message first.' } });
+        return;
+      }
+      this.postMessage({ type: 'reviewLoopEvent', event: { kind: 'info', round: 0, text: 'Resuming the session to run the review...' } });
+      try {
+        await this.processManager.start({
+          resume: sid,
+          skipReplay: true,
+          cwd: this.getEffectiveCwd(),
+          cliPathOverride: this.cliPathOverride ?? undefined,
+          appendSystemPrompt: this.appendSystemPrompt ?? undefined,
+          allowedTools: this.allowedTools ?? undefined,
+          ...this.claudeAccountProcessOptions(),
+        });
+        this.processManager.seedSessionId(sid);
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        this.postMessage({ type: 'reviewLoopEvent', event: { kind: 'error', round: 0, text: `Could not resume the session to review: ${reason}` } });
+        return;
+      }
+      if (this.disposed || this.reviewLoop?.isRunning) {
+        return;
+      }
+    }
+
+    const reviewCwd = this.getWorktreePath() ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? undefined;
+    const tabLog = (msg: string) => this.log(`[Tab ${this.tabNumber}] ${msg}`);
+
+    this.reviewerSession = new CodexReviewerSession(this.context, tabLog);
+    const classifier = new ReviewVerdictClassifier();
+    classifier.setLogger(tabLog);
+    classifier.setClaudeConfigDirProvider(() => this.claudeConfigDir ?? undefined);
+
+    this.reviewLoop = new ReviewLoopOrchestrator({
+      developer: {
+        captureTurn: (prompt, timeoutMs) => this.captureNextTurn(prompt, timeoutMs),
+        abortTurn: (hard) => {
+          // Only act when a developer turn is actually in flight. During the
+          // review/classify phases Claude is idle and must not be cancelled.
+          if (!this.turnCapture) {
+            return;
+          }
+          this.failTurnCapture(new Error('Review loop stopped.'));
+          // Hard stop (Stop button) interrupts the live CLI turn; a soft stop
+          // (user sent a message) only detaches so we never cancel-then-write.
+          if (hard) {
+            this.cancelRequest();
+          }
+        },
+      },
+      reviewer: this.reviewerSession,
+      classifier,
+      config: this.getReviewLoopConfig(),
+      cwd: reviewCwd,
+      emit: (event) => this.postMessage({ type: 'reviewLoopEvent', event }),
+      log: tabLog,
+    });
+
+    void this.reviewLoop.start().finally(() => {
+      this.closeReviewLoop();
+    });
+  }
+
+  /** Stop an in-flight review loop (Stop button). */
+  stopReviewLoop(): void {
+    this.reviewLoop?.stop();
+  }
+
+  /** Called when the user sends a manual message; stops any running review loop. */
+  notifyUserActivity(): void {
+    // A user-initiated turn is starting; mark it so the next completed turn can
+    // optionally auto-start the review loop (and never chain off injected turns).
+    this.pendingUserTurn = true;
+    if (this.reviewLoop?.isRunning) {
+      this.log(`[Tab ${this.tabNumber}] User activity detected; stopping review loop (soft).`);
+      // Soft stop: detach our capture but never cancel the live Claude process,
+      // because MessageHandler is about to send the user's message to it.
+      this.reviewLoop.stop('Stopped because you sent a message.', false);
+    }
+  }
+
+  /** Tear down the review loop and its reviewer session. */
+  private closeReviewLoop(): void {
+    if (this.reviewerSession) {
+      this.reviewerSession.dispose();
+      this.reviewerSession = null;
+    }
+    this.reviewLoop = null;
+  }
+
+  /**
+   * Auto-start the review loop after a user-initiated Claude turn completes,
+   * when claudeMirror.reviewLoop.autoStart is enabled. Never chains off the
+   * loop's own injected turns (wasCapturingTurn) or non-user turns / replay.
+   */
+  private maybeAutoStartReviewLoop(resultEvent: ResultSuccess | ResultError, wasCapturingTurn: boolean): void {
+    const userInitiated = this.pendingUserTurn;
+    this.pendingUserTurn = false;
+    const usedTools = this.pendingTurnUsedTools;
+    this.pendingTurnUsedTools = false;
+    // Only auto-review turns where Claude actually did work (used a tool); skip
+    // pure text-only Q&A so we never run a Codex review after casual chat.
+    if (wasCapturingTurn || !userInitiated || !usedTools) {
+      return;
+    }
+    if (this.disposed || this.reviewLoop?.isRunning) {
+      return;
+    }
+    if (resultEvent.subtype !== 'success') {
+      return;
+    }
+    if (this.getProvider() !== 'claude') {
+      return;
+    }
+    // A known session id is enough; the process may have exited at session end,
+    // and startReviewLoop() will resume it before running the review.
+    if (!this.processManager.currentSessionId && !this.lastKnownSessionId) {
+      return;
+    }
+    const autoStart = vscode.workspace
+      .getConfiguration('claudeMirror.reviewLoop')
+      .get<boolean>('autoStart', true);
+    if (!autoStart) {
+      return;
+    }
+    // Defer so the just-finished turn fully settles before we inject the handover prompt.
+    setTimeout(() => {
+      if (this.disposed || this.reviewLoop?.isRunning || this.isBusy) {
+        return;
+      }
+      this.log(`[Tab ${this.tabNumber}] Auto-starting review loop (reviewLoop.autoStart).`);
+      void this.startReviewLoop();
+    }, 400);
   }
 
   // --- Merge Conflict Assistant ---
@@ -1906,7 +2185,10 @@ export class SessionTab implements WebviewBridge {
         // in webpack production builds despite being registered. This direct path
         // guarantees turnComplete events are emitted. A dedup guard in
         // handleResultEvent prevents double-processing if the demux path also fires.
+        const wasCapturingTurn = this.turnCapture !== null;
         this.messageHandler.handleResultEvent(resultEvent, 'wireProcessEvents');
+        this.resolveTurnCapture();
+        this.maybeAutoStartReviewLoop(resultEvent, wasCapturingTurn);
       }
       // Silent-resume: detect successful resume spawn via system/init.
       if (event.type === 'system' && event.subtype === 'init' && this.silentResumeInFlight) {
@@ -1937,6 +2219,9 @@ export class SessionTab implements WebviewBridge {
 
     this.processManager.on('exit', (info: { code: number | null; signal: string | null }) => {
       tabLog(`Process exited: code=${info.code}, signal=${info.signal}`);
+
+      // Review loop: a process exit aborts any in-flight turn capture.
+      this.failTurnCapture(new Error('Session process exited during a review-loop turn.'));
 
       // Deliberate stop+restart (e.g. edit-and-resend): skip sessionEnded, the new start() handles it
       if (this.suppressNextExit) {

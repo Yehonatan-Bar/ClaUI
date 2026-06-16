@@ -37,6 +37,10 @@ export interface CodexRunTurnOptions {
    *  first user turn carries an embedded "## SYSTEM" preamble that the model
    *  treats as instructions for the rest of the conversation. */
   appendSystemPrompt?: string;
+  /** Override reasoning effort for this turn; falls back to claudeMirror.codex.reasoningEffort when undefined. */
+  reasoningEffort?: string;
+  /** Override service tier for this turn ('fast'); falls back to claudeMirror.codex.serviceTier when undefined. */
+  serviceTier?: string;
 }
 
 export interface CodexProcessExitInfo {
@@ -96,8 +100,10 @@ export class CodexExecProcessManager extends EventEmitter {
     // Guard: skip display-only labels like "Codex (default)" that aren't real model IDs
     const rawModel = options.model ?? config.get<string>('codex.model', '');
     const selectedModel = rawModel && !rawModel.includes('(') ? rawModel : '';
-    const selectedReasoningEffort = config.get<string>('codex.reasoningEffort', '').trim();
-    const selectedServiceTier = config.get<string>('codex.serviceTier', '').trim();
+    // Per-turn overrides (e.g. the review-loop reviewer) take precedence; otherwise
+    // fall back to the global Codex settings.
+    const selectedReasoningEffort = (options.reasoningEffort ?? config.get<string>('codex.reasoningEffort', '')).trim();
+    const selectedServiceTier = (options.serviceTier ?? config.get<string>('codex.serviceTier', '')).trim();
     const permissionMode =
       options.permissionMode ??
       (config.get<string>('permissionMode', 'full-access') as 'full-access' | 'supervised');

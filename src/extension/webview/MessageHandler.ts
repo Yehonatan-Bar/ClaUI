@@ -88,6 +88,12 @@ export interface WebviewBridge {
   sendBtwMessage?(text: string): void;
   /** Close the active btw session */
   closeBtwSession?(): void;
+  /** Start the automatic Claude<->Codex review loop on this tab. */
+  startReviewLoop?(): void;
+  /** Stop an in-flight review loop. */
+  stopReviewLoop?(): void;
+  /** Notify the tab the user took a manual action (stops any running review loop). */
+  notifyUserActivity?(): void;
   /** Start a fresh, merge-focused assistant seeded with the conflict file list */
   startMergeAssistant?(opts: { targetCwd: string; conflictFiles: string[]; sourceBranch: string; targetBranch: string }): void;
   /** Send a follow-up message in the active merge assistant */
@@ -1768,6 +1774,7 @@ export class MessageHandler {
 
       switch (msg.type) {
         case 'sendMessage':
+          this.webview.notifyUserActivity?.();
           if (this.resolvePermissionFromText(msg.text)) { break; }
           if (this.usageLimitActive && this.getActiveProvider() === 'claude') {
             this.queuePromptUntilUsageReset(msg.text);
@@ -1848,6 +1855,7 @@ export class MessageHandler {
           break;
 
         case 'sendMessageWithImages': {
+          this.webview.notifyUserActivity?.();
           if (this.resolvePermissionFromText(msg.text)) { break; }
           if (this.usageLimitActive && this.getActiveProvider() === 'claude') {
             this.queuePromptUntilUsageReset(msg.text, msg.images);
@@ -2568,8 +2576,15 @@ export class MessageHandler {
         case 'skillGenOnboardingDecision': {
           this.log(`[SkillGen:Onboard][INFO] onboardingDecision | accepted=${msg.accepted}`);
           void this.globalState?.update('claui.skillGenOnboardingSeen', true);
-          if (!msg.accepted) {
-            void vscode.workspace.getConfiguration('claudeMirror').update('skillGen.enabled', false, true);
+          const onboardCfg = vscode.workspace.getConfiguration('claudeMirror');
+          if (msg.accepted) {
+            // User opted in -> enable the full SkillDocs feature explicitly. The
+            // extension's config-change listener picks this up and installs the
+            // sr-ptd-skill + injects the CLAUDE.md instructions immediately.
+            void onboardCfg.update('skillGen.enabled', true, true);
+            void onboardCfg.update('srPtdAutoInject', true, true);
+          } else {
+            void onboardCfg.update('skillGen.enabled', false, true);
           }
           // Re-send settings so the webview hides the onboarding FAB
           this.sendSkillGenSettings();
@@ -3052,6 +3067,16 @@ export class MessageHandler {
           this.webview.closeBtwSession?.();
           break;
 
+        case 'reviewLoopStart':
+          this.log('Review loop start requested.');
+          this.webview.startReviewLoop?.();
+          break;
+
+        case 'reviewLoopStop':
+          this.log('Review loop stop requested.');
+          this.webview.stopReviewLoop?.();
+          break;
+
         case 'startMergeAssistant':
           this.log(`Starting merge assistant for ${msg.targetPath} (${msg.conflictFiles.length} files).`);
           this.webview.startMergeAssistant?.({
@@ -3115,6 +3140,7 @@ export class MessageHandler {
         }
 
         case 'editAndResend':
+          this.webview.notifyUserActivity?.();
           this.log(`Edit-and-resend: resuming session with edited prompt`);
           this.clearUsageLimitState('editAndResend', { notifyWebview: true, clearQueuedPrompt: true });
           this.clearScheduledPromptState(true);
@@ -3664,6 +3690,17 @@ export class MessageHandler {
           break;
         }
 
+        case 'setReviewLoopAutoStart': {
+          this.log(`Setting review loop autoStart: ${msg.enabled}`);
+          // Echo only AFTER the async update resolves, so the read does not race
+          // ahead of the write and send back the stale value.
+          void vscode.workspace
+            .getConfiguration('claudeMirror')
+            .update('reviewLoop.autoStart', msg.enabled, true)
+            .then(() => this.sendReviewLoopAutoStartSetting());
+          break;
+        }
+
         case 'setRestoreSessionsEnabled': {
           this.log(`Setting restoreSessionsOnStartup: ${msg.enabled}`);
           void vscode.workspace
@@ -3898,6 +3935,7 @@ export class MessageHandler {
           this.sendWeatherWidgetSetting();
           // Send usage widget setting and auto-fetch initial usage data
           this.sendUsageWidgetSetting();
+          this.sendReviewLoopAutoStartSetting();
           void this.fetchAndSendUsage();
           // Send restore-sessions-on-startup setting
           this.sendRestoreSessionsSetting();
@@ -4424,6 +4462,12 @@ export class MessageHandler {
     this.webview.postMessage({ type: 'usageWidgetSetting', enabled });
   }
 
+  /** Read review-loop autoStart setting from VS Code config and send to webview */
+  private sendReviewLoopAutoStartSetting(): void {
+    const enabled = vscode.workspace.getConfiguration('claudeMirror.reviewLoop').get<boolean>('autoStart', true);
+    this.webview.postMessage({ type: 'reviewLoopAutoStartSetting', enabled });
+  }
+
   /** Read restoreSessionsOnStartup setting from VS Code config and send to webview */
   private sendRestoreSessionsSetting(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -4615,7 +4659,7 @@ export class MessageHandler {
     const onboardingSeen = this.globalState?.get<boolean>('claui.skillGenOnboardingSeen', false) ?? false;
     this.webview.postMessage({
       type: 'skillGenSettings',
-      enabled: config.get<boolean>('skillGen.enabled', true),
+      enabled: config.get<boolean>('skillGen.enabled', false),
       threshold: config.get<number>('skillGen.threshold', 30),
       docsDirectory: config.get<string>('skillGen.docsDirectory', ''),
       autoRun: config.get<boolean>('skillGen.autoRun', false),
@@ -4864,6 +4908,9 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.usageWidget')) {
         this.sendUsageWidgetSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.reviewLoop.autoStart')) {
+        this.sendReviewLoopAutoStartSetting();
       }
       if (e.affectsConfiguration('claudeMirror.restoreSessionsOnStartup')) {
         this.sendRestoreSessionsSetting();
@@ -5340,6 +5387,40 @@ export class MessageHandler {
           if (visible.length > 0) {
             this.postSyntheticToolContent(visible, event.sourceToolUseID);
           }
+          return;
+        }
+
+        // Tool results -- from a normal tool, or a finished top-level
+        // Task/sub-agent -- are delivered as `type: "user"` envelopes by
+        // Anthropic API convention. They must never render as "YOU" nor
+        // pollute the TurnAnalyzer context. Two independent signals identify
+        // them; either is sufficient:
+        //   1. A structured tool_result content block (array content; normal
+        //      Read/Bash/etc. tool results).
+        //   2. The envelope arrived while an assistant turn is in flight
+        //      (inAssistantTurn) and is NOT the echo of a message ClaUi sent
+        //      from its own input box. A top-level Task result loses signal (1)
+        //      when the CLI flattens it to a string, but it always arrives
+        //      mid-turn, so signal (2) still catches it.
+        // Genuine input never matches: optimistic input is recorded in
+        // lastPostedUserMsg (matches -> handled as the echo below), and replayed
+        // history on resume arrives at idle (inAssistantTurn === false; history
+        // is rebuilt via the separate conversationHistory path regardless).
+        const flatText = content
+          .filter((b) => b.type === 'text')
+          .map((b) => (b as any).text || '')
+          .join('');
+        const isOptimisticEcho =
+          flatText.length > 0
+          && this.lastPostedUserMsg !== null
+          && this.lastPostedUserMsg.text === flatText;
+        const hasToolResultBlock = content.some((b) => b.type === 'tool_result');
+        if (hasToolResultBlock || (this.inAssistantTurn && !isOptimisticEcho)) {
+          this.log(
+            `[userMessage] Suppressed non-input tool-result envelope `
+            + `(toolResultBlock=${hasToolResultBlock}, inAssistantTurn=${this.inAssistantTurn}, `
+            + `optimisticEcho=${isOptimisticEcho})`
+          );
           return;
         }
 

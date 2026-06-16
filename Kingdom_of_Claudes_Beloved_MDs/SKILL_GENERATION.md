@@ -400,18 +400,18 @@ All settings under `claudeMirror.skillGen.*` in `package.json`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `enabled` | `true` | Enable the feature |
-| `threshold` | `5` | Pending docs count to trigger generation |
-| `docsDirectory` | `"C:\\projects\\Skills\\Dev_doc_for_skills"` | SR-PTD documents directory |
-| `docsPattern` | `"SR-PTD_*.md"` | Glob pattern for document files |
-| `skillsDirectory` | `"~/.claude/skills"` | Target directory for installed skills |
+| `enabled` | `false` | **Opt-in** master switch for the feature |
+| `threshold` | `30` | Pending docs count to trigger generation |
+| `docsDirectory` | `"C:/projects/Skills/Dev_doc_for_skills"` | SR-PTD documents directory |
+| `docsPattern` | `"SR-PTD*.md"` | Glob pattern for document files |
+| `skillsDirectory` | `""` (defaults to `~/.claude/skills`) | Target directory for installed skills |
 | `pythonPath` | `"python"` | Python executable path |
 | `toolkitPath` | `""` (auto-resolves to `<docsDir>/used/skills_from_docs_toolkit`) | Skill generation toolkit path |
 | `workspaceDir` | `""` | Isolated pipeline workspace |
 | `pipelineMode` | `"run_pipeline"` | Legacy setting (ignored by PhaseOrchestrator) |
-| `autoRun` | `true` | Auto-trigger on threshold |
-| `timeoutMs` | `300000` | Pipeline timeout (5 min) |
-| `aiDeduplication` | `false` | Enable AI dedup (Tier 3) |
+| `autoRun` | `false` | Auto-trigger on threshold (else only notify) |
+| `timeoutMs` | `600000` | Pipeline timeout (10 min) |
+| `aiDeduplication` | `true` | Enable AI dedup (Tier 3) |
 | `maxSkills` | `50` | Maximum active skills; excess archived by usage |
 | `minDocsPerBucket` | `3` | Min docs in bucket to qualify for clustering (C3) |
 | `minDocsPerSkill` | `3` | Min docs for a cluster to become a skill (C4) |
@@ -422,25 +422,48 @@ All settings under `claudeMirror.skillGen.*` in `package.json`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `claudeMirror.srPtdAutoInject` | `true` | Auto-install SR-PTD skill and inject instructions into project CLAUDE.md |
+| `claudeMirror.srPtdAutoInject` | `false` | **Opt-in**: install SR-PTD skill and inject instructions into project CLAUDE.md (also requires `skillGen.enabled`) |
+
+### Opt-in Behavior
+
+The whole SkillDocs feature is **off by default**. Nothing is installed, injected, or
+scanned until the user explicitly opts in:
+
+- **Onboarding FAB** (`SkillGenOnboarding.tsx`): clicking **Enable** sets both
+  `skillGen.enabled` and `srPtdAutoInject` to `true`. **Skip** sets `skillGen.enabled` to `false`.
+- **Settings gear toggle**: toggles `skillGen.enabled` only.
+
+`extension.ts` registers a `vscode.workspace.onDidChangeConfiguration` listener that
+re-runs the SR-PTD bootstrap (install/inject or remove) whenever `skillGen.enabled` or
+`srPtdAutoInject` changes, so opting in/out takes effect immediately without a window reload.
 
 ---
 
 ## SR-PTD Bootstrap
 
-On extension activation, `SrPtdBootstrap.ts` performs two automatic actions:
+On extension activation (and on every relevant settings change),
+`extension.ts` calls a local `applySkillGenBootstrap()` helper that uses
+`SrPtdBootstrap.ts`. The bootstrap is **opt-in** — it only acts when both
+`claudeMirror.skillGen.enabled` and `claudeMirror.srPtdAutoInject` are `true`.
 
-### 1. Skill Installation
+### When opted in (both settings `true`)
+
+#### 1. Skill Installation
 
 Copies the bundled `sr-ptd-skill/` directory to `~/.claude/skills/sr-ptd-skill/`.
 
 - Skips if target `SKILL.md` already exists with the same file size
 - Overwrites if the bundled version has changed (size differs)
 
-### 2. CLAUDE.md Injection
+#### 2. CLAUDE.md Injection
 
 Appends SR-PTD documentation instructions to the project-level `CLAUDE.md`.
 
 - Marker-based duplicate detection: checks for `MANDATORY: Post-Task Documentation (SR-PTD)`
 - The docs save path uses the configured `claudeMirror.skillGen.docsDirectory` value
-- Gated by `claudeMirror.srPtdAutoInject` setting (default: `true`)
+
+### When opted out (default)
+
+`removeClaudeMdInstructions()` strips any previously-injected marker-bounded block from the
+project `CLAUDE.md`, so Claude stops being told to generate documentation. The skill is not
+installed. This also runs automatically the moment the user disables either setting.

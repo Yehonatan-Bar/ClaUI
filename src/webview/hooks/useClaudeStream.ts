@@ -124,6 +124,8 @@ export function useClaudeStream(): void {
     setSummaryModeEnabled,
     setMessageSummary,
     incrementSessionToolCount,
+    applyReviewLoopEvent,
+    setReviewLoopAutoStart,
     initBtwSession,
     addBtwUserMessage,
     handleBtwMessageStart,
@@ -1231,6 +1233,15 @@ export function useClaudeStream(): void {
           handleBtwResult();
           break;
 
+        // --- Review Loop events ---
+        case 'reviewLoopEvent':
+          applyReviewLoopEvent(msg.event);
+          break;
+
+        case 'reviewLoopAutoStartSetting':
+          setReviewLoopAutoStart(msg.enabled);
+          break;
+
         // --- Merge Conflict Assistant events ---
         case 'mergeAssistantUserMessage':
           // Skip CLI echo - user messages are added optimistically in MergeAssistantChat
@@ -1474,6 +1485,8 @@ export function useClaudeStream(): void {
     setThinkingEffort,
     setDetailedDiffEnabled,
     addWriteOldContent,
+    applyReviewLoopEvent,
+    setReviewLoopAutoStart,
     initBtwSession,
     addBtwUserMessage,
     handleBtwMessageStart,

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>לולאת ביקורת אוטומטית – סיכום מנהלים</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --ink: #1f2937;
+    --muted: #5b6573;
+    --brand: #3b5bdb;
+    --brand-soft: #e7ecfd;
+    --green: #2f9e57;
+    --green-soft: #e5f5ec;
+    --amber: #c9820a;
+    --amber-soft: #fbf2dd;
+    --line: #e3e7ef;
+    --shadow: 0 6px 22px rgba(31, 41, 55, 0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", "Arial", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.75;
+    padding: 32px 16px 64px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  header.hero {
+    background: linear-gradient(135deg, #3b5bdb 0%, #5f3dc4 100%);
+    color: #fff;
+    border-radius: 18px;
+    padding: 38px 34px;
+    box-shadow: var(--shadow);
+  }
+  header.hero h1 { margin: 0 0 10px; font-size: 30px; letter-spacing: -0.3px; }
+  header.hero p { margin: 0; font-size: 17px; opacity: 0.95; max-width: 760px; }
+  .tagline { margin-top: 16px; display: inline-block; background: rgba(255,255,255,0.18);
+             padding: 6px 14px; border-radius: 999px; font-size: 14px; }
+
+  section.card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 26px 28px;
+    margin-top: 22px;
+    box-shadow: var(--shadow);
+  }
+  h2 { font-size: 21px; margin: 0 0 14px; color: var(--brand); display: flex; align-items: center; gap: 10px; }
+  h2 .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--brand); display: inline-block; }
+  p { margin: 0 0 12px; }
+  .muted { color: var(--muted); }
+
+  .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 720px) { .twocol { grid-template-columns: 1fr; } }
+
+  .pill-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; }
+  .pill { background: var(--brand-soft); color: #2b3f9e; border-radius: 12px;
+          padding: 12px 16px; font-size: 15px; flex: 1 1 200px; }
+  .pill b { display: block; font-size: 16px; margin-bottom: 2px; }
+
+  /* roles */
+  .roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .roles { grid-template-columns: 1fr; } }
+  .role { border: 1px solid var(--line); border-radius: 14px; padding: 18px; background: #fbfcfe; }
+  .role .icon { font-size: 0; height: 40px; width: 40px; border-radius: 10px; display: flex;
+                align-items: center; justify-content: center; font-weight: 700; color: #fff; margin-bottom: 10px; }
+  .role.dev .icon { background: #3b5bdb; font-size: 18px; }
+  .role.rev .icon { background: #5f3dc4; font-size: 18px; }
+  .role.judge .icon { background: #2f9e57; font-size: 18px; }
+  .role h3 { margin: 0 0 6px; font-size: 17px; }
+  .role p { font-size: 14.5px; color: var(--muted); margin: 0; }
+
+  /* flow */
+  .flow { display: flex; flex-direction: column; gap: 0; }
+  .step { display: flex; gap: 16px; align-items: flex-start; }
+  .step .num { flex: 0 0 38px; height: 38px; width: 38px; border-radius: 50%;
+               background: var(--brand); color: #fff; font-weight: 700; display: flex;
+               align-items: center; justify-content: center; font-size: 16px; }
+  .step .body { padding-bottom: 8px; }
+  .step .body h4 { margin: 4px 0 4px; font-size: 16.5px; }
+  .step .body p { margin: 0; font-size: 14.5px; color: var(--muted); }
+  .connector { flex: 0 0 38px; display: flex; justify-content: center; }
+  .connector span { width: 2px; height: 22px; background: var(--line); }
+
+  .branch { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 6px 0 6px; }
+  @media (max-width: 720px) { .branch { grid-template-columns: 1fr; } }
+  .outcome { border-radius: 14px; padding: 16px 18px; font-size: 15px; }
+  .outcome.ok { background: var(--green-soft); border: 1px solid #bfe6cd; }
+  .outcome.ok b { color: var(--green); }
+  .outcome.fix { background: var(--amber-soft); border: 1px solid #f0dcae; }
+  .outcome.fix b { color: var(--amber); }
+
+  ul.clean { margin: 6px 0 0; padding-inline-start: 22px; }
+  ul.clean li { margin-bottom: 8px; }
+
+  .benefit { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (max-width: 720px) { .benefit { grid-template-columns: 1fr; } }
+  .benefit .b { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: #fbfcfe; }
+  .benefit .b h4 { margin: 0 0 6px; color: var(--brand); font-size: 16px; }
+  .benefit .b p { margin: 0; font-size: 14.5px; color: var(--muted); }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 12px; }
+  .control { background: #fbfcfe; border: 1px solid var(--line); border-radius: 12px;
+             padding: 14px 16px; flex: 1 1 220px; font-size: 14.5px; }
+  .control b { color: var(--ink); }
+
+  footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 30px; }
+  .note { background: #fff8e6; border: 1px solid #f0dcae; border-radius: 12px; padding: 14px 18px;
+          font-size: 14.5px; color: #6b4e08; margin-top: 22px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <h1>לולאת ביקורת אוטומטית בין שתי בינות מלאכותיות</h1>
+    <p>
+      מנגנון חדש לקלואי: בסיום פיתוח, התוצר נשלח אוטומטית לביקורת של מנוע בלתי תלוי,
+      וההערות חוזרות לתיקון שוב ושוב — עד שמתקבל אישור. בדומה ל"חבר בודק" אנושי, רק מהיר,
+      עקבי וללא מצב שבו המפתח בודק את עצמו.
+    </p>
+    <span class="tagline">אוטומטי מלא · שקוף · ניתן לעצירה בכל רגע</span>
+  </header>
+
+  <section class="card">
+    <h2><span class="dot"></span>הצורך</h2>
+    <p>
+      כשבינת הפיתוח מסיימת משימה, אין כיום בדיקה חיצונית שמוודאת שהעבודה אכן נכונה ושלמה.
+      בודק שהוא גם המפתח נוטה לפספס את הטעויות של עצמו. אנחנו רוצים שכבת ביקורת
+      <b>בלתי תלויה</b> שתתבצע מאליה, תאתר חוסרים, ותדאג שהם יתוקנו — בלי שתצטרכו לנהל
+      את התהליך ידנית.
+    </p>
+  </section>
+
+  <section class="card">
+    <h2><span class="dot"></span>הפתרון בקצרה</h2>
+    <p>שלושה משתתפים פועלים יחד בלולאה סגורה, בניהול אוטומטי:</p>
+    <div class="roles">
+      <div class="role dev">
+        <div class="icon">מ</div>
+        <h3>המפתח</h3>
+        <p>בינת הפיתוח שכתבה את הקוד. היא מסכמת מה עשתה ומתקנת לפי ההערות.</p>
+      </div>
+      <div class="role rev">
+        <div class="icon">ב</div>
+        <h3>הבודק</h3>
+        <p>מנוע ביקורת עצמאי ובלתי תלוי, שבוחן את הקוד עצמו (קריאה בלבד) ומחזיר חוות דעת.</p>
+      </div>
+      <div class="role judge">
+        <div class="icon">ש</div>
+        <h3>השופט</h3>
+        <p>בודק קל ומהיר שמכריע: האם חוות הדעת היא אישור, או שיש עדיין תיקונים לבצע.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="dot"></span>איך זה עובד – שלב אחר שלב</h2>
+    <div class="flow">
+
+      <div class="step">
+        <div class="num">1</div>
+        <div class="body">
+          <h4>סיכום העבודה לבודק</h4>
+          <p>בתום הפיתוח, המפתח כותב מסמך מסירה תמציתי ונקי: מה הייתה המשימה, מה בוצע,
+             ואיך לאמת. המסמך נשלח כמו שהוא, ללא תוספות מיותרות.</p>
+        </div>
+      </div>
+      <div class="connector"><span></span></div>
+
+      <div class="step">
+        <div class="num">2</div>
+        <div class="body">
+          <h4>הבודק בוחן את הקוד</h4>
+          <p>הבודק העצמאי קורא את המסמך ואת הקוד עצמו, בודק נכונות ומקרי קצה, ומחזיר חוות דעת
+             מסודרת. הוא זוכר את ההקשר לאורך כל הסבבים.</p>
+        </div>
+      </div>
+      <div class="connector"><span></span></div>
+
+      <div class="step">
+        <div class="num">3</div>
+        <div class="body">
+          <h4>השופט מכריע</h4>
+          <p>השופט קורא את חוות הדעת ומחליט בבירור: אושר, או שנדרשים תיקונים.</p>
+          <div class="branch">
+            <div class="outcome ok">
+              <b>אושר</b> — הלולאה מסתיימת בהצלחה. אין מה לתקן.
+            </div>
+            <div class="outcome fix">
+              <b>נדרשים תיקונים</b> — ההערות חוזרות אל המפתח (שלב 4).
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="connector"><span></span></div>
+
+      <div class="step">
+        <div class="num">4</div>
+        <div class="body">
+          <h4>תיקון וחזרה</h4>
+          <p>המפתח מטפל בהערות, מעדכן את מסמך המסירה, והכל חוזר לבודק (שלב 2).
+             המחזור נמשך עד אישור — או עד התקרה שהוגדרה.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="dot"></span>הבקרות שלכם</h2>
+    <div class="controls">
+      <div class="control"><b>אוטומטי מלא.</b> התהליך רץ מעצמו מקצה לקצה, ללא צורך בפעולה בכל שלב.</div>
+      <div class="control"><b>שקיפות מלאה.</b> מסך ייעודי מציג כל סבב: הסיכום, חוות הדעת וההכרעה.</div>
+      <div class="control"><b>כפתור עצירה.</b> אפשר לעצור את הלולאה בכל רגע בלחיצה אחת.</div>
+      <div class="control"><b>גבול סבבים.</b> עד 5 סבבים כברירת מחדל; אם לא הושג אישור — עצירה והצגת ההערות הפתוחות.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><span class="dot"></span>התועלת</h2>
+    <div class="benefit">
+      <div class="b">
+        <h4>איכות גבוהה יותר</h4>
+        <p>עין שנייה בלתי תלויה תופסת באגים וחוסרים לפני שהם מגיעים אליכם.</p>
+      </div>
+      <div class="b">
+        <h4>חיסכון בזמן</h4>
+        <p>סבבי הביקורת והתיקון קורים מעצמם, בלי ניהול ידני של מעבר הודעות בין הכלים.</p>
+      </div>
+      <div class="b">
+        <h4>אובייקטיביות</h4>
+        <p>המפתח כבר לא בודק את עצמו — הבודק הוא מנוע נפרד לחלוטין.</p>
+      </div>
+      <div class="b">
+        <h4>שליטה ובטיחות</h4>
+        <p>הבודק עובד בקריאה בלבד (לא משנה קבצים), והתהליך עצור־בלחיצה ותחום במספר סבבים.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="note">
+    מסמך זה הוא סיכום מנהלים של התוכנית שאושרה. יישום בפועל יתחיל רק לאחר אישור נוסף.
+  </div>
+
+  <footer>
+    ClaUi · תוכנית "לולאת ביקורת אוטומטית" · גרסת סיכום מנהלים
+  </footer>
+
+</div>
+</body>
+</html>

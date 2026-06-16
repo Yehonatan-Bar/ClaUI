@@ -890,6 +890,24 @@ export interface CodexConsultRequest {
   question: string;
 }
 
+// --- Review Loop (Webview -> Extension) ---
+
+/** Start the automatic Claude<->Codex review loop on the active tab. */
+export interface ReviewLoopStartRequest {
+  type: 'reviewLoopStart';
+}
+
+/** Stop an in-flight review loop on the active tab. */
+export interface ReviewLoopStopRequest {
+  type: 'reviewLoopStop';
+}
+
+/** Toggle whether the review loop auto-starts after each work turn. */
+export interface SetReviewLoopAutoStartRequest {
+  type: 'setReviewLoopAutoStart';
+  enabled: boolean;
+}
+
 export interface SetApiKeyRequest {
   type: 'setApiKey';
   apiKey: string;  // empty string = clear the key
@@ -1262,7 +1280,10 @@ export type WebviewToExtensionMessage =
   | WorkspaceAccessGuardGetOrgPolicyStatusRequest
   | WorkspaceAccessGuardGetAuditEventsRequest
   | WorkspaceAccessGuardTestPathRequest
-  | WorkspaceAccessGuardTestCommandRequest;
+  | WorkspaceAccessGuardTestCommandRequest
+  | ReviewLoopStartRequest
+  | ReviewLoopStopRequest
+  | SetReviewLoopAutoStartRequest;
 
 // --- Super Particle Accelerator (Webview -> Extension) ---
 export interface SuperParticleAcceleratorGetStatusRequest { type: 'superParticleAcceleratorGetStatus' }
@@ -2792,6 +2813,39 @@ export interface MpInitDialogMessage {
   serverUrl: string;
 }
 
+// --- Review Loop (Extension -> Webview) ---
+
+/** Lifecycle phase of the automatic review loop, mirrored to the webview panel. */
+export type ReviewLoopPhase =
+  | 'idle'
+  | 'awaiting-handover'
+  | 'reviewing'
+  | 'classifying'
+  | 'awaiting-fix'
+  | 'approved'
+  | 'stopped'
+  | 'max-rounds'
+  | 'error';
+
+/** A single transcript event streamed from the orchestrator to the panel. */
+export type ReviewLoopEvent =
+  | { kind: 'status'; phase: ReviewLoopPhase; round: number; maxRounds: number; detail?: string }
+  | { kind: 'handover'; round: number; text: string }
+  | { kind: 'review'; round: number; text: string }
+  | { kind: 'verdict'; round: number; approved: boolean; reason: string }
+  | { kind: 'info'; round: number; text: string }
+  | { kind: 'error'; round: number; text: string };
+
+export interface ReviewLoopEventMessage {
+  type: 'reviewLoopEvent';
+  event: ReviewLoopEvent;
+}
+
+export interface ReviewLoopAutoStartSettingMessage {
+  type: 'reviewLoopAutoStartSetting';
+  enabled: boolean;
+}
+
 export type ExtensionToWebviewMessage =
   | McpInventoryMessage
   | McpCatalogMessage
@@ -2974,7 +3028,9 @@ export type ExtensionToWebviewMessage =
   | WorkspaceAccessGuardOrgPolicyStatusMessage
   | WorkspaceAccessGuardAuditEventsMessage
   | WorkspaceAccessGuardTestResultMessage
-  | WorkspaceAccessGuardErrorMessage;
+  | WorkspaceAccessGuardErrorMessage
+  | ReviewLoopEventMessage
+  | ReviewLoopAutoStartSettingMessage;
 
 // --- Super Particle Accelerator (Extension -> Webview) ---
 export interface SuperParticleAcceleratorStatusMessage {

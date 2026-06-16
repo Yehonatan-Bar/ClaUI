@@ -94,27 +94,54 @@ export function activate(context: vscode.ExtensionContext): void {
   const skillGenService = new SkillGenService(context.globalState);
   skillGenService.setLogger(log);
   skillGenService.setSecrets(context.secrets);
-  // Initial document scan on activation
-  const skillGenConfig = vscode.workspace.getConfiguration('claudeMirror');
-  if (skillGenConfig.get<boolean>('skillGen.enabled', true)) {
-    void skillGenService.scanDocuments().then(pending => {
-      log(`[SkillGen] Initial scan: ${pending} pending documents`);
-    });
-  }
+  // SkillDocs / SR-PTD bootstrap. The whole feature is OPT-IN: nothing is
+  // installed, injected, or scanned unless the user has explicitly enabled it.
+  // `skillGen.enabled` is the master switch; `srPtdAutoInject` additionally
+  // gates installing the sr-ptd-skill and injecting the post-task documentation
+  // instructions into the project CLAUDE.md. Both default to false.
+  const applySkillGenBootstrap = (): void => {
+    const cfg = vscode.workspace.getConfiguration('claudeMirror');
+    const skillGenEnabled = cfg.get<boolean>('skillGen.enabled', false);
+    const srPtdAutoInject = cfg.get<boolean>('srPtdAutoInject', false);
 
-  // Auto-install SR-PTD skill and inject CLAUDE.md instructions (only when skillGen is enabled)
-  if (skillGenConfig.get<boolean>('skillGen.enabled', true)) {
-    void installSkillFiles(context.extensionPath, log);
-    if (config.get<boolean>('srPtdAutoInject', true)) {
-      const docsDir = skillGenConfig.get<string>(
+    // Skill-generation pipeline: only scan documents when the master switch is on.
+    if (skillGenEnabled) {
+      void skillGenService.scanDocuments().then(pending => {
+        log(`[SkillGen] Scan: ${pending} pending documents`);
+      });
+    }
+
+    // SR-PTD documentation mandate (install skill + inject CLAUDE.md instructions):
+    // strictly opt-in. Requires both the master switch and srPtdAutoInject.
+    if (skillGenEnabled && srPtdAutoInject) {
+      void installSkillFiles(context.extensionPath, log);
+      const docsDir = cfg.get<string>(
         'skillGen.docsDirectory',
         'C:\\projects\\Skills\\Dev_doc_for_skills'
       );
       void injectClaudeMdInstructions(docsDir, log);
+    } else {
+      // Disabled (or injection opted out) -> remove any previously injected block
+      // so Claude stops being told to generate documentation.
+      void removeClaudeMdInstructions(log);
     }
-  } else {
-    void removeClaudeMdInstructions(log);
-  }
+  };
+
+  applySkillGenBootstrap();
+
+  // Re-apply when the user toggles the feature (onboarding decision or settings
+  // gear) so opting in/out takes effect immediately without a window reload.
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(e => {
+      if (
+        e.affectsConfiguration('claudeMirror.skillGen.enabled') ||
+        e.affectsConfiguration('claudeMirror.srPtdAutoInject')
+      ) {
+        log('[SkillGen] Settings changed, re-applying SkillDocs bootstrap');
+        applySkillGenBootstrap();
+      }
+    })
+  );
 
   // Create global token-usage ratio tracker (shared across all tabs)
   const tokenRatioTracker = new TokenUsageRatioTracker(context.globalState);

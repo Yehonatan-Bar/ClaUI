@@ -25,6 +25,7 @@ import { McpPanel } from './components/McpPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { SuperParticleAcceleratorPanel } from './components/SuperParticleAccelerator/SuperParticleAcceleratorPanel';
 import { CodexConsultPanel } from './components/InputArea/CodexConsultPanel';
+import { ReviewLoopPanel } from './components/ReviewLoop/ReviewLoopPanel';
 import { TeamPanel, TeamStatusWidget } from './components/Teams';
 import { WorkstreamMapView } from './components/WorkstreamMap/WorkstreamMapView';
 import { WorktreePanel } from './components/Worktree';
@@ -259,6 +260,8 @@ const ChatAppContent: React.FC = () => {
     communityPanelOpen,
     codexConsultPanelOpen,
     setCodexConsultPanelOpen,
+    reviewLoopPanelOpen,
+    setReviewLoopPanelOpen,
     bugReportPanelOpen,
     teamActive,
     teamPanelOpen,
@@ -628,6 +631,9 @@ const ChatAppContent: React.FC = () => {
           ) : null}
           {providerCapabilities.supportsCodexConsult && codexConsultPanelOpen && (
             <CodexConsultPanel onClose={() => setCodexConsultPanelOpen(false)} />
+          )}
+          {providerCapabilities.supportsCodexConsult && reviewLoopPanelOpen && (
+            <ReviewLoopPanel onClose={() => setReviewLoopPanelOpen(false)} />
           )}
           <InputArea />
           {achievementsEnabled && <SessionSummaryNudge hasMessages={hasMessages} />}

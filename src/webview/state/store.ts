@@ -48,6 +48,8 @@ import type {
   CommunityFriendProfilePayload,
   UsageStat,
   CheckpointState,
+  ReviewLoopEvent,
+  ReviewLoopPhase,
 } from '../../extension/types/webview-messages';
 import type {
   MPSession,
@@ -509,6 +511,19 @@ export interface AppState {
   // Codex Consultation
   codexConsultPanelOpen: boolean;
   setCodexConsultPanelOpen: (open: boolean) => void;
+
+  // Review Loop (automatic Claude<->Codex review)
+  reviewLoopPanelOpen: boolean;
+  reviewLoopRunning: boolean;
+  reviewLoopPhase: ReviewLoopPhase;
+  reviewLoopRound: number;
+  reviewLoopMaxRounds: number;
+  reviewLoopTranscript: ReviewLoopEvent[];
+  setReviewLoopPanelOpen: (open: boolean) => void;
+  applyReviewLoopEvent: (event: ReviewLoopEvent) => void;
+  resetReviewLoop: () => void;
+  reviewLoopAutoStart: boolean;
+  setReviewLoopAutoStart: (enabled: boolean) => void;
 
   // Worktree dashboard
   worktreePanelOpen: boolean;
@@ -1324,6 +1339,45 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Codex Consultation
   codexConsultPanelOpen: false,
   setCodexConsultPanelOpen: (open) => set({ codexConsultPanelOpen: open }),
+
+  // Review Loop
+  reviewLoopPanelOpen: false,
+  reviewLoopRunning: false,
+  reviewLoopPhase: 'idle',
+  reviewLoopRound: 0,
+  reviewLoopMaxRounds: 0,
+  reviewLoopTranscript: [],
+  setReviewLoopPanelOpen: (open) => set({ reviewLoopPanelOpen: open }),
+  applyReviewLoopEvent: (event) =>
+    set((state) => {
+      // The first status of a run ('awaiting-handover', round 1) starts a fresh
+      // transcript, so auto-started runs don't accumulate on top of an old one.
+      const isFreshRun =
+        event.kind === 'status' && event.phase === 'awaiting-handover' && event.round === 1;
+      const transcript = [...(isFreshRun ? [] : state.reviewLoopTranscript), event];
+      if (event.kind === 'status') {
+        const terminal = ['idle', 'approved', 'stopped', 'max-rounds', 'error'];
+        return {
+          reviewLoopTranscript: transcript,
+          reviewLoopPhase: event.phase,
+          reviewLoopRound: event.round,
+          reviewLoopMaxRounds: event.maxRounds,
+          reviewLoopRunning: !terminal.includes(event.phase),
+          reviewLoopPanelOpen: true,
+        };
+      }
+      return { reviewLoopTranscript: transcript, reviewLoopPanelOpen: true };
+    }),
+  resetReviewLoop: () =>
+    set({
+      reviewLoopRunning: false,
+      reviewLoopPhase: 'idle',
+      reviewLoopRound: 0,
+      reviewLoopMaxRounds: 0,
+      reviewLoopTranscript: [],
+    }),
+  reviewLoopAutoStart: true,
+  setReviewLoopAutoStart: (enabled) => set({ reviewLoopAutoStart: enabled }),
 
   // Worktree dashboard
   worktreePanelOpen: false,
@@ -3174,6 +3228,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Note: githubSyncStatus and communityFriends persist across resets
       friendActionPending: false,
       codexConsultPanelOpen: false,
+      reviewLoopPanelOpen: false,
+      reviewLoopRunning: false,
+      reviewLoopPhase: 'idle',
+      reviewLoopRound: 0,
+      reviewLoopMaxRounds: 0,
+      reviewLoopTranscript: [],
       // Worktree dashboard: close on session reset (data re-fetched on open)
       worktreePanelOpen: false,
       worktreeList: [],
