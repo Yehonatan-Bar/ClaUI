@@ -39,6 +39,7 @@ export function useClaudeStream(): void {
     setSelectedProvider,
     setProviderCapabilities,
     setSelectedModel,
+    setLastResolvedDefaultModel,
     setSelectedClaudeEffort,
     setSelectedClaudeFastMode,
     setSelectedCodexReasoningEffort,
@@ -671,6 +672,12 @@ export function useClaudeStream(): void {
 
         case 'modelSetting':
           setSelectedModel(msg.model);
+          break;
+
+        case 'defaultModelHint':
+          // Model the CLI last resolved "Default" to; shown on the selector before
+          // this session's own system/init reports the live model.
+          setLastResolvedDefaultModel(msg.model || null);
           break;
 
         case 'claudeEffortSetting':
@@ -1413,6 +1420,7 @@ export function useClaudeStream(): void {
     setSelectedProvider,
     setProviderCapabilities,
     setSelectedModel,
+    setLastResolvedDefaultModel,
     setSelectedClaudeEffort,
     setSelectedClaudeFastMode,
     setSelectedCodexReasoningEffort,

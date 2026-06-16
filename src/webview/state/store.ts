@@ -175,6 +175,10 @@ export interface AppState {
   selectedProvider: ProviderId;
   providerCapabilities: ProviderCapabilities;
   selectedModel: string;  // model chosen by user for next session
+  // Model the Claude CLI last resolved "Default" to (no --model flag), pushed from
+  // the extension's globalState. Lets the Model selector show the likely model on
+  // hover BEFORE the session's own system/init reports it. null = none known yet.
+  lastResolvedDefaultModel: string | null;
   selectedClaudeEffort: ClaudeEffortLevel;
   selectedClaudeFastMode: boolean;
   selectedCodexReasoningEffort: CodexReasoningEffort;
@@ -754,6 +758,7 @@ export interface AppState {
   setProviderCapabilities: (capabilities: ProviderCapabilities) => void;
   setResuming: (resuming: boolean) => void;
   setSelectedModel: (model: string) => void;
+  setLastResolvedDefaultModel: (model: string | null) => void;
   setSelectedClaudeEffort: (effort: ClaudeEffortLevel) => void;
   setSelectedClaudeFastMode: (fastMode: boolean) => void;
   setSelectedCodexReasoningEffort: (effort: CodexReasoningEffort) => void;
@@ -1150,6 +1155,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   provider: 'claude',
   tabKind: 'chat',
   model: null,
+  lastResolvedDefaultModel: null,
   selectedProvider: 'claude',
   providerCapabilities: { ...DEFAULT_PROVIDER_CAPABILITIES },
   selectedModel: '',
@@ -2171,6 +2177,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setResuming: (resuming) => set({ isResuming: resuming }),
 
   setSelectedModel: (model) => set({ selectedModel: model }),
+
+  setLastResolvedDefaultModel: (model) => set({ lastResolvedDefaultModel: model }),
 
   setSelectedClaudeEffort: (effort) => set({ selectedClaudeEffort: effort }),
 

@@ -3907,6 +3907,9 @@ export class MessageHandler {
           this.sendTypingThemeSetting();
           // Send model setting
           this.sendModelSetting();
+          // Send the last-resolved Default model so the selector can show the
+          // likely model on hover before this session's first turn reports it
+          this.sendDefaultModelHint();
           // Send Claude effort level setting
           this.sendClaudeEffortSetting();
           // Send Claude fast mode setting
@@ -4282,6 +4285,18 @@ export class MessageHandler {
     this.log(`Sending model setting: "${model}"`);
     this.webview.postMessage({
       type: 'modelSetting',
+      model,
+    });
+  }
+
+  /** Push the model the CLI last resolved "Default" to (persisted in globalState)
+   *  so the Model selector can show the likely model BEFORE this session's own
+   *  system/init reports it (init only fires after the first message is sent). */
+  private sendDefaultModelHint(): void {
+    const model = this.globalState?.get<string>('claui.lastResolvedDefaultModel', '') ?? '';
+    this.log(`Sending default model hint: "${model}"`);
+    this.webview.postMessage({
+      type: 'defaultModelHint',
       model,
     });
   }
@@ -5000,6 +5015,20 @@ export class MessageHandler {
           model: event.model,
           provider: this.getActiveProvider(),
         });
+        // Remember what the CLI resolved "Default" to (this session was spawned
+        // with no --model flag, so event.model IS the default resolution). Persist
+        // it globally and push it so future fresh sessions can show the likely
+        // model on hover before their own init fires. Skip explicit-model sessions
+        // (configuredModel set) and placeholder values.
+        if (
+          !this.processManager.configuredModel &&
+          event.model &&
+          event.model !== 'unknown' &&
+          event.model !== 'connected'
+        ) {
+          void this.globalState?.update('claui.lastResolvedDefaultModel', event.model);
+          this.webview.postMessage({ type: 'defaultModelHint', model: event.model });
+        }
         const runtimeMcpServers = this.mcpRegistryService.buildRuntimeServers(event);
         this.currentRuntimeMcpServers = runtimeMcpServers;
         // Send runtime-only metadata for Context Inspector tab

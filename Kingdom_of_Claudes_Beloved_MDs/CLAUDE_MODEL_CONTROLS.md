@@ -1,6 +1,6 @@
 # Claude Model Controls (Model, Thinking Effort, Fast Mode)
 
-Snapshot: 2026-06-10 (Fable 5 model added)
+Snapshot: 2026-06-16 (Default-resolution hint remembers last resolved model)
 
 This document covers the three Claude-side controls exposed in the AI chip's
 model area:
@@ -71,19 +71,43 @@ flag and lets the CLI choose (see "CLI argument" below), `ModelSelector`
 surfaces which model `Default` actually resolved to. This only applies when
 `Default` is the active selection (`!selectedModel`) — with a specific model
 chosen, the CLI-reported `model` merely echoes that explicit choice, so it would
-not describe the default. When `Default` is selected:
+not describe the default.
 
-- **Tooltip** (`data-tooltip` on the `<select>`): once connected,
-  `Default: Claude CLI is running <label>`; before a session resolves,
-  `Default: Claude CLI picks the model (resolved once the session starts)`.
-- **Inline option label:** once connected, the `Default` option text becomes
-  `Default (<label>)` (e.g. `Default (Opus 4.8)`) so the resolved model is
-  visible in the open dropdown, where native `<option>` elements cannot render
-  the CSS `data-tooltip`.
+The hint resolves from two sources, in priority order:
 
-Both derive from `resolvedDefaultLabel = isDefaultSelected && isConnected ?
-activeModelLabel : null`, where `activeModelLabel` is the CLI-reported runtime
-model (`model`) passed through `getClaudeModelLabel()`.
+1. **Live** (`liveDefaultLabel`): this session's own CLI-reported runtime model
+   (`model` via `getClaudeModelLabel()`), available only once connected.
+2. **Remembered** (`rememberedDefaultLabel`): the model the CLI resolved
+   `Default` to **last time**, pushed from the extension's `globalState`
+   (`lastResolvedDefaultModel` store field). Used as a fallback before the live
+   value is known.
+
+**Why a remembered fallback is needed.** The CLI's `system/init` event — the
+only event that reports the resolved model — does **not** fire until the user
+sends the **first message** of a session (verified in the process logs: a tab
+can sit spawned-but-idle for minutes with no `init`). So on a freshly opened
+`Default` tab the live model is unknown, and without the fallback the selector
+could not show "the model that will run" before the first turn. Remembering the
+last resolution lets it display the likely model immediately.
+
+When `Default` is selected, `resolvedDefaultLabel = liveDefaultLabel ??
+rememberedDefaultLabel` drives:
+
+- **Tooltip** (`data-tooltip` on the `<select>`):
+  - live known: `Default: Claude CLI is running <label>`
+  - remembered only: `Default: Claude CLI will run <label> (confirmed once the session starts)`
+  - neither: `Default: Claude CLI picks the model (resolved once the session starts)`
+- **Inline option label:** the `Default` option text becomes `Default (<label>)`
+  (e.g. `Default (Opus 4.6)`) so the resolved/likely model is visible in the open
+  dropdown, where native `<option>` elements cannot render the CSS `data-tooltip`.
+
+**Persistence + push.** When a session spawned with no `--model` reaches its
+`system/init` (so `event.model` *is* the default resolution), `MessageHandler`
+guards on `!processManager.configuredModel` (and rejects `unknown` / `connected`
+placeholders), persists `event.model` to `globalState` key
+`claui.lastResolvedDefaultModel`, and pushes a `defaultModelHint` message. The
+same value is re-sent to every webview from the `ready` handler
+(`sendDefaultModelHint`), so new tabs get it before their first turn.
 
 ### Options
 
@@ -403,6 +427,7 @@ a non-empty level, `--settings` only when fast mode is enabled.
 |-----------|------|---------|---------|
 | Webview -> Ext | `setModel` | `model: string` | persist model + live switch |
 | Ext -> Webview | `modelSetting` | `model: string` | echo current model on ready/change |
+| Ext -> Webview | `defaultModelHint` | `model: string` | last model the CLI resolved `Default` to (for the pre-turn hint); `""` if none known |
 | Webview -> Ext | `setClaudeEffort` | `effort: ClaudeEffortLevel` | persist effort |
 | Ext -> Webview | `claudeEffortSetting` | `effort: ClaudeEffortLevel` | echo current effort |
 | Webview -> Ext | `setClaudeFastMode` | `fastMode: boolean` | persist fast mode |
@@ -412,7 +437,9 @@ The extension sends all three setting messages in the `ready` handler
 (`sendModelSetting`, `sendClaudeEffortSetting`, `sendClaudeFastModeSetting`) and
 re-sends the relevant one from its `onDidChangeConfiguration` watch when
 `claudeMirror.model` / `claudeMirror.effortLevel` / `claudeMirror.fastMode`
-changes.
+changes. The `ready` handler additionally sends `defaultModelHint`
+(`sendDefaultModelHint`, sourced from `globalState`); it is pushed again from the
+`system/init` handler whenever a `Default` session resolves its model.
 
 ---
 
@@ -420,18 +447,21 @@ changes.
 
 - `package.json` — `claudeMirror.model`, `claudeMirror.effortLevel`, `claudeMirror.fastMode`
 - `src/extension/types/webview-messages.ts` — `ClaudeEffortLevel`,
-  `SetModelRequest`/`ModelSettingMessage`, `SetClaudeEffortRequest`/`ClaudeEffortSettingMessage`,
+  `SetModelRequest`/`ModelSettingMessage`, `DefaultModelHintMessage`,
+  `SetClaudeEffortRequest`/`ClaudeEffortSettingMessage`,
   `SetClaudeFastModeRequest`/`ClaudeFastModeSettingMessage` (+ union entries)
 - `src/extension/webview/MessageHandler.ts` — `setModel`/`setClaudeEffort`/`setClaudeFastMode`
   cases, `sendModelSetting`/`sendClaudeEffortSetting`/`sendClaudeFastModeSetting`, `ready` + config watch;
+  `sendDefaultModelHint` + `system/init` persistence of `claui.lastResolvedDefaultModel` to `globalState`;
   `currentThinkingEffort`/`sessionThinkingEffort` fields + badge-label resolution (init / assistantMessage / thinkingDetected handlers)
 - `src/extension/process/ClaudeProcessManager.ts` — `ProcessStartOptions`
   (`model`, `effortLevel`, `fastMode`), `--model`/`--effort`/`--settings` assembly,
   `writeFastModeSettingsFile()`
 - `src/extension/session/SessionTab.ts` — `switchModel()` live-switch logic
-- `src/webview/state/store.ts` — `selectedModel`, `selectedClaudeEffort`,
-  `selectedClaudeFastMode` (+ `setSelected*` actions)
-- `src/webview/hooks/useClaudeStream.ts` — `modelSetting`/`claudeEffortSetting`/`claudeFastModeSetting` cases
+- `src/webview/state/store.ts` — `selectedModel`, `lastResolvedDefaultModel`,
+  `selectedClaudeEffort`, `selectedClaudeFastMode`
+  (+ `setSelectedModel`/`setLastResolvedDefaultModel`/other `setSelected*` actions)
+- `src/webview/hooks/useClaudeStream.ts` — `modelSetting`/`defaultModelHint`/`claudeEffortSetting`/`claudeFastModeSetting` cases
 - `src/webview/utils/claudeModelDisplay.ts` — `CLAUDE_MODEL_OPTIONS`, `getClaudeModelLabel`, `getClaudeModelCompactLabel`
 - `src/webview/components/ModelSelector/ModelSelector.tsx`
 - `src/webview/components/ModelSelector/ClaudeEffortSelector.tsx`

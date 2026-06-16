@@ -1579,6 +1579,14 @@ export interface ModelSettingMessage {
   model: string;
 }
 
+/** Last model the Claude CLI resolved "Default" to (i.e. a session spawned with no
+ *  --model flag). Lets the Model selector show "the model that will run" before the
+ *  first turn's system/init event reports it. Empty string when none is known yet. */
+export interface DefaultModelHintMessage {
+  type: 'defaultModelHint';
+  model: string;
+}
+
 export interface ClaudeEffortSettingMessage {
   type: 'claudeEffortSetting';
   effort: ClaudeEffortLevel;
@@ -2889,6 +2897,7 @@ export type ExtensionToWebviewMessage =
   | TextSettingsMessage
   | TypingThemeSettingMessage
   | ModelSettingMessage
+  | DefaultModelHintMessage
   | ClaudeEffortSettingMessage
   | ClaudeFastModeSettingMessage
   | ProviderSettingMessage

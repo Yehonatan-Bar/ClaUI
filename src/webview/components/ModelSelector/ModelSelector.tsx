@@ -8,7 +8,7 @@ import { CLAUDE_MODEL_OPTIONS, getClaudeModelLabel } from '../../utils/claudeMod
  * Changing the model live-switches the current session (stop + resume with new model).
  */
 export const ModelSelector: React.FC = () => {
-  const { selectedModel, model, isConnected, setSelectedModel } = useAppStore();
+  const { selectedModel, model, isConnected, lastResolvedDefaultModel, setSelectedModel } = useAppStore();
 
   // "Default" (empty value) means no --model flag is passed and the Claude CLI
   // picks the model itself. Only when Default is the active selection does the
@@ -21,8 +21,20 @@ export const ModelSelector: React.FC = () => {
     ? getClaudeModelLabel(model)
     : null;
 
-  // Model the CLI actually resolved "Default" to (known only once connected).
-  const resolvedDefaultLabel = isDefaultSelected && isConnected ? activeModelLabel : null;
+  // Live: this Default session's own resolved model, as reported by the CLI. The
+  // CLI only emits its system/init (with the model) after the FIRST message is
+  // sent, so this stays null on a freshly opened session until the first turn.
+  const liveDefaultLabel = isDefaultSelected && isConnected ? activeModelLabel : null;
+
+  // Remembered: the model the CLI resolved Default to last time, pushed from the
+  // extension's globalState. Used as a fallback so the user can see "the model
+  // that will run" on hover BEFORE this session's first turn reports it.
+  const rememberedDefaultLabel = isDefaultSelected && !liveDefaultLabel && lastResolvedDefaultModel
+    ? getClaudeModelLabel(lastResolvedDefaultModel)
+    : null;
+
+  // Prefer the live value (this session) over the remembered one (last session).
+  const resolvedDefaultLabel = liveDefaultLabel ?? rememberedDefaultLabel;
 
   const modelOptions = useMemo(() => {
     const base = !selectedModel || CLAUDE_MODEL_OPTIONS.some((opt) => opt.value === selectedModel)
@@ -51,9 +63,11 @@ export const ModelSelector: React.FC = () => {
   // Tooltip: for Default, explain that the CLI chooses and reveal the resolved
   // model once known; for an explicit model, keep the active-model hint.
   const selectTooltip = isDefaultSelected
-    ? (resolvedDefaultLabel
-        ? `Default: Claude CLI is running ${resolvedDefaultLabel}`
-        : 'Default: Claude CLI picks the model (resolved once the session starts)')
+    ? (liveDefaultLabel
+        ? `Default: Claude CLI is running ${liveDefaultLabel}`
+        : rememberedDefaultLabel
+          ? `Default: Claude CLI will run ${rememberedDefaultLabel} (confirmed once the session starts)`
+          : 'Default: Claude CLI picks the model (resolved once the session starts)')
     : (isConnected && activeModelLabel
         ? `Active: ${activeModelLabel}`
         : 'Select model');

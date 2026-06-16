@@ -273,8 +273,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
     }
   };
 
+  const isProcessMessage = !isUser && messageToolCount > 0;
+
   return (
-    <div className={`message ${isUser ? 'message-user' : 'message-assistant'}${isFinalAnswer ? ' message-final-answer' : ''}${isSearchMatch ? ' search-match' : ''}${isCurrentSearchMatch ? ' search-current-match' : ''}${isInRevertedRange ? ' message-reverted' : ''}`} data-message-id={message.id} style={vitalsBorderStyle}>
+    <div className={`message ${isUser ? 'message-user' : 'message-assistant'}${isFinalAnswer ? ' message-final-answer' : ''}${isProcessMessage ? ' message-process' : ''}${isSearchMatch ? ' search-match' : ''}${isCurrentSearchMatch ? ' search-current-match' : ''}${isInRevertedRange ? ' message-reverted' : ''}`} data-message-id={message.id} style={vitalsBorderStyle}>
       {vitalsBorderStyle && (
         <div
           className="intensity-border-zone"

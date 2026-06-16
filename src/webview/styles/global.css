@@ -408,69 +408,125 @@ html, body, #root {
   background: var(--clarity-assistant-accent);
 }
 
-/* Your input: distinct blue card with a strong left rail */
+/* Your input: prominent blue card—the user's prompt is the starting point */
 .theme-clarity .message-user {
-  background: color-mix(in srgb, var(--clarity-user-accent) 13%, var(--vscode-editor-background));
-  border: 1px solid color-mix(in srgb, var(--clarity-user-accent) 40%, transparent);
-  border-left: 4px solid var(--clarity-user-accent);
-  border-radius: 10px;
+  background: color-mix(in srgb, var(--clarity-user-accent) 18%, var(--vscode-editor-background));
+  border: 1px solid color-mix(in srgb, var(--clarity-user-accent) 50%, transparent);
+  border-left: 6px solid var(--clarity-user-accent);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(59, 130, 246, 0.1),
+    0 0 0 1px color-mix(in srgb, var(--clarity-user-accent) 12%, transparent);
+  margin-bottom: 18px;
 }
 
-/* Claude's output (working/narration): its own purple-tinted surface */
+/* Claude's output (general): its own purple-tinted surface for all responses */
 .theme-clarity .message-assistant {
-  background: color-mix(in srgb, var(--clarity-assistant-accent) 6%, var(--vscode-editor-background));
-  border: 1px solid color-mix(in srgb, var(--clarity-assistant-accent) 24%, transparent);
-  border-left: 4px solid color-mix(in srgb, var(--clarity-assistant-accent) 72%, transparent);
+  background: color-mix(in srgb, var(--clarity-assistant-accent) 8%, var(--vscode-editor-background));
+  border: 1px solid color-mix(in srgb, var(--clarity-assistant-accent) 30%, transparent);
+  border-left: 4px solid color-mix(in srgb, var(--clarity-assistant-accent) 65%, transparent);
   border-radius: 10px;
+  padding: 10px 12px;
+}
+
+/* Process message: when Claude is narrating its work (tool calls present).
+   Visually recessed and de-emphasized to distinguish from the final answer. */
+.theme-clarity .message-assistant.message-process {
+  background: color-mix(in srgb, var(--clarity-assistant-accent) 4%, var(--vscode-editor-background));
+  border: 1px dashed color-mix(in srgb, var(--clarity-assistant-accent) 18%, transparent);
+  border-left: 3px dashed color-mix(in srgb, var(--clarity-assistant-accent) 40%, transparent);
+  opacity: 0.88;
+}
+.theme-clarity .message-assistant.message-process:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--clarity-assistant-accent) 6%, var(--vscode-editor-background));
+  border-color: color-mix(in srgb, var(--clarity-assistant-accent) 28%, transparent);
+  border-left-color: color-mix(in srgb, var(--clarity-assistant-accent) 50%, transparent);
 }
 
 /* The process: tool steps inside Claude's output are visually recessed and
    reveal on hover, so the eye treats them as secondary to the prose */
 .theme-clarity .message-assistant .tool-use-block {
-  opacity: 0.66;
+  opacity: 0.64;
   border-style: dashed;
-  border-color: color-mix(in srgb, var(--vscode-panel-border, #333) 70%, transparent);
-  background: color-mix(in srgb, var(--vscode-editor-background) 90%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-panel-border, #333) 60%, transparent);
+  background: color-mix(in srgb, var(--vscode-editor-background) 88%, transparent);
+  margin: 10px 0;
 }
 .theme-clarity .message-assistant .tool-use-block:hover,
 .theme-clarity .message-assistant .tool-use-block:focus-within {
   opacity: 1;
+  background: color-mix(in srgb, var(--vscode-editor-background) 92%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-panel-border, #333) 75%, transparent);
 }
 .theme-clarity .message-assistant .tool-use-header {
   font-weight: 500;
-  background: color-mix(in srgb, var(--vscode-sideBarSectionHeader-background, #252526) 60%, transparent);
+  background: color-mix(in srgb, var(--vscode-sideBarSectionHeader-background, #252526) 55%, transparent);
+  color: color-mix(in srgb, var(--vscode-editor-foreground) 72%, transparent);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.3px;
 }
 
 /* The final answer: a prominent green card that stands apart from the process.
+   Rich background, strong border, and glow effect to signal "this is the answer".
    The compound selector keeps these rules above the generic .message-assistant ones. */
 .theme-clarity .message-assistant.message-final-answer {
-  background: color-mix(in srgb, var(--clarity-answer-accent) 10%, var(--vscode-editor-background));
-  border: 1px solid color-mix(in srgb, var(--clarity-answer-accent) 42%, transparent);
-  border-left: 4px solid var(--clarity-answer-accent);
-  border-radius: 12px;
+  background: color-mix(in srgb, var(--clarity-answer-accent) 14%, var(--vscode-editor-background));
+  border: 1px solid color-mix(in srgb, var(--clarity-answer-accent) 48%, transparent);
+  border-left: 6px solid var(--clarity-answer-accent);
+  border-radius: 14px;
+  padding: 14px 16px;
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--clarity-answer-accent) 16%, transparent),
-    0 6px 18px rgba(0, 0, 0, 0.12);
-}
-.theme-clarity .message-assistant.message-final-answer .message-role-name {
-  background: var(--clarity-answer-accent);
+    inset 0 1px 0 rgba(34, 197, 94, 0.15),
+    0 0 0 1px color-mix(in srgb, var(--clarity-answer-accent) 20%, transparent),
+    0 0 16px color-mix(in srgb, var(--clarity-answer-accent) 24%, transparent),
+    0 8px 24px rgba(34, 197, 94, 0.1);
+  opacity: 1;
+  margin-bottom: 18px;
+  position: relative;
 }
 
-/* "Final answer" badge: hidden everywhere by default, revealed only in Clarity */
+/* Add a visual separator line above the final answer to emphasize "this is different" */
+.theme-clarity .message-assistant.message-final-answer::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background: linear-gradient(to right,
+    transparent,
+    color-mix(in srgb, var(--clarity-answer-accent) 32%, transparent),
+    transparent);
+  opacity: 0.6;
+}
+
+.theme-clarity .message-assistant.message-final-answer .message-role-name {
+  background: var(--clarity-answer-accent);
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+/* "Final answer" badge: hidden everywhere by default, revealed only in Clarity.
+   Made larger and more prominent to signal finality. */
 .final-answer-badge {
   display: none;
 }
 .theme-clarity .final-answer-badge {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 2px 9px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: normal;
-  text-transform: none;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 10px;
+  padding: 3px 11px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
   color: #ffffff;
   background: var(--clarity-answer-accent);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
 }
 
 /* Spacer pushes input to bottom when no messages exist */
