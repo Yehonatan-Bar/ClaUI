@@ -4486,7 +4486,7 @@ export class MessageHandler {
 
   /** Read review-loop autoStart setting from VS Code config and send to webview */
   private sendReviewLoopAutoStartSetting(): void {
-    const enabled = vscode.workspace.getConfiguration('claudeMirror.reviewLoop').get<boolean>('autoStart', true);
+    const enabled = vscode.workspace.getConfiguration('claudeMirror.reviewLoop').get<boolean>('autoStart', false);
     this.webview.postMessage({ type: 'reviewLoopAutoStartSetting', enabled });
   }
 

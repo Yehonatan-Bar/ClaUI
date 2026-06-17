@@ -99,15 +99,17 @@ loop never falsely declares success.
 
 All settings under `claudeMirror.reviewLoop.*`:
 
-The loop can always be started from the StatusBar "Review Loop" button. By default
-(`autoStart`) it also starts automatically after each user-initiated Claude turn
+Auto-review is **off by default**. When `autoStart` is turned on (the "Auto-review"
+toggle), the loop also starts automatically after each user-initiated Claude turn
 **that used at least one tool** (i.e. Claude actually did work). Pure text-only
 Q&A turns are skipped, so casual chat never triggers a Codex review. Detection:
 `SessionTab` sets a per-turn `usedTools` flag on the demux `toolUseStart` event.
+When auto-review is off, launch a review on demand from the rocket button in the
+Auto-review row (enabled only when the session is idle).
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `autoStart` | `true` | Auto-start the loop after each user-initiated Claude turn; set false for manual-only |
+| `autoStart` | `false` | Off by default. When on, auto-start the loop after each work turn; when off, launch manually via the rocket button |
 | `maxRounds` | `5` | Max review rounds before stopping (clamped 1-20) |
 | `reviewerModel` | `gpt-5.5` | Codex model id for the reviewer (empty = fall back to `codex.model`, then Codex default) |
 | `reviewerReasoningEffort` | `xhigh` | Reviewer reasoning effort (empty = fall back to `codex.reasoningEffort`) |

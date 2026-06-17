@@ -287,8 +287,8 @@
         },
         "claudeMirror.reviewLoop.autoStart": {
           "type": "boolean",
-          "default": true,
-          "description": "Automatically start the Claude<->Codex review loop after each user-initiated Claude turn completes (sendMessage / images / edit-and-resend). On by default; set to false to start the loop only manually from the StatusBar 'Review Loop' button."
+          "default": false,
+          "description": "Automatically start the Claude<->Codex review loop after each user-initiated Claude turn that used a tool. Off by default; set to true (or use the Auto-review toggle) to enable automatic reviews. When off, launch a review manually from the rocket button in the Auto-review row."
         },
         "claudeMirror.reviewLoop.maxRounds": {
           "type": "number",

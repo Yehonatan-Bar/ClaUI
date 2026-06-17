@@ -1687,7 +1687,7 @@ export class SessionTab implements WebviewBridge {
     }
     const autoStart = vscode.workspace
       .getConfiguration('claudeMirror.reviewLoop')
-      .get<boolean>('autoStart', true);
+      .get<boolean>('autoStart', false);
     if (!autoStart) {
       return;
     }
@@ -1703,7 +1703,7 @@ export class SessionTab implements WebviewBridge {
       }
       const stillAutoStart = vscode.workspace
         .getConfiguration('claudeMirror.reviewLoop')
-        .get<boolean>('autoStart', true);
+        .get<boolean>('autoStart', false);
       if (!stillAutoStart) {
         return;
       }

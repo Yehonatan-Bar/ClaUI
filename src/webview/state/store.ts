@@ -1388,7 +1388,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       reviewLoopMaxRounds: 0,
       reviewLoopTranscript: [],
     }),
-  reviewLoopAutoStart: true,
+  reviewLoopAutoStart: false,
   setReviewLoopAutoStart: (enabled) => set({ reviewLoopAutoStart: enabled }),
   reviewLoopSessionEnabled: true,
   setReviewLoopSessionEnabled: (enabled) => set({ reviewLoopSessionEnabled: enabled }),

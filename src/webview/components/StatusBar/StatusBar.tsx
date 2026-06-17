@@ -79,6 +79,7 @@ export const StatusBar: React.FC<{
     setReviewLoopAutoStart,
     reviewLoopSessionEnabled,
     setReviewLoopSessionEnabled,
+    reviewLoopRunning,
     setPromptHistoryPanelOpen,
     usageStats,
     usageFetchedAt,
@@ -728,6 +729,26 @@ export const StatusBar: React.FC<{
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
                 <circle cx="8" cy="8" r="6.2" />
                 <line x1="3.6" y1="3.6" x2="12.4" y2="12.4" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="status-bar-autoreview-launch-btn"
+              disabled={isBusy || reviewLoopRunning}
+              aria-label="Launch a review loop for the current session now"
+              onClick={() => {
+                resetReviewLoop();
+                setReviewLoopPanelOpen(true);
+                postToExtension({ type: 'reviewLoopStart' });
+              }}
+              data-tooltip="Launch a review loop for the current session now!"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M8 1.5 C 10.5 4 11 7 10.5 10 L 5.5 10 C 5 7 5.5 4 8 1.5 Z" />
+                <circle cx="8" cy="5.5" r="1.2" />
+                <path d="M5.5 9.5 L 3.5 12.5" />
+                <path d="M10.5 9.5 L 12.5 12.5" />
+                <path d="M6.8 11 L 8 14 L 9.2 11" />
               </svg>
             </button>
           </span>

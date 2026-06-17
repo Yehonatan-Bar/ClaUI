@@ -3610,6 +3610,30 @@ html, body, #root {
   color: var(--vscode-charts-orange, #d18616);
 }
 
+/* Rocket "launch review now" button; enabled only when the session is idle. */
+.status-bar-autoreview-launch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 3px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  line-height: 0;
+}
+
+.status-bar-autoreview-launch-btn:hover:not(:disabled) {
+  background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.2));
+  color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.status-bar-autoreview-launch-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .review-loop-toggle {
   position: relative;
   display: inline-block;

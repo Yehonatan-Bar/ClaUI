@@ -10,7 +10,7 @@
 - **Clean handover contract**: the developer is told to output ONLY the document between `===CLAUI_HANDOVER_BEGIN===` and `===CLAUI_HANDOVER_END===`; `extractHandover()` returns only the inner text (and returns null when a closed marker block is absent, so the loop retries once then errors) -- no preamble or unmarked text ever reaches Codex
 - **Explicit reviewer task**: before it is sent to Codex the handover is wrapped by `buildReviewerPrompt()`, which states the reviewer's role IN THE MESSAGE itself (review the work, read the real code, judge it, return a verdict) instead of relying only on the separate Codex `instructions` channel
 - **Verdict = blocking bugs only**: the reviewer approves unless there is a defect that breaks correctness, crashes, loses data, or opens a security hole -- style, naming, and non-blocking nits never trigger a change request. It must end with exactly one bare line, `VERDICT: APPROVED` or `VERDICT: CHANGES_REQUESTED`; `parseVerdictLine()` reads the last non-empty line exactly (rejecting lookalikes such as `UNAPPROVED` and trailing text), the Haiku model is consulted only when that line is missing/ambiguous, and any classifier failure conservatively counts as "changes requested" so the loop never falsely declares success
-- **Trigger (`autoStart`, default on)**: the loop auto-starts after a user-initiated, successful turn **that used at least one tool** (a per-turn `usedTools` flag set on the demux `toolUseStart` event) -- pure text-only Q&A turns are skipped, so casual chat never triggers a Codex review. It never chains off the loop's own injected turns
+- **Trigger (`autoStart`, default off / opt-in)**: when enabled, the loop auto-starts after a user-initiated, successful turn **that used at least one tool** (a per-turn `usedTools` flag set on the demux `toolUseStart` event) -- pure text-only Q&A turns are skipped, so casual chat never triggers a Codex review. It never chains off the loop's own injected turns
 - **Resume robustness**: if the Claude process already exited (e.g. at session end), the loop resumes it (`--resume`, skip-replay) before injecting the handover instead of bailing with "no active session"; the reviewer only needs the workspace path, not a live Claude session id
 - **Stop conditions**: approval, the round cap, the Stop button, the user sending a manual message (a soft stop that detaches the capture without cancelling the live process, so the user's message is never lost), a per-turn timeout, or tab disposal. The Codex reviewer and Haiku classifier subprocesses are killed on stop
 
@@ -22,7 +22,7 @@
 
 **Settings (`claudeMirror.reviewLoop.*`)**
 
-- `autoStart` (true), `maxRounds` (5, clamped 1-20), `reviewerModel` (`gpt-5.5`; empty falls back to `codex.model` then the Codex default), `reviewerReasoningEffort` (`xhigh`), `reviewerServiceTier` (`fast`), `classifierModel` (`claude-haiku-4-5-20251001`), `turnTimeoutMs` (600000)
+- `autoStart` (false; off by default), `maxRounds` (5, clamped 1-20), `reviewerModel` (`gpt-5.5`; empty falls back to `codex.model` then the Codex default), `reviewerReasoningEffort` (`xhigh`), `reviewerServiceTier` (`fast`), `classifierModel` (`claude-haiku-4-5-20251001`), `turnTimeoutMs` (600000)
 
 **Tests**
 
