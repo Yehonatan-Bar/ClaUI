@@ -76,6 +76,16 @@ the reviewer.
 The reviewer is scoped to BLOCKING bugs only — defects that break correctness,
 crash, lose data, or open a security hole. Style, naming, and non-blocking nits
 never trigger a change request; the loop runs until Codex finds no blocking bug.
+The handover is deliberately NOT "concise". `buildHandoverPrompt()` asks the developer
+for two separated parts: (1) THE TASK — the objective requirements, scope, and every
+pre-approved decision/constraint, written as the spec to verify against — and (2) THE
+DEVELOPER REPORT — what was actually done, deviations, what was not done, changed files,
+how to verify. A thin "what I did" summary gives the reviewer no spec to check against
+and yields a rubber-stamp APPROVED; the explicit task/spec section is what lets the
+reviewer find real problems. `buildReviewerPrompt()` correspondingly tells Codex to
+read PART 1 (and any named plan doc), verify the code against it, and treat an unmet
+requirement or violated constraint as itself a blocking issue.
+
 Before it is sent to Codex, the clean handover is wrapped by `buildReviewerPrompt()`,
 which states the reviewer's role explicitly IN THE MESSAGE itself (review the work,
 read the real code, judge it, and return a verdict) instead of relying only on the
