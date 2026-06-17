@@ -331,7 +331,7 @@
         },
         "claudeMirror.reviewLoop.turnTimeoutMs": {
           "type": "number",
-          "default": 600000,
+          "default": 3600000,
           "minimum": 30000,
           "description": "Per-turn timeout (ms) for both the developer turn and the Codex reviewer turn."
         },
