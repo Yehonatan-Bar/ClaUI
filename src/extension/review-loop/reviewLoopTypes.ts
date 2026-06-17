@@ -25,7 +25,7 @@ export const DEFAULT_REVIEW_LOOP_CONFIG: ReviewLoopConfig = {
   reviewerReasoningEffort: 'xhigh',
   reviewerServiceTier: 'fast',
   classifierModel: 'claude-haiku-4-5-20251001',
-  turnTimeoutMs: 300_000,
+  turnTimeoutMs: 600_000,
 };
 
 /**

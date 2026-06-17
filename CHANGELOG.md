@@ -22,7 +22,7 @@
 
 **Settings (`claudeMirror.reviewLoop.*`)**
 
-- `autoStart` (true), `maxRounds` (5, clamped 1-20), `reviewerModel` (`gpt-5.5`; empty falls back to `codex.model` then the Codex default), `reviewerReasoningEffort` (`xhigh`), `reviewerServiceTier` (`fast`), `classifierModel` (`claude-haiku-4-5-20251001`), `turnTimeoutMs` (300000)
+- `autoStart` (true), `maxRounds` (5, clamped 1-20), `reviewerModel` (`gpt-5.5`; empty falls back to `codex.model` then the Codex default), `reviewerReasoningEffort` (`xhigh`), `reviewerServiceTier` (`fast`), `classifierModel` (`claude-haiku-4-5-20251001`), `turnTimeoutMs` (600000)
 
 **Tests**
 

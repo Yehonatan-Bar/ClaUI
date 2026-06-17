@@ -113,7 +113,7 @@ Q&A turns are skipped, so casual chat never triggers a Codex review. Detection:
 | `reviewerReasoningEffort` | `xhigh` | Reviewer reasoning effort (empty = fall back to `codex.reasoningEffort`) |
 | `reviewerServiceTier` | `fast` | Reviewer service tier; `fast` = Codex fast mode (empty = fall back to `codex.serviceTier`) |
 | `classifierModel` | `claude-haiku-4-5-20251001` | Claude model for the verdict classifier |
-| `turnTimeoutMs` | `300000` | Per-turn timeout for developer and reviewer turns |
+| `turnTimeoutMs` | `600000` | Per-turn timeout for developer and reviewer turns |
 
 The reviewer therefore runs **GPT-5.5, reasoning effort xhigh (extra high), Codex fast mode** by default. Per-turn overrides flow through `CodexExecProcessManager.runTurn` (model / `reasoningEffort` / `serviceTier`), so the reviewer's model and effort are independent of any Codex tab's global settings.
 
