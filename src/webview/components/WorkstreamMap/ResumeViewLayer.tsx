@@ -63,6 +63,7 @@ export const ResumeViewLayer: React.FC<ResumeViewLayerProps> = React.memo(({
             )}
             <button
               onClick={onDismiss}
+              data-tooltip="Dismiss resume view highlights"
               style={{
                 background: 'none',
                 border: '1px solid #475569',

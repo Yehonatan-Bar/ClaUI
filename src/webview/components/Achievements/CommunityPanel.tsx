@@ -95,7 +95,7 @@ export const CommunityPanel: React.FC = () => {
     <div className="community-panel" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="community-panel-header">
         <strong>{tr.community}</strong>
-        <button className="community-panel-close" onClick={() => setCommunityPanelOpen(false)}>x</button>
+        <button className="community-panel-close" onClick={() => setCommunityPanelOpen(false)} data-tooltip="Close">x</button>
       </div>
 
       {!connected ? (
@@ -118,7 +118,7 @@ export const CommunityPanel: React.FC = () => {
               {tr.connectPatLink}
             </a>
           </p>
-          <button className="community-connect-btn" onClick={handleConnect}>
+          <button className="community-connect-btn" onClick={handleConnect} data-tooltip="Connect GitHub account">
             {tr.connectGitHub}
           </button>
         </div>
@@ -157,12 +157,14 @@ export const CommunityPanel: React.FC = () => {
             <button
               className={`community-tab ${activeTab === 'friends' ? 'active' : ''}`}
               onClick={() => setActiveTab('friends')}
+              data-tooltip="Show friends list"
             >
               {tr.friends}
             </button>
             <button
               className={`community-tab ${activeTab === 'compare' ? 'active' : ''}`}
               onClick={() => setActiveTab('compare')}
+              data-tooltip="Compare with a friend"
             >
               {tr.compare}
             </button>
@@ -182,6 +184,7 @@ export const CommunityPanel: React.FC = () => {
                   className="community-add-btn"
                   onClick={handleAddFriend}
                   disabled={friendActionPending || !addInput.trim()}
+                  data-tooltip="Add friend by username"
                 >
                   {friendActionPending ? '...' : tr.addFriend}
                 </button>
@@ -299,13 +302,14 @@ const MyPublicProfileCard: React.FC<{
       </div>
 
       <div className="community-my-profile-actions">
-        <button className="community-my-profile-btn primary" onClick={onPublish}>
+        <button className="community-my-profile-btn primary" onClick={onPublish} data-tooltip="Publish profile now">
           {tr.publishNow}
         </button>
         <button
           className="community-my-profile-btn"
           onClick={onOpenPublishedProfile}
           disabled={!gistUrl}
+          data-tooltip="Open published profile"
         >
           {tr.openPublishedProfile}
         </button>

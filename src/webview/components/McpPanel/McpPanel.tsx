@@ -8,10 +8,10 @@ import { McpSessionTab } from './McpSessionTab';
 import { McpWorkspaceTab } from './McpWorkspaceTab';
 
 const TABS = [
-  { key: 'session', label: 'Session' },
-  { key: 'workspace', label: 'Workspace' },
-  { key: 'add', label: 'Add' },
-  { key: 'debug', label: 'Debug' },
+  { key: 'session', label: 'Session', tooltip: 'Show MCP servers loaded in this session' },
+  { key: 'workspace', label: 'Workspace', tooltip: 'Show configured MCP servers by scope' },
+  { key: 'add', label: 'Add', tooltip: 'Add a new MCP server' },
+  { key: 'debug', label: 'Debug', tooltip: 'Show MCP config paths and diagnostics' },
 ] as const;
 
 function buildMcpBugReportContext(
@@ -211,6 +211,7 @@ export const McpPanel: React.FC = () => {
             <button
               onClick={handleRefresh}
               disabled={mcpLoading}
+              data-tooltip="Reload MCP inventory"
               style={{
                 padding: '8px 12px',
                 borderRadius: 9,
@@ -226,6 +227,7 @@ export const McpPanel: React.FC = () => {
             </button>
             <button
               onClick={() => setMcpPanelOpen(false)}
+              data-tooltip="Close MCP panel"
               style={{
                 width: 34,
                 height: 34,
@@ -286,6 +288,7 @@ export const McpPanel: React.FC = () => {
                     postToExtension({ type: 'mcpRestartSession' });
                   }}
                   disabled={restartInFlight || mcpLoading}
+                  data-tooltip="Restart Claude session to reload MCP"
                   style={{
                     padding: '8px 12px',
                     borderRadius: 8,
@@ -306,6 +309,7 @@ export const McpPanel: React.FC = () => {
               {hasRestartAction && !restartSucceeded && !restartInFlight && (
                 <button
                   onClick={() => setMcpSelectedTab('session')}
+                  data-tooltip="Postpone restart and open Session tab"
                   style={{
                     padding: '8px 12px',
                     borderRadius: 8,
@@ -330,6 +334,7 @@ export const McpPanel: React.FC = () => {
               <button
                 key={tab.key}
                 onClick={() => setMcpSelectedTab(tab.key)}
+                data-tooltip={tab.tooltip}
                 style={{
                   padding: '8px 14px',
                   borderRadius: '10px 10px 0 0',

@@ -344,6 +344,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
           <button
             className={`vitals-info-toggle-btn ${adventureEnabled ? 'on' : 'off'}`}
             onClick={handleAdventureToggle}
+            data-tooltip="Toggle Adventure Widget"
           >
             <span className="vitals-toggle-knob" />
           </button>
@@ -355,6 +356,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
         <button
           className={`vitals-info-toggle-btn ${weatherWidgetEnabled ? 'on' : 'off'}`}
           onClick={handleWeatherWidgetToggle}
+          data-tooltip="Toggle Session Mood weather widget"
         >
           <span className="vitals-toggle-knob" />
         </button>
@@ -365,6 +367,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
         <button
           className={`vitals-info-toggle-btn ${turnAnalysisEnabled ? 'on' : 'off'}`}
           onClick={handleTurnAnalysisToggle}
+          data-tooltip="Toggle semantic turn analysis"
         >
           <span className="vitals-toggle-knob" />
         </button>
@@ -388,6 +391,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
         <button
           className={`vitals-info-toggle-btn ${skillGenEnabled ? 'on' : 'off'}`}
           onClick={handleSkillGenToggle}
+          data-tooltip="Toggle skill generation"
         >
           <span className="vitals-toggle-knob" />
         </button>
@@ -409,6 +413,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
           <button
             className={`vitals-info-toggle-btn ${usageWidgetEnabled ? 'on' : 'off'}`}
             onClick={handleUsageWidgetToggle}
+            data-tooltip="Toggle Usage Widget"
           >
             <span className="vitals-toggle-knob" />
           </button>
@@ -420,6 +425,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
         <button
           className={`vitals-info-toggle-btn ${restoreSessionsEnabled ? 'on' : 'off'}`}
           onClick={handleRestoreSessionsToggle}
+          data-tooltip="Toggle restoring last sessions on reopen"
         >
           <span className="vitals-toggle-knob" />
         </button>
@@ -430,6 +436,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
         <button
           className={`vitals-info-toggle-btn ${vitalsEnabled ? 'on' : 'off'}`}
           onClick={handleToggle}
+          data-tooltip="Toggle session vitals display"
         >
           <span className="vitals-toggle-knob" />
         </button>
@@ -439,6 +446,7 @@ export const VitalsInfoPanel: React.FC<VitalsInfoPanelProps> = ({ onClose }) => 
         <span data-tooltip="Show AI-generated activity summaries in the busy indicator while Claude is working.">Activity Summary</span>
         <button
           className={`vitals-info-toggle-btn ${activitySummaryEnabled ? 'on' : 'off'}`}
+          data-tooltip="Toggle activity summary in busy indicator"
           onClick={() => {
             const next = !activitySummaryEnabled;
             setActivitySummaryEnabled(next);

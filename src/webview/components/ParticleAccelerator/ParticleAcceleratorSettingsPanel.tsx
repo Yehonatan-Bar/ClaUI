@@ -41,6 +41,7 @@ export function ParticleAcceleratorSettingsPanel() {
         <span style={{ fontWeight: 600, fontSize: '13px' }}>Particle Accelerator</span>
         <button
           onClick={handleToggle}
+          data-tooltip={status?.enabled ? 'Disable Particle Accelerator' : 'Enable Particle Accelerator'}
           style={{
             padding: '2px 8px',
             borderRadius: '3px',
@@ -91,14 +92,16 @@ export function ParticleAcceleratorSettingsPanel() {
               onClick={() => status.claudeHookInstalled ? handleUninstallHooks('claude') : handleInstallHooks('claude')}
               label={status.claudeHookInstalled ? 'Remove Claude Hook' : 'Install Claude Hook'}
               active={status.claudeHookInstalled}
+              tooltip={status.claudeHookInstalled ? 'Uninstall Claude hook' : 'Install Claude hook'}
             />
             <SmallButton
               onClick={() => status.codexHookInstalled ? handleUninstallHooks('codex') : handleInstallHooks('codex')}
               label={status.codexHookInstalled ? 'Remove Codex Hook' : 'Install Codex Hook'}
               active={status.codexHookInstalled}
+              tooltip={status.codexHookInstalled ? 'Uninstall Codex hook' : 'Install Codex hook'}
             />
-            <SmallButton onClick={handleClearData} label="Clear Data" />
-            <SmallButton onClick={handleRefresh} label="Refresh" />
+            <SmallButton onClick={handleClearData} label="Clear Data" tooltip="Clear all trace data" />
+            <SmallButton onClick={handleRefresh} label="Refresh" tooltip="Refresh status" />
           </div>
         </>
       )}
@@ -121,10 +124,11 @@ function HookStatus({ label, installed }: { label: string; installed: boolean })
   );
 }
 
-function SmallButton({ onClick, label, active }: { onClick: () => void; label: string; active?: boolean }) {
+function SmallButton({ onClick, label, active, tooltip }: { onClick: () => void; label: string; active?: boolean; tooltip?: string }) {
   return (
     <button
       onClick={onClick}
+      data-tooltip={tooltip}
       style={{
         padding: '2px 6px',
         borderRadius: '3px',

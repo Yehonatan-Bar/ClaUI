@@ -343,6 +343,7 @@ export const ContextTab: React.FC = () => {
           <button
             key={role}
             onClick={() => setFilterRole(role)}
+            data-tooltip={`Show ${role} messages`}
             style={{
               padding: '4px 12px',
               borderRadius: '14px',
@@ -377,6 +378,7 @@ export const ContextTab: React.FC = () => {
 
         <button
           onClick={expandAll}
+          data-tooltip="Expand all messages"
           style={{
             padding: '4px 10px',
             borderRadius: '6px',
@@ -391,6 +393,7 @@ export const ContextTab: React.FC = () => {
         </button>
         <button
           onClick={collapseAll}
+          data-tooltip="Collapse all messages"
           style={{
             padding: '4px 10px',
             borderRadius: '6px',

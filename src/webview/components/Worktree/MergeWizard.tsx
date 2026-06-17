@@ -120,12 +120,14 @@ interface StrategyCardProps {
   disabled?: boolean;
   title: string;
   desc: string;
+  tooltip: string;
   onClick: () => void;
 }
-const StrategyCard: React.FC<StrategyCardProps> = ({ active, disabled, title, desc, onClick }) => (
+const StrategyCard: React.FC<StrategyCardProps> = ({ active, disabled, title, desc, tooltip, onClick }) => (
   <button
     onClick={() => !disabled && onClick()}
     disabled={disabled}
+    data-tooltip={tooltip}
     style={{
       flex: '1 1 0',
       textAlign: 'left',
@@ -474,14 +476,14 @@ export const MergeWizard: React.FC<{
             </div>
             <div style={footer}>
               {result?.canDiscard ? (
-                <button onClick={() => setDiscardConfirm(true)} disabled={busy} style={{ ...ghostBtn(busy), color: WT_COLORS.red, borderColor: 'rgba(248,81,73,0.4)' }}>
+                <button onClick={() => setDiscardConfirm(true)} disabled={busy} data-tooltip="Discard merge by rewriting history" style={{ ...ghostBtn(busy), color: WT_COLORS.red, borderColor: 'rgba(248,81,73,0.4)' }}>
                   Discard (rewrite history)
                 </button>
               ) : null}
-              <button onClick={() => undo('revert')} disabled={busy || !result?.newSha} style={ghostBtn(busy || !result?.newSha)}>
+              <button onClick={() => undo('revert')} disabled={busy || !result?.newSha} data-tooltip="Revert the merge commit" style={ghostBtn(busy || !result?.newSha)}>
                 Undo merge
               </button>
-              <button onClick={onClose} style={{ ...ghostBtn(), background: WT_COLORS.accent, color: '#0d1117', border: 'none', fontWeight: 600 }}>
+              <button onClick={onClose} data-tooltip="Close the wizard" style={{ ...ghostBtn(), background: WT_COLORS.accent, color: '#0d1117', border: 'none', fontWeight: 600 }}>
                 Done
               </button>
             </div>
@@ -494,8 +496,8 @@ export const MergeWizard: React.FC<{
               </StatusCard>
             </div>
             <div style={footer}>
-              <button onClick={() => setMergeResult(null)} style={ghostBtn()}>Back</button>
-              <button onClick={onClose} style={{ ...ghostBtn(), background: WT_COLORS.accent, color: '#0d1117', border: 'none', fontWeight: 600 }}>Close</button>
+              <button onClick={() => setMergeResult(null)} data-tooltip="Return to merge options" style={ghostBtn()}>Back</button>
+              <button onClick={onClose} data-tooltip="Close the wizard" style={{ ...ghostBtn(), background: WT_COLORS.accent, color: '#0d1117', border: 'none', fontWeight: 600 }}>Close</button>
             </div>
           </>
         ) : isConflict ? (
@@ -522,6 +524,7 @@ export const MergeWizard: React.FC<{
               ) : (
                 <button
                   onClick={startAssistant}
+                  data-tooltip="Start a Claude session to resolve conflicts"
                   style={{
                     ...ghostBtn(),
                     marginTop: 12,
@@ -536,12 +539,13 @@ export const MergeWizard: React.FC<{
               )}
             </div>
             <div style={footer}>
-              <button onClick={openConflicts} disabled={!liveConflicts.length} style={ghostBtn(!liveConflicts.length)}>
+              <button onClick={openConflicts} disabled={!liveConflicts.length} data-tooltip="Open conflicted files in the editor" style={ghostBtn(!liveConflicts.length)}>
                 Open conflicted files
               </button>
               <button
                 onClick={() => stopAssistantThen(abort)}
                 disabled={busy}
+                data-tooltip="Abort merge and restore target branch"
                 style={{ ...ghostBtn(busy), color: WT_COLORS.red, borderColor: 'rgba(248,81,73,0.4)' }}
               >
                 Abort merge
@@ -624,6 +628,7 @@ export const MergeWizard: React.FC<{
                 <div style={{ marginBottom: 10 }}>
                   <button
                     onClick={() => setShowCommits((v) => !v)}
+                    data-tooltip="Toggle the commit list"
                     style={{ ...ghostBtn(), width: '100%', textAlign: 'left', display: 'flex', justifyContent: 'space-between' }}
                   >
                     <span>{ours.commits.length} commit{ours.commits.length === 1 ? '' : 's'} to merge</span>
@@ -655,14 +660,14 @@ export const MergeWizard: React.FC<{
                         style={{ background: WT_COLORS.inputBg, border: `1px solid ${WT_COLORS.cardBorder}`, borderRadius: 5, color: WT_COLORS.text, padding: '6px 10px', fontSize: 12 }}
                       />
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={commitFirst} disabled={!commitMsg.trim() || busy} style={{ ...ghostBtn(!commitMsg.trim() || busy), color: WT_COLORS.green, borderColor: 'rgba(63,185,80,0.4)' }}>
+                        <button onClick={commitFirst} disabled={!commitMsg.trim() || busy} data-tooltip="Commit the worktree changes" style={{ ...ghostBtn(!commitMsg.trim() || busy), color: WT_COLORS.green, borderColor: 'rgba(63,185,80,0.4)' }}>
                           Commit them
                         </button>
-                        <button onClick={() => setShowCommit(false)} style={ghostBtn()}>Cancel</button>
+                        <button onClick={() => setShowCommit(false)} data-tooltip="Cancel committing" style={ghostBtn()}>Cancel</button>
                       </div>
                     </div>
                   ) : (
-                    <button onClick={() => setShowCommit(true)} style={ghostBtn()}>Commit them first</button>
+                    <button onClick={() => setShowCommit(true)} data-tooltip="Commit changes before merging" style={ghostBtn()}>Commit them first</button>
                   )}
                 </StatusCard>
               )}
@@ -683,12 +688,14 @@ export const MergeWizard: React.FC<{
                   active={effectiveStrategy === 'merge'}
                   title="Merge commit"
                   desc="Keep all the branch's commits and add one merge point."
+                  tooltip="Use a merge commit"
                   onClick={() => setStrategy('merge')}
                 />
                 <StrategyCard
                   active={effectiveStrategy === 'squash'}
                   title="Squash"
                   desc="Combine everything into a single clean commit."
+                  tooltip="Squash into one commit"
                   onClick={() => setStrategy('squash')}
                 />
                 <StrategyCard
@@ -696,6 +703,7 @@ export const MergeWizard: React.FC<{
                   disabled={ffDisabled}
                   title="Fast-forward"
                   desc={ffDisabled ? `Unavailable - ${targetBranch} has moved on.` : `Move ${targetBranch} forward with no extra commit.`}
+                  tooltip="Fast-forward without a merge commit"
                   onClick={() => setStrategy('ff')}
                 />
               </div>
@@ -729,10 +737,11 @@ export const MergeWizard: React.FC<{
               {ours && !ours.success && !blocked && (
                 <span style={{ fontSize: 12, color: WT_COLORS.red, marginInlineEnd: 'auto' }}>{ours.message}</span>
               )}
-              <button onClick={onClose} style={ghostBtn()}>Cancel</button>
+              <button onClick={onClose} data-tooltip="Close without merging" style={ghostBtn()}>Cancel</button>
               <button
                 onClick={runMerge}
                 disabled={mergeDisabled}
+                data-tooltip={`${mergeLabel} into ${targetBranch || 'the target'}`}
                 style={{
                   ...ghostBtn(mergeDisabled),
                   background: mergeDisabled ? WT_COLORS.cardBorder : conflictPredicted ? WT_COLORS.amber : WT_COLORS.accent,
@@ -757,9 +766,10 @@ export const MergeWizard: React.FC<{
                   {targetBranch} is a protected branch. {mergeLabel} {ours?.sourceBranch || source.branch} into it now?
                 </div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <button onClick={() => setProtectedConfirm(false)} style={ghostBtn()}>Cancel</button>
+                  <button onClick={() => setProtectedConfirm(false)} data-tooltip="Cancel the merge" style={ghostBtn()}>Cancel</button>
                   <button
                     onClick={() => { setProtectedConfirm(false); dispatchMerge(); }}
+                    data-tooltip={`Confirm merge into ${targetBranch}`}
                     style={{ ...ghostBtn(), background: WT_COLORS.accent, color: '#0d1117', border: 'none', fontWeight: 600 }}
                   >
                     {mergeLabel}
@@ -781,9 +791,10 @@ export const MergeWizard: React.FC<{
                   state. Safe only because the commit was never pushed.
                 </div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <button onClick={() => setDiscardConfirm(false)} style={ghostBtn()}>Cancel</button>
+                  <button onClick={() => setDiscardConfirm(false)} data-tooltip="Keep the merge commit" style={ghostBtn()}>Cancel</button>
                   <button
                     onClick={() => { setDiscardConfirm(false); undo('discard'); }}
+                    data-tooltip="Discard merge by rewriting history"
                     style={{ ...ghostBtn(), background: WT_COLORS.red, color: '#0d1117', border: 'none', fontWeight: 600 }}
                   >
                     Discard

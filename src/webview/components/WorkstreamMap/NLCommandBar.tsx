@@ -62,6 +62,7 @@ export const NLCommandBar: React.FC = () => {
       <button
         onClick={handleSubmit}
         disabled={!input.trim()}
+        data-tooltip="Apply natural language edit to map"
         style={{
           background: 'var(--vscode-button-background, #4A9EFF)',
           color: 'var(--vscode-button-foreground, #fff)',

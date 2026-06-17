@@ -86,20 +86,20 @@ export const BtwContextMenu: React.FC<BtwContextMenuProps> = ({ x, y, hasSelecti
         style={{ left: adjustedPosition.left, top: adjustedPosition.top }}
       >
         {linkUrl && (
-          <button className="btw-context-menu-item" onClick={onCopyLink}>
+          <button className="btw-context-menu-item" onClick={onCopyLink} data-tooltip="Copy link to clipboard">
             Copy link
           </button>
         )}
         {hasSelection && (
-          <button className="btw-context-menu-item" onClick={handleCopy}>
+          <button className="btw-context-menu-item" onClick={handleCopy} data-tooltip="Copy selection to clipboard">
             Copy
           </button>
         )}
-        <button className="btw-context-menu-item" onClick={handlePaste}>
+        <button className="btw-context-menu-item" onClick={handlePaste} data-tooltip="Paste from clipboard">
           Paste
         </button>
         <div className="btw-context-menu-separator" />
-        <button className="btw-context-menu-item" onClick={onBtwClick}>
+        <button className="btw-context-menu-item" onClick={onBtwClick} data-tooltip="Start a side thought (by the way...)">
           btw...
         </button>
       </div>

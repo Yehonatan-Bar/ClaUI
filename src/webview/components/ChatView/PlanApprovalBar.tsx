@@ -260,7 +260,7 @@ export const PlanApprovalBar: React.FC = () => {
           ))}
         </div>
         {questionData.multiSelect && selectedOptions.size > 0 && (
-          <button className="question-submit-btn" onClick={handleSubmitMultiSelect}>
+          <button className="question-submit-btn" onClick={handleSubmitMultiSelect} data-tooltip="Submit your selected answers">
             Submit ({selectedOptions.size} selected)
           </button>
         )}
@@ -268,6 +268,7 @@ export const PlanApprovalBar: React.FC = () => {
           <button
             className="plan-feedback-btn"
             onClick={() => setShowFeedback(!showFeedback)}
+            data-tooltip={showFeedback ? 'Cancel the custom answer' : 'Write a free-text answer instead of choosing an option'}
           >
             {showFeedback ? 'Cancel' : 'Custom answer...'}
           </button>
@@ -286,6 +287,7 @@ export const PlanApprovalBar: React.FC = () => {
                 className="plan-feedback-send"
                 onClick={handleSendCustomAnswer}
                 disabled={!feedbackText.trim()}
+                data-tooltip="Send your custom answer (Enter)"
               >
                 Send
               </button>
@@ -302,21 +304,25 @@ export const PlanApprovalBar: React.FC = () => {
       key: 1,
       label: `Yes, clear context${contextPercent > 0 ? ` (${contextPercent}% used)` : ''} and bypass permissions`,
       handler: handleApproveClearBypass,
+      tooltip: 'Approve the plan, clear the context window, and stop asking permission for each action',
     },
     {
       key: 2,
       label: 'Yes, and bypass permissions',
       handler: handleApproveBypass,
+      tooltip: 'Approve the plan and stop asking permission for each action',
     },
     {
       key: 3,
       label: 'Yes, manually approve edits',
       handler: handleApproveManual,
+      tooltip: 'Approve the plan but review and confirm each edit manually',
     },
     {
       key: 4,
       label: 'Type here to tell Claude what to change',
       handler: () => setShowFeedback(!showFeedback),
+      tooltip: 'Reject for now and type changes you want Claude to make',
     },
   ];
 
@@ -348,6 +354,7 @@ export const PlanApprovalBar: React.FC = () => {
             onClick={opt.handler}
             onMouseEnter={() => setHoveredOption(opt.key)}
             onMouseLeave={() => setHoveredOption(null)}
+            data-tooltip={opt.tooltip}
           >
             <span className="plan-option-indicator">
               {hoveredOption === opt.key ? '>' : ' '}
@@ -372,6 +379,7 @@ export const PlanApprovalBar: React.FC = () => {
             className="plan-feedback-send"
             onClick={handleSendFeedback}
             disabled={!feedbackText.trim()}
+            data-tooltip="Send your feedback to Claude (Enter)"
           >
             Send
           </button>

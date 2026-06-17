@@ -132,7 +132,7 @@ export const SkillGenPanel: React.FC = () => {
             <p>Every completed task produces a structured <strong>SR-PTD</strong> document. These are not regular reports -- each section maps directly to a reusable Skill component.</p>
             <p>After <strong>3-5 similar documents</strong> accumulate, they are automatically clustered and merged into a formal <strong>Skill</strong> -- a knowledge package that handles similar tasks automatically in the future.</p>
             <p>Every task solved today becomes organizational knowledge that accelerates future work.</p>
-            <button className="skillgen-info-link" onClick={handleOpenGuide}>
+            <button className="skillgen-info-link" onClick={handleOpenGuide} data-tooltip="Open full visual guide">
               Open full visual guide
             </button>
           </div>
@@ -198,7 +198,7 @@ export const SkillGenPanel: React.FC = () => {
         {/* Action buttons */}
         <div className="skillgen-actions">
           {isRunning ? (
-            <button className="skillgen-btn skillgen-btn-cancel" onClick={handleCancel}>
+            <button className="skillgen-btn skillgen-btn-cancel" onClick={handleCancel} data-tooltip="Cancel the running generation">
               Cancel
             </button>
           ) : (

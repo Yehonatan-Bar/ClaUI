@@ -321,6 +321,7 @@ export const McpAddWizard: React.FC = () => {
               <button
                 onClick={handlePreview}
                 disabled={disabled || mcpLoading}
+                data-tooltip="Preview the .mcp.json diff before saving"
                 style={{
                   padding: '9px 14px',
                   borderRadius: 9,
@@ -338,6 +339,7 @@ export const McpAddWizard: React.FC = () => {
             <button
               onClick={handleApply}
               disabled={disabled || mcpLoading}
+              data-tooltip="Save the MCP server to the selected scope"
               style={{
                 padding: '9px 14px',
                 borderRadius: 9,

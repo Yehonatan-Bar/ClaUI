@@ -62,6 +62,7 @@ export const ConfidenceReviewPanel: React.FC<ConfidenceReviewPanelProps> = ({ st
         </div>
         <button
           onClick={onClose}
+          data-tooltip="Close low confidence panel"
           style={{
             background: 'transparent',
             border: 'none',
@@ -156,6 +157,7 @@ export const ConfidenceReviewPanel: React.FC<ConfidenceReviewPanelProps> = ({ st
       >
         <button
           onClick={handleReclassify}
+          data-tooltip="Rebuild the workstream map"
           style={{
             flex: 1,
             background: 'var(--vscode-button-background, #0E639C)',

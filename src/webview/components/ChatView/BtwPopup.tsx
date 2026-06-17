@@ -148,7 +148,7 @@ export const BtwPopup: React.FC<BtwPopupProps> = ({
         <div className="btw-chat-panel">
           <div className="btw-chat-header">
             <span className="btw-chat-title">btw...</span>
-            <button className="btw-popup-close" onClick={onClose} aria-label="Close">
+            <button className="btw-popup-close" onClick={onClose} aria-label="Close" data-tooltip="Close">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M8 8.707l3.646 3.647.708-.707L8.707 8l3.647-3.646-.707-.708L8 7.293 4.354 3.646l-.708.708L7.293 8l-3.647 3.646.708.708z" />
               </svg>
@@ -197,6 +197,7 @@ export const BtwPopup: React.FC<BtwPopupProps> = ({
               onClick={handleChatSend}
               disabled={!text.trim() || isBtwBusy}
               aria-label="Send"
+              data-tooltip="Send message (Enter)"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M1 1.5l14 6.5-14 6.5V9l8-1-8-1z" />
@@ -214,7 +215,7 @@ export const BtwPopup: React.FC<BtwPopupProps> = ({
       <div className="btw-popup" onMouseDown={(e) => e.stopPropagation()}>
         <div className="btw-popup-header">
           <span className="btw-popup-title">btw...</span>
-          <button className="btw-popup-close" onClick={onClose} aria-label="Close">
+          <button className="btw-popup-close" onClick={onClose} aria-label="Close" data-tooltip="Close">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 8.707l3.646 3.647.708-.707L8.707 8l3.647-3.646-.707-.708L8 7.293 4.354 3.646l-.708.708L7.293 8l-3.647 3.646.708.708z" />
             </svg>
@@ -235,13 +236,14 @@ export const BtwPopup: React.FC<BtwPopupProps> = ({
         />
 
         <div className="btw-popup-actions">
-          <button className="btw-popup-btn btw-popup-btn-cancel" onClick={onClose}>
+          <button className="btw-popup-btn btw-popup-btn-cancel" onClick={onClose} data-tooltip="Cancel (Esc)">
             Cancel
           </button>
           <button
             className="btw-popup-btn btw-popup-btn-secondary"
             onClick={handleNewTabSubmit}
             disabled={!canSubmit}
+            data-tooltip="Open this side thought in a new tab"
           >
             New Tab
           </button>
@@ -249,6 +251,7 @@ export const BtwPopup: React.FC<BtwPopupProps> = ({
             className="btw-popup-btn btw-popup-btn-submit"
             onClick={handleStartBtwSession}
             disabled={!canSubmit}
+            data-tooltip="Start a background BTW session (Ctrl+Enter)"
           >
             Send
           </button>

@@ -417,6 +417,7 @@ export const MpMessageBubble: React.FC<MpMessageBubbleProps> = ({ message }) => 
               <button
                 key={emoji}
                 onClick={() => handleReactionToggle(emoji)}
+                data-tooltip={`React with ${emoji}`}
                 style={{
                   width: 30,
                   height: 30,
