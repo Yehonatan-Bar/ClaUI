@@ -112,7 +112,25 @@ function getClaUiSettings(): string[] {
     'restoreSessionsOnStartup',
     'sessionVitals', 'adventureWidget', 'weatherWidget', 'chatFontSize', 'typingTheme',
   ];
-  return keys.map(k => `  ${k}: ${JSON.stringify(config.get(k))}`);
+  const lines = keys.map(k => `  ${k}: ${JSON.stringify(config.get(k))}`);
+
+  // Multi-Participant settings are essential for diagnosing collaborative-session
+  // failures (the most common cause is a missing/wrong server URL or token), yet
+  // were previously omitted from the report. The auth token is a shared secret,
+  // so report only whether it is set and its length -- never the value itself.
+  const mpKeys = [
+    'multiParticipant.serverUrl',
+    'multiParticipant.defaultHumanName',
+    'multiParticipant.defaultAgentName',
+    'multiParticipant.defaultAgentProvider',
+  ];
+  for (const mpKey of mpKeys) {
+    lines.push(`  ${mpKey}: ${JSON.stringify(config.get(mpKey))}`);
+  }
+  const mpAuthToken = config.get<string>('multiParticipant.authToken', '');
+  lines.push(`  multiParticipant.authToken: ${mpAuthToken ? `(set, ${mpAuthToken.length} chars)` : '(not set)'}`);
+
+  return lines;
 }
 
 function collectRecentLogs(logDir: string): { text: string; fileCount: number; totalSize: number; filePaths: string[] } {

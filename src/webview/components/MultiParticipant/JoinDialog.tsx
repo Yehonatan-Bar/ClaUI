@@ -7,6 +7,7 @@ export const JoinDialog: React.FC = () => {
   const isOpen = useAppStore((s) => s.mpJoinDialogOpen);
   const joinError = useAppStore((s) => s.mpJoinError);
   const connectionStatus = useAppStore((s) => s.mpConnectionStatus);
+  const connectionMessage = useAppStore((s) => s.mpConnectionMessage);
   const setOpen = useAppStore((s) => s.setMpJoinDialogOpen);
   const defaults = useAppStore((s) => s.mpDialogDefaults);
 
@@ -89,7 +90,12 @@ export const JoinDialog: React.FC = () => {
 
   if (!isOpen) return null;
 
-  const error = joinError ?? localError;
+  // Surface connection failures (e.g. server unreachable or auth rejected) in the
+  // dialog too -- previously only join errors showed, so a failed connection just
+  // silently reopened a blank dialog and looked "stuck".
+  const error = joinError
+    ?? (connectionStatus === 'error' ? connectionMessage : null)
+    ?? localError;
 
   return (
     <div style={{

@@ -130,6 +130,7 @@ export class MultiParticipantSessionTab {
     this.client.removeAllListeners('disconnected');
     this.client.removeAllListeners('reconnecting');
     this.client.removeAllListeners('error');
+    this.client.removeAllListeners('authFailed');
 
     this.client.on('connected', () => {
       this.postToWebview({ type: 'mpConnectionStatus', status: 'connected' });
@@ -168,6 +169,14 @@ export class MultiParticipantSessionTab {
 
     this.client.on('error', (err: Error) => {
       this.postToWebview({ type: 'mpConnectionStatus', status: 'error', message: err.message });
+    });
+
+    this.client.on('authFailed', (message: string) => {
+      // The client has already stopped its reconnect loop. Surface a clear,
+      // actionable error in both the dialog (via the error status) and a VS Code
+      // toast, instead of leaving the tab looking stuck on "connecting".
+      this.postToWebview({ type: 'mpConnectionStatus', status: 'error', message });
+      void vscode.window.showErrorMessage(`Multi-Participant: ${message}`);
     });
 
     // Connect WebSocket immediately - independent of agent process
@@ -313,19 +322,24 @@ export class MultiParticipantSessionTab {
           this.dispose();
           break;
 
-        case 'mpJoinSession':
+        case 'mpJoinSession': {
           if (msg.serverUrl) {
             this.client.setServerUrl(msg.serverUrl);
           }
-          if (!this.client.hasToken) {
-            const token = vscode.workspace.getConfiguration('claudeMirror').get<string>('multiParticipant.authToken', '');
-            if (token) {
-              this.client.setAuthToken(token);
-              this.log('[MPTab] Auth token loaded from settings');
-            }
+          // Always re-read the auth token from settings on every connect attempt.
+          // The token's only source is `claudeMirror.multiParticipant.authToken`
+          // (the dialog has no token field), so refreshing it here lets a user who
+          // fixed a wrong/expired token retry in the SAME tab. The previous guard
+          // skipped the reload whenever the client already held a (now-stale) token,
+          // so a retry after correcting settings kept sending the bad credentials.
+          const token = vscode.workspace.getConfiguration('claudeMirror').get<string>('multiParticipant.authToken', '');
+          this.client.setAuthToken(token);
+          if (token) {
+            this.log('[MPTab] Auth token loaded from settings');
           }
           this.connect(msg.humanName, msg.agentName, msg.agentProvider, msg.password, msg.sessionNumber, msg.sessionName, msg.mode || 'join');
           break;
+        }
 
         case 'mpRenameParticipant':
           this.client.send({

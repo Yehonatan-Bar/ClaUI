@@ -7,6 +7,8 @@ export interface MultiParticipantClientEvents {
   disconnected: [code: number, reason: string];
   reconnecting: [attempt: number, delayMs: number];
   error: [error: Error];
+  /** A permanent auth/handshake rejection -- reconnect has been stopped. */
+  authFailed: [message: string];
   message: [msg: ServerToClientMessage];
 }
 
@@ -24,6 +26,9 @@ export class MultiParticipantClient extends EventEmitter {
   private reconnectAttempt = 0;
   private intentionalClose = false;
   private autoReconnect = true;
+  /** Set when the server rejects the WS handshake (bad/missing token). Stops the
+   * reconnect loop so the tab does not retry doomed credentials forever. */
+  private fatalAuthFailure = false;
 
   private humanParticipantId: string | null = null;
   private agentParticipantId: string | null = null;
@@ -75,6 +80,7 @@ export class MultiParticipantClient extends EventEmitter {
 
   connect(): void {
     this.intentionalClose = false;
+    this.autoReconnect = true;
     this.reconnectAttempt = 0;
     this.doConnect();
   }
@@ -84,6 +90,10 @@ export class MultiParticipantClient extends EventEmitter {
       this.ws.removeAllListeners();
       try { this.ws.close(); } catch { /* ignore */ }
     }
+
+    // A fresh attempt clears any prior auth verdict; we re-learn it from this
+    // socket's handshake outcome.
+    this.fatalAuthFailure = false;
 
     const connectUrl = this.buildConnectUrl();
     const tokenIncluded = connectUrl.includes('token=');
@@ -113,6 +123,19 @@ export class MultiParticipantClient extends EventEmitter {
       this.clearPingTimer();
       this.emit('disconnected', code, reasonStr);
 
+      if (this.fatalAuthFailure) {
+        // Permanent failure: reconnecting with the same credentials would fail
+        // identically. Stop the loop so the tab does not sit on "Reconnecting..."
+        // forever, and tell the user exactly what to fix.
+        this.autoReconnect = false;
+        this.log('Server rejected the handshake (auth token); stopping reconnect loop');
+        this.emit(
+          'authFailed',
+          'Could not connect: the server rejected the connection (auth). Check the server URL and auth token (claudeMirror.multiParticipant.serverUrl / authToken).',
+        );
+        return;
+      }
+
       if (!this.intentionalClose && this.autoReconnect) {
         this.scheduleReconnect();
       }
@@ -120,6 +143,13 @@ export class MultiParticipantClient extends EventEmitter {
 
     this.ws.on('error', (err) => {
       this.log(`WebSocket error: ${err.message}`);
+      // A rejected handshake (server requires a token, or the token is wrong or
+      // empty) surfaces as an HTTP error on the WebSocket upgrade, not as a
+      // normal close. Flag it so the close handler stops retrying the same
+      // doomed credentials forever.
+      if (/Unexpected server response: (401|403)/.test(err.message || '')) {
+        this.fatalAuthFailure = true;
+      }
       this.emit('error', err);
     });
 

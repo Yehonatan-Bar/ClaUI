@@ -83,7 +83,7 @@ User clicks "Report MCP issue" inside McpPanel ->
 | Node.js version | `process.version` |
 | Claude CLI version | `execFile('claude', ['--version'])` with 5s timeout |
 | Codex CLI version | `execFile('codex', ['--version'])` with 5s timeout |
-| ClaUi settings | Key settings from `claudeMirror.*` configuration |
+| ClaUi settings | Key settings from `claudeMirror.*` configuration, including the `multiParticipant.*` connection settings (server URL, default names/provider). The `multiParticipant.authToken` is a shared secret, so only its presence and length are reported -- never the value. |
 | Recent logs | `.log` files modified in last 30 min from logDir, capped at 500KB |
 
 ## ZIP Contents
