@@ -144,7 +144,8 @@ export class TabManager {
     private readonly tokenRatioTracker?: TokenUsageRatioTracker,
     private readonly skillUsageTracker?: SkillUsageTracker,
     private readonly memorySampler?: ProcessMemorySampler,
-    private readonly tabGroupStore?: TabGroupStore
+    private readonly tabGroupStore?: TabGroupStore,
+    private readonly developerUsageReporter?: import('../usage/DeveloperUsageReporter').DeveloperUsageReporter
   ) {
     // Single shared status bar item across all tabs
     this.statusBarItem = vscode.window.createStatusBarItem(
@@ -530,7 +531,8 @@ export class TabManager {
       this.skillGenService,
       this.tokenRatioTracker,
       this.skillUsageTracker,
-      this.memorySampler
+      this.memorySampler,
+      this.developerUsageReporter
     );
 
     this.tabs.set(tab.id, tab);

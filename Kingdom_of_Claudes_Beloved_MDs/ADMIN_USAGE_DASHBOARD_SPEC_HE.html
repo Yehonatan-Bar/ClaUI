@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>אפיון מוצר - דשבורד אדמין לניטור שימוש ועלויות</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f5f6fb;
+    --surface:#ffffff;
+    --surface-2:#fafbff;
+    --ink:#1b1d2e;
+    --muted:#6a6f88;
+    --faint:#9aa0bb;
+    --line:#e7e9f3;
+    --accent:#5a4fd6;
+    --accent-soft:#eef0ff;
+    --accent-ink:#3b32a8;
+    --teal:#0ea59a;
+    --teal-soft:#e2f6f4;
+    --warn:#d98a2b;
+    --warn-soft:#fdf2e2;
+    --danger:#dc4b5c;
+    --danger-soft:#fdebed;
+    --good:#1faf6b;
+    --good-soft:#e4f6ee;
+    --shadow:0 1px 2px rgba(27,29,46,.04), 0 8px 28px rgba(27,29,46,.06);
+    --shadow-sm:0 1px 2px rgba(27,29,46,.05);
+    --radius:16px;
+    --radius-sm:11px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    font-family:"Heebo",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+  /* ---------- Hero ---------- */
+  .hero{
+    background:
+      radial-gradient(1200px 420px at 88% -8%, rgba(90,79,214,.22), transparent 60%),
+      radial-gradient(900px 380px at 6% 4%, rgba(14,165,154,.16), transparent 55%),
+      linear-gradient(180deg,#1d1f33 0%, #232645 100%);
+    color:#fff;
+    padding:64px 0 78px;
+    position:relative;
+    overflow:hidden;
+  }
+  .hero::after{
+    content:"";position:absolute;inset:0;
+    background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+    background-size:34px 34px;
+    -webkit-mask-image:radial-gradient(900px 400px at 80% 0%, #000 30%, transparent 75%);
+    mask-image:radial-gradient(900px 400px at 80% 0%, #000 30%, transparent 75%);
+    pointer-events:none;
+  }
+  .hero .wrap{position:relative;z-index:1}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:9px;
+    font-size:13px;font-weight:600;letter-spacing:.02em;
+    color:#cdd0ff;background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.16);
+    padding:7px 14px;border-radius:999px;margin-bottom:22px;
+  }
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 4px rgba(14,165,154,.25)}
+  .hero h1{font-size:42px;line-height:1.15;font-weight:800;margin:0 0 14px;letter-spacing:-.01em}
+  .hero h1 span{color:#b9b3ff}
+  .hero p.lead{font-size:18.5px;color:#d6d8ea;max-width:680px;margin:0 0 30px;font-weight:300}
+  .hero-meta{display:flex;flex-wrap:wrap;gap:10px}
+  .chip{
+    font-size:13px;font-weight:500;color:#e7e8f6;
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);
+    padding:8px 14px;border-radius:10px;
+  }
+  .chip b{color:#fff;font-weight:700}
+
+  /* ---------- Layout ---------- */
+  main{padding:54px 0 80px}
+  section{margin-bottom:46px;scroll-margin-top:24px}
+  .sec-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:22px}
+  .sec-num{
+    flex:0 0 auto;width:42px;height:42px;border-radius:12px;
+    background:var(--accent-soft);color:var(--accent-ink);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:18px;border:1px solid #dfe1ff;
+  }
+  .sec-head h2{margin:0;font-size:25px;font-weight:700;letter-spacing:-.01em}
+  .sec-head .sub{margin:3px 0 0;color:var(--muted);font-size:15.5px}
+
+  .card{
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:26px 28px;
+  }
+  .card + .card{margin-top:18px}
+  p{margin:0 0 14px}
+  p:last-child{margin-bottom:0}
+  .muted{color:var(--muted)}
+
+  /* ---------- Foundation two-up ---------- */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .found{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:24px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden;
+  }
+  .found::before{content:"";position:absolute;inset-inline-start:0;top:0;bottom:0;width:5px;background:var(--accent)}
+  .found.teal::before{background:var(--teal)}
+  .found h3{margin:0 0 4px;font-size:18px;font-weight:700;display:flex;align-items:center;gap:10px}
+  .found .tag{font-size:12px;font-weight:600;color:var(--muted);background:var(--bg);border:1px solid var(--line);padding:3px 9px;border-radius:7px}
+  .found p{font-size:15px;color:var(--muted);margin-top:10px}
+  .found ul{margin:12px 0 0;padding:0;list-style:none}
+  .found li{font-size:14.5px;padding:6px 0 6px 0;display:flex;gap:9px;align-items:flex-start;color:#3a3e57}
+  .found li::before{content:"";flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-top:9px}
+  .found.teal li::before{background:var(--teal)}
+
+  /* ---------- Flow diagram ---------- */
+  .flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:stretch;gap:0;margin-top:6px}
+  .flow-node{
+    background:var(--surface-2);border:1.5px solid var(--line);border-radius:var(--radius-sm);
+    padding:18px 16px;text-align:center;
+  }
+  .flow-node .ttl{font-weight:700;font-size:15.5px;margin-bottom:4px}
+  .flow-node .desc{font-size:13px;color:var(--muted);line-height:1.5}
+  .flow-node.mid{border-color:#d6d3ff;background:linear-gradient(180deg,#f4f3ff,#fff)}
+  .flow-node.end{border-color:#cfeeea;background:linear-gradient(180deg,#effaf8,#fff)}
+  .flow-arrow{display:flex;align-items:center;justify-content:center;color:var(--faint);padding:0 10px}
+  .flow-arrow svg{transform:scaleX(-1)}
+
+  /* ---------- Capability grid ---------- */
+  .caps{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .cap{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);padding:18px 20px;box-shadow:var(--shadow-sm)}
+  .cap .ic{width:36px;height:36px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:11px}
+  .cap h4{margin:0 0 5px;font-size:16px;font-weight:700}
+  .cap p{font-size:14px;color:var(--muted);margin:0}
+
+  /* ---------- Mockup frame ---------- */
+  .mock{
+    border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+    box-shadow:var(--shadow);background:var(--surface);margin-top:8px;
+  }
+  .mock-bar{display:flex;align-items:center;gap:8px;padding:11px 16px;background:#f0f1f8;border-bottom:1px solid var(--line)}
+  .mock-bar .tl{display:flex;gap:6px}
+  .mock-bar .tl i{width:11px;height:11px;border-radius:50%;display:block}
+  .mock-bar .tl i:nth-child(1){background:#e6727f}
+  .mock-bar .tl i:nth-child(2){background:#e7b24a}
+  .mock-bar .tl i:nth-child(3){background:#4fb477}
+  .mock-bar .addr{flex:1;text-align:center;font-size:12.5px;color:var(--muted);background:#fff;border:1px solid var(--line);border-radius:7px;padding:4px 10px;direction:ltr}
+  .mock-body{padding:22px}
+  .mock-caption{font-size:13px;color:var(--faint);text-align:center;margin-top:10px;font-style:italic}
+
+  /* dashboard internals */
+  .dash-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px}
+  .dash-top .t1{font-size:18px;font-weight:800}
+  .dash-top .t2{font-size:13px;color:var(--muted)}
+  .lastreport{font-size:12.5px;color:var(--muted);background:var(--good-soft);border:1px solid #bfe8d2;color:#147a4c;padding:5px 11px;border-radius:8px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+  .lastreport i{width:7px;height:7px;border-radius:50%;background:var(--good);display:block}
+  .period{display:flex;gap:6px}
+  .period span{font-size:12.5px;padding:5px 12px;border-radius:8px;border:1px solid var(--line);color:var(--muted);background:#fff}
+  .period span.on{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  .kpi{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:15px 16px}
+  .kpi .lbl{font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:500}
+  .kpi .val{font-size:24px;font-weight:800;letter-spacing:-.02em}
+  .kpi .val small{font-size:14px;font-weight:600;color:var(--muted)}
+  .kpi .delta{font-size:12px;font-weight:600;margin-top:4px;display:inline-flex;align-items:center;gap:4px}
+  .delta.up{color:var(--danger)}
+  .delta.down{color:var(--good)}
+  .delta.flat{color:var(--muted)}
+
+  .dash-mid{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;margin-bottom:18px}
+  .panel{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .panel .ph{font-size:13.5px;font-weight:700;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+  .panel .ph small{font-weight:500;color:var(--muted)}
+
+  .bars{display:flex;align-items:flex-end;gap:14px;height:130px;padding-top:6px}
+  .bars .b{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;height:100%;justify-content:flex-end}
+  .bars .b .bar{width:70%;border-radius:6px 6px 3px 3px;background:linear-gradient(180deg,#6a5fe0,#5a4fd6)}
+  .bars .b .bl{font-size:11px;color:var(--muted)}
+
+  .donut-wrap{display:flex;align-items:center;gap:16px}
+  .donut{
+    width:108px;height:108px;border-radius:50%;flex:0 0 auto;
+    background:conic-gradient(var(--accent) 0 46%, #8b82e8 46% 87%, var(--teal) 87% 100%);
+    -webkit-mask:radial-gradient(circle 33px at center, transparent 98%, #000 100%);
+    mask:radial-gradient(circle 33px at center, transparent 98%, #000 100%);
+  }
+  .legend{font-size:13px;display:flex;flex-direction:column;gap:8px}
+  .legend div{display:flex;align-items:center;gap:8px}
+  .legend i{width:11px;height:11px;border-radius:3px;display:block}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  thead th{text-align:right;font-weight:600;color:var(--muted);font-size:12px;padding:0 10px 10px;border-bottom:1px solid var(--line)}
+  tbody td{padding:11px 10px;border-bottom:1px solid #f0f1f7}
+  tbody tr:last-child td{border-bottom:none}
+  .who{display:flex;align-items:center;gap:10px}
+  .ava{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
+  .meter{position:relative;height:7px;background:#eceef6;border-radius:99px;overflow:hidden;width:84px;display:inline-block;vertical-align:middle}
+  .meter i{position:absolute;inset-inline-start:0;top:0;bottom:0;border-radius:99px;background:var(--accent)}
+  .pill{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:7px;display:inline-block}
+  .pill.opus{background:#efe9fc;color:#6a3fb5}
+  .pill.sonnet{background:var(--teal-soft);color:#0b8077}
+  .pill.haiku{background:#eef1f6;color:#5a6275}
+  .cost{font-weight:700;direction:ltr;display:inline-block}
+
+  .alert{display:flex;gap:13px;align-items:flex-start;padding:14px 16px;border-radius:11px;border:1px solid;margin-bottom:10px}
+  .alert:last-child{margin-bottom:0}
+  .alert .ai{flex:0 0 auto;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+  .alert .at{font-weight:700;font-size:14.5px;margin:0 0 2px}
+  .alert .ad{font-size:13px;margin:0;color:var(--muted)}
+  .alert.warn{background:var(--warn-soft);border-color:#f3dcb6}
+  .alert.warn .ai{background:#f5d49a;color:#8a5a14}
+  .alert.danger{background:var(--danger-soft);border-color:#f6cdd2}
+  .alert.danger .ai{background:#f3b4bb;color:#9c2733}
+  .alert.good{background:var(--good-soft);border-color:#bfe8d2}
+  .alert.good .ai{background:#aee0c4;color:#147a4c}
+
+  .pcard{max-width:380px;margin:0 auto;background:linear-gradient(180deg,#23254100,#fff);border:1px solid var(--line);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow)}
+  .pcard .ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .pcard .ph .nm{font-weight:700;font-size:15px}
+  .pcard .big{font-size:34px;font-weight:800;letter-spacing:-.02em;margin-bottom:2px;direction:ltr;text-align:right}
+  .pcard .bigsub{font-size:13px;color:var(--muted);margin-bottom:16px}
+  .pcard .row{display:flex;justify-content:space-between;font-size:13.5px;padding:8px 0;border-top:1px solid #f0f1f7}
+  .pcard .row b{font-weight:700}
+
+  /* money explainer */
+  .money{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:0;align-items:center;margin:6px 0 4px}
+  .money .mbox{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center}
+  .money .mbox .mt{font-size:12.5px;color:var(--muted);margin-bottom:6px}
+  .money .mbox .mv{font-size:16px;font-weight:800;line-height:1.4}
+  .money .op{font-size:22px;color:var(--accent);font-weight:700;padding:0 12px;text-align:center}
+  .formula{background:var(--accent-soft);border:1px dashed #c4bef0;border-radius:12px;padding:14px 18px;text-align:center;font-size:15px;color:var(--accent-ink);font-weight:600;margin-top:14px}
+
+  /* API-only banner */
+  .api-banner{display:flex;gap:12px;align-items:flex-start;background:var(--warn-soft);border:1px solid #f3dcb6;border-radius:12px;padding:14px 16px;margin-top:16px}
+  .api-banner .bi{flex:0 0 auto;width:30px;height:30px;border-radius:8px;background:#f5d49a;color:#8a5a14;display:flex;align-items:center;justify-content:center}
+  .api-banner b{display:block;font-size:14.5px;margin-bottom:2px;color:#8a5a14}
+  .api-banner span{font-size:13.5px;color:#7a5a26}
+
+  /* cost settings screen */
+  .settings-banner{background:var(--accent-soft);border:1px solid #d6d3ff;border-radius:10px;padding:11px 15px;font-size:13px;color:var(--accent-ink);font-weight:600;margin-bottom:16px;text-align:center}
+  table.prices td,table.prices th{text-align:center}
+  table.prices td:first-child,table.prices th:first-child{text-align:right}
+  .priceinput{display:inline-flex;align-items:center;gap:3px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:5px 9px;font-size:13px;font-weight:600;direction:ltr}
+  .priceinput .cur{color:var(--faint);font-weight:500}
+  .save-row{display:flex;justify-content:space-between;align-items:center;margin-top:16px}
+  .save-btn{background:var(--accent);color:#fff;border:none;border-radius:9px;padding:9px 20px;font-size:14px;font-weight:700;font-family:inherit}
+  .save-hint{font-size:12.5px;color:var(--muted)}
+
+  /* roles */
+  .roles{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .role{border:1px solid var(--line);border-radius:12px;padding:18px;background:var(--surface)}
+  .role h4{margin:0 0 10px;font-size:16px;display:flex;align-items:center;gap:9px}
+  .role .badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px}
+  .badge.dev{background:var(--teal-soft);color:#0b8077}
+  .badge.adm{background:var(--accent-soft);color:var(--accent-ink)}
+  .role ul{margin:0;padding-inline-start:18px}
+  .role li{font-size:14px;margin-bottom:6px;color:#3a3e57}
+  .yes{color:var(--good);font-weight:700}
+  .no{color:var(--danger);font-weight:700}
+
+  /* phases */
+  .phases{position:relative;padding-inline-start:8px}
+  .phase{display:flex;gap:18px;padding-bottom:22px;position:relative}
+  .phase:last-child{padding-bottom:0}
+  .phase::before{content:"";position:absolute;inset-inline-start:15px;top:34px;bottom:-4px;width:2px;background:var(--line)}
+  .phase:last-child::before{display:none}
+  .phase .pn{flex:0 0 auto;width:32px;height:32px;border-radius:50%;background:var(--surface);border:2px solid var(--accent);color:var(--accent);font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:1}
+  .phase .pc h4{margin:2px 0 4px;font-size:16.5px;font-weight:700}
+  .phase .pc p{font-size:14.5px;color:var(--muted);margin:0}
+  .phase .pc .eff{font-size:12px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);padding:3px 10px;border-radius:7px;display:inline-block;margin-top:8px}
+
+  /* value */
+  .vlist{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .vitem{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+  .vitem .vi{flex:0 0 auto;width:34px;height:34px;border-radius:9px;background:var(--good-soft);color:var(--good);display:flex;align-items:center;justify-content:center}
+  .vitem b{display:block;font-size:15px;margin-bottom:2px}
+  .vitem span{font-size:13.5px;color:var(--muted)}
+
+  /* decisions */
+  .dec{display:flex;gap:13px;padding:14px 0;border-bottom:1px solid var(--line)}
+  .dec:last-child{border-bottom:none}
+  .dec .dm{flex:0 0 auto;width:28px;height:28px;border-radius:8px;background:var(--good-soft);color:var(--good);display:flex;align-items:center;justify-content:center}
+  .dec .dt{font-weight:700;font-size:14.5px;margin:0 0 2px}
+  .dec .dd{font-size:14px;margin:0;color:var(--muted)}
+
+  footer{border-top:1px solid var(--line);padding:26px 0 60px;color:var(--faint);font-size:13px;text-align:center}
+  .note{background:var(--surface-2);border:1px solid var(--line);border-inline-start:4px solid var(--teal);border-radius:10px;padding:14px 18px;font-size:14px;color:#3a3e57;margin-top:14px}
+
+  @media (max-width:860px){
+    .grid2,.caps,.dash-mid,.roles,.vlist,.kpis{grid-template-columns:1fr}
+    .kpis{grid-template-columns:1fr 1fr}
+    .flow,.money{grid-template-columns:1fr;gap:10px}
+    .flow-arrow{transform:rotate(90deg)}
+    .hero h1{font-size:32px}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow"><span class="dot"></span> אפיון מוצר · ClaUi · גרסה לדיון</div>
+    <h1>דשבורד אדמין<br>לניטור <span>שימוש ועלויות</span> של צוות המפתחים</h1>
+    <p class="lead">דף ניהול מרכזי בדפדפן שמראה כמה טוקנים כל מפתח צורך, כמה זה עולה בעלות API, ואיפה אפשר לחסוך - בנוי על שני רכיבים שכבר קיימים במוצר.</p>
+    <div class="hero-meta">
+      <div class="chip">מבוסס על <b>סופר הטוקנים</b> הקיים</div>
+      <div class="chip">מבוסס על <b>השרת המתווך</b> הקיים</div>
+      <div class="chip">קהל יעד: <b>מנהל צוות / אדמין</b></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- 1 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">1</div>
+      <div>
+        <h2>תקציר מנהלים</h2>
+        <div class="sub">מה זה, ולמה זה שווה</div>
+      </div>
+    </div>
+    <div class="card">
+      <p>היום לכל מפתח בצוות יש כלי שסופר בדיוק כמה טוקנים הוא צורך, לפי כל מודל - אבל הנתון הזה נשאר אצלו במחשב בלבד. <b>אף אחד בהנהלה לא רואה תמונה כוללת.</b> אי אפשר לדעת מי הצרכן הגדול, כמה באמת עולה השירות לכל מפתח, או אם יש מפתחים רשומים שאינם פעילים.</p>
+      <p>הפיצ'ר המוצע פותר זאת: <b>מפתחים נרשמים לשירות</b>, הכלי שלהם שולח (בהסכמתם) את נתוני השימוש לשרת מרכזי, <b>ומנהל הצוות נכנס לדף אינטרנט אחד</b> שמרכז את כל התמונה - כמה טוקנים נצרכו, על ידי מי, באיזה מודל, ומעל הכל: <b>כמה זה עולה בכסף</b>. תרגום השימוש לעלות נעשה בצורה פשוטה וישירה: סופרים את הטוקנים בפועל לפי מודל וסוג, וכופלים במחיר ה-API שמוגדר מראש בממשק.</p>
+      <div class="note">בשורה התחתונה: שקיפות מלאה על צריכת המשאבים של הצוות, יכולת לתקצב נכון, ולזהות חריגות וחיסכון - בלי להוסיף תשתית חדשה מאפס, אלא לחבר שני דברים שכבר עובדים.</div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">2</div>
+      <div>
+        <h2>הצורך - מה חסר היום</h2>
+        <div class="sub">הבעיה שהפיצ'ר בא לפתור</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="caps">
+        <div class="cap">
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></div>
+          <h4>אין תמונה כוללת</h4>
+          <p>נתוני השימוש קיימים, אבל מפוזרים - כל אחד רואה רק את עצמו. אין מסך אחד שמרכז את כל הצוות.</p>
+        </div>
+        <div class="cap">
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+          <h4>אי אפשר לתקצב</h4>
+          <p>בלי לדעת כמה עלות API כל מפתח מייצר, אי אפשר לבנות תקציב, להצדיק הוצאה או להקצות משאבים בהיגיון.</p>
+        </div>
+        <div class="cap">
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div>
+          <h4>חריגות לא מזוהות</h4>
+          <p>קפיצה חדה בצריכה של מפתח מסוים, או חריגה מתקציב חודשי, מתגלות מאוחר מדי.</p>
+        </div>
+        <div class="cap">
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+          <h4>בזבוז נסתר</h4>
+          <p>מפתחים רשומים שלא פעילים, או מודל יקר בשימוש למשימות פשוטות - לא נראים לאיש.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">3</div>
+      <div>
+        <h2>הבסיס הקיים - על מה אנחנו בונים</h2>
+        <div class="sub">שני רכיבים שכבר עובדים במוצר, והחיבור ביניהם</div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="found">
+        <h3>סופר הטוקנים <span class="tag">קיים</span></h3>
+        <p>רכיב שכבר סופר כל טוקן שנצרך, עם פירוק מדויק לפי מודל וסוג. <b>זה מקור הנתונים שעליו נשען חישוב העלות.</b></p>
+        <ul>
+          <li>סופר את כל הטוקנים, מופרדים לקלט, פלט, וכתיבה/קריאה ממטמון</li>
+          <li>פירוק לפי מודל - Opus, Sonnet, Haiku</li>
+          <li>עובד חוצה-פרויקטים: הספירה ממשיכה גם בין פרויקטים שונים</li>
+          <li>ספירת הטוקנים היא חומר הגלם שכופלים במחיר ה-API כדי לקבל עלות</li>
+        </ul>
+      </div>
+      <div class="found teal">
+        <h3>השרת המתווך <span class="tag">קיים</span></h3>
+        <p>שרת מרכזי שכבר מחבר כמה משתמשים לסשן משותף. <b>התשתית לתקשורת בין מפתחים לשרת כבר קיימת ופועלת.</b></p>
+        <ul>
+          <li>שרת עצמאי שמספר מפתחים מתחברים אליו בו-זמנית</li>
+          <li>מנגנון התחברות, חדרים, וזיהוי משתתפים</li>
+          <li>אבטחה בסיסית: סיסמה וגישה מבוקרת לשרת</li>
+          <li>שמירה והתאוששות של נתונים בצד השרת</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <p style="font-weight:600;margin-bottom:16px">החיבור: לוקחים את <b>סופר הטוקנים</b> שמייצר את הנתונים, ואת <b>השרת</b> שכבר יודע לדבר עם כל המפתחים - ומוסיפים ביניהם שכבה של זהות והסכמה, כדי לרכז הכול לדף אדמין אחד.</p>
+      <div class="flow">
+        <div class="flow-node">
+          <div class="ttl">המפתחים</div>
+          <div class="desc">כל מפתח עובד כרגיל. הכלי סופר את הטוקנים שלו ושולח דיווח אוטומטי כל שעה - בהסכמתו.</div>
+        </div>
+        <div class="flow-arrow"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="flow-node mid">
+          <div class="ttl">השרת המרכזי</div>
+          <div class="desc">מקבל את הדיווחים, מזהה כל מפתח רשום, מחשב עלות לפי מחירי ה-API, ושומר את ההיסטוריה.</div>
+        </div>
+        <div class="flow-arrow"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="flow-node end">
+          <div class="ttl">דף האדמין</div>
+          <div class="desc">דף אינטרנט שהשרת מגיש. המנהל נכנס בדפדפן עם שם משתמש וסיסמה ורואה את התמונה המלאה.</div>
+        </div>
+      </div>
+      <div class="note">חשוב: היום נתוני השימוש <b>לא</b> נשלחים לשום מקום - הם נשארים מקומית. הפיצ'ר הזה מוסיף, ביודעין ובהסכמה, את הצינור שמעביר אותם לשרת. זו הוספה מכוונת, עם מנגנון הסכמה מובנה (ראו פרק הפרטיות).</div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">4</div>
+      <div>
+        <h2>מה הפיצ'ר עושה</h2>
+        <div class="sub">היכולות המרכזיות בקצרה</div>
+      </div>
+    </div>
+    <div class="caps">
+      <div class="cap">
+        <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11"/></svg></div>
+        <h4>רישום מפתחים לשירות</h4>
+        <p>כל מפתח מקבל זהות קבועה בשירות. כך אפשר לעקוב אחרי שימוש לאורך זמן ולשייך אותו לאדם.</p>
+      </div>
+      <div class="cap">
+        <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <h4>דיווח אוטומטי כל שעה</h4>
+        <p>הכלי שולח דיווח תקופתי על הטוקנים שנצרכו - ברקע, כל שעה, בלי שהמפתח צריך לעשות דבר.</p>
+      </div>
+      <div class="cap">
+        <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+        <h4>דף אדמין מרכזי</h4>
+        <p>דף אינטרנט נפרד שמרכז את כל המפתחים: סיכומים, טבלת מובילים, גרפים ופירוט לפי מודל וזמן.</p>
+      </div>
+      <div class="cap">
+        <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <h4>תרגום שימוש לכסף</h4>
+        <p>כמות הטוקנים מתורגמת לעלות API מוערכת לפי מחירון שהאדמין מגדיר - לכל מפתח ולכל הצוות.</p>
+      </div>
+      <div class="cap">
+        <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
+        <h4>התראות וחריגות</h4>
+        <p>זיהוי אוטומטי של חריגה מתקציב, קפיצות חריגות בצריכה, ומפתחים רשומים שאינם פעילים.</p>
+      </div>
+      <div class="cap">
+        <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h4>פרטיות והרשאות</h4>
+        <p>שיתוף בהסכמה בלבד, גישת אדמין מוגנת בסיסמה, ושמירה על תוכן הקוד מחוץ לתמונה.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">5</div>
+      <div>
+        <h2>חווית המשתמש - המפתח</h2>
+        <div class="sub">מה המפתח רואה ועושה, מההצטרפות ועד לתצוגה האישית</div>
+      </div>
+    </div>
+    <div class="card">
+      <p style="font-weight:700;font-size:16px;margin-bottom:14px">מסע ההצטרפות - שלוש פעולות חד-פעמיות:</p>
+      <div class="phases">
+        <div class="phase">
+          <div class="pn">1</div>
+          <div class="pc">
+            <h4>הרשמה לשירות</h4>
+            <p>המפתח מזין שם ופרטי גישה לשרת הצוות (כתובת שמקבל מהאדמין). מרגע זה יש לו זהות קבועה.</p>
+          </div>
+        </div>
+        <div class="phase">
+          <div class="pn">2</div>
+          <div class="pc">
+            <h4>אישור שיתוף נתונים</h4>
+            <p>מסך הסכמה ברור מסביר בדיוק מה ישותף - <b>מספרי שימוש בלבד, לא קוד ולא תוכן שיחות</b> - ומבקש אישור מפורש. בלי אישור, שום דבר לא נשלח.</p>
+          </div>
+        </div>
+        <div class="phase">
+          <div class="pn">3</div>
+          <div class="pc">
+            <h4>זהו - עובדים כרגיל</h4>
+            <p>מכאן הכל אוטומטי. הדיווח נשלח ברקע כל שעה. אם המפתח לא מחובר לרשת, הדיווח פשוט מדלג בשקט וישלים בפעם הבאה. המפתח יכול בכל רגע לראות את הנתונים שלו או לכבות את השיתוף.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p style="font-weight:700;font-size:16px;margin-bottom:6px">התצוגה האישית - "השימוש שלי"</p>
+      <p class="muted" style="margin-bottom:18px">לכל מפתח יש כרטיס אישי בתוך הכלי שמראה את הנתונים שלו בלבד - הטוקנים שצרך ועלות ה-API המוערכת. <b>המפתח אינו רואה דירוג או השוואה מול מפתחים אחרים</b> (ההשוואה גלויה לאדמין בלבד).</p>
+
+      <div class="mock">
+        <div class="mock-bar">
+          <div class="tl"><i></i><i></i><i></i></div>
+          <div class="addr">ClaUi - My Usage</div>
+        </div>
+        <div class="mock-body">
+          <div class="pcard">
+            <div class="ph">
+              <div class="nm">דנה לוי</div>
+              <span class="pill sonnet">פעיל</span>
+            </div>
+            <div class="big">$612</div>
+            <div class="bigsub">עלות API מוערכת · החודש</div>
+            <div class="row"><span>טוקנים החודש (משוקלל)</span><b>28.4M</b></div>
+            <div class="row"><span>מודל עיקרי</span><b>Opus</b></div>
+            <div class="row"><span>דיווח אוטומטי אחרון</span><b>לפני 12 דק'</b></div>
+          </div>
+          <p class="mock-caption">המחשה - כרטיס השימוש האישי בתוך הכלי</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">6</div>
+      <div>
+        <h2>חווית המשתמש - האדמין</h2>
+        <div class="sub">הלב של הפיצ'ר: דף אינטרנט נפרד שמרכז את כל הצוות</div>
+      </div>
+    </div>
+
+    <div class="mock">
+      <div class="mock-bar">
+        <div class="tl"><i></i><i></i><i></i></div>
+        <div class="addr">https://claui-server/admin</div>
+      </div>
+      <div class="mock-body">
+
+        <div class="dash-top">
+          <div>
+            <div class="t1">סקירת שימוש - צוות הפיתוח</div>
+            <div class="t2">18 מתוך 24 מפתחים פעילים השבוע</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span class="lastreport"><i></i> דיווח אוטומטי אחרון: לפני 8 דק'</span>
+            <div class="period"><span>היום</span><span>7 ימים</span><span class="on">30 ימים</span><span>רבעון</span></div>
+          </div>
+        </div>
+
+        <div class="kpis">
+          <div class="kpi">
+            <div class="lbl">מפתחים רשומים</div>
+            <div class="val">24</div>
+            <div class="delta flat">3 חדשים החודש</div>
+          </div>
+          <div class="kpi">
+            <div class="lbl">פעילים השבוע</div>
+            <div class="val">18 <small>/ 24</small></div>
+            <div class="delta down"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>75%</div>
+          </div>
+          <div class="kpi">
+            <div class="lbl">טוקנים החודש (משוקלל)</div>
+            <div class="val">142.6M</div>
+            <div class="delta up"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 15l6-6 6 6"/></svg>12% מהחודש שעבר</div>
+          </div>
+          <div class="kpi">
+            <div class="lbl">עלות API מוערכת</div>
+            <div class="val cost">$2,840</div>
+            <div class="delta up"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 15l6-6 6 6"/></svg>$310</div>
+          </div>
+        </div>
+
+        <div class="dash-mid">
+          <div class="panel">
+            <div class="ph">עלות API לאורך זמן <small>5 שבועות אחרונים</small></div>
+            <div class="bars">
+              <div class="b"><div class="bar" style="height:48%"></div><div class="bl">ש' 1</div></div>
+              <div class="b"><div class="bar" style="height:62%"></div><div class="bl">ש' 2</div></div>
+              <div class="b"><div class="bar" style="height:55%"></div><div class="bl">ש' 3</div></div>
+              <div class="b"><div class="bar" style="height:78%"></div><div class="bl">ש' 4</div></div>
+              <div class="b"><div class="bar" style="height:94%"></div><div class="bl">ש' 5</div></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="ph">תמהיל מודלים <small>לפי עלות</small></div>
+            <div class="donut-wrap">
+              <div class="donut"></div>
+              <div class="legend">
+                <div><i style="background:#5a4fd6"></i> Opus · 46%</div>
+                <div><i style="background:#8b82e8"></i> Sonnet · 41%</div>
+                <div><i style="background:#0ea59a"></i> Haiku · 13%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="ph">מובילי צריכה <small>לחיצה על מפתח פותחת פירוט מלא</small></div>
+          <table>
+            <thead>
+              <tr><th>מפתח</th><th>טוקנים (משוקלל)</th><th>חלק מעלות הצוות</th><th>עלות API מוערכת</th><th>מודל עיקרי</th><th>דיווח אחרון</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><div class="who"><span class="ava" style="background:#5a4fd6">דל</span> דנה לוי</div></td>
+                <td>28.4M</td>
+                <td><span class="meter"><i style="width:88%"></i></span> 22%</td>
+                <td class="cost">$612</td>
+                <td><span class="pill opus">Opus</span></td>
+                <td class="muted">לפני 4 דק'</td>
+              </tr>
+              <tr>
+                <td><div class="who"><span class="ava" style="background:#0ea59a">יכ</span> יוסי כהן</div></td>
+                <td>19.1M</td>
+                <td><span class="meter"><i style="width:60%"></i></span> 15%</td>
+                <td class="cost">$415</td>
+                <td><span class="pill sonnet">Sonnet</span></td>
+                <td class="muted">לפני 12 דק'</td>
+              </tr>
+              <tr>
+                <td><div class="who"><span class="ava" style="background:#d98a2b">מב</span> מאיה בר</div></td>
+                <td>12.7M</td>
+                <td><span class="meter"><i style="width:38%"></i></span> 9%</td>
+                <td class="cost">$268</td>
+                <td><span class="pill sonnet">Sonnet</span></td>
+                <td class="muted">לפני שעה</td>
+              </tr>
+              <tr>
+                <td><div class="who"><span class="ava" style="background:#6a6f88">רנ</span> רם נחום</div></td>
+                <td>9.3M</td>
+                <td><span class="meter"><i style="width:25%"></i></span> 6%</td>
+                <td class="cost">$176</td>
+                <td><span class="pill haiku">Haiku</span></td>
+                <td class="muted">אתמול</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="mock-caption">המחשה - דף האדמין הראשי (נפתח בדפדפן)</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <p style="font-weight:700;font-size:16px;margin-bottom:12px">מה האדמין יכול לעשות מהדף הזה</p>
+      <div class="caps">
+        <div class="cap"><h4>לסנן ולחתוך</h4><p>לפי טווח זמן, מודל, או מפתח בודד - להבין מאיפה מגיעה העלות.</p></div>
+        <div class="cap"><h4>לצלול לעומק</h4><p>לחיצה על מפתח פותחת פירוט אישי: מגמת שימוש, פילוח מודלים, וההיסטוריה שלו.</p></div>
+        <div class="cap"><h4>להגדיר מחירי API</h4><p>לעדכן את מחיר הטוקנים לכל מודל במסך ייעודי - וכל החישובים מתעדכנים מיד.</p></div>
+        <div class="cap"><h4>לקבל התראות ולייצא</h4><p>פאנל חריגות + הפקת סיכום חודשי לצורכי תקצוב או דיווח להנהלה.</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p style="font-weight:700;font-size:16px;margin-bottom:14px">פאנל התראות - לזהות מוקדם</p>
+      <div class="alert danger">
+        <div class="ai"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
+        <div>
+          <p class="at">דנה לוי חרגה מתקציב ה-API החודשי</p>
+          <p class="ad">עלות ה-API שלה החודש ($612) חצתה את התקציב שהוגדר ($500). מומלץ לבדוק שימוש במודלים יקרים.</p>
+        </div>
+      </div>
+      <div class="alert warn">
+        <div class="ai"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></div>
+        <div>
+          <p class="at">עלייה חריגה בשימוש - רם נחום</p>
+          <p class="ad">צריכה גבוהה ב-180% מהשבוע הקודם. מומלץ לבדוק אם מדובר במשימה חריגה או בשימוש לא יעיל.</p>
+        </div>
+      </div>
+      <div class="alert good">
+        <div class="ai"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <div>
+          <p class="at">3 מפתחים רשומים ללא דיווח</p>
+          <p class="ad">שלושה מפתחים רשומים שלא שלחו דיווח אוטומטי ב-14 הימים האחרונים. ייתכן שאינם פעילים.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">7</div>
+      <div>
+        <h2>תרגום שימוש לכסף</h2>
+        <div class="sub">איך הופכים טוקנים לעלות - והיכן מגדירים את המחירון</div>
+      </div>
+    </div>
+    <div class="card">
+      <p>החישוב פשוט וישיר: <b>לכל מודל ולכל סוג טוקן יש מחיר ידוע לכל מיליון טוקנים.</b> סופרים כמה טוקנים נצרכו בפועל (קלט, פלט, מטמון), כופלים במחיר המתאים, ומסכמים. אין כאן אחוזים ואין הערכות - רק כמות אמיתית כפול מחיר.</p>
+
+      <div class="money">
+        <div class="mbox"><div class="mt">כמות טוקנים</div><div class="mv">לפי מודל וסוג</div></div>
+        <div class="op">×</div>
+        <div class="mbox"><div class="mt">מחיר API</div><div class="mv">לכל סוג טוקן</div></div>
+        <div class="op">=</div>
+        <div class="mbox" style="border-color:#c4bef0;background:var(--accent-soft)"><div class="mt">עלות מוערכת</div><div class="mv" style="color:var(--accent-ink)">למפתח ולצוות</div></div>
+      </div>
+      <div class="formula">עלות = סכום ( טוקנים × מחיר ל-API ) לכל מודל וסוג טוקן · עלות הצוות = סכום כל המפתחים</div>
+
+      <div class="api-banner">
+        <div class="bi"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></div>
+        <div>
+          <b>שימו לב: מדובר בעלות API בלבד</b>
+          <span>החישוב משקף את העלות לפי מחירון ה-API של הטוקנים. הוא <b>אינו</b> מייצג מנויים, מסלולים או חבילות מנוי - אלה תמחור נפרד שאינו רלוונטי כאן. המחיר אחיד לכל הצוות.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p style="font-weight:700;font-size:16px;margin-bottom:6px">מסך הגדרת מחירים - בתוך הממשק</p>
+      <p class="muted" style="margin-bottom:16px">לאדמין יש מסך ייעודי לעדכון מחיר הטוקנים לכל מודל. המסך מגיע <b>עם ערכי ברירת מחדל מעודכנים</b> (לפי מחירון ה-API הרשמי), ואפשר לשנות אותם בכל עת. כל שינוי מעדכן מיד את כל החישובים בדף.</p>
+
+      <div class="mock">
+        <div class="mock-bar">
+          <div class="tl"><i></i><i></i><i></i></div>
+          <div class="addr">https://claui-server/admin/settings - Pricing</div>
+        </div>
+        <div class="mock-body">
+          <div class="settings-banner">המחירים הם עלות API לכל מיליון טוקנים ($/MTok) · נתון אחיד לכל הצוות · אינו רלוונטי למנויים/מסלולים</div>
+          <table class="prices">
+            <thead>
+              <tr><th>מודל</th><th>Input</th><th>Output</th><th>כתיבת מטמון</th><th>קריאת מטמון</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>Claude Opus 4.8</b></td>
+                <td><span class="priceinput"><span class="cur">$</span>5.00</span></td>
+                <td><span class="priceinput"><span class="cur">$</span>25.00</span></td>
+                <td><span class="priceinput"><span class="cur">$</span>6.25</span></td>
+                <td><span class="priceinput"><span class="cur">$</span>0.50</span></td>
+              </tr>
+              <tr>
+                <td><b>Claude Sonnet 4.6</b></td>
+                <td><span class="priceinput"><span class="cur">$</span>3.00</span></td>
+                <td><span class="priceinput"><span class="cur">$</span>15.00</span></td>
+                <td><span class="priceinput"><span class="cur">$</span>3.75</span></td>
+                <td><span class="priceinput"><span class="cur">$</span>0.30</span></td>
+              </tr>
+              <tr>
+                <td><b>Claude Haiku 4.5</b></td>
+                <td><span class="priceinput"><span class="cur">$</span>1.00</span></td>
+                <td><span class="priceinput"><span class="cur">$</span>5.00</span></td>
+                <td><span class="priceinput"><span class="cur">$</span>1.25</span></td>
+                <td><span class="priceinput"><span class="cur">$</span>0.10</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="save-row">
+            <span class="save-hint">ערכי ברירת המחדל נטענים אוטומטית · ניתן להוסיף מודלים נוספים</span>
+            <button class="save-btn">שמירת מחירון</button>
+          </div>
+          <p class="mock-caption">המחשה - מסך הגדרת מחירי API לכל מודל</p>
+        </div>
+      </div>
+      <div class="note">מעבר לעלות, פירוק העלות לפי סוג טוקן חושף הזדמנויות חיסכון: ניצול נכון של מטמון (קריאה ממטמון זולה פי עשרה מקלט רגיל) או ניתוב משימות פשוטות למודל זול יותר - הכול גלוי ומדיד בדף.</div>
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">8</div>
+      <div>
+        <h2>פרטיות והרשאות</h2>
+        <div class="sub">מה משותף, מה לא, ומי רואה מה</div>
+      </div>
+    </div>
+    <div class="card">
+      <p style="font-weight:700;margin-bottom:6px">העיקרון: רק מספרים, אף פעם לא תוכן.</p>
+      <p class="muted" style="margin-bottom:18px">הדבר היחיד שיוצא מהמחשב של המפתח הוא נתוני שימוש מספריים - כמות טוקנים לפי מודל וסוג. <b>הקוד, השיחות עם הסוכן, ושמות הקבצים נשארים מקומיים ולא נשלחים לעולם.</b></p>
+      <div class="roles">
+        <div class="role">
+          <h4><span class="badge dev">מפתח</span> מה הוא רואה</h4>
+          <ul>
+            <li><span class="yes">רואה</span> את כל הנתונים האישיים שלו ועלות ה-API שלו</li>
+            <li><span class="yes">שולט</span> בהסכמה - יכול לכבות שיתוף בכל רגע</li>
+            <li><span class="no">לא רואה</span> דירוג או השוואה מול מפתחים אחרים</li>
+            <li><span class="no">לא רואה</span> נתונים של מפתחים אחרים</li>
+          </ul>
+        </div>
+        <div class="role">
+          <h4><span class="badge adm">אדמין</span> מה הוא רואה</h4>
+          <ul>
+            <li><span class="yes">רואה</span> סיכומי שימוש ועלות של כל הצוות</li>
+            <li><span class="yes">רואה</span> דירוג והשוואה בין כל המפתחים</li>
+            <li><span class="yes">מגדיר</span> מחירי API למודל והגדרות תקציב</li>
+            <li><span class="no">לא רואה</span> קוד, שיחות או תוכן עבודה</li>
+          </ul>
+        </div>
+      </div>
+      <div class="note" style="border-inline-start-color:var(--accent)"><b>הרשאת אדמין:</b> מי שמקים את השרת מגדיר את המנהל בעזרת שם משתמש וסיסמה. הכניסה לדף האדמין דורשת התחברות. <b>השיתוף הוא הצטרפות מרצון (Opt-in):</b> כברירת מחדל כלום לא נשלח, עד שהמפתח מאשר במפורש.</div>
+    </div>
+  </section>
+
+  <!-- 9 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">9</div>
+      <div>
+        <h2>תועלות עסקיות</h2>
+        <div class="sub">למה זה שווה את ההשקעה</div>
+      </div>
+    </div>
+    <div class="vlist">
+      <div class="vitem">
+        <div class="vi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg></div>
+        <div><b>שקיפות מלאה</b><span>תמונת צריכה אחת ואמיתית לכל הצוות, בדף אחד.</span></div>
+      </div>
+      <div class="vitem">
+        <div class="vi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <div><b>שליטה בתקציב</b><span>החלטות מבוססות נתונים על עלות API, הקצאות והוצאה.</span></div>
+      </div>
+      <div class="vitem">
+        <div class="vi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+        <div><b>זיהוי מוקדם</b><span>התראה על חריגת תקציב או קפיצת עלות לפני שמצטברת.</span></div>
+      </div>
+      <div class="vitem">
+        <div class="vi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div><b>חיסכון בפועל</b><span>איתור מפתחים לא פעילים ושימוש לא יעיל במודלים יקרים.</span></div>
+      </div>
+      <div class="vitem">
+        <div class="vi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg></div>
+        <div><b>בנוי על הקיים</b><span>מנצל שני רכיבים שכבר עובדים - פיתוח מצומצם, סיכון נמוך.</span></div>
+      </div>
+      <div class="vitem">
+        <div class="vi"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <div><b>אמון בצוות</b><span>שיתוף בהסכמה מפורשת - לא ניטור סמוי.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">10</div>
+      <div>
+        <h2>שלבי מימוש מוצעים</h2>
+        <div class="sub">חלוקה שמאפשרת ערך מהיר וצמיחה הדרגתית</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="phases">
+        <div class="phase">
+          <div class="pn">א</div>
+          <div class="pc">
+            <h4>זהות ודיווח</h4>
+            <p>הוספת רישום מפתחים, מנגנון הסכמה, והדיווח האוטומטי השעתי ששולח את ספירת הטוקנים מהכלי לשרת.</p>
+            <span class="eff">תשתית בסיסית</span>
+          </div>
+        </div>
+        <div class="phase">
+          <div class="pn">ב</div>
+          <div class="pc">
+            <h4>דף האדמין והמחירון</h4>
+            <p>דף אינטרנט עם התחברות, סיכומים, טבלת מובילים, מסך הגדרת מחירי API, וחישוב עלות.</p>
+            <span class="eff">הערך המרכזי</span>
+          </div>
+        </div>
+        <div class="phase">
+          <div class="pn">ג</div>
+          <div class="pc">
+            <h4>תובנות והתראות</h4>
+            <p>גרפי מגמה, צלילה לעומק לכל מפתח, פאנל התראות חכמות, וייצוא דוחות.</p>
+            <span class="eff">העמקה</span>
+          </div>
+        </div>
+        <div class="phase">
+          <div class="pn">ד</div>
+          <div class="pc">
+            <h4>הכרטיס האישי וחידוד</h4>
+            <p>תצוגת "השימוש שלי" למפתח, הגדרות תקציב מתקדמות, וחיזוק פרטיות והרשאות.</p>
+            <span class="eff">ליטוש</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 -->
+  <section>
+    <div class="sec-head">
+      <div class="sec-num">11</div>
+      <div>
+        <h2>החלטות מוצר</h2>
+        <div class="sub">הנקודות שנסגרו ומנחות את המימוש</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="dec">
+        <div class="dm"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div>
+          <p class="dt">היכן יוצג הדשבורד</p>
+          <p class="dd">דף אינטרנט נפרד שהשרת מגיש - נגיש למנהל בדפדפן, ללא צורך בכלי הפיתוח עצמו.</p>
+        </div>
+      </div>
+      <div class="dec">
+        <div class="dm"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div>
+          <p class="dt">דירוג והשוואה בין מפתחים</p>
+          <p class="dd">גלוי לאדמין בלבד. כל מפתח רואה את הנתונים שלו בלבד, ללא השוואה לאחרים.</p>
+        </div>
+      </div>
+      <div class="dec">
+        <div class="dm"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div>
+          <p class="dt">הגדרת מחיר</p>
+          <p class="dd">מחיר API אחיד לכל הצוות, מוגדר פעם אחת בממשק עם ערכי ברירת מחדל. מודגש בממשק שמדובר בעלות API ולא במנויים.</p>
+        </div>
+      </div>
+      <div class="dec">
+        <div class="dm"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div>
+          <p class="dt">הרשאת אדמין</p>
+          <p class="dd">מי שמקים את האפליקציה מגדיר את המנהל בעזרת שם משתמש וסיסמה. הכניסה לדף דורשת התחברות.</p>
+        </div>
+      </div>
+      <div class="dec">
+        <div class="dm"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div>
+          <p class="dt">תדירות דיווח</p>
+          <p class="dd">הכלי מדווח אוטומטית כל שעה. אם המפתח לא מחובר, הדיווח נכשל בשקט ומשלים בפעם הבאה. הדף מציג תמיד את זמן הדיווח האוטומטי האחרון.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    אפיון מוצר · דשבורד אדמין לניטור שימוש ועלויות · ClaUi · מסמך לדיון ואישור
+  </div>
+</footer>
+
+</body>
+</html>

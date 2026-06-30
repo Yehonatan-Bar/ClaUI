@@ -12,6 +12,7 @@ import { GitHubSyncService } from './achievements/GitHubSyncService';
 import { SkillGenService } from './skillgen/SkillGenService';
 import { installSkillFiles, injectClaudeMdInstructions, removeClaudeMdInstructions } from './skillgen/SrPtdBootstrap';
 import { TokenUsageRatioTracker } from './session/TokenUsageRatioTracker';
+import { DeveloperUsageReporter } from './usage/DeveloperUsageReporter';
 import { SkillUsageTracker } from './skillgen/SkillUsageTracker';
 import { registerCommands } from './commands';
 import { registerTabGroupCommands } from './commands/tabGroupCommands';
@@ -146,6 +147,18 @@ export function activate(context: vscode.ExtensionContext): void {
   // Create global token-usage ratio tracker (shared across all tabs)
   const tokenRatioTracker = new TokenUsageRatioTracker(context.globalState);
 
+  // Create global developer usage reporter (admin usage/cost dashboard).
+  // Off by default; only reports after explicit registration + consent.
+  const developerUsageReporter = new DeveloperUsageReporter(
+    context.globalState,
+    context.secrets,
+    () => vscode.workspace.getConfiguration('claudeMirror'),
+    vscode.env.machineId,
+    log,
+  );
+  developerUsageReporter.startHourlyTimer();
+  context.subscriptions.push({ dispose: () => developerUsageReporter.dispose() });
+
   // Create global skill usage tracker (shared across all tabs)
   const skillsDir = path.join(os.homedir(), '.claude', 'skills');
   const skillUsageTracker = new SkillUsageTracker(skillsDir);
@@ -209,12 +222,13 @@ export function activate(context: vscode.ExtensionContext): void {
     tokenRatioTracker,
     skillUsageTracker,
     memorySampler,
-    tabGroupStore
+    tabGroupStore,
+    developerUsageReporter
   );
   memorySampler.setRootProvider(() => tabManager.enumerateCliProcesses());
 
   // Register commands routed through the tab manager
-  registerCommands(context, tabManager, sessionStore, log, logDir);
+  registerCommands(context, tabManager, sessionStore, log, logDir, developerUsageReporter);
   registerDiscoverCommand(context, tabManager, log);
 
   // Register workstream map command

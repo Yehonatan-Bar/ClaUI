@@ -12,6 +12,12 @@ import { useEffect, useRef } from 'react';
  * updates together. With `mousedown`, the close fires before the target
  * button's `click`, causing a re-render that can swallow the click — the
  * classic "first click does nothing" bug.
+ *
+ * The webview is a sandboxed iframe, so clicks that land OUTSIDE it (the
+ * editor, terminal, sidebar, another panel/tab, another app) never reach this
+ * document and the `click` listener above can't see them. To cover that case
+ * we also close every open dropdown when the webview window loses focus
+ * (`blur`), so a menu never lingers after focus moves elsewhere.
  */
 
 type DropdownEntry = {
@@ -35,9 +41,19 @@ function handleDocumentClick(e: MouseEvent) {
   toClose.forEach((close) => close());
 }
 
+function handleWindowBlur() {
+  // Focus left the webview entirely (the user clicked the editor, terminal,
+  // another panel/tab, or switched apps). No in-document click fires in that
+  // case, so close every open dropdown regardless of its ref.
+  const toClose: (() => void)[] = [];
+  registry.forEach((entry) => toClose.push(entry.close));
+  toClose.forEach((close) => close());
+}
+
 function ensureListener() {
   if (!listenerActive) {
     document.addEventListener('click', handleDocumentClick);
+    window.addEventListener('blur', handleWindowBlur);
     listenerActive = true;
   }
 }
@@ -45,6 +61,7 @@ function ensureListener() {
 function removeListenerIfEmpty() {
   if (listenerActive && registry.size === 0) {
     document.removeEventListener('click', handleDocumentClick);
+    window.removeEventListener('blur', handleWindowBlur);
     listenerActive = false;
   }
 }

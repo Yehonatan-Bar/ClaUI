@@ -238,7 +238,8 @@ export class SessionTab implements WebviewBridge {
     private readonly skillGenService?: SkillGenService,
     private readonly tokenRatioTracker?: TokenUsageRatioTracker,
     private readonly skillUsageTracker?: import('../skillgen/SkillUsageTracker').SkillUsageTracker,
-    private readonly memorySampler?: import('../process/ProcessMemorySampler').ProcessMemorySampler
+    private readonly memorySampler?: import('../process/ProcessMemorySampler').ProcessMemorySampler,
+    private readonly developerUsageReporter?: import('../usage/DeveloperUsageReporter').DeveloperUsageReporter
   ) {
     this.tabNumber = tabNumber;
     this.id = `tab-${tabNumber}`;
@@ -271,6 +272,9 @@ export class SessionTab implements WebviewBridge {
     }
     if (this.tokenRatioTracker) {
       this.messageHandler.setTokenRatioTracker(this.tokenRatioTracker);
+    }
+    if (this.developerUsageReporter) {
+      this.messageHandler.setDeveloperUsageReporter(this.developerUsageReporter);
     }
     if (this.skillUsageTracker) {
       this.messageHandler.setSkillUsageTracker(this.skillUsageTracker);

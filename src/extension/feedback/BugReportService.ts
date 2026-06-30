@@ -8,7 +8,7 @@ import * as fs from 'fs';
 import { exec } from 'child_process';
 import AdmZip from 'adm-zip';
 import { collectDiagnostics, DiagnosticsResult } from './DiagnosticsCollector';
-import { FormspreeService } from './FormspreeService';
+import { FormspreeService, type FeedbackResult } from './FormspreeService';
 import { ClaudeCliCaller } from '../skillgen/ClaudeCliCaller';
 import type { WebviewBridge } from './BugReportTypes';
 import type { BugReportContext } from '../types/webview-messages';
@@ -370,6 +370,7 @@ export class BugReportService {
           const decision = await broker.scanDiagnosticExport(fullContent, 'formspree.io');
           if (decision.action === 'block' || decision.action === 'require_approval') {
             this.log(`[SecretProtection] Bug report blocked: ${decision.reason}`);
+            if (this.disposed) return;
             this.postStatus('error', undefined, `Secret protection blocked this report: ${decision.reason}`);
             this.bridge.postMessage({
               type: 'bugReportSubmitResult',
@@ -431,80 +432,84 @@ export class BugReportService {
       }
       const zipBuffer = zip.toBuffer();
 
-      // ----- Show success immediately so the user can close the panel -----
-      this.log('[BugReport] Report assembled, showing success to user');
-      this.postStatus('sent');
-      this.bridge.postMessage({ type: 'bugReportSubmitResult', ok: true });
-
-      // ----- Send in the background (fire-and-forget) -----
+      // ----- Send and report the REAL result -----
+      // Success ("sent") is shown ONLY after every part has actually been sent,
+      // so the user is never told the report went out when parts are still in
+      // flight (or failed). The UI shows the 'sending' spinner meanwhile.
+      this.log('[BugReport] Report assembled, sending now');
       const formspree = new FormspreeService(FORMSPREE_FORM_ID);
       formspree.setLogger(this.log);
 
-      this.sendInBackground(formspree, mode, reportLabel, header, sections, zipBuffer);
+      const sendResult = await this.sendReport(formspree, mode, reportLabel, header, sections, zipBuffer);
+      if (this.disposed) return;
+
+      if (sendResult.ok) {
+        this.log('[BugReport] Report sent successfully (all parts confirmed)');
+        this.postStatus('sent');
+        this.bridge.postMessage({ type: 'bugReportSubmitResult', ok: true });
+      } else {
+        this.log(`[BugReport] Report send failed: ${sendResult.error}`);
+        this.postStatus('error', undefined, sendResult.error);
+        this.bridge.postMessage({ type: 'bugReportSubmitResult', ok: false, error: sendResult.error });
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.log(`[BugReport] Submit error: ${msg}`);
+      if (this.disposed) return;
       this.postStatus('error', undefined, msg);
       this.bridge.postMessage({ type: 'bugReportSubmitResult', ok: false, error: msg });
     }
   }
 
   /**
-   * Fire-and-forget: send the report via Formspree in the background.
-   * The user already sees "sent" and can close the panel.
+   * Send the report via Formspree and return the real result. Resolves only
+   * after every part has been attempted, so the caller can show a truthful
+   * "sent"/"error" state instead of an optimistic one.
    */
-  private sendInBackground(
+  private async sendReport(
     formspree: FormspreeService,
     mode: string,
     reportLabel: string,
     header: string,
     sections: Array<{ name: string; content: string }>,
     zipBuffer: Buffer,
-  ): void {
+  ): Promise<FeedbackResult> {
     const totalChars = header.length + sections.reduce((sum, s) => sum + s.content.length, 0);
 
-    const doSend = async () => {
-      if (totalChars <= MAX_CHUNK_CHARS) {
-        this.log('[BugReport] Background: single submission');
-        const fullMessage = header + sections.map(s => s.content).join('\n');
-        const result = await formspree.submit({
-          message: fullMessage,
-          subject: `${reportLabel} (${mode})`,
-          category: 'bug',
-          extensionVersion: this.extensionVersion,
-          attachments: [{ filename: 'bug-report.zip', content: zipBuffer, contentType: 'application/zip' }],
-        });
-        if (!result.ok) {
-          this.log(`[BugReport] Background send failed: ${result.error}`);
-        } else {
-          this.log('[BugReport] Background send complete');
-        }
-      } else {
-        const chunks = this.splitSectionsIntoChunks(header, sections);
-        this.log(`[BugReport] Background: chunked submission (${chunks.length} parts)`);
+    if (totalChars <= MAX_CHUNK_CHARS) {
+      this.log('[BugReport] Single submission');
+      const fullMessage = header + sections.map(s => s.content).join('\n');
+      const result = await formspree.submit({
+        message: fullMessage,
+        subject: `${reportLabel} (${mode})`,
+        category: 'bug',
+        extensionVersion: this.extensionVersion,
+        attachments: [{ filename: 'bug-report.zip', content: zipBuffer, contentType: 'application/zip' }],
+      });
+      this.log(result.ok ? '[BugReport] Single send complete' : `[BugReport] Single send failed: ${result.error}`);
+      return result;
+    }
 
-        const payloads = chunks.map((chunk, i) => ({
-          message: `${header}[Part ${i + 1} of ${chunks.length}]\n\n${chunk}`,
-          subject: `${reportLabel} (${mode}) - Part ${i + 1}/${chunks.length}`,
-          category: 'bug',
-          extensionVersion: this.extensionVersion,
-          ...(i === 0
-            ? { attachments: [{ filename: 'bug-report.zip', content: zipBuffer, contentType: 'application/zip' }] }
-            : {}),
-        }));
+    const chunks = this.splitSectionsIntoChunks(header, sections);
+    this.log(`[BugReport] Chunked submission (${chunks.length} parts)`);
 
-        const result = await formspree.submitChunked(payloads, CHUNK_DELAY_MS);
-        if (!result.ok) {
-          this.log(`[BugReport] Background chunked send failed: ${result.error}`);
-        } else {
-          this.log(`[BugReport] Background chunked send complete (${chunks.length} parts)`);
-        }
-      }
-    };
+    const payloads = chunks.map((chunk, i) => ({
+      message: `${header}[Part ${i + 1} of ${chunks.length}]\n\n${chunk}`,
+      subject: `${reportLabel} (${mode}) - Part ${i + 1}/${chunks.length}`,
+      category: 'bug',
+      extensionVersion: this.extensionVersion,
+      ...(i === 0
+        ? { attachments: [{ filename: 'bug-report.zip', content: zipBuffer, contentType: 'application/zip' }] }
+        : {}),
+    }));
 
-    doSend().catch(err => {
-      this.log(`[BugReport] Background send error: ${err instanceof Error ? err.message : String(err)}`);
-    });
+    const result = await formspree.submitChunked(payloads, CHUNK_DELAY_MS);
+    this.log(
+      result.ok
+        ? `[BugReport] Chunked send complete (${chunks.length} parts accepted)`
+        : `[BugReport] Chunked send failed: ${result.error}`,
+    );
+    return result;
   }
 
   /**

@@ -1,5 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import { IncomingMessage } from 'http';
+import { IncomingMessage, Server as HttpServer } from 'http';
 import { URL } from 'url';
 import { v4 as uuid } from 'uuid';
 import {
@@ -152,7 +152,15 @@ export class CoordinationServer {
     return room;
   }
 
-  start(port: number): void {
+  /**
+   * Start the coordination server.
+   *
+   * When `httpServer` is provided, the WebSocket server attaches to it
+   * (`{ server }` mode) so WS and the usage/admin HTTP layer share one port; the
+   * caller owns `httpServer.listen(port)`. When omitted, a standalone
+   * WebSocketServer binds the port directly (legacy/standalone behaviour).
+   */
+  start(port: number, httpServer?: HttpServer): void {
     // Restore persisted sessions
     if (this.config.persistenceDir) {
       const allSessions = SessionPersistence.loadAllSessions(this.config.persistenceDir, this.log);
@@ -209,8 +217,12 @@ export class CoordinationServer {
         }
       : undefined;
 
-    this.wss = new WebSocketServer({ port, verifyClient });
-    this.log(`Coordination server listening on port ${port}`);
+    this.wss = httpServer
+      ? new WebSocketServer({ server: httpServer, verifyClient })
+      : new WebSocketServer({ port, verifyClient });
+    this.log(httpServer
+      ? `Coordination server attached to shared HTTP server on port ${port}`
+      : `Coordination server listening on port ${port}`);
     this.log(`Active rooms: ${this.rooms.size}`);
     if (this.config.sessionToken) {
       this.log('Token authentication enabled');

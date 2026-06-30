@@ -457,7 +457,7 @@ A visual session health dashboard with 4 components:
 ### 25.5 Behavior
 
 - Uses `ResizeObserver` hook (`useStatusBarCollapse`) with hysteresis thresholds and overflow guard
-- Dropdowns open upward with click-outside dismiss, mutual exclusivity, and Escape key support
+- Dropdowns open upward with click-outside dismiss, webview-blur dismiss (auto-close when focus leaves the webview iframe, e.g. clicking the editor/terminal/another panel or switching apps), mutual exclusivity, and Escape key support
 - Provider-specific gating: Codex mode hides SkillDocs, "!" info button, and Usage button
 - Disabled with tooltips (instead of disappearing) when a feature is unavailable for the current provider
 

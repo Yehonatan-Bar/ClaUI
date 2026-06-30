@@ -133,7 +133,13 @@ Formspree free-tier rejects payloads over ~100 KB (HTTP 413). Instead of truncat
 - Sections are kept intact when possible (split happens between sections, not mid-text).
 - If a single section exceeds the chunk budget, it is truncated (head-kept) to fit alone.
 - The header (extension version, timestamp, part label) is prepended to every chunk.
-- `FormspreeService.submitChunked()` sends each part sequentially and stops on the first failure.
+- `FormspreeService.submitChunked()` attempts **every** part sequentially (1.5 s delay between parts) and does not stop on the first failure. It collects per-part results and returns `ok: false` (with a summary of which parts failed) if any part failed, otherwise `ok: true`.
+
+### Truthful "sent" status and submission logging
+
+- The success state ("Report sent successfully!") is shown **only after the real send completes** -- the panel shows the `sending` spinner while parts are in flight, then `sent` or `error` based on the actual outcome. `BugReportService.submit()` awaits `sendReport()` (single or chunked) and posts `bugReportSubmitResult` with the real result; there is no optimistic/early success.
+- "Accepted by Formspree (HTTP ok)" in the logs means the submission returned a success response -- it does **not** prove the email was delivered (the free tier can accept-and-not-deliver).
+- For each submission, `FormspreeService.postForm()` logs `[Feedback] Response: HTTP <status> <statusText> | json.ok=<...> | body: <raw body, truncated to 1500 chars>`. The body is read as text first so non-JSON responses (rate-limit notices, spam challenges, HTML error pages) are captured too. `submitChunked()` logs each part's send size, attachment count, and ACCEPTED/FAILED outcome.
 
 ## Script Execution Flow
 

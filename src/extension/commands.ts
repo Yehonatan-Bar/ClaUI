@@ -168,7 +168,8 @@ export function registerCommands(
   tabManager: TabManager,
   sessionStore: SessionStore,
   log: (msg: string) => void,
-  logDir: string
+  logDir: string,
+  developerUsageReporter?: import('./usage/DeveloperUsageReporter').DeveloperUsageReporter
 ): void {
   const getConfiguredProvider = (): ProviderId =>
     vscode.workspace.getConfiguration('claudeMirror').get<ProviderId>('provider', 'claude');
@@ -1343,4 +1344,187 @@ export function registerCommands(
       }
     })
   );
+
+  // --- Admin usage dashboard: developer-side commands ---
+  registerUsageReportingCommands(context, log, developerUsageReporter);
+}
+
+/** Human-readable relative time from a ms-epoch timestamp (Hebrew). */
+function relativeTimeFromMs(ms: number | null): string {
+  if (!ms) return 'אין דיווח עדיין';
+  const diffMin = Math.floor((Date.now() - ms) / 60000);
+  if (diffMin < 1) return 'ממש עכשיו';
+  if (diffMin < 60) return `לפני ${diffMin} דק'`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `לפני ${diffHr} שע'`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay === 1) return 'אתמול';
+  return `לפני ${diffDay} ימים`;
+}
+
+function formatTokenCount(n: number): string {
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
+  return String(Math.round(n));
+}
+
+function escapeHtml(s: string): string {
+  return String(s ?? '').replace(/[&<>"]/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as Record<string, string>)[c]);
+}
+
+const USAGE_CONSENT_MESSAGE =
+  'הצטרפות לדיווח שימוש לדשבורד האדמין של הצוות.\n\n' +
+  'מה ישותף: מספרי שימוש בלבד - כמות טוקנים לפי מודל וסוג (קלט/פלט/מטמון).\n' +
+  'מה לא ישותף: קוד, תוכן שיחות, פרומפטים, ושמות קבצים - לעולם לא נשלחים.\n\n' +
+  'הדיווח נשלח אוטומטית כל שעה. אם אינך מחובר, הוא מדלג בשקט ומשלים בפעם הבאה.\n' +
+  'ניתן לכבות את השיתוף בכל רגע. להמשיך?';
+
+/** Register the three developer-facing usage-reporting commands. */
+function registerUsageReportingCommands(
+  context: vscode.ExtensionContext,
+  log: (msg: string) => void,
+  reporter?: import('./usage/DeveloperUsageReporter').DeveloperUsageReporter,
+): void {
+  context.subscriptions.push(
+    vscode.commands.registerCommand('claudeMirror.registerUsageReporting', async () => {
+      if (!reporter) {
+        vscode.window.showErrorMessage('Usage reporting is not available in this session.');
+        return;
+      }
+      if (!reporter.getBaseUrl()) {
+        const pick = await vscode.window.showErrorMessage(
+          'No usage server URL is configured. Set claudeMirror.usageReporting.serverUrl (or the multi-participant server URL).',
+          'Open Settings',
+        );
+        if (pick === 'Open Settings') {
+          void vscode.commands.executeCommand('workbench.action.openSettings', 'claudeMirror.usageReporting');
+        }
+        return;
+      }
+
+      const agree = await vscode.window.showInformationMessage(
+        USAGE_CONSENT_MESSAGE, { modal: true }, 'אני מאשר/ת', 'ביטול',
+      );
+      if (agree !== 'אני מאשר/ת') {
+        return;
+      }
+
+      const name = await vscode.window.showInputBox({
+        prompt: 'שם התצוגה שלך בדשבורד האדמין',
+        value: reporter.getConfiguredDisplayName(),
+        ignoreFocusOut: true,
+        validateInput: (v) => (v.trim() ? undefined : 'נדרש שם תצוגה'),
+      });
+      if (!name) {
+        return;
+      }
+
+      const result = await reporter.register(name.trim());
+      if (!result.ok) {
+        vscode.window.showErrorMessage(`הרשמה לדיווח שימוש נכשלה: ${result.error}`);
+        return;
+      }
+      await vscode.workspace.getConfiguration('claudeMirror')
+        .update('usageReporting.enabled', true, vscode.ConfigurationTarget.Global);
+      // Send a first report right away so the admin sees data immediately.
+      void reporter.flushReport();
+      log('[Usage] Developer registered for usage reporting');
+      vscode.window.showInformationMessage(
+        `נרשמת לדיווח שימוש בשם "${name.trim()}". הדיווח נשלח אוטומטית כל שעה.`,
+      );
+    }),
+
+    vscode.commands.registerCommand('claudeMirror.reportUsageNow', async () => {
+      if (!reporter) {
+        vscode.window.showErrorMessage('Usage reporting is not available in this session.');
+        return;
+      }
+      if (!reporter.isRegistered()) {
+        vscode.window.showWarningMessage('עדיין לא נרשמת. הרץ קודם "ClaUi: Register for Usage Reporting".');
+        return;
+      }
+      const res = await reporter.flushReport();
+      if (res.ok) {
+        const msg = (res.sent && res.sent > 0)
+          ? `דיווח שימוש נשלח לשרת (${res.sent} מודלים). רענן את דף האדמין.`
+          : 'דופק נשלח (אין שימוש חדש מאז הדיווח האחרון). רענן את דף האדמין.';
+        vscode.window.showInformationMessage(msg);
+      } else {
+        const reasons: Record<string, string> = {
+          busy: 'דיווח כבר מתבצע ברקע, נסה שוב בעוד רגע.',
+          'not-registered': 'לא רשום - הרץ קודם הרשמה.',
+          'reporting-off': 'הדיווח כבוי בהגדרות.',
+          'no-server-url': 'לא הוגדרה כתובת שרת (claudeMirror.usageReporting.serverUrl).',
+          'no-credential': 'חסר אישור גישה - הרשם מחדש.',
+        };
+        vscode.window.showWarningMessage(`הדיווח לא נשלח: ${reasons[res.reason ?? ''] ?? res.reason}`);
+      }
+    }),
+
+    vscode.commands.registerCommand('claudeMirror.viewMyUsage', () => {
+      if (!reporter) {
+        vscode.window.showErrorMessage('Usage reporting is not available in this session.');
+        return;
+      }
+      const snap = reporter.getMyUsageSnapshot();
+      const panel = vscode.window.createWebviewPanel(
+        'claudeMirrorMyUsage', 'ClaUi - My Usage', vscode.ViewColumn.Active, { enableScripts: false },
+      );
+      panel.webview.html = buildMyUsageHtml(snap);
+    }),
+
+    vscode.commands.registerCommand('claudeMirror.disableUsageReporting', async () => {
+      if (!reporter) {
+        vscode.window.showErrorMessage('Usage reporting is not available in this session.');
+        return;
+      }
+      const confirm = await vscode.window.showWarningMessage(
+        'לכבות את דיווח השימוש לדשבורד האדמין? לא יישלחו עוד דיווחים.',
+        { modal: true }, 'כבה דיווח',
+      );
+      if (confirm !== 'כבה דיווח') {
+        return;
+      }
+      await vscode.workspace.getConfiguration('claudeMirror')
+        .update('usageReporting.enabled', false, vscode.ConfigurationTarget.Global);
+      await reporter.disable();
+      vscode.window.showInformationMessage('דיווח השימוש כובה.');
+    }),
+  );
+}
+
+/** Render the personal "My Usage" card (no ranking, no comparison to others). */
+function buildMyUsageHtml(snap: import('./usage/DeveloperUsageReporter').MyUsageSnapshot): string {
+  const statusOn = snap.enabled && snap.consentGranted;
+  const statusLabel = statusOn ? 'פעיל' : (snap.registered ? 'כבוי' : 'לא רשום');
+  const statusColor = statusOn ? '#0b8077' : '#9c2733';
+  const statusBg = statusOn ? '#e2f6f4' : '#fdebed';
+  const cost = `$${Math.round(snap.estimatedCostUsd).toLocaleString('en-US')}`;
+  const name = snap.developerName || 'המשתמש שלי';
+  return `<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="UTF-8">
+<style>
+  body{font-family:"Segoe UI",system-ui,Arial,sans-serif;background:#f5f6fb;color:#1b1d2e;margin:0;padding:28px}
+  .card{max-width:420px;margin:0 auto;background:#fff;border:1px solid #e7e9f3;border-radius:14px;padding:22px 24px;box-shadow:0 8px 28px rgba(27,29,46,.06)}
+  .ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .nm{font-weight:700;font-size:16px}
+  .pill{font-size:12px;font-weight:600;padding:4px 10px;border-radius:7px;background:${statusBg};color:${statusColor}}
+  .big{font-size:34px;font-weight:800;letter-spacing:-.02em;direction:ltr;text-align:right}
+  .bigsub{font-size:13px;color:#6a6f88;margin-bottom:16px}
+  .row{display:flex;justify-content:space-between;font-size:14px;padding:9px 0;border-top:1px solid #f0f1f7}
+  .row b{font-weight:700}
+  .note{margin-top:16px;font-size:12px;color:#9aa0bb;text-align:center;line-height:1.6}
+</style></head><body>
+  <div class="card">
+    <div class="ph"><div class="nm">${escapeHtml(name)}</div><span class="pill">${statusLabel}</span></div>
+    <div class="big">${cost}</div>
+    <div class="bigsub">עלות API מוערכת (מצטבר, לפי מחירון ברירת מחדל)</div>
+    <div class="row"><span>טוקנים (משוקלל)</span><b>${formatTokenCount(snap.totalWeightedTokens)}</b></div>
+    <div class="row"><span>טוקנים (גולמי)</span><b>${formatTokenCount(snap.totalRawTokens)}</b></div>
+    <div class="row"><span>מודל עיקרי</span><b>${escapeHtml(snap.primaryModel)}</b></div>
+    <div class="row"><span>דיווח אוטומטי אחרון</span><b>${relativeTimeFromMs(snap.lastSuccessfulReportAt)}</b></div>
+    <div class="note">הנתונים האישיים שלך בלבד - ללא דירוג או השוואה למפתחים אחרים.<br>ההשוואה גלויה לאדמין בלבד.</div>
+  </div>
+</body></html>`;
 }

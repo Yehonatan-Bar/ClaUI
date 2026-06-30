@@ -17,6 +17,7 @@ import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import { getStoredApiKey, setStoredApiKey, maskApiKey } from '../process/envUtils';
 import type { TokenUsageRatioTracker } from '../session/TokenUsageRatioTracker';
+import type { DeveloperUsageReporter } from '../usage/DeveloperUsageReporter';
 import type { CheckpointManager } from '../session/CheckpointManager';
 import { parseUsageLimitError } from '../process/usageLimitParser';
 import { AuthManager } from '../auth/AuthManager';
@@ -304,6 +305,8 @@ export class MessageHandler {
   private skillUsageTracker: import('../skillgen/SkillUsageTracker').SkillUsageTracker | null = null;
   /** Global token-usage ratio tracker (shared across all tabs) */
   private tokenRatioTracker: TokenUsageRatioTracker | null = null;
+  /** Global developer usage reporter (admin usage dashboard; shared across all tabs) */
+  private developerUsageReporter: DeveloperUsageReporter | null = null;
   /** Per-session checkpoint manager for revert/redo of file changes */
   private checkpointManager: CheckpointManager | null = null;
 
@@ -549,6 +552,11 @@ export class MessageHandler {
   /** Attach the global TokenUsageRatioTracker */
   setTokenRatioTracker(tracker: TokenUsageRatioTracker): void {
     this.tokenRatioTracker = tracker;
+  }
+
+  /** Attach the global DeveloperUsageReporter (admin usage dashboard) */
+  setDeveloperUsageReporter(reporter: DeveloperUsageReporter): void {
+    this.developerUsageReporter = reporter;
   }
 
   setCheckpointManager(manager: CheckpointManager): void {
@@ -5646,6 +5654,15 @@ export class MessageHandler {
             void this.sampleTokenUsageRatio();
           }
         }
+        // Developer Usage Reporter: accumulate per-model/per-type counts for the
+        // admin usage dashboard (full model id, not normalized).
+        this.developerUsageReporter?.recordTurn({
+          inputTokens: successTurn.inputTokens ?? 0,
+          outputTokens: successTurn.outputTokens ?? 0,
+          cacheCreationTokens: successTurn.cacheCreationTokens ?? 0,
+          cacheReadTokens: successTurn.cacheReadTokens ?? 0,
+          model: this.currentTurnModel,
+        });
         // TurnAnalyzer: fire-and-forget semantic analysis
         if (this.turnAnalyzer) {
           void this.turnAnalyzer.analyze({
@@ -5704,6 +5721,11 @@ export class MessageHandler {
             void this.sampleTokenUsageRatio();
           }
         }
+        // Developer Usage Reporter: record the (zero-token) error turn for symmetry.
+        this.developerUsageReporter?.recordTurn({
+          inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0,
+          model: this.currentTurnModel,
+        });
         // TurnAnalyzer: fire-and-forget semantic analysis for error turns
         if (this.turnAnalyzer) {
           void this.turnAnalyzer.analyze({

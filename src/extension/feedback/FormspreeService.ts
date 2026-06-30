@@ -99,21 +99,35 @@ export class FormspreeService {
     parts: FeedbackPayload[],
     delayMs = 1500,
   ): Promise<FeedbackResult> {
+    // Attempt EVERY part (do not stop on the first failure) so the logs show
+    // the HTTP outcome of all parts. "accepted" below means Formspree returned
+    // a success response — it does NOT prove the email was delivered.
+    const failures: string[] = [];
     for (let i = 0; i < parts.length; i++) {
-      this.log(`[Feedback] Sending part ${i + 1}/${parts.length}`);
+      this.log(
+        `[Feedback] Sending part ${i + 1}/${parts.length} ` +
+          `(message ${parts[i].message.length} chars, attachments: ${parts[i].attachments?.length ?? 0})`,
+      );
       const result = await this.submit(parts[i]);
-      if (!result.ok) {
-        return {
-          ok: false,
-          error: `Part ${i + 1}/${parts.length} failed: ${result.error}`,
-        };
+      if (result.ok) {
+        this.log(`[Feedback] Part ${i + 1}/${parts.length} ACCEPTED by Formspree (HTTP ok)`);
+      } else {
+        this.log(`[Feedback] Part ${i + 1}/${parts.length} FAILED: ${result.error}`);
+        failures.push(`part ${i + 1}: ${result.error}`);
       }
-      // Delay between parts to avoid rate limiting (skip after last)
+      // Delay between parts (skip after the last one)
       if (i < parts.length - 1) {
         await new Promise(resolve => setTimeout(resolve, delayMs));
       }
     }
-    this.log(`[Feedback] All ${parts.length} parts sent successfully`);
+
+    if (failures.length > 0) {
+      return {
+        ok: false,
+        error: `${failures.length}/${parts.length} parts failed -> ${failures.join('; ')}`,
+      };
+    }
+    this.log(`[Feedback] All ${parts.length} parts accepted by Formspree (HTTP ok)`);
     return { ok: true };
   }
 
@@ -142,11 +156,26 @@ export class FormspreeService {
         signal: controller.signal,
       });
 
-      const json = (await res.json().catch(() => null)) as {
+      // Read the body as text FIRST so we always capture the raw response,
+      // including non-JSON bodies (spam challenges, HTML error pages, rate-limit
+      // notices). Then try to parse it as JSON for the ok/error fields.
+      const rawBody = await res.text().catch(() => '');
+      let json: {
         ok?: boolean;
         error?: string;
         errors?: Array<{ message?: string }>;
-      } | null;
+      } | null = null;
+      try {
+        json = rawBody ? JSON.parse(rawBody) : null;
+      } catch {
+        json = null;
+      }
+
+      const bodyPreview =
+        rawBody.length > 1500 ? `${rawBody.slice(0, 1500)}... (${rawBody.length} chars total)` : rawBody;
+      this.log(
+        `[Feedback] Response: HTTP ${res.status} ${res.statusText} | json.ok=${json?.ok} | body: ${bodyPreview}`,
+      );
 
       if (res.ok && json?.ok !== false) {
         this.log('[Feedback] Submission succeeded');
@@ -156,7 +185,7 @@ export class FormspreeService {
       const errorMsg =
         json?.error ||
         json?.errors?.[0]?.message ||
-        `HTTP ${res.status}`;
+        `HTTP ${res.status} ${res.statusText}`;
       this.log(`[Feedback] Submission failed: ${errorMsg}`);
       return { ok: false, error: errorMsg };
     } catch (err: unknown) {

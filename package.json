@@ -78,6 +78,23 @@
         "title": "ClaUi: Leave Multi-Participant Session"
       },
       {
+        "command": "claudeMirror.registerUsageReporting",
+        "title": "ClaUi: Register for Usage Reporting (Admin Dashboard)",
+        "icon": "$(broadcast)"
+      },
+      {
+        "command": "claudeMirror.viewMyUsage",
+        "title": "ClaUi: View My Usage"
+      },
+      {
+        "command": "claudeMirror.reportUsageNow",
+        "title": "ClaUi: Report Usage Now"
+      },
+      {
+        "command": "claudeMirror.disableUsageReporting",
+        "title": "ClaUi: Disable Usage Reporting"
+      },
+      {
         "command": "claudeMirror.startSession",
         "title": "ClaUi: Start New Session"
       },
@@ -384,6 +401,21 @@
             "codex"
           ],
           "description": "Default AI agent provider for multi-participant sessions. If empty, you will be prompted each time."
+        },
+        "claudeMirror.usageReporting.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Send hourly token-usage reports to the team coordination server for the admin usage/cost dashboard. Off by default; only sends after you register and grant consent. Only numeric token counts per model/type are sent - never code, prompts, or file names."
+        },
+        "claudeMirror.usageReporting.serverUrl": {
+          "type": "string",
+          "default": "",
+          "description": "HTTP(S) base URL of the usage/admin server (e.g. https://my-server.com/mp). If empty, it is derived from claudeMirror.multiParticipant.serverUrl by converting ws:// to http:// (and wss:// to https://)."
+        },
+        "claudeMirror.usageReporting.developerName": {
+          "type": "string",
+          "default": "",
+          "description": "Display name shown for you in the admin usage dashboard. If empty, you will be prompted when registering."
         },
         "claudeMirror.codex.cliPath": {
           "type": "string",
