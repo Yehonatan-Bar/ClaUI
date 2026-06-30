@@ -269,6 +269,7 @@ const QuotaPanel: React.FC<{
             </div>
             <button
               onClick={() => setShowSampleOverlay(v => !v)}
+              data-tooltip="Toggle sample point markers"
               style={{
                 background: showSampleOverlay ? DASH_COLORS.blue : 'rgba(88, 166, 255, 0.12)',
                 border: `1px solid ${DASH_COLORS.blue}`,
@@ -492,6 +493,7 @@ export const TokenRatioTab: React.FC = () => {
           </span>
           <button
             onClick={handleResample}
+            data-tooltip="Recompute token ratios now"
             style={{
               background: DASH_COLORS.amber,
               color: '#000',
@@ -519,6 +521,7 @@ export const TokenRatioTab: React.FC = () => {
             <button
               key={range.label}
               onClick={() => setSelectedRange(range)}
+              data-tooltip={`Show ${range.label} of history`}
               style={{
                 background: isActive ? DASH_COLORS.blue : DASH_COLORS.cardBg,
                 color: isActive ? '#fff' : DASH_COLORS.textMuted,
@@ -600,6 +603,7 @@ export const TokenRatioTab: React.FC = () => {
       <div style={{ textAlign: 'center', paddingTop: 8, display: 'flex', justifyContent: 'center', gap: 12 }}>
         <button
           onClick={handleResample}
+          data-tooltip="Recompute token ratios now"
           style={{
             background: 'transparent',
             border: `1px solid ${DASH_COLORS.blue}`,
@@ -614,6 +618,7 @@ export const TokenRatioTab: React.FC = () => {
         </button>
         <button
           onClick={handleClear}
+          data-tooltip="Delete all token ratio data"
           style={{
             background: 'transparent',
             border: `1px solid ${DASH_COLORS.border}`,

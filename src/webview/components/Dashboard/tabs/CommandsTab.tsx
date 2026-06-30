@@ -64,6 +64,7 @@ export const CommandsTab: React.FC<CommandsTabProps> = ({ turnHistory }) => {
               <button
                 key={cat}
                 onClick={() => toggleCategory(cat)}
+                data-tooltip={`Toggle ${cat} commands`}
                 style={{
                   padding: '4px 10px',
                   fontSize: '11px',

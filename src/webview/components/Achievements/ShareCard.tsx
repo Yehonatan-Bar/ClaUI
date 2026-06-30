@@ -55,7 +55,7 @@ export const ShareCard: React.FC = () => {
       <div className="share-card-modal" onClick={(e) => e.stopPropagation()}>
         <div className="share-card-modal-header">
           <strong>{tr.shareCardTitle}</strong>
-          <button className="share-card-close" onClick={() => setOpen(false)}>x</button>
+          <button className="share-card-close" onClick={() => setOpen(false)} data-tooltip="Close">x</button>
         </div>
 
         <p style={{ fontSize: 13, opacity: 0.7, marginBottom: 16 }}>{tr.shareCardDesc}</p>

@@ -52,6 +52,7 @@ const SessionRow: React.FC<{ session: WorktreeSessionRef }> = ({ session }) => {
       </span>
       <button
         onClick={() => postToExtension({ type: 'focusWorktreeSession', tabId: session.tabId })}
+        data-tooltip="Focus this session's tab"
         style={{
           background: 'transparent',
           border: `1px solid ${WT_COLORS.cardBorder}`,
@@ -163,11 +164,12 @@ const WorktreeCard: React.FC<{
             Merge paused - {inProgress.conflictedFiles.length} conflicted file{inProgress.conflictedFiles.length === 1 ? '' : 's'}
           </span>
           <div style={{ display: 'flex', gap: 8, marginInlineStart: 'auto' }}>
-            <button onClick={() => onResume(wt)} style={{ ...cardBtn(), color: WT_COLORS.amber, borderColor: `${WT_COLORS.amber}66` }}>
+            <button onClick={() => onResume(wt)} data-tooltip="Open the conflict resolver" style={{ ...cardBtn(), color: WT_COLORS.amber, borderColor: `${WT_COLORS.amber}66` }}>
               Resolve
             </button>
             <button
               onClick={() => postToExtension({ type: 'abortMerge', targetPath: wt.path, squash: inProgress.kind === 'squash' })}
+              data-tooltip="Abort merge and restore target branch"
               style={{ ...cardBtn(), color: WT_COLORS.red, borderColor: 'rgba(248, 81, 73, 0.4)' }}
             >
               Abort
@@ -180,12 +182,14 @@ const WorktreeCard: React.FC<{
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         <button
           onClick={() => postToExtension({ type: 'createWorktreeSession', worktreePath: wt.path })}
+          data-tooltip="Start a new session in this worktree"
           style={cardBtn()}
         >
           + New session here
         </button>
         <button
           onClick={() => postToExtension({ type: 'openWorktreeFolder', worktreePath: wt.path })}
+          data-tooltip="Open this worktree folder"
           style={cardBtn()}
         >
           Open folder
@@ -316,6 +320,7 @@ export const WorktreePanel: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             onClick={() => postToExtension({ type: 'getWorktreeList' })}
+            data-tooltip="Reload the worktree list"
             style={{
               background: 'transparent',
               border: `1px solid ${WT_COLORS.cardBorder}`,
@@ -362,6 +367,7 @@ export const WorktreePanel: React.FC = () => {
             <div style={{ display: 'flex', gap: 8, marginInlineStart: 'auto' }}>
               <button
                 onClick={() => setMergeTarget({ wt: mergeInProgressWt, resume: true })}
+                data-tooltip="Open the conflict resolver"
                 style={{ ...cardBtn(), color: WT_COLORS.amber, borderColor: `${WT_COLORS.amber}66` }}
               >
                 Resolve
@@ -374,6 +380,7 @@ export const WorktreePanel: React.FC = () => {
                     squash: mergeInProgressWt.mergeInProgress!.kind === 'squash',
                   })
                 }
+                data-tooltip="Abort merge and restore target branch"
                 style={{ ...cardBtn(), color: WT_COLORS.red, borderColor: 'rgba(248, 81, 73, 0.4)' }}
               >
                 Abort
@@ -465,6 +472,7 @@ export const WorktreePanel: React.FC = () => {
                 <button
                   onClick={submitCreate}
                   disabled={!name.trim() || creating}
+                  data-tooltip="Create the worktree"
                   style={{
                     background: !name.trim() || creating ? WT_COLORS.cardBorder : WT_COLORS.accent,
                     border: 'none',
@@ -507,9 +515,10 @@ export const WorktreePanel: React.FC = () => {
               {forcePath} has uncommitted or untracked changes. Removing it will permanently discard them.
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setForcePath(null)} style={cardBtn()}>Cancel</button>
+              <button onClick={() => setForcePath(null)} data-tooltip="Keep the worktree" style={cardBtn()}>Cancel</button>
               <button
                 onClick={confirmForceRemove}
+                data-tooltip="Discard changes and remove worktree"
                 style={{ ...cardBtn(), color: '#0d1117', background: WT_COLORS.red, border: 'none', fontWeight: 600 }}
               >
                 Discard and remove

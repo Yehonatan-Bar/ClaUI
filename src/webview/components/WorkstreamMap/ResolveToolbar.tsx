@@ -93,18 +93,19 @@ export const ResolveToolbar: React.FC = () => {
 
       {hasWorkstream && (
         <>
-          <ResolveBtn label="Rename" onClick={handleRename} />
-          <ResolveBtn label="Mark Complete" onClick={handleMarkComplete} />
-          <ResolveBtn label="Mark Abandoned" onClick={handleMarkAbandoned} />
+          <ResolveBtn label="Rename" tooltip="Rename this workstream" onClick={handleRename} />
+          <ResolveBtn label="Mark Complete" tooltip="Mark workstream as complete" onClick={handleMarkComplete} />
+          <ResolveBtn label="Mark Abandoned" tooltip="Mark workstream as abandoned" onClick={handleMarkAbandoned} />
           <ResolveBtn
             label={ws?.userPinned ? 'Unpin' : 'Pin'}
+            tooltip={ws?.userPinned ? 'Unpin this workstream' : 'Pin this workstream'}
             onClick={handlePin}
           />
         </>
       )}
 
       {hasStation && (
-        <ResolveBtn label="Hide Station" onClick={handleHideStation} />
+        <ResolveBtn label="Hide Station" tooltip="Hide this station from the map" onClick={handleHideStation} />
       )}
 
       {!hasWorkstream && !hasStation && (
@@ -116,9 +117,10 @@ export const ResolveToolbar: React.FC = () => {
   );
 };
 
-const ResolveBtn: React.FC<{ label: string; onClick: () => void }> = ({ label, onClick }) => (
+const ResolveBtn: React.FC<{ label: string; tooltip: string; onClick: () => void }> = ({ label, tooltip, onClick }) => (
   <button
     onClick={onClick}
+    data-tooltip={tooltip}
     style={{
       background: 'var(--vscode-button-secondaryBackground, #334155)',
       color: 'var(--vscode-button-secondaryForeground, #CBD5E1)',

@@ -55,6 +55,7 @@ export const ActivityTab: React.FC = () => {
               {status !== 'shutdown' && (
                 <button
                   onClick={() => postToExtension({ type: 'teamShutdownAgent', agentName: member.name })}
+                  data-tooltip="Shut down this agent"
                   style={{
                     background: 'transparent',
                     border: '1px solid #f8514933',

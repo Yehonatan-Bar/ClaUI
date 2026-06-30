@@ -163,6 +163,7 @@ export const TurnTable: React.FC<TurnTableProps> = ({ turnHistory }) => {
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={page === 0}
             style={paginationBtnStyle}
+            data-tooltip="Previous page"
           >
             Prev
           </button>
@@ -173,6 +174,7 @@ export const TurnTable: React.FC<TurnTableProps> = ({ turnHistory }) => {
             onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
             disabled={page >= pageCount - 1}
             style={paginationBtnStyle}
+            data-tooltip="Next page"
           >
             Next
           </button>

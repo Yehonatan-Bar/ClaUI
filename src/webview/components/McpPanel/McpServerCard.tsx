@@ -29,6 +29,7 @@ export interface McpServerCardProps {
     onClick: () => void;
     tone?: 'primary' | 'danger' | 'neutral';
     disabled?: boolean;
+    tooltip?: string;
   }>;
   children?: React.ReactNode;
 }
@@ -104,6 +105,7 @@ export const McpServerCard: React.FC<McpServerCardProps> = ({
                 key={action.label}
                 onClick={action.onClick}
                 disabled={action.disabled}
+                data-tooltip={action.tooltip}
                 style={{
                   padding: '7px 12px',
                   borderRadius: 8,

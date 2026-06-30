@@ -408,6 +408,9 @@ export interface AppState {
   /** Pending semantics by messageId (for late/early arrival merge) */
   pendingTurnSemanticsByMessageId: Record<string, TurnSemantics>;
 
+  // Help panel (buttons & commands reference)
+  helpPanelOpen: boolean;
+
   // Prompt Enhancer
   isEnhancing: boolean;
   autoEnhanceEnabled: boolean;
@@ -858,6 +861,7 @@ export interface AppState {
   markSessionPromptSent: () => void;
   toggleDashboard: () => void;
   setDashboardOpen: (open: boolean) => void;
+  setHelpPanelOpen: (open: boolean) => void;
   applyTurnSemantics: (messageId: string, semantics: TurnSemantics) => void;
   setIsEnhancing: (enhancing: boolean) => void;
   setAutoEnhanceEnabled: (enabled: boolean) => void;
@@ -1268,6 +1272,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   adventureEnabled: false,
   adventureBeats: [],
   dashboardOpen: false,
+  helpPanelOpen: false,
   pendingTurnSemanticsByMessageId: {},
   isEnhancing: false,
   autoEnhanceEnabled: false,
@@ -2723,6 +2728,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   toggleDashboard: () => set((s) => ({ dashboardOpen: !s.dashboardOpen })),
   setDashboardOpen: (open) => set({ dashboardOpen: open }),
+  setHelpPanelOpen: (open) => set({ helpPanelOpen: open }),
 
   applyTurnSemantics: (messageId, semantics) =>
     set((s) => ({

@@ -146,6 +146,7 @@ export const MessagesTab: React.FC = () => {
         <button
           onClick={handleSend}
           disabled={!selectedAgent || !messageText.trim()}
+          data-tooltip="Send message to agent"
           style={{
             background: !selectedAgent || !messageText.trim() ? '#21262d' : '#238636',
             color: !selectedAgent || !messageText.trim() ? '#484f58' : '#fff',

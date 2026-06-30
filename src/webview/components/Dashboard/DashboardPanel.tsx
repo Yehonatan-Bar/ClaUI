@@ -146,6 +146,7 @@ export const DashboardPanel: React.FC = () => {
           }}>
             <button
               onClick={() => handleModeSwitch('session')}
+              data-tooltip="Show current session analytics"
               style={{
                 ...modeToggleBase,
                 background: mode === 'session' ? DASH_COLORS.blue : 'transparent',
@@ -156,6 +157,7 @@ export const DashboardPanel: React.FC = () => {
             </button>
             <button
               onClick={() => handleModeSwitch('project')}
+              data-tooltip="Show project-wide analytics"
               style={{
                 ...modeToggleBase,
                 background: mode === 'project' ? DASH_COLORS.purple : 'transparent',
@@ -166,6 +168,7 @@ export const DashboardPanel: React.FC = () => {
             </button>
             <button
               onClick={() => handleModeSwitch('user')}
+              data-tooltip="Show user-wide analytics"
               style={{
                 ...modeToggleBase,
                 background: mode === 'user' ? DASH_COLORS.amber : 'transparent',
@@ -222,6 +225,7 @@ export const DashboardPanel: React.FC = () => {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
+              data-tooltip={`Open ${tab.label} tab`}
               style={{
                 padding: '10px 18px',
                 cursor: 'pointer',

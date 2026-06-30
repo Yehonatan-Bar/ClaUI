@@ -36,6 +36,7 @@ export const McpWorkspaceTab: React.FC<{
               </div>
               <button
                 onClick={() => onOpenConfig(scope)}
+                data-tooltip={`Open ${scope} config file`}
                 style={{
                   padding: '6px 10px',
                   borderRadius: 8,
@@ -60,11 +61,13 @@ export const McpWorkspaceTab: React.FC<{
                     label: 'Open config',
                     onClick: () => onOpenConfig(server.scope),
                     tone: 'neutral',
+                    tooltip: 'Open this server config file',
                   },
                   {
                     label: 'Remove',
                     tone: 'danger',
                     disabled: provider !== 'claude',
+                    tooltip: 'Remove this MCP server',
                     onClick: () => {
                       if (provider !== 'claude') {
                         return;

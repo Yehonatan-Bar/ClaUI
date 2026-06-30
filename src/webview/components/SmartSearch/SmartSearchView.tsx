@@ -110,6 +110,7 @@ export const SmartSearchView: React.FC = () => {
           className="smart-search-send-btn"
           onClick={sendCurrent}
           disabled={!isConnected || isBusy || text.trim().length === 0}
+          data-tooltip="Send search query (Ctrl+Enter)"
         >
           {isBusy ? 'Working...' : 'Send'}
         </button>

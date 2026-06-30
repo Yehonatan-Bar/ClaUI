@@ -49,7 +49,7 @@ export const AuditLogPanel: React.FC = () => {
         <select value={severityMin} onChange={(e) => setSeverityMin(e.target.value)} aria-label="Severity filter">
           {SEVERITIES.map((value) => <option key={value} value={value}>{value || 'Any severity'}</option>)}
         </select>
-        <button className="dlp-secondary-btn" onClick={requestData} disabled={loading}>
+        <button className="dlp-secondary-btn" onClick={requestData} disabled={loading} data-tooltip="Reload audit events and compliance report">
           Refresh
         </button>
       </div>

@@ -51,6 +51,7 @@ export const FileMentionPopup: React.FC<FileMentionPopupProps> = ({
           key={result.relativePath}
           ref={index === selectedIndex ? selectedRef : undefined}
           className={`file-mention-item${index === selectedIndex ? ' selected' : ''}`}
+          data-tooltip={`Mention ${result.relativePath}`}
           onMouseDown={(e) => {
             e.preventDefault(); // Prevent textarea blur
             onSelect(result.relativePath);

@@ -24,6 +24,7 @@ function renderScopePath(label: string, scope: McpScope, configPath: string | un
       <button
         onClick={() => onOpenConfig(scope)}
         disabled={!configPath}
+        data-tooltip={`Open ${label} config file`}
         style={{
           padding: '6px 10px',
           borderRadius: 8,
@@ -94,6 +95,7 @@ export const McpDebugTab: React.FC<{
             <code style={{ color: '#dbeafe' }}>{command}</code>
             <button
               onClick={() => postToExtension({ type: 'copyToClipboard', text: command })}
+              data-tooltip={`Copy "${command}" to clipboard`}
               style={{
                 padding: '6px 10px',
                 borderRadius: 8,
@@ -114,6 +116,7 @@ export const McpDebugTab: React.FC<{
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
             onClick={onOpenLogs}
+            data-tooltip="Open the ClaUi log file"
             style={{
               padding: '8px 12px',
               borderRadius: 8,
@@ -130,6 +133,7 @@ export const McpDebugTab: React.FC<{
           <button
             onClick={() => postToExtension({ type: 'mcpResetProjectChoices' })}
             disabled={provider !== 'claude'}
+            data-tooltip="Clear saved project approval choices"
             style={{
               padding: '8px 12px',
               borderRadius: 8,

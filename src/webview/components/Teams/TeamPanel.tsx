@@ -7,11 +7,11 @@ import { ActivityTab } from './ActivityTab';
 
 type TeamTab = 'topology' | 'tasks' | 'messages' | 'activity';
 
-const TABS: { key: TeamTab; label: string }[] = [
-  { key: 'topology', label: 'Topology' },
-  { key: 'tasks', label: 'Tasks' },
-  { key: 'messages', label: 'Messages' },
-  { key: 'activity', label: 'Activity' },
+const TABS: { key: TeamTab; label: string; tooltip: string }[] = [
+  { key: 'topology', label: 'Topology', tooltip: 'View team topology' },
+  { key: 'tasks', label: 'Tasks', tooltip: 'View team tasks' },
+  { key: 'messages', label: 'Messages', tooltip: 'View team messages' },
+  { key: 'activity', label: 'Activity', tooltip: 'View agent activity' },
 ];
 
 export const TeamPanel: React.FC = () => {
@@ -96,6 +96,7 @@ export const TeamPanel: React.FC = () => {
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
+            data-tooltip={tab.tooltip}
             style={{
               background: 'transparent',
               border: 'none',

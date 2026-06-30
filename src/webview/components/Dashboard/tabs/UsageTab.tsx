@@ -157,6 +157,7 @@ export const UsageTab: React.FC = () => {
         <button
           onClick={handleRefresh}
           disabled={loading}
+          data-tooltip="Reload current usage data"
           style={{
             background: DASH_COLORS.blue,
             color: '#fff',
@@ -188,6 +189,7 @@ export const UsageTab: React.FC = () => {
               <button
                 key={period}
                 onClick={() => setSelectedPeriod(period)}
+                data-tooltip={`Show ${period} usage`}
                 style={{
                   background: isActive ? DASH_COLORS.blue : DASH_COLORS.cardBg,
                   color: isActive ? '#fff' : DASH_COLORS.textMuted,

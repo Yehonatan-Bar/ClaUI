@@ -245,6 +245,7 @@ const ApprovalDialogInner: React.FC<ApprovalDialogInnerProps> = ({
         >
           <button
             onClick={handleDeny}
+            data-tooltip="Deny this request"
             style={{
               ...buttonBaseStyle,
               backgroundColor: 'rgba(248, 81, 73, 0.15)',
@@ -257,6 +258,7 @@ const ApprovalDialogInner: React.FC<ApprovalDialogInnerProps> = ({
 
           <button
             onClick={handleApproveCount}
+            data-tooltip="Allow a set number of messages"
             style={{
               ...buttonBaseStyle,
               backgroundColor: 'rgba(88, 166, 255, 0.15)',
@@ -269,6 +271,7 @@ const ApprovalDialogInner: React.FC<ApprovalDialogInnerProps> = ({
 
           <button
             onClick={handleAlwaysAllow}
+            data-tooltip="Always allow this agent pair"
             style={{
               ...buttonBaseStyle,
               backgroundColor: 'rgba(63, 185, 80, 0.15)',
@@ -281,6 +284,7 @@ const ApprovalDialogInner: React.FC<ApprovalDialogInnerProps> = ({
 
           <button
             onClick={handleForce}
+            data-tooltip="Force approve, bypassing safety checks"
             style={{
               ...buttonBaseStyle,
               backgroundColor: confirmForce

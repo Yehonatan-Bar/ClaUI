@@ -109,6 +109,7 @@ export const TasksTab: React.FC = () => {
         {!showAddForm ? (
           <button
             onClick={() => setShowAddForm(true)}
+            data-tooltip="Show new task form"
             style={{
               background: '#238636',
               color: '#fff',
@@ -142,6 +143,7 @@ export const TasksTab: React.FC = () => {
             />
             <button
               onClick={handleAddTask}
+              data-tooltip="Create task"
               style={{
                 background: '#238636',
                 color: '#fff',
@@ -156,6 +158,7 @@ export const TasksTab: React.FC = () => {
             </button>
             <button
               onClick={() => { setShowAddForm(false); setNewSubject(''); }}
+              data-tooltip="Cancel new task"
               style={{
                 background: '#21262d',
                 color: '#8b949e',

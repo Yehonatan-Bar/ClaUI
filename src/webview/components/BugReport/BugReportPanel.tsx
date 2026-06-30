@@ -121,12 +121,14 @@ export const BugReportPanel: React.FC = () => {
           <button
             className={`bugreport-tab ${bugReportMode === 'quick' ? 'active' : ''}`}
             onClick={() => setBugReportMode('quick')}
+            data-tooltip="Switch to quick report"
           >
             Quick Report
           </button>
           <button
             className={`bugreport-tab ${bugReportMode === 'ai' ? 'active' : ''}`}
             onClick={() => setBugReportMode('ai')}
+            data-tooltip="Switch to AI-assisted report"
           >
             AI-Assisted Report
           </button>
@@ -223,6 +225,7 @@ export const BugReportPanel: React.FC = () => {
                   className="bugreport-chat-send-btn"
                   onClick={handleSendChat}
                   disabled={!chatInput.trim() || bugReportChatLoading}
+                  data-tooltip="Send chat message"
                 >
                   Send
                 </button>
@@ -233,7 +236,7 @@ export const BugReportPanel: React.FC = () => {
 
         {/* Preview Section */}
         <div className="bugreport-preview-section">
-          <button className="bugreport-preview-toggle" onClick={handleRequestPreview}>
+          <button className="bugreport-preview-toggle" onClick={handleRequestPreview} data-tooltip={previewOpen ? 'Hide attachment preview' : 'Preview info to be sent'}>
             {previewOpen ? 'Hide' : 'What info will be sent to the developer?'}
           </button>
           {previewOpen && bugReportPreviewFiles.length > 0 && (
@@ -251,7 +254,7 @@ export const BugReportPanel: React.FC = () => {
         {/* Submit */}
         <div className="bugreport-submit-row">
           {bugReportPhase === 'sent' ? (
-            <button className="bugreport-submit-btn bugreport-submit-done" onClick={handleClose}>
+            <button className="bugreport-submit-btn bugreport-submit-done" onClick={handleClose} data-tooltip="Close panel">
               Done - Close Panel
             </button>
           ) : (
@@ -259,6 +262,7 @@ export const BugReportPanel: React.FC = () => {
               className="bugreport-submit-btn"
               disabled={!canSend || isSending}
               onClick={handleSubmit}
+              data-tooltip="Send bug report"
             >
               {isSending ? 'Sending...' : bugReportMode === 'ai' ? 'Done Talking - Send Full Report' : 'SEND BUG REPORT'}
             </button>
@@ -300,8 +304,8 @@ function renderChatContent(
       <div key={`s-${si}`} className="bugreport-script-block">
         <pre className="bugreport-script-code">{cmd}</pre>
         <div className="bugreport-script-actions">
-          <button className="bugreport-script-approve" onClick={() => onApprove(cmd, si)}>Approve</button>
-          <button className="bugreport-script-reject" onClick={() => onReject(cmd, si)}>Reject</button>
+          <button className="bugreport-script-approve" onClick={() => onApprove(cmd, si)} data-tooltip="Run this script">Approve</button>
+          <button className="bugreport-script-reject" onClick={() => onReject(cmd, si)} data-tooltip="Reject this script">Reject</button>
         </div>
       </div>,
     );

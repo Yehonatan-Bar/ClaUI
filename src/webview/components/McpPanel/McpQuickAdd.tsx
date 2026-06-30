@@ -27,6 +27,7 @@ export const McpQuickAdd: React.FC<{
         <button
           onClick={onImportDesktop}
           disabled={disabled}
+          data-tooltip="Import MCP servers from Claude Desktop"
           style={{
             padding: '8px 12px',
             borderRadius: 8,
@@ -48,6 +49,7 @@ export const McpQuickAdd: React.FC<{
             key={template.id}
             onClick={() => onSelectTemplate(template)}
             disabled={disabled}
+            data-tooltip={`Add ${template.title} MCP server`}
             style={{
               ...cardStyle,
               opacity: disabled ? 0.55 : 1,
@@ -71,6 +73,7 @@ export const McpQuickAdd: React.FC<{
             key={transport}
             onClick={() => onSelectCustom(transport)}
             disabled={disabled}
+            data-tooltip={`Add custom ${transport.toUpperCase()} MCP server`}
             style={{
               padding: '9px 12px',
               borderRadius: 8,

@@ -218,6 +218,7 @@ export const MergeAssistantChat: React.FC<{ targetPath: string }> = ({ targetPat
             key={s}
             onClick={() => send(s)}
             disabled={isBusy}
+            data-tooltip={`Ask Claude: ${s}`}
             style={{
               background: 'transparent',
               border: `1px solid ${WT_COLORS.cardBorder}`,
@@ -259,6 +260,7 @@ export const MergeAssistantChat: React.FC<{ targetPath: string }> = ({ targetPat
         <button
           onClick={() => send(text)}
           disabled={!text.trim() || isBusy}
+          data-tooltip="Send message to Claude"
           style={{
             background: !text.trim() || isBusy ? WT_COLORS.cardBorder : WT_COLORS.accent,
             color: !text.trim() || isBusy ? WT_COLORS.textDim : '#0d1117',

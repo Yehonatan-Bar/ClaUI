@@ -86,6 +86,7 @@ export const MPInputArea: React.FC = () => {
           className="mp-send-btn"
           onClick={handleSend}
           disabled={isDisconnected || !text.trim()}
+          data-tooltip="Send message"
         >
           Send
         </button>

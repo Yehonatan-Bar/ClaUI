@@ -52,7 +52,7 @@ export const SettingsPanel: React.FC = () => {
             <div className="dlp-panel-title">Secret Protection</div>
             <div className="dlp-panel-subtitle">{settings.mode} mode</div>
           </div>
-          <button className="dlp-icon-btn" onClick={() => setOpen(false)} aria-label="Close">x</button>
+          <button className="dlp-icon-btn" onClick={() => setOpen(false)} aria-label="Close" data-tooltip="Close">x</button>
         </div>
 
         <div className="dlp-tabs" role="tablist">
@@ -63,6 +63,7 @@ export const SettingsPanel: React.FC = () => {
               onClick={() => setTab(item)}
               role="tab"
               aria-selected={tab === item}
+              data-tooltip={`Show ${item} tab`}
             >
               {item[0].toUpperCase() + item.slice(1)}
             </button>
