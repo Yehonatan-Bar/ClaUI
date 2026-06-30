@@ -258,6 +258,7 @@ export const GuardStopNotification: React.FC = () => {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button
           onClick={handleDeny}
+          data-tooltip="Deny this request"
           style={{
             ...btnStyle,
             backgroundColor: 'rgba(248, 81, 73, 0.15)',
@@ -270,6 +271,7 @@ export const GuardStopNotification: React.FC = () => {
 
         <button
           onClick={handleApproveCount}
+          data-tooltip="Allow a set number of messages"
           style={{
             ...btnStyle,
             backgroundColor: 'rgba(88, 166, 255, 0.15)',
@@ -282,6 +284,7 @@ export const GuardStopNotification: React.FC = () => {
 
         <button
           onClick={handleAlwaysAllow}
+          data-tooltip="Always allow this agent pair"
           style={{
             ...btnStyle,
             backgroundColor: 'rgba(63, 185, 80, 0.15)',
@@ -294,6 +297,7 @@ export const GuardStopNotification: React.FC = () => {
 
         <button
           onClick={handleForce}
+          data-tooltip="Force approve, bypassing safety checks"
           style={{
             ...btnStyle,
             backgroundColor: confirmForce

@@ -19,6 +19,7 @@ import { UsageWidget } from './components/Usage/UsageWidget';
 import { SessionTimeline } from './components/Vitals/SessionTimeline';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { DashboardPanel } from './components/Dashboard';
+import { HelpPanel } from './components/Help/HelpPanel';
 import { SkillGenPanel, SkillGenOnboarding } from './components/SkillGen';
 import { BugReportPanel } from './components/BugReport';
 import { McpPanel } from './components/McpPanel';
@@ -254,6 +255,7 @@ const ChatAppContent: React.FC = () => {
     contextWidgetVisible,
     turnHistory,
     dashboardOpen,
+    helpPanelOpen,
     mcpPanelOpen,
     skillGenPanelOpen,
     skillGenOnboardingSeen,
@@ -392,6 +394,7 @@ const ChatAppContent: React.FC = () => {
       {achievementsEnabled && communityPanelOpen && <CommunityPanel />}
       {achievementsEnabled && <ShareCard />}
       {dashboardOpen && <DashboardPanel />}
+      {helpPanelOpen && <HelpPanel />}
       {mcpPanelOpen && <McpPanel />}
       <SettingsPanel />
       <SuperParticleAcceleratorPanel />
@@ -417,6 +420,7 @@ const ChatAppContent: React.FC = () => {
                   setError(null);
                   postToExtension({ type: 'openProviderTab', provider: 'codex' });
                 }}
+                data-tooltip="Open a Codex tab and use Codex instead of Claude"
               >
                 Switch to Codex
               </button>
@@ -432,18 +436,21 @@ const ChatAppContent: React.FC = () => {
               <button
                 className="setup-notice-btn"
                 onClick={() => postToExtension({ type: 'openUrl', url: 'https://docs.anthropic.com/en/docs/claude-code/overview' })}
+                data-tooltip="Open the Claude Code documentation in your browser"
               >
                 Claude Code Docs
               </button>
               <button
                 className="setup-notice-btn"
                 onClick={() => postToExtension({ type: 'openSettings', query: 'claudeMirror.cliPath' })}
+                data-tooltip="Open settings to set the path to the claude executable"
               >
                 Set CLI Path
               </button>
               <button
                 className="setup-notice-btn ghost"
                 onClick={() => setError(null)}
+                data-tooltip="Dismiss this notice"
               >
                 Dismiss
               </button>
@@ -462,42 +469,49 @@ const ChatAppContent: React.FC = () => {
               <button
                 className="setup-notice-btn primary"
                 onClick={() => postToExtension({ type: 'autoSetupCodexCli' })}
+                data-tooltip="Automatically install and configure the Codex CLI"
               >
                 Auto-setup Codex CLI
               </button>
               <button
                 className="setup-notice-btn"
                 onClick={() => postToExtension({ type: 'autoDetectCodexCliPath' })}
+                data-tooltip="Search common locations for an existing codex executable"
               >
                 Auto-detect Codex CLI
               </button>
               <button
                 className="setup-notice-btn"
                 onClick={() => postToExtension({ type: 'openUrl', url: 'https://github.com/openai/codex' })}
+                data-tooltip="Open the Codex install guide on GitHub"
               >
                 Open Install Guide
               </button>
               <button
                 className="setup-notice-btn"
                 onClick={() => postToExtension({ type: 'pickCodexCliPath' })}
+                data-tooltip="Pick the codex executable manually with a file dialog"
               >
                 Browse for codex executable
               </button>
               <button
                 className="setup-notice-btn"
                 onClick={() => postToExtension({ type: 'openSettings', query: 'claudeMirror.codex.cliPath' })}
+                data-tooltip="Open settings to set the Codex CLI path"
               >
                 Open Codex Path Setting
               </button>
               <button
                 className="setup-notice-btn"
                 onClick={() => postToExtension({ type: 'openCodexLogin' })}
+                data-tooltip="Open a terminal to install or sign in to Codex"
               >
                 Open Setup/Login Terminal
               </button>
               <button
                 className="setup-notice-btn ghost"
                 onClick={() => setError(null)}
+                data-tooltip="Dismiss this notice"
               >
                 Dismiss
               </button>
@@ -517,6 +531,7 @@ const ChatAppContent: React.FC = () => {
               <button
                 className="error-banner__toggle"
                 onClick={() => setErrorExpanded(e => !e)}
+                data-tooltip={errorExpanded ? 'Collapse the error message' : 'Show the full error message'}
               >
                 {errorExpanded ? 'Show less' : 'Show more'}
               </button>
@@ -580,6 +595,7 @@ const ChatAppContent: React.FC = () => {
                   <button
                     className="activity-summary-disable-btn"
                     onClick={handleDisableActivitySummaryPermanently}
+                    data-tooltip="Never show the live activity summary again"
                   >
                     Disable permanently
                   </button>
@@ -713,6 +729,7 @@ const SessionSummaryNudge: React.FC<{ hasMessages: boolean }> = ({ hasMessages }
             postToExtension({ type: 'requestSessionRecapSnapshot' });
             setHiddenForActivityAt(lastActivityAt);
           }}
+          data-tooltip="Generate a summary of this session so far"
         >
           Session Summary
         </button>
@@ -722,12 +739,14 @@ const SessionSummaryNudge: React.FC<{ hasMessages: boolean }> = ({ hasMessages }
             setDeferUntilMs(Date.now() + SESSION_SUMMARY_DEFER_MS);
             setHiddenForActivityAt(lastActivityAt);
           }}
+          data-tooltip="Hide this nudge and ask again later"
         >
           Later
         </button>
         <button
           className="session-summary-nudge-btn ghost"
           onClick={() => setHiddenForActivityAt(lastActivityAt)}
+          data-tooltip="Dismiss this nudge"
         >
           Dismiss
         </button>

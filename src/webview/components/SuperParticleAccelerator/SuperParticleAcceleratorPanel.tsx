@@ -33,7 +33,7 @@ export const SuperParticleAcceleratorPanel: React.FC = () => {
       <div className="dlp-panel spa-panel">
         <div className="dlp-panel-header">
           <h2>Super Particle Accelerator</h2>
-          <button className="dlp-panel-close" onClick={() => setPanelOpen(false)}>
+          <button className="dlp-panel-close" onClick={() => setPanelOpen(false)} data-tooltip="Close">
             X
           </button>
         </div>
@@ -58,6 +58,7 @@ export const SuperParticleAcceleratorPanel: React.FC = () => {
                   onClick={() =>
                     postToExtension({ type: 'superParticleAcceleratorSetEnabled', enabled: true } as any)
                   }
+                  data-tooltip="Enable Super Particle Accelerator"
                 >
                   Enable
                 </button>
@@ -71,6 +72,7 @@ export const SuperParticleAcceleratorPanel: React.FC = () => {
                   onClick={() =>
                     postToExtension({ type: 'superParticleAcceleratorSetEnabled', enabled: false } as any)
                   }
+                  data-tooltip="Disable Super Particle Accelerator"
                 >
                   Disable
                 </button>

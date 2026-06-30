@@ -56,23 +56,26 @@ export const MapControls: React.FC = () => {
       fontFamily: 'var(--vscode-font-family)',
     }}>
       {(zoom !== 'project' || enteredFromPortfolio || cachedViewProject) && zoom !== 'portfolio' && (
-        <button onClick={handleBack} style={btnStyle}>
+        <button onClick={handleBack} data-tooltip="Go back one level" style={btnStyle}>
           {zoom === 'project' && (enteredFromPortfolio || cachedViewProject) ? 'All Projects' : 'Back'}
         </button>
       )}
 
       <ToggleBtn
         label="Current State"
+        tooltip="Toggle current state overlay"
         active={currentStateEnabled}
         onToggle={() => setCurrentState(!currentStateEnabled)}
       />
       <ToggleBtn
         label="Plan Overlay"
+        tooltip="Toggle plan overlay"
         active={planOverlayEnabled}
         onToggle={() => setPlanOverlay(!planOverlayEnabled)}
       />
       <ToggleBtn
         label="Resolve"
+        tooltip="Toggle resolve editing mode"
         active={resolveModeEnabled}
         onToggle={() => setResolveMode(!resolveModeEnabled)}
       />
@@ -81,20 +84,22 @@ export const MapControls: React.FC = () => {
 
       <ToggleBtn
         label="Inactive"
+        tooltip="Show inactive workstreams"
         active={filters.showInactive}
         onToggle={() => setFilters({ showInactive: !filters.showInactive })}
       />
       <ToggleBtn
         label="Low Confidence"
+        tooltip="Show low confidence workstreams"
         active={filters.showLowConfidence}
         onToggle={() => setFilters({ showLowConfidence: !filters.showLowConfidence })}
       />
 
-      <button onClick={handleImportExternalFolder} disabled={isClassifying} style={isClassifying ? disabledBtnStyle : btnStyle}>
+      <button onClick={handleImportExternalFolder} disabled={isClassifying} data-tooltip="Import workstreams from an external folder" style={isClassifying ? disabledBtnStyle : btnStyle}>
         Import Folder
       </button>
 
-      <button onClick={handleReclassify} disabled={isClassifying} style={isClassifying ? disabledBtnStyle : btnStyle}>
+      <button onClick={handleReclassify} disabled={isClassifying} data-tooltip="Rebuild the workstream map" style={isClassifying ? disabledBtnStyle : btnStyle}>
         Reclassify
       </button>
     </div>
@@ -120,9 +125,10 @@ const disabledBtnStyle: React.CSSProperties = {
   cursor: 'not-allowed',
 };
 
-const ToggleBtn: React.FC<{ label: string; active: boolean; onToggle: () => void }> = ({ label, active, onToggle }) => (
+const ToggleBtn: React.FC<{ label: string; tooltip: string; active: boolean; onToggle: () => void }> = ({ label, tooltip, active, onToggle }) => (
   <button
     onClick={onToggle}
+    data-tooltip={tooltip}
     style={{
       ...btnStyle,
       background: active ? 'var(--vscode-button-background, #4A9EFF)' : btnStyle.background,

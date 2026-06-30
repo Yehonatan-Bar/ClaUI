@@ -125,6 +125,7 @@ export const WorkstreamMapView: React.FC = () => {
             <div style={{ fontSize: 11, color: '#94A3B8', maxWidth: 400, textAlign: 'center' }}>{error}</div>
             <motion.button
               onClick={() => postToExtension({ type: 'workstreamMapReclassify', force: true })}
+              data-tooltip="Retry building the workstream map"
               style={{
                 marginTop: 12,
                 background: 'linear-gradient(135deg, #F87171, #DC2626)',
@@ -197,6 +198,7 @@ export const WorkstreamMapView: React.FC = () => {
             </div>
             <motion.button
               onClick={() => postToExtension({ type: 'workstreamMapReclassify', force: true })}
+              data-tooltip="Build the workstream map from sessions"
               style={{
                 marginTop: 8,
                 background: 'linear-gradient(135deg, #4A9EFF, #7C3AED)',
@@ -217,6 +219,7 @@ export const WorkstreamMapView: React.FC = () => {
             </motion.button>
             <motion.button
               onClick={() => postToExtension({ type: 'workstreamMapImportExternalFolder' })}
+              data-tooltip="Import workstreams from an external folder"
               style={{
                 background: 'rgba(51, 65, 85, 0.55)',
                 color: '#CBD5E1',
@@ -240,6 +243,7 @@ export const WorkstreamMapView: React.FC = () => {
                   useAppStore.getState().setWorkstreamMapZoom('portfolio');
                   postToExtension({ type: 'workstreamPortfolioRequestData' });
                 }}
+                data-tooltip="View all projects portfolio"
                 style={{
                   background: 'rgba(74, 158, 255, 0.1)',
                   color: '#9ecbff',
@@ -402,6 +406,7 @@ const CachedMapBanner: React.FC<{ project: ProjectSummaryEntry }> = ({ project }
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <button
           onClick={handleBack}
+          data-tooltip="Back to projects portfolio"
           style={{
             background: 'rgba(51, 65, 85, 0.5)',
             color: '#94A3B8',
@@ -422,6 +427,7 @@ const CachedMapBanner: React.FC<{ project: ProjectSummaryEntry }> = ({ project }
       </div>
       <button
         onClick={handleOpenWorkspace}
+        data-tooltip="Open this project's workspace"
         style={{
           background: 'linear-gradient(135deg, #4A9EFF, #7C3AED)',
           color: '#fff',

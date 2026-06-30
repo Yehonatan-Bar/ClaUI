@@ -127,6 +127,7 @@ export const TeamStatusWidget: React.FC = () => {
         </span>
         <button
           onClick={(e) => { e.stopPropagation(); setMinimized(true); }}
+          data-tooltip="Minimize widget"
           style={{
             background: 'transparent',
             border: 'none',

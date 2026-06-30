@@ -99,6 +99,7 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({ turnHistory }) => {
             </select>
             <button
               type="button"
+              data-tooltip="Toggle Workspace Access Guard"
               style={{
                 ...buttonStyle,
                 background: workspaceAccessGuardEnabled ? '#1f6feb' : 'transparent',
@@ -118,10 +119,10 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({ turnHistory }) => {
           <section>
             <div style={labelStyle}>Allowed Working Folders</div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
-              <button type="button" style={buttonStyle} onClick={() => postToExtension({ type: 'workspaceAccessGuardPickAllowedRoots' } as any)}>
+              <button type="button" style={buttonStyle} data-tooltip="Pick a folder to allow" onClick={() => postToExtension({ type: 'workspaceAccessGuardPickAllowedRoots' } as any)}>
                 Add Folder
               </button>
-              <button type="button" style={buttonStyle} onClick={() => postToExtension({ type: 'workspaceAccessGuardAddCurrentWorkspace' } as any)}>
+              <button type="button" style={buttonStyle} data-tooltip="Allow current workspace folder" onClick={() => postToExtension({ type: 'workspaceAccessGuardAddCurrentWorkspace' } as any)}>
                 Add Workspace
               </button>
             </div>
@@ -144,6 +145,7 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({ turnHistory }) => {
                     <code style={{ color: DASH_COLORS.text, wordBreak: 'break-all', fontSize: '12px' }}>{root.path}</code>
                     <button
                       type="button"
+                      data-tooltip="Remove this allowed folder"
                       style={{ ...buttonStyle, padding: '4px 8px' }}
                       onClick={() => postToExtension({ type: 'workspaceAccessGuardRemoveAllowedRoot', root: root.path } as any)}
                     >
@@ -189,6 +191,7 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({ turnHistory }) => {
             <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
               <button
                 type="button"
+                data-tooltip="Test against a file path"
                 style={{ ...buttonStyle, background: testKind === 'path' ? '#1f6feb' : 'transparent' }}
                 onClick={() => setTestKind('path')}
               >
@@ -196,6 +199,7 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({ turnHistory }) => {
               </button>
               <button
                 type="button"
+                data-tooltip="Test against a shell command"
                 style={{ ...buttonStyle, background: testKind === 'command' ? '#1f6feb' : 'transparent' }}
                 onClick={() => setTestKind('command')}
               >
@@ -219,6 +223,7 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({ turnHistory }) => {
             />
             <button
               type="button"
+              data-tooltip="Check guard decision for input"
               style={{ ...buttonStyle, marginTop: '8px' }}
               onClick={() => {
                 const value = testValue.trim();

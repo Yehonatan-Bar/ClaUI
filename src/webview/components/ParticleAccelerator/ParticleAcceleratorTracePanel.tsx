@@ -292,6 +292,7 @@ export function ParticleAcceleratorTracePanel() {
           {recentTraces.length > INITIAL_TRACES_SHOWN && (
             <button
               onClick={() => setTracesExpanded(!tracesExpanded)}
+              data-tooltip={tracesExpanded ? 'Show fewer traces' : 'Show all traces'}
               style={{
                 marginTop: '4px',
                 padding: '4px 8px',

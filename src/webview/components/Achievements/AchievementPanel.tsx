@@ -138,7 +138,7 @@ export const AchievementPanel: React.FC = () => {
             <p>{tr.infoAiInsightDesc}</p>
           </div>
 
-          <button className="achievement-info-dismiss-btn" onClick={() => setInfoOpen(false)}>
+          <button className="achievement-info-dismiss-btn" onClick={() => setInfoOpen(false)} data-tooltip="Close info">
             {tr.gotIt}
           </button>
         </div>
@@ -164,7 +164,7 @@ export const AchievementPanel: React.FC = () => {
         ))}
       </div>
 
-      <button className="achievement-disable-btn" onClick={handleDisable}>
+      <button className="achievement-disable-btn" onClick={handleDisable} data-tooltip="Turn off achievements">
         {tr.turnOffAchievements}
       </button>
     </div>

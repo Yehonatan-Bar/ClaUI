@@ -26,6 +26,7 @@ export const SearchEmptyState: React.FC<{ onPickExample: (example: string) => vo
               type="button"
               className="smart-search-example-btn"
               onClick={() => onPickExample(ex)}
+              data-tooltip={`Use example: ${ex}`}
             >
               {ex}
             </button>

@@ -7,12 +7,13 @@ type TabKey = 'session' | 'project' | 'global';
 interface TabDef {
   key: TabKey;
   label: string;
+  tooltip: string;
 }
 
 const TABS: TabDef[] = [
-  { key: 'session', label: 'Session' },
-  { key: 'project', label: 'Project' },
-  { key: 'global', label: 'Global' },
+  { key: 'session', label: 'Session', tooltip: 'Prompts from the current session' },
+  { key: 'project', label: 'Project', tooltip: 'Prompts from all sessions in this project' },
+  { key: 'global', label: 'Global', tooltip: 'Prompts from all projects' },
 ];
 
 /**
@@ -97,6 +98,7 @@ export const PromptHistoryPanel: React.FC = () => {
               key={tab.key}
               className={`prompt-history-tab ${activeTab === tab.key ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.key)}
+              data-tooltip={tab.tooltip}
             >
               {tab.label}
             </button>

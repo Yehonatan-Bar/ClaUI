@@ -85,6 +85,7 @@ export const TeamInlineWidget: React.FC<TeamInlineWidgetProps> = ({
                 e.stopPropagation();
                 onOpenPanel();
               }}
+              data-tooltip="Open the Agent Teams management panel"
             >
               Open Team Panel
             </button>

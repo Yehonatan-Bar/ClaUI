@@ -131,6 +131,7 @@ export const JoinDialog: React.FC = () => {
             <button
               key={m}
               onClick={() => setMode(m)}
+              data-tooltip={m === 'create' ? 'Create a new session' : 'Join an existing session'}
               style={{
                 flex: 1,
                 padding: '6px 12px',
@@ -222,6 +223,7 @@ export const JoinDialog: React.FC = () => {
             <button
               key={prov}
               onClick={() => setAgentProvider(prov)}
+              data-tooltip={`Use ${prov === 'claude' ? 'Claude' : 'Codex'} provider`}
               style={{
                 flex: 1,
                 padding: '6px 12px',
@@ -255,6 +257,7 @@ export const JoinDialog: React.FC = () => {
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button
             onClick={() => setOpen(false)}
+            data-tooltip="Close dialog"
             style={{
               padding: '6px 16px',
               borderRadius: 4,
@@ -270,6 +273,7 @@ export const JoinDialog: React.FC = () => {
           <button
             onClick={handleSubmit}
             disabled={isConnecting}
+            data-tooltip={mode === 'create' ? 'Create session' : 'Join session'}
             style={{
               padding: '6px 16px',
               borderRadius: 4,

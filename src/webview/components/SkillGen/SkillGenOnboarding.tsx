@@ -386,6 +386,7 @@ export const SkillGenOnboarding: React.FC = () => {
                         key={code}
                         className={`skilldocs-lang-option${lang === code ? ' active' : ''}`}
                         onClick={() => handleSelectLang(code)}
+                        data-tooltip={`Show in ${TRANSLATIONS[code].label}`}
                       >
                         {TRANSLATIONS[code].label}
                       </button>
@@ -409,10 +410,10 @@ export const SkillGenOnboarding: React.FC = () => {
 
             {/* Footer */}
             <div className="skilldocs-modal-footer">
-              <button className="skilldocs-enable-btn" onClick={() => handleDecision(true)}>
+              <button className="skilldocs-enable-btn" onClick={() => handleDecision(true)} data-tooltip="Enable SkillDocs">
                 {t.enableBtn}
               </button>
-              <button className="skilldocs-skip-btn" onClick={() => handleDecision(false)}>
+              <button className="skilldocs-skip-btn" onClick={() => handleDecision(false)} data-tooltip="Skip SkillDocs onboarding">
                 {t.skipBtn}
               </button>
             </div>

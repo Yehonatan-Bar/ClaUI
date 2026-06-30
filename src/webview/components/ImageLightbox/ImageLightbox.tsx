@@ -434,7 +434,7 @@ export const ImageLightbox: React.FC = () => {
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
-            <button className="image-lightbox-ctx-item" onClick={handleCopy}>
+            <button className="image-lightbox-ctx-item" onClick={handleCopy} data-tooltip="Copy image with annotations to clipboard">
               Copy image
             </button>
           </div>

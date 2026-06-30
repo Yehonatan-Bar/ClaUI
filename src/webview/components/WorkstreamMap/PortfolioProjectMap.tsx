@@ -525,6 +525,7 @@ const PortfolioSnapshotFallback: React.FC<{
       {!isMissing && (
         <button
           onClick={onOpen}
+          data-tooltip="Open this project"
           style={{
             background: 'rgba(51, 65, 85, 0.55)',
             color: '#CBD5E1',
