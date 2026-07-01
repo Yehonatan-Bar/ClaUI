@@ -1,21 +1,35 @@
 # git-push.ps1 - Add all, commit with session name, and push to remote
 # Usage: npm run git:push
-#   or:  powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-push.ps1
+#   or:  powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-push.ps1 -Message "your message"
 
 param(
     [string]$Message
 )
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
+# NOTE: Do NOT set $ErrorActionPreference = "Stop" here. git writes progress and
+# warnings (e.g. "LF will be replaced by CRLF") to stderr even on success; under
+# "Stop" that stderr can abort the script on an otherwise-successful (exit 0)
+# call. We drive control flow off $LASTEXITCODE instead, and surface real
+# failures on STDERR so the VS Code extension can display them (the extension
+# reads stderr; anything written to stdout via Write-Host is not shown to the
+# user on failure).
+$ErrorActionPreference = "Continue"
 
-# Colors for output
+# Colors for output (stdout - informational only)
 function Write-Step($text)  { Write-Host "  -> $text" -ForegroundColor Cyan }
 function Write-Ok($text)    { Write-Host "  OK $text" -ForegroundColor Green }
-function Write-Err($text)   { Write-Host "  !! $text" -ForegroundColor Red }
+
+# Failures go to STDERR so the caller surfaces the real reason, then exit non-zero.
+function Fail($text) {
+    [Console]::Error.WriteLine("git-push failed: $text")
+    exit 1
+}
 
 # 1. Check for changes
 $status = git status --porcelain
+if ($LASTEXITCODE -ne 0) {
+    Fail "git status failed (exit $LASTEXITCODE). Is this a git repository with git on PATH?"
+}
 if (-not $status) {
     Write-Ok "Nothing to commit - working tree clean."
     exit 0
@@ -31,40 +45,37 @@ Write-Host ""
 if ($Message) {
     $commitMessage = $Message
 } else {
-    # Prompt user for session/task name
+    # Prompt user for session/task name (interactive use only)
     $commitMessage = Read-Host "Enter session/task name for commit message"
-    if (-not $commitMessage.Trim()) {
-        Write-Err "Commit message cannot be empty."
-        exit 1
+    if (-not $commitMessage -or -not $commitMessage.Trim()) {
+        Fail "Commit message cannot be empty."
     }
 }
 
-# 4. Stage all changes
+# 4. Stage all changes (capture output so a real failure is reported, not swallowed)
 Write-Step "Staging all changes..."
-git add -A
+$addOutput = (git add -A 2>&1 | Out-String).Trim()
 if ($LASTEXITCODE -ne 0) {
-    Write-Err "git add failed."
-    exit 1
+    Fail "git add failed (exit $LASTEXITCODE): $addOutput"
 }
 Write-Ok "All changes staged."
 
 # 5. Commit
 Write-Step "Committing: $commitMessage"
-git commit -m $commitMessage
+$commitOutput = (git commit -m $commitMessage 2>&1 | Out-String).Trim()
 if ($LASTEXITCODE -ne 0) {
-    Write-Err "git commit failed."
-    exit 1
+    Fail "git commit failed (exit $LASTEXITCODE): $commitOutput"
 }
-Write-Ok "Committed."
+Write-Ok "Committed. $commitOutput"
 
 # 6. Push
 Write-Step "Pushing to remote..."
-git push
+$pushOutput = (git push 2>&1 | Out-String).Trim()
 if ($LASTEXITCODE -ne 0) {
-    Write-Err "git push failed. You may need to pull first."
-    exit 1
+    Fail "git push failed (exit $LASTEXITCODE): $pushOutput`nYou may need to pull first or check your git credentials."
 }
 
 Write-Host ""
 Write-Ok "Done! All changes committed and pushed."
+if ($pushOutput) { Write-Host $pushOutput }
 Write-Host ""

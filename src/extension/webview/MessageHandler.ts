@@ -4859,14 +4859,23 @@ export class MessageHandler {
     cp.execFile(
       'powershell',
       ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', fullScriptPath, '-Message', commitMessage],
-      { cwd: workspaceRoot, timeout: 30000 },
+      { cwd: workspaceRoot, timeout: 120000 },
       (error: Error | null, stdout: string, stderr: string) => {
+        // The push script writes real failures to stderr, but its step markers
+        // and git's own output go to stdout. Surface BOTH so the user sees the
+        // actual reason (e.g. "git push failed: ...") instead of a bare
+        // "Command failed: powershell ...". A too-short timeout previously
+        // killed slow pushes mid-authentication, so it is bumped to 120s.
+        const combined = [stdout, stderr]
+          .map((s) => (s || '').trim())
+          .filter(Boolean)
+          .join('\n\n');
         if (error) {
-          this.log(`Git push failed: ${error.message}`);
+          this.log(`Git push failed: ${error.message}\n${combined}`);
           this.webview.postMessage({
             type: 'gitPushResult',
             success: false,
-            output: stderr || error.message,
+            output: combined || error.message,
           });
         } else {
           this.log('Git push succeeded');

@@ -12,7 +12,8 @@ const LANGUAGE_OPTIONS = [
 
 const MODEL_OPTIONS = [
   { value: 'claude-haiku-4-5-20251001', label: 'Haiku (fastest, cheapest)' },
-  { value: 'claude-sonnet-4-6', label: 'Sonnet (balanced)' },
+  { value: 'claude-sonnet-5', label: 'Sonnet 5 (agentic, near-Opus, low cost)' },
+  { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6 (balanced)' },
   { value: 'claude-opus-4-6', label: 'Opus (most capable)' },
 ];
 

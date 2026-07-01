@@ -1862,6 +1862,7 @@ export const InputArea: React.FC = () => {
                       onChange={(e) => handleEnhancerModelChange(e.target.value)}
                     >
                       <option value="claude-haiku-4-5-20251001">Haiku</option>
+                      <option value="claude-sonnet-5">Sonnet 5</option>
                       <option value="claude-sonnet-4-6">Sonnet 4.6</option>
                       <option value="claude-sonnet-4-5-20250929">Sonnet 4.5</option>
                       <option value="claude-opus-4-6">Opus 4.6</option>

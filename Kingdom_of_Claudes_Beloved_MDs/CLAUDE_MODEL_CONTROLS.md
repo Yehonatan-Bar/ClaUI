@@ -1,6 +1,6 @@
 # Claude Model Controls (Model, Thinking Effort, Fast Mode)
 
-Snapshot: 2026-06-16 (Default-resolution hint remembers last resolved model)
+Snapshot: 2026-07-01 (Sonnet 5 added to the model lineup)
 
 This document covers the three Claude-side controls exposed in the AI chip's
 model area:
@@ -121,6 +121,7 @@ and mirrored in the `claudeMirror.model` enum in `package.json`:
 | Fable 5 (Blocked) | `claude-fable-5` |
 | Opus 4.8 | `claude-opus-4-8` |
 | Opus 4.7 | `claude-opus-4-7` |
+| Sonnet 5 | `claude-sonnet-5` |
 | Sonnet 4.6 | `claude-sonnet-4-6` |
 | Sonnet 4.5 | `claude-sonnet-4-5-20250929` |
 | Opus 4.6 | `claude-opus-4-6` |
@@ -138,10 +139,15 @@ surfaced for selection but is not a general-availability lineup model. Fable 5
 
 **Context windows are not uniform.** `getModelMaxContext()` in
 `src/webview/utils/modelContextLimits.ts` returns `1_000_000` for the 1M-context
-models — Fable 5, Opus 4.6/4.7/4.8, and Sonnet 4.6 — and `200_000` for everything
-else (Sonnet 4.5, Haiku 4.5, Mythos 5, and older Claude models), so the
+models — Fable 5, Opus 4.6/4.7/4.8, Sonnet 4.6, and Sonnet 5 — and `200_000` for
+everything else (Sonnet 4.5, Haiku 4.5, Mythos 5, and older Claude models), so the
 context-usage gauge scales correctly. `inferClaudeModelLabel()` also treats
 `fable` and `mythos` as known families.
+
+Sonnet 5 (alias `claude-sonnet-5`, dated id `claude-sonnet-5-20260630`) is
+Anthropic's most agentic Sonnet — near-Opus quality at Sonnet-tier cost, with a
+1M-token context window. Its dated id resolves to the `Sonnet 5` label via the
+`value-<suffix>` prefix match in `getClaudeModelLabel()`.
 
 ### Message flow
 

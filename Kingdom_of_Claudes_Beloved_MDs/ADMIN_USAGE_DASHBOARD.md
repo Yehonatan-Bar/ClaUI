@@ -122,7 +122,7 @@ Windows: `today`, `7d`, `30d` (default), `quarter`. Always bucketed by server-re
 | Model | input | output | cacheCreation (5-min) | cacheRead |
 |---|---|---|---|---|
 | claude-opus-4-8 / 4-7 / 4-6 / 4-5 | 5.00 | 25.00 | 6.25 | 0.50 |
-| claude-sonnet-4-6 / 4-5 | 3.00 | 15.00 | 3.75 | 0.30 |
+| claude-sonnet-5 / 4-6 / 4-5 | 3.00 | 15.00 | 3.75 | 0.30 |
 | claude-haiku-4-5 | 1.00 | 5.00 | 1.25 | 0.10 |
 | claude-fable-5 | 10.00 | 50.00 | 12.50 | 1.00 |
 

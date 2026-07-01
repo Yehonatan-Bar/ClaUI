@@ -285,6 +285,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
       )}
       <div className="message-role">
         <span className="message-role-name">{isUser ? 'You' : 'Assistant'}</span>
+        {isProcessMessage && (
+          <span
+            className="process-badge"
+            data-tooltip="קלוד עוסק בתהליך: קורא קבצים, מריץ כלים, מחשב תשובה"
+          >
+            תהליך
+          </span>
+        )}
         {isFinalAnswer && (
           <span
             className="final-answer-badge"

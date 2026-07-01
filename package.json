@@ -566,6 +566,7 @@
             "claude-fable-5",
             "claude-opus-4-8",
             "claude-opus-4-7",
+            "claude-sonnet-5",
             "claude-sonnet-4-6",
             "claude-sonnet-4-5-20250929",
             "claude-opus-4-6",
@@ -577,6 +578,7 @@
             "Claude Fable 5 (Blocked)",
             "Claude Opus 4.8",
             "Claude Opus 4.7",
+            "Claude Sonnet 5 - most agentic Sonnet, near-Opus quality, low cost",
             "Claude Sonnet 4.6",
             "Claude Sonnet 4.5",
             "Claude Opus 4.6",
@@ -760,12 +762,14 @@
           "default": "claude-haiku-4-5-20251001",
           "enum": [
             "claude-haiku-4-5-20251001",
+            "claude-sonnet-5",
             "claude-sonnet-4-6",
             "claude-opus-4-6"
           ],
           "enumDescriptions": [
             "Haiku - fastest and cheapest, good for quick summaries (recommended)",
-            "Sonnet - higher quality analysis, moderate cost",
+            "Sonnet 5 - most agentic Sonnet, near-Opus quality, low cost",
+            "Sonnet 4.6 - higher quality analysis, moderate cost",
             "Opus - highest quality, slower and more expensive"
           ],
           "description": "Model used for background analysis: session naming, activity summaries, and semantic turn analysis"
@@ -780,12 +784,14 @@
           "default": "claude-sonnet-4-6",
           "enum": [
             "claude-haiku-4-5-20251001",
+            "claude-sonnet-5",
             "claude-sonnet-4-6",
             "claude-sonnet-4-5-20250929",
             "claude-opus-4-6"
           ],
           "enumDescriptions": [
             "Haiku - fastest and cheapest",
+            "Sonnet 5 - most agentic Sonnet, near-Opus quality, low cost",
             "Sonnet 4.6 - good balance of quality and speed (recommended)",
             "Sonnet 4.5 - previous generation",
             "Opus 4.6 - highest quality, slower"

@@ -96,7 +96,6 @@ claude-code-mirror/
 |   |   |   +-- CheckpointManager.ts      #   Per-session file change checkpoint for revert/redo
 |   |   |   +-- SessionTruncator.ts       #   Truncates JSONL for forked sessions (reduces API context)
 |   |   |   +-- sessionPathResolver.ts    #   Shared utility to find session JSONL files
-|   |   |   +-- MergeAssistantSession.ts  #   Fresh merge-focused Claude session for the Merge Conflict Assistant (bypassPermissions, target-checkout cwd)
 |   |   +-- multiparticipant/              #   Multi-participant shared session (Phase 0-2, Tracks A-D)
 |   |   |   +-- MultiParticipantProtocol.ts #  Client-server WebSocket message types, including A2A/typing/file/rename contracts
 |   |   |   +-- MultiParticipantClient.ts  #   WebSocket client connecting to coordination server
@@ -118,7 +117,6 @@ claude-code-mirror/
 |   |   |   +-- McpSecretsService.ts     #   SecretStorage registry for MCP placeholders + process env injection
 |   |   +-- auth/
 |   |   |   +-- AuthManager.ts           #   Claude CLI auth status/login/logout helpers
-|   |   |   +-- ClaudeAccountProfileStore.ts # Global Claude account profile CRUD + CLAUDE_CONFIG_DIR resolution
 |   |   +-- skillgen/
 |   |   |   +-- SkillGenStore.ts          #   Document ledger persistence (globalState)
 |   |   |   +-- SkillGenService.ts        #   Main orchestrator (scan, preflight, lock, pipeline, dedup, install)
@@ -163,11 +161,6 @@ claude-code-mirror/
 |   |   |   +-- ExternalWorkFolderIngestor.ts # Explicit folder import for external docs as workstreams
 |   |   |   +-- UserPortfolioStore.ts     #   Cross-project portfolio persistence (globalState, max 30 projects)
 |   |   |   +-- UserPortfolioManager.ts   #   Portfolio orchestrator: health scoring, resume algorithm, path validation
-|   |   +-- worktree/                      # Git worktree support (create/run/merge/remove + dashboard join)
-|   |   |   +-- worktreeTypes.ts           #   Wire/domain types (WorktreeInfo, MergePreview/Result/Options, WorktreeWithSessions)
-|   |   |   +-- WorktreeService.ts         #   All git ops via execFile (list/create/remove, merge engine, realpath join)
-|   |   |   +-- WorktreeSettings.ts        #   Reads claudeMirror.worktree.* settings
-|   |   |   +-- WorktreeController.ts      #   Bridges WorktreeService with the live tab list (join + merge mutations)
 |   |   +-- particle-accelerator/
 |   |   |   +-- ParticleAcceleratorTypes.ts        #   Shared types, version constants, settings interface
 |   |   |   +-- ParticleAcceleratorSettings.ts     #   VS Code settings reader (claudeMirror.particleAccelerator.*)
@@ -305,10 +298,10 @@ claude-code-mirror/
 |       |   +-- useRtlDetection.ts        #   detectRtl() / resolveDir() - RTL auto-detection (per-message LTR override lives in Zustand messageForcedLtr Set)
 |       |   +-- useFileMention.ts         #   @ file mention trigger detection, debounced search, popup state
 |       |   +-- useStatusBarCollapse.ts  #   3-stage responsive layout hook for grouped StatusBar (full/compact/minimal) + progressive right-side collapse (clock/MCP/usage)
-|       |   +-- useOutsideClick.ts      #   Centralized dismiss manager for all dropdowns/popovers (closes on outside click AND on webview window blur / focus loss)
+|       |   +-- useOutsideClick.ts      #   Centralized outside-click manager for all dropdowns/popovers
 |       +-- components/
 |       |   +-- StatusBadge.tsx           #   Shared compact status badge primitive
-|       |   +-- SecretProtectionStatusBadge.tsx # StatusBar Tools-menu DLP badge (Protection section) and audit/settings panel launcher
+|       |   +-- SecretProtectionStatusBadge.tsx # StatusBar DLP badge and audit/settings panel launcher
 |       |   +-- SettingsPanel.tsx         #   Secret Protection settings/audit/manifest overlay
 |       |   +-- AuditLogPanel.tsx         #   Interactive audit log and compliance evidence viewer
 |       |   +-- ChatView/
@@ -329,13 +322,13 @@ claude-code-mirror/
 |       |   |   +-- MarkdownContent.tsx  #   Markdown rendering with sanitization and link detection
 |       |   |   +-- filePathLinks.tsx   #   Clickable file path and URL detection and rendering
 |       |   +-- InputArea/
-|       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt/steer, usage-limit queue mode, scheduled messages, image paste, @ file mentions, ultrathink button, prompt navigation arrows + conversation edge jumps
+|       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt/steer, usage-limit queue mode, scheduled messages, image paste, @ file mentions, ultrathink button, prompt navigation arrows
 |       |   |   +-- FileMentionPopup.tsx  #   Autocomplete popup for @ file mentions
 |       |   |   +-- GitPushPanel.tsx      #   Config panel for git push (status, ask Claude to configure)
 |       |   |   +-- CustomSnippetPanel.tsx #  Config panel for the custom snippet button (text, Save, Clear)
 |       |   |   +-- CodexConsultPanel.tsx #   Input panel for Codex GPT expert consultation
 |       |   +-- ModelSelector/
-|       |   |   +-- ModelSelector.tsx          #   Claude model dropdown (Mythos 5, Fable 5, Opus 4.8/4.7/4.6, Sonnet 4.6/4.5, Haiku 4.5)
+|       |   |   +-- ModelSelector.tsx          #   Claude model dropdown (Opus 4.8/4.7/4.6, Sonnet 4.6/4.5, Haiku 4.5)
 |       |   |   +-- ClaudeEffortSelector.tsx   #   Claude thinking effort dropdown (Low/Medium/High/XHigh/Max)
 |       |   |   +-- ClaudeFastModeSelector.tsx  #   Claude Speed dropdown (Default / Fast, Opus only)
 |       |   |   +-- CodexModelSelector.tsx     #   Codex model dropdown (dynamic cache + fallback options)
@@ -453,12 +446,6 @@ claude-code-mirror/
 |       |   |   +-- layout.ts               #   Deterministic lane-based SVG layout algorithm
 |       |   |   +-- visualEncoding.ts        #   Status colors, shapes, sizes, line styles
 |       |   |   +-- animations.ts            #   CSS keyframe definitions
-|       |   +-- Worktree/
-|       |   |   +-- WorktreePanel.tsx         #   Full-screen worktree dashboard (cards + sessions + create/merge/remove)
-|       |   |   +-- MergeWizard.tsx           #   Staged merge modal (review/conflict/result) with abort + undo
-|       |   |   +-- MergeAssistantChat.tsx    #   Embedded merge-helper chat pane in the conflict stage (tool-activity line + suggestion chips)
-|       |   |   +-- worktreeColors.ts         #   GitHub-dark palette + provider badge colors/labels
-|       |   |   +-- index.ts                  #   Re-export
 |       |   +-- ParticleAccelerator/
 |       |   |   +-- ParticleAcceleratorStatusBadge.tsx  # StatusBar badge (green/red dot + summary text)
 |       |   |   +-- ParticleAcceleratorSettingsPanel.tsx # Toggle, hook management, status info
@@ -501,7 +488,7 @@ claude-code-mirror/
     +-- ACTIVITY_SUMMARIZER.md            #   Periodic activity summary via Haiku
     +-- ADVENTURE_WIDGET.md              #   Pixel-art dungeon crawler session visualizer
     +-- CLAUDE_AUTH_LOGIN_LOGOUT.md      #   Claude CLI account login/logout/status integration
-    +-- CLAUDE_MODEL_CONTROLS.md         #   Claude model (incl. Fable 5), thinking effort, and fast mode controls
+    +-- CLAUDE_MODEL_CONTROLS.md         #   Claude model (incl. Opus 4.8), thinking effort, and fast mode controls
     +-- CODEX_FAST_MODE.md              #   Codex Fast mode selector + CLI service tier override
     +-- CUSTOM_SNIPPET_BUTTON.md         #   Configurable text snippet button that injects text into the input
     +-- DRAG_AND_DROP_CHALLENGE.md        #   Why drag-and-drop is blocked, workarounds
@@ -527,17 +514,16 @@ claude-code-mirror/
     +-- USAGE_LIMIT_DEFERRED_SEND_PLAN.md #   Archived execution plan
     +-- SKILL_GENERATION.md             #   Auto skill generation from SR-PTD docs
     +-- WORKSTREAM_MAP.md               #   Workstream map feature (classification, visualization, editing)
-    +-- WORKTREE_SUPPORT.md             #   Git worktree create/run/merge/remove + dashboard (session<->worktree join)
 ```
 
 ---
 
 ## Component Index
 
-**SessionTab** - Bundles all per-tab resources (process, demux, control, message handler, webview panel) and wires them together. Each tab is fully independent with its own CLI process. Generates a colored SVG icon for the VS Code tab bar and supports tab renaming via a hover button. Supports per-tab CLI override (`cliPathOverride`) so Happy provider sessions can reuse the same pipeline while spawning `happy` instead of `claude`. Claude tabs also store a per-tab Claude account profile (`claudeAccountProfileId` + `claudeConfigDir`) and thread it through start, model switch, MCP restart, silent crash resume, cancel auto-resume, BTW sessions, merge assistant sessions, conversation replay, end-of-session summarization, and the per-tab one-shot CLI helpers (session naming, message/prompt translation, prompt enhancement, turn analysis, activity and Visual Progress summaries). Exposes `getCliPathOverride()`, `getProvider()`, and Claude account getters via `WebviewBridge`, stamps `sessionStarted` with provider/account metadata, and persists provider/account-aware metadata/analytics. Detects missing CLI binaries and Happy auth-required stderr patterns, suppresses known non-fatal CLI stderr notices (for example `Using Claude Code v... from npm`), and sends targeted guidance to the webview instead of generic noise. Focus behavior is hardened: window-focus events no longer call `panel.reveal()`, `focusInput` is delayed/throttled, and diagnostic logs capture schedule/suppress/post decisions.
+**SessionTab** - Bundles all per-tab resources (process, demux, control, message handler, webview panel) and wires them together. Each tab is fully independent with its own CLI process. Generates a colored SVG icon for the VS Code tab bar and supports tab renaming via a hover button. Supports per-tab CLI override (`cliPathOverride`) so Happy provider sessions can reuse the same pipeline while spawning `happy` instead of `claude`. Exposes `getCliPathOverride()` and `getProvider()` via `WebviewBridge`, stamps `sessionStarted` with the active provider, and persists provider-aware metadata/analytics (`claude` vs `remote`). Detects missing CLI binaries and Happy auth-required stderr patterns, suppresses known non-fatal CLI stderr notices (for example `Using Claude Code v... from npm`), and sends targeted guidance to the webview instead of generic noise. Focus behavior is hardened: window-focus events no longer call `panel.reveal()`, `focusInput` is delayed/throttled, and diagnostic logs capture schedule/suppress/post decisions.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**TabManager** - Manages all SessionTab instances. Tracks the active (focused) tab, provides create/close/closeAll methods, shares a single status bar item, assigns distinct colors from an 8-color palette, and groups tabs in the same editor column. Owns `ClaudeAccountProfileStore`, applies the current Claude account profile to new Claude tabs, persists `claudeAccountProfileId` in the open-tabs snapshot, restores tabs with their saved profile, and implements `handoffClaudeAccount(...)` for Claude-to-Claude account context handoff. Owns the open-tabs snapshot: listens to `onSessionIdAssigned` / `onNameChanged` / focus / close callbacks, writes a debounced per-workspace snapshot to `workspaceState`, and exposes `restoreFromSnapshot()` for startup restoration.
+**TabManager** - Manages all SessionTab instances. Tracks the active (focused) tab, provides create/close/closeAll methods, shares a single status bar item, assigns distinct colors from an 8-color palette, and groups tabs in the same editor column. Owns the open-tabs snapshot: listens to `onSessionIdAssigned` / `onNameChanged` / focus / close callbacks, writes a debounced per-workspace snapshot to `workspaceState`, and exposes `restoreFromSnapshot()` for startup restoration.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Session Restore on Startup** - Optional feature (setting `claudeMirror.restoreSessionsOnStartup`, default true). When enabled, automatically reopens all ClaUi tabs (Claude / Codex / Happy) that were open when VS Code last closed. Snapshot is stored per-workspace in `workspaceState`, capped by configurable setting `claudeMirror.restoreSessionsMaxTabs` (default 15, range 1–50), and restored serially with a progress notification. Tab selection prioritizes **most-recently focused tabs** (`lastFocusedAt` field) when truncating, and guarantees the **active tab is always included** even if it would fall outside the limit. Unrestored tabs are preserved as `preserved-{sessionId}` entries (up to 50 total) so users can manually reopen them later without losing metadata. Only the originally-active tab eagerly spawns its CLI process; the rest are restored as **lazy panels** that spawn their CLI on first user focus, keeping memory and CPU low when many tabs are restored but only a few are actively used. Tab order is preserved via `tabOrder` field assigned at shutdown. A sticky `restoreInProgress` flag in `workspaceState` acts as a **crash-loop breaker**: if a previous restore did not finish cleanly, auto-restore is skipped and a `Restore now` button is offered. Smart Search tabs are restored fresh (no resume): the snapshot keeps `tabKind='search'` + `searchModel`, and the restore branch calls `configureSearchMode` + `startSession({ cwd: $HOME })` instead of the resume path.
@@ -558,23 +544,17 @@ claude-code-mirror/
 **Silent Crash Resume** - Suppresses the legacy "process exited - Restart?" toast / `sessionEnded` UI on a non-zero CLI exit when an eligibility classifier passes. The tab is armed with the existing `pendingResumeSessionId`; on the next user message (or panel focus, for Claude), the extension transparently respawns the CLI with `--resume <sessionId>` (Claude) / `--resume <threadId>` (Codex), flushes any queued prompts, and streams responses normally. Mid-stream interruptions finalize the partial assistant bubble with a muted "(message ended unexpectedly)" footer (`ChatMessage.interrupted`). Failure paths (timeout, spawn-error, exit-while-spawning, fresh-session, cap-exhausted) escalate to the visible Restart UX and restore the user's typed text via a `messageDeferredFailed -> silent-resume-restore-input` handoff. Configurable via `claudeMirror.silentCrashResume.enabled` (default true), `.maxAttempts` (default 2), `.timeoutMs` (default 15000), `.reconnectingHintDelayMs` (default 4000). Telemetry under `[SilentResume]` tags in `Output -> ClaUi`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SILENT_CRASH_RESUME.md`
 
-**Multi-Participant Session** - Shared coding sessions where multiple humans and agents participate through a coordination server. Supports **multiple concurrent sessions** (rooms) identified by session number. Users **create** (name + number) or **join** (by number) sessions via separate protocol messages; the server rejects invalid operations (create on existing number, join on non-existent). Each room has isolated state (transcript, participants, deliveries, approvals). The server routes messages by name/routeKey prefix, builds delta context for agents, manages delivery lifecycles, A2A loop protection (LoopController + GuardService), rename handling, typing relay, JSONL persistence, ping/pong keepalive, and textDelta stream coalescing. Supports **reset session** (new sessionId, same sessionNumber, archives old JSONL) via "New Session" button in header. Persistence restores rooms on startup with participants marked offline for rejoin. Each ClaUi instance connects via WebSocket with auto-reconnect (exponential backoff that retries indefinitely for transient outages, identity-preserving rejoin with sessionNumber; a rejected handshake -- HTTP 401/403 from a wrong or missing auth token -- is treated as terminal: the client stops reconnecting, emits `authFailed`, and the tab shows a clear error in the dialog plus a VS Code toast instead of spinning forever), runs a headless local agent (Claude or Codex), and routes human input through the server. The webview uses the React bundle with `MPSessionView` (header shows session name + number badge + "New Session" button) as the top-level component, with full Zustand store integration for all MP state.
+**Multi-Participant Session** - Shared coding sessions where multiple humans and agents participate through a coordination server. Supports **multiple concurrent sessions** (rooms) identified by session number. Users **create** (name + number) or **join** (by number) sessions via separate protocol messages; the server rejects invalid operations (create on existing number, join on non-existent). Each room has isolated state (transcript, participants, deliveries, approvals). The server routes messages by name/routeKey prefix, builds delta context for agents, manages delivery lifecycles, A2A loop protection (LoopController + GuardService), rename handling, typing relay, JSONL persistence, ping/pong keepalive, and textDelta stream coalescing. Supports **reset session** (new sessionId, same sessionNumber, archives old JSONL) via "New Session" button in header. Persistence restores rooms on startup with participants marked offline for rejoin. Each ClaUi instance connects via WebSocket with auto-reconnect (exponential backoff, identity-preserving rejoin with sessionNumber), runs a headless local agent (Claude or Codex), and routes human input through the server. The webview uses the React bundle with `MPSessionView` (header shows session name + number badge + "New Session" button) as the top-level component, with full Zustand store integration for all MP state.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/MULTI_PARTICIPANT.md`
 > Server setup: `server/deploy/SERVER_SETUP_GUIDE.md` (user-facing guide designed to be given to an AI assistant for step-by-step deployment)
-
-**Admin Usage Dashboard** - Central, manager-facing web page served by the coordination server that aggregates token consumption and estimated **API cost** (raw token counts x editable price list, per model and token type) across all registered developers. The extension's `DeveloperUsageReporter` accumulates per-model/per-type counts and POSTs an hourly delta (consent-gated, default off; only numeric counts leave the client - never code/prompts/file names; offline reports fail silently and retry next cycle). The server adds an HTTP layer (`UsageHttpServer`, built on Node's `http`+`crypto`, **no new deps**) that shares the same `http.Server` as the existing WebSocket server - `CoordinationServer.start(port, httpServer?)` now attaches WS via `{ server }`. Routes: `POST /api/usage/register` (shared-secret gated) + `POST /api/usage/report` (bearer), admin `login`/`summary`/`developer`/`prices` (cookie/JWT via `AdminAuth`, scrypt-hashed creds + HS256), and the static `/admin` SPA. `UsageStore` persists append-only JSONL (developers + usage) replayed on startup; `UsageAggregator` derives KPIs, leaderboard, cost-over-time series, model mix, drill-down, and alerts (budget breach / usage spike / inactive developer), bucketed by server-received time. Developer-side commands: `registerUsageReporting`, `viewMyUsage` (personal card, no ranking), `disableUsageReporting`. Settings: `claudeMirror.usageReporting.enabled` / `.serverUrl` / `.developerName`.
-> Detail: `Kingdom_of_Claudes_Beloved_MDs/ADMIN_USAGE_DASHBOARD.md`
-> Server setup: `server/deploy/SERVER_SETUP_GUIDE.md`
 
 **ClaUiSidebarViewProvider** - Provides the Activity Bar sidebar launcher view (`claui.sidebarLauncher`) and forwards button clicks from the sidebar webview to existing extension commands (start session, history, discovery, logs). This gives ClaUi a dedicated left-side VS Code icon without moving the main chat UI into the sidebar.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ACTIVITY_BAR_LAUNCHER.md`
 
-**AuthManager** - Claude account auth helper for the extension host. Reads `.credentials.json` presence (legacy stub behavior) and runs `claude auth status --json` / `claude auth logout` via `execFile` with a 10s timeout. Calls are profile-aware: non-default Claude account profiles inject `CLAUDE_CONFIG_DIR`, while the Default profile keeps normal `~/.claude` behavior. Returns normalized `{ loggedIn, email, subscriptionType }` to `MessageHandler`, which forwards status to the webview and triggers logout refresh.
-
-**ClaudeAccountProfileStore** - GlobalState-backed profile registry for multiple Claude Code accounts. Stores `{ id, label, configDir, createdAt, lastUsedAt }`, provides built-in `Default`, creates per-profile config dirs under `<globalStorageUri>/claude-profiles/<profile-id>`, tracks the current profile for new Claude tabs, and resolves/ensures config dirs without editing `.credentials.json`.
+**AuthManager** - Claude account auth helper for the extension host. Reads `.claude/.credentials.json` presence (legacy stub behavior) and now runs `claude auth status --json` / `claude auth logout` via `execFile` with a 10s timeout. Returns normalized `{ loggedIn, email, subscriptionType }` to `MessageHandler`, which forwards status to the webview and triggers logout refresh.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CLAUDE_AUTH_LOGIN_LOGOUT.md`
 
-**ClaudeProcessManager** - Spawns the Claude CLI child process with stream-json flags, handles stdin/stdout piping, process lifecycle, and crash detection. Uses the shared `killProcessTree()` utility on Windows to kill the entire process tree (required because `shell: true` creates a cmd.exe wrapper that SIGTERM alone cannot penetrate). Reads the user's API key from SecretStorage before each spawn and passes it via `buildClaudeCliEnv()`. Accepts optional `claudeConfigDir` / `claudeAccountProfileId` start options and injects `CLAUDE_CONFIG_DIR` for non-default account profiles, logging only profile ids and shortened paths. Instantiated per-tab by SessionTab.
+**ClaudeProcessManager** - Spawns the Claude CLI child process with stream-json flags, handles stdin/stdout piping, process lifecycle, and crash detection. Uses the shared `killProcessTree()` utility on Windows to kill the entire process tree (required because `shell: true` creates a cmd.exe wrapper that SIGTERM alone cannot penetrate). Reads the user's API key from SecretStorage before each spawn and passes it via `buildClaudeCliEnv()`. Instantiated per-tab by SessionTab.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Process Tree Kill (`killTree.ts`)** - Shared utility for cross-platform child process tree termination. On Windows, uses `taskkill /F /T /PID` to kill the cmd.exe wrapper AND all descendant processes. On Unix, uses standard `SIGTERM`. Used by all 13 CLI spawn points: `ClaudeProcessManager`, `CodexExecProcessManager`, `SessionNamer`, `CodexSessionNamer`, `ActivitySummarizer`, `VisualProgressProcessor`, `MessageTranslator`, `TurnAnalyzer`, `PromptEnhancer`, `PromptTranslator`, `ClaudeCliCaller`, `AchievementInsightAnalyzer`, `PythonPhaseRunner`.
@@ -632,22 +612,19 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 
 **Scheduled Messages** - Users can schedule a message to be sent at a specific future time via a toggle in the send settings gear popover. A date/time picker sets the target time (default: 1 hour from now); the extension-side timer dispatches the message when the time arrives. A blue banner shows the scheduled message status with a cancel option. Only one scheduled message at a time (latest wins). State lives on the extension side (survives webview reloads) and is cleared on session lifecycle events. The shared InputArea flow is now wired for both Claude and Codex tabs; the Codex path keeps its own tab-local timer/state inside `CodexMessageHandler` and retries after 15 seconds if a turn is still busy at fire time. Mirrors the usage-limit deferred send architecture.
 
-**StatusBar (Grouped Layout)** - Bottom status bar reorganized with a UX-first grouped design. Uses **AI Chip** compound control (`AIChip.tsx`) showing Provider+Model+Permissions in one segmented button that opens a config panel with provider pills, model/permissions selectors, and carry-context. Claude/Codex provider pills are clean-session shortcuts and are never disabled by current-tab busy/handoff state, including the active provider pill for opening another same-provider session; carry-context remains a separate idle-only handoff action. Features organized into **3 semantic group dropdowns**: **Session** (History, Plans, Prompts, Dashboard, Teams, Achievements), **Tools** (Git, Consult, Babel Fish, SkillDocs, Feedback/Bugs), **View** (TextSettings/Font, Vitals toggle+settings). Right side shows **passive metrics**: session clock, MCP status, and the usage bar with inline progress indicator. Uses `useStatusBarCollapse` with 3 responsive stages for left-side dropdown grouping (`full` >=650px: all groups visible; `collapsed` 380-650px: Session + merged "More"; `minimal` <380px: single "Menu") AND progressive right-side collapse that moves bar elements into dropdowns as width shrinks: **Stage 1** (<580px) session timer moves into View dropdown, **Stage 2** (<500px) MCP chip moves into Tools dropdown, **Stage 3** (<430px) usage metric moves into View dropdown. All thresholds use hysteresis (20px gap) to prevent flicker. Reduces ~25 inline buttons to ~7 visible elements while keeping every feature exactly 1 click away. Dropdowns open upward with click-outside dismiss, webview-blur dismiss (auto-close when focus leaves the iframe, e.g. clicking the editor/terminal/another panel), mutual exclusivity, and Escape key support. StatusBar action clicks for History/Plans/Prompts now emit `[UiDebug][StatusBar]` logs with click detail + layout/dropdown state.
+**StatusBar (Grouped Layout)** - Bottom status bar reorganized with a UX-first grouped design. Uses **AI Chip** compound control (`AIChip.tsx`) showing Provider+Model+Permissions in one segmented button that opens a config panel with provider pills, model/permissions selectors, and carry-context. Claude/Codex provider pills are clean-session shortcuts and are never disabled by current-tab busy/handoff state, including the active provider pill for opening another same-provider session; carry-context remains a separate idle-only handoff action. Features organized into **3 semantic group dropdowns**: **Session** (History, Plans, Prompts, Dashboard, Teams, Achievements), **Tools** (Git, Consult, Babel Fish, SkillDocs, Feedback/Bugs), **View** (TextSettings/Font, Vitals toggle+settings). Right side shows **passive metrics**: session clock, MCP status, and the usage bar with inline progress indicator. Uses `useStatusBarCollapse` with 3 responsive stages for left-side dropdown grouping (`full` >=650px: all groups visible; `collapsed` 380-650px: Session + merged "More"; `minimal` <380px: single "Menu") AND progressive right-side collapse that moves bar elements into dropdowns as width shrinks: **Stage 1** (<580px) session timer moves into View dropdown, **Stage 2** (<500px) MCP chip moves into Tools dropdown, **Stage 3** (<430px) usage metric moves into View dropdown. All thresholds use hysteresis (20px gap) to prevent flicker. Reduces ~25 inline buttons to ~7 visible elements while keeping every feature exactly 1 click away. Dropdowns open upward with click-outside dismiss, mutual exclusivity, and Escape key support. StatusBar action clicks for History/Plans/Prompts now emit `[UiDebug][StatusBar]` logs with click detail + layout/dropdown state.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **Global Tooltip System** - Unified, VS Code-themed tooltip rendered via a single `GlobalTooltip` React component mounted at the App root. Uses document-level event delegation to detect `mouseover` on any element with a `data-tooltip` attribute, then renders a positioned tooltip via `createPortal`. 400ms hover delay, auto-flips above/below trigger, shifts horizontally to stay within viewport, hides on scroll. Accessible (`role="tooltip"`, dynamic `aria-describedby`). Touch-device guard. All ~25 component files use `data-tooltip="..."` instead of native `title` attributes.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/GLOBAL_TOOLTIP_SYSTEM.md`
 
-**UI Buttons & Commands Reference** - Bilingual (EN/HE) catalog of every command and UI button, each with its short hover tooltip and a detailed explanation. Built in three waves: (1) all 46 registered `claudeMirror.*` commands + Status Bar, Input Area, App-level controls; (2) the Chat view (message bubbles, code/tool/agent/team blocks, Plan Approval & Question bar, in-chat search, prompt history, links, "btw…"); (3) all feature panels (Dashboard, MCP, Worktree/Merge, Workstream Map, Teams, Multi-Participant, SkillGen, Achievements/Community, Review Loop, Particle/Super-Particle Accelerator, Settings, Bug Report, Vitals) and the Model/Provider/Permission selectors. Result: every interactive webview button now carries a hover tooltip (`data-tooltip` or native `title`); selectors carry a control-level `data-tooltip`. Tooltips are driven by `data-tooltip` (see Global Tooltip System).
-> Detail: `Kingdom_of_Claudes_Beloved_MDs/UI_BUTTONS_AND_COMMANDS.md`
-
 **Image Lightbox** - Full-screen overlay for viewing pasted/message images at natural size, annotating them (pencil/rect/arrow toolbar), and copying them to the OS clipboard with annotations baked in. Copy works via a Copy button in the toolbar or via right-click -> "Copy image" (a custom menu replaces VS Code's native context menu, which cannot copy images). Uses `navigator.clipboard.write` with `ClipboardItem('image/png')`. Portal-based component mounted at App root, driven by `lightboxImageSrc` Zustand state field.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/IMAGE_LIGHTBOX.md`
 
-**TextSettingsBar** - In-webview UI for adjusting chat text font size, font family, and typing personality theme. Supports Hebrew-friendly font presets and four rendering themes: Terminal Hacker, Retro, Zen, and Neo Zen. Settings are stored in Zustand and synced from VS Code configuration on startup and on change. (Per-message LTR alignment override is a separate per-message button on each MessageBubble — see `MARKDOWN_RENDERING.md`.)
-> Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
+**TextSettingsBar** - In-webview UI for adjusting chat text font size, font family, and typing personality theme. Supports Hebrew-friendly font presets and five rendering themes: Terminal Hacker, Retro, Zen, Neo Zen, and **Clarity** (high-contrast theme that visually separates user input, Claude's process, and final answer). Settings are stored in Zustand and synced from VS Code configuration on startup and on change. (Per-message LTR alignment override is a separate per-message button on each MessageBubble — see `MARKDOWN_RENDERING.md`.)
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/TYPING_PERSONALITY_THEMES.md`
 
-**ModelSelector / Codex Selectors** - Dropdowns in the AI chip for choosing provider-specific model behavior. Claude uses `ModelSelector` for Fable/Opus/Sonnet/Haiku/Mythos/CLI default and live-switches via `SessionTab.switchModel()`, plus `ClaudeEffortSelector` (thinking effort -> `--effort`) and `ClaudeFastModeSelector` (Speed -> `--settings` overlay), which persist to `claudeMirror.effortLevel` and `claudeMirror.fastMode` and apply on the next session start. Codex uses `CodexModelSelector`, `CodexReasoningEffortSelector`, and `CodexServiceTierSelector`; values persist to `claudeMirror.codex.model`, `claudeMirror.codex.reasoningEffort`, and `claudeMirror.codex.serviceTier`, then apply on the next `codex exec` turn. The Codex Speed selector passes Fast mode as `-c service_tier="fast" -c features.fast_mode=true` when selected. Shows the currently active runtime model label when connected; `claudeModelDisplay.ts` maps IDs like `claude-opus-4-7` to `Opus 4.7` in the AI chip, message badges, and dashboard metadata.
+**ModelSelector / Codex Selectors** - Dropdowns in the AI chip for choosing provider-specific model behavior. Claude uses `ModelSelector` for Opus/Sonnet/Haiku/CLI default and live-switches via `SessionTab.switchModel()`, plus `ClaudeEffortSelector` (thinking effort -> `--effort`) and `ClaudeFastModeSelector` (Speed -> `--settings` overlay), which persist to `claudeMirror.effortLevel` and `claudeMirror.fastMode` and apply on the next session start. Codex uses `CodexModelSelector`, `CodexReasoningEffortSelector`, and `CodexServiceTierSelector`; values persist to `claudeMirror.codex.model`, `claudeMirror.codex.reasoningEffort`, and `claudeMirror.codex.serviceTier`, then apply on the next `codex exec` turn. The Codex Speed selector passes Fast mode as `-c service_tier="fast" -c features.fast_mode=true` when selected. Shows the currently active runtime model label when connected; `claudeModelDisplay.ts` maps IDs like `claude-opus-4-7` to `Opus 4.7` in the AI chip, message badges, and dashboard metadata.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CLAUDE_MODEL_CONTROLS.md`
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_FAST_MODE.md`
@@ -664,7 +641,7 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **Ultrathink Button & Glow** - Brain icon button in the input area with a 3-state cycle (off -> single -> locked -> off), plus a separate lock button rendered directly above it as a shortcut to toggle `locked` mode. Single mode prepends "ultrathink" for one prompt then resets. Locked mode auto-prepends on every prompt and highlights both the brain button and the lock button. On activation, plays one of 4 random CSS animations. The word "ultrathink" displays with an animated rainbow glow effect in chat messages.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ULTRATHINK_BUTTON.md`
 
-**Prompt Navigation Arrows** - Four buttons above the Send button: double-triangle edge-jump buttons scroll the chat to the very start/end of the conversation (smooth `scrollTo` on `.message-list`), and single up/down arrows scroll to the previous/next user prompt. Prompt navigation filters messages by `role === 'user'`, tracks an index ref, and uses `data-message-id` DOM queries with `scrollIntoView({ behavior: 'smooth', block: 'center' })`. Edge jumps sync the index (start -> first prompt, end -> reset); the index also resets when new messages arrive.
+**Prompt Navigation Arrows** - Up/down arrow buttons above the Send button that scroll the chat view to the previous/next user prompt. Filters messages by `role === 'user'`, tracks an index ref, and uses `data-message-id` DOM queries with `scrollIntoView({ behavior: 'smooth', block: 'center' })`. Navigation index resets when new messages arrive.
 
 **Clear Session** - Button in the input area that resets all UI state (messages, cost, streaming) and restarts the CLI process. Sends `clearSession` message to the extension, which stops the current process and spawns a new one.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
@@ -672,7 +649,7 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **SessionStore** - Persists session metadata (ID, name, model, timestamps, first prompt) in VS Code `globalState`. The History command (`Ctrl+Shift+H`) first shows a source picker with two options: "Extension Sessions" (ClaUi-only sessions from SessionStore) and "All Sessions" (delegates to SessionDiscovery for disk-wide scan including CLI sessions). Extension Sessions shows session name, model, relative time, and first prompt line. Preserves existing names when sessions are resumed. Capped at 100 entries, sorted by most recently active. `claudeMirror.showHistory` now includes request-scoped diagnostics (`[showHistory#N] ...`) and an in-flight guard to prevent overlapping quick-pick flows.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**ConversationReader** - Reads full conversation history from Claude Code's local session storage (`<Claude config dir>/projects/<project-hash>/<session-id>.jsonl`, defaulting to `~/.claude`). When resuming a session, the CLI in pipe mode waits for user input before replaying messages. ConversationReader bypasses this by reading the JSONL file directly, merging partial assistant entries by message ID, filtering out tool_result and thinking blocks, and sending the conversation to the webview for immediate display. Used by `SessionTab.startSession()` during resume (not fork).
+**ConversationReader** - Reads full conversation history from Claude Code's local session storage (`~/.claude/projects/<project-hash>/<session-id>.jsonl`). When resuming a session, the CLI in pipe mode waits for user input before replaying messages. ConversationReader bypasses this by reading the JSONL file directly, merging partial assistant entries by message ID, filtering out tool_result and thinking blocks, and sending the conversation to the webview for immediate display. Used by `SessionTab.startSession()` during resume (not fork).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
 **SessionTruncator** - Truncates JSONL session files for fork-with-context-reduction. When a user forks a conversation at message N, creates a new JSONL file containing only messages 0..N-1 (plus metadata). Classifies JSONL lines (real user, tool_result user, isMeta user, assistant, metadata), maps them to UI message indices mirroring ConversationReader's logic, determines the cut point, extends forward through agentic tool_use loops to avoid dangling tool_use blocks, and ensures the truncated file ends with an assistant message. The fork command uses `--resume <truncated-id>` (no `--fork-session`) so the CLI loads only the truncated context. Falls back to the original full-fork behavior on any failure. Path resolution uses the shared `sessionPathResolver` utility.
@@ -742,10 +719,10 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **Token-Usage Ratio Tracker** - Correlates token consumption with Anthropic usage percentage to answer "how many tokens equal 1% of usage?" Uses cost-weighted token calculation (Output=5x, CacheWrite=1.25x, Input=1x, CacheRead=0.1x) so the ratio accurately reflects actual API spend. Global singleton (`TokenUsageRatioTracker`) injected via extension.ts -> TabManager -> SessionTab -> MessageHandler. Samples every 5 turns: records cumulative weighted tokens, fetches usage % via `UsageFetcher`, computes delta-based `tokensPerPercent` ratio. Stores up to 500 samples in VS Code `globalState` (persists across sessions). Groups samples by billing bucket, computes per-bucket summaries (avg, latest, trend). Displayed in the dashboard's **User** mode (top-level, alongside Session and Project) since it operates at user level, not session or project level. Dashboard `TokenRatioTab` shows summary cards with cost weight info, Recharts trend line, raw + weighted token columns in samples table. The trend chart uses period-aware X-axis labels (time for 5/24-hour buckets, date for 7-day+ buckets). Serialized write queue prevents race conditions from concurrent tabs.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ANALYTICS_DASHBOARD.md`
 
-**Auto Skill Generation** - **Opt-in (off by default; enabled via the SkillDocs onboarding or the gear toggle).** Automatically generates Claude skills from accumulated SR-PTD documentation files. Scans a configurable docs directory, maintains a persistent document ledger (fingerprint-based change detection), and triggers a phase-orchestrated pipeline when the pending document count reaches a configurable threshold. The pipeline runs 8 phases: non-AI phases (B, C.0-C.1, C.5, sanity) execute as Python subprocesses, while AI phases (C.2 tag enrichment, C.3 incremental clustering, C.4 cross-bucket merge, D skill synthesis) use Claude Code CLI one-shot calls -- no API key required. Features configurable min-docs thresholds (C3 minDocsPerBucket=3, C4 minDocsPerSkill=3), aggressive merge bias (maxSkillsPerRollup=2), 120-char trigger-first descriptions, lower dedup upgrade threshold (0.45), usage tracking via `SkillUsageTracker` (`_usage.json`), and auto-archiving when skills exceed maxSkills cap (50). 3-tier deduplication, atomic install with backup/rollback, cross-process locking, resume support. Backend: `SkillGenStore`, `SkillGenService`, `PhaseOrchestrator`, `ClaudeCliCaller`, `phases/*`, `DeduplicationEngine`, `SkillInstaller`, `SkillUsageTracker`. Frontend: `SkillGenPanel`.
+**Auto Skill Generation** - Automatically generates Claude skills from accumulated SR-PTD documentation files. Scans a configurable docs directory, maintains a persistent document ledger (fingerprint-based change detection), and triggers a phase-orchestrated pipeline when the pending document count reaches a configurable threshold. The pipeline runs 8 phases: non-AI phases (B, C.0-C.1, C.5, sanity) execute as Python subprocesses, while AI phases (C.2 tag enrichment, C.3 incremental clustering, C.4 cross-bucket merge, D skill synthesis) use Claude Code CLI one-shot calls -- no API key required. Features configurable min-docs thresholds (C3 minDocsPerBucket=3, C4 minDocsPerSkill=3), aggressive merge bias (maxSkillsPerRollup=2), 120-char trigger-first descriptions, lower dedup upgrade threshold (0.45), usage tracking via `SkillUsageTracker` (`_usage.json`), and auto-archiving when skills exceed maxSkills cap (50). 3-tier deduplication, atomic install with backup/rollback, cross-process locking, resume support. Backend: `SkillGenStore`, `SkillGenService`, `PhaseOrchestrator`, `ClaudeCliCaller`, `phases/*`, `DeduplicationEngine`, `SkillInstaller`, `SkillUsageTracker`. Frontend: `SkillGenPanel`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SKILL_GENERATION.md`
 
-**SR-PTD Bootstrap** - **Opt-in.** Only when both `claudeMirror.skillGen.enabled` and `claudeMirror.srPtdAutoInject` are `true` does it install the bundled SR-PTD skill to `~/.claude/skills/sr-ptd-skill/` and inject post-task documentation instructions into the project-level `CLAUDE.md`. Skill files are only overwritten when the bundled version changes (size comparison). CLAUDE.md injection uses marker-based duplicate detection (`MANDATORY: Post-Task Documentation (SR-PTD)`). The docs save path in the template uses the configured `claudeMirror.skillGen.docsDirectory` value. Both settings default to `false`; a `onDidChangeConfiguration` listener in `extension.ts` re-applies the bootstrap (install/inject or remove) the moment the user toggles either, so opting in/out takes effect without a reload. The SkillDocs onboarding "Enable" button sets both settings to `true`.
+**SR-PTD Bootstrap** - On activation, automatically installs the bundled SR-PTD skill to `~/.claude/skills/sr-ptd-skill/` and injects post-task documentation instructions into the project-level `CLAUDE.md`. Skill files are only overwritten when the bundled version changes (size comparison). CLAUDE.md injection uses marker-based duplicate detection (`MANDATORY: Post-Task Documentation (SR-PTD)`). The docs save path in the template uses the configured `claudeMirror.skillGen.docsDirectory` value. Enabled by default, can be disabled via `claudeMirror.srPtdAutoInject`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SKILL_GENERATION.md`
 
 **Prompt Enhancer** - AI-powered prompt rewriting that improves user prompts before sending. Uses a one-shot `claude -p` CLI call with a meta-prompt applying advanced prompt engineering (scaffolding, structure, context cues). Manual mode: sparkles button or Ctrl+Shift+E opens a comparison panel showing original and enhanced prompts stacked vertically for side-by-side review. Auto mode: intercepts Send, enhances, then auto-sends (falls back to original on failure). Gear popover with auto-enhance toggle and model selector. Configurable via `claudeMirror.promptEnhancer.*` settings.
@@ -756,9 +733,6 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 
 **Codex Consultation** - Consult an external GPT expert (Codex) directly from the chat UI. A "Consult" button in the StatusBar opens an input panel where the user types a question. The question is sent to the Claude CLI session as a structured prompt instructing Claude to enrich it with system context and call the `mcp__codex__codex` MCP tool. The Codex response streams into the chat, and Claude continues development based on the advice.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_CONSULTATION.md`
-
-**Review Loop** - Automatic Claude+Codex review cycle started from a "Review Loop" StatusBar button. Claude writes a clean handover (sentinel-wrapped), a persistent read-only Codex reviewer inspects the actual workspace code, and a lightweight Haiku classifier decides approve vs. changes. On changes, the feedback returns to Claude and the cycle repeats until approval or the round cap (default 5). A live panel shows the transcript with a Stop button.
-> Detail: `Kingdom_of_Claudes_Beloved_MDs/REVIEW_LOOP.md`
 
 **File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/DRAG_AND_DROP_CHALLENGE.md`
@@ -790,7 +764,7 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **Secret Protection Demo Test Harness** -- Comprehensive evidence-producing test suite for the Secret Protection Broker covering all 13 DLP boundaries, all rule packs, and all enforcement modes. Wired boundaries execute through `SecretProtectionBroker`; `git.diff`, `mcp.response`, and `telemetry.export` are recorded as scanner-only. 26 fixtures (21 dirty, 5 clean) include rule-aligned `minimumExpectedFindings`, expected rule IDs/finding types, severity floors, and clean negative cases. Outputs include `demo-results.json`, `live-evidence.json`, `screenshot-manifest.json`, audit JSONL, no-regression clean workflow proxy evidence, policy decision matrix, acceptance failures, and a generated HTML report.
 > Detail: `tests/secret-protection-demo/DEMO_GUIDE.md`
 
-**Super Particle Accelerator (SPA)** -- Hook-based secret write guard that intercepts every AI agent write operation (Edit, Write, Bash file-writes, MCP writes, git commit/push) and blocks any attempt to write API keys, tokens, credentials, or other secrets into the codebase. Runs as Claude Code and Codex hooks (PreToolUse, PermissionRequest, PostToolUse, Stop). Architecture: deny-first waterfall policy engine with 5 gates (no findings, placeholder filter, public-path hard deny, gitignored env file audit, exception matching). PathClassifier maps files to risk levels (public-client-code, generated-public-artifact, server-code, local-secret-file, unknown-repository-file). GitStateScanner verifies gitignore status and scans staged/unstaged/untracked files. Per-session baselines prevent blocking pre-existing secrets in Stop hook. Extension-side: SuperParticleAcceleratorService manages lifecycle and hook installation, SuperParticleAcceleratorHookManager installs SPA hooks BEFORE PA hooks with per-matcher status verification, SuperParticleAcceleratorEnvBuilder always injects CLAUI_SPA_STORE_DIR (even when disabled) for file-based mid-session activation via `runtime-enabled.json`. UI: StatusBadge in the StatusBar Tools menu (Protection section), modal SPA panel with enable toggle, mode selector, audit event viewer. Configurable via `claudeMirror.superParticleAccelerator.*` (11 settings).
+**Super Particle Accelerator (SPA)** -- Hook-based secret write guard that intercepts every AI agent write operation (Edit, Write, Bash file-writes, MCP writes, git commit/push) and blocks any attempt to write API keys, tokens, credentials, or other secrets into the codebase. Runs as Claude Code and Codex hooks (PreToolUse, PermissionRequest, PostToolUse, Stop). Architecture: deny-first waterfall policy engine with 5 gates (no findings, placeholder filter, public-path hard deny, gitignored env file audit, exception matching). PathClassifier maps files to risk levels (public-client-code, generated-public-artifact, server-code, local-secret-file, unknown-repository-file). GitStateScanner verifies gitignore status and scans staged/unstaged/untracked files. Per-session baselines prevent blocking pre-existing secrets in Stop hook. Extension-side: SuperParticleAcceleratorService manages lifecycle and hook installation, SuperParticleAcceleratorHookManager installs SPA hooks BEFORE PA hooks with per-matcher status verification, SuperParticleAcceleratorEnvBuilder always injects CLAUI_SPA_STORE_DIR (even when disabled) for file-based mid-session activation via `runtime-enabled.json`. UI: StatusBadge in StatusBar, modal SPA panel with enable toggle, mode selector, audit event viewer. Configurable via `claudeMirror.superParticleAccelerator.*` (11 settings).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SUPER_PARTICLE_ACCELERATOR.md`
 
 **Workspace Access Guard (WAG)** -- Hook-based filesystem boundary enforcer that prevents AI coding agents (Claude Code and Codex) from reading, writing, or searching files outside user-approved working folders or inside organization-denied folders (credential stores, browser profiles, SSH keys, cloud configs). Claude coverage uses PreToolUse hooks; Codex coverage uses PreToolUse hooks plus a Bash PermissionRequest hook. WAG entries are installed BEFORE SPA and PA hooks. Architecture: Windows path normalizer handles Git Bash `/c/`, WSL `/mnt/c/`, `%ENV%`, `$ENV`, `~`, relative paths, and symlinks/junctions; segment-aware containment uses `path.win32.relative()` (not prefix matching); command parser tokenizes Bash commands and classifies 10 access kinds (recursive-file-read, file-write, git-operation, network-or-exfiltration, unknown-file-access, etc.); two-layer policy: user-allowed roots + organization-denied roots (deny always wins), including wildcard denied roots and deny-by-default when no allowed roots exist. Runtime hooks load the complete `runtime-enabled.json` settings snapshot and apply env overrides for hook-time toggles; direct file tool requests with no parseable path fail closed. Organization policy loads from `C:\ProgramData\ClaUi\workspace-access-guard.policy.json` with 20 built-in Windows denied roots as fallback. JSONL audit logging records denied/audit decisions without file contents. Extension-side: `WorkspaceAccessGuardService` manages lifecycle, hook installation, user roots store, org policy loader, test helpers, and env injection through `SessionTab`/`CodexSessionTab` process managers. UI: Dashboard Tools tab card for enable/mode, allowed roots, org policy status, audit preview, and path/command testing. Configurable via `claudeMirror.workspaceAccessGuard.*` (14 settings). Tests: `tests/workspace-access-guard/*`.
@@ -798,9 +772,6 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 
 **Workstream Map** -- Subway-map style visualization that groups sessions into logical workstreams (coherent threads of work with a goal, status, and history). AI-powered classification pipeline: scoped to open-tab sessions + last 3 days, heuristic pre-clustering (git branch, file overlap Jaccard, temporal proximity), then Sonnet classification via stdin-piped CLI call. Explicit external folder import lets the user enter a folder path and digest supported documents (`md/txt/json/yaml/html/xml/docx`, capped) into a dashed `external_folder` workstream with source-file evidence; normal reclassification preserves those imported workstreams. Stations represent meaningful events (milestones, decisions, blockers, discoveries). SVG deterministic lane layout with visual encodings for status, confidence, type. Layers: Current State, Resume View, Plan Overlay, Resolve Mode. Backend: `WorkstreamManager` orchestrator + 14 service classes. Frontend includes `UserPortfolioView`, `PortfolioProjectMap`, `ProjectMapView`, and shared SVG primitives. Claude and Codex tabs both route Workstream Map/Portfolio messages through the shared manager. Includes **User Portfolio View** (cross-project): `UserPortfolioManager` + `UserPortfolioStore` use `globalState` for cross-workspace persistence; project health scoring (healthy/needs_attention/blocked/stale), cross-project resume recommendations, path validation for deleted projects, and a stacked full-map overview that renders every cached project workstream with simple project separators. Portfolio auto-open is suppressed for unclassified current workspaces so the empty Project Map remains available for first classification. Commands: `claudeMirror.openWorkstreamMap`, `claudeMirror.openWorkstreamPortfolio`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/WORKSTREAM_MAP.md`
-
-**Worktree Support** -- Lets a user create, run, merge, and remove git worktrees (isolated checkouts on their own branch) so several sessions edit code in parallel without fighting over the same files. ClaUi runs `git worktree add` itself and spawns the session with `cwd` = the worktree path (no dependency on the CLI `--worktree` flag); the worktree path is persisted per tab and threaded through every re-spawn and window-reload so a session never silently jumps back to the main repo. A full-screen dashboard (StatusBar -> Session -> Worktrees, or the `claudeMirror.openWorktreePanel` command) joins `git worktree list` against the live tab list using realpath-normalized paths and shows each worktree card with the sessions running on it. A guided **merge wizard** integrates a worktree's branch into a target branch with conflict prediction (`git merge-tree`), merge/squash/fast-forward strategies (rebase intentionally excluded), an editor-based conflict-resolution loop with real **abort**, optional remove/push-after, and a one-click **undo** (non-destructive revert by default; guarded history-rewrite only when provably unpushed). A persistent in-progress bar resumes or aborts a paused merge even after a reload. When a merge pauses with conflicts, an opt-in **Merge Conflict Assistant** embeds a chat pane in the conflict stage: a fresh, merge-focused Claude session (`MergeAssistantSession`, cloned from the BTW background-session pattern) runs in the target checkout with `bypassPermissions` so it can read the conflicts, answer questions, and -- on request -- edit conflicted files and `git add` them; an instruction-only boundary (no hard gate) keeps finalization on the wizard's Complete/Abort buttons, which run kill-before-teardown and a `git ls-files -u` re-sync gate. Backend: `WorktreeService` (all git via injection-safe `execFile`), `WorktreeController` (session<->worktree join + merge mutations + conflict re-read), `WorktreeSettings`. Create auto-starts a session via an opt-out checkbox; remove is blocked for the main worktree and for cards with a live session, and prompts before discarding dirty changes. An existing **Claude** session can also be **moved into a worktree** (`claudeMirror.moveSessionToWorktree`, QuickPick): ClaUi copies the session transcript into the target tree's CLI project folder (`relocateSessionTranscript` in `sessionPathResolver.ts`) then kills + `--resume`s the CLI with the worktree as its new `cwd`, so all further changes happen in that tree -- idle Claude sessions only. Any session running in a non-primary worktree shows a small **in-chat indicator** -- a green git-branch chip with the worktree name in the StatusBar (suppressed in the primary worktree); the worktree identity rides on the existing `sessionStarted` message and is held in the `sessionWorktree` store slice. Configurable via `claudeMirror.worktree.*` (8 settings). Commands: `claudeMirror.openWorktreePanel`, `claudeMirror.createWorktreeSession`, `claudeMirror.moveSessionToWorktree`.
-> Detail: `Kingdom_of_Claudes_Beloved_MDs/WORKTREE_SUPPORT.md`
 
 ---
 
@@ -814,11 +785,11 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 | `claudeMirror.autoRestart` | `true` | Auto-restart process on crash |
 | `claudeMirror.chatFontSize` | `14` | Font size (px) for chat messages (10-32) |
 | `claudeMirror.chatFontFamily` | `""` | Font family for chat messages (empty = VS Code default) |
-| `claudeMirror.typingTheme` | `"neo-zen"` | Response rendering personality theme: "terminal-hacker", "retro", "zen", "neo-zen", or "clarity" (high-contrast: color-codes user input vs Claude output, dims process steps, highlights the final answer). See `Kingdom_of_Claudes_Beloved_MDs/TYPING_PERSONALITY_THEMES.md` |
+| `claudeMirror.typingTheme` | `"neo-zen"` | Response rendering personality theme: "terminal-hacker", "retro", "zen", "neo-zen", or "clarity" (Clarity separates user input in blue, process in purple, and final answer in green) |
 | `claudeMirror.autoNameSessions` | `true` | Auto-generate tab names from first message (Claude: Haiku, Codex: one-shot codex exec) |
 | `claudeMirror.activitySummary` | `true` | Periodically summarize tool activity in busy indicator via Haiku |
 | `claudeMirror.activitySummaryThreshold` | `3` | Tool uses before triggering an activity summary (1-10) |
-| `claudeMirror.model` | `""` | Claude model to use for new sessions (empty = CLI default; choices include Mythos 5, Fable 5, Opus 4.8/4.7/4.6, Sonnet 4.6/4.5, Haiku 4.5) |
+| `claudeMirror.model` | `""` | Claude model to use for new sessions (empty = CLI default; choices include Opus 4.8/4.7/4.6, Sonnet 4.6/4.5, Haiku 4.5) |
 | `claudeMirror.effortLevel` | `""` | Claude thinking effort level (empty = model default; choices: low/medium/high/xhigh/max) |
 | `claudeMirror.fastMode` | `false` | Claude Fast mode: ~2.5x faster output on Opus (4.8/4.7/4.6), costs more, no effect on Sonnet/Haiku; applied via a `--settings` overlay on next session start |
 | `claudeMirror.permissionMode` | `"full-access"` | Permission mode: "full-access" (all tools) or "supervised" (read-only tools only) |
@@ -844,33 +815,24 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 | `claudeMirror.gitPush.enabled` | `true` | Whether git push is configured and ready to use via the Git button |
 | `claudeMirror.gitPush.scriptPath` | `"scripts/git-push.ps1"` | Path to the git push script (relative to workspace root) |
 | `claudeMirror.gitPush.commitMessageTemplate` | `"{sessionName}"` | Commit message template ({sessionName} = tab name) |
-| `claudeMirror.worktree.enabled` | `true` | Enable the git worktree dashboard (create/run/remove sessions in isolated worktrees) |
-| `claudeMirror.worktree.directory` | `".claude/worktrees"` | Directory (relative to repo root) for new worktrees; mirrors the Claude CLI convention |
-| `claudeMirror.worktree.branchPrefix` | `"worktree-"` | Prefix for branches created with a new worktree (branch = prefix + name) |
-| `claudeMirror.worktree.baseBranch` | `"origin/HEAD"` | Default base ref for new worktrees; falls back to current HEAD when unresolved |
-| `claudeMirror.worktree.copyIncludeFile` | `true` | Copy `.worktreeinclude` entries (e.g. `.env`) into each newly created worktree |
-| `claudeMirror.worktree.defaultMergeStrategy` | `"merge"` | Strategy pre-selected in the merge wizard (`merge`/`squash`/`ff`) |
-| `claudeMirror.worktree.removeAfterMerge` | `false` | Default state of "remove worktree after a successful merge" |
-| `claudeMirror.worktree.confirmMergeIntoProtected` | `true` | Extra confirm step when the merge target is `main`/`master` |
-| `claudeMirror.srPtdAutoInject` | `false` | Opt-in: inject SR-PTD instructions into project CLAUDE.md and install sr-ptd-skill (requires skillGen.enabled) |
-| `claudeMirror.skillGen.enabled` | `false` | Opt-in master switch for skill generation (enabled via SkillDocs onboarding or gear toggle) |
-| `claudeMirror.skillGen.threshold` | `30` | Number of new SR-PTD docs to trigger generation (5-100) |
-| `claudeMirror.skillGen.docsDirectory` | `"C:/projects/Skills/Dev_doc_for_skills"` | Directory containing SR-PTD documents |
-| `claudeMirror.skillGen.docsPattern` | `"SR-PTD*.md"` | Glob pattern for SR-PTD files |
-| `claudeMirror.skillGen.skillsDirectory` | `""` (defaults to `~/.claude/skills`) | Target directory for generated skills |
+| `claudeMirror.srPtdAutoInject` | `true` | Automatically inject SR-PTD instructions into project CLAUDE.md and install sr-ptd-skill |
+| `claudeMirror.skillGen.enabled` | `true` | Enable auto skill generation feature (toggleable via gear icon in UI) |
+| `claudeMirror.skillGen.threshold` | `5` | Number of new SR-PTD docs to trigger generation (1-50) |
+| `claudeMirror.skillGen.docsDirectory` | `"C:\\projects\\Skills\\Dev_doc_for_skills"` | Directory containing SR-PTD documents |
+| `claudeMirror.skillGen.docsPattern` | `"SR-PTD_*.md"` | Glob pattern for SR-PTD files |
+| `claudeMirror.skillGen.skillsDirectory` | `"~/.claude/skills"` | Target directory for generated skills |
 | `claudeMirror.skillGen.pythonPath` | `"python"` | Path to Python executable |
 | `claudeMirror.skillGen.toolkitPath` | `""` | Path to skill generation toolkit |
 | `claudeMirror.skillGen.workspaceDir` | `""` | Isolated workspace directory for pipeline |
 | `claudeMirror.skillGen.pipelineMode` | `"run_pipeline"` | Pipeline mode (legacy, ignored by PhaseOrchestrator) |
-| `claudeMirror.skillGen.autoRun` | `false` | Automatically run pipeline when threshold reached (else only notify) |
-| `claudeMirror.skillGen.timeoutMs` | `600000` | Pipeline timeout in milliseconds (10 min default) |
-| `claudeMirror.skillGen.aiDeduplication` | `true` | Enable AI-powered deduplication (Tier 3) |
+| `claudeMirror.skillGen.autoRun` | `true` | Automatically run pipeline when threshold reached |
+| `claudeMirror.skillGen.timeoutMs` | `300000` | Pipeline timeout in milliseconds (5 min default) |
+| `claudeMirror.skillGen.aiDeduplication` | `false` | Enable AI-powered deduplication (Tier 3) |
 | `claudeMirror.teams.enabled` | `true` | Enable Agent Teams detection and visualization |
 | `claudeMirror.teams.autoOpenPanel` | `true` | Auto-open team panel when a team is detected |
 | `claudeMirror.teams.pollIntervalMs` | `2000` | Polling interval for team file watching (ms) |
 | `claudeMirror.sessionEndSummary` | `true` | Generate a 1-3 sentence summary at the end of every session (Haiku, with Codex low-reasoning fallback). Stored on the session and shown on hover in the Sessions TreeView. |
 | `claudeMirror.tabs.indicateGroupOnTitle` | `false` | When a tab belongs to a folder, also prefix its native tab title with a colored bar character (opt-in). |
-| `claudeMirror.claudeAccounts.experimentalTrueResume` | `false` | Reserved feature flag for future cross-account true resume; current implementation uses context handoff. |
 | `claudeMirror.smartSearch.defaultModel` | `"claude-sonnet-4-6"` | Default model used when `claudeMirror.smartSearch.open` is invoked from the command palette without a `model` argument. |
 | `claudeMirror.smartSearch.allowBash` | `true` | Allow the Smart Search agent to use Bash (ripgrep). Disable to restrict the agent to Read + Glob + Grep only. |
 | `claudeMirror.particleAccelerator.enabled` | `false` | Enable Particle Accelerator command output compression |
@@ -918,9 +880,6 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 | `claudeMirror.workspaceAccessGuard.denyUnresolvedSymlinkTargets` | `true` | Deny unresolved symlink/junction target traversal |
 | `claudeMirror.workspaceAccessGuard.denyUnknownFileAccessCommands` | `true` | Block unrecognized commands with potential file access |
 | `claudeMirror.workspaceAccessGuard.auditRetentionDays` | `90` | Retention window setting for WAG audit logs (1-365) |
-| `claudeMirror.usageReporting.enabled` | `false` | Send hourly token-usage reports to the team server for the Admin Usage Dashboard. Off by default; only after register + consent. Only numeric per-model/type counts are sent (never code/prompts/file names). See `Kingdom_of_Claudes_Beloved_MDs/ADMIN_USAGE_DASHBOARD.md` |
-| `claudeMirror.usageReporting.serverUrl` | `""` | HTTP(S) base URL of the usage/admin server. If empty, derived from `claudeMirror.multiParticipant.serverUrl` (ws->http, wss->https) |
-| `claudeMirror.usageReporting.developerName` | `""` | Display name shown for you in the Admin Usage Dashboard (prompted on register if empty) |
 
 ---
 
@@ -1173,63 +1132,6 @@ npm install -g @vscode/vsce
 | **6. Polish** | Pending | Virtualized scrolling, error recovery, theming |
 
 ---
-
-## 2026-06-11 - Claude Account Profiles
-
-### New Components
-
-- `src/extension/auth/ClaudeAccountProfileStore.ts`
-  - GlobalState-backed Claude account profile CRUD, current-profile tracking, and config-dir creation under `<globalStorageUri>/claude-profiles/<profile-id>`.
-- `Kingdom_of_Claudes_Beloved_MDs/CLAUDE_ACCOUNT_PROFILES.md`
-  - Detail doc for multi-account behavior, handoff, storage, and security notes.
-
-### Updated Components
-
-- `src/extension/process/ClaudeProcessManager.ts`
-  - Added `claudeConfigDir` / `claudeAccountProfileId` start options and injects `CLAUDE_CONFIG_DIR` for non-default profiles.
-- `src/extension/auth/AuthManager.ts`
-  - Auth status/logout are profile-aware and run with `CLAUDE_CONFIG_DIR` when supplied.
-- `src/extension/session/SessionTab.ts`
-  - Stores Claude account profile per tab and threads it through CLI start/restart/resume paths, auth status, conversation replay, BTW sessions, merge assistant sessions, and summary generation.
-- `src/extension/session/TabManager.ts`
-  - Applies current profile to new Claude tabs, persists/restores `claudeAccountProfileId`, handles deleted profiles gracefully, and adds Claude account context handoff.
-- `src/extension/session/OpenTabsSnapshot.ts`
-  - Adds `claudeAccountProfileId` to restored tab snapshots.
-- `src/extension/session/SessionStore.ts`
-  - Adds Claude account profile metadata for sessions and handoff links.
-- `src/extension/session/sessionPathResolver.ts`, `ConversationReader.ts`, `SessionTruncator.ts`, `SessionDiscovery.ts`, `SessionSummarizer.ts`
-  - Accept optional `claudeConfigDir` and default to `~/.claude` when omitted.
-- `src/extension/process/UsageFetcher.ts`
-  - Reads OAuth credentials from the selected profile config dir.
-- `src/extension/session/handoff/*`
-  - Capsule supports optional source/target account profile metadata.
-- `src/extension/process/envUtils.ts`
-  - `buildClaudeCliEnv` accepts an optional `claudeConfigDir` and injects `CLAUDE_CONFIG_DIR`.
-- `SessionNamer`, `MessageTranslator`, `PromptEnhancer`, `PromptTranslator`, `TurnAnalyzer`, `ActivitySummarizer`, `VisualProgressProcessor`
-  - Per-tab one-shot CLI helpers spawn with the tab's Claude account profile via a config-dir provider wired in `SessionTab`.
-- `src/extension/commands.ts`
-  - Adds account management, login/logout, new-tab-with-account, and account handoff commands.
-
-### Manifest/Settings Delta
-
-Added commands:
-
-- `claudeMirror.claudeAccounts.manage`
-- `claudeMirror.claudeAccounts.login`
-- `claudeMirror.claudeAccounts.logout`
-- `claudeMirror.newClaudeTabWithAccount`
-- `claudeMirror.switchClaudeAccountWithContext`
-
-Added setting:
-
-- `claudeMirror.claudeAccounts.experimentalTrueResume` (default `false`, reserved for future true resume).
-
-### Behavior Notes
-
-- ClaUi never edits `.credentials.json` manually.
-- `Default` profile keeps historical behavior with no `CLAUDE_CONFIG_DIR`.
-- Non-default profiles isolate Claude CLI auth/config under extension global storage.
-- MVP account switching uses context handoff into a new Claude tab; true cross-account `--resume` is not active yet.
 
 ## 2026-03-05 - Provider Handoff (Claude Code <-> Codex) Mid-Session
 
@@ -1552,7 +1454,7 @@ New setting in `package.json`:
 ### New Files
 
 - `src/webview/components/MultiParticipant/ParticipantList.tsx` -- Sidebar component showing all session participants with status dots, kind badges (H/A), provider icons (C/X), route key labels, typing indicators
-- `src/webview/components/MultiParticipant/JoinDialog.tsx` -- Modal join form with human name, agent name, provider selector, server URL input. Client-side validation (non-empty, max 32 chars) and error display. The error line shows join-rejection errors AND connection failures (server unreachable / auth rejected) by falling back to `mpConnectionMessage` when `mpConnectionStatus === 'error'`, so a failed connection no longer reopens a blank dialog that looks "stuck"
+- `src/webview/components/MultiParticipant/JoinDialog.tsx` -- Modal join form with human name, agent name, provider selector, server URL input. Client-side validation (non-empty, max 32 chars) and server error display
 - `src/webview/components/MultiParticipant/ConflictWarning.tsx` -- Dismissable banner for file conflict warnings showing conflicting file paths and agents
 - `src/webview/components/MultiParticipant/MpMessageBubble.tsx` -- MP-specific message renderer with deterministic author color from participantId hash, kind badge, delivery status dots, streaming text overlay, RTL support
 - `src/webview/components/MultiParticipant/mpColors.ts` -- 12-color palette with `hashParticipantColor()` for deterministic participant-to-color mapping
@@ -1561,7 +1463,7 @@ New setting in `package.json`:
 ### Updated Files
 
 - `src/webview/state/store.ts`
-  - Added MP state slice: `mpConnectionStatus`, `mpConnectionMessage`, `mpSession`, `mpParticipants`, `mpMessages`, `mpMyHumanId`, `mpMyAgentId`, `mpApprovals`, `mpTypingStates`, `mpFileConflicts`, `mpStreamingTexts`, `mpDeliveryStatuses`, `mpJoinDialogOpen`, `mpJoinError`, `mpRenameError`, `mpDismissedConflictIds`. `setMpConnectionStatus(status, message?)` populates both `mpConnectionStatus` and `mpConnectionMessage` (the latter surfaced by `JoinDialog` on a connection/auth error)
+  - Added MP state slice: `mpConnectionStatus`, `mpSession`, `mpParticipants`, `mpMessages`, `mpMyHumanId`, `mpMyAgentId`, `mpApprovals`, `mpTypingStates`, `mpFileConflicts`, `mpStreamingTexts`, `mpDeliveryStatuses`, `mpJoinDialogOpen`, `mpJoinError`, `mpRenameError`, `mpDismissedConflictIds`
   - Added all MP actions: `setMpConnectionStatus`, `setMpSession`, `addMpMessage`, `setMpParticipants`, `updateMpParticipant`, `removeMpParticipant`, `setMpDeliveryStatus`, `appendMpStreamingText`, `addMpApprovalEvent`, `resolveMpApproval`, `setMpFileConflict`, `dismissMpConflict`, `setMpTypingState`, `setMpJoinDialogOpen`, `setMpJoinError`, `setMpRenameError`, `clearMpState`
   - All MP state is cleared in `reset()`
 - `src/webview/hooks/useClaudeStream.ts`
