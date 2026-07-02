@@ -6,7 +6,7 @@ export interface ClaudeModelOption {
 export const CLAUDE_MODEL_OPTIONS: ClaudeModelOption[] = [
   { label: 'Mythos 5 (Blocked)', value: 'claude-mythos-5' },
   { label: 'Default', value: '' },
-  { label: 'Fable 5 (Blocked)', value: 'claude-fable-5' },
+  { label: 'Fable 5', value: 'claude-fable-5' },
   { label: 'Opus 4.8', value: 'claude-opus-4-8' },
   { label: 'Opus 4.7', value: 'claude-opus-4-7' },
   { label: 'Sonnet 5', value: 'claude-sonnet-5' },

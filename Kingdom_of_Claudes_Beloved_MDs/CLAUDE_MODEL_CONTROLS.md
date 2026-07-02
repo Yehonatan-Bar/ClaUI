@@ -1,6 +1,7 @@
 # Claude Model Controls (Model, Thinking Effort, Fast Mode)
 
-Snapshot: 2026-07-01 (Sonnet 5 added to the model lineup)
+Snapshot: 2026-07-02. Model lineup: Fable 5, Opus 4.8/4.7/4.6, Sonnet 5/4.6/4.5,
+Haiku 4.5 are selectable; Mythos 5 is marked blocked.
 
 This document covers the three Claude-side controls exposed in the AI chip's
 model area:
@@ -118,7 +119,7 @@ and mirrored in the `claudeMirror.model` enum in `package.json`:
 |-------|----------------------------|
 | Mythos 5 (Blocked) | `claude-mythos-5` |
 | Default | `""` (CLI default) |
-| Fable 5 (Blocked) | `claude-fable-5` |
+| Fable 5 | `claude-fable-5` |
 | Opus 4.8 | `claude-opus-4-8` |
 | Opus 4.7 | `claude-opus-4-7` |
 | Sonnet 5 | `claude-sonnet-5` |
@@ -135,7 +136,9 @@ Mythos 5 (`claude-mythos-5`) is listed first (at the top of the dropdown, above
 `Default`). It is a specialized/preview model — it has no entry in the CLI's
 general model/pricing table and ships a `claude-mythos-preview` variant, so it is
 surfaced for selection but is not a general-availability lineup model. Fable 5
-(alias `fable`, full id `claude-fable-5`) follows after `Default`.
+(alias `fable`, full id `claude-fable-5`) follows after `Default`. It is a
+general-availability model — Anthropic's most capable — with a 1M-token context
+window, so its label carries no `(Blocked)` marker.
 
 **Context windows are not uniform.** `getModelMaxContext()` in
 `src/webview/utils/modelContextLimits.ts` returns `1_000_000` for the 1M-context

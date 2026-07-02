@@ -328,7 +328,7 @@ claude-code-mirror/
 |       |   |   +-- CustomSnippetPanel.tsx #  Config panel for the custom snippet button (text, Save, Clear)
 |       |   |   +-- CodexConsultPanel.tsx #   Input panel for Codex GPT expert consultation
 |       |   +-- ModelSelector/
-|       |   |   +-- ModelSelector.tsx          #   Claude model dropdown (Opus 4.8/4.7/4.6, Sonnet 4.6/4.5, Haiku 4.5)
+|       |   |   +-- ModelSelector.tsx          #   Claude model dropdown (Fable 5, Opus 4.8/4.7/4.6, Sonnet 5/4.6/4.5, Haiku 4.5, Mythos 5 [Blocked])
 |       |   |   +-- ClaudeEffortSelector.tsx   #   Claude thinking effort dropdown (Low/Medium/High/XHigh/Max)
 |       |   |   +-- ClaudeFastModeSelector.tsx  #   Claude Speed dropdown (Default / Fast, Opus only)
 |       |   |   +-- CodexModelSelector.tsx     #   Codex model dropdown (dynamic cache + fallback options)
@@ -789,7 +789,7 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 | `claudeMirror.autoNameSessions` | `true` | Auto-generate tab names from first message (Claude: Haiku, Codex: one-shot codex exec) |
 | `claudeMirror.activitySummary` | `true` | Periodically summarize tool activity in busy indicator via Haiku |
 | `claudeMirror.activitySummaryThreshold` | `3` | Tool uses before triggering an activity summary (1-10) |
-| `claudeMirror.model` | `""` | Claude model to use for new sessions (empty = CLI default; choices include Opus 4.8/4.7/4.6, Sonnet 4.6/4.5, Haiku 4.5) |
+| `claudeMirror.model` | `""` | Claude model to use for new sessions (empty = CLI default; choices include Fable 5, Opus 4.8/4.7/4.6, Sonnet 5/4.6/4.5, Haiku 4.5, and Mythos 5 [Blocked]) |
 | `claudeMirror.effortLevel` | `""` | Claude thinking effort level (empty = model default; choices: low/medium/high/xhigh/max) |
 | `claudeMirror.fastMode` | `false` | Claude Fast mode: ~2.5x faster output on Opus (4.8/4.7/4.6), costs more, no effect on Sonnet/Haiku; applied via a `--settings` overlay on next session start |
 | `claudeMirror.permissionMode` | `"full-access"` | Permission mode: "full-access" (all tools) or "supervised" (read-only tools only) |

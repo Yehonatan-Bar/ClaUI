@@ -575,7 +575,7 @@
           "enumDescriptions": [
             "Claude Mythos 5 (Blocked)",
             "Default (CLI default)",
-            "Claude Fable 5 (Blocked)",
+            "Claude Fable 5 - most capable Claude model, 1M-token context",
             "Claude Opus 4.8",
             "Claude Opus 4.7",
             "Claude Sonnet 5 - most agentic Sonnet, near-Opus quality, low cost",
