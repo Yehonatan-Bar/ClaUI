@@ -1,5 +1,16 @@
 # ClaUi - Changelog
 
+## Unreleased - 2026-07-10
+
+**Improvement: current OpenAI Codex model lineup**
+
+- Added Codex model selector fallback options for GPT-5.6 Sol, GPT-5.6 Terra, GPT-5.6 Luna, GPT-5.5, GPT-5.4 Mini, and GPT-5.3-Codex-Spark, while keeping `~/.codex/models_cache.json` as the primary dynamic source
+- Added Codex reasoning effort values `minimal`, `max`, and `ultra` across the webview selector, message contract, and VS Code settings manifest
+- Updated Smart Search Codex quick picks to the current recommended Codex models
+- Updated context-window heuristics for the new Codex CLI models based on the current local Codex model cache
+
+---
+
 ## v0.1.194 - 2026-06-16
 
 **Feature: Auto-review -- automatic Claude<->Codex review loop that runs after every work turn until there is no blocking bug**

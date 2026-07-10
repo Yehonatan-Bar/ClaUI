@@ -24,9 +24,10 @@ Smart Search is the union: agentic, cross-provider, conversational.
 
 1. **Entry point** — `StatusBar -> Tools` dropdown adds a "Smart Search"
    group with two header rows ("Smart Search - Claude" / "Smart Search -
-   Codex") followed by model rows (Opus 4.7, Sonnet 4.6, Haiku 4.5; GPT-5,
-   GPT-5 Pro). Click dispatches `{ type: 'openSmartSearch', provider, model }`
-   to the active tab's MessageHandler.
+   Codex") followed by model rows (Opus 4.7, Sonnet 4.6, Haiku 4.5; GPT-5.6
+   Sol, GPT-5.6 Terra, GPT-5.6 Luna, GPT-5.5, GPT-5.3-Codex-Spark). Click
+   dispatches `{ type: 'openSmartSearch', provider, model }` to the active
+   tab's MessageHandler.
 
 2. **Handler routing** — `MessageHandler.ts` and `CodexMessageHandler.ts`
    both forward `openSmartSearch` to the VS Code command

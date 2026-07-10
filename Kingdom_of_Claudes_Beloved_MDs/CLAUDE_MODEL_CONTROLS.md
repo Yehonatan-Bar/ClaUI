@@ -15,6 +15,14 @@ All three are Claude-only: they are hidden in Codex tabs (`AIChip` gates them on
 Codex has its own parallel controls (`CodexModelSelector`,
 `CodexReasoningEffortSelector`, `CodexServiceTierSelector`).
 
+Codex model options are loaded dynamically from `~/.codex/models_cache.json`.
+When that cache is unavailable, the fallback list includes the current OpenAI
+Codex lineup: GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4, GPT-5.4 Mini,
+GPT-5.3-Codex-Spark, and older compatibility aliases. Codex reasoning effort is
+also model-dependent; ClaUi exposes `none`, `minimal`, `low`, `medium`, `high`,
+`xhigh`, `max`, and `ultra`, and filters the selector to the selected model's
+supported efforts when cache metadata is present.
+
 A key behavioral distinction:
 
 | Control | Applies | Mechanism |

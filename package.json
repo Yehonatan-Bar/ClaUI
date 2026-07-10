@@ -317,7 +317,7 @@
         "claudeMirror.reviewLoop.reviewerModel": {
           "type": "string",
           "default": "gpt-5.5",
-          "description": "Codex model id used by the review-loop reviewer (e.g. gpt-5.5, gpt-5.4). Empty = fall back to claudeMirror.codex.model, then the Codex CLI default."
+          "description": "Codex model id used by the review-loop reviewer (e.g. gpt-5.6-sol, gpt-5.5, gpt-5.4). Empty = fall back to claudeMirror.codex.model, then the Codex CLI default."
         },
         "claudeMirror.reviewLoop.reviewerReasoningEffort": {
           "type": "string",
@@ -325,12 +325,15 @@
           "enum": [
             "",
             "none",
+            "minimal",
             "low",
             "medium",
             "high",
-            "xhigh"
+            "xhigh",
+            "max",
+            "ultra"
           ],
-          "description": "Reasoning effort for the review-loop reviewer (xhigh = extra high). Empty = fall back to claudeMirror.codex.reasoningEffort."
+          "description": "Reasoning effort for the review-loop reviewer (xhigh = extra high, max/ultra = deepest supported Codex efforts). Empty = fall back to claudeMirror.codex.reasoningEffort."
         },
         "claudeMirror.reviewLoop.reviewerServiceTier": {
           "type": "string",
@@ -433,18 +436,24 @@
           "enum": [
             "",
             "none",
+            "minimal",
             "low",
             "medium",
             "high",
-            "xhigh"
+            "xhigh",
+            "max",
+            "ultra"
           ],
           "enumDescriptions": [
             "Use Codex CLI/config default reasoning effort",
             "No reasoning effort (fastest, for direct answers)",
+            "Minimal reasoning effort (lower latency when supported)",
             "Low reasoning effort (faster, lighter reasoning)",
             "Medium reasoning effort (balanced)",
             "High reasoning effort (deeper reasoning)",
-            "Extra high reasoning effort (maximum depth, slower)"
+            "Extra high reasoning effort (deeper reasoning, slower)",
+            "Max reasoning effort (maximum single-agent depth when supported)",
+            "Ultra reasoning effort (deepest mode with automatic task delegation when supported)"
           ],
           "description": "Codex reasoning effort for new turns. Leave empty to use the CLI/config default."
         },

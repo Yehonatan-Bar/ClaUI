@@ -96,6 +96,9 @@ claude-code-mirror/
 |   |   |   +-- CheckpointManager.ts      #   Per-session file change checkpoint for revert/redo
 |   |   |   +-- SessionTruncator.ts       #   Truncates JSONL for forked sessions (reduces API context)
 |   |   |   +-- sessionPathResolver.ts    #   Shared utility to find session JSONL files
+|   |   +-- usage/                        #   Developer usage reporting for admin cost dashboard
+|   |   |   +-- DeveloperUsageReporter.ts #   Hourly usage reporting: token accumulation, consent, registration, delta computation
+|   |   |   +-- UsageReportClient.ts      #   HTTP(S) client for register + report endpoints
 |   |   +-- multiparticipant/              #   Multi-participant shared session (Phase 0-2, Tracks A-D)
 |   |   |   +-- MultiParticipantProtocol.ts #  Client-server WebSocket message types, including A2A/typing/file/rename contracts
 |   |   |   +-- MultiParticipantClient.ts  #   WebSocket client connecting to coordination server
@@ -470,10 +473,25 @@ claude-code-mirror/
 |       +-- example-completed.md          #   Worked example
 +-- server/                               # Multi-participant coordination server (standalone Node.js)
 |   +-- src/
-|   |   +-- index.ts                      #   Entry point, starts WebSocket server
+|   |   +-- index.ts                      #   Entry point, starts HTTP + WebSocket server on shared port
 |   |   +-- CoordinationServer.ts         #   WebSocket server, session/participant/delivery management
 |   |   +-- Router.ts                     #   Name validation, routeKey extraction, message routing
 |   |   +-- types.ts                      #   Shared data model and WebSocket protocol types
+|   |   +-- http/
+|   |   |   +-- UsageHttpServer.ts        #   REST API for developer registration, usage reporting, admin dashboard, price settings
+|   |   +-- usage/
+|   |   |   +-- UsageStore.ts             #   JSONL-backed persistence (developers.jsonl, usage.jsonl, prices.json)
+|   |   |   +-- UsageAggregator.ts        #   Windowing, aggregation, leaderboard, alerts, drill-down analytics
+|   |   |   +-- CostCalculator.ts         #   Token cost computation, price resolution, unpriced token surfacing
+|   |   |   +-- PriceDefaults.ts          #   Seeded API pricing from official Anthropic price list
+|   |   |   +-- types.ts                  #   Shared types (CostConfig, DeveloperRecord, UsageRecord)
+|   |   +-- admin/
+|   |   |   +-- AdminAuth.ts              #   JWT-based admin authentication with constant-time credential verification
+|   |   +-- util/
+|   |   |   +-- crypto.ts                 #   Salted scrypt hashing, random tokens, HS256 JWT signing/verification
+|   +-- public/
+|   |   +-- admin/
+|   |   |   +-- index.html                #   Admin dashboard SPA (login, KPIs, leaderboard, alerts, price settings, charts)
 |   +-- deploy/
 |   |   +-- SERVER_SETUP_GUIDE.md         #   User-facing guide for server deployment (designed to be given to an AI assistant)
 |   |   +-- DEPLOY.md                     #   Internal deployment notes
@@ -529,7 +547,7 @@ claude-code-mirror/
 **Session Restore on Startup** - Optional feature (setting `claudeMirror.restoreSessionsOnStartup`, default true). When enabled, automatically reopens all ClaUi tabs (Claude / Codex / Happy) that were open when VS Code last closed. Snapshot is stored per-workspace in `workspaceState`, capped by configurable setting `claudeMirror.restoreSessionsMaxTabs` (default 15, range 1–50), and restored serially with a progress notification. Tab selection prioritizes **most-recently focused tabs** (`lastFocusedAt` field) when truncating, and guarantees the **active tab is always included** even if it would fall outside the limit. Unrestored tabs are preserved as `preserved-{sessionId}` entries (up to 50 total) so users can manually reopen them later without losing metadata. Only the originally-active tab eagerly spawns its CLI process; the rest are restored as **lazy panels** that spawn their CLI on first user focus, keeping memory and CPU low when many tabs are restored but only a few are actively used. Tab order is preserved via `tabOrder` field assigned at shutdown. A sticky `restoreInProgress` flag in `workspaceState` acts as a **crash-loop breaker**: if a previous restore did not finish cleanly, auto-restore is skipped and a `Restore now` button is offered. Smart Search tabs are restored fresh (no resume): the snapshot keeps `tabKind='search'` + `searchModel`, and the restore branch calls `configureSearchMode` + `startSession({ cwd: $HOME })` instead of the resume path.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_RESTORE.md`
 
-**Smart Search** - New tab kind ("Smart Search") that delegates "find a past session" to a real Claude or Codex agent, spawned with a baked-in system prompt and a read-only tool allow-list. Opened from `StatusBar -> Tools -> Smart Search` (Claude/Opus 4.7, Sonnet 4.6, Haiku 4.5; Codex/GPT-5, GPT-5 Pro). Search-mode flags reach the CLIs via `SessionTab.configureSearchMode` (Claude path: `--allowedTools "Read,Glob,Grep,Bash"` + `--append-system-prompt`) and `CodexSessionTab.configureSearchMode` (Codex path: `--sandbox read-only` + system preamble prepended to every turn). The agent ripgreps over `~/.claude/projects/` and `~/.codex/sessions/` and emits `[[OPEN_SESSION:<id>:<provider>]]` tokens that `MarkdownContent.tsx` transforms into `Open session ->` buttons. Click dispatches `openSessionFromSearch`, which routes through `claudeMirror.resumeSession` with an explicit provider hint so disk-resident sessions resume on the correct provider. Search tabs use a magenta slot color (`#FF00C8`).
+**Smart Search** - New tab kind ("Smart Search") that delegates "find a past session" to a real Claude or Codex agent, spawned with a baked-in system prompt and a read-only tool allow-list. Opened from `StatusBar -> Tools -> Smart Search` (Claude/Opus 4.7, Sonnet 4.6, Haiku 4.5; Codex/GPT-5.6 Sol, GPT-5.6 Terra, GPT-5.6 Luna, GPT-5.5, GPT-5.3-Codex-Spark). Search-mode flags reach the CLIs via `SessionTab.configureSearchMode` (Claude path: `--allowedTools "Read,Glob,Grep,Bash"` + `--append-system-prompt`) and `CodexSessionTab.configureSearchMode` (Codex path: `--sandbox read-only` + system preamble prepended to every turn). The agent ripgreps over `~/.claude/projects/` and `~/.codex/sessions/` and emits `[[OPEN_SESSION:<id>:<provider>]]` tokens that `MarkdownContent.tsx` transforms into `Open session ->` buttons. Click dispatches `openSessionFromSearch`, which routes through `claudeMirror.resumeSession` with an explicit provider hint so disk-resident sessions resume on the correct provider. Search tabs use a magenta slot color (`#FF00C8`).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SMART_SEARCH.md`
 
 **Tab Folders / Sub-folders** - Sidebar TreeView (`claudeMirror.sessionsTree`) inside the ClaUi Activity Bar that organizes session tabs into nestable folders. Folders live in `TabGroupStore` (`workspaceState`, key `claudeMirror.tabGroups`); tab membership rides on `OpenTabSnapshotEntry.groupId/orderInGroup`. Right-click commands cover create/rename/recolor/delete (with cascade-vs-reparent prompt) and move/remove tabs. When a tab joins a folder its native VS Code tab icon recolors to the folder's color via each tab's `applyTabColor()`. Folder assignments survive restore-on-startup.
@@ -624,7 +642,7 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **TextSettingsBar** - In-webview UI for adjusting chat text font size, font family, and typing personality theme. Supports Hebrew-friendly font presets and five rendering themes: Terminal Hacker, Retro, Zen, Neo Zen, and **Clarity** (high-contrast theme that visually separates user input, Claude's process, and final answer). Settings are stored in Zustand and synced from VS Code configuration on startup and on change. (Per-message LTR alignment override is a separate per-message button on each MessageBubble — see `MARKDOWN_RENDERING.md`.)
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/TYPING_PERSONALITY_THEMES.md`
 
-**ModelSelector / Codex Selectors** - Dropdowns in the AI chip for choosing provider-specific model behavior. Claude uses `ModelSelector` for Opus/Sonnet/Haiku/CLI default and live-switches via `SessionTab.switchModel()`, plus `ClaudeEffortSelector` (thinking effort -> `--effort`) and `ClaudeFastModeSelector` (Speed -> `--settings` overlay), which persist to `claudeMirror.effortLevel` and `claudeMirror.fastMode` and apply on the next session start. Codex uses `CodexModelSelector`, `CodexReasoningEffortSelector`, and `CodexServiceTierSelector`; values persist to `claudeMirror.codex.model`, `claudeMirror.codex.reasoningEffort`, and `claudeMirror.codex.serviceTier`, then apply on the next `codex exec` turn. The Codex Speed selector passes Fast mode as `-c service_tier="fast" -c features.fast_mode=true` when selected. Shows the currently active runtime model label when connected; `claudeModelDisplay.ts` maps IDs like `claude-opus-4-7` to `Opus 4.7` in the AI chip, message badges, and dashboard metadata.
+**ModelSelector / Codex Selectors** - Dropdowns in the AI chip for choosing provider-specific model behavior. Claude uses `ModelSelector` for Opus/Sonnet/Haiku/CLI default and live-switches via `SessionTab.switchModel()`, plus `ClaudeEffortSelector` (thinking effort -> `--effort`) and `ClaudeFastModeSelector` (Speed -> `--settings` overlay), which persist to `claudeMirror.effortLevel` and `claudeMirror.fastMode` and apply on the next session start. Codex uses `CodexModelSelector`, `CodexReasoningEffortSelector`, and `CodexServiceTierSelector`; values persist to `claudeMirror.codex.model`, `claudeMirror.codex.reasoningEffort`, and `claudeMirror.codex.serviceTier`, then apply on the next `codex exec` turn. `CodexModelSelector` loads `~/.codex/models_cache.json` when available and falls back to current OpenAI Codex options including GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4 Mini, and GPT-5.3-Codex-Spark. The Codex Reasoning selector supports model-dependent efforts through `ultra`, `max`, `xhigh`, `high`, `medium`, `low`, `minimal`, and `none`; when model cache metadata is present it filters to the selected model's supported levels. The Codex Speed selector passes Fast mode as `-c service_tier="fast" -c features.fast_mode=true` when selected. Shows the currently active runtime model label when connected; `claudeModelDisplay.ts` maps IDs like `claude-opus-4-7` to `Opus 4.7` in the AI chip, message badges, and dashboard metadata.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CLAUDE_MODEL_CONTROLS.md`
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_FAST_MODE.md`
@@ -749,6 +767,9 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **Chat Search** -- Search bar for finding text across chat messages. Two scopes: Session (instant client-side filtering of loaded messages with match navigation and message highlighting) and Project (extension-side raw string search across JSONL session files with 300ms debounce, cancellation, max 50 results). Activated via StatusBar > Session > Search or `Ctrl+Shift+F`. Backend: `ChatSearchService`. Frontend: `ChatSearchBar`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CHAT_SEARCH.md`
 
+**Admin Usage Dashboard** -- Team-wide API cost tracking and developer usage analytics. Developers opt-in to hourly reporting via a consent dialog + register command (`ClaUi: Register for Usage Reporting`). The extension's `DeveloperUsageReporter` accumulates **numeric token counts only** (per model/type, never code/prompts) in VS Code `globalState`, computes hourly deltas, and POSTs them to the coordination server with a bearer token (stored in `SecretStorage`). The server's `UsageStore` persists reports to JSONL (developers.json, usage.jsonl) and maintains in-memory aggregates. Admins log into a standalone web SPA at `/admin` (served alongside the WebSocket server on the same port) using credentials from `CLAUI_ADMIN_USER` / `CLAUI_ADMIN_PASSWORD` environment variables. The dashboard displays KPIs (total cost, model breakdown, developer count), a leaderboard ranked by cost (with cost-share percentages), cost-over-time charts, and three alert types (budget breach, usage spike, inactive developer). Admins can edit the API price list (seeded from official Anthropic rates) and set alert thresholds; price changes retroactively re-cost history. Backend isolation: `UsageStore` (JSONL + in-memory registry), `UsageAggregator` (windowing, leaderboard, alerts), `CostCalculator` (token-to-dollar conversion with "unknown" fallback for unpriced models), `AdminAuth` (JWT session tokens with constant-time credential compare), `UsageHttpServer` (REST API endpoints). Frontend: `public/admin/index.html` with RTL Hebrew layout, responsive grids, and Recharts visualizations. Privacy: only numeric token counts leave the client; heartbeat-only developers (no usage) still update `lastReportAt` to disambiguate from offline. Developer token stored in SecretStorage, registration gated by shared secret (re-uses `CLAUI_SESSION_TOKEN`), and heartbeat silently retries on network failure.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/ADMIN_USAGE_DASHBOARD_TECH_PLAN.md`
+
 **Remote Server & Data Capture** -- (Archived) Historical technical reference for two planned capabilities. The actual remote implementation uses a simpler provider/CLI override approach via Happy provider.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/Archive/plans/REMOTE_SERVER_AND_DATA_CAPTURE.md`
 
@@ -835,6 +856,9 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 | `claudeMirror.tabs.indicateGroupOnTitle` | `false` | When a tab belongs to a folder, also prefix its native tab title with a colored bar character (opt-in). |
 | `claudeMirror.smartSearch.defaultModel` | `"claude-sonnet-4-6"` | Default model used when `claudeMirror.smartSearch.open` is invoked from the command palette without a `model` argument. |
 | `claudeMirror.smartSearch.allowBash` | `true` | Allow the Smart Search agent to use Bash (ripgrep). Disable to restrict the agent to Read + Glob + Grep only. |
+| `claudeMirror.codex.model` | `""` | Codex model for new Codex turns (empty = Codex CLI/config default; selector fallback includes GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4 Mini, and GPT-5.3-Codex-Spark). |
+| `claudeMirror.codex.reasoningEffort` | `""` | Codex reasoning effort for new turns (empty = CLI/config default; choices: none/minimal/low/medium/high/xhigh/max/ultra, filtered by model cache when available). |
+| `claudeMirror.codex.serviceTier` | `""` | Codex service tier; `fast` passes Codex Fast mode overrides, empty preserves CLI/config default. |
 | `claudeMirror.particleAccelerator.enabled` | `false` | Enable Particle Accelerator command output compression |
 | `claudeMirror.particleAccelerator.filterProfile` | `"balanced"` | Output filter profile: balanced, strict, or verbose |
 | `claudeMirror.particleAccelerator.storeRawRedactedLogs` | `true` | Store raw redacted command output for debugging |
@@ -1515,6 +1539,50 @@ New setting in `package.json`:
 ### Detail Doc
 
 - `Kingdom_of_Claudes_Beloved_MDs/MULTI_PARTICIPANT.md`
+
+---
+
+## 2026-07-10 - Codex GPT-5.6 / GPT-5.5 Model Update
+
+### Updated Components
+
+- `src/webview/components/ModelSelector/CodexModelSelector.tsx`
+  - Added current OpenAI Codex fallback options: `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4-mini`, and `gpt-5.3-codex-spark`.
+  - Dynamic loading from `~/.codex/models_cache.json` remains primary; fallback options are used only when the cache is unavailable.
+- `src/extension/types/webview-messages.ts`
+  - Extended `CodexReasoningEffort` with `minimal`, `max`, and `ultra`.
+- `src/webview/components/ModelSelector/CodexReasoningEffortSelector.tsx`
+  - Added `Minimal`, `Max`, and `Ultra` options.
+  - Existing cache-based filtering still hides unsupported efforts when the selected model's metadata is available.
+- `src/webview/components/StatusBar/StatusBar.tsx`
+  - Updated Smart Search Codex rows to GPT-5.6 Sol, GPT-5.6 Terra, GPT-5.6 Luna, GPT-5.5, and GPT-5.3-Codex-Spark.
+- `src/webview/utils/modelContextLimits.ts`
+  - Added Codex CLI context heuristics for `gpt-5.6-*` (`372,000`), `gpt-5.5` / `gpt-5.4-mini` (`272,000`), and `gpt-5.3-codex-spark` (`128,000`).
+
+### Directory Structure Delta
+
+- None.
+
+### Manifest/Settings Delta
+
+Updated settings in `package.json`:
+
+- `claudeMirror.codex.reasoningEffort`
+  - Added enum values: `minimal`, `max`, `ultra`
+  - Added enum descriptions for those values
+- `claudeMirror.reviewLoop.reviewerReasoningEffort`
+  - Added enum values: `minimal`, `max`, `ultra`
+- `claudeMirror.reviewLoop.reviewerModel`
+  - Description examples now include `gpt-5.6-sol`
+
+### Runtime Notes
+
+- `CodexExecProcessManager` already forwards the selected effort with `-c model_reasoning_effort=<value>`, so no runtime argument change was needed.
+- Review-loop defaults remain unchanged (`gpt-5.5` + `xhigh` + Fast) to avoid implicit cost/behavior changes; users can opt into GPT-5.6 models via settings.
+
+### Detail Doc
+
+- `Kingdom_of_Claudes_Beloved_MDs/CODEX_INTEGRATION_PROGRESS.md`
 
 ---
 

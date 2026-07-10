@@ -55,7 +55,7 @@ Run multiple Claude conversations in parallel, each isolated in its own VS Code 
 
 - **Dual provider** -- switch between Claude and Codex per session; each has its own model and settings
 - **Model selection** -- choose Claude Sonnet, Opus, or Haiku (or Codex models) from the status bar
-- **Codex reasoning effort** -- set reasoning depth (none / low / medium / high / xhigh) per Codex session
+- **Codex reasoning effort** -- set reasoning depth (none / minimal / low / medium / high / xhigh / max / ultra) per Codex session
 - **Codex Fast mode** -- set Codex speed to Default or Fast from the same AI configuration menu; Fast uses more credits on supported models
 - **Semantic turn analysis** -- background AI classification of user mood, task type, outcome, and bug patterns per turn
 - **Activity summarizer** -- AI-powered live summaries of what Claude is doing, shown in the tab title
@@ -189,8 +189,8 @@ All settings are under `claudeMirror.*` in VS Code Settings (`Ctrl+,`).
 | `cliPath` | `"claude"` | Path to Claude CLI executable |
 | `provider` | `"claude"` | Default provider: `claude` or `codex` |
 | `model` | `""` | Claude model for new sessions (empty = CLI default) |
-| `codex.model` | `""` | Codex model for new sessions |
-| `codex.reasoningEffort` | `""` | Codex reasoning depth: `none`, `low`, `medium`, `high`, `xhigh` |
+| `codex.model` | `""` | Codex model for new sessions; selector includes GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4 Mini, and GPT-5.3-Codex-Spark |
+| `codex.reasoningEffort` | `""` | Codex reasoning depth: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
 | `codex.serviceTier` | `""` | Codex service tier override: `fast` or empty for CLI/config default |
 | `permissionMode` | `"full-access"` | `full-access` or `supervised` (read-only) |
 | `useCtrlEnterToSend` | `true` | Ctrl+Enter sends, Enter adds newline |

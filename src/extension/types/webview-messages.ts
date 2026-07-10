@@ -36,7 +36,7 @@ export type HandoffStage =
   | 'arming_first_user_prompt'
   | 'completed'
   | 'failed';
-export type CodexReasoningEffort = '' | 'none' | 'low' | 'medium' | 'high' | 'xhigh';
+export type CodexReasoningEffort = '' | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
 export type CodexServiceTier = '' | 'fast';
 export type ClaudeEffortLevel = '' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export interface CodexModelOption {

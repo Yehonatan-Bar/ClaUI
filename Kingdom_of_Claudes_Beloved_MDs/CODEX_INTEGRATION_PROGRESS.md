@@ -2,6 +2,39 @@
 
 > **Note:** This is a historical development log, not a current-state specification. For current Codex feature status, refer to `COMPLETE_FEATURE_LIST.md` (section 5) and `CODEX_FAST_MODE.md`.
 
+## 2026-07-10 - GPT-5.6 / GPT-5.5 Codex model alignment
+
+Updated ClaUi's Codex model UX for the current OpenAI Codex lineup:
+
+- Added current Codex fallback model options for cases where `~/.codex/models_cache.json` is missing or unreadable:
+  - `gpt-5.6-sol`
+  - `gpt-5.6-terra`
+  - `gpt-5.6-luna`
+  - `gpt-5.5`
+  - `gpt-5.4-mini`
+  - `gpt-5.3-codex-spark`
+- Kept dynamic model loading from `~/.codex/models_cache.json` as the primary source. When the cache is present, it still controls ordering and supported reasoning levels.
+- Extended Codex reasoning effort support end-to-end:
+  - `CodexReasoningEffort` now includes `minimal`, `max`, and `ultra`
+  - `CodexReasoningEffortSelector` now renders `Minimal`, `Max`, and `Ultra`
+  - `claudeMirror.codex.reasoningEffort` and `claudeMirror.reviewLoop.reviewerReasoningEffort` enums in `package.json` include the new values
+- Updated Smart Search Codex quick-pick rows to use the current recommended Codex models:
+  - GPT-5.6 Sol
+  - GPT-5.6 Terra
+  - GPT-5.6 Luna
+  - GPT-5.5
+  - GPT-5.3-Codex-Spark
+- Updated context-window heuristics for the new Codex CLI model family based on the current local Codex model cache:
+  - `gpt-5.6-*` -> `372,000`
+  - `gpt-5.5` / `gpt-5.4-mini` -> `272,000`
+  - `gpt-5.3-codex-spark` -> `128,000`
+
+Reference basis:
+
+- OpenAI Codex Models docs list GPT-5.6 Sol/Terra/Luna, GPT-5.5, and GPT-5.3-Codex-Spark as recommended Codex models.
+- OpenAI Codex Subagents docs list `ultra`, `max`, `xhigh`, `high`, `medium`, `low`, `minimal`, and `none` as model-dependent `model_reasoning_effort` values.
+- The local Codex model cache fetched on 2026-07-10 confirms the GPT-5.6 slugs and `max` / `ultra` support for the new family.
+
 ## 2026-05-05 - Codex Fast Mode support
 
 - Added a Codex `Speed` selector in the AI chip via `CodexServiceTierSelector`.
@@ -386,11 +419,11 @@ Codex runtime hardening (observed during manual testing):
   - logs outbound `sendMessage` preview/length in `CodexMessageHandler`
   - surfaces an explicit error if `turn.completed` arrives without any `agent_message` event (instead of silent no-response)
 
-Codex reasoning effort support (new user-facing capability):
+Codex reasoning effort support (new user-facing capability; expanded on 2026-07-10 for GPT-5.6):
 
-- Added Codex reasoning effort setting + UI selector (`None` / `Low` / `Medium` / `High` / `Extra High`, plus `Default`)
+- Added Codex reasoning effort setting + UI selector (`None` / `Minimal` / `Low` / `Medium` / `High` / `Extra High` / `Max` / `Ultra`, plus `Default`)
 - New VS Code setting:
-  - `claudeMirror.codex.reasoningEffort` (`'' | none | low | medium | high | xhigh`)
+  - `claudeMirror.codex.reasoningEffort` (`'' | none | minimal | low | medium | high | xhigh | max | ultra`)
 - Codex webview handler now syncs this setting to/from the webview (`setCodexReasoningEffort` / `codexReasoningEffortSetting`)
 - `CodexExecProcessManager` now forwards reasoning effort to the Codex CLI using:
   - `-c model_reasoning_effort=<value>`

@@ -111,8 +111,8 @@ Auto-review row (enabled only when the session is idle).
 |---------|---------|-------------|
 | `autoStart` | `false` | Off by default. When on, auto-start the loop after each work turn; when off, launch manually via the rocket button |
 | `maxRounds` | `5` | Max review rounds before stopping (clamped 1-20) |
-| `reviewerModel` | `gpt-5.5` | Codex model id for the reviewer (empty = fall back to `codex.model`, then Codex default) |
-| `reviewerReasoningEffort` | `xhigh` | Reviewer reasoning effort (empty = fall back to `codex.reasoningEffort`) |
+| `reviewerModel` | `gpt-5.5` | Codex model id for the reviewer (empty = fall back to `codex.model`, then Codex default; can be set to current Codex models such as `gpt-5.6-sol`) |
+| `reviewerReasoningEffort` | `xhigh` | Reviewer reasoning effort (empty = fall back to `codex.reasoningEffort`; supports `none`/`minimal`/`low`/`medium`/`high`/`xhigh`/`max`/`ultra`, subject to model support) |
 | `reviewerServiceTier` | `fast` | Reviewer service tier; `fast` = Codex fast mode (empty = fall back to `codex.serviceTier`) |
 | `classifierModel` | `claude-haiku-4-5-20251001` | Claude model for the verdict classifier |
 | `turnTimeoutMs` | `3600000` | Per-turn timeout for developer and reviewer turns (1 hour) |

@@ -9,7 +9,7 @@ export interface ReviewLoopConfig {
   maxRounds: number;
   /** Codex model id for the reviewer ('' = fall back to codex.model, then Codex default). */
   reviewerModel: string;
-  /** Reviewer reasoning effort, e.g. 'xhigh' ('' = fall back to codex.reasoningEffort). */
+  /** Reviewer reasoning effort, e.g. 'xhigh', 'max', or 'ultra' ('' = fall back to codex.reasoningEffort). */
   reviewerReasoningEffort: string;
   /** Reviewer service tier, 'fast' or '' (= fall back to codex.serviceTier). */
   reviewerServiceTier: string;
