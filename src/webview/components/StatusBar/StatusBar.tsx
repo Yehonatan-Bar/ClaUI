@@ -14,6 +14,18 @@ import { SecretProtectionStatusBadge } from '../SecretProtectionStatusBadge';
 import { SuperParticleAcceleratorStatusBadge } from '../SuperParticleAccelerator/SuperParticleAcceleratorStatusBadge';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 
+/**
+ * Shown only when the Codex CLI model cache is unavailable. The cache is the
+ * source of truth for which models the account may actually use.
+ */
+const CODEX_SMART_SEARCH_FALLBACK = [
+  { label: 'GPT-5.6 Sol', value: 'gpt-5.6-sol' },
+  { label: 'GPT-5.6 Terra', value: 'gpt-5.6-terra' },
+  { label: 'GPT-5.6 Luna', value: 'gpt-5.6-luna' },
+  { label: 'GPT-5.5', value: 'gpt-5.5' },
+  { label: 'GPT-5.3-Codex-Spark', value: 'gpt-5.3-codex-spark' },
+];
+
 function formatDuration(durationMs: number): string {
   const totalSec = Math.max(0, Math.floor(durationMs / 1000));
   const h = Math.floor(totalSec / 3600);
@@ -104,7 +116,12 @@ export const StatusBar: React.FC<{
     goalObjective,
     setGoalActive,
     setHelpPanelOpen,
+    codexModelOptions,
   } = useAppStore();
+
+  const codexSearchModels = codexModelOptions.length > 0
+    ? codexModelOptions
+    : CODEX_SMART_SEARCH_FALLBACK;
 
   const { barRef, layoutMode, hideClockFromBar, hideMcpFromBar, hideUsageFromBar } = useStatusBarCollapse();
   const logUiDebug = React.useCallback((event: string, payload?: Record<string, unknown>) => {
@@ -846,56 +863,19 @@ export const StatusBar: React.FC<{
       <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" style={{ fontWeight: 600, opacity: 0.7 }}>
         Smart Search - Codex
       </div>
-      <button
-        className="status-bar-group-dropdown-item"
-        onClick={() => {
-          closeAllGroups();
-          postToExtension({ type: 'openSmartSearch', provider: 'codex', model: 'gpt-5.6-sol' });
-        }}
-        data-tooltip="Search past sessions using GPT-5.6 Sol"
-      >
-        GPT-5.6 Sol
-      </button>
-      <button
-        className="status-bar-group-dropdown-item"
-        onClick={() => {
-          closeAllGroups();
-          postToExtension({ type: 'openSmartSearch', provider: 'codex', model: 'gpt-5.6-terra' });
-        }}
-        data-tooltip="Search past sessions using GPT-5.6 Terra"
-      >
-        GPT-5.6 Terra
-      </button>
-      <button
-        className="status-bar-group-dropdown-item"
-        onClick={() => {
-          closeAllGroups();
-          postToExtension({ type: 'openSmartSearch', provider: 'codex', model: 'gpt-5.6-luna' });
-        }}
-        data-tooltip="Search past sessions using GPT-5.6 Luna"
-      >
-        GPT-5.6 Luna
-      </button>
-      <button
-        className="status-bar-group-dropdown-item"
-        onClick={() => {
-          closeAllGroups();
-          postToExtension({ type: 'openSmartSearch', provider: 'codex', model: 'gpt-5.5' });
-        }}
-        data-tooltip="Search past sessions using GPT-5.5"
-      >
-        GPT-5.5
-      </button>
-      <button
-        className="status-bar-group-dropdown-item"
-        onClick={() => {
-          closeAllGroups();
-          postToExtension({ type: 'openSmartSearch', provider: 'codex', model: 'gpt-5.3-codex-spark' });
-        }}
-        data-tooltip="Search past sessions using GPT-5.3-Codex-Spark"
-      >
-        GPT-5.3-Codex-Spark
-      </button>
+      {codexSearchModels.map((opt) => (
+        <button
+          key={opt.value}
+          className="status-bar-group-dropdown-item"
+          onClick={() => {
+            closeAllGroups();
+            postToExtension({ type: 'openSmartSearch', provider: 'codex', model: opt.value });
+          }}
+          data-tooltip={`Search past sessions using ${opt.label}`}
+        >
+          {opt.label}
+        </button>
+      ))}
       <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" ref={babelFishRef}>
         <button
           className={`status-bar-babelfish-icon-btn ${babelFishEnabled ? 'active' : ''}`}

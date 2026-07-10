@@ -18,16 +18,12 @@ Updated ClaUi's Codex model UX for the current OpenAI Codex lineup:
   - `CodexReasoningEffort` now includes `minimal`, `max`, and `ultra`
   - `CodexReasoningEffortSelector` now renders `Minimal`, `Max`, and `Ultra`
   - `claudeMirror.codex.reasoningEffort` and `claudeMirror.reviewLoop.reviewerReasoningEffort` enums in `package.json` include the new values
-- Updated Smart Search Codex quick-pick rows to use the current recommended Codex models:
-  - GPT-5.6 Sol
-  - GPT-5.6 Terra
-  - GPT-5.6 Luna
-  - GPT-5.5
-  - GPT-5.3-Codex-Spark
+- Smart Search Codex quick-pick rows are generated from `~/.codex/models_cache.json` rather than hardcoded. The cache reader moved to `src/extension/process/codexModelCache.ts` so both `CodexMessageHandler` and `MessageHandler` can post `codexModelOptions` -- the Claude handler needs it too, because Claude tabs also render the Codex rows of the Smart Search menu. A static fallback list applies only when the cache is unreadable.
 - Updated context-window heuristics for the new Codex CLI model family based on the current local Codex model cache:
   - `gpt-5.6-*` -> `372,000`
-  - `gpt-5.5` / `gpt-5.4-mini` -> `272,000`
+  - `gpt-5.5` / `gpt-5.4` / `gpt-5.4-mini` -> `272,000`
   - `gpt-5.3-codex-spark` -> `128,000`
+  - These follow each model's active `context_window`. `gpt-5.4` advertises `max_context_window: 1,000,000`, but its active window is `272,000`, so the context bar uses the latter.
 
 Reference basis:
 

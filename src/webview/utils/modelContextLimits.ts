@@ -10,19 +10,16 @@ export function getModelMaxContext(model: string): number {
   if (lower.includes('gemini')) {
     return 1_000_000;
   }
-  // Codex CLI model cache reports these active windows for the latest Codex models.
+  // Active context windows as reported by the Codex CLI model cache. GPT-5.4
+  // advertises a larger max_context_window, but the active window is 272K.
   if (lower.includes('gpt-5.6')) {
     return 372_000;
   }
-  if (lower.includes('gpt-5.5') || lower.includes('gpt-5.4-mini')) {
+  if (lower.includes('gpt-5.5') || lower.includes('gpt-5.4')) {
     return 272_000;
   }
   if (lower.includes('gpt-5.3-codex-spark')) {
     return 128_000;
-  }
-  // GPT-5.4 and GPT-5.4-pro expose a larger 1.05M context window.
-  if (lower.includes('gpt-5.4') && !lower.includes('mini')) {
-    return 1_050_000;
   }
   // GPT-5 and Codex GPT-5.x models use a 400K context window.
   if (lower.includes('gpt-5')) {

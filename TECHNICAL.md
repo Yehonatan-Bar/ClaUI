@@ -58,6 +58,7 @@ claude-code-mirror/
 |   |   |   +-- ClaudeProcessManager.ts   #   Spawns and manages CLI process
 |   |   |   +-- CodexCliDetector.ts        #  Shared Codex CLI detection, probing & candidate scoring
 |   |   |   +-- CodexExecProcessManager.ts #  Spawns and manages Codex exec processes
+|   |   |   +-- codexModelCache.ts         #  Reads ~/.codex/models_cache.json (shared by both handlers)
 |   |   |   +-- envUtils.ts               #   Shared env sanitization & API key management
 |   |   |   +-- killTree.ts              #   Shared cross-platform process tree kill utility
 |   |   |   +-- orphanCleanup.ts         #   Startup cleanup of orphaned ClaUi processes
@@ -547,7 +548,7 @@ claude-code-mirror/
 **Session Restore on Startup** - Optional feature (setting `claudeMirror.restoreSessionsOnStartup`, default true). When enabled, automatically reopens all ClaUi tabs (Claude / Codex / Happy) that were open when VS Code last closed. Snapshot is stored per-workspace in `workspaceState`, capped by configurable setting `claudeMirror.restoreSessionsMaxTabs` (default 15, range 1–50), and restored serially with a progress notification. Tab selection prioritizes **most-recently focused tabs** (`lastFocusedAt` field) when truncating, and guarantees the **active tab is always included** even if it would fall outside the limit. Unrestored tabs are preserved as `preserved-{sessionId}` entries (up to 50 total) so users can manually reopen them later without losing metadata. Only the originally-active tab eagerly spawns its CLI process; the rest are restored as **lazy panels** that spawn their CLI on first user focus, keeping memory and CPU low when many tabs are restored but only a few are actively used. Tab order is preserved via `tabOrder` field assigned at shutdown. A sticky `restoreInProgress` flag in `workspaceState` acts as a **crash-loop breaker**: if a previous restore did not finish cleanly, auto-restore is skipped and a `Restore now` button is offered. Smart Search tabs are restored fresh (no resume): the snapshot keeps `tabKind='search'` + `searchModel`, and the restore branch calls `configureSearchMode` + `startSession({ cwd: $HOME })` instead of the resume path.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_RESTORE.md`
 
-**Smart Search** - New tab kind ("Smart Search") that delegates "find a past session" to a real Claude or Codex agent, spawned with a baked-in system prompt and a read-only tool allow-list. Opened from `StatusBar -> Tools -> Smart Search` (Claude/Opus 4.7, Sonnet 4.6, Haiku 4.5; Codex/GPT-5.6 Sol, GPT-5.6 Terra, GPT-5.6 Luna, GPT-5.5, GPT-5.3-Codex-Spark). Search-mode flags reach the CLIs via `SessionTab.configureSearchMode` (Claude path: `--allowedTools "Read,Glob,Grep,Bash"` + `--append-system-prompt`) and `CodexSessionTab.configureSearchMode` (Codex path: `--sandbox read-only` + system preamble prepended to every turn). The agent ripgreps over `~/.claude/projects/` and `~/.codex/sessions/` and emits `[[OPEN_SESSION:<id>:<provider>]]` tokens that `MarkdownContent.tsx` transforms into `Open session ->` buttons. Click dispatches `openSessionFromSearch`, which routes through `claudeMirror.resumeSession` with an explicit provider hint so disk-resident sessions resume on the correct provider. Search tabs use a magenta slot color (`#FF00C8`).
+**Smart Search** - New tab kind ("Smart Search") that delegates "find a past session" to a real Claude or Codex agent, spawned with a baked-in system prompt and a read-only tool allow-list. Opened from `StatusBar -> Tools -> Smart Search` (Claude rows are fixed: Opus 4.7, Sonnet 4.6, Haiku 4.5; Codex rows are built from `~/.codex/models_cache.json` via `codexModelCache.ts`, so they list exactly the models the current account may use, falling back to a static list only when the cache is unreadable). Search-mode flags reach the CLIs via `SessionTab.configureSearchMode` (Claude path: `--allowedTools "Read,Glob,Grep,Bash"` + `--append-system-prompt`) and `CodexSessionTab.configureSearchMode` (Codex path: `--sandbox read-only` + system preamble prepended to every turn). The agent ripgreps over `~/.claude/projects/` and `~/.codex/sessions/` and emits `[[OPEN_SESSION:<id>:<provider>]]` tokens that `MarkdownContent.tsx` transforms into `Open session ->` buttons. Click dispatches `openSessionFromSearch`, which routes through `claudeMirror.resumeSession` with an explicit provider hint so disk-resident sessions resume on the correct provider. Search tabs use a magenta slot color (`#FF00C8`).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SMART_SEARCH.md`
 
 **Tab Folders / Sub-folders** - Sidebar TreeView (`claudeMirror.sessionsTree`) inside the ClaUi Activity Bar that organizes session tabs into nestable folders. Folders live in `TabGroupStore` (`workspaceState`, key `claudeMirror.tabGroups`); tab membership rides on `OpenTabSnapshotEntry.groupId/orderInGroup`. Right-click commands cover create/rename/recolor/delete (with cascade-vs-reparent prompt) and move/remove tabs. When a tab joins a folder its native VS Code tab icon recolors to the folder's color via each tab's `applyTabColor()`. Folder assignments survive restore-on-startup.
@@ -1554,14 +1555,18 @@ New setting in `package.json`:
 - `src/webview/components/ModelSelector/CodexReasoningEffortSelector.tsx`
   - Added `Minimal`, `Max`, and `Ultra` options.
   - Existing cache-based filtering still hides unsupported efforts when the selected model's metadata is available.
+- `src/extension/process/codexModelCache.ts` (new)
+  - Shared reader for `~/.codex/models_cache.json`, extracted from `CodexMessageHandler`. Filters to `visibility: "list"` models (so hidden entries such as `codex-auto-review` never surface), sorts by `priority`, and carries each model's `supported_reasoning_levels`.
+- `src/extension/webview/CodexMessageHandler.ts`, `src/extension/webview/MessageHandler.ts`
+  - Both now post `codexModelOptions` from the shared reader. The Claude handler sends it too, because Claude tabs also render the Codex rows of the Smart Search menu.
 - `src/webview/components/StatusBar/StatusBar.tsx`
-  - Updated Smart Search Codex rows to GPT-5.6 Sol, GPT-5.6 Terra, GPT-5.6 Luna, GPT-5.5, and GPT-5.3-Codex-Spark.
+  - Smart Search Codex rows are rendered from the cache-derived `codexModelOptions` instead of a hardcoded model list. A static fallback is used only when the cache is unavailable.
 - `src/webview/utils/modelContextLimits.ts`
-  - Added Codex CLI context heuristics for `gpt-5.6-*` (`372,000`), `gpt-5.5` / `gpt-5.4-mini` (`272,000`), and `gpt-5.3-codex-spark` (`128,000`).
+  - Context heuristics follow the cache's active `context_window`: `gpt-5.6-*` (`372,000`), `gpt-5.5` / `gpt-5.4` / `gpt-5.4-mini` (`272,000`), `gpt-5.3-codex-spark` (`128,000`). Note `gpt-5.4` advertises a larger `max_context_window`, but its active window is `272,000`.
 
 ### Directory Structure Delta
 
-- None.
+- Added `src/extension/process/codexModelCache.ts`.
 
 ### Manifest/Settings Delta
 

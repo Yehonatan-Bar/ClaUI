@@ -16,6 +16,7 @@ import type { ProjectAnalyticsStore } from '../session/ProjectAnalyticsStore';
 import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import { getStoredApiKey, setStoredApiKey, maskApiKey } from '../process/envUtils';
+import { readCodexModelOptions } from '../process/codexModelCache';
 import type { TokenUsageRatioTracker } from '../session/TokenUsageRatioTracker';
 import type { DeveloperUsageReporter } from '../usage/DeveloperUsageReporter';
 import type { CheckpointManager } from '../session/CheckpointManager';
@@ -3915,6 +3916,8 @@ export class MessageHandler {
           this.sendTypingThemeSetting();
           // Send model setting
           this.sendModelSetting();
+          // Send Codex model options (Smart Search offers Codex models here too)
+          this.sendCodexModelOptions();
           // Send the last-resolved Default model so the selector can show the
           // likely model on hover before this session's first turn reports it
           this.sendDefaultModelHint();
@@ -4294,6 +4297,17 @@ export class MessageHandler {
     this.webview.postMessage({
       type: 'modelSetting',
       model,
+    });
+  }
+
+  /**
+   * Claude tabs still offer Codex models in the Smart Search menu, so they need
+   * the same cache-derived list the Codex tabs use.
+   */
+  private sendCodexModelOptions(): void {
+    this.webview.postMessage({
+      type: 'codexModelOptions',
+      options: readCodexModelOptions((message) => this.log(message)),
     });
   }
 
