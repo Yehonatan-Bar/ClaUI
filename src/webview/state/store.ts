@@ -535,6 +535,10 @@ export interface AppState {
   resetReviewLoop: () => void;
   reviewLoopAutoStart: boolean;
   setReviewLoopAutoStart: (enabled: boolean) => void;
+  /** The CONFIGURED max rounds (claudeMirror.reviewLoop.maxRounds), distinct from
+   *  `reviewLoopMaxRounds` which is the running loop's value from status events. */
+  reviewLoopMaxRoundsSetting: number;
+  setReviewLoopMaxRoundsSetting: (value: number) => void;
   reviewLoopSessionEnabled: boolean;
   setReviewLoopSessionEnabled: (enabled: boolean) => void;
 
@@ -1395,6 +1399,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
   reviewLoopAutoStart: false,
   setReviewLoopAutoStart: (enabled) => set({ reviewLoopAutoStart: enabled }),
+  reviewLoopMaxRoundsSetting: 5,
+  setReviewLoopMaxRoundsSetting: (value) => set({ reviewLoopMaxRoundsSetting: value }),
   reviewLoopSessionEnabled: true,
   setReviewLoopSessionEnabled: (enabled) => set({ reviewLoopSessionEnabled: enabled }),
 

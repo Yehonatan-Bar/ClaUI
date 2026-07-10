@@ -54,6 +54,9 @@ export const StatusBar: React.FC<{
   const [goalOpen, setGoalOpen] = React.useState(false);
   const [goalInputText, setGoalInputText] = React.useState('');
   const goalRef = React.useRef<HTMLDivElement>(null);
+  const [roundsEditing, setRoundsEditing] = React.useState(false);
+  const [roundsInput, setRoundsInput] = React.useState('');
+  const skipRoundsBlurCommit = React.useRef(false);
   const {
     gitPushSettings,
     gitPushRunning,
@@ -89,6 +92,8 @@ export const StatusBar: React.FC<{
     resetReviewLoop,
     reviewLoopAutoStart,
     setReviewLoopAutoStart,
+    reviewLoopMaxRoundsSetting,
+    setReviewLoopMaxRoundsSetting,
     reviewLoopSessionEnabled,
     setReviewLoopSessionEnabled,
     reviewLoopRunning,
@@ -213,6 +218,34 @@ export const StatusBar: React.FC<{
     const next = !menuOpen;
     closeAllGroups();
     setMenuOpen(next);
+  };
+
+  // --- Review-loop max-rounds inline editor (chip next to the rocket) ---
+
+  const clampRounds = (n: number) => Math.max(1, Math.min(20, Math.round(n)));
+
+  const startRoundsEdit = () => {
+    setRoundsInput(String(reviewLoopMaxRoundsSetting));
+    setRoundsEditing(true);
+  };
+
+  const cancelRoundsEdit = () => {
+    // Esc unmounts the input, which fires blur; skip the blur-commit for that.
+    skipRoundsBlurCommit.current = true;
+    setRoundsEditing(false);
+  };
+
+  const commitRoundsEdit = () => {
+    const parsed = Number(roundsInput);
+    const value =
+      roundsInput.trim() !== '' && Number.isFinite(parsed)
+        ? clampRounds(parsed)
+        : reviewLoopMaxRoundsSetting;
+    setRoundsEditing(false);
+    if (value !== reviewLoopMaxRoundsSetting) {
+      setReviewLoopMaxRoundsSetting(value);
+      postToExtension({ type: 'setReviewLoopMaxRounds', value });
+    }
   };
 
   const handleHistory = (clickDetail?: number) => {
@@ -759,7 +792,11 @@ export const StatusBar: React.FC<{
                 setReviewLoopPanelOpen(true);
                 postToExtension({ type: 'reviewLoopStart' });
               }}
-              data-tooltip="Launch a review loop for the current session now!"
+              onContextMenu={(e) => {
+                e.preventDefault();
+                startRoundsEdit();
+              }}
+              data-tooltip="Launch a review loop for the current session now!  (right-click to edit max rounds)"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M8 1.5 C 10.5 4 11 7 10.5 10 L 5.5 10 C 5 7 5.5 4 8 1.5 Z" />
@@ -769,6 +806,44 @@ export const StatusBar: React.FC<{
                 <path d="M6.8 11 L 8 14 L 9.2 11" />
               </svg>
             </button>
+            {roundsEditing ? (
+              <input
+                type="number"
+                min={1}
+                max={20}
+                className="status-bar-autoreview-rounds-input"
+                value={roundsInput}
+                autoFocus
+                aria-label="Max review rounds"
+                onChange={(e) => setRoundsInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    commitRoundsEdit();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelRoundsEdit();
+                  }
+                }}
+                onBlur={() => {
+                  if (skipRoundsBlurCommit.current) {
+                    skipRoundsBlurCommit.current = false;
+                    return;
+                  }
+                  commitRoundsEdit();
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                className="status-bar-autoreview-rounds-badge"
+                onClick={startRoundsEdit}
+                aria-label={`Max review rounds: ${reviewLoopMaxRoundsSetting}. Click to edit.`}
+                data-tooltip={`Max review rounds: ${reviewLoopMaxRoundsSetting} — click to edit (1-20). Applies to the next launch.`}
+              >
+                {reviewLoopMaxRoundsSetting}
+              </button>
+            )}
           </span>
         </div>
       )}

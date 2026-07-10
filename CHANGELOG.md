@@ -33,7 +33,7 @@
 
 **Settings (`claudeMirror.reviewLoop.*`)**
 
-- `autoStart` (false; off by default), `maxRounds` (5, clamped 1-20), `reviewerModel` (`gpt-5.5`; empty falls back to `codex.model` then the Codex default), `reviewerReasoningEffort` (`xhigh`), `reviewerServiceTier` (`fast`), `classifierModel` (`claude-haiku-4-5-20251001`), `turnTimeoutMs` (3600000)
+- `autoStart` (false; off by default), `maxRounds` (5, clamped 1-20; editable inline from the chip next to the rocket launch button -- click the chip or right-click the rocket; applies to the next launch), `reviewerModel` (`gpt-5.5`; empty falls back to `codex.model` then the Codex default), `reviewerReasoningEffort` (`xhigh`), `reviewerServiceTier` (`fast`), `classifierModel` (`claude-haiku-4-5-20251001`), `turnTimeoutMs` (3600000)
 
 **Tests**
 

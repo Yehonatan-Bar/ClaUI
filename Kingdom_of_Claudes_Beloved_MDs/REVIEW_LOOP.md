@@ -107,10 +107,21 @@ Q&A turns are skipped, so casual chat never triggers a Codex review. Detection:
 When auto-review is off, launch a review on demand from the rocket button in the
 Auto-review row (enabled only when the session is idle).
 
+The small chip next to the rocket shows the configured `maxRounds`. Click it — or
+right-click the rocket — to edit it inline (1-20; Enter commits, Esc cancels). The
+value is clamped on BOTH sides (the manifest's `minimum`/`maximum` are advisory for
+the Settings UI only and are NOT enforced on a programmatic `update()`), and the
+webview receives it via `reviewLoopMaxRoundsSetting` (pushed on the `ready` burst,
+echoed after the config `update()` resolves, and forwarded on
+`onDidChangeConfiguration`). Note this is the *setting*: `getReviewLoopConfig()`
+reads `maxRounds` once at loop start, so an edit applies to the **next** launch,
+not to a running loop. The store keeps it as `reviewLoopMaxRoundsSetting`, distinct
+from `reviewLoopMaxRounds` (the running loop's value, from status events).
+
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `autoStart` | `false` | Off by default. When on, auto-start the loop after each work turn; when off, launch manually via the rocket button |
-| `maxRounds` | `5` | Max review rounds before stopping (clamped 1-20) |
+| `maxRounds` | `5` | Max review rounds before stopping (clamped 1-20). Editable inline from the chip next to the rocket button |
 | `reviewerModel` | `gpt-5.5` | Codex model id for the reviewer (empty = fall back to `codex.model`, then Codex default; can be set to current Codex models such as `gpt-5.6-sol`) |
 | `reviewerReasoningEffort` | `xhigh` | Reviewer reasoning effort (empty = fall back to `codex.reasoningEffort`; supports `none`/`minimal`/`low`/`medium`/`high`/`xhigh`/`max`/`ultra`, subject to model support) |
 | `reviewerServiceTier` | `fast` | Reviewer service tier; `fast` = Codex fast mode (empty = fall back to `codex.serviceTier`) |

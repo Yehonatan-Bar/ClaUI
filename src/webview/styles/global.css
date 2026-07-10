@@ -3697,6 +3697,38 @@ html, body, #root {
   cursor: not-allowed;
 }
 
+/* Max-rounds chip next to the rocket: click it (or right-click the rocket) to edit. */
+.status-bar-autoreview-rounds-badge {
+  min-width: 17px;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 15px;
+  font-weight: 600;
+  background: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #ffffff);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.status-bar-autoreview-rounds-badge:hover {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.35));
+}
+
+.status-bar-autoreview-rounds-input {
+  width: 40px;
+  padding: 0 3px;
+  font-size: 11px;
+  line-height: 15px;
+  background: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #cccccc);
+  border: 1px solid var(--vscode-focusBorder, #007fd4);
+  border-radius: 4px;
+  outline: none;
+}
+
 .review-loop-toggle {
   position: relative;
   display: inline-block;

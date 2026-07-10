@@ -3717,6 +3717,19 @@ export class MessageHandler {
           break;
         }
 
+        case 'setReviewLoopMaxRounds': {
+          // The manifest's minimum/maximum are advisory for the Settings UI only;
+          // a programmatic update() is NOT clamped, so clamp here as well.
+          const clamped = this.clampReviewLoopRounds(msg.value);
+          this.log(`Setting review loop maxRounds: ${clamped}`);
+          // Echo only AFTER the async update resolves (same race guard as autoStart).
+          void vscode.workspace
+            .getConfiguration('claudeMirror')
+            .update('reviewLoop.maxRounds', clamped, true)
+            .then(() => this.sendReviewLoopMaxRoundsSetting());
+          break;
+        }
+
         case 'setRestoreSessionsEnabled': {
           this.log(`Setting restoreSessionsOnStartup: ${msg.enabled}`);
           void vscode.workspace
@@ -3957,6 +3970,7 @@ export class MessageHandler {
           // Send usage widget setting and auto-fetch initial usage data
           this.sendUsageWidgetSetting();
           this.sendReviewLoopAutoStartSetting();
+          this.sendReviewLoopMaxRoundsSetting();
           void this.fetchAndSendUsage();
           // Send restore-sessions-on-startup setting
           this.sendRestoreSessionsSetting();
@@ -4512,6 +4526,21 @@ export class MessageHandler {
     this.webview.postMessage({ type: 'reviewLoopAutoStartSetting', enabled });
   }
 
+  /** Clamp a max-rounds value to the supported 1-20 integer range. */
+  private clampReviewLoopRounds(value: number): number {
+    const raw = Number(value);
+    if (!Number.isFinite(raw)) {
+      return 5;
+    }
+    return Math.max(1, Math.min(20, Math.round(raw)));
+  }
+
+  /** Read review-loop maxRounds setting from VS Code config and send to webview */
+  private sendReviewLoopMaxRoundsSetting(): void {
+    const raw = vscode.workspace.getConfiguration('claudeMirror.reviewLoop').get<number>('maxRounds', 5);
+    this.webview.postMessage({ type: 'reviewLoopMaxRoundsSetting', value: this.clampReviewLoopRounds(raw) });
+  }
+
   /** Read restoreSessionsOnStartup setting from VS Code config and send to webview */
   private sendRestoreSessionsSetting(): void {
     const config = vscode.workspace.getConfiguration('claudeMirror');
@@ -4964,6 +4993,9 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.reviewLoop.autoStart')) {
         this.sendReviewLoopAutoStartSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.reviewLoop.maxRounds')) {
+        this.sendReviewLoopMaxRoundsSetting();
       }
       if (e.affectsConfiguration('claudeMirror.restoreSessionsOnStartup')) {
         this.sendRestoreSessionsSetting();

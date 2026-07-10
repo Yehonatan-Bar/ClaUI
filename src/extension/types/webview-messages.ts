@@ -914,6 +914,12 @@ export interface SetReviewLoopSessionEnabledRequest {
   enabled: boolean;
 }
 
+/** Set the max review rounds. Clamped to 1-20 on the extension side too. */
+export interface SetReviewLoopMaxRoundsRequest {
+  type: 'setReviewLoopMaxRounds';
+  value: number;
+}
+
 export interface SetApiKeyRequest {
   type: 'setApiKey';
   apiKey: string;  // empty string = clear the key
@@ -1290,7 +1296,8 @@ export type WebviewToExtensionMessage =
   | ReviewLoopStartRequest
   | ReviewLoopStopRequest
   | SetReviewLoopAutoStartRequest
-  | SetReviewLoopSessionEnabledRequest;
+  | SetReviewLoopSessionEnabledRequest
+  | SetReviewLoopMaxRoundsRequest;
 
 // --- Super Particle Accelerator (Webview -> Extension) ---
 export interface SuperParticleAcceleratorGetStatusRequest { type: 'superParticleAcceleratorGetStatus' }
@@ -2869,6 +2876,12 @@ export interface ReviewLoopSessionEnabledSettingMessage {
   enabled: boolean;
 }
 
+/** Current configured max review rounds (the setting, not the running loop's value). */
+export interface ReviewLoopMaxRoundsSettingMessage {
+  type: 'reviewLoopMaxRoundsSetting';
+  value: number;
+}
+
 export type ExtensionToWebviewMessage =
   | McpInventoryMessage
   | McpCatalogMessage
@@ -3055,7 +3068,8 @@ export type ExtensionToWebviewMessage =
   | WorkspaceAccessGuardErrorMessage
   | ReviewLoopEventMessage
   | ReviewLoopAutoStartSettingMessage
-  | ReviewLoopSessionEnabledSettingMessage;
+  | ReviewLoopSessionEnabledSettingMessage
+  | ReviewLoopMaxRoundsSettingMessage;
 
 // --- Super Particle Accelerator (Extension -> Webview) ---
 export interface SuperParticleAcceleratorStatusMessage {

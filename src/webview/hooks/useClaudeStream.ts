@@ -127,6 +127,7 @@ export function useClaudeStream(): void {
     incrementSessionToolCount,
     applyReviewLoopEvent,
     setReviewLoopAutoStart,
+    setReviewLoopMaxRoundsSetting,
     setReviewLoopSessionEnabled,
     initBtwSession,
     addBtwUserMessage,
@@ -1252,6 +1253,10 @@ export function useClaudeStream(): void {
           setReviewLoopAutoStart(msg.enabled);
           break;
 
+        case 'reviewLoopMaxRoundsSetting':
+          setReviewLoopMaxRoundsSetting(msg.value);
+          break;
+
         case 'reviewLoopSessionEnabledSetting':
           setReviewLoopSessionEnabled(msg.enabled);
           break;
@@ -1502,6 +1507,7 @@ export function useClaudeStream(): void {
     addWriteOldContent,
     applyReviewLoopEvent,
     setReviewLoopAutoStart,
+    setReviewLoopMaxRoundsSetting,
     setReviewLoopSessionEnabled,
     initBtwSession,
     addBtwUserMessage,
