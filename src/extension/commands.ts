@@ -375,6 +375,26 @@ export function registerCommands(
       vscode.window.showErrorMessage(`Provider handoff failed: ${message}`);
     }
   };
+  const runCompactSession = async (args?: { sourceTabId?: string }): Promise<void> => {
+    const sourceTab = args?.sourceTabId ? tabManager.getTabById(args.sourceTabId) : tabManager.getActiveTab();
+    if (!sourceTab) {
+      vscode.window.showWarningMessage('No active ClaUi tab to compact. Start or open a session first.');
+      return;
+    }
+    try {
+      const result = await tabManager.compactSession({ sourceTabId: sourceTab.id });
+      const via = result.source === 'ai' ? 'AI summary' : 'quick summary';
+      vscode.window.showInformationMessage(
+        `Compact Session ready (${via}). Opened a new tab with the prompt pre-filled and copied it to the clipboard.`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      vscode.window.showErrorMessage(`Compact Session failed: ${message}`);
+      // Re-throw so webview-initiated runs receive a failure result via the
+      // MessageHandler catch (which clears the button's loading state).
+      throw err;
+    }
+  };
   let showHistoryInFlight = false;
   let showHistorySeq = 0;
   let openPlanDocsInFlight = false;
@@ -536,6 +556,14 @@ export function registerCommands(
       'claudeMirror.switchProviderWithContext',
       async (args?: { sourceTabId?: string; targetProvider?: 'claude' | 'codex'; keepSourceOpen?: boolean }) => {
         await runProviderHandoff(args);
+      }
+    ),
+
+    // Compact the active session into a continuation prompt and open a fresh tab
+    vscode.commands.registerCommand(
+      'claudeMirror.compactSession',
+      async (args?: { sourceTabId?: string }) => {
+        await runCompactSession(args);
       }
     ),
 

@@ -83,6 +83,7 @@ claude-code-mirror/
 |   |   |   +-- FileLogger.ts             #   Per-session file logging with rotation and rename
 |   |   |   +-- SessionStore.ts           #   Persists session metadata in globalState (incl. end-of-session summary)
 |   |   |   +-- SessionSummarizer.ts      #   End-of-session summary via Haiku (Codex low-reasoning fallback)
+|   |   |   +-- CompactSessionService.ts  #   "Compact Session": summarize a session into a continuation prompt (AI + heuristic fallback)
 |   |   |   +-- TabGroupStore.ts          #   Memento-backed CRUD for tab folders/sub-folders (workspaceState)
 |   |   |   +-- OpenTabsSnapshot.ts       #   Persists list of open tabs per-workspace for restore-on-startup (groupId/orderInGroup/lastFocusedAt/tabOrder)
 |   |   |   +-- ProjectAnalyticsStore.ts  #   Persists SessionSummary in workspaceState (per-project)
@@ -1247,6 +1248,23 @@ Added settings:
 ### Detail Doc
 
 - `Kingdom_of_Claudes_Beloved_MDs/PROVIDER_HANDOFF.md`
+
+---
+
+## Compact Session (token-saving handoff to a new tab)
+
+**Compact Session** — an InputArea button that summarizes the current session into
+one self-contained continuation prompt (AI via the analysis model, deterministic
+heuristic fallback), copies it to the clipboard, and opens a fresh tab with the
+prompt pre-filled. Lets you continue the same task in a new, low-token session.
+Distinct from `claudeMirror.compact` (the CLI's in-place context compaction).
+
+- `src/extension/session/CompactSessionService.ts` — transcript + grounding capsule -> Claude CLI summary, heuristic fallback.
+- `TabManager.compactSession()` — snapshot -> build -> clipboard -> new tab (`setForkInit`) -> `compactSessionResult`.
+- Command `claudeMirror.compactSession`; webview message `compactSession` / result `compactSessionResult`.
+- Setting `claudeMirror.compactSession.model` (empty = reuse `analysisModel`).
+
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/COMPACT_SESSION.md`
 
 ---
 

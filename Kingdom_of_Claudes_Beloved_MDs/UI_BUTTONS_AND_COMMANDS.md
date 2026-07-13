@@ -163,6 +163,12 @@ All commands are registered under the `claudeMirror.*` namespace in `package.jso
 - **HE:** מעביר את השיחה הנוכחית לספק אחר (למשל Claude ↔ Codex), ואורז את ההקשר כך שהספק החדש ממשיך מהמקום שבו הפסקת.
 - > Detail: `Kingdom_of_Claudes_Beloved_MDs/PROVIDER_HANDOFF.md`
 
+### `claudeMirror.compactSession` — "ClaUi: Compact Session to New Tab"
+- **Tooltip:** Compact session: summarize into a prompt, copy it, and open a fresh tab with it pre-filled (saves tokens)
+- **EN:** Summarizes the current session into one self-contained continuation prompt, copies it to the clipboard, and opens a fresh tab with the prompt pre-filled in the input (not sent). Lets you continue the same task in a new, low-token session. Distinct from `claudeMirror.compact` (in-place CLI compaction).
+- **HE:** מסכם את הסשן הנוכחי לפרומפט המשך אחד ועצמאי, מעתיק אותו ללוח, ופותח לשונית חדשה עם הפרומפט ממולא בתיבת הקלט (בלי לשלוח). מאפשר להמשיך את אותה משימה בסשן חדש וחסכוני בטוקנים. שונה מ-`claudeMirror.compact` (דחיסת הקשר במקום).
+- > Detail: `Kingdom_of_Claudes_Beloved_MDs/COMPACT_SESSION.md`
+
 ### `claudeMirror.switchClaudeAccountWithContext` — "ClaUi: Switch Claude Account (Carry Context)"
 - **Tooltip:** Switch Claude account, carrying context over
 - **EN:** Moves the current conversation to a different Claude account profile while preserving context (useful for separate billing/orgs).
@@ -355,6 +361,7 @@ All commands are registered under the `claudeMirror.*` namespace in `package.jso
 | Button | Tooltip | EN | HE |
 |---|---|---|---|
 | 🔍 Search chat | Search chat (Ctrl+Shift+F) | Toggle the in-chat search bar. | הפעל/כבה את שורת החיפוש בצ'אט. |
+| Compact Session | Compact session: summarize into a prompt, copy it, and open a fresh tab with it pre-filled (saves tokens) | Summarize the session into a continuation prompt, copy it, and open a fresh tab with it pre-filled. | סכם את הסשן לפרומפט המשך, העתק אותו, ופתח לשונית חדשה עם הפרומפט ממולא. |
 | Clear | Clear session and start fresh | Reset the conversation and restart the session. | אפס את השיחה והפעל מחדש את הסשן. |
 | Ultrathink lock 🔒 | Lock ultrathink on every prompt | Keep "ultrathink" prepended to every prompt. | שמור על "ultrathink" בתחילת כל פקודה. |
 | Ultrathink ⚡ | Ultrathink – boost reasoning power | Cycle ultrathink off → single → locked. | החלף ultrathink כבוי → חד-פעמי → נעול. |

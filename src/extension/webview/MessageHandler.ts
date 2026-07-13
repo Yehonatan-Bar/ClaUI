@@ -2199,6 +2199,20 @@ export class MessageHandler {
             });
           break;
 
+        case 'compactSession':
+          this.log('Compact session requested');
+          void vscode.commands.executeCommand('claudeMirror.compactSession', {
+            sourceTabId: this.tabId,
+          }).then(
+            () => undefined,
+            (err: unknown) => {
+              const message = err instanceof Error ? err.message : String(err);
+              this.log(`Failed compactSession: ${message}`);
+              this.webview.postMessage({ type: 'compactSessionResult', success: false, error: message });
+            },
+          );
+          break;
+
         case 'switchProviderWithContext':
           this.log(`Switch provider with context requested: "${msg.targetProvider}"`);
           void vscode.commands.executeCommand('claudeMirror.switchProviderWithContext', {

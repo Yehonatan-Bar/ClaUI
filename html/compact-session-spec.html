@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compact Session - כפתור דחיסת סשן</title>
+<style>
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #f4f6f9;
+    color: #1f2933;
+    line-height: 1.7;
+    margin: 0;
+    padding: 0;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 32px 24px 64px; }
+  header {
+    background: linear-gradient(135deg, #2b5876, #4e4376);
+    color: #fff;
+    padding: 36px 24px;
+    border-radius: 0 0 16px 16px;
+    text-align: center;
+  }
+  header h1 { margin: 0 0 8px; font-size: 30px; }
+  header p { margin: 0; opacity: 0.9; font-size: 17px; }
+  h2 {
+    color: #2b5876;
+    border-bottom: 2px solid #dfe6ee;
+    padding-bottom: 8px;
+    margin-top: 40px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 18px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .steps { list-style: none; padding: 0; margin: 0; }
+  .steps li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px dashed #e2e8f0;
+  }
+  .steps li:last-child { border-bottom: none; }
+  .steps input[type="checkbox"] { margin-top: 6px; width: 18px; height: 18px; accent-color: #2b5876; }
+  .steps .txt strong { display: block; }
+  .flow {
+    background: #eef2f7;
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-size: 16px;
+  }
+  .flow ol { margin: 0; padding-inline-start: 22px; }
+  .flow li { margin: 6px 0; }
+  .note {
+    background: #fff8e6;
+    border-right: 4px solid #f0b429;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 16px 0;
+  }
+  .pill {
+    display: inline-block;
+    background: #2b5876;
+    color: #fff;
+    border-radius: 999px;
+    padding: 2px 12px;
+    font-size: 13px;
+    margin-inline-start: 6px;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { text-align: right; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+  th { background: #f0f4f8; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Compact Session - דחיסת סשן ומעבר חלק</h1>
+  <p>כפתור חדש שחוסך טוקנים בכך שהוא מסכם שיחה ארוכה ופותח סשן חדש וחסכוני</p>
+</header>
+
+<div class="wrap">
+
+  <h2>מה זה עושה, בשפה פשוטה</h2>
+  <div class="card">
+    <p>
+      ככל ששיחה מתארכת, היא צוברת יותר ויותר "זיכרון" (טוקנים), וזה מייקר ומאט
+      את העבודה. הכפתור החדש <strong>Compact Session</strong> פותר את זה בלחיצה אחת:
+    </p>
+    <ul>
+      <li>הוא <strong>קורא את כל השיחה הנוכחית</strong>.</li>
+      <li>מבקש מהמערכת <strong>לסכם אותה לפרומפט המשך אחד</strong> - קצר, אך שמכיל את כל מה שצריך כדי להמשיך: המטרה, מה כבר נעשה, החלטות, קבצים, בעיות פתוחות, והצעדים הבאים.</li>
+      <li><strong>מעתיק את הסיכום</strong> אוטומטית ללוח (clipboard).</li>
+      <li><strong>פותח לשונית חדשה</strong> ומדביק בה את הסיכום בתיבת ההקלדה - מוכן, בלי לשלוח - כדי שתבדוק ותשלח בעצמך.</li>
+    </ul>
+    <p>
+      התוצאה: ממשיכים בדיוק מאותה נקודה, אבל בסשן חדש ו"נקי" שצורך הרבה פחות טוקנים.
+    </p>
+  </div>
+
+  <h2>איך זה עובד, שלב אחר שלב</h2>
+  <div class="card flow">
+    <ol>
+      <li>לוחצים על הכפתור <strong>Compact</strong> שליד כפתורי החיפוש וה-Clear שמעל תיבת ההקלדה.</li>
+      <li>המערכת קוראת את השיחה ושולחת אותה לסיכום חכם (עם גיבוי אוטומטי לסיכום מהיר אם הסיכום החכם אינו זמין).</li>
+      <li>הסיכום מועתק ללוח ונפתחת לשונית חדשה עם הפרומפט מוכן בתיבה.</li>
+      <li>מופיעה הודעת אישור קצרה, והכפתור חוזר למצב רגיל.</li>
+    </ol>
+  </div>
+
+  <div class="note">
+    <strong>הבחנה חשובה:</strong> קיים כבר כפתור "Compact Context" שדוחס את ההקשר
+    <em>בתוך אותו סשן</em>. הכפתור החדש שונה - הוא יוצר פרומפט נייד ופותח
+    <em>סשן חדש לגמרי</em>.
+  </div>
+
+  <h2>שלבי הביצוע (הושלמו)</h2>
+  <div class="card">
+    <ul class="steps">
+      <li>
+        <input type="checkbox" checked>
+        <span class="txt"><strong>הגדרת ערוץ התקשורת</strong> בין הממשק למנוע - הודעת בקשה והודעת תוצאה.</span>
+      </li>
+      <li>
+        <input type="checkbox" checked>
+        <span class="txt"><strong>מנוע הסיכום</strong> - קורא את השיחה, מייצר פרומפט המשך מקיף, עם נפילה-לאחור לסיכום מהיר.</span>
+      </li>
+      <li>
+        <input type="checkbox" checked>
+        <span class="txt"><strong>תזמור הפעולה</strong> - העתקה ללוח, פתיחת לשונית חדשה, ומילוי הפרומפט בתיבה.</span>
+      </li>
+      <li>
+        <input type="checkbox" checked>
+        <span class="txt"><strong>הכפתור בממשק</strong> - עם אנימציית טעינה, הודעת אישור, וטולטיפ הסבר.</span>
+      </li>
+      <li>
+        <input type="checkbox" checked>
+        <span class="txt"><strong>זמין גם דרך לוח הפקודות</strong> (Command Palette) ולא רק ככפתור.</span>
+      </li>
+      <li>
+        <input type="checkbox" checked>
+        <span class="txt"><strong>עזרה דו-לשונית ותיעוד</strong> - הכפתור נוסף לפאנל ה-Help (עברית ואנגלית) ולמסמכי התיעוד.</span>
+      </li>
+      <li>
+        <input type="checkbox" checked>
+        <span class="txt"><strong>בנייה ובדיקת קומפילציה</strong> עברו בהצלחה ללא שגיאות.</span>
+      </li>
+    </ul>
+  </div>
+
+  <h2>הגדרה שכדאי להכיר</h2>
+  <div class="card">
+    <table>
+      <tr><th>הגדרה</th><th>ברירת מחדל</th><th>למה זה טוב</th></tr>
+      <tr>
+        <td>מודל הסיכום <span class="pill">compactSession.model</span></td>
+        <td>ריק</td>
+        <td>ריק = שימוש במודל הניתוח הקיים (מהיר וזול). אפשר להגדיר מודל חזק יותר לסיכום איכותי יותר.</td>
+      </tr>
+    </table>
+  </div>
+
+  <h2>מגבלות ידועות</h2>
+  <div class="card">
+    <ul>
+      <li>הסשן החדש מתחיל "רענן" - הפרומפט הוא ההקשר, לא שחזור מלא של ההיסטוריה. איכות הסיכום תלויה במודל שנבחר.</li>
+      <li>זמין בלשוניות Claude ו-Codex; לא בלשוניות ריבוי-משתתפים.</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

@@ -179,6 +179,10 @@
         "title": "ClaUi: Switch Provider (Carry Context)"
       },
       {
+        "command": "claudeMirror.compactSession",
+        "title": "ClaUi: Compact Session to New Tab"
+      },
+      {
         "command": "claudeMirror.switchClaudeAccountWithContext",
         "title": "ClaUi: Switch Claude Account (Carry Context)"
       },
@@ -301,6 +305,11 @@
           "type": "boolean",
           "default": true,
           "description": "Enable cross-provider session handoff (Claude Code <-> Codex) with context capsule transfer."
+        },
+        "claudeMirror.compactSession.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model used by the 'Compact Session' button to summarize a session into a continuation prompt. Leave empty to reuse claudeMirror.analysisModel (Haiku by default). Set a stronger model (e.g. a Sonnet id) for higher-quality handoff prompts."
         },
         "claudeMirror.reviewLoop.autoStart": {
           "type": "boolean",
