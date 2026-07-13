@@ -808,6 +808,7 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 | `claudeMirror.chatFontSize` | `14` | Font size (px) for chat messages (10-32) |
 | `claudeMirror.chatFontFamily` | `""` | Font family for chat messages (empty = VS Code default) |
 | `claudeMirror.typingTheme` | `"neo-zen"` | Response rendering personality theme: "terminal-hacker", "retro", "zen", "neo-zen", or "clarity" (Clarity separates user input in blue, process in purple, and final answer in green) |
+| `claudeMirror.messageColorScheme` | `"default"` | Chat message background palette: "default" (blue/violet), "ocean" (teal/indigo), "sunset" (amber/rose), "mono" (subtle), or "off". Picked via the "Message colors" dropdown in the text settings panel. See `TYPING_PERSONALITY_THEMES.md` |
 | `claudeMirror.autoNameSessions` | `true` | Auto-generate tab names from first message (Claude: Haiku, Codex: one-shot codex exec) |
 | `claudeMirror.activitySummary` | `true` | Periodically summarize tool activity in busy indicator via Haiku |
 | `claudeMirror.activitySummaryThreshold` | `3` | Tool uses before triggering an activity summary (1-10) |

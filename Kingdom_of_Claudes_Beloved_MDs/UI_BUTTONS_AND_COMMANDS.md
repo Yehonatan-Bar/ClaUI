@@ -589,6 +589,14 @@ All commands are registered under the `claudeMirror.*` namespace in `package.jso
 
 ---
 
+## Text settings: Message colors selector / הגדרות טקסט: בורר צבעי הודעות (`TextSettingsBar/`)
+
+**EN:** The text settings panel (the `Aa` toggle) has a **Message colors** dropdown that sets the chat-bubble background palette: `Blue / Violet (default)`, `Ocean (Teal / Indigo)`, `Sunset (Amber / Rose)`, `Mono (subtle)`, or `Off (no colors)`. It applies a `msg-colors-<scheme>` class on the app container which overrides the CSS accent variables, so the Zen / Neo Zen / Clarity themes recolor instantly; `Off` neutralizes the surfaces. Saved to `claudeMirror.messageColorScheme`. / **HE:** בפאנל הגדרות הטקסט (מתג `Aa`) יש תפריט **Message colors** שקובע את פלטת רקע בועות הצ'אט: `כחול/סגול (ברירת מחדל)`, `Ocean (טורקיז/אינדיגו)`, `Sunset (ענבר/ורוד)`, `Mono (עדין)`, או `Off (בלי צבע)`. הוא מוסיף מחלקה `msg-colors-<scheme>` על מיכל האפליקציה שדורסת את משתני ה-CSS, כך שהערכות Zen / Neo Zen / Clarity נצבעות מחדש מיידית; `Off` מנטרל את הרקעים. נשמר ב-`claudeMirror.messageColorScheme`.
+
+> Detail: `TYPING_PERSONALITY_THEMES.md`
+
+---
+
 ## Coverage / כיסוי
 
 **EN:** **Done (Wave 1):** 46 commands, Status Bar, Input Area, App-level controls. **Done (Wave 2):** the Chat view — message bubbles, code/tool/agent/team blocks, Plan Approval & Question bar, in-chat search, prompt history, file/URL links, "btw…" feature. **Done (Wave 3):** all feature panels — Dashboard, MCP, Worktree/Merge, Workstream Map, Teams, Multi-Participant, SkillGen, Achievements/Community, Review Loop, Particle/Super-Particle Accelerator, Settings, Bug Report, Vitals info & misc widgets — plus the Model/Provider/Permission selectors. **Result:** every interactive button across the webview now shows a hover tooltip (`data-tooltip` or native `title`); selectors carry a control-level `data-tooltip`.

@@ -16,6 +16,7 @@ import type {
   ProviderCapabilities,
   ProviderId,
   TypingTheme,
+  MessageColorScheme,
   WebviewTabSummary,
   WorktreeActionResultMessage,
 } from '../../extension/types/webview-messages';
@@ -217,6 +218,7 @@ export interface AppState {
   // Text display settings
   textSettings: TextSettings;
   typingTheme: TypingTheme;
+  messageColorScheme: MessageColorScheme;
 
   // File paths dropped/picked
   pendingFilePaths: string[] | null;
@@ -760,6 +762,7 @@ export interface AppState {
   addToPromptHistory: (prompt: string) => void;
   setTextSettings: (settings: Partial<TextSettings>) => void;
   setTypingTheme: (theme: TypingTheme) => void;
+  setMessageColorScheme: (scheme: MessageColorScheme) => void;
   setProvider: (provider: ProviderId | null) => void;
   setSelectedProvider: (provider: ProviderId) => void;
   setProviderCapabilities: (capabilities: ProviderCapabilities) => void;
@@ -1190,6 +1193,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   lastError: null,
   textSettings: { ...defaultTextSettings },
   typingTheme: 'zen' as const,
+  messageColorScheme: 'default' as const,
   pendingFilePaths: null,
   promptHistory: [],
   isResuming: false,
@@ -2167,6 +2171,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
 
   setTypingTheme: (theme) => set({ typingTheme: theme }),
+
+  setMessageColorScheme: (scheme) => set({ messageColorScheme: scheme }),
 
   setProvider: (provider) => set((state) => ({
     provider,
@@ -3197,6 +3203,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       lastError: null,
       textSettings: { ...defaultTextSettings },
       typingTheme: 'zen' as const,
+      messageColorScheme: 'default' as const,
       pendingFilePaths: null,
       selectedProvider: state.selectedProvider,
       providerCapabilities: state.providerCapabilities,

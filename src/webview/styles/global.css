@@ -378,6 +378,92 @@ html, body, #root {
   box-shadow: 0 0 6px color-mix(in srgb, var(--vscode-editorCursor-foreground) 42%, transparent);
 }
 
+/* --- Message background color-coding (Zen & Neo Zen) ---
+   Three distinct surfaces so the eye instantly separates the conversation:
+     - user prompt       -> blue surface
+     - system answer     -> violet surface
+     - thinking/process  -> the SAME violet, a fainter shade (Claude's rough work)
+   Colors are mixed into the editor background, so they stay subtle and adapt to
+   both light and dark VS Code themes. Clarity has its own richer treatment, and
+   Terminal Hacker / Retro keep their deliberate monochrome look, so this is
+   scoped to the two neutral themes. */
+.theme-zen,
+.theme-neo-zen {
+  --claui-user-accent: #3b82f6;    /* blue   = your prompt */
+  --claui-system-accent: #a855f7;  /* violet = the system's reply and its thinking */
+}
+
+/* Your prompt: a clear blue surface with a solid blue left rail. */
+.theme-zen .message-user,
+.theme-neo-zen .message-user {
+  background: color-mix(in srgb, var(--claui-user-accent) 15%, var(--vscode-editor-background));
+  border-color: color-mix(in srgb, var(--claui-user-accent) 40%, transparent);
+  border-left: 3px solid var(--claui-user-accent);
+}
+
+/* System reply (and final answer): a violet surface, distinct from your blue. */
+.theme-zen .message-assistant,
+.theme-neo-zen .message-assistant {
+  background: color-mix(in srgb, var(--claui-system-accent) 12%, var(--vscode-editor-background));
+  border-left: 3px solid color-mix(in srgb, var(--claui-system-accent) 55%, transparent);
+  border-radius: 8px;
+}
+
+/* Background thinking (process turns with tool calls): the same violet hue, but a
+   much fainter shade so the "rough work" recedes behind the actual reply. */
+.theme-zen .message-assistant.message-process,
+.theme-neo-zen .message-assistant.message-process {
+  background: color-mix(in srgb, var(--claui-system-accent) 5%, var(--vscode-editor-background));
+  border-left-color: color-mix(in srgb, var(--claui-system-accent) 30%, transparent);
+}
+
+/* --- Message color scheme selector (claudeMirror.messageColorScheme) ---
+   Applied as `msg-colors-<scheme>` on .app-container. Because all message-color
+   rules read CSS variables, switching a palette is just a variable override, so
+   the Zen / Neo Zen / Clarity treatments recolor automatically. 'default' has no
+   rules (keeps each theme's built-in palette); 'off' neutralizes the surfaces.
+   The `.theme-clarity` variants raise specificity to beat Clarity's own vars. */
+
+/* Ocean: teal prompt / indigo reply */
+.app-container.msg-colors-ocean {
+  --claui-user-accent: #14b8a6;
+  --claui-system-accent: #6366f1;
+}
+.app-container.theme-clarity.msg-colors-ocean {
+  --clarity-user-accent: #14b8a6;
+  --clarity-assistant-accent: #6366f1;
+}
+
+/* Sunset: amber prompt / rose reply */
+.app-container.msg-colors-sunset {
+  --claui-user-accent: #f59e0b;
+  --claui-system-accent: #f43f5e;
+}
+.app-container.theme-clarity.msg-colors-sunset {
+  --clarity-user-accent: #f59e0b;
+  --clarity-assistant-accent: #f43f5e;
+}
+
+/* Mono: subtle slate tones for a quieter, low-color look */
+.app-container.msg-colors-mono {
+  --claui-user-accent: #64748b;
+  --claui-system-accent: #94a3b8;
+}
+.app-container.theme-clarity.msg-colors-mono {
+  --clarity-user-accent: #64748b;
+  --clarity-assistant-accent: #94a3b8;
+}
+
+/* Off: no message background coloring at all (neutral surfaces). */
+.app-container.msg-colors-off .message-user,
+.app-container.msg-colors-off .message-assistant,
+.app-container.msg-colors-off .message-assistant.message-process {
+  background: transparent;
+  border-left: none;
+  border-color: var(--vscode-panel-border, transparent);
+  box-shadow: none;
+}
+
 /* Clarity Enhanced: Maximum visual distinction between user input, Claude's process,
    and the final answer. Each state has unmistakable styling so users instantly understand
    where each part comes from and what it means. */

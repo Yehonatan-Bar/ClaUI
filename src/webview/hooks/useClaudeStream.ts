@@ -35,6 +35,7 @@ export function useClaudeStream(): void {
     setPendingFilePaths,
     setTextSettings,
     setTypingTheme,
+    setMessageColorScheme,
     setProvider,
     setSelectedProvider,
     setProviderCapabilities,
@@ -711,6 +712,10 @@ export function useClaudeStream(): void {
 
         case 'typingThemeSetting':
           setTypingTheme(msg.theme);
+          break;
+
+        case 'messageColorSchemeSetting':
+          setMessageColorScheme(msg.scheme);
           break;
 
         case 'permissionModeSetting':
@@ -1421,6 +1426,7 @@ export function useClaudeStream(): void {
     setPendingFilePaths,
     setTextSettings,
     setTypingTheme,
+    setMessageColorScheme,
     setProvider,
     setSelectedProvider,
     setProviderCapabilities,

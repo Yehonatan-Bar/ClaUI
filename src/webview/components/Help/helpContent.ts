@@ -1762,4 +1762,12 @@ export const HELP_ENTRIES: HelpEntry[] = [
     detailEn: 'Model, Provider, Permission Mode, and the Codex/Claude effort & service-tier selectors are native <select> dropdowns. Each carries a data-tooltip on the <select> element describing what it controls, so hovering the control shows the tooltip; the individual options are native and self-labeled.',
     detailHe: 'בוררי Model, Provider, Permission Mode, ו-effort/service-tier של Codex/Claude הם תפריטי <select> מקוריים. כל אחד נושא data-tooltip על אלמנט ה-<select> המתאר מה הוא שולט בו, כך שריחוף מעל הפקד מציג את ה-tooltip; ה-option עצמם מקוריים וברורים.',
   },
+  {
+    id: 'selectors-message-colors',
+    section: 'selectors',
+    name: 'Message colors',
+    tooltip: 'Background colors for chat messages (your prompt vs the system reply/thinking). Choose a palette or turn it off.',
+    detailEn: "In the text settings panel (the 'Aa' button), the 'Message colors' dropdown sets the background palette for chat bubbles: Blue/Violet (default), Ocean (Teal/Indigo), Sunset (Amber/Rose), Mono (subtle), or Off (no coloring). It swaps CSS accent variables so the Zen / Neo Zen / Clarity themes recolor instantly; the choice is saved to claudeMirror.messageColorScheme.",
+    detailHe: "בפאנל הגדרות הטקסט (כפתור 'Aa'), התפריט 'Message colors' קובע את פלטת הרקע של בועות הצ'אט: כחול/סגול (ברירת מחדל), Ocean (טורקיז/אינדיגו), Sunset (ענבר/ורוד), Mono (עדין), או Off (בלי צבע). הוא מחליף משתני CSS כך שהערכות Zen / Neo Zen / Clarity נצבעות מחדש מיידית; הבחירה נשמרת ב-claudeMirror.messageColorScheme.",
+  },
 ];

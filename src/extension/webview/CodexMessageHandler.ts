@@ -23,6 +23,7 @@ import type {
   TurnRecord,
   TurnCategory,
   TypingTheme,
+  MessageColorScheme,
   WebviewImageData,
   WebviewToExtensionMessage,
 } from '../types/webview-messages';
@@ -999,6 +1000,10 @@ export class CodexMessageHandler {
           void vscode.workspace.getConfiguration('claudeMirror').update('typingTheme', msg.theme, true);
           break;
 
+        case 'setMessageColorScheme':
+          void vscode.workspace.getConfiguration('claudeMirror').update('messageColorScheme', msg.scheme, true);
+          break;
+
         case 'setGoalState':
           this.log(`Goal state update (Codex): active=${msg.active}`);
           break;
@@ -1777,6 +1782,9 @@ export class CodexMessageHandler {
       if (e.affectsConfiguration('claudeMirror.typingTheme')) {
         this.sendTypingThemeSetting();
       }
+      if (e.affectsConfiguration('claudeMirror.messageColorScheme')) {
+        this.sendMessageColorSchemeSetting();
+      }
       if (e.affectsConfiguration('claudeMirror.provider')) {
         this.log('Configuration changed: claudeMirror.provider (Codex handler)');
         this.sendProviderSetting();
@@ -1811,6 +1819,7 @@ export class CodexMessageHandler {
   private sendInitialSettings(): void {
     this.sendTextSettings();
     this.sendTypingThemeSetting();
+    this.sendMessageColorSchemeSetting();
     this.sendProviderSetting();
     this.sendProviderCapabilities();
     this.sendPermissionModeSetting();
@@ -1848,6 +1857,14 @@ export class CodexMessageHandler {
     this.webview.postMessage({
       type: 'typingThemeSetting',
       theme: config.get<TypingTheme>('typingTheme', 'zen'),
+    });
+  }
+
+  private sendMessageColorSchemeSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    this.webview.postMessage({
+      type: 'messageColorSchemeSetting',
+      scheme: config.get<MessageColorScheme>('messageColorScheme', 'default'),
     });
   }
 
