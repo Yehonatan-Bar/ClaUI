@@ -418,10 +418,10 @@ html, body, #root {
 }
 .theme-clarity .message-assistant.message-process .message-role-name {
   font-weight: 700;
-  opacity: 0.85;
+  opacity: 0.70;
   box-shadow:
-    0 1px 3px rgba(168, 85, 247, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 1px 2px rgba(168, 85, 247, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 .theme-clarity .message-assistant.message-final-answer .message-role-name {
   background: var(--clarity-answer-accent);
@@ -434,18 +434,18 @@ html, body, #root {
 
 /* Your input: bold blue card with strong visual markers—unmistakably YOUR prompt */
 .theme-clarity .message-user {
-  background: color-mix(in srgb, var(--clarity-user-accent) 28%, var(--vscode-editor-background));
-  border: 2px solid color-mix(in srgb, var(--clarity-user-accent) 58%, transparent);
-  border-left: 9px solid var(--clarity-user-accent);
-  border-right: 3px solid color-mix(in srgb, var(--clarity-user-accent) 42%, transparent);
-  border-radius: 14px;
-  padding: 14px 16px;
+  background: color-mix(in srgb, var(--clarity-user-accent) 34%, var(--vscode-editor-background));
+  border: 2px solid color-mix(in srgb, var(--clarity-user-accent) 62%, transparent);
+  border-left: 11px solid var(--clarity-user-accent);
+  border-right: 4px solid color-mix(in srgb, var(--clarity-user-accent) 45%, transparent);
+  border-radius: 16px;
+  padding: 15px 18px;
   box-shadow:
-    inset 0 2px 0 rgba(37, 99, 235, 0.2),
-    inset 0 -1px 0 rgba(37, 99, 235, 0.1),
-    0 0 0 1px color-mix(in srgb, var(--clarity-user-accent) 18%, transparent),
-    0 0 16px color-mix(in srgb, var(--clarity-user-accent) 22%, transparent);
-  margin-bottom: 22px;
+    inset 0 2px 0 rgba(37, 99, 235, 0.25),
+    inset 0 -1px 0 rgba(37, 99, 235, 0.12),
+    0 0 0 1px color-mix(in srgb, var(--clarity-user-accent) 20%, transparent),
+    0 0 24px color-mix(in srgb, var(--clarity-user-accent) 26%, transparent);
+  margin-bottom: 24px;
 }
 
 /* Claude's output (general): its own purple-tinted surface for all responses */
@@ -458,37 +458,37 @@ html, body, #root {
 }
 
 /* Process message: when Claude is working (tool calls present).
-   Heavily de-emphasized background, thin/dashed borders, low opacity.
-   This is the "rough work" — what Claude shows as it's thinking, not the actual answer. */
+   Extremely de-emphasized background, very thin dotted borders, low opacity.
+   This is the "rough work" — what Claude shows as it's thinking, NOT the actual answer. */
 .theme-clarity .message-assistant.message-process {
-  background: color-mix(in srgb, var(--clarity-assistant-accent) 3%, var(--vscode-editor-background));
-  border: 2px dotted color-mix(in srgb, var(--clarity-assistant-accent) 20%, transparent);
-  border-left: 4px dotted color-mix(in srgb, var(--clarity-assistant-accent) 38%, transparent);
-  opacity: 0.65;
-  margin-bottom: 14px;
+  background: color-mix(in srgb, var(--clarity-assistant-accent) 2%, var(--vscode-editor-background));
+  border: 1px dotted color-mix(in srgb, var(--clarity-assistant-accent) 18%, transparent);
+  border-left: 3px dotted color-mix(in srgb, var(--clarity-assistant-accent) 32%, transparent);
+  opacity: 0.40;
+  margin-bottom: 12px;
 }
 .theme-clarity .message-assistant.message-process:hover {
-  opacity: 0.82;
-  background: color-mix(in srgb, var(--clarity-assistant-accent) 6%, var(--vscode-editor-background));
-  border-color: color-mix(in srgb, var(--clarity-assistant-accent) 28%, transparent);
-  border-left-color: color-mix(in srgb, var(--clarity-assistant-accent) 48%, transparent);
+  opacity: 0.60;
+  background: color-mix(in srgb, var(--clarity-assistant-accent) 4%, var(--vscode-editor-background));
+  border-color: color-mix(in srgb, var(--clarity-assistant-accent) 22%, transparent);
+  border-left-color: color-mix(in srgb, var(--clarity-assistant-accent) 38%, transparent);
 }
 
-/* Process tools: HEAVILY de-emphasized.
-   Tool blocks are internal workings—render at low opacity/contrast until user inspects them.
-   On hover, reveal the details. They should NOT distract from the final answer. */
+/* Process tools: EXTREMELY de-emphasized.
+   Tool blocks are internal workings—render at very low opacity/contrast until user inspects them.
+   On hover, slightly reveal the details. They should NOT distract from the final answer. */
 .theme-clarity .message-assistant .tool-use-block {
-  opacity: 0.55;
+  opacity: 0.35;
   border-style: dotted;
-  border-color: color-mix(in srgb, var(--vscode-panel-border, #333) 45%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-panel-border, #333) 35%, transparent);
   background: transparent;
-  margin: 8px 0;
+  margin: 6px 0;
 }
 .theme-clarity .message-assistant .tool-use-block:hover,
 .theme-clarity .message-assistant .tool-use-block:focus-within {
-  opacity: 0.88;
-  background: color-mix(in srgb, var(--vscode-editor-background) 85%, transparent);
-  border-color: color-mix(in srgb, var(--vscode-panel-border, #333) 62%, transparent);
+  opacity: 0.62;
+  background: color-mix(in srgb, var(--vscode-editor-background) 80%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-panel-border, #333) 50%, transparent);
   border-style: dotted;
 }
 .theme-clarity .message-assistant .tool-use-header {
@@ -500,49 +500,52 @@ html, body, #root {
   letter-spacing: 0.4px;
 }
 
-/* The final answer: UNMISSABLY prominent green card that absolutely stands out.
-   Bold background, thick borders, and powerful glow to signal "THIS IS CLAUDE'S ANSWER".
-   This is what the user came for — make it shine. */
+/* The final answer: ABSOLUTELY UNMISSABLY prominent green card that stands out massively.
+   Bold background, thick borders, and massive glow to signal "THIS IS CLAUDE'S ANSWER".
+   This is what the user came for — make it SHINE like a beacon. */
 .theme-clarity .message-assistant.message-final-answer {
-  background: color-mix(in srgb, var(--clarity-answer-accent) 26%, var(--vscode-editor-background));
-  border: 2.5px solid color-mix(in srgb, var(--clarity-answer-accent) 62%, transparent);
-  border-left: 9px solid var(--clarity-answer-accent);
-  border-right: 4px solid color-mix(in srgb, var(--clarity-answer-accent) 48%, transparent);
-  border-radius: 16px;
-  padding: 16px 18px;
+  background: color-mix(in srgb, var(--clarity-answer-accent) 32%, var(--vscode-editor-background));
+  border: 2.5px solid color-mix(in srgb, var(--clarity-answer-accent) 68%, transparent);
+  border-left: 11px solid var(--clarity-answer-accent);
+  border-right: 5px solid color-mix(in srgb, var(--clarity-answer-accent) 52%, transparent);
+  border-radius: 18px;
+  padding: 17px 20px;
   box-shadow:
-    inset 0 2px 0 rgba(22, 163, 74, 0.25),
-    inset 0 -1px 0 rgba(22, 163, 74, 0.12),
-    0 0 0 1px color-mix(in srgb, var(--clarity-answer-accent) 32%, transparent),
-    0 0 2px color-mix(in srgb, var(--clarity-answer-accent) 40%, transparent),
-    0 8px 24px rgba(22, 163, 74, 0.22),
-    0 0 32px color-mix(in srgb, var(--clarity-answer-accent) 36%, transparent);
+    inset 0 2px 0 rgba(22, 163, 74, 0.3),
+    inset 0 -1px 0 rgba(22, 163, 74, 0.15),
+    0 0 0 1px color-mix(in srgb, var(--clarity-answer-accent) 36%, transparent),
+    0 0 3px color-mix(in srgb, var(--clarity-answer-accent) 44%, transparent),
+    0 8px 28px rgba(22, 163, 74, 0.28),
+    0 0 44px color-mix(in srgb, var(--clarity-answer-accent) 42%, transparent);
   opacity: 1;
-  margin-bottom: 26px;
+  margin-bottom: 28px;
   position: relative;
 }
 
-/* Visual separator above final answer: gradient accent line to emphasize transition */
+/* Visual separator above final answer: bold gradient accent line to emphasize transition */
 .theme-clarity .message-assistant.message-final-answer::before {
   content: '';
   position: absolute;
-  top: -10px;
-  left: 20px;
-  right: 20px;
-  height: 2px;
+  top: -11px;
+  left: 18px;
+  right: 18px;
+  height: 2.5px;
   background: linear-gradient(to right,
     transparent 0%,
-    color-mix(in srgb, var(--clarity-answer-accent) 45%, transparent) 20%,
+    color-mix(in srgb, var(--clarity-answer-accent) 50%, transparent) 15%,
     var(--clarity-answer-accent) 50%,
-    color-mix(in srgb, var(--clarity-answer-accent) 45%, transparent) 80%,
+    color-mix(in srgb, var(--clarity-answer-accent) 50%, transparent) 85%,
     transparent 100%);
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
 .theme-clarity .message-assistant.message-final-answer .message-role-name {
   background: var(--clarity-answer-accent);
-  font-weight: 800;
-  letter-spacing: 0.2px;
+  font-weight: 950;
+  letter-spacing: 0.3px;
+  box-shadow:
+    0 4px 10px rgba(22, 163, 74, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 /* Process badge: indicates Claude is WORKING (not the final answer yet) */
@@ -552,44 +555,44 @@ html, body, #root {
 .theme-clarity .process-badge {
   display: inline-flex;
   align-items: center;
-  margin-left: 10px;
-  padding: 3px 11px;
-  border-radius: 14px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.3px;
+  margin-left: 12px;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.4px;
   text-transform: uppercase;
   color: #ffffff;
   background: var(--clarity-assistant-accent);
   box-shadow:
-    0 2px 6px rgba(168, 85, 247, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  opacity: 0.95;
-  border: 1px solid color-mix(in srgb, var(--clarity-assistant-accent) 40%, transparent);
+    0 3px 8px rgba(168, 85, 247, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  opacity: 0.98;
+  border: 1.5px solid color-mix(in srgb, var(--clarity-assistant-accent) 48%, transparent);
 }
 
-/* "Final answer" badge: BOLD and unmissable—"THIS IS THE ANSWER"
-   Large, bright, prominent. Appears ONLY in Clarity theme. */
+/* "Final answer" badge: ULTRA BOLD and UNMISSABLE—"THIS IS THE ANSWER"
+   Large, bright, prominent, with maximum visual impact. Appears ONLY in Clarity theme. */
 .final-answer-badge {
   display: none;
 }
 .theme-clarity .final-answer-badge {
   display: inline-flex;
   align-items: center;
-  margin-left: 12px;
-  padding: 4px 13px;
-  border-radius: 16px;
+  margin-left: 14px;
+  padding: 5px 15px;
+  border-radius: 18px;
   font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.4px;
+  font-weight: 950;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
   color: #ffffff;
   background: var(--clarity-answer-accent);
   box-shadow:
-    0 3px 10px rgba(22, 163, 74, 0.42),
-    0 0 0 1px color-mix(in srgb, var(--clarity-answer-accent) 30%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  border: 1px solid color-mix(in srgb, var(--clarity-answer-accent) 50%, transparent);
+    0 4px 12px rgba(22, 163, 74, 0.5),
+    0 0 0 1px color-mix(in srgb, var(--clarity-answer-accent) 35%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  border: 1.5px solid color-mix(in srgb, var(--clarity-answer-accent) 58%, transparent);
 }
 
 /* Spacer pushes input to bottom when no messages exist */

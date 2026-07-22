@@ -30,7 +30,12 @@ export class CodexSessionNamer {
       'Reply with ONLY the name, nothing else. Do not use tools or shell commands.\n\n' +
       `User message: "${truncatedMessage}"`;
 
-    const args = ['exec', '--json', '--sandbox', 'read-only'];
+    // --ephemeral: this is a throwaway naming call, not a real session. Without
+    // it, this process and the tab's main `codex exec` process both register a
+    // thread in ~/.codex/sessions within milliseconds of each other, which races
+    // codex-core's session/rollout store and can produce
+    // "failed to record rollout items: thread ... not found" for either thread.
+    const args = ['exec', '--json', '--sandbox', 'read-only', '--ephemeral'];
     if (selectedCwd) {
       args.push('-C', selectedCwd);
     }
