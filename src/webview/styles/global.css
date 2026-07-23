@@ -457,11 +457,30 @@ html, body, #root {
 /* Off: no message background coloring at all (neutral surfaces). */
 .app-container.msg-colors-off .message-user,
 .app-container.msg-colors-off .message-assistant,
-.app-container.msg-colors-off .message-assistant.message-process {
+.app-container.msg-colors-off .message-assistant.message-process,
+.app-container.msg-colors-off .message-assistant.message-final-answer {
   background: transparent;
   border-left: none;
   border-color: var(--vscode-panel-border, transparent);
   box-shadow: none;
+}
+
+/* Clarity paints its palette with higher-specificity selectors (2px/11px rails,
+   glow shadows, and a ::before accent bar on the final answer), so the generic
+   `off` rules above tie on specificity and lose to Clarity by source order —
+   leaving the green final-answer bubble colored. Scope to `.theme-clarity` so
+   these win outright, strip every border/shadow, and hide the accent bar, so
+   'Off' is genuinely colorless on Clarity too. */
+.app-container.theme-clarity.msg-colors-off .message-user,
+.app-container.theme-clarity.msg-colors-off .message-assistant,
+.app-container.theme-clarity.msg-colors-off .message-assistant.message-process,
+.app-container.theme-clarity.msg-colors-off .message-assistant.message-final-answer {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+.app-container.theme-clarity.msg-colors-off .message-assistant.message-final-answer::before {
+  display: none;
 }
 
 /* Clarity Enhanced: Maximum visual distinction between user input, Claude's process,
