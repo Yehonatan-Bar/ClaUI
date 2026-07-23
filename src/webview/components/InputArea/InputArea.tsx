@@ -95,6 +95,10 @@ export const InputArea: React.FC = () => {
     addToPromptHistory,
     pendingApproval,
     setPendingApproval,
+    compactingSession,
+    setCompactingSession,
+    compactSessionNotice,
+    setCompactSessionNotice,
     gitPushResult,
     setGitPushResult,
     gitPushConfigPanelOpen,
@@ -1002,6 +1006,45 @@ export const InputArea: React.FC = () => {
     postToExtension({ type: 'clearSession' });
   }, []);
 
+  /**
+   * Compact Session: ask the extension to summarize this session into a
+   * continuation prompt, copy it to the clipboard, and open a fresh tab with
+   * that prompt pre-filled. Guarded against double-runs; the loading state is
+   * cleared by the `compactSessionResult` message (with a safety timeout).
+   */
+  const compactTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleCompactSession = useCallback(() => {
+    if (!isConnected || inputLockedByHandoff || compactingSession) return;
+    setCompactSessionNotice(null);
+    setCompactingSession(true);
+    if (compactTimeoutRef.current) clearTimeout(compactTimeoutRef.current);
+    // Safety: the CLI summary can run up to ~90s; give it headroom before giving up.
+    compactTimeoutRef.current = setTimeout(() => {
+      setCompactingSession(false);
+      setCompactSessionNotice({ success: false, text: 'Compact timed out. Please try again.' });
+      compactTimeoutRef.current = null;
+    }, 120_000);
+    postToExtension({ type: 'compactSession' } as any);
+  }, [isConnected, inputLockedByHandoff, compactingSession, setCompactingSession, setCompactSessionNotice]);
+
+  // Clear the safety timeout as soon as a result arrives (or on unmount).
+  useEffect(() => {
+    if (!compactingSession && compactTimeoutRef.current) {
+      clearTimeout(compactTimeoutRef.current);
+      compactTimeoutRef.current = null;
+    }
+  }, [compactingSession]);
+  useEffect(() => () => {
+    if (compactTimeoutRef.current) clearTimeout(compactTimeoutRef.current);
+  }, []);
+
+  // Auto-dismiss the compact notice after a few seconds.
+  useEffect(() => {
+    if (!compactSessionNotice) return;
+    const id = setTimeout(() => setCompactSessionNotice(null), 6000);
+    return () => clearTimeout(id);
+  }, [compactSessionNotice, setCompactSessionNotice]);
+
   const handleClearGoal = useCallback(() => {
     if (!isConnected) return;
     postToExtension({ type: 'sendMessage', text: '/goal clear' });
@@ -1560,6 +1603,13 @@ export const InputArea: React.FC = () => {
           ))}
         </div>
       )}
+      {/* Compact Session result toast (reuses git-push-toast styling) */}
+      {compactSessionNotice && (
+        <div className={`git-push-toast ${compactSessionNotice.success ? 'success' : 'error'}`}>
+          <span>{compactSessionNotice.text}</span>
+          <button className="git-push-toast-dismiss" onClick={() => setCompactSessionNotice(null)} data-tooltip="Dismiss">x</button>
+        </div>
+      )}
       {/* Git push result toast */}
       {gitPushResult && (
         <div className={`git-push-toast ${gitPushResult.success ? 'success' : 'error'}`}>
@@ -1720,6 +1770,30 @@ export const InputArea: React.FC = () => {
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
+          </button>
+          <button
+            className={`compact-session-button${compactingSession ? ' compacting' : ''}`}
+            onClick={handleCompactSession}
+            disabled={!isConnected || inputLockedByHandoff || compactingSession}
+            data-tooltip={
+              compactingSession
+                ? 'Compacting session… summarizing into a new-session prompt'
+                : 'Compact session: summarize into a prompt, copy it, and open a fresh tab with it pre-filled (saves tokens)'
+            }
+            aria-busy={compactingSession}
+          >
+            {compactingSession ? (
+              <svg className="compact-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 14 10 14 10 20" />
+                <polyline points="20 10 14 10 14 4" />
+                <line x1="14" y1="10" x2="21" y2="3" />
+                <line x1="3" y1="21" x2="10" y2="14" />
+              </svg>
+            )}
           </button>
           <button
             className="clear-session-button"

@@ -706,6 +706,14 @@ export const HELP_ENTRIES: HelpEntry[] = [
     detailHe: "הפעל/כבה את שורת החיפוש בצ'אט.",
   },
   {
+    id: 'inputarea-compact-session',
+    section: 'inputarea',
+    name: 'Compact Session',
+    tooltip: 'Compact session: summarize into a prompt, copy it, and open a fresh tab with it pre-filled (saves tokens)',
+    detailEn: "Reads the current session, asks the analysis model to summarize it into one self-contained continuation prompt (objective, progress, decisions, files, blockers, next steps), copies that prompt to the clipboard, and opens a fresh tab with the prompt pre-filled in the input (not sent). Lets you continue the same task in a brand-new, low-token session. Falls back to a quick structured summary if the AI call is unavailable.",
+    detailHe: 'קורא את הסשן הנוכחי, מבקש ממודל הניתוח לסכם אותו לפרומפט המשך אחד ועצמאי (מטרה, התקדמות, החלטות, קבצים, חוסמים, צעדים הבאים), מעתיק את הפרומפט ללוח (clipboard), ופותח לשונית חדשה עם הפרומפט ממולא בתיבת הקלט (בלי לשלוח). מאפשר להמשיך את אותה משימה בסשן חדש וחסכוני בטוקנים. אם קריאת ה-AI לא זמינה, נופל לאחור לסיכום מובנה מהיר.',
+  },
+  {
     id: 'inputarea-clear',
     section: 'inputarea',
     name: 'Clear',

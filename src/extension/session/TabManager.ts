@@ -23,6 +23,7 @@ import { HandoffContextBuilder } from './handoff/HandoffContextBuilder';
 import { HandoffPromptComposer } from './handoff/HandoffPromptComposer';
 import { HandoffArtifactStore } from './handoff/HandoffArtifactStore';
 import { HandoffOrchestrator, type HandoffTargetRuntime } from './handoff/HandoffOrchestrator';
+import { CompactSessionService } from './CompactSessionService';
 import type { HandoffProvider, HandoffSessionRequest } from './handoff/HandoffTypes';
 import { isHandoffProvider } from './handoff/HandoffTypes';
 import {
@@ -95,6 +96,7 @@ export class TabManager {
   private readonly handoffOrchestrator: HandoffOrchestrator;
   private readonly handoffLocks = new Set<string>();
   private readonly handoffLastByTab = new Map<string, number>();
+  private readonly compactSessionService: CompactSessionService;
 
   /** Shared workstream manager, injected after construction to avoid circular dependency */
   workstreamManager: import('../workstream/WorkstreamManager').WorkstreamManager | null = null;
@@ -163,6 +165,11 @@ export class TabManager {
       new HandoffContextBuilder(this.log),
       new HandoffPromptComposer(),
       new HandoffArtifactStore(artifactsRoot, this.log, { persistToDisk: storeArtifacts }),
+      this.log,
+    );
+    this.compactSessionService = new CompactSessionService(
+      new HandoffContextBuilder(this.log),
+      new HandoffPromptComposer(),
       this.log,
     );
 
@@ -961,6 +968,84 @@ export class TabManager {
       }
 
       return { targetTabId: result.targetTabId, artifactPath };
+    } finally {
+      this.handoffLocks.delete(sourceTab.id);
+    }
+  }
+
+  /**
+   * "Compact Session": summarize the source session into a self-contained
+   * continuation prompt, copy it to the clipboard, and open a fresh tab (same
+   * provider) with that prompt pre-filled in the input box (NOT auto-sent).
+   * Lets the user carry the full task context into a new, low-token session.
+   *
+   * Posts a `compactSessionResult` back to the source tab's webview on success;
+   * throws on failure so the caller can surface the error (and, for webview-
+   * initiated runs, post the failure result).
+   */
+  async compactSession(request: { sourceTabId?: string }): Promise<{
+    targetTabId: string;
+    promptChars: number;
+    source: 'ai' | 'heuristic';
+  }> {
+    const sourceTab = request.sourceTabId ? this.getTabById(request.sourceTabId) : this.getActiveTab();
+    if (!sourceTab) {
+      throw new Error('No source tab found to compact.');
+    }
+    if (sourceTab instanceof MultiParticipantSessionTab) {
+      throw new Error('Multi-participant tabs do not support Compact Session.');
+    }
+
+    const sourceProvider = sourceTab.getProvider();
+    if (!isHandoffProvider(sourceProvider)) {
+      throw new Error(`Provider "${sourceProvider}" does not support Compact Session.`);
+    }
+
+    if (this.handoffLocks.has(sourceTab.id)) {
+      throw new Error('A handoff or compact is already in progress for this tab.');
+    }
+
+    this.handoffLocks.add(sourceTab.id);
+    try {
+      this.log(`[Compact] start tab=${sourceTab.id} provider=${sourceProvider}`);
+      const snapshot = await sourceTab.collectHandoffSnapshot();
+      if (!snapshot.messages || snapshot.messages.length === 0) {
+        throw new Error('This session has no conversation yet to compact.');
+      }
+
+      const claudeConfigDir =
+        sourceTab instanceof SessionTab ? sourceTab.getClaudeConfigDir() ?? undefined : undefined;
+      const startedAt = Date.now();
+      const compact = await this.compactSessionService.build(snapshot, { claudeConfigDir });
+      this.log(
+        `[Compact] prompt built tab=${sourceTab.id} source=${compact.source} chars=${compact.prompt.length} durationMs=${Date.now() - startedAt}`,
+      );
+
+      // Clipboard copy (best-effort backup so the user can paste anywhere).
+      let copiedToClipboard = false;
+      try {
+        await vscode.env.clipboard.writeText(compact.prompt);
+        copiedToClipboard = true;
+      } catch (err) {
+        this.log(`[Compact] clipboard write failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+
+      // Open a fresh tab (same provider) and pre-fill its input with the prompt.
+      const targetTab = this.createTabForProvider(sourceProvider);
+      targetTab.setForkInit({ promptText: compact.prompt, messages: [] });
+      await targetTab.startSession({ cwd: snapshot.cwd });
+      this.log(`[Compact] opened target tab=${targetTab.id} (input pre-filled, not sent)`);
+
+      sourceTab.postMessage({
+        type: 'compactSessionResult',
+        success: true,
+        promptChars: compact.prompt.length,
+        openedNewTab: true,
+        copiedToClipboard,
+        source: compact.source,
+      });
+
+      return { targetTabId: targetTab.id, promptChars: compact.prompt.length, source: compact.source };
     } finally {
       this.handoffLocks.delete(sourceTab.id);
     }

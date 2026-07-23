@@ -54,6 +54,8 @@ export function useClaudeStream(): void {
     setActivitySummaryDismissed,
     setActivitySummaryEnabled,
     setPermissionMode,
+    setCompactingSession,
+    setCompactSessionNotice,
     setGitPushSettings,
     setGitPushResult,
     setGitPushRunning,
@@ -794,6 +796,23 @@ export function useClaudeStream(): void {
           setPendingApproval(null);
           break;
 
+        case 'compactSessionResult': {
+          setCompactingSession(false);
+          if (msg.success) {
+            const bits: string[] = ['Compact prompt ready.'];
+            if (msg.openedNewTab) bits.push('Opened a new tab with it pre-filled.');
+            if (msg.copiedToClipboard) bits.push('Copied to clipboard.');
+            if (msg.source === 'heuristic') bits.push('(quick summary — AI unavailable)');
+            setCompactSessionNotice({ success: true, text: bits.join(' ') });
+          } else {
+            setCompactSessionNotice({
+              success: false,
+              text: `Compact failed: ${msg.error || 'unknown error'}`,
+            });
+          }
+          break;
+        }
+
         case 'gitPushResult':
           setGitPushRunning(false);
           setGitPushResult({ success: msg.success, output: msg.output });
@@ -1440,6 +1459,8 @@ export function useClaudeStream(): void {
     setActivitySummaryDismissed,
     setActivitySummaryEnabled,
     setPermissionMode,
+    setCompactingSession,
+    setCompactSessionNotice,
     setGitPushSettings,
     setGitPushResult,
     setGitPushRunning,

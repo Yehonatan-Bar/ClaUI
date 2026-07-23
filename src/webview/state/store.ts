@@ -249,6 +249,10 @@ export interface AppState {
   // Permission mode
   permissionMode: 'full-access' | 'supervised';
 
+  // Compact Session (token-saving handoff to a new tab)
+  compactingSession: boolean;
+  compactSessionNotice: { success: boolean; text: string } | null;
+
   // Git push
   gitPushSettings: { enabled: boolean; scriptPath: string; commitMessageTemplate: string } | null;
   gitPushResult: { success: boolean; output: string } | null;
@@ -782,6 +786,8 @@ export interface AppState {
   setPermissionMode: (mode: 'full-access' | 'supervised') => void;
   setProjectPromptHistory: (history: string[]) => void;
   setGlobalPromptHistory: (history: string[]) => void;
+  setCompactingSession: (running: boolean) => void;
+  setCompactSessionNotice: (notice: { success: boolean; text: string } | null) => void;
   setGitPushSettings: (settings: { enabled: boolean; scriptPath: string; commitMessageTemplate: string }) => void;
   setGitPushResult: (result: { success: boolean; output: string } | null) => void;
   setGitPushConfigPanelOpen: (open: boolean) => void;
@@ -1203,6 +1209,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   activitySummaryDismissed: false,
   activitySummaryEnabled: true,
   permissionMode: 'full-access' as const,
+  compactingSession: false,
+  compactSessionNotice: null,
   gitPushSettings: null,
   gitPushResult: null,
   gitPushConfigPanelOpen: false,
@@ -2247,6 +2255,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setGlobalPromptHistory: (history) => set({ globalPromptHistory: history }),
 
+  setCompactingSession: (running) => set({ compactingSession: running }),
+  setCompactSessionNotice: (notice) => set({ compactSessionNotice: notice }),
+
   setGitPushSettings: (settings) => set({ gitPushSettings: settings }),
   setGitPushResult: (result) => set({ gitPushResult: result }),
   setGitPushConfigPanelOpen: (open) => set({ gitPushConfigPanelOpen: open }),
@@ -3210,6 +3221,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       activitySummaryDismissed: false,
       sessionSkills: [],
       permissionMode: 'full-access' as const,
+      compactingSession: false,
+      compactSessionNotice: null,
       gitPushSettings: null,
       gitPushResult: null,
       gitPushConfigPanelOpen: false,

@@ -223,6 +223,16 @@ export interface CompactRequest {
   instructions?: string;
 }
 
+/**
+ * "Compact Session" (token-saving handoff): read the current session, summarize
+ * it into a comprehensive self-contained continuation prompt, copy it to the
+ * clipboard, and open a fresh tab with that prompt pre-filled in the input.
+ * Distinct from `compact` (the CLI's in-place context compaction).
+ */
+export interface CompactSessionRequest {
+  type: 'compactSession';
+}
+
 export interface StartSessionRequest {
   type: 'startSession';
   workspacePath?: string;
@@ -1095,6 +1105,7 @@ export type WebviewToExtensionMessage =
   | CancelScheduledMessageRequest
   | CancelRequest
   | CompactRequest
+  | CompactSessionRequest
   | StartSessionRequest
   | StopSessionRequest
   | ResumeSessionRequest
@@ -1674,6 +1685,26 @@ export interface ToolActivityMessage {
 export interface PermissionModeSettingMessage {
   type: 'permissionModeSetting';
   mode: 'full-access' | 'supervised';
+}
+
+/**
+ * Result of a "Compact Session" run (see CompactSessionRequest). Posted back to
+ * the SOURCE tab's webview so it can clear the button's loading state and show a
+ * transient notice.
+ */
+export interface CompactSessionResultMessage {
+  type: 'compactSessionResult';
+  success: boolean;
+  /** Failure reason when success is false. */
+  error?: string;
+  /** Character length of the generated prompt (shown in the success notice). */
+  promptChars?: number;
+  /** True when a new tab was opened and its input pre-filled with the prompt. */
+  openedNewTab?: boolean;
+  /** True when the prompt was also copied to the OS clipboard. */
+  copiedToClipboard?: boolean;
+  /** Which engine produced the prompt: 'ai' (CLI summary) or 'heuristic' (fallback). */
+  source?: 'ai' | 'heuristic';
 }
 
 export interface GitPushResultMessage {
@@ -2925,6 +2956,7 @@ export type ExtensionToWebviewMessage =
   | ActivitySummaryMessage
   | ToolActivityMessage
   | PermissionModeSettingMessage
+  | CompactSessionResultMessage
   | GitPushResultMessage
   | GitPushSettingsMessage
   | WorktreeListMessage

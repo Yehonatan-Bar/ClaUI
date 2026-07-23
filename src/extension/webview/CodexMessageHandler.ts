@@ -962,6 +962,20 @@ export class CodexMessageHandler {
             });
           break;
 
+        case 'compactSession':
+          this.log('Compact session requested (Codex handler)');
+          void vscode.commands.executeCommand('claudeMirror.compactSession', {
+            sourceTabId: this.tabId,
+          }).then(
+            () => undefined,
+            (err: unknown) => {
+              const message = this.errMsg(err);
+              this.log(`Failed compactSession (Codex handler): ${message}`);
+              this.webview.postMessage({ type: 'compactSessionResult', success: false, error: message });
+            },
+          );
+          break;
+
         case 'switchProviderWithContext':
           this.log(`Switch provider with context requested: "${msg.targetProvider}" (Codex handler)`);
           void vscode.commands.executeCommand('claudeMirror.switchProviderWithContext', {
