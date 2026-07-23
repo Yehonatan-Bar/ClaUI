@@ -27,6 +27,12 @@ import type {
 } from '../multiparticipant/MultiParticipantProtocol';
 
 export type TypingTheme = 'terminal-hacker' | 'retro' | 'zen' | 'neo-zen' | 'clarity';
+/**
+ * Palette for the message-bubble background coloring (user vs system/thinking).
+ * 'default' defers to the typing theme's built-in colors; 'off' disables the
+ * coloring entirely; the others swap the accent palette.
+ */
+export type MessageColorScheme = 'default' | 'ocean' | 'sunset' | 'mono' | 'off';
 export type ProviderId = 'claude' | 'codex' | 'remote';
 export type HandoffStage =
   | 'idle'
@@ -372,6 +378,11 @@ export interface SetCodexServiceTierRequest {
 export interface SetTypingThemeRequest {
   type: 'setTypingTheme';
   theme: TypingTheme;
+}
+
+export interface SetMessageColorSchemeRequest {
+  type: 'setMessageColorScheme';
+  scheme: MessageColorScheme;
 }
 
 export interface ShowHistoryRequest {
@@ -1134,6 +1145,7 @@ export type WebviewToExtensionMessage =
   | SetCodexReasoningEffortRequest
   | SetCodexServiceTierRequest
   | SetTypingThemeRequest
+  | SetMessageColorSchemeRequest
   | ShowHistoryRequest
   | OpenPlanDocsRequest
   | PlanApprovalResponseMessage
@@ -1590,6 +1602,11 @@ export interface TextSettingsMessage {
 export interface TypingThemeSettingMessage {
   type: 'typingThemeSetting';
   theme: TypingTheme;
+}
+
+export interface MessageColorSchemeSettingMessage {
+  type: 'messageColorSchemeSetting';
+  scheme: MessageColorScheme;
 }
 
 export interface ModelSettingMessage {
@@ -2940,6 +2957,7 @@ export type ExtensionToWebviewMessage =
   | FilePathsPickedMessage
   | TextSettingsMessage
   | TypingThemeSettingMessage
+  | MessageColorSchemeSettingMessage
   | ModelSettingMessage
   | DefaultModelHintMessage
   | ClaudeEffortSettingMessage

@@ -31,6 +31,15 @@ let listenerActive = false;
 
 function handleDocumentClick(e: MouseEvent) {
   const target = e.target as Node;
+  // If the clicked node was already removed from the DOM by the time this
+  // handler runs (e.g. a toggle button that swaps itself out for a panel in
+  // its own onClick), it is NOT an outside click. A detached node fails every
+  // `contains()` check below, which would otherwise close every open dropdown
+  // — including the one that owns the toggle, making it look like the click
+  // "did nothing". Bail out so the owning dropdown stays open.
+  if (target && target.nodeType && !document.contains(target)) {
+    return;
+  }
   // Collect entries to close first (avoid mutating map during iteration)
   const toClose: (() => void)[] = [];
   registry.forEach((entry) => {

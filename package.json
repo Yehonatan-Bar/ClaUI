@@ -546,6 +546,25 @@
           ],
           "description": "Visual personality theme for response rendering in the chat webview."
         },
+        "claudeMirror.messageColorScheme": {
+          "type": "string",
+          "default": "default",
+          "enum": [
+            "default",
+            "ocean",
+            "sunset",
+            "mono",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Default - Blue (your prompt) / Violet (system reply & thinking)",
+            "Ocean - Teal (your prompt) / Indigo (system reply & thinking)",
+            "Sunset - Amber (your prompt) / Rose (system reply & thinking)",
+            "Mono - Subtle slate tones for a quieter, low-color look",
+            "Off - No message background coloring"
+          ],
+          "description": "Color palette for the chat message backgrounds (user vs system/thinking). Applies on themes that use message coloring (Zen / Neo Zen / Clarity). 'Off' disables it entirely."
+        },
         "claudeMirror.autoNameSessions": {
           "type": "boolean",
           "default": true,

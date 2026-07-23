@@ -239,6 +239,7 @@ const ChatAppContent: React.FC = () => {
     streamingMessageId,
     textSettings,
     typingTheme,
+    messageColorScheme,
     pendingApproval,
     provider,
     providerCapabilities,
@@ -387,7 +388,7 @@ const ChatAppContent: React.FC = () => {
   } as React.CSSProperties), [textSettings.fontSize, textSettings.fontFamily]);
 
   return (
-    <div className={`app-container theme-${typingTheme}`} style={containerStyle}>
+    <div className={`app-container theme-${typingTheme} msg-colors-${messageColorScheme}`} style={containerStyle}>
       {/* Prompt history panel overlay */}
       {promptHistoryPanelOpen && <PromptHistoryPanel />}
       {achievementsEnabled && achievementPanelOpen && <AchievementPanel />}

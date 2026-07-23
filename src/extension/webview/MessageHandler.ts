@@ -41,6 +41,7 @@ import type {
   ProviderId,
   TurnSemantics,
   TypingTheme,
+  MessageColorScheme,
   TurnCategory,
   TurnRecord,
   WebviewImageData,
@@ -2315,6 +2316,11 @@ export class MessageHandler {
           vscode.workspace.getConfiguration('claudeMirror').update('typingTheme', msg.theme, true);
           break;
 
+        case 'setMessageColorScheme':
+          this.log(`Setting message color scheme to: "${msg.scheme}"`);
+          vscode.workspace.getConfiguration('claudeMirror').update('messageColorScheme', msg.scheme, true);
+          break;
+
 
         case 'setPermissionMode':
           this.log(`Setting permission mode to: "${msg.mode}"`);
@@ -3941,6 +3947,8 @@ export class MessageHandler {
           this.sendTextSettings();
           // Send typing theme setting
           this.sendTypingThemeSetting();
+          // Send message color scheme setting
+          this.sendMessageColorSchemeSetting();
           // Send model setting
           this.sendModelSetting();
           // Send Codex model options (Smart Search offers Codex models here too)
@@ -4314,6 +4322,17 @@ export class MessageHandler {
     this.webview.postMessage({
       type: 'typingThemeSetting',
       theme,
+    });
+  }
+
+  /** Read message color scheme setting from VS Code config and send to webview */
+  private sendMessageColorSchemeSetting(): void {
+    const config = vscode.workspace.getConfiguration('claudeMirror');
+    const scheme = config.get<MessageColorScheme>('messageColorScheme', 'default');
+    this.log(`Sending message color scheme setting: "${scheme}"`);
+    this.webview.postMessage({
+      type: 'messageColorSchemeSetting',
+      scheme,
     });
   }
 
@@ -4968,6 +4987,9 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.typingTheme')) {
         this.sendTypingThemeSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.messageColorScheme')) {
+        this.sendMessageColorSchemeSetting();
       }
       if (e.affectsConfiguration('claudeMirror.permissionMode')) {
         this.sendPermissionModeSetting();
