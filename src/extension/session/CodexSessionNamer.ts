@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import { spawn } from 'child_process';
 import { buildSanitizedEnv } from '../process/envUtils';
 import { killProcessTree } from '../process/killTree';
+import { spawnCli } from '../process/spawnCli';
 
 /**
  * Spawns a lightweight one-shot Codex CLI process to generate
@@ -70,11 +70,12 @@ export class CodexSessionNamer {
 
       let child;
       try {
-        child = spawn(cliPath, args, {
+        // spawnCli avoids the Windows `shell: true` word-splitting footgun (a spaced
+        // workspace path would corrupt the `-C <cwd>` argument and crash Codex).
+        child = spawnCli(cliPath, args, {
           cwd: selectedCwd || undefined,
           env,
           stdio: ['pipe', 'pipe', 'pipe'],
-          shell: true,
         });
         this.log(`CodexSessionNamer: spawn succeeded, PID=${child.pid ?? 'unknown'}`);
       } catch (err) {

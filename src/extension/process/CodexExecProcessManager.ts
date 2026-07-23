@@ -2,11 +2,12 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { ChildProcess, spawn } from 'child_process';
+import { ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import type { CodexExecJsonEvent } from '../types/codex-exec-json';
 import { buildSanitizedEnv } from './envUtils';
 import { killProcessTree } from './killTree';
+import { spawnCli } from './spawnCli';
 import { buildCodexDlpInstructions } from '../../server/Codex';
 
 /**
@@ -188,11 +189,13 @@ export class CodexExecProcessManager extends EventEmitter {
     this.log(`Spawning Codex: ${cliPath} ${args.join(' ')}`);
     this.log(`CWD: ${cwd || '(none)'}`);
 
-    const child = spawn(cliPath, args, {
+    // spawnCli avoids the Windows `shell: true` word-splitting footgun: a workspace
+    // path with a space (e.g. under OneDrive) would otherwise split the `-C <cwd>`
+    // argument and make Codex fail with "unexpected argument '-' found".
+    const child = spawnCli(cliPath, args, {
       cwd,
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
-      shell: true,
     });
 
     this.process = child;

@@ -62,6 +62,7 @@ claude-code-mirror/
 |   |   |   +-- envUtils.ts               #   Shared env sanitization & API key management
 |   |   |   +-- killTree.ts              #   Shared cross-platform process tree kill utility
 |   |   |   +-- orphanCleanup.ts         #   Startup cleanup of orphaned ClaUi processes
+|   |   |   +-- spawnCli.ts              #   Space-safe CLI spawn (shell selection + Windows arg quoting) for Codex
 |   |   |   +-- ProcessMemorySampler.ts   #   Samples VS Code/extension-host/CLI process memory for the dashboard Memory tab
 |   |   |   +-- usageLimitParser.ts      #   Parses usage-limit errors into reset timestamps
 |   |   |   +-- StreamDemux.ts            #   Parses JSON lines, routes events
@@ -580,6 +581,9 @@ claude-code-mirror/
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/PROCESS_LIFECYCLE.md`
 
 **Orphan Cleanup (`orphanCleanup.ts`)** - Runs on extension activation. Scans for orphaned node.exe processes from previous ClaUi sessions (identified by `stream-json` CLI flag in command line) whose parent process is dead, and kills them. Prevents zombie process accumulation when VS Code crashes or extension host dies without running `deactivate()`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/PROCESS_LIFECYCLE.md`
+
+**Space-safe CLI spawn (`spawnCli.ts`)** - Used by `CodexExecProcessManager` and `CodexSessionNamer` to spawn `codex exec`. Avoids the Windows `shell: true` footgun where Node joins arguments unquoted and `cmd.exe` word-splits any argument containing a space — a workspace path with a space (e.g. under OneDrive) would otherwise split `-C <cwd>` and make Codex fail with `error: unexpected argument '-' found`. Runs concrete executables (`codex.exe`) with `shell: false` so argv is passed verbatim; keeps `shell: true` with quoted arguments only for bare names / `.cmd` shims that need PATH resolution.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/PROCESS_LIFECYCLE.md`
 
 **Environment Sanitization & API Key Management** - Shared utility (`envUtils.ts`) that sanitizes inherited environment variables for all spawned CLI processes. Strips `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, and `ANTHROPIC_API_KEY` (case-insensitive on Windows) from the inherited env. Two modes: `buildSanitizedEnv()` for Codex processes (no key injection), `buildClaudeCliEnv(apiKey?)` for Claude CLI processes (optional key injection). API key is stored in VS Code SecretStorage (OS keychain) and managed through the Settings panel UI. Used by all 9 CLI spawn points.
