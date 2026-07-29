@@ -83,6 +83,17 @@ export const SuperParticleAcceleratorPanel: React.FC = () => {
           <div className="spa-status-row">
             <span className={statusDotClass} />
             <span>{getStatusLabel(status)}</span>
+            {status === 'disabled-drift' && (
+              <button
+                className="spa-toggle-button spa-toggle-disable"
+                onClick={() =>
+                  postToExtension({ type: 'superParticleAcceleratorSetEnabled', enabled: false } as any)
+                }
+                data-tooltip="Remove leftover hooks and runtime files so nothing keeps enforcing"
+              >
+                Force cleanup
+              </button>
+            )}
           </div>
 
           {error && <div className="spa-error">{error}</div>}
@@ -136,6 +147,8 @@ function getStatusLabel(status: string): string {
   switch (status) {
     case 'disabled':
       return 'Disabled';
+    case 'disabled-drift':
+      return 'Disabled in settings, but leftover hooks remain on disk and may still enforce';
     case 'enabled-hooks-installed':
       return 'Active - protecting Claude and Codex';
     case 'enabled-hooks-missing':

@@ -44,13 +44,31 @@ export class SuperParticleAcceleratorService implements vscode.Disposable {
 
     await this.installRuntime();
 
+    // Reconcile on-disk state with the setting in BOTH directions, so stale
+    // artifacts from a previous session can never keep enforcing (or keep
+    // reporting) a state the user turned off.
+    await this.reconcile();
+  }
+
+  /**
+   * Make on-disk reality (workspace hooks + runtime-enabled.json) match the
+   * current VS Code setting. Safe to call repeatedly.
+   */
+  async reconcile(): Promise<void> {
     const settings = getSuperParticleAcceleratorSettings();
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+    // The runtime file does not depend on a workspace being open - write it
+    // first so already-running agent processes see the truth immediately.
+    this.writeRuntimeSettings(settings);
+
+    if (!workspaceRoot) return;
+
     if (settings.enabled) {
       this.exceptionStore.prune();
-      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (workspaceRoot) {
-        await this.activate(workspaceRoot);
-      }
+      await this.activate(workspaceRoot);
+    } else {
+      await this.deactivate(workspaceRoot);
     }
   }
 
@@ -73,7 +91,18 @@ export class SuperParticleAcceleratorService implements vscode.Disposable {
 
   async getStatus(workspaceRoot?: string): Promise<SuperParticleAcceleratorStatus> {
     const settings = getSuperParticleAcceleratorSettings();
-    if (!settings.enabled) return 'disabled';
+    if (!settings.enabled) {
+      // "Disabled" must mean nothing on disk still enforces. Stale hooks or a
+      // stale runtime-enabled.json would keep blocking while the UI says Off,
+      // so verify, self-heal once, and report drift if cleanup failed.
+      if (await this.hasEnforcementResidue(workspaceRoot)) {
+        try { await this.reconcile(); } catch { /* re-checked below */ }
+        if (await this.hasEnforcementResidue(workspaceRoot)) {
+          return 'disabled-drift';
+        }
+      }
+      return 'disabled';
+    }
 
     if (!workspaceRoot) return 'enabled-hooks-missing';
 
@@ -81,6 +110,22 @@ export class SuperParticleAcceleratorService implements vscode.Disposable {
       return await this.hookManager.getStatus(workspaceRoot);
     } catch {
       return 'error';
+    }
+  }
+
+  /** True when any on-disk artifact could still enforce SPA despite enabled=false. */
+  private async hasEnforcementResidue(workspaceRoot?: string): Promise<boolean> {
+    if (this.isRuntimeFileEnabled()) return true;
+    if (!workspaceRoot) return false;
+    return this.hookManager.hasAnySpaHook(workspaceRoot);
+  }
+
+  private isRuntimeFileEnabled(): boolean {
+    try {
+      const raw = fs.readFileSync(this.runtimeSettingsPath, 'utf8');
+      return JSON.parse(raw).enabled === true;
+    } catch {
+      return false;
     }
   }
 
@@ -107,35 +152,22 @@ export class SuperParticleAcceleratorService implements vscode.Disposable {
   }
 
   async setEnabled(enabled: boolean): Promise<void> {
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!workspaceRoot) return;
-
     if (enabled) {
       await this.installRuntime();
-      await this.activate(workspaceRoot);
-      this.exceptionStore.prune();
-      this.writeRuntimeSettings(getSuperParticleAcceleratorSettings());
-    } else {
-      await this.deactivate(workspaceRoot);
-      this.deleteRuntimeSettings();
     }
+    // reconcile() reads the current setting, which the caller updates before
+    // invoking us; it writes the runtime file even without a workspace so a
+    // mid-session disable always reaches running agent processes.
+    await this.reconcile();
   }
 
   private async onSettingsChanged(
     settings: import('../../shared/super-particle-accelerator/types').SuperParticleAcceleratorSettings,
   ): Promise<void> {
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!workspaceRoot) return;
-
     if (settings.enabled) {
       await this.installRuntime();
-      await this.activate(workspaceRoot);
-      this.exceptionStore.prune();
-      this.writeRuntimeSettings(settings);
-    } else {
-      await this.deactivate(workspaceRoot);
-      this.deleteRuntimeSettings();
     }
+    await this.reconcile();
   }
 
   private get runtimeSettingsPath(): string {
@@ -145,7 +177,7 @@ export class SuperParticleAcceleratorService implements vscode.Disposable {
   private writeRuntimeSettings(settings: import('../../shared/super-particle-accelerator/types').SuperParticleAcceleratorSettings): void {
     try {
       const data = {
-        enabled: true,
+        enabled: settings.enabled,
         mode: settings.mode,
         scanEditTools: settings.scanEditTools,
         scanBashCommands: settings.scanBashCommands,
@@ -161,10 +193,6 @@ export class SuperParticleAcceleratorService implements vscode.Disposable {
       fs.writeFileSync(tmpPath, JSON.stringify(data), 'utf8');
       fs.renameSync(tmpPath, this.runtimeSettingsPath);
     } catch { /* best-effort */ }
-  }
-
-  private deleteRuntimeSettings(): void {
-    try { fs.unlinkSync(this.runtimeSettingsPath); } catch { /* ignore */ }
   }
 
   private async installRuntime(): Promise<void> {

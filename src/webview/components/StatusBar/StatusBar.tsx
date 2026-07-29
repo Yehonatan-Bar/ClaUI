@@ -124,9 +124,10 @@ export const StatusBar: React.FC<{
     codexModelOptions,
   } = useAppStore();
 
-  const codexSearchModels = codexModelOptions.length > 0
+  const codexSearchModels = (codexModelOptions.length > 0
     ? codexModelOptions
-    : CODEX_SMART_SEARCH_FALLBACK;
+    : CODEX_SMART_SEARCH_FALLBACK
+  ).filter((opt) => opt.value === 'gpt-5.6-luna');
 
   const { barRef, layoutMode, hideClockFromBar, hideMcpFromBar, hideUsageFromBar } = useStatusBarCollapse();
   const logUiDebug = React.useCallback((event: string, payload?: Record<string, unknown>) => {
@@ -909,31 +910,11 @@ export const StatusBar: React.FC<{
         className="status-bar-group-dropdown-item"
         onClick={() => {
           closeAllGroups();
-          postToExtension({ type: 'openSmartSearch', provider: 'claude', model: 'claude-opus-4-7' });
-        }}
-        data-tooltip="Search past sessions using Claude Opus 4.7"
-      >
-        Opus 4.7
-      </button>
-      <button
-        className="status-bar-group-dropdown-item"
-        onClick={() => {
-          closeAllGroups();
           postToExtension({ type: 'openSmartSearch', provider: 'claude', model: 'claude-sonnet-4-6' });
         }}
         data-tooltip="Search past sessions using Claude Sonnet 4.6"
       >
         Sonnet 4.6
-      </button>
-      <button
-        className="status-bar-group-dropdown-item"
-        onClick={() => {
-          closeAllGroups();
-          postToExtension({ type: 'openSmartSearch', provider: 'claude', model: 'claude-haiku-4-5-20251001' });
-        }}
-        data-tooltip="Search past sessions using Claude Haiku 4.5"
-      >
-        Haiku 4.5
       </button>
       <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static" style={{ fontWeight: 600, opacity: 0.7 }}>
         Smart Search - Codex

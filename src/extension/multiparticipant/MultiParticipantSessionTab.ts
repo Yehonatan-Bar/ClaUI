@@ -294,11 +294,23 @@ export class MultiParticipantSessionTab {
           void vscode.commands.executeCommand('claudeMirror.tabs.reorder', msg.tabIds);
           break;
 
+        case 'moveTabInNavigation':
+          void vscode.commands.executeCommand(
+            'claudeMirror.tabs.moveInNavigation', msg.tabId, msg.targetGroupId, msg.targetIndex);
+          break;
+
+        case 'setGroupCollapsed':
+          void vscode.commands.executeCommand(
+            'claudeMirror.groups.setCollapsed', msg.groupId, msg.collapsed);
+          break;
+
+        case 'createTabGroup':
+          void vscode.commands.executeCommand('claudeMirror.groups.create');
+          break;
+
         case 'setTabLayout': {
           const layout = msg.layout as 'horizontal' | 'vertical';
-          void vscode.workspace
-            .getConfiguration('claudeMirror.tabs')
-            .update('layout', layout, vscode.ConfigurationTarget.Global);
+          void vscode.commands.executeCommand('claudeMirror.tabs.setLayout', layout);
           break;
         }
 

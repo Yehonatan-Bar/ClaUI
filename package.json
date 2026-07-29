@@ -227,6 +227,18 @@
         "title": "ClaUi: Reorder Tabs"
       },
       {
+        "command": "claudeMirror.tabs.moveInNavigation",
+        "title": "ClaUi: Move Tab in Navigation"
+      },
+      {
+        "command": "claudeMirror.tabs.setLayout",
+        "title": "ClaUi: Set Tab Layout (This Window)"
+      },
+      {
+        "command": "claudeMirror.groups.setCollapsed",
+        "title": "ClaUi: Set Folder Collapsed"
+      },
+      {
         "command": "claudeMirror.groups.create",
         "title": "ClaUi: New Folder",
         "icon": "$(new-folder)"
@@ -1036,7 +1048,8 @@
             "Horizontal: all ClaUi tabs share one editor group (single row of tabs)",
             "Vertical: ClaUi tabs stay in one editor group and use an in-webview vertical tab rail"
           ],
-          "description": "How ClaUi tabs are navigated. Toggle from the in-tab View menu or the Sessions view title bar (gear icon)."
+          "description": "How ClaUi tabs are navigated in THIS window. The in-tab View menu and the Sessions title-bar gear write this at workspace scope, so each VS Code window keeps its own layout.",
+          "scope": "window"
         },
         "claudeMirror.particleAccelerator.enabled": {
           "type": "boolean",
@@ -1548,6 +1561,18 @@
           "when": "false"
         },
         {
+          "command": "claudeMirror.tabs.moveInNavigation",
+          "when": "false"
+        },
+        {
+          "command": "claudeMirror.tabs.setLayout",
+          "when": "false"
+        },
+        {
+          "command": "claudeMirror.groups.setCollapsed",
+          "when": "false"
+        },
+        {
           "command": "claudeMirror.tabs.openLayoutMenu"
         }
       ],
@@ -1630,6 +1655,7 @@
     "watch": "webpack --mode development --watch",
     "lint": "eslint src --ext ts,tsx",
     "test:review-loop": "node --import tsx --test tests/review-loop/reviewLoopPrompts.test.ts",
+    "test:tabs": "node --import tsx --test tests/tabs/navigationOrder.test.ts tests/tabs/navTree.test.ts",
     "verify:installed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installed.ps1",
     "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1",
     "git:push": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-push.ps1",

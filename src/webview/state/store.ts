@@ -17,6 +17,7 @@ import type {
   ProviderId,
   TypingTheme,
   MessageColorScheme,
+  WebviewTabGroup,
   WebviewTabSummary,
   WorktreeActionResultMessage,
 } from '../../extension/types/webview-messages';
@@ -323,6 +324,8 @@ export interface AppState {
   verticalTabRailWidth: number | null;
   openTabs: WebviewTabSummary[];
   activeTabId: string | null;
+  tabGroups: WebviewTabGroup[];
+  collapsedGroupIds: string[];
 
   // Session Vitals
   vitalsEnabled: boolean;
@@ -841,7 +844,12 @@ export interface AppState {
   setVitalsEnabled: (enabled: boolean) => void;
   setTabLayout: (layout: 'horizontal' | 'vertical') => void;
   setVerticalTabRailWidth: (width: number | null) => void;
-  setOpenTabs: (tabs: WebviewTabSummary[], activeTabId: string | null) => void;
+  setOpenTabs: (
+    tabs: WebviewTabSummary[],
+    activeTabId: string | null,
+    groups?: WebviewTabGroup[],
+    collapsedGroupIds?: string[],
+  ) => void;
   setWeatherWidgetEnabled: (enabled: boolean) => void;
   setCheckpointState: (state: CheckpointState) => void;
   setCheckpointResult: (result: AppState['checkpointResult']) => void;
@@ -1249,6 +1257,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   verticalTabRailWidth: null as number | null,
   openTabs: [],
   activeTabId: null,
+  tabGroups: [] as WebviewTabGroup[],
+  collapsedGroupIds: [] as string[],
   vitalsEnabled: false,
   weatherWidgetEnabled: false,
   turnHistory: [],
@@ -2594,7 +2604,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setTabLayout: (layout) => set({ tabLayout: layout }),
   setVerticalTabRailWidth: (width) => set({ verticalTabRailWidth: width }),
-  setOpenTabs: (tabs, activeTabId) => set({ openTabs: tabs, activeTabId }),
+  setOpenTabs: (tabs, activeTabId, groups, collapsedGroupIds) =>
+    set({
+      openTabs: tabs,
+      activeTabId,
+      tabGroups: groups ?? [],
+      collapsedGroupIds: collapsedGroupIds ?? [],
+    }),
 
   setVitalsEnabled: (enabled) =>
     set((state) => {

@@ -33,6 +33,7 @@ import {
 } from './OpenTabsSnapshot';
 import type { ProcessMemorySampler } from '../process/ProcessMemorySampler';
 import type { TabGroupStore } from './TabGroupStore';
+import { planMoveTabInNavigation, planNormalizeAllOrders } from './tabOrdering';
 import { MultiParticipantSessionTab } from '../multiparticipant/MultiParticipantSessionTab';
 import { WorktreeController } from '../worktree/WorktreeController';
 
@@ -122,7 +123,10 @@ export class TabManager {
   private snapshotDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private isRestoringSnapshot = false;
   private isShuttingDown = false;
-  private savedShowTabs: string | null = null;
+  /** True while vertical mode has hidden the native tab strip in THIS window. */
+  private nativeTabsHidden = false;
+  /** workbench.editor.showTabs workspace-level value before we hid it (undefined = key was unset). */
+  private savedShowTabsWorkspaceValue: string | undefined;
   private static readonly SNAPSHOT_DEBOUNCE_MS = 500;
   private static readonly MAX_RESTORE = 10;
   private static readonly LAYOUT_SETTLE_MS = 75;
@@ -217,17 +221,59 @@ export class TabManager {
     context.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor((editor) => {
         const layout = this.getTabLayout();
-        this.log(`[TabLayout] activeTextEditor changed: editor=${editor ? 'TextEditor' : 'none'} layout=${layout} savedShowTabs=${this.savedShowTabs}`);
-        if (layout !== 'vertical' || !this.savedShowTabs) return;
+        this.log(`[TabLayout] activeTextEditor changed: editor=${editor ? 'TextEditor' : 'none'} layout=${layout} nativeTabsHidden=${this.nativeTabsHidden}`);
+        if (layout !== 'vertical' || !this.nativeTabsHidden) return;
         if (!editor) return;
         const cfg = vscode.workspace.getConfiguration('workbench.editor');
         const current = cfg.get<string>('showTabs');
-        this.log(`[TabLayout] Restoring native tabs: current=${current} restoreTo=${this.savedShowTabs}`);
+        this.log(`[TabLayout] Restoring native tabs: current=${current} restoreTo=${this.savedShowTabsWorkspaceValue ?? '(unset)'}`);
         if (current === 'none') {
-          void Promise.resolve(cfg.update('showTabs', this.savedShowTabs, vscode.ConfigurationTarget.Global)).catch(() => {});
+          void Promise.resolve(
+            cfg.update('showTabs', this.savedShowTabsWorkspaceValue, vscode.ConfigurationTarget.Workspace)
+          ).catch(() => {});
         }
       })
     );
+
+    // Older builds wrote layout + hidden-tabs to user-global settings, which
+    // leaked vertical mode into every VS Code window. Clean that up once.
+    void this.migratePerWindowLayoutSettings();
+  }
+
+  /**
+   * One-time migration to per-window layout: lift leftover global values into
+   * this window's workspace scope and clear the global slots. Also clears a
+   * stale workspace-level "showTabs: none" when this window is horizontal
+   * (leftover of a crash while vertical mode was active).
+   */
+  private async migratePerWindowLayoutSettings(): Promise<void> {
+    try {
+      const tabsConfig = vscode.workspace.getConfiguration('claudeMirror.tabs');
+      const layoutInfo = tabsConfig.inspect<'horizontal' | 'vertical'>('layout');
+      if (layoutInfo?.globalValue !== undefined) {
+        if (layoutInfo.workspaceValue === undefined) {
+          await tabsConfig.update('layout', layoutInfo.globalValue, vscode.ConfigurationTarget.Workspace);
+        }
+        await tabsConfig.update('layout', undefined, vscode.ConfigurationTarget.Global);
+        this.log('[TabLayout] Migrated global layout setting to this window (workspace scope)');
+      }
+
+      const editorConfig = vscode.workspace.getConfiguration('workbench.editor');
+      const showTabsInfo = editorConfig.inspect<string>('showTabs');
+      const layoutNow = this.getTabLayout();
+      if (showTabsInfo?.globalValue === 'none' && layoutNow === 'vertical') {
+        if (showTabsInfo.workspaceValue === undefined) {
+          await editorConfig.update('showTabs', 'none', vscode.ConfigurationTarget.Workspace);
+        }
+        await editorConfig.update('showTabs', undefined, vscode.ConfigurationTarget.Global);
+        this.log('[TabLayout] Migrated hidden native tabs to this window (workspace scope)');
+      } else if (showTabsInfo?.workspaceValue === 'none' && layoutNow === 'horizontal') {
+        await editorConfig.update('showTabs', undefined, vscode.ConfigurationTarget.Workspace);
+        this.log('[TabLayout] Cleared stale hidden-tabs leftover (window is horizontal)');
+      }
+    } catch (err) {
+      this.log(`[TabLayout] Per-window migration skipped: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   /** Public accessors for the TreeView. */
@@ -295,6 +341,14 @@ export class TabManager {
       type: 'tabList',
       tabs: this.listTabs(),
       activeTabId: this.activeTabId,
+      groups: (this.tabGroupStore?.listGroups() ?? []).map((g) => ({
+        id: g.id,
+        parentId: g.parentId,
+        label: g.label,
+        color: g.color,
+        order: g.order,
+      })),
+      collapsedGroupIds: this.tabGroupStore?.getCollapsedGroupIds() ?? [],
     };
     for (const tab of this.tabs.values()) {
       if (!tab.isDisposed) {
@@ -324,6 +378,77 @@ export class TabManager {
   /** The folder a tab belongs to, if any. */
   getTabGroup(tabId: string): string | undefined {
     return this.snapshotEntries.get(tabId)?.groupId;
+  }
+
+  /**
+   * Group-aware move from the vertical rail: place a tab inside a folder
+   * (null = ungrouped) at a specific sibling index. Validates against current
+   * truth; invalid requests mutate nothing and re-broadcast so a stale rail
+   * re-syncs. Both affected sibling lists are re-numbered contiguously.
+   */
+  async moveTabInNavigation(
+    tabId: string,
+    targetGroupId: string | null,
+    targetIndex: number,
+  ): Promise<void> {
+    if (targetGroupId && !this.tabGroupStore?.getGroup(targetGroupId)) {
+      this.log(`[TabGroups] moveTabInNavigation rejected: folder ${targetGroupId} not found`);
+      this.broadcastTabsState();
+      return;
+    }
+    const orderable = this.listTabs().map((t) => ({
+      id: t.id,
+      tabNumber: t.tabNumber,
+      groupId: t.groupId,
+      orderInGroup: t.orderInGroup,
+    }));
+    const plan = planMoveTabInNavigation(orderable, tabId, targetGroupId, targetIndex);
+    if (!plan) {
+      this.log(`[TabGroups] moveTabInNavigation rejected tab=${tabId} index=${targetIndex}`);
+      this.broadcastTabsState();
+      return;
+    }
+    const now = new Date().toISOString();
+    for (const assignment of plan) {
+      const entry = this.snapshotEntries.get(assignment.id);
+      if (entry) {
+        entry.groupId = assignment.groupId;
+        entry.orderInGroup = assignment.orderInGroup;
+        entry.savedAt = now;
+      }
+    }
+    this.applyEffectiveTabIcon(tabId);
+    this.schedulePersistSnapshot();
+    this.treeChangeEmitter.fire();
+    this.broadcastTabsState();
+  }
+
+  /**
+   * One-time idempotent cleanup of legacy orderInGroup values (undefined,
+   * duplicates, or the old flat-global numbering). Runs after snapshot
+   * restore; no-ops when data is already contiguous per sibling list.
+   */
+  normalizeAllOrders(): void {
+    const orderable = this.listTabs().map((t) => ({
+      id: t.id,
+      tabNumber: t.tabNumber,
+      groupId: t.groupId,
+      orderInGroup: t.orderInGroup,
+    }));
+    const plan = planNormalizeAllOrders(orderable);
+    if (plan.length === 0) {
+      return;
+    }
+    const now = new Date().toISOString();
+    for (const assignment of plan) {
+      const entry = this.snapshotEntries.get(assignment.id);
+      if (entry) {
+        entry.orderInGroup = assignment.orderInGroup;
+        entry.savedAt = now;
+      }
+    }
+    this.log(`[TabGroups] Normalized orderInGroup on ${plan.length} tab(s)`);
+    this.schedulePersistSnapshot();
   }
 
   /** Public surface for SessionSummarizer to broadcast that a session's summary changed. */
@@ -1187,14 +1312,15 @@ export class TabManager {
     // currently-open set, not the post-disposal empty state.
     const finalSnapshot = this.buildSnapshot();
 
-    // Restore native tabs if we hid them for vertical layout
-    if (this.savedShowTabs) {
+    // Restore native tabs if we hid them for vertical layout (this window only)
+    if (this.nativeTabsHidden) {
       try {
         const editorConfig = vscode.workspace.getConfiguration('workbench.editor');
-        await editorConfig.update('showTabs', this.savedShowTabs, vscode.ConfigurationTarget.Global);
-        this.log(`[TabLayout] Restored native tabs to "${this.savedShowTabs}" on shutdown`);
+        await editorConfig.update('showTabs', this.savedShowTabsWorkspaceValue, vscode.ConfigurationTarget.Workspace);
+        this.log('[TabLayout] Restored native tabs on shutdown (workspace scope)');
       } catch { /* best-effort */ }
-      this.savedShowTabs = null;
+      this.nativeTabsHidden = false;
+      this.savedShowTabsWorkspaceValue = undefined;
     }
 
     for (const tab of this.tabs.values()) {
@@ -1323,19 +1449,23 @@ export class TabManager {
    */
   private async syncNativeTabVisibility(mode: 'horizontal' | 'vertical'): Promise<void> {
     const editorConfig = vscode.workspace.getConfiguration('workbench.editor');
-    const current = editorConfig.get<string>('showTabs', 'multiple');
 
     if (mode === 'vertical') {
-      if (current !== 'none') {
-        this.savedShowTabs = current;
+      if (!this.nativeTabsHidden) {
+        // Remember this window's workspace-level value so horizontal mode can
+        // put it back exactly. A leftover 'none' (crash while vertical) is
+        // ours, not the user's — treat it as unset.
+        const prior = editorConfig.inspect<string>('showTabs')?.workspaceValue;
+        this.savedShowTabsWorkspaceValue = prior === 'none' ? undefined : prior;
+        this.nativeTabsHidden = true;
       }
-      await editorConfig.update('showTabs', 'none', vscode.ConfigurationTarget.Global);
-      this.log(`[TabLayout] Hid native tabs (was "${this.savedShowTabs}")`);
-    } else {
-      const restore = this.savedShowTabs ?? 'multiple';
-      await editorConfig.update('showTabs', restore, vscode.ConfigurationTarget.Global);
-      this.log(`[TabLayout] Restored native tabs to "${restore}"`);
-      this.savedShowTabs = null;
+      await editorConfig.update('showTabs', 'none', vscode.ConfigurationTarget.Workspace);
+      this.log(`[TabLayout] Hid native tabs in this window (workspace was "${this.savedShowTabsWorkspaceValue ?? '(unset)'}")`);
+    } else if (this.nativeTabsHidden) {
+      await editorConfig.update('showTabs', this.savedShowTabsWorkspaceValue, vscode.ConfigurationTarget.Workspace);
+      this.log('[TabLayout] Restored native tabs in this window');
+      this.nativeTabsHidden = false;
+      this.savedShowTabsWorkspaceValue = undefined;
     }
   }
 
@@ -1454,12 +1584,12 @@ export class TabManager {
     this.broadcastTabsState();
 
     // Re-hide native tabs when a ClaUi panel regains focus in vertical mode
-    if (this.getTabLayout() === 'vertical' && this.savedShowTabs) {
+    if (this.getTabLayout() === 'vertical' && this.nativeTabsHidden) {
       const cfg = vscode.workspace.getConfiguration('workbench.editor');
       const current = cfg.get<string>('showTabs');
       this.log(`[TabLayout] ClaUi panel focused, re-hiding native tabs: current=${current}`);
       if (current !== 'none') {
-        void Promise.resolve(cfg.update('showTabs', 'none', vscode.ConfigurationTarget.Global)).catch(() => {});
+        void Promise.resolve(cfg.update('showTabs', 'none', vscode.ConfigurationTarget.Workspace)).catch(() => {});
       }
     }
   }
@@ -1893,6 +2023,7 @@ export class TabManager {
       preservedCount++;
     }
 
+    this.normalizeAllOrders();
     void this.persistSnapshotNow();
     this.treeChangeEmitter.fire();
     this.broadcastTabsState();

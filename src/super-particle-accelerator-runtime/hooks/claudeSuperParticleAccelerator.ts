@@ -486,26 +486,34 @@ async function handleStop(
   return allow();
 }
 
-function tryLoadRuntimeSettings(storeDir: string): SuperParticleAcceleratorSettings | null {
+type RuntimeFileState =
+  | { state: 'absent' }
+  | { state: 'disabled' }
+  | { state: 'enabled'; settings: SuperParticleAcceleratorSettings };
+
+function tryLoadRuntimeSettings(storeDir: string): RuntimeFileState {
   try {
     const raw = fs.readFileSync(path.join(storeDir, 'runtime-enabled.json'), 'utf-8');
     const data = JSON.parse(raw);
-    if (!data.enabled) return null;
+    if (!data.enabled) return { state: 'disabled' };
     return {
-      enabled: true,
-      mode: data.mode || 'block',
-      scanEditTools: data.scanEditTools !== false,
-      scanBashCommands: data.scanBashCommands !== false,
-      scanMcpTools: data.scanMcpTools !== false,
-      scanWorkingTreeOnStop: data.scanWorkingTreeOnStop !== false,
-      blockGitCommitPush: data.blockGitCommitPush !== false,
-      allowIgnoredEnvFiles: data.allowIgnoredEnvFiles !== false,
-      entropyThreshold: data.entropyThreshold ?? 4.2,
-      frontendPathGlobs: data.frontendPathGlobs ?? [],
-      allowedSecretFileGlobs: data.allowedSecretFileGlobs ?? [],
+      state: 'enabled',
+      settings: {
+        enabled: true,
+        mode: data.mode || 'block',
+        scanEditTools: data.scanEditTools !== false,
+        scanBashCommands: data.scanBashCommands !== false,
+        scanMcpTools: data.scanMcpTools !== false,
+        scanWorkingTreeOnStop: data.scanWorkingTreeOnStop !== false,
+        blockGitCommitPush: data.blockGitCommitPush !== false,
+        allowIgnoredEnvFiles: data.allowIgnoredEnvFiles !== false,
+        entropyThreshold: data.entropyThreshold ?? 4.2,
+        frontendPathGlobs: data.frontendPathGlobs ?? [],
+        allowedSecretFileGlobs: data.allowedSecretFileGlobs ?? [],
+      },
     };
   } catch {
-    return null;
+    return { state: 'absent' };
   }
 }
 
@@ -516,13 +524,22 @@ async function main() {
   const storeDir = process.env.CLAUI_SPA_STORE_DIR;
   if (!storeDir) return allow();
 
+  // The runtime file is the single source of truth: the extension rewrites it
+  // on every UI toggle / settings change, so it always reflects the user's
+  // current choice. Env vars are frozen at process spawn time and serve only
+  // as a fallback when the file is missing. In particular, enabled:false in
+  // the file must override a stale CLAUI_SPA=1 env from before a mid-session
+  // disable.
+  const fileState = tryLoadRuntimeSettings(storeDir);
   let settings: SuperParticleAcceleratorSettings;
-  if (process.env.CLAUI_SPA === '1') {
+  if (fileState.state === 'disabled') {
+    return allow();
+  } else if (fileState.state === 'enabled') {
+    settings = fileState.settings;
+  } else if (process.env.CLAUI_SPA === '1') {
     settings = loadSettingsFromEnv();
   } else {
-    const fileSettings = tryLoadRuntimeSettings(storeDir);
-    if (!fileSettings) return allow();
-    settings = fileSettings;
+    return allow();
   }
 
   const scanner = new SpaSecretScanner(settings.entropyThreshold);

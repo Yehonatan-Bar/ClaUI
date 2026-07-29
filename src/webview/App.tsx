@@ -38,6 +38,8 @@ import { ImageLightbox } from './components/ImageLightbox';
 import { ChatSearchBar } from './components/ChatView/ChatSearchBar';
 import { SmartSearchView } from './components/SmartSearch/SmartSearchView';
 import { MPSessionView } from './components/MultiParticipant';
+import { buildTabNavTree, type TabNavGroupNode } from './tabNav';
+import type { WebviewTabSummary } from '../extension/types/webview-messages';
 
 const SESSION_SUMMARY_IDLE_MS = 60 * 60 * 1000;
 const SESSION_SUMMARY_DEFER_MS = 3 * 60 * 60 * 1000;
@@ -47,17 +49,19 @@ const RAIL_MAX_WIDTH = 300;
 
 const VerticalTabRail: React.FC = () => {
   const tabs = useAppStore((s) => s.openTabs);
+  const tabGroups = useAppStore((s) => s.tabGroups);
+  const collapsedGroupIds = useAppStore((s) => s.collapsedGroupIds);
   const activeTabId = useAppStore((s) => s.activeTabId);
   const setRailWidth = useAppStore((s) => s.setVerticalTabRailWidth);
   const railRef = useRef<HTMLElement>(null);
   const resizing = useRef(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  // Where a dragged tab would land: folder id (null = ungrouped) + insertion
+  // index within that folder's tab list, counted with the dragged tab removed.
+  const [dropTarget, setDropTarget] = useState<{ groupId: string | null; index: number } | null>(null);
 
-  const sortedTabs = useMemo(
-    () => [...tabs].sort((a, b) => (a.orderInGroup ?? a.tabNumber) - (b.orderInGroup ?? b.tabNumber)),
-    [tabs]
-  );
+  const tree = useMemo(() => buildTabNavTree(tabs, tabGroups), [tabs, tabGroups]);
+  const collapsed = useMemo(() => new Set(collapsedGroupIds), [collapsedGroupIds]);
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -88,89 +92,192 @@ const VerticalTabRail: React.FC = () => {
   }, [setRailWidth]);
 
   const handleDrop = useCallback(() => {
-    if (!draggedId || dropIndex === null) return;
-    const fromIndex = sortedTabs.findIndex(t => t.id === draggedId);
-    if (fromIndex === -1 || fromIndex === dropIndex || fromIndex + 1 === dropIndex) {
-      setDraggedId(null);
-      setDropIndex(null);
-      return;
+    if (draggedId && dropTarget) {
+      // The extension validates against current truth (folder existence,
+      // index clamping) and re-broadcasts; stale drops mutate nothing.
+      postToExtension({
+        type: 'moveTabInNavigation',
+        tabId: draggedId,
+        targetGroupId: dropTarget.groupId,
+        targetIndex: dropTarget.index,
+      });
     }
-    const ids = sortedTabs.map(t => t.id);
-    ids.splice(fromIndex, 1);
-    const insertAt = fromIndex < dropIndex ? dropIndex - 1 : dropIndex;
-    ids.splice(insertAt, 0, draggedId);
-    postToExtension({ type: 'reorderTabs', tabIds: ids });
     setDraggedId(null);
-    setDropIndex(null);
-  }, [draggedId, dropIndex, sortedTabs]);
+    setDropTarget(null);
+  }, [draggedId, dropTarget]);
 
-  if (sortedTabs.length <= 1) {
+  // The rail shows whenever navigation has content: >1 tab, or folders exist.
+  if (tabs.length <= 1 && tree.roots.length === 0) {
     return null;
   }
 
-  const dragFromIndex = draggedId ? sortedTabs.findIndex(t => t.id === draggedId) : -1;
+  const isDropAt = (groupId: string | null, index: number) =>
+    !!dropTarget && dropTarget.groupId === groupId && dropTarget.index === index;
+
+  const renderTabRow = (
+    tab: WebviewTabSummary,
+    groupId: string | null,
+    insertBase: number,
+    depth: number,
+  ) => {
+    const isActive = tab.id === activeTabId;
+    const isDragged = tab.id === draggedId;
+    const providerLabel =
+      tab.provider === 'codex' ? 'Codex' : tab.provider === 'remote' ? 'Happy' : 'Claude';
+    return (
+      <button
+        key={tab.id}
+        className={`vertical-tab-item ${isActive ? 'active' : ''} ${tab.isBusy ? 'vertical-tab-busy' : ''} ${isDragged ? 'vertical-tab-dragging' : ''}`}
+        draggable
+        onDragStart={(e) => {
+          setDraggedId(tab.id);
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', tab.id);
+        }}
+        onDragEnd={() => { setDraggedId(null); setDropTarget(null); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!draggedId || isDragged) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          setDropTarget({
+            groupId,
+            index: e.clientY < rect.top + rect.height / 2 ? insertBase : insertBase + 1,
+          });
+        }}
+        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDrop(); }}
+        onClick={() => {
+          if (!isActive) {
+            postToExtension({ type: 'focusTab', tabId: tab.id });
+          }
+        }}
+        style={{ '--tab-color': tab.slotColor, '--depth': Math.min(depth, 3) } as React.CSSProperties}
+        title={`${providerLabel}: ${tab.displayName}`}
+        aria-current={isActive ? 'page' : undefined}
+      >
+        <span className="vertical-tab-title">{tab.displayName}</span>
+        <span
+          className="vertical-tab-provider"
+          aria-label="Close tab"
+          role="button"
+          data-letter={tab.provider === 'codex' ? 'X' : tab.provider === 'remote' ? 'H' : 'C'}
+          onClick={(e) => {
+            e.stopPropagation();
+            postToExtension({ type: 'closeTab', tabId: tab.id });
+          }}
+        />
+      </button>
+    );
+  };
+
+  // Renders one folder's (or the ungrouped bucket's) tab rows with drop
+  // indicators. `insertBase` counts only non-dragged rows so drop indices
+  // match the extension's "index after removing the dragged tab" contract.
+  const renderTabList = (list: WebviewTabSummary[], groupId: string | null, depth: number) => {
+    const rows: React.ReactNode[] = [];
+    let insertBase = 0;
+    for (const tab of list) {
+      const isDragged = tab.id === draggedId;
+      if (!isDragged && isDropAt(groupId, insertBase)) {
+        rows.push(
+          <div key={`drop-before-${tab.id}`} className="vertical-tab-drop-indicator" />
+        );
+      }
+      rows.push(renderTabRow(tab, groupId, insertBase, depth));
+      if (!isDragged) {
+        insertBase++;
+      }
+    }
+    if (isDropAt(groupId, insertBase)) {
+      rows.push(
+        <div key={`drop-end-${groupId ?? 'top'}`} className="vertical-tab-drop-indicator" />
+      );
+    }
+    return rows;
+  };
+
+  const renderGroupNode = (node: TabNavGroupNode): React.ReactNode => {
+    const isCollapsed = collapsed.has(node.group.id);
+    const count = node.subtreeTabs.length;
+    const containsActive = !!activeTabId && node.subtreeTabs.some((t) => t.id === activeTabId);
+    const containsBusy = node.subtreeTabs.some((t) => t.isBusy);
+    const appendIndex = node.tabs.filter((t) => t.id !== draggedId).length;
+    return (
+      <React.Fragment key={`group-${node.group.id}`}>
+        <button
+          className={`vertical-tab-group-header ${isCollapsed ? 'collapsed' : ''} ${containsActive ? 'contains-active' : ''} ${containsBusy && isCollapsed ? 'contains-busy' : ''}`}
+          style={{ '--group-color': node.group.color, '--depth': Math.min(node.depth, 3) } as React.CSSProperties}
+          aria-expanded={!isCollapsed}
+          title={`${node.group.label} (${count} tab${count === 1 ? '' : 's'})`}
+          onClick={() =>
+            postToExtension({
+              type: 'setGroupCollapsed',
+              groupId: node.group.id,
+              collapsed: !isCollapsed,
+            })
+          }
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (draggedId) {
+              // Dropping on a header (collapsed or not) appends to that folder.
+              setDropTarget({ groupId: node.group.id, index: appendIndex });
+            }
+          }}
+          onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDrop(); }}
+        >
+          <span className="vertical-tab-group-chevron" aria-hidden="true">
+            {isCollapsed ? '▸' : '▾'}
+          </span>
+          <span className="vertical-tab-group-swatch" aria-hidden="true" />
+          <span className="vertical-tab-group-label">{node.group.label}</span>
+          <span className="vertical-tab-group-count">{count}</span>
+        </button>
+        {isDropAt(node.group.id, appendIndex) && isCollapsed && (
+          <div className="vertical-tab-drop-indicator" />
+        )}
+        {!isCollapsed && renderTabList(node.tabs, node.group.id, node.depth + 1)}
+        {!isCollapsed && node.childGroups.map(renderGroupNode)}
+      </React.Fragment>
+    );
+  };
+
+  const showUngroupedDropzone =
+    !!draggedId && tree.ungrouped.filter((t) => t.id !== draggedId).length === 0;
 
   return (
     <nav className="vertical-tab-rail" aria-label="ClaUi tabs" ref={railRef}>
+      <button
+        className="vertical-tab-newfolder"
+        title="Create a new folder"
+        onClick={() => postToExtension({ type: 'createTabGroup' })}
+      >
+        <span aria-hidden="true">+</span>
+        <span className="vertical-tab-newfolder-label">Folder</span>
+      </button>
       <div
         className="vertical-tab-rail-list"
         onDragOver={(e) => e.preventDefault()}
         onDragLeave={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropIndex(null);
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(null);
         }}
         onDrop={(e) => { e.preventDefault(); handleDrop(); }}
       >
-        {sortedTabs.map((tab, index) => {
-          const isActive = tab.id === activeTabId;
-          const isDragged = tab.id === draggedId;
-          const providerLabel =
-            tab.provider === 'codex' ? 'Codex' : tab.provider === 'remote' ? 'Happy' : 'Claude';
-          const showDropBefore = dropIndex === index &&
-            dragFromIndex !== index && dragFromIndex !== index - 1;
-          const showDropAfter = dropIndex === sortedTabs.length &&
-            index === sortedTabs.length - 1 && dragFromIndex !== sortedTabs.length - 1;
-          return (
-            <React.Fragment key={tab.id}>
-              {showDropBefore && <div className="vertical-tab-drop-indicator" />}
-              <button
-                className={`vertical-tab-item ${isActive ? 'active' : ''} ${tab.isBusy ? 'vertical-tab-busy' : ''} ${isDragged ? 'vertical-tab-dragging' : ''}`}
-                draggable
-                onDragStart={(e) => {
-                  setDraggedId(tab.id);
-                  e.dataTransfer.effectAllowed = 'move';
-                  e.dataTransfer.setData('text/plain', tab.id);
-                }}
-                onDragEnd={() => { setDraggedId(null); setDropIndex(null); }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setDropIndex(e.clientY < rect.top + rect.height / 2 ? index : index + 1);
-                }}
-                onClick={() => {
-                  if (!isActive) {
-                    postToExtension({ type: 'focusTab', tabId: tab.id });
-                  }
-                }}
-                style={{ '--tab-color': tab.slotColor } as React.CSSProperties}
-                title={`${providerLabel}: ${tab.displayName}`}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <span className="vertical-tab-title">{tab.displayName}</span>
-                <span
-                  className="vertical-tab-provider"
-                  aria-label="Close tab"
-                  role="button"
-                  data-letter={tab.provider === 'codex' ? 'X' : tab.provider === 'remote' ? 'H' : 'C'}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    postToExtension({ type: 'closeTab', tabId: tab.id });
-                  }}
-                />
-              </button>
-              {showDropAfter && <div className="vertical-tab-drop-indicator" />}
-            </React.Fragment>
-          );
-        })}
+        {renderTabList(tree.ungrouped, null, 0)}
+        {showUngroupedDropzone && (
+          <div
+            className="vertical-tab-ungrouped-dropzone"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setDropTarget({ groupId: null, index: 0 });
+            }}
+            onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDrop(); }}
+          >
+            No folder
+          </div>
+        )}
+        {tree.roots.map(renderGroupNode)}
       </div>
       <div
         className="vertical-tab-resize-handle"
@@ -196,8 +303,11 @@ export const App: React.FC = () => {
   const tabKind = useAppStore((s) => s.tabKind);
   const tabLayout = useAppStore((s) => s.tabLayout);
   const openTabs = useAppStore((s) => s.openTabs);
+  const railTabGroups = useAppStore((s) => s.tabGroups);
   const verticalTabRailWidth = useAppStore((s) => s.verticalTabRailWidth);
-  const showVerticalTabRail = tabLayout === 'vertical' && openTabs.length > 1;
+  // Folders keep the rail visible even with a single tab open.
+  const showVerticalTabRail =
+    tabLayout === 'vertical' && (openTabs.length > 1 || railTabGroups.length > 0);
 
   const wrapWithRail = (content: React.ReactNode) => {
     if (!showVerticalTabRail) return content;

@@ -14,6 +14,8 @@ export interface TabGroup {
 }
 
 const STORAGE_KEY = 'claudeMirror.tabGroups';
+/** workspaceState slot holding ids of folders collapsed in the vertical rail. */
+const COLLAPSED_IDS_STORAGE = 'claudeMirror.tabGroupCollapsed';
 
 /** Default palette for newly-created folders, cycling through. */
 const DEFAULT_COLORS = [
@@ -49,10 +51,14 @@ export class TabGroupStore {
   readonly onDidChange = this.emitter.event;
 
   private cache: TabGroup[];
+  // Assigned in the constructor: ES2022 field initializers run before the
+  // workspaceState parameter property is assigned.
+  private collapsedCache: Set<string>;
   private nextColorIdx = 0;
 
   constructor(private readonly workspaceState: vscode.Memento) {
     this.cache = this.read();
+    this.collapsedCache = this.readCollapsed();
     this.nextColorIdx = this.cache.length % DEFAULT_COLORS.length;
   }
 
@@ -67,6 +73,62 @@ export class TabGroupStore {
   private async write(): Promise<void> {
     await this.workspaceState.update(STORAGE_KEY, this.cache);
     this.emitter.fire();
+  }
+
+  /**
+   * Load persisted collapsed folder ids. Does no existence pruning — stale
+   * ids are harmless to consumers and are pruned on folder delete.
+   */
+  private readCollapsed(): Set<string> {
+    const raw = this.workspaceState.get(COLLAPSED_IDS_STORAGE, [] as string[]);
+    const list = Array.isArray(raw) ? raw : [];
+    return new Set(list.filter((id) => typeof id === 'string'));
+  }
+
+  private async writeCollapsed(): Promise<void> {
+    await this.workspaceState.update(COLLAPSED_IDS_STORAGE, Array.from(this.collapsedCache));
+    this.emitter.fire();
+  }
+
+  /** Ids of folders currently collapsed in the vertical rail. */
+  getCollapsedGroupIds(): string[] {
+    return Array.from(this.collapsedCache);
+  }
+
+  /**
+   * Collapse or expand a folder. Ignores unknown ids and no-ops so callers can
+   * fire freely without churning workspaceState. Fires onDidChange only when
+   * the set actually changed, which drives a single rail broadcast.
+   */
+  async setGroupCollapsed(id: string, collapsed: boolean): Promise<void> {
+    if (collapsed && !this.getGroup(id)) {
+      return;
+    }
+    if (collapsed === this.collapsedCache.has(id)) {
+      return;
+    }
+    if (collapsed) {
+      this.collapsedCache.add(id);
+    } else {
+      this.collapsedCache.delete(id);
+    }
+    await this.writeCollapsed();
+  }
+
+  /**
+   * Drop folder ids from the collapsed set after a delete. Persists without
+   * firing onDidChange — the delete's own write() already notifies listeners.
+   */
+  private async pruneCollapsed(ids: string[]): Promise<void> {
+    let mutated = false;
+    for (const id of ids) {
+      if (this.collapsedCache.delete(id)) {
+        mutated = true;
+      }
+    }
+    if (mutated) {
+      await this.workspaceState.update(COLLAPSED_IDS_STORAGE, Array.from(this.collapsedCache));
+    }
   }
 
   listGroups(): TabGroup[] {
@@ -190,6 +252,7 @@ export class TabGroupStore {
     if (mode === 'cascade') {
       const allToDelete = new Set([id, ...descendants]);
       this.cache = this.cache.filter((g) => !allToDelete.has(g.id));
+      await this.pruneCollapsed(Array.from(allToDelete));
       await this.write();
       return { deletedGroupIds: Array.from(allToDelete) };
     }
@@ -201,6 +264,7 @@ export class TabGroupStore {
       }
     }
     this.cache = this.cache.filter((g) => g.id !== id);
+    await this.pruneCollapsed([id]);
     await this.write();
     return { deletedGroupIds: [id], reparentedTo: newParent ?? null };
   }

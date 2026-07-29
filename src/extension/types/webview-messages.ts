@@ -679,6 +679,32 @@ export interface RequestTabListRequest {
   type: 'requestTabList';
 }
 
+/**
+ * Group-aware tab move used by the grouped vertical rail. Unlike the flat
+ * `reorderTabs`, this carries an explicit target folder and an index *within
+ * that folder's tab-only sibling list*, so cross-folder drops are unambiguous.
+ */
+export interface MoveTabInNavigationRequest {
+  type: 'moveTabInNavigation';
+  tabId: string;
+  /** Destination folder id, or null for the top-level ("Ungrouped") list. */
+  targetGroupId: string | null;
+  /** Insertion index in the destination folder's tab list (extension clamps). */
+  targetIndex: number;
+}
+
+/** Toggle a folder's collapsed state in the vertical rail (persisted per-workspace). */
+export interface SetGroupCollapsedRequest {
+  type: 'setGroupCollapsed';
+  groupId: string;
+  collapsed: boolean;
+}
+
+/** Rail "+" affordance: create a new top-level folder (routes to the existing command). */
+export interface CreateTabGroupRequest {
+  type: 'createTabGroup';
+}
+
 export interface SetDetailedDiffViewEnabledRequest {
   type: 'setDetailedDiffViewEnabled';
   enabled: boolean;
@@ -1191,6 +1217,9 @@ export type WebviewToExtensionMessage =
   | CloseTabRequest
   | ReorderTabsRequest
   | RequestTabListRequest
+  | MoveTabInNavigationRequest
+  | SetGroupCollapsedRequest
+  | CreateTabGroupRequest
   | SetDetailedDiffViewEnabledRequest
   | SetAdventureWidgetEnabledRequest
   | SetWeatherWidgetEnabledRequest
@@ -1991,10 +2020,26 @@ export interface WebviewTabSummary {
   claudeAccountProfileLabel?: string | null;
 }
 
+/** Serializable folder record for the grouped vertical rail (mirrors TabGroup). */
+export interface WebviewTabGroup {
+  id: string;
+  parentId?: string;
+  label: string;
+  color: string;
+  order: number;
+}
+
 export interface TabListMessage {
   type: 'tabList';
   tabs: WebviewTabSummary[];
   activeTabId: string | null;
+  /**
+   * Folder records so the rail can rebuild the tree. Optional for backward
+   * compatibility — consumers must default to `[]` when absent.
+   */
+  groups?: WebviewTabGroup[];
+  /** Ids of folders the user has collapsed in the rail. Default `[]` when absent. */
+  collapsedGroupIds?: string[];
 }
 
 export interface DetailedDiffViewSettingMessage {

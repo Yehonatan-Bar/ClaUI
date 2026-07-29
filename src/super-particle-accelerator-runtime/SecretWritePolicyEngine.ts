@@ -98,7 +98,9 @@ export class SecretWritePolicyEngine {
     pathRisk: PathRisk,
     hardReason?: string,
   ): SecretWritePolicyDecision {
-    const action = hardReason ? 'deny' : (input.settings.mode === 'block' ? 'deny' : 'audit');
+    // Audit mode never blocks - it only records. Only block mode denies,
+    // including the public/client-path rule (hardReason).
+    const action = input.settings.mode === 'block' ? 'deny' : 'audit';
     return {
       action,
       reason: hardReason ?? this.buildReason(findings, pathRisk),

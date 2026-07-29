@@ -2353,10 +2353,8 @@ export class MessageHandler {
           break;
 
         case 'setTabLayout':
-          this.log(`Setting tab layout to: "${msg.layout}"`);
-          vscode.workspace
-            .getConfiguration('claudeMirror.tabs')
-            .update('layout', msg.layout, vscode.ConfigurationTarget.Global);
+          this.log(`Setting tab layout to: "${msg.layout}" (this window only)`);
+          void vscode.commands.executeCommand('claudeMirror.tabs.setLayout', msg.layout);
           break;
 
         case 'focusTab':
@@ -2369,6 +2367,20 @@ export class MessageHandler {
 
         case 'reorderTabs':
           void vscode.commands.executeCommand('claudeMirror.tabs.reorder', msg.tabIds);
+          break;
+
+        case 'moveTabInNavigation':
+          void vscode.commands.executeCommand(
+            'claudeMirror.tabs.moveInNavigation', msg.tabId, msg.targetGroupId, msg.targetIndex);
+          break;
+
+        case 'setGroupCollapsed':
+          void vscode.commands.executeCommand(
+            'claudeMirror.groups.setCollapsed', msg.groupId, msg.collapsed);
+          break;
+
+        case 'createTabGroup':
+          void vscode.commands.executeCommand('claudeMirror.groups.create');
           break;
 
         case 'requestTabList':
@@ -3841,7 +3853,15 @@ export class MessageHandler {
         }
         case 'superParticleAcceleratorSetMode': {
           void vscode.workspace.getConfiguration('claudeMirror.superParticleAccelerator')
-            .update('mode', (msg as { mode: string }).mode, vscode.ConfigurationTarget.Workspace);
+            .update('mode', (msg as { mode: string }).mode, vscode.ConfigurationTarget.Workspace)
+            .then(async () => {
+              // Rewrite the runtime file so already-running agent processes
+              // pick up the new mode, then report the resulting state back
+              if (this.superParticleAcceleratorService) {
+                await this.superParticleAcceleratorService.reconcile();
+              }
+              void this.sendSuperParticleAcceleratorStatus();
+            });
           break;
         }
         case 'superParticleAcceleratorGetAuditEvents': {
@@ -3952,6 +3972,10 @@ export class MessageHandler {
 
         case 'ready':
           this.log('Webview ready');
+          // Send real SPA state immediately so the header badge reflects the
+          // truth from first paint (previously it stayed on the store default
+          // "Off" until the panel was opened)
+          void this.sendSuperParticleAcceleratorStatus();
           // Send text display settings
           this.sendTextSettings();
           // Send typing theme setting

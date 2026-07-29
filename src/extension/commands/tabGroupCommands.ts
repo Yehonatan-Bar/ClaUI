@@ -14,6 +14,26 @@ const FOLDER_COLOR_PRESETS: Array<{ label: string; value: string }> = [
   { label: 'Brick', value: '#BE5046' },
 ];
 
+/**
+ * Write the tab layout for THIS window only (workspace scope). Older builds
+ * wrote user-global settings, which flipped the layout in every open VS Code
+ * window at once. Empty windows have no workspace settings, so those fall
+ * back to the global scope (single-window sessions anyway).
+ */
+async function updateTabLayoutForThisWindow(
+  layout: 'horizontal' | 'vertical',
+  log: (msg: string) => void
+): Promise<void> {
+  const config = vscode.workspace.getConfiguration('claudeMirror.tabs');
+  try {
+    await config.update('layout', layout, vscode.ConfigurationTarget.Workspace);
+    log(`[TabLayout] Set layout="${layout}" for this window (workspace scope)`);
+  } catch (err) {
+    log(`[TabLayout] Workspace write failed (${err instanceof Error ? err.message : String(err)}); falling back to global`);
+    await config.update('layout', layout, vscode.ConfigurationTarget.Global);
+  }
+}
+
 function isGroupNode(arg: unknown): arg is TabGroupTreeNode & { kind: 'group' } {
   return !!arg && typeof arg === 'object' && (arg as TabGroupTreeNode).kind === 'group';
 }
@@ -70,6 +90,33 @@ export function registerTabGroupCommands(
     vscode.commands.registerCommand('claudeMirror.tabs.reorder', (tabIds: string[]) => {
       tabManager.reorderTabs(tabIds);
     }),
+
+    // Group-aware move from the vertical rail (drop into a folder at an index).
+    vscode.commands.registerCommand(
+      'claudeMirror.tabs.moveInNavigation',
+      (tabId: string, targetGroupId: string | null, targetIndex: number) => {
+        void tabManager.moveTabInNavigation(tabId, targetGroupId, targetIndex);
+      }
+    ),
+
+    // Collapse/expand a folder in the vertical rail (persisted per-workspace).
+    vscode.commands.registerCommand(
+      'claudeMirror.groups.setCollapsed',
+      (groupId: string, collapsed: boolean) => {
+        void tabGroupStore.setGroupCollapsed(groupId, collapsed);
+      }
+    ),
+
+    // Single write path for the layout toggle — per-window (workspace) scope.
+    vscode.commands.registerCommand(
+      'claudeMirror.tabs.setLayout',
+      async (layout: 'horizontal' | 'vertical') => {
+        if (layout !== 'horizontal' && layout !== 'vertical') {
+          return;
+        }
+        await updateTabLayoutForThisWindow(layout, log);
+      }
+    ),
 
     // Create a top-level folder
     vscode.commands.registerCommand('claudeMirror.groups.create', async () => {
@@ -308,7 +355,7 @@ export function registerTabGroupCommands(
       if (!picked || picked.value === current) {
         return;
       }
-      await config.update('layout', picked.value, vscode.ConfigurationTarget.Global);
+      await updateTabLayoutForThisWindow(picked.value, log);
       log(`[TabLayout] Switched to "${picked.value}" via title-bar gear`);
     })
   );

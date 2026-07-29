@@ -208,11 +208,34 @@ describe('SecretWritePolicyEngine', () => {
       assert.equal(decision.action, 'audit');
     });
 
-    it('still hard-denies public paths even in audit mode', () => {
+    it('audits (never denies) public paths in audit mode', () => {
       const engine = createEngine();
       const decision = engine.evaluate(makeInput({
         filePath: '/project/public/config.js',
         settings: makeSettings({ mode: 'audit' }),
+      }));
+      assert.equal(decision.action, 'audit');
+      assert.ok(decision.reason.includes('client-side or public code'));
+    });
+
+    it('still hard-denies public paths in block mode even with exceptions', () => {
+      const engine = createEngine();
+      const now = new Date();
+      const future = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
+      const decision = engine.evaluate(makeInput({
+        filePath: '/project/public/config.js',
+        exceptions: [{
+          id: 'exc-pub',
+          createdAt: now.toISOString(),
+          expiresAt: future,
+          createdBy: 'user',
+          ruleId: 'test-rule',
+          valueSha256: 'abc123def456',
+          filePathGlob: '**/*.js',
+          maxUses: 10,
+          usedCount: 0,
+          reason: 'Should not override public-path rule',
+        }],
       }));
       assert.equal(decision.action, 'deny');
     });

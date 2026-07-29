@@ -1023,10 +1023,8 @@ export class CodexMessageHandler {
           break;
 
         case 'setTabLayout':
-          this.log(`Setting tab layout to: "${msg.layout}" (Codex handler)`);
-          void vscode.workspace
-            .getConfiguration('claudeMirror.tabs')
-            .update('layout', msg.layout, vscode.ConfigurationTarget.Global);
+          this.log(`Setting tab layout to: "${msg.layout}" (Codex handler, this window only)`);
+          void vscode.commands.executeCommand('claudeMirror.tabs.setLayout', msg.layout);
           break;
 
         case 'focusTab':
@@ -1039,6 +1037,20 @@ export class CodexMessageHandler {
 
         case 'reorderTabs':
           void vscode.commands.executeCommand('claudeMirror.tabs.reorder', msg.tabIds);
+          break;
+
+        case 'moveTabInNavigation':
+          void vscode.commands.executeCommand(
+            'claudeMirror.tabs.moveInNavigation', msg.tabId, msg.targetGroupId, msg.targetIndex);
+          break;
+
+        case 'setGroupCollapsed':
+          void vscode.commands.executeCommand(
+            'claudeMirror.groups.setCollapsed', msg.groupId, msg.collapsed);
+          break;
+
+        case 'createTabGroup':
+          void vscode.commands.executeCommand('claudeMirror.groups.create');
           break;
 
         case 'requestTabList':

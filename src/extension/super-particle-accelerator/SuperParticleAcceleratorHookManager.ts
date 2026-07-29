@@ -253,6 +253,25 @@ export class SuperParticleAcceleratorHookManager {
     }
   }
 
+  /**
+   * True when ANY SPA hook entry exists in either provider's hook file.
+   * Unlike isClaudeHookInstalled/isCodexHookInstalled (which require the full
+   * matcher set), this catches partial leftovers that would still enforce.
+   */
+  async hasAnySpaHook(workspacePath: string): Promise<boolean> {
+    const files = [
+      path.join(workspacePath, '.claude', 'settings.json'),
+      path.join(workspacePath, '.codex', 'hooks.json'),
+    ];
+    for (const file of files) {
+      try {
+        const raw = await fs.promises.readFile(file, 'utf8');
+        if (raw.includes(SPA_MARKER)) return true;
+      } catch { /* file absent - no hooks */ }
+    }
+    return false;
+  }
+
   async getStatus(workspacePath: string): Promise<SuperParticleAcceleratorStatus> {
     const claudeInstalled = await this.isClaudeHookInstalled(workspacePath);
     const codexInstalled = await this.isCodexHookInstalled(workspacePath);

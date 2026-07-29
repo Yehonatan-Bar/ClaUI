@@ -2,11 +2,11 @@
 
 Controls how open ClaUi tabs are navigated.
 
-- **Horizontal** (default): all ClaUi tabs are collapsed into one editor group and use VS Code's native top tab strip.
-- **Vertical**: all ClaUi tabs stay in one full-height editor group, and the active webview renders a left-side vertical tab rail for navigation. VS Code's native horizontal tabs are hidden automatically.
+- **Horizontal** (default): all ClaUi tabs are collapsed into one editor group and use VS Code's native top tab strip. Folder membership shows only as icon color + optional title prefix (platform limit — no headers possible in the native strip).
+- **Vertical**: all ClaUi tabs stay in one full-height editor group, and the active webview renders a left-side vertical tab rail for navigation. VS Code's native horizontal tabs are hidden automatically. The rail groups tabs under collapsible folder headers (see `TAB_GROUPS.md` for the full grouped-rail + drag-and-drop spec) and shows even with a single open tab when folders exist.
 - The toggle does not open, close, or switch the VS Code sidebar.
 
-Setting: `claudeMirror.tabs.layout` (`horizontal` | `vertical`, global).
+Setting: `claudeMirror.tabs.layout` (`horizontal` | `vertical`), **per-window**: all toggles funnel through the `claudeMirror.tabs.setLayout` command, which writes the **workspace scope** (falling back to global only in empty windows with no workspace settings). Switching to vertical in one VS Code window does not affect other windows. A one-time migration in `TabManager` lifts leftover global values (layout + `workbench.editor.showTabs: none`) written by older builds into the current window's workspace scope and clears the global slots.
 
 ## Entry Points
 
@@ -23,19 +23,21 @@ All three entry points write the same config key. `TabManager` listens for that 
   - `resolveViewColumnForNewTab()` chooses the initial column for a new panel.
   - `maybeApplyVerticalLayoutAfterCreate()` collapses stale editor splits and refreshes the vertical tab rail after a new tab is created.
   - `applyTabLayout(mode)` routes horizontal vs vertical behavior and calls `syncNativeTabVisibility()`.
-  - `syncNativeTabVisibility(mode)` hides VS Code's native editor tabs (`workbench.editor.showTabs` -> `'none'`) when entering vertical mode and restores the original value when switching back to horizontal. Saved/restored on extension shutdown.
+  - `syncNativeTabVisibility(mode)` hides VS Code's native editor tabs (`workbench.editor.showTabs` -> `'none'`, **workspace scope — this window only**) when entering vertical mode and restores the previous workspace-level value (usually unset) when switching back to horizontal. Saved/restored on extension shutdown; a leftover workspace `'none'` found while capturing is treated as ours (crash remnant) and restored to unset.
+  - `migratePerWindowLayoutSettings()` runs once at construction: lifts legacy global layout / hidden-tabs values into this window's workspace scope, clears the globals, and removes a stale workspace `showTabs: 'none'` when the window is horizontal.
   - `joinAllEditorGroups()` normalizes stale split/row layouts with `workbench.action.joinAllGroups` before refreshing either layout.
   - `broadcastTabsState()` sends the open tab list and active tab id to every webview as `tabList`.
   - `restoreFromSnapshot()` recreates tabs in one column first, then applies the selected layout after restore.
 - `src/extension/commands/tabGroupCommands.ts` - `claudeMirror.tabs.openLayoutMenu` QuickPick plus `claudeMirror.tabs.refreshList` (internal command, not in package.json contributes), `claudeMirror.tabs.close`, and `claudeMirror.tabs.reorder` commands.
-- `src/extension/webview/MessageHandler.ts` + `CodexMessageHandler.ts`
-  - `setTabLayout` message writes the config key (`ConfigurationTarget.Global`).
-  - `sendTabLayoutSetting()` pushes the current value to the webview as `tabLayoutSetting`; called on init and config changes.
+- `src/extension/webview/MessageHandler.ts` + `CodexMessageHandler.ts` + `MultiParticipantSessionTab.ts`
+  - `setTabLayout` message routes to the `claudeMirror.tabs.setLayout` command (workspace-scope write for this window).
+  - `sendTabLayoutSetting()` pushes the current effective value to the webview as `tabLayoutSetting`; called on init and config changes.
 - `src/webview/App.tsx`
-  - `VerticalTabRail` renders the left-side in-webview tab navigator when vertical mode is active and more than one tab is open. Includes a draggable resize handle on the right edge (80px-300px, double-click to reset). Tabs are drag-and-drop reorderable; the provider letter (C/X/H) becomes a red close button on hover.
+  - `VerticalTabRail` renders the left-side in-webview tab navigator when vertical mode is active and there is more than one tab OR any folder exists. Includes a draggable resize handle on the right edge (80px-300px, double-click to reset). Tabs render grouped under collapsible folder headers (built by `src/webview/tabNav.ts`); ungrouped tabs list first without a header. Tab drag-and-drop posts `moveTabInNavigation` (target folder + index); header click posts `setGroupCollapsed`; the "+ Folder" button posts `createTabGroup`. The provider letter (C/X/H) becomes a red close button on hover.
   - The `App` component wraps all tab kinds (chat, search, multiparticipant) with `wrapWithRail()`, so the vertical rail appears regardless of which tab kind is active.
-- `src/webview/state/store.ts` - `tabLayout`, `verticalTabRailWidth`, `openTabs`, `activeTabId`, `setTabLayout()`, `setVerticalTabRailWidth()`, and `setOpenTabs()`.
-- `src/webview/hooks/useClaudeStream.ts` - handles inbound `tabLayoutSetting` and `tabList`; sends `requestTabList` on webview ready.
+- `src/webview/tabNav.ts` - pure `buildTabNavTree()` (hardened against duplicate/orphan/cyclic folder records; unit-tested in `tests/tabs/navTree.test.ts`).
+- `src/webview/state/store.ts` - `tabLayout`, `verticalTabRailWidth`, `openTabs`, `activeTabId`, `tabGroups`, `collapsedGroupIds`, `setTabLayout()`, `setVerticalTabRailWidth()`, and `setOpenTabs()` (now also carries groups + collapse state).
+- `src/webview/hooks/useClaudeStream.ts` - handles inbound `tabLayoutSetting` and `tabList` (tabs + groups + collapsedGroupIds); sends `requestTabList` on webview ready.
 - `src/webview/components/StatusBar/StatusBar.tsx` - `viewItems` segmented control. Posts `setTabLayout` and optimistically updates the store.
 - `src/webview/styles/global.css` - `.app-vertical-rail-wrapper` provides the outer flex container; `.vertical-tab-resize-handle` styles the drag handle.
 

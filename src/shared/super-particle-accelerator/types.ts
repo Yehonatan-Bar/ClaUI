@@ -107,6 +107,8 @@ export interface SuperParticleAcceleratorSettings {
 
 export type SuperParticleAcceleratorStatus =
   | 'disabled'
+  /** Setting is off but stale on-disk hooks/runtime file may still enforce. */
+  | 'disabled-drift'
   | 'enabled-hooks-installed'
   | 'enabled-hooks-missing'
   | 'enabled-trust-required'
