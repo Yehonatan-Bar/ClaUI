@@ -1,7 +1,7 @@
 # Claude Model Controls (Model, Thinking Effort, Fast Mode)
 
-Snapshot: 2026-07-02. Model lineup: Fable 5, Opus 4.8/4.7/4.6, Sonnet 5/4.6/4.5,
-Haiku 4.5 are selectable; Mythos 5 is marked blocked.
+Snapshot: 2026-07-29. Model lineup: Fable 5, Opus 5, Opus 4.8/4.7/4.6, Sonnet
+5/4.6/4.5, Haiku 4.5 are selectable; Mythos 5 is marked blocked.
 
 This document covers the three Claude-side controls exposed in the AI chip's
 model area:
@@ -54,6 +54,12 @@ choice instantly) and is **also** the sink for the authoritative setting message
 that the extension echoes back on `ready` and on config change. This two-way
 sync keeps the webview consistent across reloads and external `settings.json`
 edits.
+
+**Model is the exception: it is per-session, not global.** Unlike effort and fast
+mode, the model selection is tracked per `SessionTab` and is deliberately **not**
+re-broadcast on a `claudeMirror.model` config change, so choosing a model in one
+session never changes another session's picker (in the same or another window).
+See "Per-session scope" under Model selection below.
 
 Relevant shared files:
 
@@ -128,6 +134,7 @@ and mirrored in the `claudeMirror.model` enum in `package.json`:
 | Mythos 5 (Blocked) | `claude-mythos-5` |
 | Default | `""` (CLI default) |
 | Fable 5 | `claude-fable-5` |
+| Opus 5 | `claude-opus-5` |
 | Opus 4.8 | `claude-opus-4-8` |
 | Opus 4.7 | `claude-opus-4-7` |
 | Sonnet 5 | `claude-sonnet-5` |
@@ -148,9 +155,14 @@ surfaced for selection but is not a general-availability lineup model. Fable 5
 general-availability model — Anthropic's most capable — with a 1M-token context
 window, so its label carries no `(Blocked)` marker.
 
+Opus 5 (`claude-opus-5`, released 2026-07-24) is Anthropic's flagship everyday
+model — near-Fable quality at Opus-tier pricing ($5/$25 per 1M input/output, the
+same as Opus 4.8), with a 1M-token context window. It is listed directly after
+Fable 5 as the top of the Opus group.
+
 **Context windows are not uniform.** `getModelMaxContext()` in
 `src/webview/utils/modelContextLimits.ts` returns `1_000_000` for the 1M-context
-models — Fable 5, Opus 4.6/4.7/4.8, Sonnet 4.6, and Sonnet 5 — and `200_000` for
+models — Fable 5, Opus 5, Opus 4.6/4.7/4.8, Sonnet 4.6, and Sonnet 5 — and `200_000` for
 everything else (Sonnet 4.5, Haiku 4.5, Mythos 5, and older Claude models), so the
 context-usage gauge scales correctly. `inferClaudeModelLabel()` also treats
 `fable` and `mythos` as known families.
@@ -167,6 +179,39 @@ Anthropic's most agentic Sonnet — near-Opus quality at Sonnet-tier cost, with 
 - Store state: `selectedModel: string`
 - Store action: `setSelectedModel`
 - UI component: `ModelSelector`
+
+### Per-session scope (no cross-session/cross-window leak)
+
+The model selection is **per tab**, not a shared global value. Each `SessionTab`
+tracks its own `selectedModel` (the `--model` selection: `''` = Default, or an
+explicit id), distinct from `currentModel` (the CLI-reported runtime model). It is
+seeded in the constructor from the global `claudeMirror.model` default (so a fresh
+tab shows the last-used default) and thereafter updated **only** by that tab's
+`switchModel()`.
+
+Consequences of this design:
+
+- **`sendModelSetting()` sends the tab's own model** (`WebviewBridge.getSelectedModel()`),
+  not a re-read of the global setting. So on `ready`/webview re-init the picker
+  always reflects this session's active model.
+- **`claudeMirror.model` config changes are NOT broadcast to open sessions.** The
+  `watchConfigChanges` watcher deliberately omits the `claudeMirror.model` branch,
+  so writing the setting (from any session, in any window) never clobbers other
+  sessions' pickers. The global setting only seeds the default for **new** tabs.
+- **The `setModel` handler echoes the choice to its own webview only** (a direct
+  `modelSetting` post), then live-switches this session. It still writes
+  `claudeMirror.model` globally so future new tabs inherit the last pick, but that
+  write no longer propagates to already-open sessions.
+
+Codex tabs work the same way: `CodexMessageHandler.sendCodexModelSetting()` sends
+`session.getCurrentModel()` (per-session) and the `claudeMirror.codex.model` watch
+branch is likewise omitted.
+
+**Known limitation:** the per-session selection is not persisted across a full
+window reload — a resumed session re-seeds `selectedModel` from `claudeMirror.model`
+(matching the model the CLI actually resumes with via its config fallback), so the
+picker stays consistent with the running model but an explicit pre-reload pick is
+not restored.
 
 ### Live switching
 
@@ -242,10 +287,10 @@ session start)".
 
 | Label | `--effort` value | Notes |
 |-------|------------------|-------|
-| Default | `""` | model default (High for Opus 4.8); no flag passed |
+| Default | `""` | model default (High for Opus); no flag passed |
 | Low | `low` | efficient, minimal token usage |
 | Medium | `medium` | balanced cost/quality |
-| High | `high` | default for Opus 4.8 |
+| High | `high` | default for Opus |
 | Extra High | `xhigh` | recommended for coding tasks |
 | Max | `max` | maximum capability, highest token usage |
 
@@ -353,7 +398,7 @@ the model name (`.ai-chip-fast` in `global.css`). Tooltip: "Claude Fast mode
 (~2.5x faster output on Opus, costs more; applies on next session start)".
 
 Fast mode roughly 2.5x's output tokens/sec. It only has an effect on Opus models
-(4.8/4.7/4.6); it is a no-op on Sonnet/Haiku and costs more on supported models.
+(5/4.8/4.7/4.6); it is a no-op on Sonnet/Haiku and costs more on supported models.
 The selector is intentionally **not** gated by the selected model (to avoid the
 control popping in and out of the UI); the CLI decides whether fast mode applies.
 
@@ -432,7 +477,7 @@ a non-empty level, `--settings` only when fast mode is enabled.
 
 | Setting | Type | Default | Effect |
 |---------|------|---------|--------|
-| `claudeMirror.model` | string (enum) | `""` | Model id for new sessions; also live-switches the active session |
+| `claudeMirror.model` | string (enum) | `""` | Seeds the model for **new** tabs. Live model switching is per-session (each tab tracks its own selection); a change does not affect already-open sessions |
 | `claudeMirror.effortLevel` | string (enum) | `""` | Thinking effort -> `--effort`; applies on next session start |
 | `claudeMirror.fastMode` | boolean | `false` | Fast mode -> `--settings` overlay; Opus only; applies on next session start |
 
@@ -443,7 +488,7 @@ a non-empty level, `--settings` only when fast mode is enabled.
 | Direction | Type | Payload | Purpose |
 |-----------|------|---------|---------|
 | Webview -> Ext | `setModel` | `model: string` | persist model + live switch |
-| Ext -> Webview | `modelSetting` | `model: string` | echo current model on ready/change |
+| Ext -> Webview | `modelSetting` | `model: string` | echo **this session's** model on ready + on setModel (per-tab; not sent on config change) |
 | Ext -> Webview | `defaultModelHint` | `model: string` | last model the CLI resolved `Default` to (for the pre-turn hint); `""` if none known |
 | Webview -> Ext | `setClaudeEffort` | `effort: ClaudeEffortLevel` | persist effort |
 | Ext -> Webview | `claudeEffortSetting` | `effort: ClaudeEffortLevel` | echo current effort |
@@ -451,10 +496,13 @@ a non-empty level, `--settings` only when fast mode is enabled.
 | Ext -> Webview | `claudeFastModeSetting` | `fastMode: boolean` | echo current fast mode |
 
 The extension sends all three setting messages in the `ready` handler
-(`sendModelSetting`, `sendClaudeEffortSetting`, `sendClaudeFastModeSetting`) and
-re-sends the relevant one from its `onDidChangeConfiguration` watch when
-`claudeMirror.model` / `claudeMirror.effortLevel` / `claudeMirror.fastMode`
-changes. The `ready` handler additionally sends `defaultModelHint`
+(`sendModelSetting`, `sendClaudeEffortSetting`, `sendClaudeFastModeSetting`). It
+re-sends **effort / fast mode** from its `onDidChangeConfiguration` watch when
+`claudeMirror.effortLevel` / `claudeMirror.fastMode` change. **Model is
+deliberately excluded from the config watch** (it is per-session); instead
+`sendModelSetting` reads this tab's own `getSelectedModel()`, and the `setModel`
+handler echoes the choice back to its own webview directly. The `ready` handler
+additionally sends `defaultModelHint`
 (`sendDefaultModelHint`, sourced from `globalState`); it is pushed again from the
 `system/init` handler whenever a `Default` session resolves its model.
 
@@ -469,12 +517,19 @@ changes. The `ready` handler additionally sends `defaultModelHint`
   `SetClaudeFastModeRequest`/`ClaudeFastModeSettingMessage` (+ union entries)
 - `src/extension/webview/MessageHandler.ts` — `setModel`/`setClaudeEffort`/`setClaudeFastMode`
   cases, `sendModelSetting`/`sendClaudeEffortSetting`/`sendClaudeFastModeSetting`, `ready` + config watch;
+  `WebviewBridge.getSelectedModel()` (per-tab model source for `sendModelSetting`); `setModel`
+  echoes to its own webview and the config watch omits `claudeMirror.model` (per-session, no leak);
   `sendDefaultModelHint` + `system/init` persistence of `claui.lastResolvedDefaultModel` to `globalState`;
   `currentThinkingEffort`/`sessionThinkingEffort` fields + badge-label resolution (init / assistantMessage / thinkingDetected handlers)
 - `src/extension/process/ClaudeProcessManager.ts` — `ProcessStartOptions`
   (`model`, `effortLevel`, `fastMode`), `--model`/`--effort`/`--settings` assembly,
   `writeFastModeSettingsFile()`
-- `src/extension/session/SessionTab.ts` — `switchModel()` live-switch logic
+- `src/extension/session/SessionTab.ts` — `switchModel()` live-switch logic;
+  per-tab `selectedModel` field (seeded from config at construction) + `getSelectedModel()`
+- `src/extension/webview/CodexMessageHandler.ts` — Codex `setModel` case,
+  `sendCodexModelSetting()` (sends per-session `session.getCurrentModel()`; config
+  watch omits `claudeMirror.codex.model`)
+- `src/extension/session/CodexSessionTab.ts` — `switchModel()` + `getCurrentModel()` (per-tab)
 - `src/webview/state/store.ts` — `selectedModel`, `lastResolvedDefaultModel`,
   `selectedClaudeEffort`, `selectedClaudeFastMode`
   (+ `setSelectedModel`/`setLastResolvedDefaultModel`/other `setSelected*` actions)

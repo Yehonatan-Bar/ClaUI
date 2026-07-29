@@ -10,6 +10,7 @@ import { CostConfig, PriceRow } from './types';
  * and add new rows for models that ship later.
  */
 export const DEFAULT_PRICES: Record<string, PriceRow> = {
+  'claude-opus-5':     { input: 5.0,  output: 25.0, cacheCreation: 6.25,  cacheRead: 0.5 },
   'claude-opus-4-8':   { input: 5.0,  output: 25.0, cacheCreation: 6.25,  cacheRead: 0.5 },
   'claude-opus-4-7':   { input: 5.0,  output: 25.0, cacheCreation: 6.25,  cacheRead: 0.5 },
   'claude-opus-4-6':   { input: 5.0,  output: 25.0, cacheCreation: 6.25,  cacheRead: 0.5 },

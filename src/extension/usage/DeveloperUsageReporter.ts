@@ -31,6 +31,7 @@ interface DeveloperUsageState {
  * authoritative, admin-editable prices live on the server.
  */
 const LOCAL_PRICES: Record<string, TokenTypeCounts> = {
+  'claude-opus-5': { input: 5, output: 25, cacheCreation: 6.25, cacheRead: 0.5 },
   'claude-opus-4-8': { input: 5, output: 25, cacheCreation: 6.25, cacheRead: 0.5 },
   'claude-opus-4-7': { input: 5, output: 25, cacheCreation: 6.25, cacheRead: 0.5 },
   'claude-opus-4-6': { input: 5, output: 25, cacheCreation: 6.25, cacheRead: 0.5 },

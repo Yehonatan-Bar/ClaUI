@@ -72,6 +72,10 @@ export interface WebviewBridge {
   setSuppressNextExit?(suppress: boolean): void;
   /** Switch the running session to a different model (stop + resume with new --model flag) */
   switchModel?(model: string): Promise<void>;
+  /** The model selected in THIS tab's picker ('' = CLI Default). Per-tab, so the
+   *  model setting echoed to the webview reflects this session's own choice
+   *  rather than a global value shared across every session and window. */
+  getSelectedModel?(): string;
   /** Restart the CLI process while preserving the live conversation (stop + --resume).
    *  Used by the MCP panel so config changes load without losing the chat. */
   restartWithCurrentSession?(): Promise<void>;
@@ -2096,8 +2100,13 @@ export class MessageHandler {
 
         case 'setModel':
           this.log(`Setting model to: "${msg.model}"`);
-          // Always save the setting (used if no active session, or as fallback if switch fails)
+          // Persist as the default for NEW tabs only. This is a global setting,
+          // but its change is intentionally NOT broadcast to other open sessions
+          // (see watchConfigChanges) so a model pick stays local to this session.
           vscode.workspace.getConfiguration('claudeMirror').update('model', msg.model, true);
+          // Confirm the choice to THIS webview only (authoritative echo). Other
+          // sessions/windows are not notified, so their pickers are unaffected.
+          this.webview.postMessage({ type: 'modelSetting', model: msg.model });
           // Live-switch: restart current session with new model (preserves conversation)
           if (this.webview.switchModel) {
             this.webview.switchModel(msg.model).catch((err: unknown) => {
@@ -4336,10 +4345,15 @@ export class MessageHandler {
     });
   }
 
-  /** Read model setting from VS Code config and send to webview */
+  /** Send THIS tab's own selected model to its webview. The value is per-tab
+   *  (see WebviewBridge.getSelectedModel) so the picker always shows the model
+   *  active in this session, not a global setting shared across sessions. Falls
+   *  back to the configured default only if the host does not expose a per-tab
+   *  selection. */
   private sendModelSetting(): void {
-    const config = vscode.workspace.getConfiguration('claudeMirror');
-    const model = config.get<string>('model', '');
+    const model = this.webview.getSelectedModel
+      ? this.webview.getSelectedModel()
+      : vscode.workspace.getConfiguration('claudeMirror').get<string>('model', '');
     this.log(`Sending model setting: "${model}"`);
     this.webview.postMessage({
       type: 'modelSetting',
@@ -4972,9 +4986,11 @@ export class MessageHandler {
           e.affectsConfiguration('claudeMirror.chatFontFamily')) {
         this.sendTextSettings();
       }
-      if (e.affectsConfiguration('claudeMirror.model')) {
-        this.sendModelSetting();
-      }
+      // NOTE: claudeMirror.model changes are intentionally NOT forwarded here.
+      // The model is per-session (each tab tracks its own selection), so a change
+      // in one session must not clobber other open sessions' pickers. The global
+      // setting only seeds the default for NEW tabs; the originating tab confirms
+      // its own choice directly in the setModel handler.
       if (e.affectsConfiguration('claudeMirror.effortLevel')) {
         this.sendClaudeEffortSetting();
       }

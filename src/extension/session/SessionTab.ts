@@ -87,6 +87,13 @@ export class SessionTab implements WebviewBridge {
   private pendingMessages: ExtensionToWebviewMessage[] = [];
   private disposed = false;
   private currentModel = '';
+  /** Model selected in THIS tab's picker (the `--model` selection: '' = CLI
+   *  Default, or an explicit model id). Distinct from `currentModel`, which is
+   *  the CLI-reported *runtime* model. Kept per-tab so choosing a model in one
+   *  session never leaks into another session's picker. Seeded in the
+   *  constructor from the global `claudeMirror.model` default (so a fresh tab
+   *  shows the last-used default); updated only by this tab's switchModel(). */
+  private selectedModel = '';
   private sessionStartedAt = '';
   /** Guard to prevent saving project analytics twice (e.g. dispose + exit handler) */
   private analyticsSaved = false;
@@ -243,6 +250,13 @@ export class SessionTab implements WebviewBridge {
   ) {
     this.tabNumber = tabNumber;
     this.id = `tab-${tabNumber}`;
+
+    // Seed the picker's model from the configured default so a fresh tab shows
+    // the last-used default. From here on it is per-tab: switchModel() updates
+    // only this tab, so a model change never propagates to other open sessions.
+    this.selectedModel = vscode.workspace
+      .getConfiguration('claudeMirror')
+      .get<string>('model', '');
 
     // Instantiate per-tab components
     this.processManager = new ClaudeProcessManager(context);
@@ -554,7 +568,17 @@ export class SessionTab implements WebviewBridge {
     this.saveProjectAnalytics();
   }
 
+  /** WebviewBridge: the model selected in THIS tab's picker ('' = CLI Default).
+   *  Per-tab, so the model setting echoed to the webview reflects this session's
+   *  own choice rather than a global value shared across sessions/windows. */
+  getSelectedModel(): string {
+    return this.selectedModel;
+  }
+
   async switchModel(model: string): Promise<void> {
+    // Record the selection for THIS tab so the picker reflects it immediately
+    // (even before the restart finishes) and stays correct on webview re-ready.
+    this.selectedModel = model;
     const sessionToResume = this.processManager.currentSessionId;
     const atSessionStart = this.messageHandler.isAtSessionStart;
 

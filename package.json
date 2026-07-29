@@ -601,6 +601,7 @@
             "claude-mythos-5",
             "",
             "claude-fable-5",
+            "claude-opus-5",
             "claude-opus-4-8",
             "claude-opus-4-7",
             "claude-sonnet-5",
@@ -613,6 +614,7 @@
             "Claude Mythos 5 (Blocked)",
             "Default (CLI default)",
             "Claude Fable 5 - most capable Claude model, 1M-token context",
+            "Claude Opus 5 - flagship everyday model, near-Fable quality, 1M-token context",
             "Claude Opus 4.8",
             "Claude Opus 4.7",
             "Claude Sonnet 5 - most agentic Sonnet, near-Opus quality, low cost",
@@ -635,10 +637,10 @@
             "max"
           ],
           "enumDescriptions": [
-            "Default (model default - High for Opus 4.8)",
+            "Default (model default - High for Opus)",
             "Low - efficient, minimal token usage",
             "Medium - balanced cost/quality",
-            "High - default for Opus 4.8",
+            "High - default for Opus",
             "Extra High - recommended for coding tasks",
             "Max - maximum capability, highest token usage"
           ],
@@ -647,7 +649,7 @@
         "claudeMirror.fastMode": {
           "type": "boolean",
           "default": false,
-          "description": "Claude Fast mode: ~2.5x faster output on Opus models (4.8/4.7/4.6). Costs more and has no effect on Sonnet/Haiku. Applies when the next session starts."
+          "description": "Claude Fast mode: ~2.5x faster output on Opus models (5/4.8/4.7/4.6). Costs more and has no effect on Sonnet/Haiku. Applies when the next session starts."
         },
         "claudeMirror.permissionMode": {
           "type": "string",

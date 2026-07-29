@@ -1812,9 +1812,11 @@ export class CodexMessageHandler {
       if (e.affectsConfiguration('claudeMirror.customSnippet')) {
         this.sendCustomSnippetSettings();
       }
-      if (e.affectsConfiguration('claudeMirror.codex.model')) {
-        this.sendCodexModelSetting();
-      }
+      // NOTE: claudeMirror.codex.model changes are intentionally NOT forwarded
+      // here. The model is per-session (each Codex tab tracks its own via
+      // getCurrentModel), so a change in one session must not clobber other open
+      // sessions' pickers. The global setting only seeds the default for NEW
+      // tabs; the originating tab confirms its own choice in the setModel handler.
       if (e.affectsConfiguration('claudeMirror.codex.reasoningEffort')) {
         this.sendCodexReasoningEffortSetting();
       }
@@ -2045,10 +2047,13 @@ export class CodexMessageHandler {
   }
 
   private sendCodexModelSetting(): void {
-    const config = vscode.workspace.getConfiguration('claudeMirror');
+    // Send THIS session's own model (per-tab) rather than the global setting, so
+    // a model change in another Codex tab/window does not clobber this picker.
+    // getCurrentModel() returns the session's model once started and falls back
+    // to the configured default for a not-yet-started tab.
     this.webview.postMessage({
       type: 'modelSetting',
-      model: config.get<string>('codex.model', ''),
+      model: this.session.getCurrentModel(),
     });
   }
 
