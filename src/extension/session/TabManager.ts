@@ -216,20 +216,20 @@ export class TabManager {
       })
     );
 
-    // When a regular text editor gets focus (non-ClaUi), restore native tabs
-    // so the user still has tab navigation. ClaUi panels re-hide them on focus.
+    // Vertical mode must stay vertical while the user reads a file. Earlier
+    // builds restored the native tab strip whenever a plain text editor got
+    // focus, which read as "the layout flipped back to horizontal." Instead,
+    // keep the strip hidden: opening a file leaves the vertical rail as the
+    // sole tab navigator. If anything re-showed the strip, re-hide it.
     context.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor((editor) => {
-        const layout = this.getTabLayout();
-        this.log(`[TabLayout] activeTextEditor changed: editor=${editor ? 'TextEditor' : 'none'} layout=${layout} nativeTabsHidden=${this.nativeTabsHidden}`);
-        if (layout !== 'vertical' || !this.nativeTabsHidden) return;
         if (!editor) return;
+        if (this.getTabLayout() !== 'vertical' || !this.nativeTabsHidden) return;
         const cfg = vscode.workspace.getConfiguration('workbench.editor');
-        const current = cfg.get<string>('showTabs');
-        this.log(`[TabLayout] Restoring native tabs: current=${current} restoreTo=${this.savedShowTabsWorkspaceValue ?? '(unset)'}`);
-        if (current === 'none') {
+        if (cfg.get<string>('showTabs') !== 'none') {
+          this.log('[TabLayout] Text editor focused in vertical mode; keeping native tabs hidden');
           void Promise.resolve(
-            cfg.update('showTabs', this.savedShowTabsWorkspaceValue, vscode.ConfigurationTarget.Workspace)
+            cfg.update('showTabs', 'none', vscode.ConfigurationTarget.Workspace)
           ).catch(() => {});
         }
       })

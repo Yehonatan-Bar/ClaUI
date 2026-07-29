@@ -45,6 +45,7 @@ All three entry points write the same config key. `TabManager` listens for that 
 
 - Vertical mode intentionally avoids `vscode.setEditorLayout`; stacked editor rows make chat panes too short.
 - Vertical mode hides VS Code's native horizontal tab strip via `workbench.editor.showTabs = 'none'`. The original value is saved and restored when switching back to horizontal or on extension shutdown.
+- **Opening a file stays vertical.** The `onDidChangeActiveTextEditor` listener no longer restores the native tab strip when a plain text editor gets focus — it re-hides it if needed — so reading a file keeps the vertical rail as the sole tab navigator instead of flipping the window back to horizontal. To get native file tabs back, switch the layout to horizontal (View menu or Sessions gear).
 - The vertical rail width is resizable by dragging the handle on its right edge. Double-click resets to the CSS default (`clamp(96px, 28vw, 132px)`). Width is stored in Zustand state (`verticalTabRailWidth`) and applied as a CSS variable override.
 - Clicking an item in the vertical rail posts `focusTab`, which routes through the existing `claudeMirror.tabs.focus` command.
 - Hovering over the provider letter (C/X/H) on a tab item turns it into a red X close button. Clicking it sends `closeTab` -> `claudeMirror.tabs.close`.
