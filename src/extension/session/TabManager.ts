@@ -216,20 +216,31 @@ export class TabManager {
       })
     );
 
-    // Vertical mode must stay vertical while the user reads a file. Earlier
-    // builds restored the native tab strip whenever a plain text editor got
-    // focus, which read as "the layout flipped back to horizontal." Instead,
-    // keep the strip hidden: opening a file leaves the vertical rail as the
-    // sole tab navigator. If anything re-showed the strip, re-hide it.
+    // Vertical mode must stay vertical while the user reads a file — and the
+    // rail must stay VISIBLE. The rail renders inside the active ClaUi
+    // webview, so a file opened into the panels' editor group would cover it
+    // entirely. Two-part fix: keep the native strip hidden, and move the file
+    // into a side editor group so file + rail show side by side.
     context.subscriptions.push(
       vscode.window.onDidChangeActiveTextEditor((editor) => {
         if (!editor) return;
-        if (this.getTabLayout() !== 'vertical' || !this.nativeTabsHidden) return;
-        const cfg = vscode.workspace.getConfiguration('workbench.editor');
-        if (cfg.get<string>('showTabs') !== 'none') {
-          this.log('[TabLayout] Text editor focused in vertical mode; keeping native tabs hidden');
+        if (this.getTabLayout() !== 'vertical') return;
+
+        if (this.nativeTabsHidden) {
+          const cfg = vscode.workspace.getConfiguration('workbench.editor');
+          if (cfg.get<string>('showTabs') !== 'none') {
+            this.log('[TabLayout] Text editor focused in vertical mode; keeping native tabs hidden');
+            void Promise.resolve(
+              cfg.update('showTabs', 'none', vscode.ConfigurationTarget.Workspace)
+            ).catch(() => {});
+          }
+        }
+
+        const panelColumn = this.getPanelsViewColumn();
+        if (panelColumn !== undefined && editor.viewColumn === panelColumn) {
+          this.log(`[TabLayout] File opened over the ClaUi group (col ${panelColumn}); moving it to a side group so the rail stays visible`);
           void Promise.resolve(
-            cfg.update('showTabs', 'none', vscode.ConfigurationTarget.Workspace)
+            vscode.commands.executeCommand('workbench.action.moveEditorToRightGroup')
           ).catch(() => {});
         }
       })
@@ -378,6 +389,22 @@ export class TabManager {
   /** The folder a tab belongs to, if any. */
   getTabGroup(tabId: string): string | undefined {
     return this.snapshotEntries.get(tabId)?.groupId;
+  }
+
+  /**
+   * The editor column hosting the ClaUi panels. Vertical mode keeps every
+   * panel in one group, so the first live tab with a resolved column answers
+   * for all of them. Undefined when no panel is open (or none resolved yet).
+   */
+  private getPanelsViewColumn(): vscode.ViewColumn | undefined {
+    for (const tab of this.tabs.values()) {
+      if (tab.isDisposed) continue;
+      const column = (tab as { viewColumn?: vscode.ViewColumn }).viewColumn;
+      if (column !== undefined) {
+        return column;
+      }
+    }
+    return undefined;
   }
 
   /**
