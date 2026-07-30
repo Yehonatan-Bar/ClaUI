@@ -705,6 +705,18 @@ export interface CreateTabGroupRequest {
   type: 'createTabGroup';
 }
 
+/** Focus an open document listed in the rail's Files section. */
+export interface FocusDocumentRequest {
+  type: 'focusDocument';
+  docId: string;
+}
+
+/** Close an open document listed in the rail's Files section. */
+export interface CloseDocumentRequest {
+  type: 'closeDocument';
+  docId: string;
+}
+
 export interface SetDetailedDiffViewEnabledRequest {
   type: 'setDetailedDiffViewEnabled';
   enabled: boolean;
@@ -1220,6 +1232,8 @@ export type WebviewToExtensionMessage =
   | MoveTabInNavigationRequest
   | SetGroupCollapsedRequest
   | CreateTabGroupRequest
+  | FocusDocumentRequest
+  | CloseDocumentRequest
   | SetDetailedDiffViewEnabledRequest
   | SetAdventureWidgetEnabledRequest
   | SetWeatherWidgetEnabledRequest
@@ -2029,6 +2043,20 @@ export interface WebviewTabGroup {
   order: number;
 }
 
+/**
+ * A non-ClaUi editor open in this window (file, diff, notebook, custom),
+ * listed in the rail's Files section. Vertical mode hides the native tab
+ * strip, so the rail is the only place these can be focused/closed from.
+ */
+export interface WebviewOpenDocument {
+  /** `${viewColumn}:${uri}` — stable within a broadcast. */
+  id: string;
+  label: string;
+  viewColumn: number;
+  isActive: boolean;
+  isDirty: boolean;
+}
+
 export interface TabListMessage {
   type: 'tabList';
   tabs: WebviewTabSummary[];
@@ -2040,6 +2068,8 @@ export interface TabListMessage {
   groups?: WebviewTabGroup[];
   /** Ids of folders the user has collapsed in the rail. Default `[]` when absent. */
   collapsedGroupIds?: string[];
+  /** Open non-ClaUi editors for the rail's Files section. Default `[]` when absent. */
+  openDocuments?: WebviewOpenDocument[];
 }
 
 export interface DetailedDiffViewSettingMessage {

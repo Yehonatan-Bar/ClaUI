@@ -266,6 +266,11 @@ html, body, #root {
   white-space: nowrap;
 }
 
+/* Open documents render as regular tab rows; only the accent color differs. */
+.vertical-doc-item {
+  --tab-color: var(--vscode-descriptionForeground, #8E9AAF);
+}
+
 .vertical-tab-ungrouped-dropzone {
   margin: 2px 6px;
   padding: 6px;

@@ -235,6 +235,14 @@
         "title": "ClaUi: Set Tab Layout (This Window)"
       },
       {
+        "command": "claudeMirror.docs.focus",
+        "title": "ClaUi: Focus Document from Rail"
+      },
+      {
+        "command": "claudeMirror.docs.close",
+        "title": "ClaUi: Close Document from Rail"
+      },
+      {
         "command": "claudeMirror.groups.setCollapsed",
         "title": "ClaUi: Set Folder Collapsed"
       },
@@ -1566,6 +1574,14 @@
         },
         {
           "command": "claudeMirror.tabs.setLayout",
+          "when": "false"
+        },
+        {
+          "command": "claudeMirror.docs.focus",
+          "when": "false"
+        },
+        {
+          "command": "claudeMirror.docs.close",
           "when": "false"
         },
         {

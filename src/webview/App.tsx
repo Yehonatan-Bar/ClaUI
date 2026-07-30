@@ -51,6 +51,7 @@ const VerticalTabRail: React.FC = () => {
   const tabs = useAppStore((s) => s.openTabs);
   const tabGroups = useAppStore((s) => s.tabGroups);
   const collapsedGroupIds = useAppStore((s) => s.collapsedGroupIds);
+  const openDocuments = useAppStore((s) => s.openDocuments);
   const activeTabId = useAppStore((s) => s.activeTabId);
   const setRailWidth = useAppStore((s) => s.setVerticalTabRailWidth);
   const railRef = useRef<HTMLElement>(null);
@@ -106,8 +107,9 @@ const VerticalTabRail: React.FC = () => {
     setDropTarget(null);
   }, [draggedId, dropTarget]);
 
-  // The rail shows whenever navigation has content: >1 tab, or folders exist.
-  if (tabs.length <= 1 && tree.roots.length === 0) {
+  // The rail shows whenever navigation has content: >1 tab, folders, or open
+  // documents (which have no other close affordance in vertical mode).
+  if (tabs.length <= 1 && tree.roots.length === 0 && openDocuments.length === 0) {
     return null;
   }
 
@@ -264,6 +266,28 @@ const VerticalTabRail: React.FC = () => {
         onDrop={(e) => { e.preventDefault(); handleDrop(); }}
       >
         {renderTabList(tree.ungrouped, null, 0)}
+        {openDocuments.map((doc) => (
+          <button
+            key={doc.id}
+            className={`vertical-tab-item vertical-doc-item ${doc.isActive ? 'active' : ''}`}
+            onClick={() => postToExtension({ type: 'focusDocument', docId: doc.id })}
+            title={doc.label}
+          >
+            <span className="vertical-tab-title">
+              {doc.isDirty ? '* ' : ''}{doc.label}
+            </span>
+            <span
+              className="vertical-tab-provider"
+              aria-label="Close file"
+              role="button"
+              data-letter="F"
+              onClick={(e) => {
+                e.stopPropagation();
+                postToExtension({ type: 'closeDocument', docId: doc.id });
+              }}
+            />
+          </button>
+        ))}
         {showUngroupedDropzone && (
           <div
             className="vertical-tab-ungrouped-dropzone"
@@ -304,10 +328,12 @@ export const App: React.FC = () => {
   const tabLayout = useAppStore((s) => s.tabLayout);
   const openTabs = useAppStore((s) => s.openTabs);
   const railTabGroups = useAppStore((s) => s.tabGroups);
+  const railOpenDocuments = useAppStore((s) => s.openDocuments);
   const verticalTabRailWidth = useAppStore((s) => s.verticalTabRailWidth);
-  // Folders keep the rail visible even with a single tab open.
+  // Folders and open documents keep the rail visible even with a single tab.
   const showVerticalTabRail =
-    tabLayout === 'vertical' && (openTabs.length > 1 || railTabGroups.length > 0);
+    tabLayout === 'vertical' &&
+    (openTabs.length > 1 || railTabGroups.length > 0 || railOpenDocuments.length > 0);
 
   const wrapWithRail = (content: React.ReactNode) => {
     if (!showVerticalTabRail) return content;

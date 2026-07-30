@@ -970,7 +970,7 @@ export function useClaudeStream(): void {
           break;
 
         case 'tabList':
-          setOpenTabs(msg.tabs, msg.activeTabId, msg.groups, msg.collapsedGroupIds);
+          setOpenTabs(msg.tabs, msg.activeTabId, msg.groups, msg.collapsedGroupIds, msg.openDocuments);
           break;
 
         case 'detailedDiffViewSetting':

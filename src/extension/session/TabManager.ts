@@ -246,6 +246,12 @@ export class TabManager {
       })
     );
 
+    // Keep the rail's Files section in sync with open/closed/dirty editors.
+    context.subscriptions.push(
+      vscode.window.tabGroups.onDidChangeTabs(() => this.broadcastTabsState()),
+      vscode.window.tabGroups.onDidChangeTabGroups(() => this.broadcastTabsState()),
+    );
+
     // Older builds wrote layout + hidden-tabs to user-global settings, which
     // leaked vertical mode into every VS Code window. Clean that up once.
     void this.migratePerWindowLayoutSettings();
@@ -360,6 +366,7 @@ export class TabManager {
         order: g.order,
       })),
       collapsedGroupIds: this.tabGroupStore?.getCollapsedGroupIds() ?? [],
+      openDocuments: this.listOpenDocuments(),
     };
     for (const tab of this.tabs.values()) {
       if (!tab.isDisposed) {
@@ -389,6 +396,78 @@ export class TabManager {
   /** The folder a tab belongs to, if any. */
   getTabGroup(tabId: string): string | undefined {
     return this.snapshotEntries.get(tabId)?.groupId;
+  }
+
+  /** Uri of a document tab (text, diff, notebook, custom), else undefined. */
+  private static docTabUri(tab: vscode.Tab): vscode.Uri | undefined {
+    const input = tab.input;
+    if (input instanceof vscode.TabInputText) return input.uri;
+    if (input instanceof vscode.TabInputTextDiff) return input.modified;
+    if (input instanceof vscode.TabInputNotebook) return input.uri;
+    if (input instanceof vscode.TabInputCustom) return input.uri;
+    return undefined;
+  }
+
+  /** Open non-ClaUi editors across all groups, for the rail's Files section. */
+  private listOpenDocuments(): Array<{
+    id: string; label: string; viewColumn: number; isActive: boolean; isDirty: boolean;
+  }> {
+    const docs: Array<{ id: string; label: string; viewColumn: number; isActive: boolean; isDirty: boolean }> = [];
+    for (const group of vscode.window.tabGroups.all) {
+      for (const tab of group.tabs) {
+        const uri = TabManager.docTabUri(tab);
+        if (!uri) continue;
+        docs.push({
+          id: `${group.viewColumn}:${uri.toString()}`,
+          label: tab.label,
+          viewColumn: group.viewColumn,
+          isActive: tab.isActive && group.isActive,
+          isDirty: tab.isDirty,
+        });
+      }
+    }
+    return docs;
+  }
+
+  /** Resolve a Files-section id back to the live vscode.Tab. */
+  private findDocumentTab(docId: string): vscode.Tab | undefined {
+    for (const group of vscode.window.tabGroups.all) {
+      for (const tab of group.tabs) {
+        const uri = TabManager.docTabUri(tab);
+        if (uri && `${group.viewColumn}:${uri.toString()}` === docId) {
+          return tab;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  async focusDocument(docId: string): Promise<void> {
+    const tab = this.findDocumentTab(docId);
+    if (!tab) {
+      this.broadcastTabsState();
+      return;
+    }
+    const uri = TabManager.docTabUri(tab);
+    if (!uri) return;
+    try {
+      await vscode.commands.executeCommand('vscode.open', uri, tab.group.viewColumn);
+    } catch (err) {
+      this.log(`[TabLayout] focusDocument failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  async closeDocument(docId: string): Promise<void> {
+    const tab = this.findDocumentTab(docId);
+    if (!tab) {
+      this.broadcastTabsState();
+      return;
+    }
+    try {
+      await vscode.window.tabGroups.close(tab);
+    } catch (err) {
+      this.log(`[TabLayout] closeDocument failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   /**

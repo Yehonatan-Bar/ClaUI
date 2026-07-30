@@ -107,6 +107,15 @@ export function registerTabGroupCommands(
       }
     ),
 
+    // Files section in the vertical rail: focus / close open documents.
+    vscode.commands.registerCommand('claudeMirror.docs.focus', (docId: string) => {
+      void tabManager.focusDocument(docId);
+    }),
+
+    vscode.commands.registerCommand('claudeMirror.docs.close', (docId: string) => {
+      void tabManager.closeDocument(docId);
+    }),
+
     // Single write path for the layout toggle — per-window (workspace) scope.
     vscode.commands.registerCommand(
       'claudeMirror.tabs.setLayout',

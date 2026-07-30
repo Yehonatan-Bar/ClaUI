@@ -1053,6 +1053,14 @@ export class CodexMessageHandler {
           void vscode.commands.executeCommand('claudeMirror.groups.create');
           break;
 
+        case 'focusDocument':
+          void vscode.commands.executeCommand('claudeMirror.docs.focus', msg.docId);
+          break;
+
+        case 'closeDocument':
+          void vscode.commands.executeCommand('claudeMirror.docs.close', msg.docId);
+          break;
+
         case 'requestTabList':
           void vscode.commands.executeCommand('claudeMirror.tabs.refreshList');
           break;

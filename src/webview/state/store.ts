@@ -17,6 +17,7 @@ import type {
   ProviderId,
   TypingTheme,
   MessageColorScheme,
+  WebviewOpenDocument,
   WebviewTabGroup,
   WebviewTabSummary,
   WorktreeActionResultMessage,
@@ -326,6 +327,7 @@ export interface AppState {
   activeTabId: string | null;
   tabGroups: WebviewTabGroup[];
   collapsedGroupIds: string[];
+  openDocuments: WebviewOpenDocument[];
 
   // Session Vitals
   vitalsEnabled: boolean;
@@ -849,6 +851,7 @@ export interface AppState {
     activeTabId: string | null,
     groups?: WebviewTabGroup[],
     collapsedGroupIds?: string[],
+    openDocuments?: WebviewOpenDocument[],
   ) => void;
   setWeatherWidgetEnabled: (enabled: boolean) => void;
   setCheckpointState: (state: CheckpointState) => void;
@@ -1259,6 +1262,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeTabId: null,
   tabGroups: [] as WebviewTabGroup[],
   collapsedGroupIds: [] as string[],
+  openDocuments: [] as WebviewOpenDocument[],
   vitalsEnabled: false,
   weatherWidgetEnabled: false,
   turnHistory: [],
@@ -2604,12 +2608,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setTabLayout: (layout) => set({ tabLayout: layout }),
   setVerticalTabRailWidth: (width) => set({ verticalTabRailWidth: width }),
-  setOpenTabs: (tabs, activeTabId, groups, collapsedGroupIds) =>
+  setOpenTabs: (tabs, activeTabId, groups, collapsedGroupIds, openDocuments) =>
     set({
       openTabs: tabs,
       activeTabId,
       tabGroups: groups ?? [],
       collapsedGroupIds: collapsedGroupIds ?? [],
+      openDocuments: openDocuments ?? [],
     }),
 
   setVitalsEnabled: (enabled) =>
