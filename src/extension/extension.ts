@@ -28,6 +28,7 @@ import { ParticleAcceleratorService } from './particle-accelerator/ParticleAccel
 import { SecretProtectionService } from './secret-protection/SecretProtectionService';
 import { SuperParticleAcceleratorService } from './super-particle-accelerator/SuperParticleAcceleratorService';
 import { WorkspaceAccessGuardService } from './workspace-access-guard/WorkspaceAccessGuardService';
+import { BridgeProviderService } from './bridge/BridgeProviderService';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -63,6 +64,11 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   log('Extension activating...');
+
+  // Bridge Providers: mirror claudeMirror.bridge.* settings into
+  // ~/.claui/bridge.json for the bundled bridge runtime (Grok / Antigravity /
+  // OpenAI-compatible backends driven through ordinary Claude tabs).
+  BridgeProviderService.init(context);
 
   // Create session store for conversation history persistence
   const sessionStore = new SessionStore(context.globalState);

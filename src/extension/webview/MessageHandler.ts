@@ -17,6 +17,7 @@ import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import { getStoredApiKey, setStoredApiKey, maskApiKey } from '../process/envUtils';
 import { readCodexModelOptions } from '../process/codexModelCache';
+import { BridgeProviderService, isBridgeModelValue } from '../bridge/BridgeProviderService';
 import type { TokenUsageRatioTracker } from '../session/TokenUsageRatioTracker';
 import type { DeveloperUsageReporter } from '../usage/DeveloperUsageReporter';
 import type { CheckpointManager } from '../session/CheckpointManager';
@@ -2103,7 +2104,11 @@ export class MessageHandler {
           // Persist as the default for NEW tabs only. This is a global setting,
           // but its change is intentionally NOT broadcast to other open sessions
           // (see watchConfigChanges) so a model pick stays local to this session.
-          vscode.workspace.getConfiguration('claudeMirror').update('model', msg.model, true);
+          // Bridge models are deliberately NOT persisted: a new Claude tab must
+          // never inherit `bridge:*` and hand it to the real claude CLI.
+          if (!isBridgeModelValue(msg.model)) {
+            vscode.workspace.getConfiguration('claudeMirror').update('model', msg.model, true);
+          }
           // Confirm the choice to THIS webview only (authoritative echo). Other
           // sessions/windows are not notified, so their pickers are unaffected.
           this.webview.postMessage({ type: 'modelSetting', model: msg.model });
@@ -4009,6 +4014,8 @@ export class MessageHandler {
           // Send the last-resolved Default model so the selector can show the
           // likely model on hover before this session's first turn reports it
           this.sendDefaultModelHint();
+          // Send Bridge Provider models (Grok / Antigravity / OpenAI-compatible)
+          this.sendBridgeModelOptions();
           // Send Claude effort level setting
           this.sendClaudeEffortSetting();
           // Send Claude fast mode setting
@@ -4413,6 +4420,16 @@ export class MessageHandler {
     this.webview.postMessage({
       type: 'codexModelOptions',
       options: readCodexModelOptions((message) => this.log(message)),
+    });
+  }
+
+  /** Push Bridge Provider model options (Grok / Antigravity / OpenAI-compatible)
+   *  so the Model selector can offer them alongside the Claude models. */
+  private sendBridgeModelOptions(): void {
+    const options = BridgeProviderService.get()?.modelOptions() ?? [];
+    this.webview.postMessage({
+      type: 'bridgeModelOptions',
+      options,
     });
   }
 

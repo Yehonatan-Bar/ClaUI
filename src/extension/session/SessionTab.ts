@@ -22,6 +22,12 @@ import type { SessionStore } from './SessionStore';
 import type { ProjectAnalyticsStore } from './ProjectAnalyticsStore';
 import type { PromptHistoryStore } from './PromptHistoryStore';
 import { MessageHandler, type WebviewBridge } from '../webview/MessageHandler';
+import {
+  BridgeProviderService,
+  bridgeBackendKey,
+  isBridgeCliCommand,
+  isBridgeModelValue,
+} from '../bridge/BridgeProviderService';
 import { buildWebviewHtml } from '../webview/WebviewProvider';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import type { TokenUsageRatioTracker } from './TokenUsageRatioTracker';
@@ -169,6 +175,9 @@ export class SessionTab implements WebviewBridge {
   private teamHadWorkingAgent = false;
   /** Per-tab CLI override (used by Happy provider to spawn `happy` instead of `claude`) */
   private cliPathOverride: string | null = null;
+  /** Bridge Providers: backend key of the active bridge model ('grok',
+   *  'antigravity', 'openai/<id>'), or null when this tab runs real Claude. */
+  private bridgeBackend: string | null = null;
   /** Subscription for VS Code window state changes (focus/blur) */
   private windowStateSubscription: vscode.Disposable | null = null;
   /** Debounced timer for delayed focusInput after window-focus events */
@@ -582,9 +591,37 @@ export class SessionTab implements WebviewBridge {
     const sessionToResume = this.processManager.currentSessionId;
     const atSessionStart = this.messageHandler.isAtSessionStart;
 
+    // Bridge Providers: crossing a provider boundary (claude <-> bridge, or one
+    // bridge backend to another) swaps the CLI override and always starts a
+    // fresh session — a claude session id cannot be resumed by another backend
+    // and vice versa. Same-backend switches keep the session; the bridge
+    // runtime resolves continuity from its own per-session state.
+    const wantsBridge = isBridgeModelValue(model);
+    const hadBridge = isBridgeCliCommand(this.cliPathOverride);
+    const newBackend = wantsBridge ? bridgeBackendKey(model) : null;
+    const backendChanged =
+      wantsBridge && hadBridge && this.bridgeBackend !== null && this.bridgeBackend !== newBackend;
+    const providerBoundaryCrossed = wantsBridge !== hadBridge || backendChanged;
+    if (wantsBridge && !hadBridge) {
+      const bridge = BridgeProviderService.get();
+      if (!bridge) {
+        this.postMessage({ type: 'error', message: 'Bridge Providers service is not available.' });
+        return;
+      }
+      this.cliPathOverride = bridge.cliCommand();
+      this.callbacks.onProviderChanged?.(this.id, 'claude', this.cliPathOverride);
+      this.log(`[Tab ${this.tabNumber}] Bridge provider engaged: ${newBackend}`);
+    } else if (!wantsBridge && hadBridge) {
+      this.cliPathOverride = null;
+      this.callbacks.onProviderChanged?.(this.id, 'claude', null);
+      this.log(`[Tab ${this.tabNumber}] Bridge provider released; back to Claude CLI`);
+    }
+    this.bridgeBackend = newBackend;
+
     // At the beginning of a session (no messages sent yet), restart fresh with the new model
     // rather than resuming, so the session is clean and uses the correct model from the start.
-    if (atSessionStart) {
+    // A provider-boundary crossing forces the same fresh path mid-session.
+    if (atSessionStart || providerBoundaryCrossed) {
       this.log(`[Tab ${this.tabNumber}] Switching model to "${model}" at session start (fresh restart)`);
       this.suppressNextExit = true;
       this.postMessage({ type: 'processBusy', busy: true });
