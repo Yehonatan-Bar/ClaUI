@@ -402,19 +402,24 @@ export function registerCommands(
 
   context.subscriptions.push(
     // Start a NEW session in a new tab
-    vscode.commands.registerCommand('claudeMirror.startSession', async () => {
-      const provider = getConfiguredProvider();
-      const tab = tabManager.createTabForProvider(provider);
-      try {
-        await tab.startSession();
-        log(`New ${provider} tab session started`);
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        vscode.window.showErrorMessage(
-          `Failed to start ${provider === 'codex' ? 'Codex' : provider === 'remote' ? 'Happy' : 'Claude'} session: ${errorMessage}`
-        );
+    vscode.commands.registerCommand(
+      'claudeMirror.startSession',
+      async (args?: { provider?: ProviderId }) => {
+        // Webview provider shortcuts pass an explicit provider so opening a tab
+        // never depends on first writing the global VS Code settings file.
+        const provider = args?.provider ?? getConfiguredProvider();
+        const tab = tabManager.createTabForProvider(provider);
+        try {
+          await tab.startSession();
+          log(`New ${provider} tab session started`);
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          vscode.window.showErrorMessage(
+            `Failed to start ${provider === 'codex' ? 'Codex' : provider === 'remote' ? 'Happy' : 'Claude'} session: ${errorMessage}`
+          );
+        }
       }
-    }),
+    ),
 
     vscode.commands.registerCommand('claudeMirror.newClaudeTabWithAccount', async () => {
       const profile = await pickClaudeProfile('New Claude tab with account profile...');

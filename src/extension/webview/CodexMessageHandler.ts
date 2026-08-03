@@ -943,24 +943,36 @@ export class CodexMessageHandler {
 
         case 'openProviderTab':
           this.log(`Open provider tab requested: "${msg.provider}" (Codex handler)`);
-          void vscode.workspace.getConfiguration('claudeMirror').update('provider', msg.provider, true)
-            .then(() => {
-              const saved = vscode.workspace.getConfiguration('claudeMirror').get<ProviderId>('provider', 'claude');
-              this.log(`Provider setting saved before opening tab (Codex handler): "${saved}" (requested "${msg.provider}")`);
-              this.webview.postMessage({ type: 'providerSetting', provider: saved });
-              void vscode.commands.executeCommand('claudeMirror.startSession').then(
-                () => this.log(`Requested new provider tab via command (Codex handler): provider="${msg.provider}"`),
+          void vscode.commands.executeCommand('claudeMirror.startSession', { provider: msg.provider }).then(
+            () => {
+              this.log(`Requested new provider tab via command (Codex handler): provider="${msg.provider}"`);
+
+              // Keep the shortcut's historical default-provider persistence,
+              // but never let a dirty User Settings editor block the new tab.
+              const config = vscode.workspace.getConfiguration('claudeMirror');
+              const current = config.get<ProviderId>('provider', 'claude');
+              if (current === msg.provider) {
+                this.webview.postMessage({ type: 'providerSetting', provider: current });
+                return;
+              }
+              void config.update('provider', msg.provider, true).then(
+                () => {
+                  const saved = vscode.workspace.getConfiguration('claudeMirror').get<ProviderId>('provider', 'claude');
+                  this.log(`Provider default saved after opening tab (Codex handler): "${saved}" (requested "${msg.provider}")`);
+                  this.webview.postMessage({ type: 'providerSetting', provider: saved });
+                },
                 (err: unknown) => {
                   const message = err instanceof Error ? err.message : String(err);
-                  this.log(`Failed to open provider tab "${msg.provider}" (Codex handler): ${message}`);
-                  this.webview.postMessage({ type: 'error', message: `Failed to open ${msg.provider} tab: ${message}` });
-                }
+                  this.log(`Provider tab opened, but default setting was not saved (Codex handler): ${message}`);
+                },
               );
-            }, (err: unknown) => {
+            },
+            (err: unknown) => {
               const message = err instanceof Error ? err.message : String(err);
-              this.log(`Failed to save provider setting before opening tab "${msg.provider}" (Codex handler): ${message}`);
+              this.log(`Failed to open provider tab "${msg.provider}" (Codex handler): ${message}`);
               this.webview.postMessage({ type: 'error', message: `Failed to open ${msg.provider} tab: ${message}` });
-            });
+            },
+          );
           break;
 
         case 'compactSession':

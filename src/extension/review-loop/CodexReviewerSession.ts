@@ -19,11 +19,14 @@ interface PendingReview {
  * review() call instead of EventEmitter streaming.
  */
 export class CodexReviewerSession {
+  private static readonly MAX_STDERR_CHARS = 4000;
   private readonly processManager: CodexExecProcessManager;
   private readonly demux: CodexExecDemux;
   private readonly log: (msg: string) => void;
   private threadId: string | null = null;
   private accumulated = '';
+  private stderr = '';
+  private stderrTruncated = false;
   private pending: PendingReview | null = null;
   private disposed = false;
 
@@ -45,6 +48,13 @@ export class CodexReviewerSession {
       if (trimmed) {
         this.log(`[Reviewer] stderr: ${trimmed.slice(0, 300)}`);
       }
+      const combined = this.stderr + text;
+      if (combined.length > CodexReviewerSession.MAX_STDERR_CHARS) {
+        this.stderr = combined.slice(-CodexReviewerSession.MAX_STDERR_CHARS);
+        this.stderrTruncated = true;
+      } else {
+        this.stderr = combined;
+      }
     });
 
     this.processManager.on('error', (err: Error) => {
@@ -56,7 +66,11 @@ export class CodexReviewerSession {
         return;
       }
       if (!this.processManager.cancelledByUser && info.code !== null && info.code !== 0) {
-        this.failPending(new Error(`Codex reviewer exited with code ${info.code}.`));
+        const stderr = this.stderr.trim();
+        const detail = stderr
+          ? `\n${this.stderrTruncated ? '[Earlier Codex stderr truncated]\n' : ''}${stderr}`
+          : '';
+        this.failPending(new Error(`Codex reviewer exited with code ${info.code}.${detail}`));
         return;
       }
       // Clean exit but turn.completed never arrived: resolve with what we have.
@@ -99,6 +113,8 @@ export class CodexReviewerSession {
       throw new Error('A reviewer turn is already running.');
     }
     this.accumulated = '';
+    this.stderr = '';
+    this.stderrTruncated = false;
     return new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.log('[Reviewer] turn timed out; stopping process.');

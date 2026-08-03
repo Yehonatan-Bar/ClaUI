@@ -175,13 +175,22 @@ ran the loop. A fresh `SessionTab` still defaults to enabled via its field initi
 The reviewer runs read-only over the whole workspace (worktree root when the tab
 runs in a worktree, otherwise the workspace root). It does not modify files.
 
+On Windows, reviewer launches use the shared `spawnCli`/`cross-spawn` path. This
+preserves the nested TOML quotes in the reviewer `instructions` argument when the
+configured CLI is an npm `codex.cmd` shim; the final `-` remains the single stdin
+prompt marker instead of being misparsed as a second positional argument. If the
+reviewer still exits non-zero, the panel error includes the captured Codex stderr
+(capped at the most recent 4,000 characters) instead of showing only the exit code.
+
 ## Tests
 
 `tests/review-loop/reviewLoopPrompts.test.ts` covers the pure functions: handover
 marker enforcement, exact final-verdict-line parsing (including `UNAPPROVED`,
 trailing-text-after-verdict, and quoted-verdict-token cases), and conservative
 classifier parsing. Run with `npm run test:review-loop` (Node's built-in test
-runner via tsx).
+runner via tsx). `tests/process/spawnCli.test.ts` covers the Windows launch
+regression (workspace/shim paths with spaces, nested reviewer TOML quotes, and cmd
+metacharacters); run it with `npm run test:spawn-cli`.
 
 ## Implementation Note
 

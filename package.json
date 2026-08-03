@@ -1671,6 +1671,7 @@
     "watch": "webpack --mode development --watch",
     "lint": "eslint src --ext ts,tsx",
     "test:review-loop": "node --import tsx --test tests/review-loop/reviewLoopPrompts.test.ts",
+    "test:spawn-cli": "node --import tsx --test tests/process/spawnCli.test.ts",
     "test:tabs": "node --import tsx --test tests/tabs/navigationOrder.test.ts tests/tabs/navTree.test.ts",
     "verify:installed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installed.ps1",
     "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1",
@@ -1696,6 +1697,7 @@
   "dependencies": {
     "@types/ws": "^8.18.1",
     "adm-zip": "^0.5.16",
+    "cross-spawn": "^7.0.6",
     "dompurify": "^3.3.1",
     "framer-motion": "^12.38.0",
     "marked": "^17.0.3",

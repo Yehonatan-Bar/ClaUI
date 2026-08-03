@@ -2,14 +2,14 @@
 
 ## Overview
 
-ClaUi spawns child processes via `child_process.spawn()`. Most helper CLIs use `shell: true` on Windows, which creates a `cmd.exe` intermediary that prevents standard `SIGTERM` signals from reaching the actual `node.exe` child, so all process termination flows through a shared kill utility to handle this correctly. The Codex CLI spawns go through the `spawnCli` helper, which prefers a shell-free spawn for concrete executables so that arguments containing spaces (e.g. a workspace path under OneDrive) are not word-split by `cmd.exe`.
+ClaUi spawns child processes via `child_process.spawn()`. Most helper CLIs use `shell: true` on Windows, which creates a `cmd.exe` intermediary that prevents standard `SIGTERM` signals from reaching the actual `node.exe` child, so all process termination flows through a shared kill utility to handle this correctly. Codex CLI spawns go through the `spawnCli` helper, backed by `cross-spawn`, so executable resolution and Windows `.cmd` escaping preserve every argv boundary.
 
 ## Key Files
 
 | File | Path | Purpose |
 |------|------|---------|
 | `killTree.ts` | `src/extension/process/killTree.ts` | Shared cross-platform process tree kill |
-| `spawnCli.ts` | `src/extension/process/spawnCli.ts` | Space-safe CLI spawn (shell selection + Windows arg quoting) |
+| `spawnCli.ts` | `src/extension/process/spawnCli.ts` | Cross-platform CLI spawn with exact Windows `.cmd` argv preservation |
 | `orphanCleanup.ts` | `src/extension/process/orphanCleanup.ts` | Startup cleanup of orphaned processes |
 
 ## killProcessTree(child)
@@ -88,17 +88,13 @@ VS Code extension host
 
 `spawnCli(command, args, options)` in `src/extension/process/spawnCli.ts` is used by `CodexExecProcessManager` and `CodexSessionNamer` to spawn `codex exec`.
 
-The problem it solves: with `shell: true` on Windows, Node joins the command and every argument with single spaces **without quoting**, then passes the string to `cmd.exe`. Any argument containing a space is word-split by the shell. For `codex exec ... -C "<workspace>" -`, a workspace path with a space (for example `C:\Users\me\OneDrive\קבצים מצורפות\BrawlCast`) splits the single `-C <dir>` value into two tokens, which pushes the trailing `-` into a second positional slot and makes Codex exit with `error: unexpected argument '-' found`. The same corruption silently breaks `-c instructions="..."` whenever that text contains spaces.
+The problem it solves: with `shell: true` on Windows, Node joins arguments into a command string and `cmd.exe` can split a workspace path containing spaces. The first `spawnCli` implementation fixed that case by manually wrapping every argument, but that corrupted nested TOML quoting such as `instructions="Read the \"Changed files\" list"`. Codex then saw an unintended positional prompt and rejected the final stdin marker (`-`) with `error: unexpected argument '-' found` / exit code 2.
 
-Selection logic:
+`spawnCli` now delegates to the directly declared `cross-spawn` runtime dependency and always requests `shell: false`. On Windows, `cross-spawn` resolves PATH/PATHEXT and `.cmd` shims, invokes `cmd.exe` only when required, and applies the complete escaping algorithm for spaces, backslashes before quotes, `%`, `!`, `^`, `&`, and other cmd metacharacters. Concrete executables and POSIX commands remain shell-free.
 
-| `command` shape | Spawn mode | Reason |
-|-----------------|-----------|--------|
-| Concrete path, not `.cmd`/`.bat` (e.g. bundled `codex.exe`) | `shell: false` | Node passes argv straight to CreateProcess and quotes each element; spaces/metacharacters survive verbatim |
-| Bare name (`codex`) or batch shim (`codex.cmd`) | `shell: true`, command + args quoted | A shell is required for PATH/PATHEXT resolution; quoting each argument prevents `cmd.exe` word-splitting |
-| Non-Windows | `shell: false` | POSIX `execvp` resolves bare names via PATH; skipping the shell avoids space word-splitting |
+Regression coverage lives in `tests/process/spawnCli.test.ts` (`npm run test:spawn-cli`). It round-trips representative Codex arguments through both a concrete executable and a real Windows batch shim whose own path contains spaces, including the review loop's nested `instructions` value.
 
-`taskkill /F /T /PID` still cleans up both spawn modes: with `shell: false` it kills the `codex.exe` tree directly; with `shell: true` it kills the `cmd.exe` wrapper and its descendants.
+`taskkill /F /T /PID` still cleans up the returned process tree; when a batch shim requires a `cmd.exe` wrapper, `/T` also kills its descendants.
 
 ## Webview Focus Diagnostics and Guardrails (2026-03)
 

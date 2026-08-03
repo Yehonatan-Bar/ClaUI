@@ -398,7 +398,8 @@ Follow-up changes implemented after Stage 5 based on interactive VS Code testing
 
 - Provider quick buttons (`Claude` / `Codex`) in the status bar now open a **new tab** for the selected provider (not just change the default provider setting):
   - added `openProviderTab` webview -> extension message
-  - extension handlers update `claudeMirror.provider` and then execute `claudeMirror.startSession`
+  - extension handlers execute `claudeMirror.startSession` with an explicit provider override, then persist `claudeMirror.provider` on a best-effort basis
+  - unsaved changes in the VS Code User Settings editor can no longer block the requested provider tab from opening
   - button behavior prevents tab spam when the current tab is already that provider
 - Added focused diagnostics/logging for provider switching and Codex startup debugging:
   - webview button click diagnostics (`diag`) for provider quick buttons
