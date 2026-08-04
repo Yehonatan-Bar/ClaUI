@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 import { SessionTab } from './SessionTab';
+import { BridgeProviderService, isBridgeCliCommand } from '../bridge/BridgeProviderService';
 import { CodexSessionTab } from './CodexSessionTab';
 import { buildSmartSearchPrompt } from './SmartSearchPrompt';
 import { relocateSessionTranscript } from './sessionPathResolver';
@@ -1967,6 +1968,20 @@ export class TabManager {
                   .get<string>('happy.cliPath', '');
                 const chosenPath = livePath || entry.cliPathOverride || 'happy';
                 tab.setCliPathOverride(chosenPath);
+              }
+
+              // Bridge tabs (claude provider + bridge cliPathOverride): recompute
+              // the bridge command from the CURRENT extension install — the
+              // stored absolute path breaks on every extension update.
+              if (
+                entry.provider === 'claude' &&
+                tab instanceof SessionTab &&
+                isBridgeCliCommand(entry.cliPathOverride)
+              ) {
+                const bridge = BridgeProviderService.get();
+                if (bridge) {
+                  tab.setCliPathOverride(bridge.cliCommand());
+                }
               }
 
               // Re-apply the worktree so the restored session spawns in the same

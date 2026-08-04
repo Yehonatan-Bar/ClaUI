@@ -8,7 +8,14 @@ import { CLAUDE_MODEL_OPTIONS, getClaudeModelLabel } from '../../utils/claudeMod
  * Changing the model live-switches the current session (stop + resume with new model).
  */
 export const ModelSelector: React.FC = () => {
-  const { selectedModel, model, isConnected, lastResolvedDefaultModel, setSelectedModel } = useAppStore();
+  const {
+    selectedModel,
+    model,
+    isConnected,
+    lastResolvedDefaultModel,
+    bridgeModelOptions,
+    setSelectedModel,
+  } = useAppStore();
 
   // "Default" (empty value) means no --model flag is passed and the Claude CLI
   // picks the model itself. Only when Default is the active selection does the
@@ -37,7 +44,10 @@ export const ModelSelector: React.FC = () => {
   const resolvedDefaultLabel = liveDefaultLabel ?? rememberedDefaultLabel;
 
   const modelOptions = useMemo(() => {
-    const base = !selectedModel || CLAUDE_MODEL_OPTIONS.some((opt) => opt.value === selectedModel)
+    const isKnown =
+      CLAUDE_MODEL_OPTIONS.some((opt) => opt.value === selectedModel) ||
+      bridgeModelOptions.some((opt) => opt.value === selectedModel);
+    const base = !selectedModel || isKnown
       ? CLAUDE_MODEL_OPTIONS
       : [
           ...CLAUDE_MODEL_OPTIONS,
@@ -52,7 +62,7 @@ export const ModelSelector: React.FC = () => {
     return base.map((opt) =>
       opt.value === '' ? { ...opt, label: `Default (${resolvedDefaultLabel})` } : opt,
     );
-  }, [selectedModel, resolvedDefaultLabel]);
+  }, [selectedModel, resolvedDefaultLabel, bridgeModelOptions]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const newModel = e.target.value;
@@ -81,11 +91,30 @@ export const ModelSelector: React.FC = () => {
         onChange={handleChange}
         data-tooltip={selectTooltip}
       >
-        {modelOptions.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
+        {bridgeModelOptions.length === 0 ? (
+          modelOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))
+        ) : (
+          <>
+            <optgroup label="Claude">
+              {modelOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Bridge Providers">
+              {bridgeModelOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </optgroup>
+          </>
+        )}
       </select>
       {isConnected && activeModelLabel && (
         <span className="model-selector-active" data-tooltip="Currently active model">

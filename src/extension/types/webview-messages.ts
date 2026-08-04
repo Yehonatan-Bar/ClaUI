@@ -1665,6 +1665,14 @@ export interface DefaultModelHintMessage {
   model: string;
 }
 
+/** Bridge Provider models (Grok / Antigravity / OpenAI-compatible) offered in
+ *  the model picker. Values are namespaced `bridge:<backend>/<model>` and are
+ *  routed to the bundled bridge runtime instead of the claude CLI. */
+export interface BridgeModelOptionsMessage {
+  type: 'bridgeModelOptions';
+  options: { label: string; value: string }[];
+}
+
 export interface ClaudeEffortSettingMessage {
   type: 'claudeEffortSetting';
   effort: ClaudeEffortLevel;
@@ -3035,6 +3043,7 @@ export type ExtensionToWebviewMessage =
   | MessageColorSchemeSettingMessage
   | ModelSettingMessage
   | DefaultModelHintMessage
+  | BridgeModelOptionsMessage
   | ClaudeEffortSettingMessage
   | ClaudeFastModeSettingMessage
   | ProviderSettingMessage

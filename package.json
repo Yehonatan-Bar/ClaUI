@@ -321,6 +321,90 @@
           "default": "happy",
           "description": "Path to the Happy Coder CLI executable"
         },
+        "claudeMirror.bridge.grok.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Bridge Providers: offer xAI Grok models in the model picker. Models appear only when the Grok CLI is detected on this machine (npm i -g @xai-official/grok, then `grok login`)."
+        },
+        "claudeMirror.bridge.grok.cliPath": {
+          "type": "string",
+          "default": "grok",
+          "description": "Bridge Providers: path to the Grok CLI executable."
+        },
+        "claudeMirror.bridge.grok.models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "grok-4.5",
+            "grok-composer-2.5-fast"
+          ],
+          "description": "Bridge Providers: Grok model ids offered in the model picker."
+        },
+        "claudeMirror.bridge.antigravity.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Bridge Providers: offer Google Antigravity models in the model picker. Models appear only when the `agy` CLI is detected on this machine (requires a Google AI subscription login). Note: no streaming — answers appear when the turn completes."
+        },
+        "claudeMirror.bridge.antigravity.cliPath": {
+          "type": "string",
+          "default": "agy",
+          "description": "Bridge Providers: path to the Antigravity CLI executable."
+        },
+        "claudeMirror.bridge.antigravity.models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "gemini-3.6-flash-medium",
+            "gemini-3.1-pro-high"
+          ],
+          "description": "Bridge Providers: Antigravity model ids offered in the model picker (run `agy models` for the current list)."
+        },
+        "claudeMirror.bridge.openaiProviders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "baseUrl",
+              "models"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Short unique id (used in the model value)."
+              },
+              "label": {
+                "type": "string",
+                "description": "Display name in the model picker."
+              },
+              "baseUrl": {
+                "type": "string",
+                "description": "OpenAI-compatible base URL, e.g. http://localhost:11434/v1 (Ollama) or http://localhost:1234/v1 (LM Studio)."
+              },
+              "apiKeyEnv": {
+                "type": "string",
+                "description": "Environment variable holding the API key (optional)."
+              },
+              "apiKeyFile": {
+                "type": "string",
+                "description": "Path to a file whose contents are the API key (optional)."
+              },
+              "models": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Model ids offered in the model picker."
+              }
+            }
+          },
+          "default": [],
+          "description": "Bridge Providers: OpenAI-compatible endpoints (Ollama, LM Studio, llama.cpp, vLLM, or hosted). Each entry's models appear in the model picker."
+        },
         "claudeMirror.handoff.enabled": {
           "type": "boolean",
           "default": true,

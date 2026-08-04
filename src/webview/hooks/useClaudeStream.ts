@@ -41,6 +41,7 @@ export function useClaudeStream(): void {
     setProviderCapabilities,
     setSelectedModel,
     setLastResolvedDefaultModel,
+    setBridgeModelOptions,
     setSelectedClaudeEffort,
     setSelectedClaudeFastMode,
     setSelectedCodexReasoningEffort,
@@ -682,6 +683,11 @@ export function useClaudeStream(): void {
           // Model the CLI last resolved "Default" to; shown on the selector before
           // this session's own system/init reports the live model.
           setLastResolvedDefaultModel(msg.model || null);
+          break;
+
+        case 'bridgeModelOptions':
+          // Bridge Provider models (Grok / Antigravity / OpenAI-compatible)
+          setBridgeModelOptions(msg.options || []);
           break;
 
         case 'claudeEffortSetting':
@@ -1451,6 +1457,7 @@ export function useClaudeStream(): void {
     setProviderCapabilities,
     setSelectedModel,
     setLastResolvedDefaultModel,
+    setBridgeModelOptions,
     setSelectedClaudeEffort,
     setSelectedClaudeFastMode,
     setSelectedCodexReasoningEffort,

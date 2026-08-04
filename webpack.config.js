@@ -59,6 +59,37 @@ module.exports = [
     },
     devtool: 'nosources-source-map',
   },
+  // Bridge Providers runtime (Node.js CLI, runs outside VS Code) — spawned
+  // instead of the claude CLI for Grok / Antigravity / OpenAI-compatible tabs.
+  {
+    name: 'bridge-runtime',
+    target: 'node',
+    mode: 'none',
+    entry: {
+      'cli': './src/bridge-runtime/cli.ts',
+    },
+    output: {
+      path: path.resolve(__dirname, 'dist', 'bridge-runtime'),
+      filename: '[name].js',
+      libraryTarget: 'commonjs2',
+    },
+    resolve: {
+      extensions: ['.ts', '.js'],
+    },
+    module: {
+      rules: [
+        {
+          test: /\.ts$/,
+          exclude: /node_modules/,
+          use: 'ts-loader',
+        },
+      ],
+    },
+    optimization: {
+      minimize: false,
+    },
+    devtool: 'nosources-source-map',
+  },
   // Particle Accelerator runtime (Node.js CLI, runs outside VS Code)
   {
     name: 'particle-accelerator-runtime',

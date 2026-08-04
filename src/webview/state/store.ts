@@ -182,6 +182,9 @@ export interface AppState {
   // the extension's globalState. Lets the Model selector show the likely model on
   // hover BEFORE the session's own system/init reports it. null = none known yet.
   lastResolvedDefaultModel: string | null;
+  // Bridge Provider models (Grok / Antigravity / OpenAI-compatible) pushed from
+  // the extension; offered in the model picker alongside the Claude models.
+  bridgeModelOptions: { label: string; value: string }[];
   selectedClaudeEffort: ClaudeEffortLevel;
   selectedClaudeFastMode: boolean;
   selectedCodexReasoningEffort: CodexReasoningEffort;
@@ -778,6 +781,7 @@ export interface AppState {
   setResuming: (resuming: boolean) => void;
   setSelectedModel: (model: string) => void;
   setLastResolvedDefaultModel: (model: string | null) => void;
+  setBridgeModelOptions: (options: { label: string; value: string }[]) => void;
   setSelectedClaudeEffort: (effort: ClaudeEffortLevel) => void;
   setSelectedClaudeFastMode: (fastMode: boolean) => void;
   setSelectedCodexReasoningEffort: (effort: CodexReasoningEffort) => void;
@@ -1184,6 +1188,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   tabKind: 'chat',
   model: null,
   lastResolvedDefaultModel: null,
+  bridgeModelOptions: [],
   selectedProvider: 'claude',
   providerCapabilities: { ...DEFAULT_PROVIDER_CAPABILITIES },
   selectedModel: '',
@@ -2218,6 +2223,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSelectedModel: (model) => set({ selectedModel: model }),
 
   setLastResolvedDefaultModel: (model) => set({ lastResolvedDefaultModel: model }),
+
+  setBridgeModelOptions: (options) => set({ bridgeModelOptions: options }),
 
   setSelectedClaudeEffort: (effort) => set({ selectedClaudeEffort: effort }),
 
