@@ -323,8 +323,8 @@
         },
         "claudeMirror.bridge.grok.enabled": {
           "type": "boolean",
-          "default": false,
-          "description": "Bridge Providers: show xAI Grok models in the model picker (requires the official Grok CLI: npm i -g @xai-official/grok, then `grok login`)."
+          "default": true,
+          "description": "Bridge Providers: offer xAI Grok models in the model picker. Models appear only when the Grok CLI is detected on this machine (npm i -g @xai-official/grok, then `grok login`)."
         },
         "claudeMirror.bridge.grok.cliPath": {
           "type": "string",
@@ -344,8 +344,8 @@
         },
         "claudeMirror.bridge.antigravity.enabled": {
           "type": "boolean",
-          "default": false,
-          "description": "Bridge Providers: show Google Antigravity models in the model picker (requires the `agy` CLI, logged in to a Google AI subscription). Note: no streaming — answers appear when the turn completes."
+          "default": true,
+          "description": "Bridge Providers: offer Google Antigravity models in the model picker. Models appear only when the `agy` CLI is detected on this machine (requires a Google AI subscription login). Note: no streaming — answers appear when the turn completes."
         },
         "claudeMirror.bridge.antigravity.cliPath": {
           "type": "string",

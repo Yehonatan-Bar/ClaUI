@@ -17,7 +17,11 @@ import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import { getStoredApiKey, setStoredApiKey, maskApiKey } from '../process/envUtils';
 import { readCodexModelOptions } from '../process/codexModelCache';
-import { BridgeProviderService, isBridgeModelValue } from '../bridge/BridgeProviderService';
+import {
+  BridgeProviderService,
+  isBridgeInstallValue,
+  isBridgeModelValue,
+} from '../bridge/BridgeProviderService';
 import type { TokenUsageRatioTracker } from '../session/TokenUsageRatioTracker';
 import type { DeveloperUsageReporter } from '../usage/DeveloperUsageReporter';
 import type { CheckpointManager } from '../session/CheckpointManager';
@@ -2100,6 +2104,18 @@ export class MessageHandler {
           break;
 
         case 'setModel':
+          // Bridge "Install CLI…" picker entries launch the guided install flow
+          // instead of a model switch; snap the picker back to the tab's model.
+          if (isBridgeInstallValue(msg.model)) {
+            const kind = msg.model.endsWith('antigravity') ? 'antigravity' : 'grok';
+            this.log(`Bridge CLI install flow requested: ${kind}`);
+            void BridgeProviderService.get()?.startCliInstall(kind);
+            this.webview.postMessage({
+              type: 'modelSetting',
+              model: this.webview.getSelectedModel?.() ?? '',
+            });
+            break;
+          }
           this.log(`Setting model to: "${msg.model}"`);
           // Persist as the default for NEW tabs only. This is a global setting,
           // but its change is intentionally NOT broadcast to other open sessions
