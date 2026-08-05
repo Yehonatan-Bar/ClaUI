@@ -2,7 +2,10 @@ import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { StreamEmitter } from '../protocol';
+import { CLAUI_HOME } from '../config';
+import { acquireLock } from '../fileLock';
+import { killTree, resolveExecutable } from '../procUtils';
+import { BridgePrompt, imagesOmittedNote, StreamEmitter } from '../protocol';
 import { SessionStore } from '../sessionStore';
 
 /**
@@ -15,6 +18,8 @@ import { SessionStore } from '../sessionStore';
  * accepts `--conversation <id>` to continue one. The bridge snapshots the brain
  * directory before the first turn, diffs afterwards to learn the new
  * conversation id, and stores it per ClaUi session for later turns/resumes.
+ * That snapshot→run→diff window is guarded by a cross-process lock so two tabs
+ * starting their first turn at once cannot bind the same conversation id.
  *
  * No streaming: agy prints the final answer only, so the UI shows a working
  * spinner until the turn completes.
@@ -22,22 +27,19 @@ import { SessionStore } from '../sessionStore';
 
 const AGY_BRAIN_DIR = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'brain');
 const PRINT_TIMEOUT_MS = Number(process.env.CLAUI_BRIDGE_AGY_TIMEOUT_MS || 15 * 60 * 1000);
+const DISCOVERY_LOCK_DIR = path.join(CLAUI_HOME, 'locks', 'agy-first-turn');
 
+/**
+ * Resolve the `agy` CLI to a concrete, shell-free invocation. We NEVER run agy
+ * through a shell: the user's prompt is passed as an argv element, and a shell
+ * would let prompt text containing `&`, `|`, `^` etc. inject extra commands.
+ */
 export function resolveAgyCli(cliPath: string): { command: string; useShell: boolean } {
-  const configured = (cliPath || 'agy').trim();
-  if (path.isAbsolute(configured) && fs.existsSync(configured)) {
-    return { command: configured, useShell: false };
+  const known: string[] = [];
+  if (process.platform === 'win32' && process.env.LOCALAPPDATA) {
+    known.push(path.join(process.env.LOCALAPPDATA, 'agy', 'bin', 'agy.exe'));
   }
-  if (process.platform === 'win32' && configured === 'agy') {
-    const localAppData = process.env.LOCALAPPDATA;
-    if (localAppData) {
-      const exe = path.join(localAppData, 'agy', 'bin', 'agy.exe');
-      if (fs.existsSync(exe)) {
-        return { command: exe, useShell: false };
-      }
-    }
-  }
-  return { command: configured, useShell: process.platform === 'win32' };
+  return resolveExecutable(cliPath, 'agy', known);
 }
 
 function listConversationIds(): Set<string> {
@@ -81,11 +83,7 @@ export class AntigravityBackend {
   ) {}
 
   interrupt(): void {
-    try {
-      this.currentChild?.kill();
-    } catch {
-      /* already dead */
-    }
+    killTree(this.currentChild);
   }
 
   private runAgy(promptText: string, conversationId: string | null): Promise<string> {
@@ -100,6 +98,7 @@ export class AntigravityBackend {
         `${Math.max(60, Math.ceil(PRINT_TIMEOUT_MS / 1000))}s`,
       ];
       // Mirror ClaUi's permission model: full-access tabs run unattended.
+      // (Supervised agy tabs keep the CLI's own interactive permission gate.)
       if (this.permissionMode !== 'supervised') {
         argv.push('--dangerously-skip-permissions');
       }
@@ -111,7 +110,7 @@ export class AntigravityBackend {
       try {
         child = spawn(command, argv, {
           cwd: process.cwd(),
-          shell: useShell,
+          shell: useShell, // always false — prompt text is never shell-interpreted
           windowsHide: true,
         });
       } catch (e) {
@@ -124,11 +123,7 @@ export class AntigravityBackend {
       const killTimer = setTimeout(() => {
         if (!settled) {
           settled = true;
-          try {
-            child.kill();
-          } catch {
-            /* already dead */
-          }
+          killTree(child);
           reject(new Error('Antigravity CLI hard-timeout'));
         }
       }, PRINT_TIMEOUT_MS + 30000);
@@ -163,34 +158,58 @@ export class AntigravityBackend {
     });
   }
 
-  async runTurn(prompt: string, emitter: StreamEmitter): Promise<string> {
+  async runTurn(prompt: BridgePrompt, emitter: StreamEmitter): Promise<string> {
     const stored = this.store.read(this.sessionId);
     const conversationId = stored?.agyConversationId || null;
     const isFirstTurn = !conversationId;
 
-    let effectivePrompt = prompt;
+    // agy print mode is text-only; never drop attachments silently.
+    let userText = prompt.text;
+    if (prompt.images.length) {
+      const note = imagesOmittedNote(prompt.images.length, 'Antigravity');
+      this.log(note);
+      userText = userText ? `${userText}\n\n${note}` : note;
+    }
+
+    let effectivePrompt = userText;
     if (isFirstTurn && this.systemPrompt) {
-      effectivePrompt = `<system-rules>\n${this.systemPrompt}\n</system-rules>\n\n${prompt}`;
+      effectivePrompt = `<system-rules>\n${this.systemPrompt}\n</system-rules>\n\n${userText}`;
     }
 
-    const before = isFirstTurn ? listConversationIds() : null;
-    const answer = await this.runAgy(effectivePrompt, conversationId);
+    // Serialize the snapshot→run→diff window across processes so two tabs
+    // starting their first turn concurrently can't bind the same new
+    // conversation id. Waiting tabs block until the running one finishes; if
+    // acquisition times out we proceed unlocked rather than fail the turn.
+    const lock = isFirstTurn
+      ? await acquireLock(DISCOVERY_LOCK_DIR, {
+          timeoutMs: PRINT_TIMEOUT_MS + 60_000,
+          staleMs: PRINT_TIMEOUT_MS + 120_000,
+        })
+      : null;
+    let answer: string;
+    try {
+      const before = isFirstTurn ? listConversationIds() : null;
+      answer = await this.runAgy(effectivePrompt, conversationId);
 
-    if (isFirstTurn && before) {
-      const discovered = findNewConversationId(before);
-      if (discovered) {
-        this.store.write(this.sessionId, {
-          backend: 'antigravity',
-          model: this.model,
-          agyConversationId: discovered,
-        });
-        this.log(`agy conversation bound: ${discovered}`);
-      } else {
-        this.log('agy conversation id not discovered; next turn starts fresh context');
+      if (isFirstTurn && before) {
+        const discovered = findNewConversationId(before);
+        if (discovered) {
+          this.store.write(this.sessionId, {
+            backend: 'antigravity',
+            model: this.model,
+            agyConversationId: discovered,
+          });
+          this.log(`agy conversation bound: ${discovered}`);
+        } else {
+          this.log('agy conversation id not discovered; next turn starts fresh context');
+        }
       }
+    } finally {
+      lock?.release();
     }
+
     this.store.write(this.sessionId, { backend: 'antigravity', model: this.model });
-    this.store.appendHistory(this.sessionId, 'user', prompt);
+    this.store.appendHistory(this.sessionId, 'user', userText);
     this.store.appendHistory(this.sessionId, 'assistant', answer);
 
     emitter.append('text', answer);

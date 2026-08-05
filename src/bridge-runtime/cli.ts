@@ -11,7 +11,7 @@ import {
   parseBridgeModel,
   storageDir,
 } from './config';
-import { attachStdin, StreamEmitter } from './protocol';
+import { attachStdin, BridgePrompt, StreamEmitter } from './protocol';
 import { SessionStore } from './sessionStore';
 
 /**
@@ -49,7 +49,7 @@ function log(...parts: unknown[]): void {
 }
 
 interface Backend {
-  runTurn(prompt: string, emitter: StreamEmitter): Promise<string>;
+  runTurn(prompt: BridgePrompt, emitter: StreamEmitter): Promise<string>;
   interrupt(): void;
   dispose?(): void;
 }
@@ -110,6 +110,7 @@ async function main(): Promise<void> {
       sessionId,
       store,
       systemPrompt,
+      permissionMode,
       log,
     );
   } else if (ref.backend === 'antigravity') {
@@ -143,7 +144,7 @@ async function main(): Promise<void> {
   }
 
   // --- Turn loop -----------------------------------------------------------
-  const queue: string[] = [];
+  const queue: BridgePrompt[] = [];
   let running = false;
   let stdinClosed = false;
 
@@ -172,8 +173,8 @@ async function main(): Promise<void> {
   }
 
   attachStdin({
-    onPrompt: (text) => {
-      queue.push(text);
+    onPrompt: (prompt) => {
+      queue.push(prompt);
       void pump();
     },
     onInterrupt: () => backend.interrupt(),

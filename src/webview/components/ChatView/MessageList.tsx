@@ -36,7 +36,24 @@ interface MessageListProps {
 }
 
 export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange }) => {
-  const { messages, streamingMessageId, streamingBlocks, isBusy, truncateFromMessage, addUserMessage, markSessionPromptSent, currentThinkingEffort, btwPopup, setBtwPopup, clearBtwSession, initBtwSession, addBtwUserMessage } = useAppStore();
+  // Field-level selectors instead of a bare useAppStore() destructure: the
+  // bare form subscribes to the WHOLE store, re-rendering every message on
+  // any unrelated state change (tab list broadcasts, busy flips of other
+  // tabs, widgets). Store actions have stable identities, so their
+  // subscriptions never fire.
+  const messages = useAppStore((s) => s.messages);
+  const streamingMessageId = useAppStore((s) => s.streamingMessageId);
+  const streamingBlocks = useAppStore((s) => s.streamingBlocks);
+  const isBusy = useAppStore((s) => s.isBusy);
+  const truncateFromMessage = useAppStore((s) => s.truncateFromMessage);
+  const addUserMessage = useAppStore((s) => s.addUserMessage);
+  const markSessionPromptSent = useAppStore((s) => s.markSessionPromptSent);
+  const currentThinkingEffort = useAppStore((s) => s.currentThinkingEffort);
+  const btwPopup = useAppStore((s) => s.btwPopup);
+  const setBtwPopup = useAppStore((s) => s.setBtwPopup);
+  const clearBtwSession = useAppStore((s) => s.clearBtwSession);
+  const initBtwSession = useAppStore((s) => s.initBtwSession);
+  const addBtwUserMessage = useAppStore((s) => s.addBtwUserMessage);
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const userScrolledUp = useRef(false);

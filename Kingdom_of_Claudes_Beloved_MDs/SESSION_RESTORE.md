@@ -60,15 +60,18 @@ Core changes:
      - Check if active tab falls outside kept set
      - If yes, swap it to guarantee inclusion
      - Re-sort by `tabOrder ?? tabNumber` for creation sequence
+   - Per-entry config (account profile / Happy CLI path / bridge command + selection / worktree) is applied via `applyEntryConfigToTab()`
+   - An entry marked `hibernated` (a deep-hibernated tab at reload time, see `TAB_HIBERNATION.md`) is restored as a **live placeholder tab** in the tab bar: `prepareForLazyResume(...)` then `hibernateDeep({ armWake:false })`, armed with the lazy tabs afterward. No CLI, no React app until the user focuses it.
 
 2. **Merge Strategy** (repopulation after partial restore):
    - Build set of restored sessionIds from live tabs
-   - Clear and repopulate from live tabs
-   - For unrestored entries: store as `preserved-{sessionId}` (capped at 50)
+   - Clear and repopulate from live tabs (carrying `lastActivityAt` for the hibernation idle clock)
+   - For unrestored entries (incl. truncation overflow): store as `preserved-{sessionId}` (capped at 50), reopenable from Conversation History
    - Clean up preserved entries when finally restored
 
 3. **Focus Tracking**:
-   - `handleTabFocused`: Update `lastFocusedAt` timestamp
+   - `handleTabFocused`: Update `lastFocusedAt` + `lastActivityAt` timestamps
+   - `onBusyStateChanged` callback: Update `lastActivityAt` (hibernation idle clock)
 
 4. **Shutdown Refresh**:
    - `closeAllTabs()`: Refresh sessionIds, assign `tabOrder`, save snapshot

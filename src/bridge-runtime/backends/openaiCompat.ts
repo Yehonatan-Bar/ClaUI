@@ -2,8 +2,17 @@ import * as http from 'http';
 import * as https from 'https';
 import { URL } from 'url';
 import { OpenAiCompatProvider, resolveOpenAiApiKey } from '../config';
-import { StreamEmitter } from '../protocol';
+import { BridgePrompt, StreamEmitter } from '../protocol';
 import { SessionStore } from '../sessionStore';
+
+/** OpenAI chat content: a plain string, or multimodal parts (text + images). */
+type ChatContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
+interface ChatMessage {
+  role: string;
+  content: string | ChatContentPart[];
+}
 
 /**
  * OpenAI-compatible chat backend (Ollama, LM Studio, llama.cpp llama-server,
@@ -28,30 +37,50 @@ export class OpenAiCompatBackend {
     this.aborter?.abort();
   }
 
-  async runTurn(prompt: string, emitter: StreamEmitter): Promise<string> {
+  async runTurn(prompt: BridgePrompt, emitter: StreamEmitter): Promise<string> {
     const state = this.store.read(this.sessionId);
     const history = state?.history || [];
-    const messages: { role: string; content: string }[] = [];
+    const messages: ChatMessage[] = [];
     if (this.systemPrompt) {
       messages.push({ role: 'system', content: this.systemPrompt });
     }
     for (const turn of history) {
       messages.push({ role: turn.role, content: turn.content });
     }
-    messages.push({ role: 'user', content: prompt });
+
+    // Forward images to vision-capable models as OpenAI image_url parts (data
+    // URLs). Text-only turns stay a plain string for maximum server compat.
+    if (prompt.images.length) {
+      const parts: ChatContentPart[] = [];
+      if (prompt.text) parts.push({ type: 'text', text: prompt.text });
+      for (const img of prompt.images) {
+        parts.push({
+          type: 'image_url',
+          image_url: { url: `data:${img.mediaType};base64,${img.data}` },
+        });
+      }
+      messages.push({ role: 'user', content: parts });
+    } else {
+      messages.push({ role: 'user', content: prompt.text });
+    }
 
     const text = await this.streamChatCompletion(messages, (delta) =>
       emitter.append('text', delta),
     );
 
     this.store.write(this.sessionId, { backend: 'openai', model: this.model });
-    this.store.appendHistory(this.sessionId, 'user', prompt);
+    // Persist the user turn as text (with a marker when images were attached) so
+    // replayed history stays a compact string the server always accepts.
+    const historyText = prompt.images.length
+      ? `${prompt.text}${prompt.text ? '\n' : ''}[${prompt.images.length} image(s) attached]`
+      : prompt.text;
+    this.store.appendHistory(this.sessionId, 'user', historyText);
     this.store.appendHistory(this.sessionId, 'assistant', text);
     return text;
   }
 
   private streamChatCompletion(
-    messages: { role: string; content: string }[],
+    messages: ChatMessage[],
     onDelta: (text: string) => void,
   ): Promise<string> {
     const endpoint = new URL(
@@ -132,7 +161,19 @@ export class OpenAiCompatBackend {
               }
             }
           });
-          res.on('end', () => resolve(full));
+          res.on('end', () => {
+            // Flush a final line with no trailing newline — covers a
+            // non-streaming server that returns the whole JSON body at once.
+            const rest = buffer.trim();
+            if (rest) {
+              if (rest.startsWith('data:')) {
+                handleDataLine(rest.slice(5).trim());
+              } else if (!full && !sawDone && rest.startsWith('{')) {
+                handleDataLine(rest);
+              }
+            }
+            resolve(full);
+          });
           res.on('error', (e) => reject(e));
         },
       );

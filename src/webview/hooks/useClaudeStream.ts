@@ -152,6 +152,7 @@ export function useClaudeStream(): void {
     clearDeferredMessage,
     failDeferredMessage,
     setSilentResumeActive,
+    setHibernationActive,
     setWorkstreamMapData,
     setWorkstreamMapClassifying,
     setWorkstreamMapError,
@@ -259,6 +260,10 @@ export function useClaudeStream(): void {
 
         case 'silentResumeStatus':
           setSilentResumeActive(msg.active);
+          break;
+
+        case 'hibernationState':
+          setHibernationActive(msg.hibernated);
           break;
 
         case 'workstreamMapData':

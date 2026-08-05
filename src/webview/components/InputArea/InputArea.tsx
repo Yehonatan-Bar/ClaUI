@@ -136,6 +136,7 @@ export const InputArea: React.FC = () => {
     handoffStage,
     handoffTargetProvider,
     silentResumeActive,
+    hibernationActive,
     goalActive,
     goalObjective,
     setGoalActive,
@@ -1500,6 +1501,28 @@ export const InputArea: React.FC = () => {
           }}
         >
           (reconnecting...)
+        </div>
+      )}
+      {hibernationActive && (
+        <div
+          className="hibernation-hint"
+          onClick={() => {
+            // Same cached instance as the rest of the webview (single-call API).
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (window as any).acquireVsCodeApi?.()?.postMessage({ type: 'wakeFromHibernation' });
+          }}
+          style={{
+            padding: '5px 10px',
+            fontSize: '0.85em',
+            color: 'var(--vscode-descriptionForeground)',
+            background: 'var(--vscode-editorWidget-background)',
+            borderTop: '1px solid var(--vscode-widget-border, transparent)',
+            cursor: 'pointer',
+            opacity: 0.9,
+          }}
+          title="The CLI process was stopped to save CPU and RAM. Click to wake, or just type a message."
+        >
+          This session is sleeping to save CPU and RAM - click to wake (or just type)
         </div>
       )}
       {/* Context usage bar: thin line at the top of the input area, visible when contextWidgetVisible is on */}

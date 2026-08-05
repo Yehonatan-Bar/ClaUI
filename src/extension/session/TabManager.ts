@@ -32,6 +32,11 @@ import {
   type OpenTabSnapshotEntry,
   type OpenTabsSnapshot,
 } from './OpenTabsSnapshot';
+import {
+  planHibernation,
+  type HibernationCandidate,
+  type HibernationConfig,
+} from './hibernation/HibernationPlanner';
 import type { ProcessMemorySampler } from '../process/ProcessMemorySampler';
 import type { TabGroupStore } from './TabGroupStore';
 import { planMoveTabInNavigation, planNormalizeAllOrders } from './tabOrdering';
@@ -67,6 +72,8 @@ export interface TabSummary {
   orderInGroup?: number;
   slotColor: string;
   isBusy: boolean;
+  /** Hibernation state: 'light' = CLI stopped (panel live), 'deep' = placeholder webview. */
+  sleepState: 'awake' | 'light' | 'deep';
   /** Absolute worktree path this tab's session runs in, or null for the primary worktree. */
   worktreePath: string | null;
   claudeAccountProfileId: string | null;
@@ -131,6 +138,14 @@ export class TabManager {
   private static readonly SNAPSHOT_DEBOUNCE_MS = 500;
   private static readonly MAX_RESTORE = 10;
   private static readonly LAYOUT_SETTLE_MS = 75;
+  /** Hibernation sweep cadence; each run re-reads config so toggling works live. */
+  private static readonly HIBERNATION_SWEEP_INTERVAL_MS = 10 * 60_000;
+  private static readonly HIBERNATION_FIRST_SWEEP_DELAY_MS = 2 * 60_000;
+  private hibernationSweepTimer: ReturnType<typeof setInterval> | null = null;
+  /** Coalesces tab-state broadcast bursts (tab open/close/focus fires many
+   *  onDidChangeTabs events in a row; each webview re-renders per message). */
+  private static readonly TABS_BROADCAST_DEBOUNCE_MS = 50;
+  private tabsBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Fires whenever the tree state (tabs, group assignments, summaries) changes — UI listens for refresh. */
   private readonly treeChangeEmitter = new vscode.EventEmitter<void>();
@@ -217,45 +232,40 @@ export class TabManager {
       })
     );
 
-    // Vertical mode must stay vertical while the user reads a file — and the
-    // rail must stay VISIBLE. The rail renders inside the active ClaUi
-    // webview, so a file opened into the panels' editor group would cover it
-    // entirely. Two-part fix: keep the native strip hidden, and move the file
-    // into a side editor group so file + rail show side by side.
+    // Vertical mode: documents open as regular tabs in the panels' editor
+    // group, so an active document covers the in-webview rail. Bring the
+    // native tab strip back while a document is the active tab (see
+    // showNativeTabsWhileDocumentActive); handleTabFocused() re-hides it once
+    // a ClaUi panel regains focus. The same events also keep the rail's
+    // Files section in sync with open/closed/dirty editors.
     context.subscriptions.push(
-      vscode.window.onDidChangeActiveTextEditor((editor) => {
-        if (!editor) return;
-        if (this.getTabLayout() !== 'vertical') return;
-
-        if (this.nativeTabsHidden) {
-          const cfg = vscode.workspace.getConfiguration('workbench.editor');
-          if (cfg.get<string>('showTabs') !== 'none') {
-            this.log('[TabLayout] Text editor focused in vertical mode; keeping native tabs hidden');
-            void Promise.resolve(
-              cfg.update('showTabs', 'none', vscode.ConfigurationTarget.Workspace)
-            ).catch(() => {});
-          }
-        }
-
-        const panelColumn = this.getPanelsViewColumn();
-        if (panelColumn !== undefined && editor.viewColumn === panelColumn) {
-          this.log(`[TabLayout] File opened over the ClaUi group (col ${panelColumn}); moving it to a side group so the rail stays visible`);
-          void Promise.resolve(
-            vscode.commands.executeCommand('workbench.action.moveEditorToRightGroup')
-          ).catch(() => {});
-        }
-      })
-    );
-
-    // Keep the rail's Files section in sync with open/closed/dirty editors.
-    context.subscriptions.push(
-      vscode.window.tabGroups.onDidChangeTabs(() => this.broadcastTabsState()),
-      vscode.window.tabGroups.onDidChangeTabGroups(() => this.broadcastTabsState()),
+      vscode.window.tabGroups.onDidChangeTabs(() => {
+        this.showNativeTabsWhileDocumentActive();
+        this.broadcastTabsState();
+      }),
+      vscode.window.tabGroups.onDidChangeTabGroups(() => {
+        this.showNativeTabsWhileDocumentActive();
+        this.broadcastTabsState();
+      }),
     );
 
     // Older builds wrote layout + hidden-tabs to user-global settings, which
     // leaked vertical mode into every VS Code window. Clean that up once.
     void this.migratePerWindowLayoutSettings();
+
+    // Tab hibernation: periodic sweep that puts long-idle tabs to sleep
+    // (light: CLI killed, panel kept; deep: whole tab disposed, session kept
+    // as a wakeable "sleeping" entry). Config is re-read on every run.
+    this.hibernationSweepTimer = setInterval(() => {
+      void this.runHibernationSweep('timer').catch((err) => {
+        this.log(`[Hibernation] sweep failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }, TabManager.HIBERNATION_SWEEP_INTERVAL_MS);
+    setTimeout(() => {
+      void this.runHibernationSweep('startup').catch((err) => {
+        this.log(`[Hibernation] startup sweep failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }, TabManager.HIBERNATION_FIRST_SWEEP_DELAY_MS);
   }
 
   /**
@@ -337,6 +347,14 @@ export class TabManager {
         orderInGroup: entry?.orderInGroup,
         slotColor: this.tabSlotColors.get(tab.id) ?? TAB_COLORS[0],
         isBusy: (tab as { isBusyState?: () => boolean }).isBusyState?.() ?? false,
+        sleepState:
+          tab instanceof SessionTab
+            ? tab.isHibernatedDeep
+              ? 'deep'
+              : tab.isHibernatedLight
+                ? 'light'
+                : 'awake'
+            : 'awake',
         worktreePath:
           (tab as { getWorktreePath?: () => string | null }).getWorktreePath?.() ?? null,
         claudeAccountProfileId:
@@ -354,7 +372,26 @@ export class TabManager {
       .filter((id): id is string => id !== null);
   }
 
+  /**
+   * Debounced: a single tab open/close/focus (and especially a vertical-mode
+   * layout pass) fires many tabGroups events back-to-back, and every broadcast
+   * makes each live webview process a full tabList message. Coalescing the
+   * burst into one trailing broadcast keeps the payload identical while
+   * cutting webview work by an order of magnitude.
+   */
   broadcastTabsState(): void {
+    if (this.tabsBroadcastTimer) {
+      return;
+    }
+    this.tabsBroadcastTimer = setTimeout(() => {
+      this.tabsBroadcastTimer = null;
+      if (!this.isShuttingDown) {
+        this.broadcastTabsStateNow();
+      }
+    }, TabManager.TABS_BROADCAST_DEBOUNCE_MS);
+  }
+
+  private broadcastTabsStateNow(): void {
     const msg: ExtensionToWebviewMessage = {
       type: 'tabList',
       tabs: this.listTabs(),
@@ -469,22 +506,6 @@ export class TabManager {
     } catch (err) {
       this.log(`[TabLayout] closeDocument failed: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }
-
-  /**
-   * The editor column hosting the ClaUi panels. Vertical mode keeps every
-   * panel in one group, so the first live tab with a resolved column answers
-   * for all of them. Undefined when no panel is open (or none resolved yet).
-   */
-  private getPanelsViewColumn(): vscode.ViewColumn | undefined {
-    for (const tab of this.tabs.values()) {
-      if (tab.isDisposed) continue;
-      const column = (tab as { viewColumn?: vscode.ViewColumn }).viewColumn;
-      if (column !== undefined) {
-        return column;
-      }
-    }
-    return undefined;
   }
 
   /**
@@ -760,7 +781,10 @@ export class TabManager {
         onSummaryGenerated: (sessionId) => this.notifySummaryChanged(sessionId),
         onProviderChanged: (tabId, provider, cliPathOverride) =>
           this.handleProviderChanged(tabId, provider, cliPathOverride),
-        onBusyStateChanged: () => this.broadcastTabsState(),
+        onBusyStateChanged: (tabId) => {
+          this.touchTabActivity(tabId);
+          this.broadcastTabsState();
+        },
       },
       this.sessionStore,
       this.projectAnalyticsStore,
@@ -838,7 +862,10 @@ export class TabManager {
         onSummaryGenerated: (sessionId) => this.notifySummaryChanged(sessionId),
         onProviderChanged: (tabId, provider, cliPathOverride) =>
           this.handleProviderChanged(tabId, provider, cliPathOverride),
-        onBusyStateChanged: () => this.broadcastTabsState(),
+        onBusyStateChanged: (tabId) => {
+          this.touchTabActivity(tabId);
+          this.broadcastTabsState();
+        },
       },
       this.sessionStore,
       this.projectAnalyticsStore,
@@ -1395,6 +1422,14 @@ export class TabManager {
       clearTimeout(this.snapshotDebounceTimer);
       this.snapshotDebounceTimer = null;
     }
+    if (this.tabsBroadcastTimer) {
+      clearTimeout(this.tabsBroadcastTimer);
+      this.tabsBroadcastTimer = null;
+    }
+    if (this.hibernationSweepTimer) {
+      clearInterval(this.hibernationSweepTimer);
+      this.hibernationSweepTimer = null;
+    }
 
     // Last-chance sessionId refresh from live tabs
     for (const [tabId, tab] of this.tabs.entries()) {
@@ -1519,10 +1554,21 @@ export class TabManager {
 
   async applyTabLayout(mode: 'horizontal' | 'vertical'): Promise<void> {
     const live = Array.from(this.tabs.values()).filter((t) => !t.isDisposed);
-    this.log(`[TabLayout] applyTabLayout invoked: mode=${mode} liveCount=${live.length}`);
     if (live.length === 0) {
       return;
     }
+
+    // Fast path: everything already sits in one editor group (the common case
+    // for every tab created after the first). Joining groups, sweeping empty
+    // groups, and re-revealing would be no-ops that still fire a storm of
+    // tabGroups events and settle delays — skip straight to the cheap parts.
+    if (vscode.window.tabGroups.all.length <= 1) {
+      await this.syncNativeTabVisibility(mode);
+      this.broadcastTabsState();
+      return;
+    }
+
+    this.log(`[TabLayout] applyTabLayout invoked: mode=${mode} liveCount=${live.length}`);
     const activeBeforeLayout = this.getActiveTab();
 
     if (live.length > 0) {
@@ -1566,13 +1612,42 @@ export class TabManager {
         this.savedShowTabsWorkspaceValue = prior === 'none' ? undefined : prior;
         this.nativeTabsHidden = true;
       }
-      await editorConfig.update('showTabs', 'none', vscode.ConfigurationTarget.Workspace);
-      this.log(`[TabLayout] Hid native tabs in this window (workspace was "${this.savedShowTabsWorkspaceValue ?? '(unset)'}")`);
+      // Skip the write when the workspace value is already 'none' — a settings
+      // write hits disk and fans a configuration-change event out to every
+      // extension, and this method runs on every tab creation in vertical mode.
+      if (editorConfig.inspect<string>('showTabs')?.workspaceValue !== 'none') {
+        await editorConfig.update('showTabs', 'none', vscode.ConfigurationTarget.Workspace);
+        this.log(`[TabLayout] Hid native tabs in this window (workspace was "${this.savedShowTabsWorkspaceValue ?? '(unset)'}")`);
+      }
     } else if (this.nativeTabsHidden) {
       await editorConfig.update('showTabs', this.savedShowTabsWorkspaceValue, vscode.ConfigurationTarget.Workspace);
       this.log('[TabLayout] Restored native tabs in this window');
       this.nativeTabsHidden = false;
       this.savedShowTabsWorkspaceValue = undefined;
+    }
+  }
+
+  /**
+   * Vertical mode hides the native tab strip because the in-webview rail
+   * replaces it — but a document tab that becomes active covers the webview
+   * (and the rail with it). Restore the strip while a document is the active
+   * tab so files behave like ordinary tabs and the user can navigate back;
+   * handleTabFocused() re-hides the strip once a ClaUi panel is active again.
+   */
+  private showNativeTabsWhileDocumentActive(): void {
+    if (this.getTabLayout() !== 'vertical' || !this.nativeTabsHidden) {
+      return;
+    }
+    const activeTab = vscode.window.tabGroups.activeTabGroup?.activeTab;
+    if (!activeTab || !TabManager.docTabUri(activeTab)) {
+      return;
+    }
+    const editorConfig = vscode.workspace.getConfiguration('workbench.editor');
+    if (editorConfig.get<string>('showTabs') === 'none') {
+      this.log('[TabLayout] Document is the active tab in vertical mode; showing native tabs while it is open');
+      void Promise.resolve(
+        editorConfig.update('showTabs', this.savedShowTabsWorkspaceValue, vscode.ConfigurationTarget.Workspace)
+      ).catch(() => {});
     }
   }
 
@@ -1685,6 +1760,7 @@ export class TabManager {
     const entry = this.snapshotEntries.get(tabId);
     if (entry) {
       entry.lastFocusedAt = new Date().toISOString();
+      entry.lastActivityAt = entry.lastFocusedAt;
     }
     this.schedulePersistSnapshot();
     this.log(`Tab focused: ${tabId}`);
@@ -1698,6 +1774,201 @@ export class TabManager {
       if (current !== 'none') {
         void Promise.resolve(cfg.update('showTabs', 'none', vscode.ConfigurationTarget.Workspace)).catch(() => {});
       }
+    }
+  }
+
+  // --- Tab hibernation (light: CLI killed / deep: tab disposed, session kept) ---
+
+  private getHibernationConfig(): HibernationConfig {
+    const config = vscode.workspace.getConfiguration('claudeMirror.hibernation');
+    return {
+      enabled: config.get<boolean>('enabled', true),
+      idleHours: Math.max(0.1, config.get<number>('idleHours', 12)),
+      deepIdleHours: Math.max(0, config.get<number>('deepIdleHours', 24)),
+    };
+  }
+
+  /** Epoch ms of the tab's last user-visible activity, from the snapshot entry. */
+  private entryActivityMs(entry: OpenTabSnapshotEntry | undefined, nowMs: number): number {
+    const raw = entry?.lastActivityAt ?? entry?.lastFocusedAt ?? entry?.savedAt;
+    const parsed = raw ? new Date(raw).getTime() : NaN;
+    return Number.isFinite(parsed) ? parsed : nowMs;
+  }
+
+  /** Record user-visible activity (focus / busy change) for the idle clock. */
+  private touchTabActivity(tabId: string): void {
+    const entry = this.snapshotEntries.get(tabId);
+    if (entry) {
+      entry.lastActivityAt = new Date().toISOString();
+      this.schedulePersistSnapshot();
+    }
+  }
+
+  /** One sweep: collect per-tab state, ask the planner, apply the actions. */
+  async runHibernationSweep(trigger: 'timer' | 'startup' | 'manual' = 'manual'): Promise<void> {
+    if (this.isShuttingDown || this.isRestoringSnapshot) {
+      return;
+    }
+    const config = this.getHibernationConfig();
+    if (!config.enabled) {
+      return;
+    }
+    const now = Date.now();
+    const candidates: HibernationCandidate[] = [];
+    for (const tab of this.tabs.values()) {
+      if (tab.isDisposed) continue;
+      const entry = this.snapshotEntries.get(tab.id);
+      const sessionTab = tab instanceof SessionTab ? tab : null;
+      candidates.push({
+        tabId: tab.id,
+        kind: sessionTab ? 'claude' : tab instanceof CodexSessionTab ? 'codex' : 'other',
+        hasSessionId: !!(entry?.sessionId || tab.sessionId),
+        processRunning: sessionTab ? sessionTab.isProcessRunning : false,
+        isBusy: (tab as { isBusyState?: () => boolean }).isBusyState?.() ?? false,
+        isVisible: (tab as { isVisible?: boolean }).isVisible ?? true,
+        isSleeping: sessionTab
+          ? sessionTab.isHibernatedLight || sessionTab.isPendingLazyResume
+          : false,
+        isDeepSleeping: sessionTab ? sessionTab.isHibernatedDeep : false,
+        hasBackgroundWork: sessionTab ? sessionTab.hasBackgroundActivity() : false,
+        isSearchTab: (tab as { getTabKind?: () => string }).getTabKind?.() === 'search',
+        lastActivityAtMs: this.entryActivityMs(entry, now),
+      });
+    }
+    const actions = planHibernation(now, config, candidates);
+    if (actions.length === 0) {
+      return;
+    }
+    let lightCount = 0;
+    let deepCount = 0;
+    for (const action of actions) {
+      const tab = this.tabs.get(action.tabId);
+      if (!tab || tab.isDisposed) continue;
+      if (action.action === 'light' && tab instanceof SessionTab) {
+        if (tab.hibernate()) lightCount++;
+      } else if (action.action === 'deep') {
+        if (this.deepHibernateTab(action.tabId)) deepCount++;
+      }
+    }
+    if (lightCount > 0 || deepCount > 0) {
+      this.log(`[Hibernation] sweep(${trigger}): light=${lightCount} deep=${deepCount}`);
+      this.schedulePersistSnapshot();
+      this.treeChangeEmitter.fire();
+      this.broadcastTabsState();
+    }
+  }
+
+  /** Light-hibernate a specific tab (command surface). Returns success. */
+  lightHibernateTab(tabId: string): boolean {
+    const tab = this.tabs.get(tabId);
+    if (!(tab instanceof SessionTab) || tab.isDisposed) {
+      return false;
+    }
+    if (!tab.hibernate()) {
+      return false;
+    }
+    this.treeChangeEmitter.fire();
+    this.broadcastTabsState();
+    return true;
+  }
+
+  /**
+   * Deep hibernation: the tab STAYS in the tab bar, but its webview content is
+   * replaced by a tiny static placeholder (React app + chat DOM torn down) and
+   * the CLI process tree is killed. Focusing the tab (or clicking the
+   * placeholder) rebuilds the app and resumes with full history reload.
+   * Claude tabs only; search tabs are excluded (they re-spawn fresh).
+   */
+  deepHibernateTab(tabId: string): boolean {
+    const tab = this.tabs.get(tabId);
+    if (!(tab instanceof SessionTab) || tab.isDisposed) {
+      return false;
+    }
+    if (tab.isBusyState()) {
+      return false;
+    }
+    if (tab.getTabKind() === 'search') {
+      return false;
+    }
+    if (!tab.hibernateDeep()) {
+      return false;
+    }
+    const entry = this.snapshotEntries.get(tabId);
+    if (entry) {
+      const now = new Date().toISOString();
+      entry.hibernated = true;
+      entry.hibernatedAt = now;
+      entry.savedAt = now;
+    }
+    this.log(`[Hibernation] deep-hibernated tab=${tabId} (kept in the tab bar as a sleeping placeholder)`);
+    this.schedulePersistSnapshot();
+    this.treeChangeEmitter.fire();
+    this.broadcastTabsState();
+    return true;
+  }
+
+  /**
+   * Re-apply persisted per-tab config (Claude account profile, Happy CLI path,
+   * bridge command + picker selection, worktree) to a freshly created tab.
+   * Shared by the workspace-restore loop and deep-hibernation wake.
+   */
+  private applyEntryConfigToTab(
+    tab: SessionTab | CodexSessionTab,
+    entry: OpenTabSnapshotEntry,
+  ): void {
+    if (entry.provider === 'claude' && tab instanceof SessionTab) {
+      const requestedProfileId =
+        entry.claudeAccountProfileId ?? DEFAULT_CLAUDE_ACCOUNT_PROFILE_ID;
+      const profile = this.accountProfileStore.getProfile(requestedProfileId);
+      if (profile) {
+        this.applyClaudeAccountProfile(tab, profile);
+      } else {
+        this.applyClaudeAccountProfile(tab, this.accountProfileStore.getDefaultProfile());
+        this.log(
+          `[OpenTabsSnapshot] Claude account profile missing during restore: ${requestedProfileId}; using Default`,
+        );
+        void vscode.window.showWarningMessage(
+          `Claude account profile "${requestedProfileId}" no longer exists. Restored that tab with Default instead.`,
+        );
+      }
+    }
+
+    // For remote (Happy) tabs, prefer the live setting over the snapshot value
+    // in case the user has since moved the CLI. A bridge cliPathOverride must
+    // NOT take this branch, even if a legacy snapshot mislabeled it
+    // provider:'remote' — otherwise the bridge command is replaced with `happy`.
+    if (
+      entry.provider === 'remote' &&
+      tab instanceof SessionTab &&
+      !isBridgeCliCommand(entry.cliPathOverride)
+    ) {
+      const livePath = vscode.workspace
+        .getConfiguration('claudeMirror')
+        .get<string>('happy.cliPath', '');
+      const chosenPath = livePath || entry.cliPathOverride || 'happy';
+      tab.setCliPathOverride(chosenPath);
+    }
+
+    // Bridge tabs: recompute the bridge command from the CURRENT extension
+    // install (the stored absolute path breaks on every extension update).
+    // Keyed on the bridge cliPathOverride marker, NOT on provider, so legacy
+    // snapshots saved as 'remote' are recovered as a bridge rather than Happy.
+    if (tab instanceof SessionTab && isBridgeCliCommand(entry.cliPathOverride)) {
+      const bridge = BridgeProviderService.get();
+      if (bridge) {
+        tab.setCliPathOverride(bridge.cliCommand());
+      }
+      // Restore the picker selection + in-memory backend key so the first
+      // cross-backend switch after reload is detected correctly.
+      tab.restoreBridgeSelection(entry.selectedModel);
+    }
+
+    // Re-apply the worktree so the session spawns in the same tree (must run
+    // before resume/lazy-wake so getEffectiveCwd sees it).
+    if (entry.worktreePath) {
+      (tab as { setWorktreePath?: (p: string | null) => void }).setWorktreePath?.(
+        entry.worktreePath,
+      );
     }
   }
 
@@ -1718,6 +1989,7 @@ export class TabManager {
       claudeAccountProfileId:
         tab instanceof SessionTab ? tab.getClaudeAccountProfileId() ?? undefined : undefined,
       savedAt: new Date().toISOString(),
+      lastActivityAt: new Date().toISOString(),
     };
     this.snapshotEntries.set(tab.id, entry);
     this.schedulePersistSnapshot();
@@ -1797,6 +2069,29 @@ export class TabManager {
   }
 
   private buildSnapshot(): OpenTabsSnapshot {
+    // Refresh the picker selection from live tabs on EVERY persist (incremental
+    // debounce + shutdown), so a bridge tab's `bridge:*` model — and thus its
+    // restored backend/bridgeBackend — is never lost. The other mutation paths
+    // (seedSnapshotEntry, handleProviderChanged) don't carry selectedModel.
+    for (const [tabId, entry] of this.snapshotEntries) {
+      const tab = this.tabs.get(tabId);
+      if (tab instanceof SessionTab) {
+        const selected = tab.getSelectedModel();
+        if (selected) {
+          entry.selectedModel = selected;
+        }
+        // Keep the deep-hibernation flag truthful for live tabs so a reload
+        // restores them as sleeping placeholders (preserved-* entries have no
+        // live tab and are never touched here).
+        if (tab.isHibernatedDeep) {
+          entry.hibernated = true;
+          entry.hibernatedAt = entry.hibernatedAt ?? new Date().toISOString();
+        } else if (entry.hibernated) {
+          entry.hibernated = undefined;
+          entry.hibernatedAt = undefined;
+        }
+      }
+    }
     const activeEntry = this.activeTabId ? this.snapshotEntries.get(this.activeTabId) : undefined;
     const activeSessionId = activeEntry?.sessionId || undefined;
     return {
@@ -1943,54 +2238,9 @@ export class TabManager {
                 this.log(`[OpenTabsSnapshot] Pinning subsequent restored tabs to column ${restoreColumn}`);
               }
 
-              if (entry.provider === 'claude' && tab instanceof SessionTab) {
-                const requestedProfileId =
-                  entry.claudeAccountProfileId ?? DEFAULT_CLAUDE_ACCOUNT_PROFILE_ID;
-                const profile = this.accountProfileStore.getProfile(requestedProfileId);
-                if (profile) {
-                  this.applyClaudeAccountProfile(tab, profile);
-                } else {
-                  this.applyClaudeAccountProfile(tab, this.accountProfileStore.getDefaultProfile());
-                  this.log(
-                    `[OpenTabsSnapshot] Claude account profile missing during restore: ${requestedProfileId}; using Default`,
-                  );
-                  void vscode.window.showWarningMessage(
-                    `Claude account profile "${requestedProfileId}" no longer exists. Restored that tab with Default instead.`,
-                  );
-                }
-              }
-
-              // For remote (Happy) tabs, prefer the live setting over the
-              // snapshot value in case the user has since moved the CLI.
-              if (entry.provider === 'remote' && tab instanceof SessionTab) {
-                const livePath = vscode.workspace
-                  .getConfiguration('claudeMirror')
-                  .get<string>('happy.cliPath', '');
-                const chosenPath = livePath || entry.cliPathOverride || 'happy';
-                tab.setCliPathOverride(chosenPath);
-              }
-
-              // Bridge tabs (claude provider + bridge cliPathOverride): recompute
-              // the bridge command from the CURRENT extension install — the
-              // stored absolute path breaks on every extension update.
-              if (
-                entry.provider === 'claude' &&
-                tab instanceof SessionTab &&
-                isBridgeCliCommand(entry.cliPathOverride)
-              ) {
-                const bridge = BridgeProviderService.get();
-                if (bridge) {
-                  tab.setCliPathOverride(bridge.cliCommand());
-                }
-              }
-
-              // Re-apply the worktree so the restored session spawns in the same
-              // tree (must run before resume/lazy-wake so getEffectiveCwd sees it).
-              if (entry.worktreePath) {
-                (tab as { setWorktreePath?: (p: string | null) => void }).setWorktreePath?.(
-                  entry.worktreePath,
-                );
-              }
+              // Account profile, Happy CLI path, bridge command + selection,
+              // worktree — shared with deep-hibernation wake.
+              this.applyEntryConfigToTab(tab, entry);
 
               const isActive =
                 !!snapshot.activeSessionId && entry.sessionId === snapshot.activeSessionId;
@@ -2024,6 +2274,13 @@ export class TabManager {
                 }
                 this.tabSlotColors.set(tab.id, SMART_SEARCH_COLOR);
                 this.applyEffectiveTabIcon(tab.id);
+              } else if (entry.hibernated && tab instanceof SessionTab) {
+                // Deep-hibernated: keep the tab in the bar as a sleeping
+                // placeholder (no CLI, no React app). Focus-wake is armed
+                // together with the lazy tabs after the restore loop settles.
+                tab.prepareForLazyResume(entry.sessionId, entry.customName);
+                tab.hibernateDeep({ armWake: false });
+                lazyTabs.push(tab);
               } else if (isActive) {
                 // Eager start so the user lands on a live, ready session.
                 await tab.startSession({ resume: entry.sessionId });
@@ -2120,7 +2377,15 @@ export class TabManager {
         orderInGroup: original?.orderInGroup,
         tabKind,
         searchModel: tabKind === 'search' ? originalSearch?.searchModel : undefined,
+        // Persist the picker selection so a bridge tab restores its backend/model
+        // (bridge:* values are deliberately never written to config).
+        selectedModel:
+          tab instanceof SessionTab
+            ? tab.getSelectedModel() || original?.selectedModel
+            : undefined,
         lastFocusedAt: original?.lastFocusedAt,
+        lastActivityAt:
+          original?.lastActivityAt ?? original?.lastFocusedAt ?? new Date().toISOString(),
         tabOrder: original?.tabOrder,
       });
       this.applyEffectiveTabIcon(tab.id);
@@ -2151,7 +2416,7 @@ export class TabManager {
 
     if (truncated) {
       void vscode.window.showInformationMessage(
-        `ClaUi restored the ${maxRestore} most recent sessions. Older sessions can be reopened from Conversation History (Ctrl+Shift+H).`
+        `ClaUi restored the ${maxRestore} most recent sessions. Older sessions are sleeping in the Sessions view - click one to wake it.`
       );
     }
     if (failed > 0) {

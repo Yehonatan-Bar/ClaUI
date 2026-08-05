@@ -27,8 +27,13 @@ interface MessageBubbleProps {
 /**
  * Renders a single completed message (user or assistant).
  * User messages show an Edit button on hover (hidden while assistant is busy).
+ *
+ * Memoized: MessageList re-renders on chat activity, and without memo every
+ * bubble (markdown parsing, code highlighting) re-runs each time. Message
+ * objects keep their identity once finalized and the MessageList callbacks
+ * are useCallback-stable, so the shallow prop compare skips untouched bubbles.
  */
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, onEditAndResend, onFork, onCheckpointRevert, onCheckpointRedo }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message, isBusy, onEditAndResend, onFork, onCheckpointRevert, onCheckpointRedo }) => {
   const isUser = message.role === 'user';
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -475,7 +480,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isBusy, o
       )}
     </div>
   );
-};
+});
+
+MessageBubble.displayName = 'MessageBubble';
 
 /**
  * Renders content blocks with agent tool_use -> tool_result pairing.

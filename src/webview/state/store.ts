@@ -213,6 +213,9 @@ export interface AppState {
   deferredMessages: Record<string, { text: string; addedAt: number }>;
   // Silent crash resume: when true, the input area shows a subtle "(reconnecting...)" hint.
   silentResumeActive: boolean;
+  // Tab hibernation: when true, the CLI was stopped to save CPU/RAM and the
+  // input area shows a "sleeping" banner (click or type to wake).
+  hibernationActive: boolean;
 
   // Cost
   cost: CostInfo;
@@ -756,6 +759,7 @@ export interface AppState {
   clearDeferredMessage: (id: string) => void;
   failDeferredMessage: (id: string, text: string, reason: string) => void;
   setSilentResumeActive: (active: boolean) => void;
+  setHibernationActive: (active: boolean) => void;
 
   setBusy: (busy: boolean) => void;
   setHandoffProgress: (progress: {
@@ -1211,6 +1215,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   lastAssistantSnapshot: null,
   deferredMessages: {},
   silentResumeActive: false,
+  hibernationActive: false,
   cost: { ...initialCost },
   lastError: null,
   textSettings: { ...defaultTextSettings },
@@ -2121,6 +2126,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   /** Silent crash resume: toggle the "(reconnecting...)" hint in the input area. */
   setSilentResumeActive: (active) => set({ silentResumeActive: active }),
 
+  /** Tab hibernation: toggle the "sleeping" banner in the input area. */
+  setHibernationActive: (active) => set({ hibernationActive: active }),
+
   setBusy: (busy) =>
     set((state) => {
       const now = Date.now();
@@ -2615,14 +2623,31 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setTabLayout: (layout) => set({ tabLayout: layout }),
   setVerticalTabRailWidth: (width) => set({ verticalTabRailWidth: width }),
-  setOpenTabs: (tabs, activeTabId, groups, collapsedGroupIds, openDocuments) =>
-    set({
+  setOpenTabs: (tabs, activeTabId, groups, collapsedGroupIds, openDocuments) => {
+    const next = {
       openTabs: tabs,
       activeTabId,
       tabGroups: groups ?? [],
       collapsedGroupIds: collapsedGroupIds ?? [],
       openDocuments: openDocuments ?? [],
-    }),
+    };
+    // The extension broadcasts the full tab list on every tabGroups event, so
+    // most messages carry data identical to what this webview already holds.
+    // Skipping the set() entirely keeps state identity stable, which prevents
+    // a re-render of every store subscriber in every live webview.
+    const s = get();
+    const current = {
+      openTabs: s.openTabs,
+      activeTabId: s.activeTabId,
+      tabGroups: s.tabGroups,
+      collapsedGroupIds: s.collapsedGroupIds,
+      openDocuments: s.openDocuments,
+    };
+    if (JSON.stringify(next) === JSON.stringify(current)) {
+      return;
+    }
+    set(next);
+  },
 
   setVitalsEnabled: (enabled) =>
     set((state) => {

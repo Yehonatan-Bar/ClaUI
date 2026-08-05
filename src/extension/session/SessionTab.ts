@@ -28,7 +28,7 @@ import {
   isBridgeCliCommand,
   isBridgeModelValue,
 } from '../bridge/BridgeProviderService';
-import { buildWebviewHtml } from '../webview/WebviewProvider';
+import { buildWebviewHtml, buildSleepingPlaceholderHtml } from '../webview/WebviewProvider';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import type { TokenUsageRatioTracker } from './TokenUsageRatioTracker';
 import { AuthManager } from '../auth/AuthManager';
@@ -158,6 +158,21 @@ export class SessionTab implements WebviewBridge {
   private silentResumeTimer: ReturnType<typeof setTimeout> | null = null;
   /** Silent crash resume: timer for the subtle "(reconnecting...)" hint. */
   private silentResumeHintTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Tab hibernation: true while this tab is light-hibernated — the CLI process
+   *  was deliberately stopped to free CPU/RAM but the panel stays open. Waking
+   *  (focus / banner click / typed message) respawns with --resume + skipReplay. */
+  private hibernatedLightFlag = false;
+  /** Deep hibernation: the webview content was replaced by a static placeholder
+   *  (React app + chat DOM torn down) in addition to the CLI being stopped.
+   *  The tab STAYS in the tab bar; waking rebuilds the app and resumes. */
+  private deepHibernatedFlag = false;
+  /** Deep hibernation: gates the focus-wake so the spurious view-state events
+   *  fired during restore-time panel creation cannot wake the tab. */
+  private deepWakeArmed = false;
+  /** Deep hibernation: true while a deep wake (HTML rebuild + resume) runs. */
+  private deepWakeInFlight = false;
+  /** Last color drawn on the native tab icon (restored when waking from sleep). */
+  private lastIconColor = '';
   /** Streaming message id observed since the most recent message_start (cleared on result). */
   private currentStreamingMessageId: string | null = null;
   /** True between message_start and result; informs whether a crash interrupted streaming. */
@@ -456,6 +471,12 @@ export class SessionTab implements WebviewBridge {
     if (this.disposed || !this.panel) {
       return;
     }
+    // Deep-hibernated: the webview is a static placeholder — drop messages
+    // instead of queueing them unboundedly. The wake path rebuilds all state
+    // from scratch (fresh app + --resume + history reload).
+    if (this.deepHibernatedFlag) {
+      return;
+    }
     const outbound =
       msg.type === 'sessionStarted'
         ? { ...msg, provider: this.getProvider(), tabKind: this.kind, ...this.worktreeDisplay() }
@@ -587,6 +608,7 @@ export class SessionTab implements WebviewBridge {
   async switchModel(model: string): Promise<void> {
     // Record the selection for THIS tab so the picker reflects it immediately
     // (even before the restart finishes) and stays correct on webview re-ready.
+    const previousModel = this.selectedModel;
     this.selectedModel = model;
     const sessionToResume = this.processManager.currentSessionId;
     const atSessionStart = this.messageHandler.isAtSessionStart;
@@ -605,7 +627,23 @@ export class SessionTab implements WebviewBridge {
     if (wantsBridge && !hadBridge) {
       const bridge = BridgeProviderService.get();
       if (!bridge) {
+        this.selectedModel = previousModel;
+        this.postMessage({ type: 'modelSetting', model: previousModel });
         this.postMessage({ type: 'error', message: 'Bridge Providers service is not available.' });
+        return;
+      }
+      // The bundled bridge runtime is a Node script; it needs `node` on PATH.
+      // Fail early with a clear message instead of a cryptic spawn error, and
+      // revert the picker to the tab's previous model.
+      if (!bridge.nodeAvailable()) {
+        this.selectedModel = previousModel;
+        this.postMessage({ type: 'modelSetting', model: previousModel });
+        this.postMessage({
+          type: 'error',
+          message:
+            'Bridge Providers need Node.js on PATH to run the bundled runtime. ' +
+            'Install Node.js (https://nodejs.org) and reload the window, then try again.',
+        });
         return;
       }
       this.cliPathOverride = bridge.cliCommand();
@@ -690,8 +728,9 @@ export class SessionTab implements WebviewBridge {
     this.postMessage({ type: 'processBusy', busy: true });
     this.processManager.stop();
 
-    // This restart supersedes any armed lazy-wake / silent-resume cycle for
-    // this tab; clear them so a later focus event cannot double-spawn the CLI.
+    // This restart supersedes any armed lazy-wake / silent-resume / hibernation
+    // cycle for this tab; clear them so a later focus event cannot double-spawn.
+    this.clearHibernationMarkers('mcp-restart');
     this.lazyWakeArmed = false;
     this.silentResumeArmedFlag = false;
     this.silentResumeInFlight = false;
@@ -703,6 +742,10 @@ export class SessionTab implements WebviewBridge {
         resume: sessionToResume,
         skipReplay: true,
         model: this.currentModel || undefined,
+        // Override currentModel for bridge tabs: currentModel is the backend
+        // display string (e.g. `grok/…`), not a namespaced bridge:* value, so
+        // the runtime would fail to select a backend. Must come AFTER `model`.
+        ...this.bridgeModelSpawnOption(),
         cwd: this.getEffectiveCwd(),
         cliPathOverride: this.cliPathOverride ?? undefined,
         appendSystemPrompt: this.appendSystemPrompt ?? undefined,
@@ -760,12 +803,294 @@ export class SessionTab implements WebviewBridge {
   armLazyWake(): void {
     if (this.pendingResumeSessionId) {
       this.lazyWakeArmed = true;
+      // Restored deep-hibernated tabs defer their focus-wake to this point too.
+      if (this.deepHibernatedFlag) {
+        this.deepWakeArmed = true;
+      }
     }
   }
 
   /** Whether this tab is in lazy-resume state (CLI not spawned yet). */
   get isPendingLazyResume(): boolean {
     return this.pendingResumeSessionId !== null;
+  }
+
+  // ====== Tab hibernation (light) ======
+
+  /** True while this tab is light-hibernated (CLI stopped, panel kept). */
+  get isHibernatedLight(): boolean {
+    return this.hibernatedLightFlag;
+  }
+
+  /** Whether a CLI process is currently running (hibernation planner input). */
+  get isProcessRunning(): boolean {
+    return this.processManager.isRunning;
+  }
+
+  /** True when background activity makes hibernation unsafe: an active review
+   *  loop, merge assistant, btw side-session, turn capture or in-flight resume. */
+  hasBackgroundActivity(): boolean {
+    return (
+      !!this.reviewLoop?.isRunning ||
+      this.mergeAssistant !== null ||
+      this.btwSession !== null ||
+      this.turnCapture !== null ||
+      this.silentResumeInFlight
+    );
+  }
+
+  /** Internal-state eligibility for light hibernation. Idle time and panel
+   *  visibility are the caller's (TabManager sweep) responsibility. */
+  canHibernate(): boolean {
+    return (
+      !this.disposed &&
+      !this.isBusy &&
+      !this.currentlyStreaming &&
+      !this.hibernatedLightFlag &&
+      !this.silentResumeArmedFlag &&
+      !this.isPendingLazyResume &&
+      this.processManager.isRunning &&
+      !!(this.processManager.currentSessionId ?? this.lastKnownSessionId) &&
+      !this.hasBackgroundActivity()
+    );
+  }
+
+  /** Light hibernation: kill the CLI process tree (frees its RAM/CPU and any
+   *  MCP child processes) but keep the webview panel. The tab enters the armed
+   *  silent-resume state so a typed message is deferred through the existing
+   *  crash-resume pipeline; focus or a banner click respawns via
+   *  wakeFromHibernation(). Returns true when the tab actually hibernated. */
+  hibernate(): boolean {
+    if (!this.canHibernate()) {
+      return false;
+    }
+    const sid = this.processManager.currentSessionId ?? this.lastKnownSessionId;
+    if (!sid) {
+      return false;
+    }
+    this.log(
+      `[Tab ${this.tabNumber}] [Hibernation] light-hibernating session ${sid.slice(0, 8)} ` +
+        `(CLI stopped, panel kept)`,
+    );
+    // Persist analytics before the process counters go away. The analyticsSaved
+    // guard resets on the next system/init, so post-wake turns still save.
+    this.saveProjectAnalytics();
+    this.suppressNextExit = true;
+    this.processManager.stop();
+    this.hibernatedLightFlag = true;
+    this.silentResumeArmedFlag = true;
+    this.silentResumeAttempts = 0;
+    this.pendingResumeSessionId = sid;
+    this.processManager.seedSessionId(sid);
+    this.postMessage({ type: 'hibernationState', hibernated: true });
+    this.applySleepingVisuals(true);
+    return true;
+  }
+
+  /** True while this tab is deep-hibernated (placeholder webview, tab in bar). */
+  get isHibernatedDeep(): boolean {
+    return this.deepHibernatedFlag;
+  }
+
+  /** Deep hibernation: on top of stopping the CLI (light), replace the webview
+   *  content with a tiny static placeholder — tearing down the React app, chat
+   *  DOM and store, so the retained webview context shrinks to a few KB. The
+   *  tab STAYS in the tab bar with sleeping visuals; focusing it (or clicking
+   *  the placeholder) rebuilds the app and resumes with full history reload.
+   *  `armWake:false` defers focus-wake until armLazyWake() (restore flow). */
+  hibernateDeep(options?: { armWake?: boolean }): boolean {
+    if (this.disposed || this.deepHibernatedFlag) {
+      return false;
+    }
+    const sid =
+      this.pendingResumeSessionId ??
+      this.processManager.currentSessionId ??
+      this.lastKnownSessionId;
+    if (!sid) {
+      return false;
+    }
+    if (
+      this.isBusy ||
+      this.currentlyStreaming ||
+      this.silentResumeInFlight ||
+      this.hasBackgroundActivity()
+    ) {
+      return false;
+    }
+    if (this.processManager.isRunning) {
+      // Live CLI: run the light phase first (stop + arm resume + visuals).
+      if (!this.hibernate()) {
+        return false;
+      }
+    } else {
+      // Already asleep in some form (light-hibernated, boot-time lazy, or
+      // crash-armed): keep/seed the resume target and ensure sleeping visuals.
+      this.pendingResumeSessionId = sid;
+      this.processManager.seedSessionId(sid);
+      this.applySleepingVisuals(true);
+    }
+    this.deepHibernatedFlag = true;
+    this.deepWakeArmed = options?.armWake ?? true;
+    this.isWebviewReady = false;
+    this.pendingMessages = [];
+    try {
+      this.panel.webview.html = buildSleepingPlaceholderHtml(this.baseTitle);
+    } catch {
+      this.deepHibernatedFlag = false;
+      return false;
+    }
+    this.log(
+      `[Tab ${this.tabNumber}] [Hibernation] deep: webview content torn down; ` +
+        `session ${sid.slice(0, 8)} stays in the tab bar as a sleeping placeholder`,
+    );
+    return true;
+  }
+
+  /** Wake from deep hibernation: rebuild the real webview app, then resume the
+   *  session via the full startSession path (spawn + history reload), exactly
+   *  like a boot-time lazy wake. Messages posted before the fresh webview's
+   *  'ready' are queued and flushed by the existing postMessage machinery. */
+  private async wakeFromDeepHibernation(trigger: string): Promise<void> {
+    if (this.disposed || !this.deepHibernatedFlag || this.deepWakeInFlight) {
+      return;
+    }
+    const sid =
+      this.pendingResumeSessionId ??
+      this.processManager.currentSessionId ??
+      this.lastKnownSessionId;
+    this.deepWakeInFlight = true;
+    this.deepHibernatedFlag = false;
+    this.deepWakeArmed = false;
+    this.hibernatedLightFlag = false;
+    this.silentResumeArmedFlag = false;
+    this.lazyWakeArmed = false;
+    this.pendingResumeSessionId = null;
+    this.log(
+      `[Tab ${this.tabNumber}] [Hibernation] deep wake (${trigger}) ` +
+        `session=${sid?.slice(0, 8) ?? 'none'}`,
+    );
+    try {
+      this.isWebviewReady = false;
+      this.pendingMessages = [];
+      this.panel.webview.html = buildWebviewHtml(this.panel.webview, this.context);
+      this.applySleepingVisuals(false);
+      if (!sid) {
+        return;
+      }
+      await this.startSession({ resume: sid });
+      this.log(`[Tab ${this.tabNumber}] [Hibernation] deep wake complete`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.log(`[Tab ${this.tabNumber}] [Hibernation] deep wake failed: ${msg}`);
+      this.postMessage({ type: 'error', message: `Could not wake the sleeping session: ${msg}` });
+      this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+    } finally {
+      this.deepWakeInFlight = false;
+    }
+  }
+
+  /** Wake from light hibernation: respawn the CLI with --resume + skipReplay.
+   *  Mirrors restartWithCurrentSession(): start() resolving is success — the
+   *  webview history is intact, so no init handshake or replay is needed. Any
+   *  messages deferred while asleep are flushed once the process is up. */
+  private async wakeFromHibernation(trigger: string): Promise<void> {
+    if (this.disposed || !this.hibernatedLightFlag) {
+      return;
+    }
+    if (this.silentResumeInFlight || this.processManager.isRunning) {
+      return;
+    }
+    const sid = this.pendingResumeSessionId;
+    if (!sid) {
+      return;
+    }
+    this.silentResumeInFlight = true; // blocks double-wake (focus + typed message)
+    this.log(
+      `[Tab ${this.tabNumber}] [Hibernation] waking (${trigger}) session=${sid.slice(0, 8)}`,
+    );
+    try {
+      await this.processManager.start({
+        resume: sid,
+        skipReplay: true,
+        ...this.bridgeModelSpawnOption(),
+        cwd: this.getEffectiveCwd(),
+        cliPathOverride: this.cliPathOverride ?? undefined,
+        appendSystemPrompt: this.appendSystemPrompt ?? undefined,
+        allowedTools: this.allowedTools ?? undefined,
+        ...this.claudeAccountProcessOptions(),
+      });
+      this.processManager.seedSessionId(sid);
+      this.silentResumeInFlight = false;
+      this.hibernatedLightFlag = false;
+      this.silentResumeArmedFlag = false;
+      this.pendingResumeSessionId = null;
+      this.postMessage({ type: 'hibernationState', hibernated: false });
+      this.applySleepingVisuals(false);
+      this.flushSilentResumeQueue();
+      this.log(`[Tab ${this.tabNumber}] [Hibernation] awake`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.log(`[Tab ${this.tabNumber}] [Hibernation] wake failed: ${msg}`);
+      this.silentResumeInFlight = false;
+      this.hibernatedLightFlag = false;
+      this.postMessage({ type: 'hibernationState', hibernated: false });
+      this.applySleepingVisuals(false);
+      // Restores any deferred messages to the input and shows the crash UX.
+      this.escalateToVisibleCrash('spawn-error');
+    }
+  }
+
+  /** Clear hibernation bookkeeping when another path (full startSession, review
+   *  loop resume, MCP restart) takes over the process lifecycle. */
+  private clearHibernationMarkers(reason: string): void {
+    if (!this.hibernatedLightFlag) {
+      return;
+    }
+    this.hibernatedLightFlag = false;
+    this.silentResumeArmedFlag = false;
+    this.pendingResumeSessionId = null;
+    this.postMessage({ type: 'hibernationState', hibernated: false });
+    this.applySleepingVisuals(false);
+    this.log(`[Tab ${this.tabNumber}] [Hibernation] markers cleared (${reason})`);
+  }
+
+  /** Dim/restore the native tab title + icon while sleeping. */
+  private applySleepingVisuals(sleeping: boolean): void {
+    if (this.disposed) {
+      return;
+    }
+    try {
+      if (sleeping) {
+        this.panel.title = `${this.baseTitle} (sleeping)`;
+        this.setSleepingIcon();
+      } else {
+        this.panel.title = this.baseTitle;
+        if (this.lastIconColor) {
+          this.setTabIcon(this.lastIconColor);
+        }
+      }
+    } catch {
+      // Panel disposed between the flag check and the access
+    }
+  }
+
+  /** Hollow, faded circle icon signalling a sleeping tab. Written to a distinct
+   *  file name so VS Code does not serve the cached full-color icon. */
+  private setSleepingIcon(): void {
+    try {
+      const color = this.lastIconColor || '#888888';
+      const svgContent =
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">` +
+        `<circle cx="8" cy="8" r="6.5" fill="${color}" fill-opacity="0.18" ` +
+        `stroke="${color}" stroke-opacity="0.55"/></svg>`;
+      const storageDir = this.context.globalStorageUri.fsPath;
+      fs.mkdirSync(storageDir, { recursive: true });
+      const iconPath = path.join(storageDir, `tab-icon-${this.tabNumber}-sleeping.svg`);
+      fs.writeFileSync(iconPath, svgContent, 'utf-8');
+      this.panel.iconPath = vscode.Uri.file(iconPath);
+    } catch {
+      // Non-critical - tab just keeps its normal icon
+    }
   }
 
   // ====== Silent crash resume API ======
@@ -854,6 +1179,10 @@ export class SessionTab implements WebviewBridge {
   /** Idempotently begin the silent resume: spawn CLI with --resume + skipReplay. */
   private async beginSilentResume(): Promise<void> {
     if (this.disposed) return;
+    // Hibernation wakes take their own path: no init handshake, no crash timers.
+    if (this.hibernatedLightFlag) {
+      return this.wakeFromHibernation('message');
+    }
     if (!this.silentResumeArmedFlag) return;
     if (this.silentResumeInFlight) return; // already spawning; queue will flush when ready
     if (!this.pendingResumeSessionId) return;
@@ -898,6 +1227,8 @@ export class SessionTab implements WebviewBridge {
       await this.processManager.start({
         resume: sid,
         skipReplay: true,
+        // Keep a bridge tab on its backend across silent crash recovery too.
+        ...this.bridgeModelSpawnOption(),
         cwd: this.getEffectiveCwd(),
         cliPathOverride: this.cliPathOverride ?? undefined,
         appendSystemPrompt: this.appendSystemPrompt ?? undefined,
@@ -1011,6 +1342,11 @@ export class SessionTab implements WebviewBridge {
     this.clearSilentResumeTimers();
     this.silentResumeInFlight = false;
     this.silentResumeArmedFlag = false;
+    if (this.hibernatedLightFlag) {
+      this.hibernatedLightFlag = false;
+      this.postMessage({ type: 'hibernationState', hibernated: false });
+      this.applySleepingVisuals(false);
+    }
     // Hide reconnecting hint.
     this.postMessage({ type: 'silentResumeStatus', active: false });
 
@@ -1064,6 +1400,7 @@ export class SessionTab implements WebviewBridge {
             try {
               await this.processManager.start({
                 resume: sid,
+                ...this.bridgeModelSpawnOption(),
                 cwd: this.getEffectiveCwd(),
                 cliPathOverride: this.cliPathOverride ?? undefined,
                 ...this.claudeAccountProcessOptions(),
@@ -1098,6 +1435,31 @@ export class SessionTab implements WebviewBridge {
 
   setCliPathOverride(pathOrNull: string | null): void {
     this.cliPathOverride = pathOrNull;
+  }
+
+  /** Restore per-tab bridge state after a window reload: the picker selection
+   *  and the in-memory backend key used for provider-boundary detection in
+   *  switchModel. Without this, the first cross-backend switch after a reload
+   *  is mis-detected and resumes stale context instead of restarting fresh. */
+  restoreBridgeSelection(model: string | undefined): void {
+    if (!model || !isBridgeModelValue(model)) return;
+    this.selectedModel = model;
+    this.bridgeBackend = bridgeBackendKey(model);
+  }
+
+  /** Spawn option forcing a bridge tab's namespaced `bridge:*` model onto a
+   *  resume/respawn. The bridge runtime needs an explicit backend whenever its
+   *  per-session store has no entry yet (e.g. a session spawned but never
+   *  messaged, then reloaded), otherwise it errors with "no backend selected".
+   *  Returns the SELECTED bridge model, not `currentModel` (which is the backend
+   *  display string like `grok/…`, not a namespaced value). Spread this AFTER
+   *  any caller-provided `model` so it overrides a wrong value for bridge tabs.
+   *  Empty for non-bridge tabs, so Claude behaviour is unchanged. */
+  private bridgeModelSpawnOption(): { model?: string } {
+    if (isBridgeCliCommand(this.cliPathOverride) && isBridgeModelValue(this.selectedModel)) {
+      return { model: this.selectedModel };
+    }
+    return {};
   }
 
   /** Set the worktree this tab's session runs in. Call before startSession so it
@@ -1172,6 +1534,7 @@ export class SessionTab implements WebviewBridge {
 
   /** Start a new CLI session in this tab (Claude by default, Happy when overridden) */
   async startSession(options?: { resume?: string; fork?: boolean; skipReplay?: boolean; truncatedFork?: boolean; cwd?: string; model?: string }): Promise<void> {
+    this.clearHibernationMarkers('startSession');
     this.messageHandler.resetTransientStateForHostLifecycle(
       options?.resume
         ? 'SessionTab.startSession(resume)'
@@ -1195,6 +1558,10 @@ export class SessionTab implements WebviewBridge {
 
     await this.processManager.start({
       ...(options ?? {}),
+      // Force the correct bridge:* model onto a bridge tab's (re)spawn — resume
+      // and lazy-wake pass no model; see bridgeModelSpawnOption. Spread AFTER
+      // options so it overrides any wrong value for bridge tabs.
+      ...this.bridgeModelSpawnOption(),
       cwd: effectiveCwd,
       cliPathOverride: this.cliPathOverride ?? undefined,
       appendSystemPrompt: this.appendSystemPrompt ?? undefined,
@@ -1624,6 +1991,7 @@ export class SessionTab implements WebviewBridge {
         await this.processManager.start({
           resume: sid,
           skipReplay: true,
+          ...this.bridgeModelSpawnOption(),
           cwd: this.getEffectiveCwd(),
           cliPathOverride: this.cliPathOverride ?? undefined,
           appendSystemPrompt: this.appendSystemPrompt ?? undefined,
@@ -1631,6 +1999,7 @@ export class SessionTab implements WebviewBridge {
           ...this.claudeAccountProcessOptions(),
         });
         this.processManager.seedSessionId(sid);
+        this.clearHibernationMarkers('review-loop-resume');
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         this.postMessage({ type: 'reviewLoopEvent', event: { kind: 'error', round: 0, text: `Could not resume the session to review: ${reason}` } });
@@ -2054,11 +2423,18 @@ export class SessionTab implements WebviewBridge {
   /** Re-color the native tab icon. Called by TabManager when this tab joins/leaves a folder. */
   applyTabColor(color: string): void {
     if (this.disposed) return;
+    this.lastIconColor = color;
+    // While sleeping, keep the dimmed icon; the new color applies on wake.
+    if (this.hibernatedLightFlag) {
+      this.setSleepingIcon();
+      return;
+    }
     this.setTabIcon(color);
   }
 
   /** Generate a colored SVG circle and set it as the panel's tab icon */
   private setTabIcon(color: string): void {
+    this.lastIconColor = color;
     try {
       const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="${color}"/></svg>`;
       const storageDir = this.context.globalStorageUri.fsPath;
@@ -2101,6 +2477,18 @@ export class SessionTab implements WebviewBridge {
         void this.handleRenameRequest();
         return;
       }
+      // Hibernation: the user clicked the "sleeping" banner to wake the CLI.
+      if (message.type === 'wakeFromHibernation') {
+        void this.wakeFromHibernation('banner-click');
+        return;
+      }
+      // Deep hibernation: the user clicked the static placeholder page.
+      // An explicit click always wakes, even before armLazyWake() ran.
+      if (message.type === 'wakeFromDeepHibernation') {
+        this.deepWakeArmed = true;
+        void this.wakeFromDeepHibernation('placeholder-click');
+        return;
+      }
       if (message.type === 'ready') {
         this.isWebviewReady = true;
         this.flushPendingMessages();
@@ -2120,10 +2508,19 @@ export class SessionTab implements WebviewBridge {
         `[Tab ${this.tabNumber}] ViewState changed: active=${e.webviewPanel.active} visible=${e.webviewPanel.visible}`,
       );
       if (e.webviewPanel.active) {
-        // Wake silently for a mid-session crash recovery — different state path
-        // from boot lazy-resume; this keeps history intact and may flush queued
-        // messages once the resumed CLI sends system/init.
-        if (this.silentResumeArmedFlag && this.pendingResumeSessionId) {
+        // Deep-hibernated tab: checked FIRST (the light flag may also be set).
+        // The armed gate keeps restore-time panel-creation events from waking.
+        if (this.deepHibernatedFlag) {
+          if (this.deepWakeArmed) {
+            void this.wakeFromDeepHibernation('focus');
+          }
+        } else if (this.hibernatedLightFlag && this.pendingResumeSessionId) {
+          // Light-hibernated tab: focusing it is the wake gesture.
+          void this.wakeFromHibernation('focus');
+        } else if (this.silentResumeArmedFlag && this.pendingResumeSessionId) {
+          // Wake silently for a mid-session crash recovery — different state path
+          // from boot lazy-resume; this keeps history intact and may flush queued
+          // messages once the resumed CLI sends system/init.
           this.log(
             `[Tab ${this.tabNumber}] [SilentResume] waking on focus session=` +
               `${this.pendingResumeSessionId.slice(0, 8)}`,
@@ -2341,6 +2738,11 @@ export class SessionTab implements WebviewBridge {
           this.processManager
             .start({
               resume: sessionToResume,
+              // Keep a bridge tab on its backend when auto-resuming after a user
+              // cancel: the sticky store may not be populated yet (e.g. the very
+              // first turn was cancelled before it completed), so the runtime
+              // needs the explicit bridge:* model to avoid "no backend selected".
+              ...this.bridgeModelSpawnOption(),
               cliPathOverride: this.cliPathOverride ?? undefined,
               ...this.claudeAccountProcessOptions(),
             })
@@ -2480,6 +2882,7 @@ export class SessionTab implements WebviewBridge {
                 try {
                   await this.processManager.start({
                     resume: currentSessionId,
+                    ...this.bridgeModelSpawnOption(),
                     cliPathOverride: this.cliPathOverride ?? undefined,
                     ...this.claudeAccountProcessOptions(),
                   });
@@ -2615,7 +3018,11 @@ export class SessionTab implements WebviewBridge {
   }
 
   private isHappyCliSession(): boolean {
-    return this.cliPathOverride !== null;
+    // A bridge tab also carries a cliPathOverride, but it impersonates the
+    // Claude CLI — it must NOT be treated as a Happy/remote session (which would
+    // mis-set the provider, fire Happy auth prompts, or fall back to real Claude
+    // and wipe the bridge on a "Clear session").
+    return this.cliPathOverride !== null && !isBridgeCliCommand(this.cliPathOverride);
   }
 
   private isLikelyHappyAuthIssue(text: string): boolean {

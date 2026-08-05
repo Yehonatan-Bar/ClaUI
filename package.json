@@ -2,7 +2,7 @@
   "name": "claude-code-mirror",
   "displayName": "ClaUi",
   "description": "The full IDE experience for Claude Code - multi-tab sessions, analytics, achievements, dual providers, prompt enhancement, and deep customization",
-  "version": "0.1.214",
+  "version": "0.1.216",
   "publisher": "JhonBar",
   "icon": "images/icon.png",
   "engines": {
@@ -101,6 +101,14 @@
       {
         "command": "claudeMirror.stopSession",
         "title": "ClaUi: Stop Session"
+      },
+      {
+        "command": "claudeMirror.hibernateTab",
+        "title": "ClaUi: Hibernate Tab (Free CPU and RAM)"
+      },
+      {
+        "command": "claudeMirror.hibernateTabDeep",
+        "title": "ClaUi: Deep Hibernate Tab (Free Webview Memory Too)"
       },
       {
         "command": "claudeMirror.toggleView",
@@ -245,6 +253,10 @@
       {
         "command": "claudeMirror.groups.setCollapsed",
         "title": "ClaUi: Set Folder Collapsed"
+      },
+      {
+        "command": "claudeMirror.groups.closeEmpty",
+        "title": "ClaUi: Close Empty Folder"
       },
       {
         "command": "claudeMirror.groups.create",
@@ -684,7 +696,26 @@
           "default": 15,
           "minimum": 1,
           "maximum": 50,
-          "description": "Maximum number of session tabs to restore on startup. The most recently focused tabs are preferred when truncating."
+          "description": "Maximum number of session tabs to restore on startup. The most recently focused tabs are preferred when truncating; older sessions become sleeping (deep-hibernated) entries in the Sessions view."
+        },
+        "claudeMirror.hibernation.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically hibernate long-idle ClaUi tabs to free CPU and RAM. Light hibernation stops the CLI process but keeps the panel; focusing the tab or typing wakes it transparently."
+        },
+        "claudeMirror.hibernation.idleHours": {
+          "type": "number",
+          "default": 12,
+          "minimum": 1,
+          "maximum": 168,
+          "description": "Hours of inactivity before a tab is light-hibernated (CLI process stopped, panel kept). Waking takes a few seconds and happens automatically on focus or typing."
+        },
+        "claudeMirror.hibernation.deepIdleHours": {
+          "type": "number",
+          "default": 24,
+          "minimum": 0,
+          "maximum": 720,
+          "description": "Hours of inactivity before a tab is deep-hibernated: its webview content is replaced by a tiny placeholder (freeing the chat UI's memory) while the tab stays in the tab bar. Clicking the tab wakes it (takes a few seconds). Set 0 to disable deep hibernation. Never lower than the light-hibernation threshold."
         },
         "claudeMirror.activitySummary": {
           "type": "boolean",
@@ -1673,6 +1704,10 @@
           "when": "false"
         },
         {
+          "command": "claudeMirror.groups.closeEmpty",
+          "when": "false"
+        },
+        {
           "command": "claudeMirror.tabs.openLayoutMenu"
         }
       ],
@@ -1757,6 +1792,8 @@
     "test:review-loop": "node --import tsx --test tests/review-loop/reviewLoopPrompts.test.ts",
     "test:spawn-cli": "node --import tsx --test tests/process/spawnCli.test.ts",
     "test:tabs": "node --import tsx --test tests/tabs/navigationOrder.test.ts tests/tabs/navTree.test.ts",
+    "test:bridge": "node --import tsx --test tests/bridge/config.test.ts tests/bridge/protocol.test.ts tests/bridge/sessionStore.test.ts tests/bridge/grokPermissions.test.ts tests/bridge/procUtils.test.ts tests/bridge/openaiCompat.test.ts",
+    "test:hibernation": "node --import tsx --test tests/hibernation/hibernationPlanner.test.ts",
     "verify:installed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installed.ps1",
     "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1",
     "git:push": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-push.ps1",

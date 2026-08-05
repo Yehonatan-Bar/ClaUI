@@ -19,6 +19,7 @@ import { getStoredApiKey, setStoredApiKey, maskApiKey } from '../process/envUtil
 import { readCodexModelOptions } from '../process/codexModelCache';
 import {
   BridgeProviderService,
+  isBridgeCliCommand,
   isBridgeInstallValue,
   isBridgeModelValue,
 } from '../bridge/BridgeProviderService';
@@ -887,6 +888,20 @@ export class MessageHandler {
     return this.webview.getCliPathOverride?.() ?? undefined;
   }
 
+  /** Force a bridge tab's `bridge:*` model onto a webview-driven (re)start or
+   *  resume that would otherwise pass no model. The bridge runtime needs an
+   *  explicit backend whenever its per-session store has no entry yet (e.g. a
+   *  session spawned but never messaged), otherwise cli.ts exits with
+   *  "no backend selected". Returns {} for non-bridge tabs, so Claude/Happy
+   *  behaviour is unchanged. */
+  private bridgeSpawnModelOption(): { model?: string } {
+    const selected = this.webview.getSelectedModel?.() ?? '';
+    if (isBridgeCliCommand(this.getCliPathOverride()) && isBridgeModelValue(selected)) {
+      return { model: selected };
+    }
+    return {};
+  }
+
   private getWorkspacePath(): string | undefined {
     return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   }
@@ -1162,6 +1177,12 @@ export class MessageHandler {
    * Only relevant when the process is NOT running (about to start a new session).
    */
   private syncProviderOverrideForNewSession(): void {
+    // Bridge tabs manage their own cliPathOverride (and report provider
+    // 'claude'); the Claude/Happy provider dropdown must never overwrite it, or
+    // a clear/restart would silently drop the bridge and start real Claude.
+    if (isBridgeCliCommand(this.getCliPathOverride())) {
+      return;
+    }
     const configuredProvider = vscode.workspace
       .getConfiguration('claudeMirror')
       .get<ProviderId>('provider', 'claude');
@@ -1973,6 +1994,8 @@ export class MessageHandler {
             .start({
               cwd: msg.workspacePath,
               cliPathOverride: this.getCliPathOverride(),
+              // A bridge tab needs its bridge:* model on a fresh start.
+              ...this.bridgeSpawnModelOption(),
             })
             .then(() => {
               this.achievementService.onSessionStart(this.tabId);
@@ -2017,6 +2040,8 @@ export class MessageHandler {
             .start({
               resume: msg.sessionId,
               cliPathOverride: this.getCliPathOverride(),
+              // Keep a bridge tab on its backend when resuming an empty session.
+              ...this.bridgeSpawnModelOption(),
             })
             .then(() => {
               this.achievementService.onSessionStart(this.tabId);
@@ -2040,6 +2065,8 @@ export class MessageHandler {
               resume: msg.sessionId,
               fork: true,
               cliPathOverride: this.getCliPathOverride(),
+              // Keep a forked bridge tab on its backend if the store is empty.
+              ...this.bridgeSpawnModelOption(),
             })
             .then(() => {
               this.achievementService.onSessionStart(this.tabId);
@@ -2084,6 +2111,10 @@ export class MessageHandler {
             .start({
               cwd: msg.workspacePath,
               cliPathOverride: this.getCliPathOverride(),
+              // A bridge tab starts a FRESH (non-resume) session on clear; carry
+              // its bridge:* model so it stays on the same backend instead of
+              // erroring "no backend selected".
+              ...this.bridgeSpawnModelOption(),
             })
             .then(() => {
               this.achievementService.onSessionStart(this.tabId);
@@ -2414,6 +2445,10 @@ export class MessageHandler {
 
         case 'createTabGroup':
           void vscode.commands.executeCommand('claudeMirror.groups.create');
+          break;
+
+        case 'closeTabGroup':
+          void vscode.commands.executeCommand('claudeMirror.groups.closeEmpty', msg.groupId);
           break;
 
         case 'focusDocument':
@@ -3281,6 +3316,8 @@ export class MessageHandler {
                 resume: sessionToResume,
                 skipReplay: true,
                 cliPathOverride: this.getCliPathOverride(),
+                // Keep a bridge tab on its backend across edit-and-resend.
+                ...this.bridgeSpawnModelOption(),
               })
               .then(async () => {
                 this.achievementService.onSessionStart(this.tabId);
@@ -4347,19 +4384,12 @@ export class MessageHandler {
       showOptions.selection = new vscode.Range(pos, pos);
     }
 
-    const layout = vscode.workspace.getConfiguration('claudeMirror.tabs').get<string>('layout', 'horizontal');
-    if (layout === 'vertical') {
-      showOptions.viewColumn = vscode.ViewColumn.Beside;
-      showOptions.preserveFocus = true;
-    }
-
     try {
       const doc = await vscode.workspace.openTextDocument(uri);
       await vscode.window.showTextDocument(doc, showOptions);
       this.log(`Opened file: ${resolvedPath}${parsed.line ? `:${parsed.line}` : ''}`);
     } catch {
-      await vscode.commands.executeCommand('vscode.open', uri,
-        layout === 'vertical' ? vscode.ViewColumn.Beside : undefined);
+      await vscode.commands.executeCommand('vscode.open', uri);
       this.log(`Opened file (non-text fallback): ${resolvedPath}`);
     }
   }
@@ -5086,6 +5116,11 @@ export class MessageHandler {
       }
       if (e.affectsConfiguration('claudeMirror.permissionMode')) {
         this.sendPermissionModeSetting();
+      }
+      if (e.affectsConfiguration('claudeMirror.bridge')) {
+        // Refresh the model picker live when bridge providers/models change,
+        // so users don't need a window reload to see new bridge entries.
+        this.sendBridgeModelOptions();
       }
       if (e.affectsConfiguration('claudeMirror.gitPush')) {
         this.sendGitPushSettings();

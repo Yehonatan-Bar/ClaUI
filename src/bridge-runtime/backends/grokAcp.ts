@@ -1,8 +1,8 @@
 import { ChildProcess, spawn } from 'child_process';
-import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
-import { StreamEmitter } from '../protocol';
+import { killTree, resolveExecutable } from '../procUtils';
+import { BridgePrompt, imagesOmittedNote, StreamEmitter } from '../protocol';
 import { SessionStore } from '../sessionStore';
 
 /**
@@ -27,19 +27,28 @@ const KIND_TO_TOOL: Record<string, string> = {
   other: 'Tool',
 };
 
-/** Resolve a runnable Grok CLI invocation from the configured path. */
+/** ACP tool-call kinds that only read/observe (never mutate the workspace or
+ *  run commands). Under supervised mode only these are auto-approved; anything
+ *  else (execute/edit/delete/move/unknown) is rejected — mirroring the
+ *  read-only --allowedTools whitelist ClaUi hands the real Claude CLI. */
+const READ_ONLY_KINDS = new Set(['read', 'search', 'fetch', 'think']);
+
+export function isReadOnlyGrokKind(kind: string | undefined | null): boolean {
+  return READ_ONLY_KINDS.has(String(kind || '').trim());
+}
+
+/** Hard ceiling on a single Grok turn so a hung agent can't wedge the tab. */
+const PROMPT_TIMEOUT_MS = Number(process.env.CLAUI_BRIDGE_GROK_TIMEOUT_MS || 10 * 60 * 1000);
+
+/** Resolve a runnable Grok CLI invocation from the configured path. Always
+ *  shell-free (grok's args are constant, but we stay consistent and robust to
+ *  npm .cmd shims by resolving the real .exe). */
 export function resolveGrokCli(cliPath: string): { command: string; useShell: boolean } {
-  const configured = (cliPath || 'grok').trim();
-  if (path.isAbsolute(configured) && fs.existsSync(configured)) {
-    return { command: configured, useShell: false };
-  }
-  if (process.platform === 'win32' && configured === 'grok') {
-    // npm .cmd shims cannot be spawned directly on Windows; prefer the real
-    // binary the shim points at when it is in the standard global location.
-    const appData = process.env.APPDATA;
-    if (appData) {
-      const exe = path.join(
-        appData,
+  const known: string[] = [];
+  if (process.platform === 'win32' && process.env.APPDATA) {
+    known.push(
+      path.join(
+        process.env.APPDATA,
         'npm',
         'node_modules',
         '@xai-official',
@@ -49,25 +58,30 @@ export function resolveGrokCli(cliPath: string): { command: string; useShell: bo
         'grok-win32-x64',
         'bin',
         'grok.exe',
-      );
-      if (fs.existsSync(exe)) {
-        return { command: exe, useShell: false };
-      }
-    }
+      ),
+    );
   }
-  // Bare command name: let the shell resolve PATH (handles .cmd shims on win32).
-  return { command: configured, useShell: process.platform === 'win32' };
+  return resolveExecutable(cliPath, 'grok', known);
 }
 
 class AcpClient {
   private nextId = 1;
   private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
   private child: ChildProcess;
+  private exited = false;
+
+  /** True once the underlying grok process has exited — the session is dead and
+   *  must be rebuilt rather than reused (writes to its stdin would be silently
+   *  dropped and every subsequent request would hang). */
+  get isDead(): boolean {
+    return this.exited;
+  }
 
   constructor(
     cliPath: string,
     private readonly onUpdate: (update: Record<string, unknown>) => void,
     private readonly log: (msg: string) => void,
+    private readonly permissionMode: string,
   ) {
     const { command, useShell } = resolveGrokCli(cliPath);
     this.child = spawn(command, ['agent', 'stdio'], {
@@ -75,9 +89,13 @@ class AcpClient {
       shell: useShell,
       windowsHide: true,
     });
-    this.child.on('error', (e) => this.rejectAll(new Error(`Failed to start Grok CLI: ${e.message}`)));
+    this.child.on('error', (e) => {
+      this.exited = true;
+      this.rejectAll(new Error(`Failed to start Grok CLI: ${e.message}`));
+    });
     this.child.stderr?.on('data', (d) => this.log(`grok stderr: ${String(d).slice(0, 400)}`));
     this.child.on('exit', (code) => {
+      this.exited = true;
       this.log(`grok agent exited: ${code}`);
       this.rejectAll(new Error(`Grok CLI exited (code ${code}). Is it installed and logged in? Run: grok login`));
     });
@@ -99,7 +117,7 @@ class AcpClient {
       params?: {
         update?: Record<string, unknown>;
         options?: { kind?: string; optionId?: string }[];
-        toolCall?: { title?: string };
+        toolCall?: { title?: string; kind?: string };
       };
     };
     try {
@@ -124,17 +142,37 @@ class AcpClient {
       return;
     }
     if (msg.method === 'session/request_permission' && msg.id !== undefined) {
-      // Mirror ClaUi full-access: auto-approve, preferring an allow-once option.
       const opts = msg.params?.options || [];
-      const allow =
-        opts.find((o) => o.kind === 'allow_once') ||
-        opts.find((o) => (o.kind || '').startsWith('allow')) ||
-        opts[0];
-      this.send({
-        jsonrpc: '2.0',
-        id: msg.id,
-        result: { outcome: { outcome: 'selected', optionId: allow?.optionId || 'allow' } },
-      });
+      const kind = msg.params?.toolCall?.kind;
+      // Supervised mirrors the real Claude CLI's read-only --allowedTools set:
+      // only read/search/fetch/think auto-approve; write/execute (and unknown)
+      // kinds are rejected. Full-access auto-approves everything.
+      const permit = this.permissionMode !== 'supervised' || isReadOnlyGrokKind(kind);
+      if (permit) {
+        const allow =
+          opts.find((o) => o.kind === 'allow_once') ||
+          opts.find((o) => (o.kind || '').startsWith('allow')) ||
+          opts[0];
+        this.send({
+          jsonrpc: '2.0',
+          id: msg.id,
+          result: { outcome: { outcome: 'selected', optionId: allow?.optionId || 'allow' } },
+        });
+      } else {
+        this.log(`supervised: rejecting non-read-only tool kind '${kind || 'unknown'}'`);
+        const reject =
+          opts.find((o) => (o.kind || '').startsWith('reject')) ||
+          opts.find((o) => (o.kind || '').startsWith('deny'));
+        this.send(
+          reject
+            ? {
+                jsonrpc: '2.0',
+                id: msg.id,
+                result: { outcome: { outcome: 'selected', optionId: reject.optionId } },
+              }
+            : { jsonrpc: '2.0', id: msg.id, result: { outcome: { outcome: 'cancelled' } } },
+        );
+      }
       return;
     }
     if (msg.method && msg.id !== undefined) {
@@ -178,11 +216,7 @@ class AcpClient {
   }
 
   kill(): void {
-    try {
-      this.child.kill();
-    } catch {
-      /* already dead */
-    }
+    killTree(this.child);
   }
 }
 
@@ -198,6 +232,7 @@ export class GrokAcpBackend {
     private readonly sessionId: string,
     private readonly store: SessionStore,
     private readonly systemPrompt: string,
+    private readonly permissionMode: string,
     private readonly log: (msg: string) => void,
   ) {}
 
@@ -272,9 +307,33 @@ export class GrokAcpBackend {
     }
   };
 
+  /** Apply the selected model to the live ACP session. Best-effort: the model
+   *  is also passed at session creation, so a CLI that lacks session/set_model
+   *  still runs the right model — this just keeps resumed sessions in sync. */
+  private async applyModel(): Promise<void> {
+    if (!this.model || !this.acp || !this.acpSessionId) return;
+    try {
+      await this.acp.request(
+        'session/set_model',
+        { sessionId: this.acpSessionId, modelId: this.model },
+        15000,
+      );
+    } catch (e) {
+      this.log(`session/set_model not applied: ${(e as Error).message}`);
+    }
+  }
+
   private async ensureSession(): Promise<void> {
+    // A crashed grok process leaves a dead ACP client; reusing it would hang
+    // every future request. Discard and rebuild instead.
+    if (this.acp?.isDead) {
+      this.log('grok ACP child had exited; rebuilding session');
+      this.acp.kill();
+      this.acp = null;
+      this.acpSessionId = null;
+    }
     if (this.acp && this.acpSessionId) return;
-    this.acp = new AcpClient(this.cliPath, this.onUpdate, this.log);
+    this.acp = new AcpClient(this.cliPath, this.onUpdate, this.log, this.permissionMode);
     await this.acp.request(
       'initialize',
       {
@@ -299,9 +358,15 @@ export class GrokAcpBackend {
       }
     }
     if (!this.acpSessionId) {
+      // Pass the model at creation so a fresh session runs it even if the CLI
+      // has no session/set_model.
       const res = (await this.acp.request(
         'session/new',
-        { cwd: process.cwd(), mcpServers: [] },
+        {
+          cwd: process.cwd(),
+          mcpServers: [],
+          ...(this.model ? { modelId: this.model } : {}),
+        },
         60000,
       )) as { sessionId?: string };
       this.acpSessionId = res.sessionId || null;
@@ -309,6 +374,7 @@ export class GrokAcpBackend {
         throw new Error('Grok CLI did not return a session id');
       }
     }
+    await this.applyModel();
     this.store.write(this.sessionId, {
       backend: 'grok',
       model: this.model,
@@ -316,23 +382,35 @@ export class GrokAcpBackend {
     });
   }
 
-  async runTurn(prompt: string, emitter: StreamEmitter): Promise<string> {
+  async runTurn(prompt: BridgePrompt, emitter: StreamEmitter): Promise<string> {
     await this.ensureSession();
     this.emitter = emitter;
     this.lastText = '';
+
+    // The bridge advertises no image capability to Grok; surface a visible note
+    // rather than dropping attachments silently.
+    let userText = prompt.text;
+    if (prompt.images.length) {
+      const note = imagesOmittedNote(prompt.images.length, 'Grok');
+      this.log(note);
+      userText = userText ? `${userText}\n\n${note}` : note;
+    }
 
     const promptBlocks: { type: 'text'; text: string }[] = [];
     if (this.systemPrompt && !this.store.read(this.sessionId)?.history?.length) {
       promptBlocks.push({ type: 'text', text: `<system-rules>\n${this.systemPrompt}\n</system-rules>` });
     }
-    promptBlocks.push({ type: 'text', text: prompt });
+    promptBlocks.push({ type: 'text', text: userText });
 
-    const res = (await this.acp!.request('session/prompt', {
-      sessionId: this.acpSessionId,
-      prompt: promptBlocks,
-    })) as { stopReason?: string } | undefined;
+    // Bound the turn so a hung agent surfaces an error instead of wedging the
+    // tab in a permanent "running" state.
+    const res = (await this.acp!.request(
+      'session/prompt',
+      { sessionId: this.acpSessionId, prompt: promptBlocks },
+      PROMPT_TIMEOUT_MS,
+    )) as { stopReason?: string } | undefined;
 
-    this.store.appendHistory(this.sessionId, 'user', prompt);
+    this.store.appendHistory(this.sessionId, 'user', userText);
     if (this.lastText) {
       this.store.appendHistory(this.sessionId, 'assistant', this.lastText);
     }

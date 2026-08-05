@@ -21,7 +21,8 @@ All stores are scoped per workspace, so folders never bleed between projects.
 - `src/webview/tabNav.ts` (`buildTabNavTree`) builds the render tree — hardened against duplicate ids (first wins), orphaned/self `parentId` (lifted to top level), and cycles (each group renders exactly once). Tabs with unknown `groupId` fall back to the ungrouped bucket.
 - Rail rendering (`VerticalTabRail` in `App.tsx`): ungrouped tabs first (no header), then folder nodes recursively. Header = collapse chevron + color swatch + ellipsized label + subtree tab count; `aria-expanded` + native button keyboard toggle. Visual indent is 11px/level **capped at depth 3** (data model depth is unlimited). Collapse hides only the rows — the panels stay open and sessions keep running; a collapsed header shows contains-active / contains-busy styling and is **not** auto-expanded when an inner tab activates.
 - Empty folders render (they are drop targets and organizational objects).
-- "+ Folder" button at rail top posts `createTabGroup`, routed to the existing `claudeMirror.groups.create` command (rename/recolor/delete stay in the sidebar for v1).
+- "+ Folder" button at rail top posts `createTabGroup`, routed to the existing `claudeMirror.groups.create` command (rename/recolor stay in the sidebar).
+- **Closing empty folders**: a folder whose subtree contains no tabs renders an always-visible close "×" in its header (dim at rest, red on hover) in place of the count; clicking posts `closeTabGroup` -> `claudeMirror.groups.closeEmpty`. The command re-validates against current truth (a non-empty folder is refused with a message + state re-broadcast), asks a modal confirmation when the folder contains empty sub-folders, then cascade-deletes the folder records (no sessions are touched — there are none inside). Collapse ids for deleted folders are pruned by `TabGroupStore.deleteGroup`.
 
 ## Drag & Drop (rail)
 
@@ -35,7 +36,7 @@ All stores are scoped per workspace, so folders never bleed between projects.
 
 - `src/extension/session/TabGroupStore.ts` — Memento-backed CRUD (`createGroup`, `renameGroup`, `setGroupColor`, `moveGroup`, `deleteGroup`, `reorderWithinParent`) plus an `onDidChange` event. Move validates against cycles by walking the proposed parent chain.
 - `src/extension/session/TabManager.ts` — Tracks per-tab slot color, exposes `listTabs()` / `moveTabToGroup()` / `getTabGroup()` / `focusTab()`, and re-skins native tab icons when a tab joins/leaves a folder via each tab's `applyTabColor(color)` method.
-- `src/extension/views/TabGroupsTreeProvider.ts` — `vscode.TreeDataProvider<TabGroupTreeNode>` rendering the nested groups + tab leaves. Tab leaves carry a Markdown tooltip (see `SESSION_SUMMARY.md`) and a `claudeMirror.tabs.focus` command.
+- `src/extension/views/TabGroupsTreeProvider.ts` — `vscode.TreeDataProvider<TabGroupTreeNode>` rendering the nested groups + tab leaves. Hibernated tabs (see `TAB_HIBERNATION.md`) stay in the list as ordinary tab leaves with a "sleeping" description; clicking focuses (and thereby wakes) them. Tab leaves carry a Markdown tooltip (see `SESSION_SUMMARY.md`) and a `claudeMirror.tabs.focus` command.
 - `src/extension/commands/tabGroupCommands.ts` — Command handlers for create/rename/recolor/delete/move/remove. All accept a `TabGroupTreeNode` from the right-click menu **or** fall back to a QuickPick when launched from the Command Palette.
 
 ## Commands

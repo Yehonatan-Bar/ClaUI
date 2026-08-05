@@ -11,6 +11,61 @@ export function generateNonce(): string {
   return result;
 }
 
+/**
+ * Minimal static page shown while a tab is deep-hibernated. Replacing the
+ * webview HTML with this tears down the React app, chat DOM and store (the
+ * retained webview context shrinks to a few KB) while the tab itself stays in
+ * the tab bar. Clicking anywhere posts `wakeFromDeepHibernation`, which
+ * SessionTab intercepts to rebuild the real app and resume the session.
+ */
+export function buildSleepingPlaceholderHtml(sessionName: string): string {
+  const nonce = generateNonce();
+  const safeName = sessionName
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <style>
+    body {
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh; margin: 0; cursor: pointer; user-select: none;
+      background: var(--vscode-editor-background);
+      color: var(--vscode-descriptionForeground);
+      font-family: var(--vscode-font-family);
+    }
+    .sleep-box { text-align: center; opacity: 0.75; }
+    .sleep-glyph {
+      font-size: 42px; line-height: 1; margin-bottom: 14px;
+      color: var(--vscode-descriptionForeground); opacity: 0.5;
+    }
+    .sleep-name { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .sleep-text { font-size: 12.5px; }
+    .sleep-hint { font-size: 12px; margin-top: 14px; font-style: italic; opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <div class="sleep-box">
+    <div class="sleep-glyph">zZ</div>
+    <div class="sleep-name">${safeName}</div>
+    <div class="sleep-text">This session is sleeping to save CPU and RAM.</div>
+    <div class="sleep-hint" id="hint">Click anywhere to wake - resuming takes a few seconds.</div>
+  </div>
+  <script nonce="${nonce}">
+    const vscode = acquireVsCodeApi();
+    document.body.addEventListener('click', () => {
+      document.getElementById('hint').textContent = 'Waking...';
+      vscode.postMessage({ type: 'wakeFromDeepHibernation' });
+    });
+  </script>
+</body>
+</html>`;
+}
+
 /** Build the HTML page that loads the bundled React app in a webview panel */
 export function buildWebviewHtml(
   webview: vscode.Webview,

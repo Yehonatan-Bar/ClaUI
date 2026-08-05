@@ -124,12 +124,13 @@ const VerticalTabRail: React.FC = () => {
   ) => {
     const isActive = tab.id === activeTabId;
     const isDragged = tab.id === draggedId;
+    const isSleeping = tab.sleepState === 'light' || tab.sleepState === 'deep';
     const providerLabel =
       tab.provider === 'codex' ? 'Codex' : tab.provider === 'remote' ? 'Happy' : 'Claude';
     return (
       <button
         key={tab.id}
-        className={`vertical-tab-item ${isActive ? 'active' : ''} ${tab.isBusy ? 'vertical-tab-busy' : ''} ${isDragged ? 'vertical-tab-dragging' : ''}`}
+        className={`vertical-tab-item ${isActive ? 'active' : ''} ${tab.isBusy ? 'vertical-tab-busy' : ''} ${isSleeping ? 'vertical-tab-sleeping' : ''} ${isDragged ? 'vertical-tab-dragging' : ''}`}
         draggable
         onDragStart={(e) => {
           setDraggedId(tab.id);
@@ -154,10 +155,21 @@ const VerticalTabRail: React.FC = () => {
           }
         }}
         style={{ '--tab-color': tab.slotColor, '--depth': Math.min(depth, 3) } as React.CSSProperties}
-        title={`${providerLabel}: ${tab.displayName}`}
+        title={
+          isSleeping
+            ? `${providerLabel}: ${tab.displayName} (sleeping - click to wake)`
+            : `${providerLabel}: ${tab.displayName}`
+        }
         aria-current={isActive ? 'page' : undefined}
       >
-        <span className="vertical-tab-title">{tab.displayName}</span>
+        <span className="vertical-tab-title">
+          {isSleeping && (
+            <span className="vertical-tab-sleep-glyph" aria-hidden="true">
+              zZ
+            </span>
+          )}
+          {tab.displayName}
+        </span>
         <span
           className="vertical-tab-provider"
           aria-label="Close tab"
@@ -233,7 +245,22 @@ const VerticalTabRail: React.FC = () => {
           </span>
           <span className="vertical-tab-group-swatch" aria-hidden="true" />
           <span className="vertical-tab-group-label">{node.group.label}</span>
-          <span className="vertical-tab-group-count">{count}</span>
+          {count === 0 ? (
+            <span
+              className="vertical-tab-group-close"
+              role="button"
+              aria-label={`Close empty folder ${node.group.label}`}
+              title="Close empty folder"
+              onClick={(e) => {
+                e.stopPropagation();
+                postToExtension({ type: 'closeTabGroup', groupId: node.group.id });
+              }}
+            >
+              ×
+            </span>
+          ) : (
+            <span className="vertical-tab-group-count">{count}</span>
+          )}
         </button>
         {isDropAt(node.group.id, appendIndex) && isCollapsed && (
           <div className="vertical-tab-drop-indicator" />

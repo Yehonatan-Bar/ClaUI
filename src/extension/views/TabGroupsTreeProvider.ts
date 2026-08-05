@@ -95,7 +95,12 @@ export class TabGroupsTreeProvider implements vscode.TreeDataProvider<TabGroupTr
     item.iconPath = dot ?? new vscode.ThemeIcon(
       node.tab.provider === 'codex' ? 'rocket' : 'comment-discussion'
     );
-    item.description = node.tab.provider === 'claude' ? undefined : node.tab.provider;
+    item.description =
+      node.tab.sleepState !== 'awake'
+        ? 'sleeping'
+        : node.tab.provider === 'claude'
+          ? undefined
+          : node.tab.provider;
     item.command = {
       command: 'claudeMirror.tabs.focus',
       title: 'Focus tab',

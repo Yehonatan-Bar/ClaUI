@@ -1065,6 +1065,10 @@ export class CodexMessageHandler {
           void vscode.commands.executeCommand('claudeMirror.groups.create');
           break;
 
+        case 'closeTabGroup':
+          void vscode.commands.executeCommand('claudeMirror.groups.closeEmpty', msg.groupId);
+          break;
+
         case 'focusDocument':
           void vscode.commands.executeCommand('claudeMirror.docs.focus', msg.docId);
           break;
@@ -2345,19 +2349,12 @@ export class CodexMessageHandler {
       showOptions.selection = new vscode.Range(pos, pos);
     }
 
-    const layout = vscode.workspace.getConfiguration('claudeMirror.tabs').get<string>('layout', 'horizontal');
-    if (layout === 'vertical') {
-      showOptions.viewColumn = vscode.ViewColumn.Beside;
-      showOptions.preserveFocus = true;
-    }
-
     try {
       const doc = await vscode.workspace.openTextDocument(uri);
       await vscode.window.showTextDocument(doc, showOptions);
       this.log(`Opened file (Codex handler): ${resolvedPath}${parsed.line ? `:${parsed.line}` : ''}`);
     } catch {
-      await vscode.commands.executeCommand('vscode.open', uri,
-        layout === 'vertical' ? vscode.ViewColumn.Beside : undefined);
+      await vscode.commands.executeCommand('vscode.open', uri);
       this.log(`Opened file (Codex non-text fallback): ${resolvedPath}`);
     }
   }

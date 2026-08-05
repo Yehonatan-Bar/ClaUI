@@ -87,6 +87,40 @@ export function registerTabGroupCommands(
       tabManager.closeTab(tabId);
     }),
 
+    // Light hibernation: stop the active tab's CLI process (frees CPU/RAM),
+    // keep the panel. Focus/typing/banner click wakes it transparently.
+    vscode.commands.registerCommand('claudeMirror.hibernateTab', () => {
+      const tab = tabManager.getActiveTab();
+      if (!tab) {
+        void vscode.window.showInformationMessage('No active ClaUi tab to hibernate.');
+        return;
+      }
+      if (!tabManager.lightHibernateTab(tab.id)) {
+        void vscode.window.showInformationMessage(
+          'This tab cannot hibernate right now (busy, no session yet, already sleeping, or not a Claude tab).',
+        );
+        return;
+      }
+      log(`[Hibernation] manual light hibernate: ${tab.id}`);
+    }),
+
+    // Deep hibernation: tear down the CLI AND the webview content; the tab
+    // stays in the tab bar as a sleeping placeholder. Click it to wake.
+    vscode.commands.registerCommand('claudeMirror.hibernateTabDeep', () => {
+      const tab = tabManager.getActiveTab();
+      if (!tab) {
+        void vscode.window.showInformationMessage('No active ClaUi tab to hibernate.');
+        return;
+      }
+      if (!tabManager.deepHibernateTab(tab.id)) {
+        void vscode.window.showInformationMessage(
+          'This tab cannot deep-hibernate right now (busy, no session yet, or a search/multi-participant tab).',
+        );
+        return;
+      }
+      log(`[Hibernation] manual deep hibernate: ${tab.id}`);
+    }),
+
     vscode.commands.registerCommand('claudeMirror.tabs.reorder', (tabIds: string[]) => {
       tabManager.reorderTabs(tabIds);
     }),
@@ -106,6 +140,48 @@ export function registerTabGroupCommands(
         void tabGroupStore.setGroupCollapsed(groupId, collapsed);
       }
     ),
+
+    // Close an EMPTY folder straight from the rail (count badge turns into X).
+    // Re-validates against current truth: a folder whose subtree contains any
+    // tab is refused (the rail may be stale), and the state is re-broadcast.
+    vscode.commands.registerCommand('claudeMirror.groups.closeEmpty', async (groupId: string) => {
+      const target = tabGroupStore.getGroup(groupId);
+      if (!target) {
+        void vscode.commands.executeCommand('claudeMirror.tabs.refreshList');
+        return;
+      }
+      const subtreeIds = new Set<string>([groupId]);
+      const walk = (parentId: string) => {
+        for (const g of tabGroupStore.listGroups()) {
+          if (g.parentId === parentId && !subtreeIds.has(g.id)) {
+            subtreeIds.add(g.id);
+            walk(g.id);
+          }
+        }
+      };
+      walk(groupId);
+      const tabsInside = tabManager.listTabs().filter((t) => t.groupId && subtreeIds.has(t.groupId));
+      if (tabsInside.length > 0) {
+        vscode.window.showInformationMessage(
+          `Folder "${target.label}" is not empty (${tabsInside.length} tab(s) inside).`
+        );
+        void vscode.commands.executeCommand('claudeMirror.tabs.refreshList');
+        return;
+      }
+      const emptySubfolders = subtreeIds.size - 1;
+      if (emptySubfolders > 0) {
+        const choice = await vscode.window.showWarningMessage(
+          `Folder "${target.label}" contains ${emptySubfolders} empty sub-folder(s). Close them all?`,
+          { modal: true },
+          'Close All'
+        );
+        if (choice !== 'Close All') {
+          return;
+        }
+      }
+      await tabGroupStore.deleteGroup(groupId, 'cascade');
+      log(`[TabGroups] Closed empty folder "${target.label}" (${subtreeIds.size} folder record(s) removed)`);
+    }),
 
     // Files section in the vertical rail: focus / close open documents.
     vscode.commands.registerCommand('claudeMirror.docs.focus', (docId: string) => {

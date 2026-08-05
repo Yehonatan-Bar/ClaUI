@@ -705,6 +705,12 @@ export interface CreateTabGroupRequest {
   type: 'createTabGroup';
 }
 
+/** Close (delete) an EMPTY folder from the rail. Extension re-validates emptiness. */
+export interface CloseTabGroupRequest {
+  type: 'closeTabGroup';
+  groupId: string;
+}
+
 /** Focus an open document listed in the rail's Files section. */
 export interface FocusDocumentRequest {
   type: 'focusDocument';
@@ -1149,6 +1155,8 @@ export interface MpRemoveReactionRequest {
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
+  | WakeFromHibernationRequest
+  | WakeFromDeepHibernationRequest
   | QueuePromptUntilUsageResetRequest
   | ScheduleMessageRequest
   | CancelScheduledMessageRequest
@@ -1232,6 +1240,7 @@ export type WebviewToExtensionMessage =
   | MoveTabInNavigationRequest
   | SetGroupCollapsedRequest
   | CreateTabGroupRequest
+  | CloseTabGroupRequest
   | FocusDocumentRequest
   | CloseDocumentRequest
   | SetDetailedDiffViewEnabledRequest
@@ -1537,6 +1546,22 @@ export interface MessageDeferredFailedMessage {
 export interface SilentResumeStatusMessage {
   type: 'silentResumeStatus';
   active: boolean;
+}
+
+/** Tab hibernation: toggles the "sleeping" banner above the input area. */
+export interface HibernationStateMessage {
+  type: 'hibernationState';
+  hibernated: boolean;
+}
+
+/** Tab hibernation: the user clicked the sleeping banner to wake the CLI. */
+export interface WakeFromHibernationRequest {
+  type: 'wakeFromHibernation';
+}
+
+/** Deep hibernation: the user clicked the static placeholder page to wake the tab. */
+export interface WakeFromDeepHibernationRequest {
+  type: 'wakeFromDeepHibernation';
 }
 
 /**
@@ -2038,6 +2063,8 @@ export interface WebviewTabSummary {
   orderInGroup?: number;
   slotColor: string;
   isBusy?: boolean;
+  /** Hibernation state for the rail's sleeping indicator. Default 'awake' when absent. */
+  sleepState?: 'awake' | 'light' | 'deep';
   claudeAccountProfileId?: string | null;
   claudeAccountProfileLabel?: string | null;
 }
@@ -2053,8 +2080,8 @@ export interface WebviewTabGroup {
 
 /**
  * A non-ClaUi editor open in this window (file, diff, notebook, custom),
- * listed in the rail's Files section. Vertical mode hides the native tab
- * strip, so the rail is the only place these can be focused/closed from.
+ * listed in the rail's Files section so documents can be focused/closed
+ * from the rail like any other tab.
  */
 export interface WebviewOpenDocument {
   /** `${viewColumn}:${uri}` — stable within a broadcast. */
@@ -3155,6 +3182,7 @@ export type ExtensionToWebviewMessage =
   | MessageDeferredDeliveredMessage
   | MessageDeferredFailedMessage
   | SilentResumeStatusMessage
+  | HibernationStateMessage
   | MpConnectionStatusMessage
   | MpSessionStateMessage
   | MpNewMessageMessage

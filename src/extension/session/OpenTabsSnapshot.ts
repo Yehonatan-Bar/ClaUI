@@ -21,10 +21,23 @@ export interface OpenTabSnapshotEntry {
   claudeAccountProfileId?: string;
   /** Model selected for a Smart Search tab (used to re-spawn the agent on restore). */
   searchModel?: string;
+  /** Per-tab picker selection (e.g. a `bridge:*` model) so a bridge tab restores
+   *  its backend/model on reload — bridge values are never persisted to config. */
+  selectedModel?: string;
   /** ISO timestamp — when the tab was last focused (used to pick most-recent tabs on truncation). */
   lastFocusedAt?: string;
+  /** ISO timestamp — last user-visible activity (focus or busy-state change).
+   *  Drives the hibernation idle clock; falls back to lastFocusedAt when absent. */
+  lastActivityAt?: string;
   /** Explicit visual position (0-based), assigned on shutdown for stable restore order. */
   tabOrder?: number;
+  /** Deep hibernation: true when this tab's webview content was torn down and
+   *  replaced by a static placeholder (CLI stopped too) to free resources. The
+   *  tab STAYS in the tab bar. On restore, such an entry is recreated as a live
+   *  sleeping placeholder tab (see TAB_HIBERNATION.md), not a normal tab. */
+  hibernated?: boolean;
+  /** ISO timestamp — when deep hibernation happened. */
+  hibernatedAt?: string;
 }
 
 export interface OpenTabsSnapshot {

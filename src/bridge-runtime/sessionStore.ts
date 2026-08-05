@@ -48,9 +48,30 @@ export class SessionStore {
       const prev = this.read(sessionId) || ({} as BridgeSessionState);
       const next = { ...prev, ...patch, updatedAt: new Date().toISOString() };
       const file = this.fileFor(sessionId);
-      const tmp = `${file}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify(next, null, 2));
-      fs.renameSync(tmp, file);
+      const json = JSON.stringify(next, null, 2);
+      // Unique tmp per process avoids cross-process tmp contention.
+      const tmp = `${file}.${process.pid}.tmp`;
+      fs.writeFileSync(tmp, json);
+      // Atomic replace, but a rename over an existing file can transiently fail
+      // on Windows (an AV/indexer briefly holds a handle). Retry a few times,
+      // then fall back to an in-place write so the update is never silently
+      // lost — a swallowed failure here would drop resume/history state.
+      for (let attempt = 0; ; attempt++) {
+        try {
+          fs.renameSync(tmp, file);
+          break;
+        } catch {
+          if (attempt >= 5) {
+            fs.writeFileSync(file, json);
+            try {
+              fs.rmSync(tmp, { force: true });
+            } catch {
+              /* tmp cleanup is best-effort */
+            }
+            break;
+          }
+        }
+      }
     } catch {
       /* session persistence is best-effort; a failed write only loses resume */
     }

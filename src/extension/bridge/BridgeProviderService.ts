@@ -151,6 +151,25 @@ export class BridgeProviderService {
     return detected;
   }
 
+  private nodeDetected: boolean | undefined;
+
+  /** True when a `node` executable is on PATH — required to run the bundled
+   *  bridge runtime. Cached; reset when settings change (same lifecycle as the
+   *  CLI-detection cache). */
+  nodeAvailable(): boolean {
+    if (this.nodeDetected !== undefined) return this.nodeDetected;
+    let ok = false;
+    try {
+      const probe = process.platform === 'win32' ? 'where' : 'which';
+      const res = spawnSync(probe, ['node'], { timeout: 3000, windowsHide: true });
+      ok = res.status === 0;
+    } catch {
+      ok = false;
+    }
+    this.nodeDetected = ok;
+    return ok;
+  }
+
   /** Command string spawned instead of the claude CLI for bridge tabs.
    *  ClaudeProcessManager spawns through a shell, so an embedded quoted path
    *  is safe. Requires `node` on PATH (same class of requirement as the other
@@ -179,6 +198,7 @@ export class BridgeProviderService {
   /** Mirror settings into ~/.claui/bridge.json for the bridge runtime. */
   syncConfigFile(): void {
     this.cliDetectionCache.clear();
+    this.nodeDetected = undefined;
     try {
       const cfg = this.config();
       const clauiHome = path.join(os.homedir(), '.claui');
@@ -224,7 +244,7 @@ export class BridgeProviderService {
         // CLI not installed: offer a one-click install flow right in the picker
         // for users who have a Grok subscription.
         options.push({
-          label: '➕ Grok — Install CLI…',
+          label: 'Grok — Install CLI…',
           value: `${BRIDGE_INSTALL_PREFIX}grok`,
         });
       }
@@ -246,7 +266,7 @@ export class BridgeProviderService {
         }
       } else {
         options.push({
-          label: '➕ Antigravity — Install CLI…',
+          label: 'Antigravity — Install CLI…',
           value: `${BRIDGE_INSTALL_PREFIX}antigravity`,
         });
       }

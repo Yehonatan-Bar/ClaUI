@@ -223,23 +223,59 @@ export class StreamEmitter {
   }
 }
 
+/** A base64 image attached to a user turn. */
+export interface BridgeImage {
+  mediaType: string;
+  data: string;
+}
+
+/** Structured user turn: text plus any attached images. Backends that cannot
+ *  accept images surface a visible note instead of dropping them silently. */
+export interface BridgePrompt {
+  text: string;
+  images: BridgeImage[];
+}
+
 export interface StdinHandlers {
-  onPrompt: (text: string) => void;
+  onPrompt: (prompt: BridgePrompt) => void;
   onInterrupt: () => void;
   onClose: () => void;
 }
 
-function extractText(message: unknown): string {
+/** Parse a stream-json `user` message into text + images. Handles both a plain
+ *  string `content` and the ContentBlock[] form (text + base64 image blocks). */
+export function parseUserMessage(message: unknown): BridgePrompt {
   const m = message as { content?: unknown } | undefined;
   const c = m?.content;
-  if (typeof c === 'string') return c;
-  if (Array.isArray(c)) {
-    return c
-      .map((b) => (b && (b as { type?: string }).type === 'text' ? (b as { text?: string }).text || '' : ''))
-      .filter(Boolean)
-      .join('\n');
+  if (typeof c === 'string') return { text: c, images: [] };
+  if (!Array.isArray(c)) return { text: '', images: [] };
+
+  const textParts: string[] = [];
+  const images: BridgeImage[] = [];
+  for (const raw of c) {
+    const b = raw as {
+      type?: string;
+      text?: string;
+      source?: { type?: string; media_type?: string; data?: string };
+    };
+    if (b?.type === 'text' && b.text) {
+      textParts.push(b.text);
+    } else if (b?.type === 'image' && b.source?.type === 'base64' && b.source.data) {
+      images.push({
+        mediaType: b.source.media_type || 'image/png',
+        data: b.source.data,
+      });
+    }
   }
-  return '';
+  return { text: textParts.join('\n'), images };
+}
+
+/** Human-readable note appended for backends that cannot receive images, so an
+ *  attachment is never dropped without a trace. */
+export function imagesOmittedNote(count: number, backendLabel: string): string {
+  if (count <= 0) return '';
+  const noun = count === 1 ? 'image' : 'images';
+  return `[Note: ${count} ${noun} attached but the ${backendLabel} bridge is text-only and cannot receive ${count === 1 ? 'it' : 'them'}.]`;
 }
 
 /** Wire ClaUi's stream-json stdin: user prompts + control requests. */
@@ -254,8 +290,8 @@ export function attachStdin(handlers: StdinHandlers): void {
       return;
     }
     if (m.type === 'user') {
-      const prompt = extractText(m.message);
-      if (prompt) handlers.onPrompt(prompt);
+      const prompt = parseUserMessage(m.message);
+      if (prompt.text || prompt.images.length) handlers.onPrompt(prompt);
     } else if (m.type === 'control_request') {
       if (m.request?.subtype === 'interrupt') {
         handlers.onInterrupt();

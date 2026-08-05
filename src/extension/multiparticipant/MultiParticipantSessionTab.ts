@@ -308,6 +308,10 @@ export class MultiParticipantSessionTab {
           void vscode.commands.executeCommand('claudeMirror.groups.create');
           break;
 
+        case 'closeTabGroup':
+          void vscode.commands.executeCommand('claudeMirror.groups.closeEmpty', msg.groupId);
+          break;
+
         case 'focusDocument':
           void vscode.commands.executeCommand('claudeMirror.docs.focus', msg.docId);
           break;

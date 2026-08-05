@@ -129,6 +129,23 @@ html, body, #root {
   50% { border-left-color: transparent; }
 }
 
+/* Hibernated (light or deep) tab in the vertical rail: dimmed with a zZ glyph. */
+.vertical-tab-item.vertical-tab-sleeping {
+  opacity: 0.55;
+  font-style: italic;
+}
+.vertical-tab-item.vertical-tab-sleeping .vertical-tab-title {
+  font-weight: 500;
+}
+.vertical-tab-sleep-glyph {
+  font-size: 9px;
+  font-weight: 700;
+  font-style: normal;
+  letter-spacing: 0.5px;
+  margin-right: 4px;
+  opacity: 0.7;
+}
+
 .vertical-tab-title {
   min-width: 0;
   overflow: hidden;
@@ -238,6 +255,23 @@ html, body, #root {
   color: var(--vscode-descriptionForeground);
   font-size: 10px;
   font-weight: 600;
+}
+
+/* Empty folders show an always-visible close X (dim at rest, red on hover). */
+.vertical-tab-group-close {
+  justify-self: end;
+  width: 16px;
+  height: 16px;
+  line-height: 15px;
+  text-align: center;
+  border-radius: 3px;
+  font-size: 14px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+}
+.vertical-tab-group-close:hover {
+  color: #f44747;
+  background: rgba(244, 71, 71, 0.2);
 }
 
 .vertical-tab-newfolder {
