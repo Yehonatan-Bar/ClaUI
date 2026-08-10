@@ -1267,6 +1267,59 @@ export class MessageHandler {
     });
   }
 
+  /**
+   * Revert is destructive: it overwrites files on disk with their earlier
+   * content and deletes files the assistant created during the reverted turns.
+   * Require an explicit modal confirmation (an "are you sure?" step) before
+   * performing the revert, and summarize the blast radius so the user knows
+   * exactly what will be undone.
+   */
+  private async confirmAndRevertCheckpoint(turnIndex: number): Promise<void> {
+    if (!this.checkpointManager) return;
+
+    // Summarize how many files/turns will be affected for the confirmation copy.
+    const affectedCheckpoints = this.checkpointManager
+      .getState()
+      .checkpoints.filter((cp) => cp.turnIndex >= turnIndex);
+    const affectedFilePaths = new Set<string>();
+    for (const checkpoint of affectedCheckpoints) {
+      for (const filePath of checkpoint.filePaths) {
+        affectedFilePaths.add(filePath);
+      }
+    }
+    const fileCount = affectedFilePaths.size;
+    const turnCount = affectedCheckpoints.length;
+    const fileLabel = fileCount === 1 ? '1 file' : `${fileCount} files`;
+    const turnLabel = turnCount === 1 ? '1 turn' : `${turnCount} turns`;
+
+    const confirmation = await vscode.window.showWarningMessage(
+      'Revert file changes from this prompt onwards?',
+      {
+        modal: true,
+        detail:
+          `${fileLabel} across ${turnLabel} will be restored to their earlier content on disk. ` +
+          'Files the assistant created will be deleted. You can re-apply the changes with Redo unless you keep working after reverting.',
+      },
+      'Revert',
+    );
+
+    if (confirmation !== 'Revert') {
+      this.log(`[CHECKPOINT] Revert cancelled by user (turnIndex=${turnIndex})`);
+      return;
+    }
+
+    const cpRevertResult = this.checkpointManager.revert(turnIndex);
+    this.webview.postMessage({
+      type: 'checkpointResult',
+      success: cpRevertResult.success,
+      action: 'revert',
+      targetTurnIndex: turnIndex,
+      error: cpRevertResult.error,
+      conflicts: cpRevertResult.conflicts.length > 0 ? cpRevertResult.conflicts : undefined,
+    });
+    this.postCheckpointState();
+  }
+
   private resetCheckpointState(reason: string): void {
     if (!this.checkpointManager) return;
     this.log(`[CHECKPOINT] Resetting checkpoint state: ${reason}`);
@@ -3243,17 +3296,9 @@ export class MessageHandler {
           break;
 
         case 'checkpointRevert': {
-          if (!this.checkpointManager) break;
-          const cpRevertResult = this.checkpointManager.revert(msg.turnIndex);
-          this.webview.postMessage({
-            type: 'checkpointResult',
-            success: cpRevertResult.success,
-            action: 'revert',
-            targetTurnIndex: msg.turnIndex,
-            error: cpRevertResult.error,
-            conflicts: cpRevertResult.conflicts.length > 0 ? cpRevertResult.conflicts : undefined,
-          });
-          this.postCheckpointState();
+          // Revert is destructive (overwrites/deletes files on disk), so route
+          // through an explicit modal confirmation before touching anything.
+          void this.confirmAndRevertCheckpoint(msg.turnIndex);
           break;
         }
 

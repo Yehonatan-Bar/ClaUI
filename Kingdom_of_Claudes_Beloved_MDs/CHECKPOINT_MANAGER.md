@@ -6,7 +6,7 @@ Per-session file change tracking that enables reverting and re-applying code mod
 
 Each time Claude modifies files via Write, Edit, MultiEdit, or NotebookEdit tools in response to a user prompt, the CheckpointManager captures a "before" and "after" snapshot of every affected file. Users can then:
 
-- **Revert**: Click "Revert" on any user message to undo all file changes from that prompt onward
+- **Revert**: Click "Revert" on any user message to undo all file changes from that prompt onward. Because revert overwrites files on disk and deletes assistant-created files, clicking it opens a modal confirmation (summarizing how many files/turns will be affected) that the user must accept before anything is touched.
 - **Redo**: After reverting, click "Redo" to re-apply the previously undone changes
 
 ## Key Files
@@ -45,6 +45,10 @@ webview finalize (messageStop)
 
 User clicks "Revert" on prompt N
   -> webview sends checkpointRevert { turnIndex }
+  -> MessageHandler.confirmAndRevertCheckpoint(turnIndex)
+     shows a modal warning (vscode.window.showWarningMessage, modal: true)
+     summarizing the affected file/turn count; aborts unless the user
+     confirms "Revert"
   -> CheckpointManager.revert(turnIndex)
      restores "before" content for all files from turn N onward
      deletes files that were newly created

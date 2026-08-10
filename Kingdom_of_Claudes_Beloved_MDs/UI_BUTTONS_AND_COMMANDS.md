@@ -425,7 +425,7 @@ All commands are registered under the `claudeMirror.*` namespace in `package.jso
 | Expand/collapse all | Expand/Collapse all blocks | Open or close every tool block in the message. | פתח או סגור את כל בלוקי הכלים בהודעה. |
 | Edit | Edit and resend this message | Edit a user message and resend it. | ערוך הודעת משתמש ושלח אותה מחדש. |
 | Fork | Fork conversation from this message | Branch a new conversation from this point. | פצל שיחה חדשה מנקודה זו. |
-| Revert | Revert file changes from this prompt onwards | Undo file changes made from this prompt onward. | בטל שינויי קבצים שבוצעו מפקודה זו והלאה. |
+| Revert | Revert file changes from this prompt onwards | Undo file changes made from this prompt onward. Opens a modal confirmation first (it overwrites/deletes files on disk). | בטל שינויי קבצים שבוצעו מפקודה זו והלאה. פותח תחילה חלון אישור (הפעולה דורסת/מוחקת קבצים בדיסק). |
 | Redo | Re-apply file changes | Re-apply previously reverted file changes. | החל מחדש שינויי קבצים שבוטלו. |
 | Translate | (dynamic) Translate / Show original / Retry | Translate the message or toggle original/translated. | תרגם את ההודעה או החלף בין מקור/תרגום. |
 | Send (edit) | Send edited message | Send the edited message. | שלח את ההודעה הערוכה. |
