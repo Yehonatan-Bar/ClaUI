@@ -146,6 +146,11 @@ export class TabManager {
    *  onDidChangeTabs events in a row; each webview re-renders per message). */
   private static readonly TABS_BROADCAST_DEBOUNCE_MS = 50;
   private tabsBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
+  /** globalState key holding the user's chosen vertical-rail width (shared across tabs/windows). */
+  private static readonly RAIL_WIDTH_KEY = 'claudeMirror.verticalTabRailWidth';
+  /** Clamp bounds for the rail width; must match RAIL_MIN/MAX_WIDTH in the webview. */
+  private static readonly RAIL_MIN_WIDTH = 80;
+  private static readonly RAIL_MAX_WIDTH = 300;
 
   /** Fires whenever the tree state (tabs, group assignments, summaries) changes — UI listens for refresh. */
   private readonly treeChangeEmitter = new vscode.EventEmitter<void>();
@@ -405,12 +410,38 @@ export class TabManager {
       })),
       collapsedGroupIds: this.tabGroupStore?.getCollapsedGroupIds() ?? [],
       openDocuments: this.listOpenDocuments(),
+      verticalTabRailWidth: this.getVerticalTabRailWidth(),
     };
     for (const tab of this.tabs.values()) {
       if (!tab.isDisposed) {
         tab.postMessage(msg);
       }
     }
+  }
+
+  /** The user's persisted vertical-rail width, or `null` for the CSS default. */
+  private getVerticalTabRailWidth(): number | null {
+    const stored = this.context.globalState.get<number | null>(TabManager.RAIL_WIDTH_KEY, null);
+    return typeof stored === 'number' ? stored : null;
+  }
+
+  /**
+   * Persist the vertical tab rail width and re-broadcast it so every tab's
+   * rail adopts it immediately. Called from the `claudeMirror.tabs.setRailWidth`
+   * command when the user finishes dragging (or double-clicks to reset with
+   * `null`). Survives reloads and horizontal<->vertical switches because the
+   * value lives in globalState, not the disposable webview store.
+   */
+  setVerticalTabRailWidth(width: number | null): void {
+    const clamped =
+      typeof width === 'number' && Number.isFinite(width)
+        ? Math.min(TabManager.RAIL_MAX_WIDTH, Math.max(TabManager.RAIL_MIN_WIDTH, Math.round(width)))
+        : null;
+    if (clamped === this.getVerticalTabRailWidth()) {
+      return;
+    }
+    void this.context.globalState.update(TabManager.RAIL_WIDTH_KEY, clamped);
+    this.broadcastTabsState();
   }
 
   /** Move (or remove) a tab to/from a folder. Triggers tree refresh and icon recolor. */

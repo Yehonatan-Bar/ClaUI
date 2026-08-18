@@ -54,6 +54,7 @@ const VerticalTabRail: React.FC = () => {
   const openDocuments = useAppStore((s) => s.openDocuments);
   const activeTabId = useAppStore((s) => s.activeTabId);
   const setRailWidth = useAppStore((s) => s.setVerticalTabRailWidth);
+  const setRailResizing = useAppStore((s) => s.setVerticalTabRailResizing);
   const railRef = useRef<HTMLElement>(null);
   const resizing = useRef(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -67,29 +68,42 @@ const VerticalTabRail: React.FC = () => {
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     resizing.current = true;
+    setRailResizing(true);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
+    // Track the last width applied during the drag so we can persist the final
+    // value on mouseup (persisting every mousemove frame would spam the store).
+    let latestWidth: number | null = null;
 
     const onMove = (ev: MouseEvent) => {
       if (!resizing.current) return;
       const newWidth = Math.min(RAIL_MAX_WIDTH, Math.max(RAIL_MIN_WIDTH, ev.clientX));
+      latestWidth = newWidth;
       setRailWidth(newWidth);
     };
 
     const onUp = () => {
       resizing.current = false;
+      setRailResizing(false);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
+      // Commit the chosen width to the extension: it persists to globalState and
+      // re-broadcasts to every tab, so the choice survives reloads, tab switches,
+      // and horizontal<->vertical toggles.
+      if (latestWidth !== null) {
+        postToExtension({ type: 'setVerticalTabRailWidth', width: latestWidth });
+      }
     };
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
-  }, [setRailWidth]);
+  }, [setRailWidth, setRailResizing]);
 
   const handleDoubleClick = useCallback(() => {
     setRailWidth(null);
+    postToExtension({ type: 'setVerticalTabRailWidth', width: null });
   }, [setRailWidth]);
 
   const handleDrop = useCallback(() => {

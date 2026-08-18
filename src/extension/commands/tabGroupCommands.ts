@@ -83,6 +83,12 @@ export function registerTabGroupCommands(
       tabManager.broadcastTabsState();
     }),
 
+    // Persist the in-webview vertical tab rail width and re-broadcast it to
+    // every tab (shared, survives reloads and layout switches). `null` resets.
+    vscode.commands.registerCommand('claudeMirror.tabs.setRailWidth', (width: number | null) => {
+      tabManager.setVerticalTabRailWidth(width);
+    }),
+
     vscode.commands.registerCommand('claudeMirror.tabs.close', (tabId: string) => {
       tabManager.closeTab(tabId);
     }),

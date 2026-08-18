@@ -660,6 +660,17 @@ export interface SetTabLayoutRequest {
   layout: 'horizontal' | 'vertical';
 }
 
+/**
+ * User resized (or double-clicked to reset) the in-webview vertical tab rail.
+ * The extension persists the width and re-broadcasts it to every tab so the
+ * choice is shared across tabs and survives reloads and layout switches.
+ * `width: null` restores the CSS default.
+ */
+export interface SetVerticalTabRailWidthRequest {
+  type: 'setVerticalTabRailWidth';
+  width: number | null;
+}
+
 export interface FocusTabRequest {
   type: 'focusTab';
   tabId: string;
@@ -1233,6 +1244,7 @@ export type WebviewToExtensionMessage =
   | GetAchievementsSnapshotRequest
   | SetVitalsEnabledRequest
   | SetTabLayoutRequest
+  | SetVerticalTabRailWidthRequest
   | FocusTabRequest
   | CloseTabRequest
   | ReorderTabsRequest
@@ -2105,6 +2117,13 @@ export interface TabListMessage {
   collapsedGroupIds?: string[];
   /** Open non-ClaUi editors for the rail's Files section. Default `[]` when absent. */
   openDocuments?: WebviewOpenDocument[];
+  /**
+   * Shared width (px) of the in-webview vertical tab rail, persisted by the
+   * extension so every tab uses the same width and it survives reloads /
+   * layout switches. `null` = CSS default; `undefined` = not provided (leave
+   * the current width untouched).
+   */
+  verticalTabRailWidth?: number | null;
 }
 
 export interface DetailedDiffViewSettingMessage {

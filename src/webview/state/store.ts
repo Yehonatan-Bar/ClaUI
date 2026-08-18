@@ -329,6 +329,9 @@ export interface AppState {
   // Tab arrangement (mirrors claudeMirror.tabs.layout)
   tabLayout: 'horizontal' | 'vertical';
   verticalTabRailWidth: number | null;
+  /** True while the user is actively dragging the rail divider; blocks
+   *  incoming broadcasts from clobbering the in-progress width. */
+  verticalTabRailResizing: boolean;
   openTabs: WebviewTabSummary[];
   activeTabId: string | null;
   tabGroups: WebviewTabGroup[];
@@ -854,6 +857,7 @@ export interface AppState {
   setVitalsEnabled: (enabled: boolean) => void;
   setTabLayout: (layout: 'horizontal' | 'vertical') => void;
   setVerticalTabRailWidth: (width: number | null) => void;
+  setVerticalTabRailResizing: (resizing: boolean) => void;
   setOpenTabs: (
     tabs: WebviewTabSummary[],
     activeTabId: string | null,
@@ -1268,6 +1272,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   goalObjective: '',
   tabLayout: 'horizontal' as 'horizontal' | 'vertical',
   verticalTabRailWidth: null as number | null,
+  verticalTabRailResizing: false,
   openTabs: [],
   activeTabId: null,
   tabGroups: [] as WebviewTabGroup[],
@@ -2623,6 +2628,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setTabLayout: (layout) => set({ tabLayout: layout }),
   setVerticalTabRailWidth: (width) => set({ verticalTabRailWidth: width }),
+  setVerticalTabRailResizing: (resizing) => set({ verticalTabRailResizing: resizing }),
   setOpenTabs: (tabs, activeTabId, groups, collapsedGroupIds, openDocuments) => {
     const next = {
       openTabs: tabs,

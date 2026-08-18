@@ -982,6 +982,11 @@ export function useClaudeStream(): void {
 
         case 'tabList':
           setOpenTabs(msg.tabs, msg.activeTabId, msg.groups, msg.collapsedGroupIds, msg.openDocuments);
+          // Adopt the extension's shared rail width, but never while the user is
+          // mid-drag (that would clobber the in-progress width with a flicker).
+          if (msg.verticalTabRailWidth !== undefined && !useAppStore.getState().verticalTabRailResizing) {
+            useAppStore.getState().setVerticalTabRailWidth(msg.verticalTabRailWidth);
+          }
           break;
 
         case 'detailedDiffViewSetting':

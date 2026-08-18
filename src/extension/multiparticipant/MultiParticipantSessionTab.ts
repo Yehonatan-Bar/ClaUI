@@ -326,6 +326,12 @@ export class MultiParticipantSessionTab {
           break;
         }
 
+        case 'setVerticalTabRailWidth': {
+          const width = (msg as { width?: number | null }).width ?? null;
+          void vscode.commands.executeCommand('claudeMirror.tabs.setRailWidth', width);
+          break;
+        }
+
         case 'mpSendMessage':
           this.client.send({ type: 'humanMessage', rawBody: msg.rawBody });
           break;

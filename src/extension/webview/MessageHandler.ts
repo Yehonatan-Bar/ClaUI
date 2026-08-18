@@ -2474,6 +2474,10 @@ export class MessageHandler {
           void vscode.commands.executeCommand('claudeMirror.tabs.setLayout', msg.layout);
           break;
 
+        case 'setVerticalTabRailWidth':
+          void vscode.commands.executeCommand('claudeMirror.tabs.setRailWidth', msg.width);
+          break;
+
         case 'focusTab':
           void vscode.commands.executeCommand('claudeMirror.tabs.focus', msg.tabId);
           break;
