@@ -403,6 +403,10 @@ export interface PlanApprovalResponseMessage {
   toolName?: string;
   /** Selected option label(s) when answering AskUserQuestion */
   selectedOptions?: string[];
+  /** Per-question answers when AskUserQuestion contains multiple questions.
+   *  Ordered like the tool input `questions` array; `answers` holds the
+   *  selected option label(s) or a single free-text answer. */
+  questionAnswers?: { question: string; answers: string[] }[];
 }
 
 export interface OpenFileRequest {

@@ -1,5 +1,17 @@
 # ClaUi - Changelog
 
+## Unreleased - 2026-08-19
+
+**Fix: AskUserQuestion with multiple questions -- every question now gets the user's real answer**
+
+- Previously the question bar rendered only the FIRST question of a multi-question `AskUserQuestion` call, and the extension silently answered every other question with its first option -- the model continued with defaults the user never chose
+- The question bar now renders ALL questions (up to 4) as stacked groups with per-question selection state: radio-style single-select, checkbox multi-select, and a per-question "Custom answer..." free-text toggle; a progress line shows answered/total and a single Submit button unlocks only when every question has an answer
+- Answers travel per-question (`questionAnswers` on `planApprovalResponse`) and are mapped back into the CLI's `updatedInput.answers` by question; the supervised (legacy) path sends readable question+answer pairs as text
+- Free text typed into the input box while several questions are pending is no longer mapped onto the first question plus defaults: the request is denied with the text quoted so the model reads the real reply instead of fabricated answers
+- Single-question behavior is unchanged (click answers immediately; multi-select keeps its Submit button; one global custom-answer area)
+
+---
+
 ## Unreleased - 2026-07-10
 
 **Improvement: current OpenAI Codex model lineup**

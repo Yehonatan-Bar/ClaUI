@@ -4880,8 +4880,38 @@ html, body, #root {
   background: var(--vscode-button-hoverBackground);
 }
 
+.question-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .question-custom-area {
   margin-top: 4px;
+}
+
+/* Multi-question layout (AskUserQuestion with several questions) */
+.question-progress {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground, #808080);
+  margin-bottom: 8px;
+}
+
+.question-group {
+  padding: 10px 0;
+  border-top: 1px solid var(--vscode-panel-border, #333);
+}
+
+/* The progress line always precedes the first group, so the group right after
+   it needs no separator */
+.question-progress + .question-group {
+  border-top: none;
+  padding-top: 0;
+}
+
+.question-custom-textarea {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Plan tool block styling */

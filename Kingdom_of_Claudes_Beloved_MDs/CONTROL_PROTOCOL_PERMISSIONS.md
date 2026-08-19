@@ -92,7 +92,7 @@ Two resolvers translate UI events into a `PermissionResult`:
 | `approve` (default) | `allow` with original input |
 | `approveClearBypass` | `allow` + request context compaction |
 | `approveManual` | `allow` + switch setting to supervised mode |
-| `questionAnswer` | `allow` with `updatedInput.answers` built from `selectedOptions` |
+| `questionAnswer` | `allow` with `updatedInput.answers` built from `questionAnswers` (per-question) or `selectedOptions` |
 | `feedback` | `deny` with the feedback text |
 | `reject` | `deny` with a "revise the plan" message |
 
@@ -100,16 +100,31 @@ Two resolvers translate UI events into a `PermissionResult`:
 is pending (so a plain message can't silently leave the CLI blocked). The typed text is
 posted as a user message, then:
 
-- `AskUserQuestion` -> `allow` with `updatedInput.answers` built from the typed text.
+- `AskUserQuestion` with a single question -> `allow` with `updatedInput.answers` built
+  from the typed text.
+- `AskUserQuestion` with multiple questions -> `deny` with the typed text quoted in the
+  message ("treat this as their answer"). One string cannot be mapped onto several
+  questions, and `allow` would fabricate default answers for the rest.
 - `ExitPlanMode` / other -> `deny` with the typed text as the revision instruction.
 
 Both resolvers return `true` only when a request was pending, so the normal
 `sendMessage` / `planApprovalResponse` handling is skipped just in that case.
 
-**`buildQuestionAnswers(input, selected, fallback)`** -- builds the
-`{ [questionText]: answerLabel }` map the CLI expects. The first question gets the chosen
-answer (selected options joined, or the fallback text); any further questions default to
-their first option's label.
+**Multi-question support.** `AskUserQuestion` may carry up to 4 questions in one call.
+The webview renders **all** of them (see `PlanApprovalBar` below) and sends
+`questionAnswers: { question, answers[] }[]` on the `planApprovalResponse` message,
+ordered like the tool input. `resolvePermissionFromApproval` requires it whenever more
+than one question is pending; a `questionAnswer` action without it (free text typed in
+the input box, or a stale webview bundle) is resolved as `deny` with the text quoted,
+never as silent defaults.
+
+**`buildQuestionAnswers(input, selected, fallback, perQuestion?)`** -- builds the
+`{ [questionText]: answerLabel }` map the CLI expects. Each question first looks for its
+entry in `perQuestion` (matched by position, then by question text; multi-select labels
+are joined with `", "`). Without a `perQuestion` entry the legacy behavior applies: the
+first question gets `selected`/`fallback`, further questions fall back to their first
+option's label -- which is why the multi-question paths above never reach that fallback
+with real user input missing.
 
 **`finishPermission(result, isExitPlanMode)`** -- clears the pending state, calls
 `clearApprovalTracking()`, sends the `control_response` via `respondPermission`, and posts
@@ -134,13 +149,22 @@ bar or its suppression flags.
 - `src/extension/webview/MessageHandler.ts` -- `handlePermissionRequest`,
   `resolvePermissionFromApproval`, `resolvePermissionFromText`, `buildQuestionAnswers`,
   `finishPermission`; gating in `notifyPlanApprovalRequired`.
-- `src/extension/types/webview-messages.ts` -- `planText?: string` on `PlanApprovalRequiredMessage`.
+- `src/extension/types/webview-messages.ts` -- `planText?: string` on `PlanApprovalRequiredMessage`;
+  `questionAnswers?: { question, answers[] }[]` on `PlanApprovalResponseMessage`.
 - `src/webview/hooks/useClaudeStream.ts` -- prefers `msg.planText` for the approval bar.
 - `src/webview/components/ChatView/PlanApprovalBar.tsx`,
   `src/webview/components/InputArea/InputArea.tsx` -- the approval / question UI and typed-text routing.
-  The question bar runs `detectRtl()` over the question text plus every option label/description;
-  if any Hebrew/Arabic is present it sets `dir="rtl"` on the bar so the whole question UI is
-  right-aligned (overrides for the hard-coded physical styles live in `src/webview/styles/rtl.css`).
+  The question bar renders **every** question in the tool input. A single question keeps the
+  original UX (single-select answers on click; multi-select gets a Submit button; one global
+  "Custom answer..." area). With multiple questions each one becomes a `question-group` with
+  its own option buttons (radio-style `(*)` for single-select, `[x]` checkboxes for
+  multi-select) and a per-question "Custom answer..." toggle; a progress line shows
+  `answered/total` and the single Submit button stays disabled until every question has a
+  selection or custom text. Picking an option clears that question's custom text and vice
+  versa. The bar runs `detectRtl()` over all question texts plus every option
+  label/description; if any Hebrew/Arabic is present it sets `dir="rtl"` on the bar so the
+  whole question UI is right-aligned (overrides for the hard-coded physical styles live in
+  `src/webview/styles/rtl.css`).
 
 ## How to verify
 
@@ -148,6 +172,11 @@ bar or its suppression flags.
 2. The question UI appears and the model **stops** -- nothing proceeds until you answer.
 3. Pick an option (or type a custom answer). The model continues using the answer you gave
    (not a guessed default).
+3b. Trigger a **multi-question** call (e.g. ask the model to clarify two independent
+    decisions at once). All questions render stacked, Submit stays disabled until each has
+    an answer, and the model's next message must reflect **every** answer -- especially a
+    non-first option picked for the second question, which previously collapsed to that
+    question's first option.
 4. Trigger plan mode (`ExitPlanMode`). Approve -> the model exits plan mode and continues.
    Reject / feedback -> the model revises the plan instead of proceeding.
 5. Confirm the `Output -> ClaUi` log shows `Control protocol: sent initialize handshake`

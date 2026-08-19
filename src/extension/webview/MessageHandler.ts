@@ -3195,9 +3195,15 @@ export class MessageHandler {
           } else if (msg.action === 'feedback') {
             sendApprovalText(msg.feedback || 'Please revise the plan.', 'feedback');
           } else if (msg.action === 'questionAnswer') {
-            // User selected option(s) from an AskUserQuestion prompt
-            const answer = msg.selectedOptions?.join(', ') || msg.feedback || '';
-            this.log(`Question answer: "${answer}"`);
+            // User selected option(s) from an AskUserQuestion prompt. With several
+            // questions, pair each question with its answer so the model does not
+            // guess which answer belongs to which question.
+            const answer = (msg.questionAnswers && msg.questionAnswers.length > 1)
+              ? msg.questionAnswers
+                  .map(a => `${a.question}\n${a.answers.join(', ')}`)
+                  .join('\n\n')
+              : (msg.questionAnswers?.[0]?.answers.join(', ') || msg.selectedOptions?.join(', ') || msg.feedback || '');
+            this.log(`Question answer: "${answer.slice(0, 200)}"`);
             sendApprovalText(answer, 'questionAnswer');
           }
           this.clearApprovalTracking({
@@ -6438,7 +6444,7 @@ export class MessageHandler {
     this.webview.postMessage({ type: 'planApprovalRequired', toolName: req.toolName, planText: pendingDetail });
   }
 
-  private resolvePermissionFromApproval(msg: { action: string; feedback?: string; selectedOptions?: string[] }): boolean {
+  private resolvePermissionFromApproval(msg: { action: string; feedback?: string; selectedOptions?: string[]; questionAnswers?: { question: string; answers: string[] }[] }): boolean {
     const req = this.pendingPermissionRequest;
     if (!req) { return false; }
     const norm = req.toolName.trim().toLowerCase();
@@ -6450,8 +6456,21 @@ export class MessageHandler {
       const fb = (msg.feedback || '').trim();
       result = { behavior: 'deny', message: fb || 'The user requested changes. Revise the plan accordingly before proceeding.' };
     } else if (msg.action === 'questionAnswer') {
-      const answers = this.buildQuestionAnswers(req.input, msg.selectedOptions, msg.feedback);
-      result = { behavior: 'allow', updatedInput: { ...req.input, answers } };
+      const questionCount = this.countPendingQuestions(req.input);
+      if (questionCount > 1 && (!msg.questionAnswers || msg.questionAnswers.length === 0)) {
+        // Free-text reply (or a stale webview) covering several questions: a single
+        // string cannot be mapped onto all of them, and silently defaulting the rest
+        // fabricates answers the user never gave. Deny with the text so the model
+        // reads the real reply instead.
+        const freeText = (msg.selectedOptions?.join(', ') || msg.feedback || '').trim();
+        result = {
+          behavior: 'deny',
+          message: `The user replied in free text instead of selecting options: "${freeText}". Treat this as their answer to your questions; do not assume default answers for questions it does not address.`,
+        };
+      } else {
+        const answers = this.buildQuestionAnswers(req.input, msg.selectedOptions, msg.feedback, msg.questionAnswers);
+        result = { behavior: 'allow', updatedInput: { ...req.input, answers } };
+      }
     } else {
       result = { behavior: 'allow', updatedInput: req.input };
       if (msg.action === 'approveClearBypass') {
@@ -6477,8 +6496,17 @@ export class MessageHandler {
     this.postUserMessage([{ type: 'text', text: trimmed } as ContentBlock], true);
     let result: PermissionResult;
     if (isAsk) {
-      const answers = this.buildQuestionAnswers(req.input, [trimmed], trimmed);
-      result = { behavior: 'allow', updatedInput: { ...req.input, answers } };
+      if (this.countPendingQuestions(req.input) > 1) {
+        // One typed reply cannot be split across several questions; deny with the
+        // text so the model reads it instead of getting fabricated defaults.
+        result = {
+          behavior: 'deny',
+          message: `The user replied in free text instead of selecting options: "${trimmed}". Treat this as their answer to your questions; do not assume default answers for questions it does not address.`,
+        };
+      } else {
+        const answers = this.buildQuestionAnswers(req.input, [trimmed], trimmed);
+        result = { behavior: 'allow', updatedInput: { ...req.input, answers } };
+      }
     } else {
       result = { behavior: 'deny', message: trimmed };
     }
@@ -6486,7 +6514,18 @@ export class MessageHandler {
     return true;
   }
 
-  private buildQuestionAnswers(input: Record<string, unknown>, selected?: string[], fallback?: string): Record<string, string> {
+  /** Number of questions in a pending AskUserQuestion tool input. */
+  private countPendingQuestions(input: Record<string, unknown>): number {
+    const rawQuestions = (input as { questions?: unknown }).questions;
+    return Array.isArray(rawQuestions) ? rawQuestions.length : 0;
+  }
+
+  private buildQuestionAnswers(
+    input: Record<string, unknown>,
+    selected?: string[],
+    fallback?: string,
+    perQuestion?: { question: string; answers: string[] }[]
+  ): Record<string, string> {
     const answers: Record<string, string> = {};
     const rawQuestions = (input as { questions?: unknown }).questions;
     const questions = Array.isArray(rawQuestions) ? rawQuestions : [];
@@ -6494,6 +6533,13 @@ export class MessageHandler {
     questions.forEach((q: unknown, idx: number) => {
       const question = q as { question?: unknown; options?: unknown };
       const qText = typeof question?.question === 'string' ? question.question : `question_${idx}`;
+      // Per-question answers from the multi-question UI: match by position first
+      // (the webview sends them in tool-input order), then by question text.
+      const uiEntry = perQuestion
+        ? (perQuestion[idx]?.question === qText ? perQuestion[idx] : perQuestion.find(a => a.question === qText))
+        : undefined;
+      const uiAnswer = uiEntry ? uiEntry.answers.map(a => (a || '').trim()).filter(Boolean).join(', ') : '';
+      if (uiAnswer) { answers[qText] = uiAnswer; return; }
       if (idx === 0 && chosen) { answers[qText] = chosen; return; }
       const options = Array.isArray(question?.options) ? question.options : [];
       const firstOption = options[0] as { label?: unknown } | undefined;

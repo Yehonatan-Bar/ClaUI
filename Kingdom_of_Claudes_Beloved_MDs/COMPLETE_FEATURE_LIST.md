@@ -86,7 +86,7 @@ A comprehensive catalog of every feature and capability in the ClaUi VS Code ext
   2. Bypass permissions
   3. Manually approve edits (switches to supervised permission mode)
   4. Type feedback (sends text to CLI)
-- **AskUserQuestion support** - When Claude calls AskUserQuestion, shows option buttons + custom answer input. Responses are sent as user messages
+- **AskUserQuestion support** - When Claude calls AskUserQuestion, shows option buttons + custom answer input for EVERY question in the call (multi-question calls render stacked groups with per-question answers and a single gated Submit). In full-access mode answers are injected back through the `can_use_tool` control protocol; in supervised mode they are sent as user messages
 - **Context usage display** - Shows token usage percentage when data is available
 - **Distinct plan styling** - Plan tool blocks render with blue styling and show extracted plan text instead of raw JSON
 - **ExitPlanMode handling** - Approve actions close the bar without sending user messages (prevents infinite loops). Reject/feedback actions send text to the CLI
