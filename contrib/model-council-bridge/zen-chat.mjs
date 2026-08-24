@@ -674,6 +674,11 @@ export async function handleZenMessage(prompt, opts = {}) {
   // synthesize. Handled before the agent loop; the session thread keeps only
   // the question + the synthesized answer.
   const councilRequest = parseCouncilRequest(prompt);
+  if (councilRequest && !councilRequest.question) {
+    return 'שימוש: `/מועצה <שאלה>` — נשלחת במקביל לכל המודלים.\n' +
+      'בחירת יו"ר: `/מועצה@grok <שאלה>` או `/מועצה יו"ר=codex <שאלה>`.\n' +
+      'הרכב נוכחי: ' + councilMembers().map((m) => m.id).join(', ');
+  }
   if (councilRequest && councilRequest.question) {
     const finalText = await runCouncil(councilRequest.question, {
       emitCycle,
