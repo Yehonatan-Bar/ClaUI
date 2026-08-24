@@ -107,7 +107,10 @@ export function zenConfigured() {
  */
 export function resolveZenModel(scoped) {
   let value = String(scoped || '').trim();
+  // Accept both the canonical scoped id (zen::or/...) and the display form
+  // (zen/or/...) — ClaUi round-trips the display id back as --model.
   if (value.toLowerCase().startsWith('zen::')) value = value.slice('zen::'.length);
+  else if (value.toLowerCase().startsWith('zen/')) value = value.slice('zen/'.length);
   else if (value.toLowerCase() === 'zen') value = '';
   let profileKey = '';
   let modelId = '';
