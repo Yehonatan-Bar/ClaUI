@@ -232,7 +232,21 @@ function boundedForRequest(messages) {
   const system = messages.filter((m) => m.role === 'system').slice(0, 1);
   const convo = messages.filter((m) => m.role !== 'system').slice(-MAX_HISTORY_MESSAGES);
   while (convo.length && convo[0].role === 'tool') convo.shift();
-  return [...system, ...convo];
+  // Merge consecutive user turns (left behind when a model returned empty) —
+  // several gateways reject or garble non-alternating history.
+  const merged = [];
+  for (const m of convo) {
+    const last = merged[merged.length - 1];
+    if (
+      last && last.role === 'user' && m.role === 'user' &&
+      typeof last.content === 'string' && typeof m.content === 'string'
+    ) {
+      last.content = `${last.content}\n\n${m.content}`;
+    } else {
+      merged.push({ ...m });
+    }
+  }
+  return [...system, ...merged];
 }
 
 function newApprovalCode() {
@@ -735,8 +749,33 @@ export async function handleZenMessage(prompt, opts = {}) {
         throw error;
       }
     }
-    const calls = Array.isArray(reply?.tool_calls) ? reply.tool_calls : [];
-    const content = typeof reply?.content === 'string' ? reply.content : '';
+    const contentText = (c) => {
+      if (typeof c === 'string') return c;
+      if (Array.isArray(c)) {
+        return c.map((p) => (p && typeof p.text === 'string' ? p.text : '')).join('');
+      }
+      return '';
+    };
+    let calls = Array.isArray(reply?.tool_calls) ? reply.tool_calls : [];
+    let content = contentText(reply?.content);
+    // Some free upstreams (ox-alpha, Aug 2026) 200-fail with EMPTY content when
+    // `tools` is combined with multi-turn history (native_finish_reason
+    // "network_error"). Retry once without tools and stick to chat-only.
+    if (!content && calls.length === 0 && tools) {
+      state.toolsUnsupported = true;
+      tools = null;
+      reply = await postChat({
+        profile,
+        apiKey,
+        model: modelId,
+        messages: boundedForRequest(messages),
+        tools: null,
+        timeoutMs,
+        doFetch,
+      });
+      calls = [];
+      content = contentText(reply?.content);
+    }
 
     if (!agentMode || !tools || calls.length === 0) {
       finalText = content;
@@ -809,7 +848,8 @@ export async function handleZenMessage(prompt, opts = {}) {
   state.messages = boundedForRequest(messages);
   state.pending = pending;
   saveState(sessionId, state);
-  return finalText;
+  return finalText ||
+    '(המודל החזיר תוכן ריק — ככל הנראה עומס זמני בשער החינמי. שלח שוב, או החלף מודל בבורר.)';
 }
 
 // Standalone probe:
