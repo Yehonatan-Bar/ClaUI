@@ -13,11 +13,14 @@ Because ClaUi runs the Claude CLI headless (`-p` + stream-json), the interactive
 | `src/webview/data/slashCommands.ts` | Static command catalog (grouped by category), filter/parse/native-route helpers |
 | `src/webview/hooks/useSlashCommand.ts` | Hook: `/`-trigger detection, synchronous filtering, popup state, selection logic |
 | `src/webview/components/InputArea/SlashCommandPopup.tsx` | Inline autocomplete popup component |
-| `src/webview/components/InputArea/SlashCommandBrowser.tsx` | Full-list modal (grouped, searchable) opened from the toolbar |
-| `src/webview/components/InputArea/InputArea.tsx` | Integration: keyboard intercepts, handleInput notification, send-time routing, popup/modal/button JSX |
+| `src/webview/components/InputArea/SlashCommandBrowser.tsx` | Full-list modal (grouped, searchable); rendered at the App root |
+| `src/webview/components/InputArea/InputArea.tsx` | Integration: keyboard intercepts, handleInput notification, send-time routing, popup + toolbar button |
+| `src/webview/App.tsx` | Renders `SlashCommandBrowser` gated on `slashBrowserOpen`; selection dispatches `claui-insert-snippet` |
+| `src/webview/components/StatusBar/StatusBar.tsx` | "Slash Commands" item in the Tools dropdown -> `setSlashBrowserOpen(true)` |
+| `src/webview/state/store.ts` | `slashBrowserOpen` + `setSlashBrowserOpen` (shared open-state for the modal) |
 | `src/webview/styles/global.css` | CSS: `.slash-command-popup`, `.slash-command-item`, `.slash-browser-*` |
 
-No extension-host or `webview-messages.ts` changes: routing reuses existing message types (`clearSession`, `compact`, `setModel`) and one local store action (`setContextWidgetVisible`).
+No extension-host or `webview-messages.ts` changes: routing reuses existing message types (`clearSession`, `compact`, `setModel`) and store actions (`setContextWidgetVisible`, `setSlashBrowserOpen`).
 
 ## Data Flow (inline autocomplete)
 
@@ -66,10 +69,14 @@ Any other slash command falls through and is sent to the CLI as plain text, exac
 
 ## Full-List Browser
 
-The `.slash-commands-button` (a `/` glyph) in the `browse-stack` toolbar toggles `SlashCommandBrowser`, a modal that:
+`SlashCommandBrowser` is a modal opened from two places, both flipping the shared `slashBrowserOpen` store flag:
+- the `.slash-commands-button` (a `/` glyph) in the input `browse-stack` toolbar, and
+- the **"Slash Commands"** item in the status-bar **Tools** dropdown.
+
+It is rendered once at the App root (`App.tsx`), alongside the other overlay panels. The modal:
 - lists all commands grouped by the CLI categories (sticky group headers),
 - has a search box that flattens to a ranked result list (accepts a leading `/`),
-- inserts `/name ` at the caret on selection and closes,
+- on selection, dispatches a `claui-insert-snippet` CustomEvent with `/name ` (InputArea's existing listener inserts it at the caret) and closes,
 - dismisses on Escape or backdrop click.
 
 ## Command Catalog
@@ -78,7 +85,7 @@ The `.slash-commands-button` (a `/` glyph) in the `browse-stack` toolbar toggles
 
 ## State Management
 
-All state is local to the `useSlashCommand` hook (`isOpen`, `results`, `selectedIndex` via `useState`; `currentText`, `triggerActive` via `useRef`) plus a `slashBrowserOpen` `useState` in `InputArea` for the modal. Nothing lives in Zustand - it is transient autocomplete/UI state. This mirrors the File Mention (@) approach.
+The inline autocomplete state is local to the `useSlashCommand` hook (`isOpen`, `results`, `selectedIndex` via `useState`; `currentText`, `triggerActive` via `useRef`) - transient UI state, mirroring the File Mention (@) approach. The full-list modal's open flag (`slashBrowserOpen`) lives in the Zustand store so both the input toolbar button and the status-bar Tools menu can toggle it (the same pattern as the Dashboard/Worktree/Team panels).
 
 ## CSS
 

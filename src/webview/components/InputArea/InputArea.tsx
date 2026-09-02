@@ -7,7 +7,6 @@ import { CustomSnippetPanel } from './CustomSnippetPanel';
 import { FileMentionPopup } from './FileMentionPopup';
 import { useFileMention } from '../../hooks/useFileMention';
 import { SlashCommandPopup } from './SlashCommandPopup';
-import { SlashCommandBrowser } from './SlashCommandBrowser';
 import { useSlashCommand } from '../../hooks/useSlashCommand';
 import { resolveNativeRoute } from '../../data/slashCommands';
 import type { WebviewImageData } from '../../../extension/types/webview-messages';
@@ -82,7 +81,6 @@ export const InputArea: React.FC = () => {
   const [text, setText] = useState('');
   const [pendingImages, setPendingImages] = useState<WebviewImageData[]>([]);
   const [codexSteerArmed, setCodexSteerArmed] = useState(false);
-  const [slashBrowserOpen, setSlashBrowserOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoMgr = useMemo(() => new UndoManager(), []);
   const [ultrathinkAnim, setUltrathinkAnim] = useState<string | null>(null);
@@ -145,6 +143,8 @@ export const InputArea: React.FC = () => {
     goalActive,
     goalObjective,
     setGoalActive,
+    slashBrowserOpen,
+    setSlashBrowserOpen,
   } = useAppStore();
   const fileMention = useFileMention(textareaRef);
   const slash = useSlashCommand(textareaRef);
@@ -1071,29 +1071,6 @@ export const InputArea: React.FC = () => {
     postToExtension({ type: 'pickFiles' });
   }, []);
 
-  /** Insert a slash command (with trailing space) at the caret, from the browser modal */
-  const insertSlashCommand = useCallback((name: string) => {
-    const snippet = `/${name} `;
-    const el = textareaRef.current;
-    setText((prev) => {
-      const start = el?.selectionStart ?? prev.length;
-      const end = el?.selectionEnd ?? prev.length;
-      const next = prev.slice(0, start) + snippet + prev.slice(end);
-      const caret = start + snippet.length;
-      undoMgr.push(next, caret);
-      requestAnimationFrame(() => {
-        const target = textareaRef.current;
-        if (target) {
-          target.style.height = 'auto';
-          target.style.height = Math.min(target.scrollHeight, 200) + 'px';
-          target.focus();
-          target.selectionStart = target.selectionEnd = caret;
-        }
-      });
-      return next;
-    });
-    setSlashBrowserOpen(false);
-  }, [undoMgr]);
 
   /** Clear all messages and restart the session */
   const handleClearSession = useCallback(() => {
@@ -1860,12 +1837,6 @@ export const InputArea: React.FC = () => {
         </div>
       )}
 
-      {slashBrowserOpen && (
-        <SlashCommandBrowser
-          onSelect={insertSlashCommand}
-          onClose={() => setSlashBrowserOpen(false)}
-        />
-      )}
       <div className="input-wrapper">
         {fileMention.isOpen && (
           <FileMentionPopup
@@ -1991,7 +1962,7 @@ export const InputArea: React.FC = () => {
           </button>
           <button
             className={`browse-button slash-commands-button${slashBrowserOpen ? ' active' : ''}`}
-            onClick={() => setSlashBrowserOpen((open) => !open)}
+            onClick={() => setSlashBrowserOpen(!slashBrowserOpen)}
             data-tooltip="Slash commands (or type / in the input)"
             aria-pressed={slashBrowserOpen}
           >

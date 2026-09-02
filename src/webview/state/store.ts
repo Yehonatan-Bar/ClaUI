@@ -577,6 +577,10 @@ export interface AppState {
   /** Settings-driven wizard defaults that arrive with each preview. */
   mergeDefaults: MergeDefaults | null;
   setWorktreePanelOpen: (open: boolean) => void;
+
+  // Slash command browser modal (opened from the input toolbar or the status-bar Tools menu)
+  slashBrowserOpen: boolean;
+  setSlashBrowserOpen: (open: boolean) => void;
   setWorktreeList: (worktrees: WorktreeWithSessions[], isGitRepo: boolean) => void;
   setWorktreeActionResult: (result: WorktreeActionResultMessage | null) => void;
   setMergeBranches: (branches: string[]) => void;
@@ -1455,6 +1459,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   mergeResult: null,
   mergeDefaults: null,
   setWorktreePanelOpen: (open) => set({ worktreePanelOpen: open }),
+
+  // Slash command browser modal
+  slashBrowserOpen: false,
+  setSlashBrowserOpen: (open) => set({ slashBrowserOpen: open }),
   setWorktreeList: (worktrees, isGitRepo) =>
     set({ worktreeList: worktrees, worktreeIsGitRepo: isGitRepo }),
   setWorktreeActionResult: (result) => set({ worktreeActionResult: result }),
@@ -3344,6 +3352,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       reviewLoopTranscript: [],
       // Worktree dashboard: close on session reset (data re-fetched on open)
       worktreePanelOpen: false,
+      slashBrowserOpen: false,
       worktreeList: [],
       worktreeIsGitRepo: false,
       worktreeActionResult: null,

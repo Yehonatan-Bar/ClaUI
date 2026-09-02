@@ -726,6 +726,13 @@ export const StatusBar: React.FC<{
       <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static">
         {snippetGroup}
       </div>
+      <button
+        className="status-bar-group-dropdown-item"
+        onClick={() => { useAppStore.getState().setSlashBrowserOpen(true); closeAllGroups(); }}
+        data-tooltip="Browse all slash commands (or type / in the input)"
+      >
+        Slash Commands
+      </button>
       {isConnected && showCodexConsult && (
         <button className="status-bar-group-dropdown-item" onClick={() => setCodexConsultPanelOpen(true)} data-tooltip="Consult Codex GPT expert">
           Consult Codex

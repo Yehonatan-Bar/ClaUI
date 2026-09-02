@@ -26,6 +26,7 @@ import { McpPanel } from './components/McpPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { SuperParticleAcceleratorPanel } from './components/SuperParticleAccelerator/SuperParticleAcceleratorPanel';
 import { CodexConsultPanel } from './components/InputArea/CodexConsultPanel';
+import { SlashCommandBrowser } from './components/InputArea/SlashCommandBrowser';
 import { ReviewLoopPanel } from './components/ReviewLoop/ReviewLoopPanel';
 import { TeamPanel, TeamStatusWidget } from './components/Teams';
 import { WorkstreamMapView } from './components/WorkstreamMap/WorkstreamMapView';
@@ -447,6 +448,8 @@ const ChatAppContent: React.FC = () => {
     teamPanelOpen,
     workstreamMapOpen,
     worktreePanelOpen,
+    slashBrowserOpen,
+    setSlashBrowserOpen,
     currentThinkingEffort,
     chatSearchOpen,
     activitySummaryDismissed,
@@ -581,6 +584,15 @@ const ChatAppContent: React.FC = () => {
       {teamPanelOpen && <TeamPanel />}
       {workstreamMapOpen && <WorkstreamMapView />}
       {worktreePanelOpen && <WorktreePanel />}
+      {slashBrowserOpen && (
+        <SlashCommandBrowser
+          onSelect={(name) => {
+            window.dispatchEvent(new CustomEvent('claui-insert-snippet', { detail: `/${name} ` }));
+            setSlashBrowserOpen(false);
+          }}
+          onClose={() => setSlashBrowserOpen(false)}
+        />
+      )}
 
       {/* Error banner / setup guidance */}
       {lastError && (isClaudeCliMissingError ? (
