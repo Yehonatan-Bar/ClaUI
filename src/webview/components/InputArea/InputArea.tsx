@@ -6,6 +6,10 @@ import { GitPushPanel } from './GitPushPanel';
 import { CustomSnippetPanel } from './CustomSnippetPanel';
 import { FileMentionPopup } from './FileMentionPopup';
 import { useFileMention } from '../../hooks/useFileMention';
+import { SlashCommandPopup } from './SlashCommandPopup';
+import { SlashCommandBrowser } from './SlashCommandBrowser';
+import { useSlashCommand } from '../../hooks/useSlashCommand';
+import { resolveNativeRoute } from '../../data/slashCommands';
 import type { WebviewImageData } from '../../../extension/types/webview-messages';
 import { getModelMaxContext } from '../../utils/modelContextLimits';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
@@ -78,6 +82,7 @@ export const InputArea: React.FC = () => {
   const [text, setText] = useState('');
   const [pendingImages, setPendingImages] = useState<WebviewImageData[]>([]);
   const [codexSteerArmed, setCodexSteerArmed] = useState(false);
+  const [slashBrowserOpen, setSlashBrowserOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const undoMgr = useMemo(() => new UndoManager(), []);
   const [ultrathinkAnim, setUltrathinkAnim] = useState<string | null>(null);
@@ -142,6 +147,7 @@ export const InputArea: React.FC = () => {
     setGoalActive,
   } = useAppStore();
   const fileMention = useFileMention(textareaRef);
+  const slash = useSlashCommand(textareaRef);
 
   // Context bar: poll store every 5s to keep bar current (same pattern as ContextUsageWidget)
   const [, setContextTick] = useState(0);
@@ -443,8 +449,9 @@ export const InputArea: React.FC = () => {
     let trimmed = text.trim();
     if ((!trimmed && pendingImages.length === 0) || !isConnected || inputLockedByHandoff) return;
 
-    // Auto-prepend "ultrathink" when mode is 'single' or 'locked'
-    if (ultrathinkMode !== 'off' && trimmed && !trimmed.toLowerCase().startsWith('ultrathink')) {
+    // Auto-prepend "ultrathink" when mode is 'single' or 'locked'.
+    // Never prefix a slash command -- it must keep its leading '/'.
+    if (ultrathinkMode !== 'off' && trimmed && !trimmed.startsWith('/') && !trimmed.toLowerCase().startsWith('ultrathink')) {
       trimmed = 'ultrathink ' + trimmed;
     }
 
@@ -455,6 +462,43 @@ export const InputArea: React.FC = () => {
       return;
     }
     lastSentRef.current = { text: trimmed, time: now };
+
+    // Slash-command smart routing: commands ClaUi implements natively run their
+    // real action instead of being shipped to the CLI as plain text. Anything
+    // not natively handled falls through and is sent verbatim (matching how the
+    // CLI would receive it).
+    if (trimmed.startsWith('/')) {
+      const native = resolveNativeRoute(trimmed);
+      if (native) {
+        addToPromptHistory(trimmed);
+        historyIndexRef.current = -1;
+        draftRef.current = '';
+        switch (native.route) {
+          case 'clear': {
+            const { reset } = useAppStore.getState();
+            reset();
+            postToExtension({ type: 'clearSession' });
+            break;
+          }
+          case 'compact':
+            postToExtension({ type: 'compact' });
+            break;
+          case 'context':
+            useAppStore.getState().setContextWidgetVisible(true);
+            break;
+          case 'model':
+            postToExtension({ type: 'setModel', model: native.arg });
+            break;
+        }
+        setText('');
+        setCodexSteerArmed(false);
+        undoMgr.reset();
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+        }
+        return;
+      }
+    }
 
     // Scheduled message mode: store on extension side for timed dispatch
     if (scheduleMessageEnabled && scheduleMessageAtMs) {
@@ -708,6 +752,31 @@ export const InputArea: React.FC = () => {
         }
       }
 
+      // Slash command popup intercepts navigation keys when open
+      if (slash.isOpen) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          slash.moveSelection(1);
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          slash.moveSelection(-1);
+          return;
+        }
+        if ((e.key === 'Enter' && !e.ctrlKey && !e.metaKey) || e.key === 'Tab') {
+          e.preventDefault();
+          const inserted = slash.confirmSelection();
+          if (inserted) applyMentionInsert(inserted);
+          return;
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          slash.dismiss();
+          return;
+        }
+      }
+
       // Undo: Ctrl+Z (without Shift)
       if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault();
@@ -830,7 +899,7 @@ export const InputArea: React.FC = () => {
         }
       }
     },
-    [sendMessage, isBusy, cancelRequest, text, resizeTextarea, undoMgr, fileMention, applyMentionInsert, handleEnhancePrompt, enhanceComparisonData, handleUseOriginal, providerCapabilities.supportsPromptEnhancer, providerCapabilities.supportsImages, logUiDebug, effectiveProvider]
+    [sendMessage, isBusy, cancelRequest, text, resizeTextarea, undoMgr, fileMention, slash, applyMentionInsert, handleEnhancePrompt, enhanceComparisonData, handleUseOriginal, providerCapabilities.supportsPromptEnhancer, providerCapabilities.supportsImages, logUiDebug, effectiveProvider]
   );
 
   /** Auto-resize textarea to fit content, reset history browsing on manual edits */
@@ -849,8 +918,10 @@ export const InputArea: React.FC = () => {
       el.style.height = Math.min(el.scrollHeight, 200) + 'px';
       // Notify file mention hook for @ trigger detection
       fileMention.handleTextChange(newValue, e.target.selectionStart);
+      // Notify slash command hook for leading-/ trigger detection
+      slash.handleTextChange(newValue, e.target.selectionStart);
     },
-    [undoMgr, fileMention, codexSteerArmed]
+    [undoMgr, fileMention, slash, codexSteerArmed]
   );
 
   /** Handle right-click to paste clipboard content (VS Code webview blocks native context menu) */
@@ -999,6 +1070,30 @@ export const InputArea: React.FC = () => {
   const handleBrowseFiles = useCallback(() => {
     postToExtension({ type: 'pickFiles' });
   }, []);
+
+  /** Insert a slash command (with trailing space) at the caret, from the browser modal */
+  const insertSlashCommand = useCallback((name: string) => {
+    const snippet = `/${name} `;
+    const el = textareaRef.current;
+    setText((prev) => {
+      const start = el?.selectionStart ?? prev.length;
+      const end = el?.selectionEnd ?? prev.length;
+      const next = prev.slice(0, start) + snippet + prev.slice(end);
+      const caret = start + snippet.length;
+      undoMgr.push(next, caret);
+      requestAnimationFrame(() => {
+        const target = textareaRef.current;
+        if (target) {
+          target.style.height = 'auto';
+          target.style.height = Math.min(target.scrollHeight, 200) + 'px';
+          target.focus();
+          target.selectionStart = target.selectionEnd = caret;
+        }
+      });
+      return next;
+    });
+    setSlashBrowserOpen(false);
+  }, [undoMgr]);
 
   /** Clear all messages and restart the session */
   const handleClearSession = useCallback(() => {
@@ -1765,6 +1860,12 @@ export const InputArea: React.FC = () => {
         </div>
       )}
 
+      {slashBrowserOpen && (
+        <SlashCommandBrowser
+          onSelect={insertSlashCommand}
+          onClose={() => setSlashBrowserOpen(false)}
+        />
+      )}
       <div className="input-wrapper">
         {fileMention.isOpen && (
           <FileMentionPopup
@@ -1778,6 +1879,19 @@ export const InputArea: React.FC = () => {
               }
             }}
             isLoading={fileMention.isLoading}
+          />
+        )}
+        {slash.isOpen && (
+          <SlashCommandPopup
+            results={slash.results}
+            selectedIndex={slash.selectedIndex}
+            onSelect={(cmd) => {
+              const inserted = slash.selectCommand(cmd);
+              if (inserted) {
+                applyMentionInsert(inserted);
+                textareaRef.current?.focus();
+              }
+            }}
           />
         )}
         <div className="clear-stack">
@@ -1873,6 +1987,16 @@ export const InputArea: React.FC = () => {
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+            </svg>
+          </button>
+          <button
+            className={`browse-button slash-commands-button${slashBrowserOpen ? ' active' : ''}`}
+            onClick={() => setSlashBrowserOpen((open) => !open)}
+            data-tooltip="Slash commands (or type / in the input)"
+            aria-pressed={slashBrowserOpen}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="16" y1="4" x2="8" y2="20" />
             </svg>
           </button>
         </div>

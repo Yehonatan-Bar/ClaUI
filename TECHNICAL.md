@@ -307,6 +307,7 @@ claude-code-mirror/
 |       |   +-- useClaudeStream.ts        #   postMessage event dispatcher
 |       |   +-- useRtlDetection.ts        #   detectRtl() / resolveDir() - RTL auto-detection (per-message LTR override lives in Zustand messageForcedLtr Set)
 |       |   +-- useFileMention.ts         #   @ file mention trigger detection, debounced search, popup state
+|       |   +-- useSlashCommand.ts        #   / slash command trigger detection, synchronous filtering, popup state
 |       |   +-- useStatusBarCollapse.ts  #   3-stage responsive layout hook for grouped StatusBar (full/compact/minimal) + progressive right-side collapse (clock/MCP/usage)
 |       |   +-- useOutsideClick.ts      #   Centralized outside-click manager for all dropdowns/popovers
 |       +-- components/
@@ -332,8 +333,10 @@ claude-code-mirror/
 |       |   |   +-- MarkdownContent.tsx  #   Markdown rendering with sanitization and link detection
 |       |   |   +-- filePathLinks.tsx   #   Clickable file path and URL detection and rendering
 |       |   +-- InputArea/
-|       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt/steer, usage-limit queue mode, scheduled messages, image paste, @ file mentions, ultrathink button, prompt navigation arrows
+|       |   |   +-- InputArea.tsx         #   Text input with RTL, Ctrl+Enter, clear session, interrupt/steer, usage-limit queue mode, scheduled messages, image paste, @ file mentions, / slash commands, ultrathink button, prompt navigation arrows
 |       |   |   +-- FileMentionPopup.tsx  #   Autocomplete popup for @ file mentions
+|       |   |   +-- SlashCommandPopup.tsx #   Inline autocomplete popup for / slash commands
+|       |   |   +-- SlashCommandBrowser.tsx # Full grouped/searchable modal of all slash commands
 |       |   |   +-- GitPushPanel.tsx      #   Config panel for git push (status, ask Claude to configure)
 |       |   |   +-- CustomSnippetPanel.tsx #  Config panel for the custom snippet button (text, Save, Clear)
 |       |   |   +-- CodexConsultPanel.tsx #   Input panel for Codex GPT expert consultation
@@ -468,8 +471,10 @@ claude-code-mirror/
 |           +-- markdown.css              #   Markdown element styles (headers, lists, tables, etc.)
 |           +-- rtl.css                   #   RTL-specific overrides (includes Markdown RTL rules)
 |       +-- utils/
-|           +-- claudeModelDisplay.ts     #   Shared Claude model options + raw model ID -> friendly label mapping
-|           +-- modelContextLimits.ts     #   Context window heuristics for Claude/Codex/Gemini models
+|       |   +-- claudeModelDisplay.ts     #   Shared Claude model options + raw model ID -> friendly label mapping
+|       |   +-- modelContextLimits.ts     #   Context window heuristics for Claude/Codex/Gemini models
+|       +-- data/
+|           +-- slashCommands.ts          #   Static slash-command catalog (grouped) + filter/parse/native-route helpers
 +-- sr-ptd-skill/                         # Bundled SR-PTD skill (installed to ~/.claude/skills/)
 |   +-- SKILL.md                          #   Main skill instructions (949 lines)
 |   +-- CLAUDE_MD_INSTRUCTIONS.md         #   Template for CLAUDE.md injection
@@ -520,6 +525,7 @@ claude-code-mirror/
     +-- DOUBLE_CLICK_FOCUS_FIX_2026-03.md #   Focus hardening for click reliability + rollback guide
     +-- FILE_LOGGER.md                    #   File-based logging with rotation and rename
     +-- FILE_MENTION.md                   #   @ file mention autocomplete feature
+    +-- SLASH_COMMANDS.md                 #   / slash command autocomplete popup + full-list browser + smart routing
     +-- GIT_PUSH_BUTTON.md               #   Git push button and configuration
     +-- PARTICLE_ACCELERATOR.md                    #   Local command output compression feature
     +-- SECRET_PROTECTION_BROKER.md      #   Multi-boundary DLP broker, scanners, policy, enforcement, UI
@@ -703,6 +709,9 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 
 **File Mention (@)** - Inline autocomplete triggered by typing `@` in the chat textarea. Searches workspace files via `vscode.workspace.findFiles()` with 150ms debounce, showing results in a popup above the input. Navigate with ArrowUp/Down, select with Enter/Tab/click. Replaces `@query` with the relative file path. Uses custom DOM events for extension-to-webview communication (same pattern as prompt history). All state is local to the `useFileMention` hook (not in Zustand).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/FILE_MENTION.md`
+
+**Slash Commands (/)** - Inline autocomplete triggered by typing `/` as the first character of the input, listing the built-in Claude Code commands (grouped catalog in `src/webview/data/slashCommands.ts`), filtered synchronously as you type. Navigate with ArrowUp/Down, select with Enter/Tab/click; the popup closes once the caret enters the command's arguments. A `/`-glyph button in the input `browse-stack` toolbar opens `SlashCommandBrowser`, a full grouped/searchable modal. On send, commands ClaUi implements natively are smart-routed to their real action (`/clear`+aliases -> clearSession, `/compact` -> in-place compact, `/context` -> reveal context strip, `/model <id>` -> setModel); all other commands pass through to the CLI as plain text. Webview-only (no extension/message-type changes); state is local to the `useSlashCommand` hook.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/SLASH_COMMANDS.md`
 
 **Plan Approval UI** - When Claude calls `ExitPlanMode` or `AskUserQuestion`, ClaUi shows a CLI-matching 4-option approval bar: (1) clear context + bypass permissions, (2) bypass permissions, (3) manually approve edits, (4) type feedback. **In full-access mode** these two tools go through the CLI's `can_use_tool` control protocol: the CLI blocks until the user responds and the answer is injected back via `updatedInput` (a true synchronous pause), so the legacy stream-detection + nudge machinery is bypassed (`notifyPlanApprovalRequired` early-returns when `controlProtocolActive`). **In supervised mode** (no control protocol) the extension instead detects the tools via the `messageDelta` event with `stop_reason: 'tool_use'` and uses the fallback machinery: the bar **persists until user interaction**; for `ExitPlanMode`, approve actions close the bar without immediately sending user messages (the CLI auto-approves via allowedTools; immediate text would create spurious turns causing infinite loops), with a busy re-check that nudges `"Continue with the implementation."` on idle and a 30s max-wait failsafe. Reject/feedback send text to the CLI; `AskUserQuestion` responses are sent as user messages. `AskUserQuestion` renders **all** questions in the call (up to 4): a single question answers on click, multiple questions show stacked question groups with per-question option/custom-answer state, a progress line, and one Submit button gated on every question being answered; answers travel per-question via `questionAnswers` on `planApprovalResponse` so no question silently falls back to its first option. Option 1 triggers context compaction; Option 3 switches to supervised permission mode. Context usage percentage is shown when token data is available. Debugging adds approval-path logs (`[Permission]`, `[EPM_APPROVE]`, `[APPROVAL_STATE]`) and webview click telemetry (`[UiDebug][PlanApprovalBar]`) in `Output -> ClaUi`. Plan tool blocks render with distinct blue styling and show extracted plan text instead of raw JSON. `TodoWrite` blocks render as a dedicated visual task card with progress bar, status counters, and color-coded todo rows instead of raw JSON.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CONTROL_PROTOCOL_PERMISSIONS.md` (full-access authoritative path)
