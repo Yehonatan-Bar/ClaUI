@@ -34,9 +34,10 @@ export function getModelMaxContext(model: string): number {
   if (lower.includes('gpt-3.5')) {
     return 16_385;
   }
-  // Claude models with a 1M-token context window: Fable 5, Opus 5, Opus
-  // 4.6/4.7/4.8, Sonnet 4.6, and Sonnet 5.
+  // Claude models with a 1M-token context window: Fable 5.1, Fable 5, Opus 5,
+  // Opus 4.6/4.7/4.8, Sonnet 4.6, and Sonnet 5.
   const oneMillionContextModels = [
+    'claude-fable-5-1',
     'claude-fable-5',
     'claude-opus-5',
     'claude-opus-4-6',

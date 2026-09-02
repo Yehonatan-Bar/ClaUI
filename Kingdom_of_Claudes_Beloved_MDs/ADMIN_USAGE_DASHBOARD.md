@@ -121,12 +121,13 @@ Windows: `today`, `7d`, `30d` (default), `quarter`. Always bucketed by server-re
 
 | Model | input | output | cacheCreation (5-min) | cacheRead |
 |---|---|---|---|---|
-| claude-opus-4-8 / 4-7 / 4-6 / 4-5 | 5.00 | 25.00 | 6.25 | 0.50 |
+| claude-opus-5 / 4-8 / 4-7 / 4-6 / 4-5 | 5.00 | 25.00 | 6.25 | 0.50 |
 | claude-sonnet-5 / 4-6 / 4-5 | 3.00 | 15.00 | 3.75 | 0.30 |
 | claude-haiku-4-5 | 1.00 | 5.00 | 1.25 | 0.10 |
+| claude-fable-5-1 | 10.00 | 50.00 | 12.50 | 0.25 |
 | claude-fable-5 | 10.00 | 50.00 | 12.50 | 1.00 |
 
-cacheCreation = input x 1.25 (5-min TTL, Claude Code default); cacheRead = input x 0.1. Currency defaults to USD; a configurable `exchangeRate` allows a different display currency without hardcoding one.
+cacheCreation = input x 1.25 (5-min TTL, Claude Code default); cacheRead = input x 0.1, except claude-fable-5-1, which reads cache at a flat $0.25/1M. Currency defaults to USD; a configurable `exchangeRate` allows a different display currency without hardcoding one.
 
 ---
 

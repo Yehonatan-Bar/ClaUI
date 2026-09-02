@@ -1,12 +1,12 @@
 # Claude Model Controls (Model, Thinking Effort, Fast Mode)
 
-Snapshot: 2026-07-29. Model lineup: Fable 5, Opus 5, Opus 4.8/4.7/4.6, Sonnet
-5/4.6/4.5, Haiku 4.5 are selectable; Mythos 5 is marked blocked.
+Snapshot: 2026-09-02. Model lineup: Fable 5.1, Fable 5, Opus 5, Opus 4.8/4.7/4.6,
+Sonnet 5/4.6/4.5, Haiku 4.5 are selectable; Mythos 5 is marked blocked.
 
 This document covers the three Claude-side controls exposed in the AI chip's
 model area:
 
-1. **Model selection** (including Fable 5)
+1. **Model selection** (including Fable 5.1)
 2. **Thinking effort level** (`--effort`)
 3. **Fast mode** (`--settings` overlay)
 
@@ -73,7 +73,7 @@ Relevant shared files:
 
 ---
 
-## 1. Model selection (including Fable 5)
+## 1. Model selection (including Fable 5.1)
 
 ### User surface
 
@@ -133,6 +133,7 @@ and mirrored in the `claudeMirror.model` enum in `package.json`:
 |-------|----------------------------|
 | Mythos 5 (Blocked) | `claude-mythos-5` |
 | Default | `""` (CLI default) |
+| Fable 5.1 | `claude-fable-5-1` |
 | Fable 5 | `claude-fable-5` |
 | Opus 5 | `claude-opus-5` |
 | Opus 4.8 | `claude-opus-4-8` |
@@ -150,10 +151,17 @@ directly into `settings.json`), `ModelSelector` appends a synthetic
 Mythos 5 (`claude-mythos-5`) is listed first (at the top of the dropdown, above
 `Default`). It is a specialized/preview model — it has no entry in the CLI's
 general model/pricing table and ships a `claude-mythos-preview` variant, so it is
-surfaced for selection but is not a general-availability lineup model. Fable 5
-(alias `fable`, full id `claude-fable-5`) follows after `Default`. It is a
-general-availability model — Anthropic's most capable — with a 1M-token context
-window, so its label carries no `(Blocked)` marker.
+surfaced for selection but is not a general-availability lineup model. Fable 5.1
+(full id `claude-fable-5-1`) follows after `Default`, with its predecessor Fable 5
+(alias `fable`, full id `claude-fable-5`) directly below it. Both are
+general-availability models — Fable 5.1 is Anthropic's most capable — with a
+1M-token context window, so their labels carry no `(Blocked)` marker.
+
+Fable 5.1 shares Fable 5's per-token input/output pricing ($10/$50 per 1M) but
+reads cache at $0.25 per 1M instead of $1.00, so it gets its own row in both
+price tables (`LOCAL_PRICES` in `DeveloperUsageReporter.ts` and `DEFAULT_PRICES`
+in `server/src/usage/PriceDefaults.ts`) rather than inheriting Fable 5's row
+through the prefix fallback.
 
 Opus 5 (`claude-opus-5`, released 2026-07-24) is Anthropic's flagship everyday
 model — near-Fable quality at Opus-tier pricing ($5/$25 per 1M input/output, the
@@ -162,15 +170,24 @@ Fable 5 as the top of the Opus group.
 
 **Context windows are not uniform.** `getModelMaxContext()` in
 `src/webview/utils/modelContextLimits.ts` returns `1_000_000` for the 1M-context
-models — Fable 5, Opus 5, Opus 4.6/4.7/4.8, Sonnet 4.6, and Sonnet 5 — and `200_000` for
-everything else (Sonnet 4.5, Haiku 4.5, Mythos 5, and older Claude models), so the
-context-usage gauge scales correctly. `inferClaudeModelLabel()` also treats
-`fable` and `mythos` as known families.
+models — Fable 5.1, Fable 5, Opus 5, Opus 4.6/4.7/4.8, Sonnet 4.6, and Sonnet 5 — and
+`200_000` for everything else (Sonnet 4.5, Haiku 4.5, Mythos 5, and older Claude
+models), so the context-usage gauge scales correctly. `inferClaudeModelLabel()`
+also treats `fable` and `mythos` as known families.
 
 Sonnet 5 (alias `claude-sonnet-5`, dated id `claude-sonnet-5-20260630`) is
 Anthropic's most agentic Sonnet — near-Opus quality at Sonnet-tier cost, with a
 1M-token context window. Its dated id resolves to the `Sonnet 5` label via the
-`value-<suffix>` prefix match in `getClaudeModelLabel()`.
+prefix match in `getClaudeModelLabel()`.
+
+**Label matching is exact-first, then longest prefix.** `getClaudeModelLabel()`
+first looks for an option whose id equals the model id, and only then falls back
+to the LONGEST option id that is a prefix of it. Both steps matter for sibling
+ids that differ by a trailing version segment: without the longest-prefix rule,
+`claude-fable-5-1-<date>` would match the shorter `claude-fable-5` option and be
+displayed as "Fable 5". The same longest-match rule is used by
+`resolveLocalPrice()` in `DeveloperUsageReporter.ts` and `resolvePriceKey()` in
+`server/src/usage/CostCalculator.ts`.
 
 ### Message flow
 

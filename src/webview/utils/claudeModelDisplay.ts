@@ -6,6 +6,7 @@ export interface ClaudeModelOption {
 export const CLAUDE_MODEL_OPTIONS: ClaudeModelOption[] = [
   { label: 'Mythos 5 (Blocked)', value: 'claude-mythos-5' },
   { label: 'Default', value: '' },
+  { label: 'Fable 5.1', value: 'claude-fable-5-1' },
   { label: 'Fable 5', value: 'claude-fable-5' },
   { label: 'Opus 5', value: 'claude-opus-5' },
   { label: 'Opus 4.8', value: 'claude-opus-4-8' },
@@ -67,16 +68,32 @@ export function getClaudeModelLabel(model: string | null | undefined): string {
     return value;
   }
 
-  const known = CLAUDE_MODEL_OPTIONS.find((option) => {
+  // Exact id wins outright. Otherwise fall back to the LONGEST option id that is
+  // a prefix of the model id, so a dated variant still resolves and a shorter
+  // sibling never shadows a longer one (e.g. "claude-fable-5-1" must not match
+  // the "claude-fable-5" option and render as "Fable 5").
+  const exact = CLAUDE_MODEL_OPTIONS.find(
+    (option) => option.value && lower === option.value.toLowerCase(),
+  );
+  if (exact) {
+    return exact.label;
+  }
+
+  let longestPrefixMatch: ClaudeModelOption | null = null;
+  for (const option of CLAUDE_MODEL_OPTIONS) {
     if (!option.value) {
-      return false;
+      continue;
     }
     const optionValue = option.value.toLowerCase();
-    return lower === optionValue ||
-      lower.startsWith(`${optionValue}-`);
-  });
-  if (known) {
-    return known.label;
+    if (!lower.startsWith(`${optionValue}-`)) {
+      continue;
+    }
+    if (!longestPrefixMatch || optionValue.length > longestPrefixMatch.value.length) {
+      longestPrefixMatch = option;
+    }
+  }
+  if (longestPrefixMatch) {
+    return longestPrefixMatch.label;
   }
 
   return inferClaudeModelLabel(value) ?? value;

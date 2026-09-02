@@ -38,6 +38,9 @@ const LOCAL_PRICES: Record<string, TokenTypeCounts> = {
   'claude-sonnet-5': { input: 3, output: 15, cacheCreation: 3.75, cacheRead: 0.3 },
   'claude-sonnet-4-6': { input: 3, output: 15, cacheCreation: 3.75, cacheRead: 0.3 },
   'claude-haiku-4-5': { input: 1, output: 5, cacheCreation: 1.25, cacheRead: 0.1 },
+  // Fable 5.1 matches Fable 5 on input/output but reads cache at a quarter of
+  // the price, so it needs its own row rather than the prefix fallback.
+  'claude-fable-5-1': { input: 10, output: 50, cacheCreation: 12.5, cacheRead: 0.25 },
   'claude-fable-5': { input: 10, output: 50, cacheCreation: 12.5, cacheRead: 1.0 },
 };
 const WEIGHTS: TokenTypeCounts = { input: 1, output: 5, cacheCreation: 1.25, cacheRead: 0.1 };
@@ -303,9 +306,17 @@ export class DeveloperUsageReporter {
   private resolveLocalPrice(model: string): TokenTypeCounts {
     const id = model.toLowerCase();
     if (LOCAL_PRICES[id]) return LOCAL_PRICES[id];
+    // Longest prefix wins (mirrors the server's resolvePriceKey), so a dated id
+    // still prices correctly and a shorter sibling key never shadows a longer
+    // one (e.g. "claude-fable-5" must not capture a "claude-fable-5-1-..." id).
+    let longestMatchingKey: string | null = null;
     for (const key of Object.keys(LOCAL_PRICES)) {
-      if (id.startsWith(key)) return LOCAL_PRICES[key];
+      if (!id.startsWith(key)) continue;
+      if (longestMatchingKey === null || key.length > longestMatchingKey.length) {
+        longestMatchingKey = key;
+      }
     }
+    if (longestMatchingKey) return LOCAL_PRICES[longestMatchingKey];
     return { input: 0, output: 0, cacheCreation: 0, cacheRead: 0 };
   }
 

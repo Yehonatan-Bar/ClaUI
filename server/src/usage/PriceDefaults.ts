@@ -21,6 +21,8 @@ export const DEFAULT_PRICES: Record<string, PriceRow> = {
   'claude-sonnet-4-6': { input: 3.0,  output: 15.0, cacheCreation: 3.75,  cacheRead: 0.3 },
   'claude-sonnet-4-5': { input: 3.0,  output: 15.0, cacheCreation: 3.75,  cacheRead: 0.3 },
   'claude-haiku-4-5':  { input: 1.0,  output: 5.0,  cacheCreation: 1.25,  cacheRead: 0.1 },
+  // Fable 5.1 shares Fable 5's input/output rates but reads cache at $0.25/MTok.
+  'claude-fable-5-1':  { input: 10.0, output: 50.0, cacheCreation: 12.5,  cacheRead: 0.25 },
   'claude-fable-5':    { input: 10.0, output: 50.0, cacheCreation: 12.5,  cacheRead: 1.0 },
   // Fallback row for any model id we have no price for. Kept at zero so unknown
   // tokens are never silently mispriced; their volume is surfaced separately as

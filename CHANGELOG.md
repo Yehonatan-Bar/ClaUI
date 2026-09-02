@@ -1,5 +1,16 @@
 # ClaUi - Changelog
 
+## Unreleased - 2026-09-02
+
+**Feature: Claude Fable 5.1 support**
+
+- Added `Fable 5.1` (`claude-fable-5-1`) to the model dropdown and to the `claudeMirror.model` setting enum, listed above Fable 5 as the top of the Fable group
+- Registered its 1M-token context window so the context-usage gauge scales correctly
+- Added its own price row in both the local (`DeveloperUsageReporter`) and server (`PriceDefaults`) tables: same $10/$50 per 1M input/output as Fable 5, but cache reads at $0.25 per 1M instead of $1.00
+- Model-label and price lookups now resolve exact ids first and otherwise pick the LONGEST matching prefix, so `claude-fable-5-1` (and any dated variant of it) is no longer captured by the shorter `claude-fable-5` entry and mislabelled/mispriced as Fable 5
+
+---
+
 ## Unreleased - 2026-08-19
 
 **Fix: AskUserQuestion with multiple questions -- every question now gets the user's real answer**
