@@ -25,9 +25,9 @@ No extension-host or `webview-messages.ts` changes: routing reuses existing mess
 ## Data Flow (inline autocomplete)
 
 ```
-User types '/comp' as the first character
+User types '/comp'
   -> handleInput calls slash.handleTextChange(text, cursorPos)
-  -> useSlashCommand: text[0] === '/', caret still inside the command token
+  -> useSlashCommand scans back from the caret, finds '/' at input start or after whitespace
   -> query = 'comp', filterSlashCommands('comp') ranks the catalog (synchronous)
   -> SlashCommandPopup renders the filtered list
   -> User presses Enter/Tab or clicks (ArrowUp/Down navigates)
@@ -37,10 +37,17 @@ User types '/comp' as the first character
 
 ## Trigger Detection Logic
 
-1. The `/` must be the very first character of the input (matching how the CLI recognises slash commands).
-2. The command token runs from the slash to the first whitespace.
-3. Once the caret moves past that token (into arguments), the popup dismisses.
-4. Filtering is local and synchronous (static catalog) - no debounce, no extension round-trip.
+Mirrors the `@` file-mention backward scan, so the menu still opens when the input already holds text, a leading space, or an earlier line:
+
+1. Scan backward from the caret for a `/`.
+2. The `/` must be at position 0 or directly preceded by whitespace (this is what stops `src/webview` style paths from opening the menu).
+3. Whitespace encountered before any `/` means the caret is not inside a command token - dismiss.
+4. Query = text between the slash and the caret; a space in the query means the user moved on to arguments - dismiss.
+5. Filtering is local and synchronous (static catalog) - no debounce, no extension round-trip.
+
+Note that send-time smart routing is stricter: `resolveNativeRoute` only fires when the trimmed message *starts* with `/`, so a mid-sentence slash is never routed to a native action.
+
+A `slashTyped` UiDebug entry is emitted on every typed `/` (visible in `Output -> ClaUi`), recording caret position and the preceding character, so trigger failures are diagnosable without a rebuild.
 
 ## Keyboard Behavior
 

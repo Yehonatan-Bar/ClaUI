@@ -918,10 +918,18 @@ export const InputArea: React.FC = () => {
       el.style.height = Math.min(el.scrollHeight, 200) + 'px';
       // Notify file mention hook for @ trigger detection
       fileMention.handleTextChange(newValue, e.target.selectionStart);
-      // Notify slash command hook for leading-/ trigger detection
+      // Notify slash command hook for / trigger detection
       slash.handleTextChange(newValue, e.target.selectionStart);
+      // Diagnostic: record every typed '/' so trigger failures are traceable in Output -> ClaUi
+      if (newValue[e.target.selectionStart - 1] === '/') {
+        logUiDebug('slashTyped', {
+          cursor: e.target.selectionStart,
+          length: newValue.length,
+          prevChar: e.target.selectionStart >= 2 ? newValue[e.target.selectionStart - 2] : '<start>',
+        });
+      }
     },
-    [undoMgr, fileMention, slash, codexSteerArmed]
+    [undoMgr, fileMention, slash, codexSteerArmed, logUiDebug]
   );
 
   /** Handle right-click to paste clipboard content (VS Code webview blocks native context menu) */
