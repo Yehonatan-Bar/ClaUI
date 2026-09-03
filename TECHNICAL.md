@@ -52,6 +52,7 @@ claude-code-mirror/
 |   |   |   +-- tabGroupCommands.ts       #   Folder/sub-folder + tab-move commands for the Sessions TreeView
 |   |   +-- views/
 |   |   |   +-- TabGroupsTreeProvider.ts  #   Sidebar TreeView (folders + tabs + summary tooltips)
+|   |   |   +-- ProjectHistoryTreeProvider.ts # Sidebar TreeView: all on-disk history for the project, grouped by date
 |   |   +-- sidebar/
 |   |   |   +-- ClaUiSidebarViewProvider.ts #   Activity Bar sidebar launcher (WebviewViewProvider)
 |   |   +-- process/
@@ -697,6 +698,9 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 
 **SessionDiscovery** - Scans `~/.claude/projects/` filesystem to discover all Claude Code sessions on disk, including sessions created outside ClaUi. Provides `discoverAll()` (all workspaces) and `discoverForWorkspace()` (current only). Extracts first user prompt from JSONL files (first 16KB scan). Two-step QuickPick: scope selection then session picker with relative time and file size. Keybinding: `Ctrl+Alt+D`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_DISCOVERY.md`
+
+**Project History Tree** - Persistent, collapsible `claudeMirror.projectHistory` sidebar TreeView (in the ClaUi Activity Bar, below Sessions) listing all on-disk conversations for the current project, grouped into collapsible date buckets (Today / Yesterday / Last 7 Days / Last 30 Days / Older). Sourced from `SessionDiscovery`, enriched with names/summaries from `SessionStore`. Click a leaf to resume in a new tab; context menu offers fork, reveal file, and delete; view title toggles project/all scope and refreshes. Auto-refreshes via a `.jsonl` FileSystemWatcher.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/PROJECT_HISTORY_TREE.md`
 
 **PromptHistoryStore** - Persists user prompts at two scopes: project (`workspaceState`) and global (`globalState`). Prompts are saved on every `sendMessage`/`sendMessageWithImages` (and Codex text sends / edit-and-resend). Deduplicates consecutive entries, capped at 200 per scope. The webview requests history via `getPromptHistory` message and receives it via `promptHistoryResponse` (handled by both Claude and Codex message handlers).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`

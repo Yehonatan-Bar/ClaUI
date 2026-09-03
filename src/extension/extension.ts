@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
+import * as fs from 'fs';
 import { TabManager } from './session/TabManager';
 import { SessionStore } from './session/SessionStore';
 import { ProjectAnalyticsStore } from './session/ProjectAnalyticsStore';
@@ -22,6 +23,7 @@ import { cleanupOrphanedProcesses } from './process/orphanCleanup';
 import { ProcessMemorySampler } from './process/ProcessMemorySampler';
 import { TabGroupStore } from './session/TabGroupStore';
 import { TabGroupsTreeProvider } from './views/TabGroupsTreeProvider';
+import { ProjectHistoryTreeProvider } from './views/ProjectHistoryTreeProvider';
 import { WorkstreamManager } from './workstream/WorkstreamManager';
 import { UserPortfolioManager } from './workstream/UserPortfolioManager';
 import { ParticleAcceleratorService } from './particle-accelerator/ParticleAcceleratorService';
@@ -292,6 +294,77 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   context.subscriptions.push(sessionsTreeView);
   context.subscriptions.push(tabManager.onTreeStateChanged(() => tabGroupsTreeProvider.refresh()));
+
+  // Project History TreeView: all conversations on disk for the current project,
+  // grouped into collapsible date buckets. Resume/fork commands live in commands.ts
+  // (they need account-profile resolution); the view-instance commands are here.
+  const projectHistoryProvider = new ProjectHistoryTreeProvider(sessionStore, log);
+  const projectHistoryView = vscode.window.createTreeView('claudeMirror.projectHistory', {
+    treeDataProvider: projectHistoryProvider,
+    showCollapseAll: true,
+  });
+  const updateHistoryScopeDescription = () => {
+    projectHistoryView.description =
+      projectHistoryProvider.getScope() === 'all' ? 'All projects' : 'This project';
+  };
+  updateHistoryScopeDescription();
+  context.subscriptions.push(projectHistoryView);
+  context.subscriptions.push(
+    vscode.commands.registerCommand('claudeMirror.history.refresh', () => {
+      projectHistoryProvider.refresh();
+    }),
+    vscode.commands.registerCommand('claudeMirror.history.toggleScope', () => {
+      projectHistoryProvider.toggleScope();
+      updateHistoryScopeDescription();
+    }),
+    vscode.commands.registerCommand('claudeMirror.history.revealFile', (node?: unknown) => {
+      const filePath = ProjectHistoryTreeProvider.filePathFromNode(node);
+      if (filePath) {
+        void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(filePath));
+      }
+    }),
+    vscode.commands.registerCommand('claudeMirror.history.delete', async (node?: unknown) => {
+      const ref = ProjectHistoryTreeProvider.sessionRefFromNode(node);
+      if (!ref) {
+        return;
+      }
+      const confirm = await vscode.window.showWarningMessage(
+        'Delete this conversation permanently? This removes the session file from disk and cannot be undone.',
+        { modal: true },
+        'Delete'
+      );
+      if (confirm !== 'Delete') {
+        return;
+      }
+      try {
+        await fs.promises.unlink(ref.filePath);
+        await sessionStore.removeSession(ref.sessionId);
+        log(`[history.delete] Deleted session file ${ref.filePath}`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        vscode.window.showErrorMessage(`Failed to delete conversation: ${msg}`);
+      }
+      projectHistoryProvider.refresh();
+    })
+  );
+
+  // Refresh the history tree when session files are written on disk (debounced),
+  // plus whenever the tab tree changes (session started/ended inside ClaUi).
+  let historyRefreshTimer: NodeJS.Timeout | undefined;
+  const debouncedHistoryRefresh = () => {
+    if (historyRefreshTimer) {
+      clearTimeout(historyRefreshTimer);
+    }
+    historyRefreshTimer = setTimeout(() => projectHistoryProvider.refresh(), 500);
+  };
+  const historyWatcher = vscode.workspace.createFileSystemWatcher(
+    new vscode.RelativePattern(projectHistoryProvider.projectsDir, '**/*.jsonl')
+  );
+  historyWatcher.onDidCreate(debouncedHistoryRefresh);
+  historyWatcher.onDidChange(debouncedHistoryRefresh);
+  historyWatcher.onDidDelete(debouncedHistoryRefresh);
+  context.subscriptions.push(historyWatcher);
+  context.subscriptions.push(tabManager.onTreeStateChanged(() => debouncedHistoryRefresh()));
 
   // Tab folder + tab focus commands
   registerTabGroupCommands(context, tabManager, tabGroupStore, log);

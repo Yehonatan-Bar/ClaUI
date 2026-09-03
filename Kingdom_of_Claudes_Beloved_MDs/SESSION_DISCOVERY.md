@@ -58,6 +58,7 @@ On selection: creates a new Claude tab via `tabManager.createTabForProvider('cla
 - Uses `TabManager.createTabForProvider()` to create new session tabs
 - Uses `SessionTab.startSession({ resume })` to resume discovered sessions
 - Complements `SessionStore` (globalState-based history) and `ConversationReader` (JSONL parsing for conversation display)
+- Its exported `DiscoveredSession` type and `discoverForWorkspace()` / `discoverAll()` back the persistent **Project History Tree** sidebar view (`Kingdom_of_Claudes_Beloved_MDs/PROJECT_HISTORY_TREE.md`)
 
 ## Diagnostics (2026-03)
 

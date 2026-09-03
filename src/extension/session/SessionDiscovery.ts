@@ -5,7 +5,7 @@ import * as os from 'os';
 import type { TabManager } from './TabManager';
 
 /** Discovered session metadata from a .jsonl file on disk */
-interface DiscoveredSession {
+export interface DiscoveredSession {
   sessionId: string;
   workspace: string;        // directory name (e.g. "c--projects-claude-code-mirror")
   workspaceLabel: string;   // human-readable (e.g. "c:/projects/claude-code-mirror")

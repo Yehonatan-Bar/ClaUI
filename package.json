@@ -59,6 +59,11 @@
           "id": "claudeMirror.sessionsTree",
           "name": "Sessions",
           "contextualTitle": "ClaUi Sessions"
+        },
+        {
+          "id": "claudeMirror.projectHistory",
+          "name": "History",
+          "contextualTitle": "ClaUi History"
         }
       ]
     },
@@ -97,6 +102,36 @@
       {
         "command": "claudeMirror.startSession",
         "title": "ClaUi: Start New Session"
+      },
+      {
+        "command": "claudeMirror.history.resume",
+        "title": "Open in New Tab",
+        "icon": "$(add)"
+      },
+      {
+        "command": "claudeMirror.history.fork",
+        "title": "Fork Conversation",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "claudeMirror.history.refresh",
+        "title": "ClaUi: Refresh History",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "claudeMirror.history.toggleScope",
+        "title": "ClaUi: Toggle History Scope (Project / All)",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "claudeMirror.history.revealFile",
+        "title": "Reveal Session File",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "claudeMirror.history.delete",
+        "title": "Delete Conversation",
+        "icon": "$(trash)"
       },
       {
         "command": "claudeMirror.stopSession",
@@ -1710,6 +1745,22 @@
           "when": "false"
         },
         {
+          "command": "claudeMirror.history.resume",
+          "when": "false"
+        },
+        {
+          "command": "claudeMirror.history.fork",
+          "when": "false"
+        },
+        {
+          "command": "claudeMirror.history.revealFile",
+          "when": "false"
+        },
+        {
+          "command": "claudeMirror.history.delete",
+          "when": "false"
+        },
+        {
           "command": "claudeMirror.tabs.openLayoutMenu"
         }
       ],
@@ -1738,6 +1789,16 @@
           "command": "claudeMirror.tabs.openLayoutMenu",
           "when": "view == claudeMirror.sessionsTree",
           "group": "navigation@9"
+        },
+        {
+          "command": "claudeMirror.history.toggleScope",
+          "when": "view == claudeMirror.projectHistory",
+          "group": "navigation@1"
+        },
+        {
+          "command": "claudeMirror.history.refresh",
+          "when": "view == claudeMirror.projectHistory",
+          "group": "navigation@2"
         }
       ],
       "editor/title/context": [
@@ -1782,6 +1843,26 @@
           "command": "claudeMirror.tabs.removeFromGroup",
           "when": "view == claudeMirror.sessionsTree && viewItem == tabLeaf",
           "group": "1_modify@2"
+        },
+        {
+          "command": "claudeMirror.history.resume",
+          "when": "view == claudeMirror.projectHistory && viewItem == historySession",
+          "group": "1_open@1"
+        },
+        {
+          "command": "claudeMirror.history.fork",
+          "when": "view == claudeMirror.projectHistory && viewItem == historySession",
+          "group": "1_open@2"
+        },
+        {
+          "command": "claudeMirror.history.revealFile",
+          "when": "view == claudeMirror.projectHistory && viewItem == historySession",
+          "group": "2_reveal@1"
+        },
+        {
+          "command": "claudeMirror.history.delete",
+          "when": "view == claudeMirror.projectHistory && viewItem == historySession",
+          "group": "9_destructive@1"
         }
       ]
     }

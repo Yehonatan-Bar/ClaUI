@@ -48,6 +48,33 @@ function formatRelativeTime(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString();
 }
 
+/**
+ * Resolve a session reference from a `claudeMirror.history.*` command invocation.
+ * The command is triggered two ways:
+ *  - Tree leaf click: `arguments: [sessionId, provider]` (two strings).
+ *  - Context menu: VS Code passes the tree node object as the first argument.
+ */
+function resolveHistorySessionRef(
+  arg1: unknown,
+  arg2: unknown
+): { sessionId: string; provider: ProviderId } | undefined {
+  if (typeof arg1 === 'string' && arg1.trim()) {
+    const provider = (typeof arg2 === 'string' ? arg2 : 'claude') as ProviderId;
+    return { sessionId: arg1, provider };
+  }
+  if (arg1 && typeof arg1 === 'object') {
+    const node = arg1 as { session?: { sessionId?: unknown; provider?: unknown } };
+    const sessionId = node.session?.sessionId;
+    if (typeof sessionId === 'string' && sessionId.trim()) {
+      const provider = (typeof node.session?.provider === 'string'
+        ? node.session.provider
+        : 'claude') as ProviderId;
+      return { sessionId, provider };
+    }
+  }
+  return undefined;
+}
+
 function quoteTerminalArg(value: string): string {
   const trimmed = (value || 'claude').trim() || 'claude';
   if (!/[\s"'&|<>^]/.test(trimmed)) {
@@ -838,6 +865,55 @@ export function registerCommands(
         log(`[showHistory#${runId}] end durationMs=${Date.now() - startedAt}`);
       }
     }),
+
+    // Resume a conversation selected in the Project History tree view (leaf click
+    // or its "Open in New Tab" context-menu entry). Reuses the same account-profile
+    // resolution as showHistory so the session resumes under the correct Claude account.
+    vscode.commands.registerCommand(
+      'claudeMirror.history.resume',
+      async (arg1?: unknown, arg2?: unknown) => {
+        const ref = resolveHistorySessionRef(arg1, arg2);
+        if (!ref) {
+          log('[history.resume] no session reference resolved');
+          return;
+        }
+        log(`[history.resume] Resuming ${ref.provider} session ${ref.sessionId}`);
+        const tab = tabManager.createTabForProvider(ref.provider);
+        if (ref.provider === 'claude') {
+          applyProfileToTab(tab, profileForSession(ref.sessionId));
+        }
+        try {
+          await tab.startSession({ resume: ref.sessionId });
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          vscode.window.showErrorMessage(`Failed to resume conversation: ${errorMessage}`);
+        }
+      }
+    ),
+
+    // Fork a conversation from the Project History tree view: resume a copy in a
+    // new tab, leaving the original session untouched.
+    vscode.commands.registerCommand(
+      'claudeMirror.history.fork',
+      async (arg1?: unknown, arg2?: unknown) => {
+        const ref = resolveHistorySessionRef(arg1, arg2);
+        if (!ref) {
+          log('[history.fork] no session reference resolved');
+          return;
+        }
+        log(`[history.fork] Forking ${ref.provider} session ${ref.sessionId}`);
+        const tab = tabManager.createTabForProvider(ref.provider);
+        if (ref.provider === 'claude') {
+          applyProfileToTab(tab, profileForSession(ref.sessionId));
+        }
+        try {
+          await tab.startSession({ resume: ref.sessionId, fork: true });
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          vscode.window.showErrorMessage(`Failed to fork conversation: ${errorMessage}`);
+        }
+      }
+    ),
 
     // Open HTML plan documents from multiple locations in the default browser
     vscode.commands.registerCommand('claudeMirror.openPlanDocs', async () => {
