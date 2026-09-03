@@ -1787,7 +1787,7 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run build",
+    "vscode:prepublish": "npm run build && node scripts/verify-bundle.js",
     "build": "webpack --mode production",
     "watch": "webpack --mode development --watch",
     "lint": "eslint src --ext ts,tsx",
@@ -1809,6 +1809,7 @@
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.1",
     "css-loader": "^6.9.0",
     "style-loader": "^3.3.0",
     "ts-loader": "^9.5.0",
