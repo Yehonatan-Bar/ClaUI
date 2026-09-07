@@ -1,9 +1,26 @@
+import type { CodexModelOption } from '../../extension/types/webview-messages';
+import { resolveCodexModelOption } from './codexModels';
+
 /**
  * Returns the maximum context window size (in tokens) for a given model name.
  * Used to compute context usage percentage.
+ *
+ * For Codex models, the active context window is account/CLI-specific and can
+ * differ from the published API window, so the CLI model cache (`codexModelOptions`,
+ * with the static fallback table behind it) is preferred over any static guess.
  */
-export function getModelMaxContext(model: string): number {
-  const lower = model.toLowerCase();
+export function getModelMaxContext(model: string, codexModelOptions?: CodexModelOption[]): number {
+  const lower = (model ?? '').toLowerCase();
+
+  // Codex models: use the dynamic active context window the CLI advertises
+  // (`context_window`) rather than the larger published `max_context_window`.
+  if (lower.startsWith('gpt-') || lower.includes('codex')) {
+    const codexOption = resolveCodexModelOption(model, codexModelOptions);
+    if (codexOption?.contextWindow && codexOption.contextWindow > 0) {
+      return codexOption.contextWindow;
+    }
+  }
+
   if (lower.includes('gemini-1.5-pro') || lower.includes('gemini-2')) {
     return 1_000_000;
   }
@@ -12,8 +29,13 @@ export function getModelMaxContext(model: string): number {
   }
   // Active context windows as reported by the Codex CLI model cache. GPT-5.4
   // advertises a larger max_context_window, but the active window is 272K.
+  // GPT-6 (Astra) active window is 272K locally even though the published max
+  // for the client is 872K; never hard-code the API's 1.05M here.
+  if (lower.includes('gpt-6')) {
+    return 272_000;
+  }
   if (lower.includes('gpt-5.6')) {
-    return 372_000;
+    return 272_000;
   }
   if (lower.includes('gpt-5.5') || lower.includes('gpt-5.4')) {
     return 272_000;

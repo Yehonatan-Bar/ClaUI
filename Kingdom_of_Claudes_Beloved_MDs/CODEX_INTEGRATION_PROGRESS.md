@@ -2,6 +2,19 @@
 
 > **Note:** This is a historical development log, not a current-state specification. For current Codex feature status, refer to `COMPLETE_FEATURE_LIST.md` (section 5) and `CODEX_FAST_MODE.md`.
 
+## 2026-09-06 - GPT-6 Astra support
+
+Added GPT-6 Astra (`gpt-6-astra`) as a first-class Codex option without changing any default. `~/.codex/models_cache.json` stays the source of truth; a static option never grants access (availability depends on the account, workspace, CLI, and policy).
+
+- **Cache metadata contract.** Extended `CodexModelOption` (`webview-messages.ts`) with validated primitives: `contextWindow`, `maxContextWindow`, `supportsFast`, `defaultReasoningEffort`. `codexModelCache.ts` now parses these from `context_window`, `max_context_window`, `additional_speed_tiers` / `service_tiers`, and `default_reasoning_level`. The parser was split into a pure `parseCodexModelOptions()` for unit testing; only validated primitives are forwarded (no free-form cache content).
+- **Fallback.** Added `GPT-6 Astra` to `CodexModelSelector` and `StatusBar` (`CODEX_SMART_SEARCH_FALLBACK`). A shared `src/webview/utils/codexModels.ts` holds the static capability fallback table (`CODEX_MODEL_FALLBACK`) plus `resolveCodexModelOption()`, so reasoning / Fast / context stay correct even before the CLI writes the cache.
+- **Context meter.** `getModelMaxContext(model, codexModelOptions?)` now prefers each Codex model's dynamic `context_window`. Astra's active window is `272,000` locally (published client max `872,000`); we never hard-code the API's `1,050,000`. Consumers updated: `StatusBar`, `InputArea`, `ContextUsageWidget`. Astra reasoning levels are `low`/`medium`/`high`/`xhigh`/`max`/`ultra` (no `none`/`minimal`).
+- **Capability-based Reasoning + Fast.** The reasoning selector filters by cache/fallback capabilities in both cache and fallback modes and labels `Default (<default_reasoning_level>)`. The Speed selector shows `Fast` only when `supportsFast`; an unsupported saved `fast` renders as `Fast (Unsupported)` instead of being sent silently, and `CodexExecProcessManager.runTurn()` drops Fast when the cache positively reports the model lacks it.
+- **Execution path unchanged.** `CodexExecProcessManager` already forwards `--model`, `model_reasoning_effort`, and Fast per turn/resume; Astra flows through every shared path (Codex chat, BTW, review loop, multi-participant `HeadlessAgentRunner`) as a free-string model. No new run path was added; no WebSocket steering / Responses API — cancel-and-resend (steer) remains the CLI model.
+- **Refresh + diagnostics.** `codexModelOptions` is re-read and re-posted after each Codex turn (`turnCompleted`) so newly granted models appear without reload. The model selector shows a `not available` chip when a saved model is absent from a non-empty cache (without clearing the choice), and CLI model-rejection stderr is rewritten into an actionable access message (`CodexSessionTab.translateCodexModelRejection`).
+- **Defaults untouched.** `claudeMirror.codex.model` stays empty (CLI default) with Astra added to the description examples; `claudeMirror.reviewLoop.reviewerModel` stays `gpt-5.5`.
+- **Tests.** `tests/process/codexModelCache.test.ts` (parser: Astra metadata, hidden-model exclusion, non-Fast model, invalid-field coercion, priority ordering) and `tests/unit/codexModels.test.ts` (fallback resolver + `getModelMaxContext`). Run with `npm run test:codex-models`.
+
 ## 2026-07-10 - GPT-5.6 / GPT-5.5 Codex model alignment
 
 Updated ClaUi's Codex model UX for the current OpenAI Codex lineup:

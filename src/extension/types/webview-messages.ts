@@ -49,6 +49,20 @@ export interface CodexModelOption {
   label: string;
   value: string;
   supportedReasoningEfforts?: CodexReasoningEffort[];
+  /**
+   * Optional, cache-derived capability metadata. Every field is a validated
+   * primitive copied out of `~/.codex/models_cache.json` — never free-form cache
+   * content. All are undefined when the cache is missing or the value fails
+   * validation, so consumers must treat them as best-effort hints.
+   */
+  /** Active context window (tokens) the CLI reports for this model (`context_window`). */
+  contextWindow?: number;
+  /** Largest advertised context window (tokens) for this model (`max_context_window`). */
+  maxContextWindow?: number;
+  /** True when the model offers a Fast speed tier (`additional_speed_tiers`/`service_tiers`). */
+  supportsFast?: boolean;
+  /** Reasoning effort the CLI applies by default for this model (`default_reasoning_level`). */
+  defaultReasoningEffort?: CodexReasoningEffort;
 }
 
 export interface ProviderCapabilities {

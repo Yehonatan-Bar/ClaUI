@@ -1809,6 +1809,10 @@ export class CodexMessageHandler {
       this.currentTurnCommands = [];
       this.currentTurnStartedAt = 0;
       this.currentTurnHadAgentMessage = false;
+      // A running Codex CLI refetches and rewrites its model cache, so re-read it
+      // after each turn: newly granted models (e.g. Astra) can appear, and stale
+      // ones can drop, without needing a reload.
+      this.sendCodexModelOptions();
     });
 
     this.demux.on('error', (data: { message: string }) => {

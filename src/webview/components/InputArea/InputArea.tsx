@@ -157,7 +157,8 @@ export const InputArea: React.FC = () => {
   }, []);
   const { inputTokens: ctxInputTokens } = useAppStore.getState().cost;
   const ctxModel = useAppStore.getState().model;
-  const ctxMaxTokens = getModelMaxContext(ctxModel ?? '');
+  const ctxCodexModelOptions = useAppStore.getState().codexModelOptions;
+  const ctxMaxTokens = getModelMaxContext(ctxModel ?? '', ctxCodexModelOptions);
   const ctxPct = ctxMaxTokens > 0 ? Math.min(((ctxInputTokens ?? 0) / ctxMaxTokens) * 100, 100) : 0;
   const [ctxHovered, setCtxHovered] = useState(false);
 

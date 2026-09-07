@@ -8,6 +8,7 @@ import type { CodexExecJsonEvent } from '../types/codex-exec-json';
 import { buildSanitizedEnv } from './envUtils';
 import { killProcessTree } from './killTree';
 import { spawnCli } from './spawnCli';
+import { readCodexModelOptions } from './codexModelCache';
 import { buildCodexDlpInstructions } from '../../server/Codex';
 
 /**
@@ -104,7 +105,21 @@ export class CodexExecProcessManager extends EventEmitter {
     // Per-turn overrides (e.g. the review-loop reviewer) take precedence; otherwise
     // fall back to the global Codex settings.
     const selectedReasoningEffort = (options.reasoningEffort ?? config.get<string>('codex.reasoningEffort', '')).trim();
-    const selectedServiceTier = (options.serviceTier ?? config.get<string>('codex.serviceTier', '')).trim();
+    let selectedServiceTier = (options.serviceTier ?? config.get<string>('codex.serviceTier', '')).trim();
+
+    // Capability guard: never silently send Fast for a model the CLI cache says
+    // does not support it. Only drop when we positively know the model lacks Fast
+    // (explicit model present in a non-empty cache with supportsFast === false);
+    // an empty cache or unknown model leaves the choice untouched so the CLI can
+    // decide. The default model ('') is likewise left alone.
+    if (selectedServiceTier === 'fast' && selectedModel) {
+      const cachedModels = readCodexModelOptions((message) => this.log(message));
+      const modelMeta = cachedModels.find((opt) => opt.value === selectedModel);
+      if (modelMeta && modelMeta.supportsFast === false) {
+        this.log(`Dropping Fast service tier: model "${selectedModel}" does not advertise a Fast tier in the Codex model cache`);
+        selectedServiceTier = '';
+      }
+    }
     const permissionMode =
       options.permissionMode ??
       (config.get<string>('permissionMode', 'full-access') as 'full-access' | 'supervised');

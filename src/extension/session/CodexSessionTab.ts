@@ -1583,7 +1583,8 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         return;
       }
       this.maybeMarkTurnAuthFailure(trimmed, tabLog);
-      this.postMessage({ type: 'error', message: trimmed });
+      const modelRejection = this.translateCodexModelRejection(trimmed);
+      this.postMessage({ type: 'error', message: modelRejection ?? trimmed });
     });
 
     this.processManager.on('exit', (info: { code: number | null; signal: string | null }) => {
@@ -1915,6 +1916,38 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       /the system cannot find the (path|file) specified/i,
     ];
     return missingPatterns.some((pattern) => pattern.test(normalized));
+  }
+
+  /**
+   * Detects a "model unavailable / unknown model" style rejection from the Codex
+   * CLI and rewrites it into an actionable access message. Availability depends on
+   * the account, workspace, CLI version, and policy — not on the model merely
+   * existing — so the message points the user at those levers. Returns null when
+   * the stderr text is not a model rejection (caller keeps the original message).
+   */
+  private translateCodexModelRejection(text: string): string | null {
+    const normalized = text.toLowerCase();
+    const modelRejectionPatterns = [
+      /\bunknown model\b/i,
+      /\bmodel\b[^.\n]*\bnot found\b/i,
+      /\bmodel\b[^.\n]*\bnot (?:supported|available|recognized|allowed)\b/i,
+      /\b(?:unsupported|invalid|unrecognized)\s+model\b/i,
+      /\bno access to (?:the )?model\b/i,
+      /\bdo(?:es)? not have access to\b[^.\n]*\bmodel\b/i,
+      /\bmodel\b[^.\n]*\bis not enabled\b/i,
+    ];
+    if (!modelRejectionPatterns.some((pattern) => pattern.test(normalized))) {
+      return null;
+    }
+    const configuredModel =
+      (this.getCurrentModel?.() || '').trim() ||
+      vscode.workspace.getConfiguration('claudeMirror').get<string>('codex.model', '').trim();
+    const modelLabel = configuredModel ? `"${configuredModel}"` : 'the selected Codex model';
+    return (
+      `Codex rejected ${modelLabel}. It may not be available for your account, workspace, ` +
+      `CLI version, or policy. Pick a model the Codex CLI advertises for you, update the ` +
+      `Codex CLI, or check your plan/workspace access, then retry. (CLI said: ${text.trim()})`
+    );
   }
 
   private isKnownNonFatalCodexStderr(text: string): boolean {

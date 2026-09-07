@@ -4531,6 +4531,17 @@ html, body, #root {
   font-style: italic;
 }
 
+.model-selector-warning {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--vscode-editorWarning-foreground, #d29922);
+  border: 1px solid var(--vscode-editorWarning-foreground, #d29922);
+  border-radius: 4px;
+  padding: 0 5px;
+  white-space: nowrap;
+  cursor: help;
+}
+
 
 /* Permission mode selector */
 .permission-mode-selector {

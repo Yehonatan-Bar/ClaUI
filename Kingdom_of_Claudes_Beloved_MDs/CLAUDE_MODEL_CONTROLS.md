@@ -171,9 +171,11 @@ Fable 5 as the top of the Opus group.
 **Context windows are not uniform.** `getModelMaxContext()` in
 `src/webview/utils/modelContextLimits.ts` returns `1_000_000` for the 1M-context
 models — Fable 5.1, Fable 5, Opus 5, Opus 4.6/4.7/4.8, Sonnet 4.6, and Sonnet 5 — and
-`200_000` for everything else (Sonnet 4.5, Haiku 4.5, Mythos 5, and older Claude
+`200_000` for other Claude models (Sonnet 4.5, Haiku 4.5, Mythos 5, and older Claude
 models), so the context-usage gauge scales correctly. `inferClaudeModelLabel()`
-also treats `fable` and `mythos` as known families.
+also treats `fable` and `mythos` as known families. For Codex (`gpt-*`/`codex`)
+models it takes an optional `codexModelOptions` argument and prefers each model's
+dynamic active `context_window` from the CLI cache (see `CODEX_INTEGRATION_PROGRESS.md`).
 
 Sonnet 5 (alias `claude-sonnet-5`, dated id `claude-sonnet-5-20260630`) is
 Anthropic's most agentic Sonnet — near-Opus quality at Sonnet-tier cost, with a

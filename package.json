@@ -588,7 +588,7 @@
         "claudeMirror.codex.model": {
           "type": "string",
           "default": "",
-          "description": "Codex model to use for new Codex sessions. Leave empty to use the CLI/config default."
+          "description": "Codex model to use for new Codex sessions (e.g. gpt-6-astra, gpt-5.6-sol, gpt-5.5). Availability depends on your account, workspace, CLI version, and policy. Leave empty to use the CLI/config default."
         },
         "claudeMirror.codex.reasoningEffort": {
           "type": "string",
@@ -1874,6 +1874,7 @@
     "lint": "eslint src --ext ts,tsx",
     "test:review-loop": "node --import tsx --test tests/review-loop/reviewLoopPrompts.test.ts",
     "test:spawn-cli": "node --import tsx --test tests/process/spawnCli.test.ts",
+    "test:codex-models": "node --import tsx --test tests/process/codexModelCache.test.ts tests/unit/codexModels.test.ts",
     "test:tabs": "node --import tsx --test tests/tabs/navigationOrder.test.ts tests/tabs/navTree.test.ts",
     "test:bridge": "node --import tsx --test tests/bridge/config.test.ts tests/bridge/protocol.test.ts tests/bridge/sessionStore.test.ts tests/bridge/grokPermissions.test.ts tests/bridge/procUtils.test.ts tests/bridge/openaiCompat.test.ts",
     "test:hibernation": "node --import tsx --test tests/hibernation/hibernationPlanner.test.ts",

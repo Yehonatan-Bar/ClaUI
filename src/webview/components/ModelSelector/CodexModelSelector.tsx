@@ -4,6 +4,7 @@ import { postToExtension } from '../../hooks/useClaudeStream';
 
 const CODEX_MODEL_OPTIONS_FALLBACK = [
   { label: 'Default', value: '' },
+  { label: 'GPT-6 Astra', value: 'gpt-6-astra' },
   { label: 'GPT-5.6 Sol', value: 'gpt-5.6-sol' },
   { label: 'GPT-5.6 Terra', value: 'gpt-5.6-terra' },
   { label: 'GPT-5.6 Luna', value: 'gpt-5.6-luna' },
@@ -59,6 +60,14 @@ export const CodexModelSelector: React.FC = () => {
     ? model
     : null;
 
+  // Diagnostic: the cache (source of truth) is present but does not advertise the
+  // saved model. Warn without clearing the choice — availability depends on the
+  // account / workspace / CLI / policy, and the cache can change between reads.
+  const selectedUnavailable =
+    !!selectedModel &&
+    codexModelOptions.length > 0 &&
+    !codexModelOptions.some((opt) => opt.value === selectedModel);
+
   return (
     <div className="model-selector">
       <span className="model-selector-label">Codex</span>
@@ -79,6 +88,14 @@ export const CodexModelSelector: React.FC = () => {
       {isConnected && activeModelLabel && (
         <span className="model-selector-active" data-tooltip="Currently active Codex model">
           {activeModelLabel}
+        </span>
+      )}
+      {selectedUnavailable && (
+        <span
+          className="model-selector-warning"
+          data-tooltip={`"${selectedModel}" is not offered by the Codex CLI model cache for the current account/client. It may be blocked by your account, workspace, CLI version, or policy. The selection is kept; the CLI will reject it at run time if it is unavailable.`}
+        >
+          not available
         </span>
       )}
     </div>

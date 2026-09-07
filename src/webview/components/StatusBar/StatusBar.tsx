@@ -19,6 +19,7 @@ import { useOutsideClick } from '../../hooks/useOutsideClick';
  * source of truth for which models the account may actually use.
  */
 const CODEX_SMART_SEARCH_FALLBACK = [
+  { label: 'GPT-6 Astra', value: 'gpt-6-astra' },
   { label: 'GPT-5.6 Sol', value: 'gpt-5.6-sol' },
   { label: 'GPT-5.6 Terra', value: 'gpt-5.6-terra' },
   { label: 'GPT-5.6 Luna', value: 'gpt-5.6-luna' },
@@ -422,7 +423,7 @@ export const StatusBar: React.FC<{
     : null;
 
   // Context usage computation
-  const ctxMax = getModelMaxContext(model ?? '');
+  const ctxMax = getModelMaxContext(model ?? '', codexModelOptions);
   const ctxTokens = cost?.inputTokens ?? 0;
   const ctxPct = ctxMax > 0 ? Math.min((ctxTokens / ctxMax) * 100, 100) : 0;
   const ctxColor = getContextColor(ctxPct);

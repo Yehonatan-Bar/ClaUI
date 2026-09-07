@@ -2,6 +2,7 @@ import React, { useCallback, useMemo } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import type { CodexReasoningEffort } from '../../../extension/types/webview-messages';
+import { resolveCodexModelOption } from '../../utils/codexModels';
 
 const CODEX_REASONING_EFFORT_OPTIONS: Array<{ label: string; value: CodexReasoningEffort }> = [
   { label: 'Default', value: '' },
@@ -24,13 +25,24 @@ export const CodexReasoningEffortSelector: React.FC = () => {
   } = useAppStore();
 
   const availableOptions = useMemo(() => {
-    const modelMeta = codexModelOptions.find((m) => m.value === selectedModel);
+    // Prefer the live cache; fall back to the static capability table so the list
+    // stays correct (e.g. Astra: no none/minimal) even before the CLI writes cache.
+    const modelMeta = resolveCodexModelOption(selectedModel, codexModelOptions);
     const supported = modelMeta?.supportedReasoningEfforts;
+    const defaultEffort = modelMeta?.defaultReasoningEffort;
+    // Label the "Default" entry with the model's default reasoning effort when known.
+    const withDefaultLabel = (opts: typeof CODEX_REASONING_EFFORT_OPTIONS) =>
+      defaultEffort
+        ? opts.map((opt) =>
+            opt.value === '' ? { ...opt, label: `Default (${defaultEffort})` } : opt
+          )
+        : opts;
+
     if (!supported || supported.length === 0) {
-      return CODEX_REASONING_EFFORT_OPTIONS;
+      return withDefaultLabel(CODEX_REASONING_EFFORT_OPTIONS);
     }
-    const filtered = CODEX_REASONING_EFFORT_OPTIONS.filter(
-      (opt) => opt.value === '' || supported.includes(opt.value)
+    const filtered = withDefaultLabel(
+      CODEX_REASONING_EFFORT_OPTIONS.filter((opt) => opt.value === '' || supported.includes(opt.value))
     );
     if (selectedCodexReasoningEffort && !filtered.some((opt) => opt.value === selectedCodexReasoningEffort)) {
       return [

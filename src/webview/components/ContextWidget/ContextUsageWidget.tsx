@@ -61,8 +61,9 @@ export const ContextUsageWidget: React.FC = () => {
 
   const { inputTokens: rawIn } = useAppStore.getState().cost;
   const model = useAppStore.getState().model;
+  const codexModelOptions = useAppStore.getState().codexModelOptions;
 
-  const maxCtx = getModelMaxContext(model ?? '');
+  const maxCtx = getModelMaxContext(model ?? '', codexModelOptions);
   const inputTokens = rawIn ?? 0;
   const pct = maxCtx > 0 ? Math.min((inputTokens / maxCtx) * 100, 100) : 0;
 
