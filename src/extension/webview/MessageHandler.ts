@@ -342,6 +342,8 @@ export class MessageHandler {
   private queuedUsagePrompt: { text: string; images?: WebviewImageData[] } | null = null;
   private queuedUsageScheduledSendAtMs: number | null = null;
   private queuedUsageTimer: ReturnType<typeof setTimeout> | null = null;
+  /** True when the current queued prompt was armed by Auto-Continue (not a manual queue). */
+  private queuedUsageAutoArmed = false;
 
   /** User-scheduled message (independent from usage-limit queue) */
   private scheduledPrompt: { text: string; images?: WebviewImageData[] } | null = null;
@@ -1632,6 +1634,7 @@ export class MessageHandler {
     this.clearQueuedUsageTimer();
     this.queuedUsagePrompt = null;
     this.queuedUsageScheduledSendAtMs = null;
+    this.queuedUsageAutoArmed = false;
     if (notifyWebview) {
       this.postUsageQueuedPromptState();
     }
@@ -1729,6 +1732,7 @@ export class MessageHandler {
     const wasQueued = !!this.queuedUsagePrompt;
     this.queuedUsagePrompt = { text, images: normalizedImages };
     this.queuedUsageScheduledSendAtMs = this.usageLimitResetAtMs + 60_000;
+    this.queuedUsageAutoArmed = false;
     this.scheduleQueuedUsageDispatch();
 
     const scheduledLabel = this.formatUsageScheduledTime(this.queuedUsageScheduledSendAtMs);
@@ -1756,6 +1760,50 @@ export class MessageHandler {
       `[UsageLimitQueue] Usage limit detected; resetAt=${new Date(parsed.resetAtMs).toISOString()} ` +
       `display="${parsed.resetDisplay}"`
     );
+    this.maybeAutoQueueContinuePrompt();
+  }
+
+  /** When the Auto-Continue toggle is enabled, automatically queue the continuation
+   *  prompt (default "המשך") to be sent one minute after the usage/session limit
+   *  resets — no user typing required. Reuses the deferred-send scheduler/retry path. */
+  private maybeAutoQueueContinuePrompt(): void {
+    if (!this.usageLimitActive || this.usageLimitResetAtMs == null) {
+      return;
+    }
+    if (this.getActiveProvider() !== 'claude') {
+      return;
+    }
+    if (!this.isAutoContinueOnLimitEnabled()) {
+      return;
+    }
+    const continueText = this.getAutoContinuePrompt();
+    if (!continueText) {
+      return;
+    }
+    this.queuedUsagePrompt = { text: continueText };
+    this.queuedUsageScheduledSendAtMs = this.usageLimitResetAtMs + 60_000;
+    this.queuedUsageAutoArmed = true;
+    this.scheduleQueuedUsageDispatch();
+
+    const scheduledLabel = this.formatUsageScheduledTime(this.queuedUsageScheduledSendAtMs);
+    this.postUsageQueuedPromptState(
+      `Auto-continue armed: "${continueText}" will be sent at ${scheduledLabel}.`
+    );
+    this.log(`[UsageLimitQueue] Auto-continue armed; "${continueText}" scheduled for ${scheduledLabel}`);
+  }
+
+  private isAutoContinueOnLimitEnabled(): boolean {
+    return vscode.workspace
+      .getConfiguration('claudeMirror.autoContinueOnLimit')
+      .get<boolean>('enabled', false);
+  }
+
+  private getAutoContinuePrompt(): string {
+    const raw = vscode.workspace
+      .getConfiguration('claudeMirror.autoContinueOnLimit')
+      .get<string>('prompt', 'המשך');
+    const trimmed = (raw ?? '').trim();
+    return trimmed || 'המשך';
   }
 
   // ---------- Scheduled Message Methods ----------
@@ -3891,6 +3939,26 @@ export class MessageHandler {
           break;
         }
 
+        case 'setAutoContinueOnLimit': {
+          this.log(`Setting auto-continue-on-limit: ${msg.enabled}`);
+          // Echo only AFTER the async update resolves (same race guard as autoStart).
+          void vscode.workspace
+            .getConfiguration('claudeMirror')
+            .update('autoContinueOnLimit.enabled', msg.enabled, true)
+            .then(() => {
+              this.sendAutoContinueOnLimitSetting();
+              // If a limit is already active, (re)arm or disarm the auto-continue
+              // queue immediately so toggling takes effect without a new detection.
+              if (msg.enabled) {
+                this.maybeAutoQueueContinuePrompt();
+              } else if (this.queuedUsagePrompt && this.queuedUsageAutoArmed) {
+                // Only cancel an auto-armed queue; never a prompt the user queued manually.
+                this.clearQueuedUsagePromptState(true);
+              }
+            });
+          break;
+        }
+
         case 'setReviewLoopMaxRounds': {
           // The manifest's minimum/maximum are advisory for the Settings UI only;
           // a programmatic update() is NOT clamped, so clamp here as well.
@@ -4160,6 +4228,7 @@ export class MessageHandler {
           // Send usage widget setting and auto-fetch initial usage data
           this.sendUsageWidgetSetting();
           this.sendReviewLoopAutoStartSetting();
+          this.sendAutoContinueOnLimitSetting();
           this.sendReviewLoopMaxRoundsSetting();
           void this.fetchAndSendUsage();
           // Send restore-sessions-on-startup setting
@@ -4733,6 +4802,14 @@ export class MessageHandler {
   private sendReviewLoopAutoStartSetting(): void {
     const enabled = vscode.workspace.getConfiguration('claudeMirror.reviewLoop').get<boolean>('autoStart', false);
     this.webview.postMessage({ type: 'reviewLoopAutoStartSetting', enabled });
+  }
+
+  /** Read auto-continue-on-limit setting from VS Code config and send to webview */
+  private sendAutoContinueOnLimitSetting(): void {
+    this.webview.postMessage({
+      type: 'autoContinueOnLimitSetting',
+      enabled: this.isAutoContinueOnLimitEnabled(),
+    });
   }
 
   /** Clamp a max-rounds value to the supported 1-20 integer range. */
@@ -5521,6 +5598,17 @@ export class MessageHandler {
           .join('\n');
         if (assistantText.trim()) {
           this.achievementService.onAssistantText(this.tabId, assistantText);
+        }
+        // Auto-Continue: some CLI builds surface the session-limit banner as assistant
+        // text rather than a result error. Only scan when the user opted in and no
+        // limit is already armed; parseUsageLimitError self-guards against false hits.
+        if (
+          assistantText.trim() &&
+          !this.usageLimitActive &&
+          this.getActiveProvider() === 'claude' &&
+          this.isAutoContinueOnLimitEnabled()
+        ) {
+          this.handleUsageLimitDetected(assistantText);
         }
         // Babel Fish: auto-translate each assistant message as it arrives (intermediate + final)
         if (this.babelFishEnabled && this.messageTranslator && !this.babelFishTranslatedIds.has(event.message.id)) {

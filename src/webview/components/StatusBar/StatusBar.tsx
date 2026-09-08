@@ -93,6 +93,8 @@ export const StatusBar: React.FC<{
     resetReviewLoop,
     reviewLoopAutoStart,
     setReviewLoopAutoStart,
+    autoContinueOnLimit,
+    setAutoContinueOnLimit,
     reviewLoopMaxRoundsSetting,
     setReviewLoopMaxRoundsSetting,
     reviewLoopSessionEnabled,
@@ -734,6 +736,29 @@ export const StatusBar: React.FC<{
       >
         Slash Commands
       </button>
+      <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static status-bar-autoreview-row">
+        <span id="autocontinue-label" className="status-bar-autoreview-label">Auto-continue on limit</span>
+        <span className="status-bar-autoreview-controls">
+          <label
+            className="review-loop-toggle"
+            data-tooltip={"When Claude reports a session limit (\"You've hit your session limit · resets 5pm\"), auto-send the continuation prompt one minute after the reset time. Claude only."}
+          >
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label="Auto-continue on session limit"
+              aria-labelledby="autocontinue-label"
+              checked={autoContinueOnLimit}
+              onChange={() => {
+                const next = !autoContinueOnLimit;
+                setAutoContinueOnLimit(next);
+                postToExtension({ type: 'setAutoContinueOnLimit', enabled: next });
+              }}
+            />
+            <span className="review-loop-toggle-slider" />
+          </label>
+        </span>
+      </div>
       {isConnected && showCodexConsult && (
         <button className="status-bar-group-dropdown-item" onClick={() => setCodexConsultPanelOpen(true)} data-tooltip="Consult Codex GPT expert">
           Consult Codex

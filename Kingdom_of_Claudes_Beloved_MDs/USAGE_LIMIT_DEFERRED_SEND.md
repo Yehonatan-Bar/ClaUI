@@ -2,11 +2,14 @@
 
 ## Status
 
-Implemented on **March 11, 2026**.
+Active for the Claude provider path. Two related behaviors share one scheduler:
 
-This feature is active for the Claude provider path and lets users queue a prompt when Claude returns a temporary usage-limit error.
+1. **Manual deferred send** — the user queues a prompt when Claude returns a usage-limit error; it is auto-sent one minute after reset.
+2. **Auto-Continue on limit** — an opt-in Tools-menu toggle that, on detecting a session/usage limit, automatically queues a fixed continuation prompt (default `המשך`) with no user typing.
 
 ## User Experience
+
+### Manual deferred send
 
 When Claude returns a usage-limit reset message:
 
@@ -16,13 +19,26 @@ When Claude returns a usage-limit reset message:
 4. User can send text-only or text+images; the prompt is queued per tab.
 5. The queued prompt is auto-sent one minute after reset time.
 
-## Scope (V1)
+### Auto-Continue on limit
+
+1. Toggle `Auto-continue on limit` lives in the status-bar **Tools** dropdown (off by default).
+2. When on and Claude reports a session/usage limit (e.g. `You've hit your session limit · resets 5pm (Asia/Jerusalem)`), the extension parses the reset time and automatically queues the continuation prompt.
+3. The prompt is auto-sent one minute after reset (`resetAt + 60s`), reusing the deferred-send scheduler and 15s busy-retry.
+4. If the post-reset send hits the limit again, detection re-arms with the new reset time — forming a persistent auto-continue loop until the session succeeds.
+5. Toggling on while a limit is already active arms immediately; toggling off clears any auto-queued prompt.
+
+## Scope
 
 - Provider: Claude only.
 - Queue size: one queued prompt per tab.
-- Replacement policy: latest queued prompt wins.
+- Replacement policy: latest queued prompt wins (manual send or auto-continue).
 - Schedule rule: `scheduledSendAt = resetAt + 60_000`.
 - Retry rule: if still busy at fire time, retry every 15 seconds.
+
+## Configuration
+
+- `claudeMirror.autoContinueOnLimit.enabled` (boolean, default `false`) — the Tools-menu toggle.
+- `claudeMirror.autoContinueOnLimit.prompt` (string, default `המשך`) — the auto-sent continuation text.
 
 ## Extension Implementation
 
@@ -31,9 +47,18 @@ When Claude returns a usage-limit reset message:
 - File: `src/extension/process/usageLimitParser.ts`
 - Entry point: `parseUsageLimitError(rawMessage, nowMs?)`
 - Behavior:
-- Detects usage-limit strings.
-- Parses reset time from absolute datetime, time-only text, or relative duration.
+- Detects usage-limit strings, including the session-limit banner form (`hit your … limit`, `session limit`) where `resets` is not adjacent to `limit`.
+- Parses reset time from absolute datetime, time-only text (`5pm`, `5:30pm`), or relative duration.
+- A bare-`resets <time>` fallback in `extractResetSegment` handles the banner form; it only runs when the stricter patterns miss, so legacy inputs are unaffected.
 - Normalizes to a future timestamp and returns `{ resetAtMs, resetDisplay }`.
+- Tests: `tests/process/usageLimitParser.test.ts` (`npm run test:usage-limit`).
+
+### Auto-continue arming
+
+- File: `src/extension/webview/MessageHandler.ts`
+- `handleUsageLimitDetected()` calls `maybeAutoQueueContinuePrompt()`, which — when the toggle is on and provider is Claude — populates `queuedUsagePrompt` with the configured prompt and schedules it via the shared `scheduleQueuedUsageDispatch()` path.
+- Secondary detection: the `assistantMessage` handler scans assistant text for the banner (guarded: only when the toggle is on and no limit is already armed), covering CLI builds that surface the limit as assistant text rather than a `result` error.
+- Setting plumbing mirrors the review-loop toggle: `setAutoContinueOnLimit` request, `autoContinueOnLimitSetting` broadcast, sent on webview init.
 
 ### Queue scheduler and lifecycle
 
@@ -57,15 +82,21 @@ When Claude returns a usage-limit reset message:
 ### Message contract
 
 - File: `src/extension/types/webview-messages.ts`
-- Added webview -> extension message: `queuePromptUntilUsageReset`
-- Added extension -> webview messages: `usageLimitDetected`, `usageQueuedPromptState`
+- Webview -> extension messages: `queuePromptUntilUsageReset`, `setAutoContinueOnLimit`
+- Extension -> webview messages: `usageLimitDetected`, `usageQueuedPromptState`, `autoContinueOnLimitSetting`
 
 ### State and event handling
 
 - Files: `src/webview/state/store.ts`, `src/webview/hooks/useClaudeStream.ts`
-- Added Zustand state: `usageLimit`, `usageQueuedPrompt`
+- Zustand state: `usageLimit`, `usageQueuedPrompt`, `autoContinueOnLimit`
 - Added setters and message handlers for the new extension events.
 - State resets on session end/reset and when switching away from Claude.
+
+### Tools-menu toggle
+
+- File: `src/webview/components/StatusBar/StatusBar.tsx`
+- `Auto-continue on limit` switch in the **Tools** dropdown (reuses the `review-loop-toggle` switch styling).
+- On change: `setAutoContinueOnLimit(next)` + posts `setAutoContinueOnLimit` to the extension.
 
 ### Input UI behavior
 

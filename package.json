@@ -474,6 +474,16 @@
           "maximum": 20,
           "description": "Maximum review rounds before the loop stops and returns the open feedback to you."
         },
+        "claudeMirror.autoContinueOnLimit.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-Continue on session limit: when Claude reports a session/usage limit (e.g. \"You've hit your session limit · resets 5pm\"), automatically queue the continuation prompt and send it one minute after the reset time. Off by default; toggle it from the Tools menu in the status bar. Claude provider only."
+        },
+        "claudeMirror.autoContinueOnLimit.prompt": {
+          "type": "string",
+          "default": "המשך",
+          "description": "The prompt text auto-sent one minute after a session/usage limit resets when Auto-Continue on limit is enabled. Defaults to \"המשך\" (Hebrew for \"continue\")."
+        },
         "claudeMirror.reviewLoop.reviewerModel": {
           "type": "string",
           "default": "gpt-5.5",
@@ -1874,6 +1884,7 @@
     "lint": "eslint src --ext ts,tsx",
     "test:review-loop": "node --import tsx --test tests/review-loop/reviewLoopPrompts.test.ts",
     "test:spawn-cli": "node --import tsx --test tests/process/spawnCli.test.ts",
+    "test:usage-limit": "node --import tsx --test tests/process/usageLimitParser.test.ts",
     "test:codex-models": "node --import tsx --test tests/process/codexModelCache.test.ts tests/unit/codexModels.test.ts",
     "test:tabs": "node --import tsx --test tests/tabs/navigationOrder.test.ts tests/tabs/navTree.test.ts",
     "test:bridge": "node --import tsx --test tests/bridge/config.test.ts tests/bridge/protocol.test.ts tests/bridge/sessionStore.test.ts tests/bridge/grokPermissions.test.ts tests/bridge/procUtils.test.ts tests/bridge/openaiCompat.test.ts",

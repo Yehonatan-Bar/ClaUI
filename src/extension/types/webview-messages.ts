@@ -1002,6 +1002,13 @@ export interface SetReviewLoopAutoStartRequest {
   enabled: boolean;
 }
 
+/** Toggle auto-continue-on-limit: when a Claude session/usage limit is detected,
+ *  automatically queue the continuation prompt to send one minute after reset. */
+export interface SetAutoContinueOnLimitRequest {
+  type: 'setAutoContinueOnLimit';
+  enabled: boolean;
+}
+
 /** Per-session override: enable/disable auto-review for the current tab only. */
 export interface SetReviewLoopSessionEnabledRequest {
   type: 'setReviewLoopSessionEnabled';
@@ -1401,6 +1408,7 @@ export type WebviewToExtensionMessage =
   | ReviewLoopStartRequest
   | ReviewLoopStopRequest
   | SetReviewLoopAutoStartRequest
+  | SetAutoContinueOnLimitRequest
   | SetReviewLoopSessionEnabledRequest
   | SetReviewLoopMaxRoundsRequest;
 
@@ -3066,6 +3074,12 @@ export interface ReviewLoopAutoStartSettingMessage {
   enabled: boolean;
 }
 
+/** Reports the current auto-continue-on-limit toggle state to the webview. */
+export interface AutoContinueOnLimitSettingMessage {
+  type: 'autoContinueOnLimitSetting';
+  enabled: boolean;
+}
+
 export interface ReviewLoopSessionEnabledSettingMessage {
   type: 'reviewLoopSessionEnabledSetting';
   enabled: boolean;
@@ -3267,6 +3281,7 @@ export type ExtensionToWebviewMessage =
   | WorkspaceAccessGuardErrorMessage
   | ReviewLoopEventMessage
   | ReviewLoopAutoStartSettingMessage
+  | AutoContinueOnLimitSettingMessage
   | ReviewLoopSessionEnabledSettingMessage
   | ReviewLoopMaxRoundsSettingMessage;
 

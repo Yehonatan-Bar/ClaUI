@@ -8,6 +8,11 @@ const USAGE_LIMIT_DETECTION_PATTERNS: RegExp[] = [
   /\byour limit will reset\b/i,
   /\blimit will reset\b/i,
   /\blimit resets?\b/i,
+  // Claude Code session-limit banner, e.g.
+  // "You've hit your session limit · resets 5pm (Asia/Jerusalem)".
+  // Here "resets" is not adjacent to "limit", so the patterns above miss it.
+  /\bhit your\s+(?:[\w-]+\s+)?limit\b/i,
+  /\bsession limit\b/i,
 ];
 
 /** Parse usage-limit reset time from a Claude error string.
@@ -50,7 +55,14 @@ function extractResetSegment(text: string): string | null {
     return match[1].trim();
   }
   const fallback = text.match(/\breset(?:s)?\s+at\s*[:\-]?\s*([^.!?\n]+)/i);
-  return fallback?.[1]?.trim() || null;
+  if (fallback?.[1]) {
+    return fallback[1].trim();
+  }
+  // Session-limit banner form: "... · resets 5pm (Asia/Jerusalem)" where "resets"
+  // is not adjacent to "limit" and no "at" keyword follows. Only reached when the
+  // stricter patterns above do not match, so existing inputs are unaffected.
+  const bareReset = text.match(/\bresets?\s+(?:at\s+)?([^.!?\n]+)/i);
+  return bareReset?.[1]?.trim() || null;
 }
 
 function parseAbsoluteDateTime(input: string | null): number | null {
