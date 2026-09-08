@@ -421,8 +421,9 @@ Follow-up changes implemented after Stage 5 based on interactive VS Code testing
 
 Codex runtime hardening (observed during manual testing):
 
-- Fixed a false-positive Codex error in UI for `rg` commands with `exit 1` (ripgrep "no matches found"):
-  - `rg`/`rg.exe` exit code `1` is now treated as non-fatal in Codex command telemetry mapping
+- Suppresses false-positive "Command failed (exit N)" toasts for known-benign non-zero exits, via the `isExpectedNonFatalCommandExit(command, exitCode, aggregatedOutput)` helper in `CodexMessageHandler.ts`:
+  - `rg`/`rg.exe` exit code `1` (ripgrep "no matches found") is treated as non-fatal
+  - PowerShell/`pwsh` exit code `1` is treated as non-fatal when the command explicitly silenced its errors (`-ErrorAction SilentlyContinue`/`Ignore`, the `-ea` alias, `$ErrorActionPreference`) AND the aggregated output shows no PowerShell error record. PowerShell maps `$? == $false` to exit `1` even for a fully successful command that merely probed for missing files (e.g. a trailing `Get-Item C:/AGENTS.md -ErrorAction SilentlyContinue`), so the exit code alone is not a reliable failure signal. The output-signature guard keeps real crashes (terminating errors, parser errors, native stderr) visible.
 - Added stdout tail flush on Codex process exit:
   - if the final JSONL event arrives without a trailing newline, it is now parsed on process exit instead of being dropped
 - Added extra Codex turn diagnostics:

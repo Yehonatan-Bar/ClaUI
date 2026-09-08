@@ -1,5 +1,19 @@
 # ClaUi - Changelog
 
+## Unreleased - 2026-09-08
+
+**Feature: What's New notifications after an update**
+
+- After ClaUi updates to a release that ships new features, a one-time notification appears (`What's New` / `Full changelog` / `Dismiss`) and a What's New banner with the release highlights shows at the top of every chat tab until dismissed; each entry is shown in English first and in Hebrew below
+- Bug-fix-only releases stay silent: announcements come from a bundled catalog (`src/extension/whatsnew/announcements.json`), one entry per feature release, so nothing is shown unless an entry exists
+- Dismiss is persisted (single globalState key with monotonic known/dismissed id sets) and clears the banner in all tabs; new tabs, reloads and deep-hibernation wakes re-request the current state so the banner never reappears after a dismissal and never goes missing before one
+- The notification is at-most-once per version across VS Code windows (exclusive receipt file in global storage); fresh installs never see a backlog
+- New commands: `ClaUi: What's New` (reopens the latest highlights even after dismissal) and `ClaUi: Open Changelog` (opens this file in the markdown preview)
+- New setting `claudeMirror.showWhatsNew` (default on) disables the automatic notification and banner
+- Unit tests: `npm run test:whats-new`
+
+---
+
 ## Unreleased - 2026-09-02
 
 **Feature: Claude Fable 5.1 support**

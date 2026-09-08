@@ -11839,3 +11839,99 @@ html, body, #root {
   color: var(--vscode-descriptionForeground, #9aa0a6);
   font-size: 13px;
 }
+
+/* ==========================================================================
+   What's New banner (post-update release highlights, WhatsNewBanner.tsx)
+   Visual language mirrors .setup-notice-banner; accent uses the link color
+   so it reads as "news", not as an error.
+   ========================================================================== */
+.whats-new-banner {
+  margin: 10px 12px 0;
+  border: 1px solid color-mix(in srgb, var(--vscode-textLink-foreground, #3794ff) 55%, var(--vscode-panel-border, #333));
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--vscode-textLink-foreground, #3794ff) 22%, transparent), transparent 55%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--vscode-editor-background) 84%, var(--vscode-sideBar-background, #111)),
+      color-mix(in srgb, var(--vscode-editor-background) 92%, #000)
+    );
+  color: var(--vscode-editor-foreground);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.whats-new-content {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.whats-new-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.whats-new-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.whats-new-close {
+  border: none;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.whats-new-close:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.08));
+  color: var(--vscode-editor-foreground);
+}
+
+.whats-new-item + .whats-new-item {
+  border-top: 1px solid color-mix(in srgb, var(--vscode-panel-border, #333) 60%, transparent);
+  padding-top: 8px;
+}
+
+.whats-new-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.whats-new-highlights {
+  margin: 6px 0 0;
+  padding-inline-start: 18px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--vscode-descriptionForeground);
+}
+
+.whats-new-highlights li + li {
+  margin-top: 3px;
+}
+
+.whats-new-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* Hebrew block of a What's New entry: rendered below the English block, RTL. */
+.whats-new-item-he {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed color-mix(in srgb, var(--vscode-panel-border, #333) 60%, transparent);
+  text-align: right;
+}

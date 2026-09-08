@@ -47,7 +47,10 @@ $requiredManifestEntries = @(
   # Smart Search
   "claudeMirror.smartSearch.open",
   "claudeMirror.smartSearch.defaultModel",
-  "claudeMirror.smartSearch.allowBash"
+  "claudeMirror.smartSearch.allowBash",
+  # What's New after update (palette commands + setting)
+  "claudeMirror.showWhatsNew",
+  "claudeMirror.openChangelog"
 )
 
 foreach ($entry in $requiredManifestEntries) {
@@ -71,13 +74,22 @@ $requiredBundleSymbols = @(
   # OPEN_SESSION token the agent emits in result cards.
   "claudeMirror.smartSearch.open",
   "configureSearchMode",
-  "OPEN_SESSION"
+  "OPEN_SESSION",
+  # What's New: internal resync command + the banner state message type
+  "claudeMirror.whatsNew.resync",
+  "whatsNewState"
 )
 
 foreach ($symbol in $requiredBundleSymbols) {
   if (-not (Select-String -Path $bundlePath -Pattern $symbol -Quiet)) {
     throw "Installed extension.js does not contain expected symbol: $symbol"
   }
+}
+
+# "ClaUi: Open Changelog" opens the packaged changelog (shipped as lowercase changelog.md).
+$changelogFile = Get-ChildItem -Path $installed.FullName -Filter "changelog.md" -File | Select-Object -First 1
+if (-not $changelogFile) {
+  throw "Installed extension is missing changelog.md (required by ClaUi: Open Changelog)"
 }
 
 Write-Host "Installed extension verified:"

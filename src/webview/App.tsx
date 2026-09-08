@@ -31,6 +31,7 @@ import { ReviewLoopPanel } from './components/ReviewLoop/ReviewLoopPanel';
 import { TeamPanel, TeamStatusWidget } from './components/Teams';
 import { WorkstreamMapView } from './components/WorkstreamMap/WorkstreamMapView';
 import { WorktreePanel } from './components/Worktree';
+import { WhatsNewBanner } from './components/WhatsNew';
 import { postToExtension } from './hooks/useClaudeStream';
 import { detectRtl } from './hooks/useRtlDetection';
 import { deriveTurnHistoryFromMessages } from './utils/turnVitals';
@@ -737,6 +738,9 @@ const ChatAppContent: React.FC = () => {
           </div>
         </div>
       ))}
+
+      {/* What's New banner: bundled release highlights, shown after an update until dismissed */}
+      <WhatsNewBanner />
 
       {/* Weather widget: floating mood icon, toggled independently via gear settings */}
       <VitalsContainer />

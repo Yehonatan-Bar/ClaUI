@@ -31,6 +31,7 @@ import { SecretProtectionService } from './secret-protection/SecretProtectionSer
 import { SuperParticleAcceleratorService } from './super-particle-accelerator/SuperParticleAcceleratorService';
 import { WorkspaceAccessGuardService } from './workspace-access-guard/WorkspaceAccessGuardService';
 import { BridgeProviderService } from './bridge/BridgeProviderService';
+import { WhatsNewService, wireWhatsNew } from './whatsnew/WhatsNewService';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -80,6 +81,21 @@ export function activate(context: vscode.ExtensionContext): void {
   log(`[SessionStore] Found ${storedSessions.length} stored sessions on activation`);
   for (const s of storedSessions.slice(0, 5)) {
     log(`[SessionStore]   - ${s.sessionId.slice(0, 8)}: "${s.name}" (${s.model}) lastActive=${s.lastActiveAt}`);
+  }
+
+  // "What's New" after update (toast + in-panel banner gated by bundled
+  // announcements). Existing-install detection reads claui.hasLaunched BEFORE
+  // the first-install logic further down can flip it, and treats stored
+  // sessions as proof of prior use for installs that predate that key.
+  // Isolated in its own try/catch: a failure here must never block activation.
+  let whatsNewService: WhatsNewService | null = null;
+  try {
+    const isExistingInstall =
+      context.globalState.get<boolean>('claui.hasLaunched', false) || storedSessions.length > 0;
+    whatsNewService = new WhatsNewService(context, log, isExistingInstall);
+    context.subscriptions.push(whatsNewService);
+  } catch (err) {
+    log(`[WhatsNew] Disabled - failed to initialize: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   // Create prompt history store for cross-session prompt persistence
@@ -269,6 +285,15 @@ export function activate(context: vscode.ExtensionContext): void {
   tabManager.superParticleAcceleratorService = superParticleAcceleratorService;
   // Expose Workspace Access Guard service for filesystem boundary enforcement
   tabManager.workspaceAccessGuardService = workspaceAccessGuardService;
+  // What's New: register tab fan-out, palette + internal commands, and run the
+  // post-update check (toast is at-most-once per version across windows).
+  if (whatsNewService) {
+    try {
+      wireWhatsNew(context, whatsNewService, tabManager);
+    } catch (err) {
+      log(`[WhatsNew] Disabled - failed to wire: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
   // Propagate settings changes to all existing tabs at runtime
   secretProtectionService.onDidChangeSettings(() => {
     tabManager.refreshSecretProtectionForAllTabs();

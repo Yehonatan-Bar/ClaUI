@@ -227,10 +227,10 @@ Codex tabs work the same way: `CodexMessageHandler.sendCodexModelSetting()` send
 branch is likewise omitted.
 
 **Known limitation:** the per-session selection is not persisted across a full
-window reload — a resumed session re-seeds `selectedModel` from `claudeMirror.model`
-(matching the model the CLI actually resumes with via its config fallback), so the
-picker stays consistent with the running model but an explicit pre-reload pick is
-not restored.
+window reload — a restored tab re-seeds `selectedModel` from `claudeMirror.model`
+at construction, and the resume then spawns on that same re-seeded model (via
+`resumeSpawnModelOption()`), so the picker stays consistent with the running
+model but an explicit pre-reload pick is not restored.
 
 ### Live switching
 
@@ -247,7 +247,34 @@ distinguishes two cases:
 In both branches `suppressNextExit` is set and `processBusy` is toggled around
 the restart. Because `ClaudeProcessManager.start()` falls back to config for
 effort and fast mode (see below), a model switch also picks up the current
-effort/fast-mode configuration.
+effort/fast-mode configuration. Both branches also call
+`supersedeSleepLifecycle()` after `stop()`, which clears any armed hibernation /
+silent-resume / lazy-wake state (a tab can be asleep when the user picks a new
+model) so a later focus or message cannot double-spawn on the pre-switch model,
+and restores non-sleeping tab visuals.
+
+### Model on resume and respawn
+
+Model selection is **per-tab** (`selectedModel`) and the global
+`claudeMirror.model` config is deliberately **not** broadcast to open sessions.
+Every path that resumes/respawns an existing session therefore carries the tab's
+own model via `SessionTab.resumeSpawnModelOption()`, which resolves
+`this.selectedModel || this.currentModel || undefined` (explicit picker choice
+first, then the CLI-reported runtime model, else the config default). It is
+spread **before** `bridgeModelSpawnOption()` so a bridge tab's namespaced
+`bridge:*` value still wins.
+
+Without this, these paths fell back to the global `claudeMirror.model` setting,
+so a tab shown as (say) Opus could silently resume on whatever model another tab
+last wrote to config (e.g. Fable). The paths that use it:
+
+- `wakeFromHibernation()` — waking a light-hibernated tab
+- `beginSilentResume()` — silent crash recovery
+- `escalateToVisibleCrash()` — the "Restart?" prompt after a failed silent resume
+- the `autoRestart` "Restart?" prompt after a non-zero exit
+- the cancel auto-resume (exit after user cancel)
+- the review-loop resume (reviving the session for the developer phase)
+- `restartWithCurrentSession()` — MCP-config restart
 
 ### CLI argument
 
@@ -544,7 +571,9 @@ additionally sends `defaultModelHint`
   (`model`, `effortLevel`, `fastMode`), `--model`/`--effort`/`--settings` assembly,
   `writeFastModeSettingsFile()`
 - `src/extension/session/SessionTab.ts` — `switchModel()` live-switch logic;
-  per-tab `selectedModel` field (seeded from config at construction) + `getSelectedModel()`
+  per-tab `selectedModel` field (seeded from config at construction) + `getSelectedModel()`;
+  `resumeSpawnModelOption()` (carries the tab's model onto every resume/respawn) and
+  `supersedeSleepLifecycle()` (clears armed hibernation/silent-resume state on a deliberate restart)
 - `src/extension/webview/CodexMessageHandler.ts` — Codex `setModel` case,
   `sendCodexModelSetting()` (sends per-session `session.getCurrentModel()`; config
   watch omits `claudeMirror.codex.model`)

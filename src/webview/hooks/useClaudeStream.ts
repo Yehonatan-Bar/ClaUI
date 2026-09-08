@@ -117,6 +117,7 @@ export function useClaudeStream(): void {
     setUsageData,
     setUsageLimitState,
     setUsageQueuedPromptState,
+    setWhatsNewState,
     appendMemorySnapshot,
     setMemoryStreamError,
     setTokenRatioData,
@@ -1155,6 +1156,10 @@ export function useClaudeStream(): void {
           setMemoryStreamError(msg.error);
           break;
 
+        case 'whatsNewState':
+          setWhatsNewState(Array.isArray(msg.items) ? msg.items : [], msg.currentVersion ?? '');
+          break;
+
         case 'usageLimitDetected':
           setUsageLimitState({
             active: msg.active,
@@ -1441,6 +1446,9 @@ export function useClaudeStream(): void {
     // Tell the extension we are ready
     vscodeApi?.postMessage({ type: 'ready' });
     vscodeApi?.postMessage({ type: 'requestTabList' });
+    // Pull the What's New banner state on every mount: the activation broadcast
+    // is dropped by deep-hibernated tabs and lost on webview reload.
+    vscodeApi?.postMessage({ type: 'whatsNewRequestState' });
 
     return () => {
       window.removeEventListener('message', handleMessage);
@@ -1545,6 +1553,7 @@ export function useClaudeStream(): void {
     setUsageData,
     setUsageLimitState,
     setUsageQueuedPromptState,
+    setWhatsNewState,
     appendMemorySnapshot,
     setMemoryStreamError,
     setTokenRatioData,

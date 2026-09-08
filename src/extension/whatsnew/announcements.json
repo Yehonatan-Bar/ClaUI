@@ -1,0 +1,24 @@
+{
+  "$comment": "Bundled What's New entries shown after an update (toast + in-panel banner). Add ONE entry per release that ships user-visible features; bug-fix-only releases get no entry and stay silent. 'version' is the EARLIEST extension version allowed to show the entry (vsce publish patch may assign a higher number, that is fine). 'id' must be unique and must never change once shipped. Newest entries can go anywhere in the list; the extension sorts by version.",
+  "announcements": [
+    {
+      "id": "2026-09-08-whats-new-notifications",
+      "version": "0.1.228",
+      "date": "2026-09-08",
+      "title": "What's New notifications",
+      "titleHe": "התראות 'מה חדש'",
+      "highlights": [
+        "ClaUi now tells you when an update ships new features: a one-time notification plus this banner in the chat panel.",
+        "Bug-fix-only releases stay silent. Only releases with announced features show up here.",
+        "Reopen the latest highlights any time with the command 'ClaUi: What's New', or read everything with 'ClaUi: Open Changelog'.",
+        "Turn the automatic notification off with the setting claudeMirror.showWhatsNew."
+      ],
+      "highlightsHe": [
+        "ClaUi מודיע כשעדכון מביא יכולות חדשות: הודעה חד-פעמית ובאנר זה בחלון הצ'אט.",
+        "גרסאות של תיקוני באגים בלבד נשארות שקטות. רק גרסאות עם יכולות מוכרזות מופיעות כאן.",
+        "פתיחה מחדש של החידושים האחרונים בכל עת עם הפקודה 'ClaUi: What's New', או קריאת הכל עם 'ClaUi: Open Changelog'.",
+        "כיבוי ההתראה האוטומטית דרך ההגדרה claudeMirror.showWhatsNew."
+      ]
+    }
+  ]
+}

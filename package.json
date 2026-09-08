@@ -69,6 +69,23 @@
     },
     "commands": [
       {
+        "command": "claudeMirror.showWhatsNew",
+        "title": "ClaUi: What's New",
+        "icon": "$(megaphone)"
+      },
+      {
+        "command": "claudeMirror.openChangelog",
+        "title": "ClaUi: Open Changelog"
+      },
+      {
+        "command": "claudeMirror.whatsNew.dismiss",
+        "title": "ClaUi: Dismiss What's New Banner"
+      },
+      {
+        "command": "claudeMirror.whatsNew.resync",
+        "title": "ClaUi: Resync What's New Banner"
+      },
+      {
         "command": "claudeMirror.joinMultiParticipantSession",
         "title": "ClaUi: Join Multi-Participant Session",
         "icon": "$(organization)"
@@ -730,6 +747,12 @@
           "type": "boolean",
           "default": true,
           "description": "Automatically generate session tab names from the first message using Claude Haiku"
+        },
+        "claudeMirror.showWhatsNew": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "After ClaUi updates to a version that ships new features, show a one-time notification and a What's New banner in the chat panel. Bug-fix-only releases never notify. Turning this off hides the banner; the 'ClaUi: What's New' command still works."
         },
         "claudeMirror.restoreSessionsOnStartup": {
           "type": "boolean",
@@ -1727,6 +1750,14 @@
           "when": "false"
         },
         {
+          "command": "claudeMirror.whatsNew.dismiss",
+          "when": "false"
+        },
+        {
+          "command": "claudeMirror.whatsNew.resync",
+          "when": "false"
+        },
+        {
           "command": "claudeMirror.tabs.reorder",
           "when": "false"
         },
@@ -1889,6 +1920,7 @@
     "test:tabs": "node --import tsx --test tests/tabs/navigationOrder.test.ts tests/tabs/navTree.test.ts",
     "test:bridge": "node --import tsx --test tests/bridge/config.test.ts tests/bridge/protocol.test.ts tests/bridge/sessionStore.test.ts tests/bridge/grokPermissions.test.ts tests/bridge/procUtils.test.ts tests/bridge/openaiCompat.test.ts",
     "test:hibernation": "node --import tsx --test tests/hibernation/hibernationPlanner.test.ts",
+    "test:whats-new": "node --import tsx --test tests/unit/whatsNewLogic.test.ts tests/unit/whatsNewCore.test.ts tests/unit/whatsNewReceipt.test.ts",
     "verify:installed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installed.ps1",
     "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1",
     "git:push": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-push.ps1",

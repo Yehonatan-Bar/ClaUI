@@ -21,6 +21,7 @@ import type {
   WebviewTabGroup,
   WebviewTabSummary,
   WorktreeActionResultMessage,
+  WhatsNewAnnouncement,
 } from '../../extension/types/webview-messages';
 import type {
   WorktreeWithSessions,
@@ -368,6 +369,11 @@ export interface AppState {
 
   // Restore-sessions-on-startup toggle (mirrors claudeMirror.restoreSessionsOnStartup)
   restoreSessionsEnabled: boolean;
+
+  // What's New banner: bundled release highlights pushed by the extension after
+  // an update (or by the "ClaUi: What's New" command). Empty = hidden.
+  whatsNewItems: WhatsNewAnnouncement[];
+  whatsNewVersion: string;
 
   // Usage widget
   usageWidgetEnabled: boolean;
@@ -879,6 +885,7 @@ export interface AppState {
   setContextWidgetVisible: (visible: boolean) => void;
   setUsageWidgetEnabled: (enabled: boolean) => void;
   setRestoreSessionsEnabled: (enabled: boolean) => void;
+  setWhatsNewState: (items: WhatsNewAnnouncement[], currentVersion: string) => void;
   setUsageData: (stats: UsageStat[], fetchedAt: number, error?: string) => void;
   setUsageLimitState: (state: { active: boolean; resetAtMs: number | null; resetDisplay: string; rawMessage: string | null }) => void;
   setUsageQueuedPromptState: (state: { queued: boolean; scheduledSendAtMs: number | null; summary: string | null }) => void;
@@ -1295,6 +1302,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   contextWidgetVisible: true,
   usageWidgetEnabled: false,
   restoreSessionsEnabled: true,
+  whatsNewItems: [],
+  whatsNewVersion: '',
   usageStats: [],
   usageFetchedAt: null,
   usageError: undefined,
@@ -2702,6 +2711,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setContextWidgetVisible: (visible) => set({ contextWidgetVisible: visible }),
   setUsageWidgetEnabled: (enabled) => set({ usageWidgetEnabled: enabled }),
   setRestoreSessionsEnabled: (enabled) => set({ restoreSessionsEnabled: enabled }),
+  setWhatsNewState: (items, currentVersion) =>
+    set({ whatsNewItems: Array.isArray(items) ? items : [], whatsNewVersion: currentVersion ?? '' }),
 
   setUsageData: (stats, fetchedAt, error) =>
     set({ usageStats: stats, usageFetchedAt: fetchedAt, usageError: error }),

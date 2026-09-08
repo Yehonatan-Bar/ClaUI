@@ -664,6 +664,10 @@ export class SessionTab implements WebviewBridge {
       this.suppressNextExit = true;
       this.postMessage({ type: 'processBusy', busy: true });
       this.processManager.stop();
+      // A model switch takes over the process lifecycle: clear any armed
+      // hibernation / silent-resume state so a later focus/message cannot
+      // double-spawn on the pre-switch model.
+      this.supersedeSleepLifecycle('model-switch (fresh restart)');
       try {
         await this.processManager.start({
           model,
@@ -691,6 +695,11 @@ export class SessionTab implements WebviewBridge {
     this.suppressNextExit = true;
     this.postMessage({ type: 'processBusy', busy: true });
     this.processManager.stop();
+    // A model switch takes over the process lifecycle: clear any armed
+    // hibernation / silent-resume state (e.g. the tab was asleep when the user
+    // picked a new model) so a later focus/message cannot double-spawn on the
+    // pre-switch model, and so sleeping visuals are cleared.
+    this.supersedeSleepLifecycle('model-switch (resume)');
 
     try {
       await this.processManager.start({
@@ -730,21 +739,18 @@ export class SessionTab implements WebviewBridge {
 
     // This restart supersedes any armed lazy-wake / silent-resume / hibernation
     // cycle for this tab; clear them so a later focus event cannot double-spawn.
-    this.clearHibernationMarkers('mcp-restart');
-    this.lazyWakeArmed = false;
-    this.silentResumeArmedFlag = false;
-    this.silentResumeInFlight = false;
-    this.pendingResumeSessionId = null;
-    this.clearSilentResumeTimers();
+    this.supersedeSleepLifecycle('mcp-restart');
 
     try {
       await this.processManager.start({
         resume: sessionToResume,
         skipReplay: true,
-        model: this.currentModel || undefined,
-        // Override currentModel for bridge tabs: currentModel is the backend
-        // display string (e.g. `grok/…`), not a namespaced bridge:* value, so
-        // the runtime would fail to select a backend. Must come AFTER `model`.
+        // Resume on THIS tab's model (explicit pick, else the running model).
+        ...this.resumeSpawnModelOption(),
+        // Override for bridge tabs: resumeSpawnModelOption may resolve to
+        // currentModel, which is the backend display string (e.g. `grok/…`), not
+        // a namespaced bridge:* value, so the runtime would fail to select a
+        // backend. Must come AFTER the model option.
         ...this.bridgeModelSpawnOption(),
         cwd: this.getEffectiveCwd(),
         cliPathOverride: this.cliPathOverride ?? undefined,
@@ -1012,6 +1018,8 @@ export class SessionTab implements WebviewBridge {
       await this.processManager.start({
         resume: sid,
         skipReplay: true,
+        // Resume on THIS tab's model, not the global config default.
+        ...this.resumeSpawnModelOption(),
         ...this.bridgeModelSpawnOption(),
         cwd: this.getEffectiveCwd(),
         cliPathOverride: this.cliPathOverride ?? undefined,
@@ -1227,6 +1235,8 @@ export class SessionTab implements WebviewBridge {
       await this.processManager.start({
         resume: sid,
         skipReplay: true,
+        // Resume on THIS tab's model, not the global config default.
+        ...this.resumeSpawnModelOption(),
         // Keep a bridge tab on its backend across silent crash recovery too.
         ...this.bridgeModelSpawnOption(),
         cwd: this.getEffectiveCwd(),
@@ -1400,6 +1410,8 @@ export class SessionTab implements WebviewBridge {
             try {
               await this.processManager.start({
                 resume: sid,
+                // Restart on THIS tab's model, not the global config default.
+                ...this.resumeSpawnModelOption(),
                 ...this.bridgeModelSpawnOption(),
                 cwd: this.getEffectiveCwd(),
                 cliPathOverride: this.cliPathOverride ?? undefined,
@@ -1460,6 +1472,34 @@ export class SessionTab implements WebviewBridge {
       return { model: this.selectedModel };
     }
     return {};
+  }
+
+  /** Spawn option carrying THIS tab's model onto a resume/respawn (hibernation
+   *  wake, silent crash resume, crash-restart prompt, cancel auto-resume,
+   *  review-loop resume). Prefers the explicit picker choice (`selectedModel`),
+   *  then the CLI-reported runtime model (`currentModel`); `undefined` falls back
+   *  to the config default inside ClaudeProcessManager.start(). Without this,
+   *  these paths resume on the GLOBAL `claudeMirror.model` setting, which — since
+   *  model selection is per-tab and deliberately not broadcast — can differ from
+   *  the model the tab is actually showing/running (e.g. resuming on Fable a tab
+   *  the user had switched to Opus). Spread this BEFORE bridgeModelSpawnOption()
+   *  so a bridge tab's namespaced `bridge:*` value still wins. */
+  private resumeSpawnModelOption(): { model?: string } {
+    return { model: this.selectedModel || this.currentModel || undefined };
+  }
+
+  /** Take over the process lifecycle from any armed sleep/recovery cycle before a
+   *  deliberate stop+respawn (model switch, MCP restart). Clears hibernation,
+   *  silent-resume and lazy-wake state so a later focus or message event cannot
+   *  double-spawn on the stale (pre-switch) model, and restores non-sleeping tab
+   *  visuals now that the tab is live again. No-op when nothing is armed. */
+  private supersedeSleepLifecycle(reason: string): void {
+    this.clearHibernationMarkers(reason);
+    this.lazyWakeArmed = false;
+    this.silentResumeArmedFlag = false;
+    this.silentResumeInFlight = false;
+    this.pendingResumeSessionId = null;
+    this.clearSilentResumeTimers();
   }
 
   /** Set the worktree this tab's session runs in. Call before startSession so it
@@ -1991,6 +2031,8 @@ export class SessionTab implements WebviewBridge {
         await this.processManager.start({
           resume: sid,
           skipReplay: true,
+          // Resume on THIS tab's model, not the global config default.
+          ...this.resumeSpawnModelOption(),
           ...this.bridgeModelSpawnOption(),
           cwd: this.getEffectiveCwd(),
           cliPathOverride: this.cliPathOverride ?? undefined,
@@ -2738,6 +2780,8 @@ export class SessionTab implements WebviewBridge {
           this.processManager
             .start({
               resume: sessionToResume,
+              // Resume on THIS tab's model, not the global config default.
+              ...this.resumeSpawnModelOption(),
               // Keep a bridge tab on its backend when auto-resuming after a user
               // cancel: the sticky store may not be populated yet (e.g. the very
               // first turn was cancelled before it completed), so the runtime
@@ -2882,6 +2926,8 @@ export class SessionTab implements WebviewBridge {
                 try {
                   await this.processManager.start({
                     resume: currentSessionId,
+                    // Restart on THIS tab's model, not the global config default.
+                    ...this.resumeSpawnModelOption(),
                     ...this.bridgeModelSpawnOption(),
                     cliPathOverride: this.cliPathOverride ?? undefined,
                     ...this.claudeAccountProcessOptions(),

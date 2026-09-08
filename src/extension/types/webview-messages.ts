@@ -1188,6 +1188,23 @@ export interface MpRemoveReactionRequest {
   emoji: string;
 }
 
+// --- What's New (post-update banner) ---
+
+/** User dismissed the What's New banner (persisted; clears it in every tab). */
+export interface WhatsNewDismissRequest {
+  type: 'whatsNewDismiss';
+}
+
+/** "Full changelog" button: open the bundled changelog in the markdown preview. */
+export interface WhatsNewOpenChangelogRequest {
+  type: 'whatsNewOpenChangelog';
+}
+
+/** Sent on every webview mount so a rebuilt webview (reload, deep-hibernation wake) gets the current banner state. */
+export interface WhatsNewRequestStateRequest {
+  type: 'whatsNewRequestState';
+}
+
 export type WebviewToExtensionMessage =
   | SendTextMessage
   | SendMessageWithImages
@@ -1410,7 +1427,10 @@ export type WebviewToExtensionMessage =
   | SetReviewLoopAutoStartRequest
   | SetAutoContinueOnLimitRequest
   | SetReviewLoopSessionEnabledRequest
-  | SetReviewLoopMaxRoundsRequest;
+  | SetReviewLoopMaxRoundsRequest
+  | WhatsNewDismissRequest
+  | WhatsNewOpenChangelogRequest
+  | WhatsNewRequestStateRequest;
 
 // --- Super Particle Accelerator (Webview -> Extension) ---
 export interface SuperParticleAcceleratorGetStatusRequest { type: 'superParticleAcceleratorGetStatus' }
@@ -3091,6 +3111,34 @@ export interface ReviewLoopMaxRoundsSettingMessage {
   value: number;
 }
 
+// --- What's New (post-update banner) ---
+
+/** One bundled announcement from src/extension/whatsnew/announcements.json. */
+export interface WhatsNewAnnouncement {
+  /** Stable unique id; never changes once shipped (dismissals are keyed by it). */
+  id: string;
+  /** Earliest extension version allowed to show this entry (major.minor.patch). */
+  version: string;
+  /** ISO date, informational only. */
+  date?: string;
+  /** English title (shown first). */
+  title: string;
+  /** English bullets (shown first). */
+  highlights: string[];
+  /** Hebrew title, rendered below the English block. */
+  titleHe?: string;
+  /** Hebrew bullets (same points, same order as `highlights`), rendered below the English block. */
+  highlightsHe?: string[];
+}
+
+/** Authoritative banner state; an empty `items` array hides the banner. */
+export interface WhatsNewStateMessage {
+  type: 'whatsNewState';
+  items: WhatsNewAnnouncement[];
+  /** Installed extension version, shown in the banner header. */
+  currentVersion: string;
+}
+
 export type ExtensionToWebviewMessage =
   | McpInventoryMessage
   | McpCatalogMessage
@@ -3283,7 +3331,8 @@ export type ExtensionToWebviewMessage =
   | ReviewLoopAutoStartSettingMessage
   | AutoContinueOnLimitSettingMessage
   | ReviewLoopSessionEnabledSettingMessage
-  | ReviewLoopMaxRoundsSettingMessage;
+  | ReviewLoopMaxRoundsSettingMessage
+  | WhatsNewStateMessage;
 
 // --- Super Particle Accelerator (Extension -> Webview) ---
 export interface SuperParticleAcceleratorStatusMessage {

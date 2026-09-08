@@ -13,6 +13,7 @@ import type { PromptHistoryStore } from './PromptHistoryStore';
 import type { ExtensionToWebviewMessage, ProviderId } from '../types/webview-messages';
 import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
+import type { WhatsNewService } from '../whatsnew/WhatsNewService';
 import type { TokenUsageRatioTracker } from './TokenUsageRatioTracker';
 import type { SkillUsageTracker } from '../skillgen/SkillUsageTracker';
 import {
@@ -109,6 +110,8 @@ export class TabManager {
 
   /** Shared workstream manager, injected after construction to avoid circular dependency */
   workstreamManager: import('../workstream/WorkstreamManager').WorkstreamManager | null = null;
+  /** "What's New" banner broadcaster; wired from extension.ts after construction (see wireWhatsNew). */
+  whatsNewService: WhatsNewService | null = null;
 
   /** Shared Particle Accelerator service, injected after construction */
   particleAcceleratorService: import('../particle-accelerator/ParticleAcceleratorService').ParticleAcceleratorService | null = null;
@@ -830,6 +833,8 @@ export class TabManager {
     );
 
     this.tabs.set(tab.id, tab);
+    // postMessage queues until the webview is ready, so registering here is safe.
+    this.whatsNewService?.registerTab(tab.id, (msg) => tab.postMessage(msg));
     this.tabSlotColors.set(tab.id, tabColor);
     this.activeTabId = tab.id;
     if (this.workstreamManager) {
@@ -908,6 +913,7 @@ export class TabManager {
     );
 
     this.tabs.set(tab.id, tab);
+    this.whatsNewService?.registerTab(tab.id, (msg) => tab.postMessage(msg));
     this.tabSlotColors.set(tab.id, tabColor);
     this.activeTabId = tab.id;
     if (this.workstreamManager) {
@@ -1125,6 +1131,50 @@ export class TabManager {
       return null;
     }
     return tab;
+  }
+
+  /**
+   * Reveal a tab that can render the What's New banner: an ordinary Claude or
+   * Codex chat tab that is awake. Smart Search and Multi-Participant tabs are
+   * skipped (the banner is not rendered there). So is every sleeping tab
+   * (deep/light hibernation, lazy restore, armed silent resume): `reveal()`
+   * fires their focus handlers and would spawn a CLI just to show release
+   * notes. Creates a fresh Claude tab when nothing qualifies.
+   */
+  revealChatTabForNotice(): void {
+    const qualifies = (tab: ManagedTab | null): tab is SessionTab | CodexSessionTab => {
+      if (!tab || tab.isDisposed) {
+        return false;
+      }
+      if (tab instanceof SessionTab) {
+        return (
+          tab.getTabKind() === 'chat' &&
+          !tab.isHibernatedDeep &&
+          !tab.isHibernatedLight &&
+          !tab.isPendingLazyResume &&
+          !tab.isSilentResumeArmed()
+        );
+      }
+      if (tab instanceof CodexSessionTab) {
+        return tab.getTabKind() === 'chat' && !tab.isPendingLazyResume;
+      }
+      return false;
+    };
+
+    const active = this.getActiveTab();
+    let target: SessionTab | CodexSessionTab | null = qualifies(active) ? active : null;
+    if (!target) {
+      for (const tab of this.tabs.values()) {
+        if (qualifies(tab)) {
+          target = tab;
+          break;
+        }
+      }
+    }
+    if (!target) {
+      target = this.createClaudeTab();
+    }
+    target.reveal();
   }
 
   /** Get or create: returns active tab if one exists, otherwise creates a new one */
@@ -1763,6 +1813,7 @@ export class TabManager {
 
   private handleTabClosed(tabId: string): void {
     this.tabs.delete(tabId);
+    this.whatsNewService?.unregisterTab(tabId);
     this.tabSlotColors.delete(tabId);
     // During shutdown, the final snapshot has already been captured. Skip
     // mutation so disposal-order callbacks do not wipe the saved state.

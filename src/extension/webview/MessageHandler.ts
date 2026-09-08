@@ -2543,6 +2543,19 @@ export class MessageHandler {
             'claudeMirror.tabs.moveInNavigation', msg.tabId, msg.targetGroupId, msg.targetIndex);
           break;
 
+        // What's New banner: routed to the global WhatsNewService via internal commands
+        case 'whatsNewDismiss':
+          void vscode.commands.executeCommand('claudeMirror.whatsNew.dismiss');
+          break;
+
+        case 'whatsNewOpenChangelog':
+          void vscode.commands.executeCommand('claudeMirror.openChangelog');
+          break;
+
+        case 'whatsNewRequestState':
+          void vscode.commands.executeCommand('claudeMirror.whatsNew.resync', this.tabId);
+          break;
+
         case 'setGroupCollapsed':
           void vscode.commands.executeCommand(
             'claudeMirror.groups.setCollapsed', msg.groupId, msg.collapsed);

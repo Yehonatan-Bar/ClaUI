@@ -58,13 +58,72 @@ function codexTurnCategory(hasCommands: boolean): TurnCategory {
   return hasCommands ? 'command' : 'discussion';
 }
 
-function isExpectedNonFatalCommandExit(command: string, exitCode: number | null): boolean {
+/** True when the command is a Windows PowerShell / PowerShell Core invocation. */
+function isPowerShellInvocation(normalizedCommand: string): boolean {
+  return /\b(?:powershell|pwsh)(?:\.exe)?\b/.test(normalizedCommand);
+}
+
+/**
+ * True when the command explicitly declares its errors non-fatal, via an
+ * `-ErrorAction SilentlyContinue`/`Ignore` argument (including the `-ea` alias
+ * and the 0/4 enum forms) or by setting `$ErrorActionPreference`. PowerShell
+ * still maps the resulting `$? == $false` to process exit code 1 even though
+ * the author explicitly asked to swallow that error.
+ */
+function powerShellSilencesErrors(normalizedCommand: string): boolean {
+  // -ErrorAction / -ea  SilentlyContinue | Ignore  (space- or colon-separated).
+  if (/-(?:ea|erroraction)[\s:]+(?:silentlycontinue|ignore|0|4)\b/.test(normalizedCommand)) {
+    return true;
+  }
+  // $ErrorActionPreference = 'SilentlyContinue' | 'Ignore'
+  if (/\$erroractionpreference\s*=\s*['"]?(?:silentlycontinue|ignore)\b/.test(normalizedCommand)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * PowerShell prints a recognizable error record whenever a command genuinely
+ * fails (terminating error, parser error, or a native command's stderr). If any
+ * of these markers appear we must NOT swallow the non-zero exit.
+ */
+function outputHasPowerShellErrorSignature(aggregatedOutput: string): boolean {
+  if (!aggregatedOutput) {
+    return false;
+  }
+  return /(?:CategoryInfo|FullyQualifiedErrorId|ParserError|is not recognized as|The term '|Unhandled exception|System\.[A-Za-z.]*Exception|at line:\d)/i
+    .test(aggregatedOutput);
+}
+
+/**
+ * Some non-zero exits are expected and must not be surfaced as command failures:
+ *  - ripgrep exits 1 when it simply finds no matches.
+ *  - PowerShell exits 1 whenever `$?` is false at the end of a command. This
+ *    happens even for a fully successful command that merely probed for missing
+ *    files with `-ErrorAction SilentlyContinue` (a false alarm, not a failure),
+ *    e.g. a trailing `Get-Item C:/AGENTS.md -ErrorAction SilentlyContinue`. We
+ *    only swallow this when the command opted into silencing errors AND the
+ *    output shows no sign of a genuine error, so real crashes still surface.
+ */
+function isExpectedNonFatalCommandExit(
+  command: string,
+  exitCode: number | null,
+  aggregatedOutput = '',
+): boolean {
   if (exitCode !== 1) {
     return false;
   }
   const normalized = command.toLowerCase();
   // ripgrep returns exit 1 when no matches are found (not a runtime failure).
   if (/\brg(\.exe)?\b/.test(normalized)) {
+    return true;
+  }
+  // PowerShell exit-1 driven purely by `$?` after an explicitly silenced error.
+  if (
+    isPowerShellInvocation(normalized) &&
+    powerShellSilencesErrors(normalized) &&
+    !outputHasPowerShellErrorSignature(aggregatedOutput)
+  ) {
     return true;
   }
   return false;
@@ -1060,6 +1119,19 @@ export class CodexMessageHandler {
             'claudeMirror.tabs.moveInNavigation', msg.tabId, msg.targetGroupId, msg.targetIndex);
           break;
 
+        // What's New banner: routed to the global WhatsNewService via internal commands
+        case 'whatsNewDismiss':
+          void vscode.commands.executeCommand('claudeMirror.whatsNew.dismiss');
+          break;
+
+        case 'whatsNewOpenChangelog':
+          void vscode.commands.executeCommand('claudeMirror.openChangelog');
+          break;
+
+        case 'whatsNewRequestState':
+          void vscode.commands.executeCommand('claudeMirror.whatsNew.resync', this.tabId);
+          break;
+
         case 'setGroupCollapsed':
           void vscode.commands.executeCommand(
             'claudeMirror.groups.setCollapsed', msg.groupId, msg.collapsed);
@@ -1755,7 +1827,7 @@ export class CodexMessageHandler {
       if (command) {
         this.currentTurnCommands.push(command);
       }
-      if (isExpectedNonFatalCommandExit(command || data.command, data.exitCode)) {
+      if (isExpectedNonFatalCommandExit(command || data.command, data.exitCode, data.aggregatedOutput)) {
         this.log(`Codex command non-fatal exit ignored: exit=${data.exitCode} cmd=${command || data.command}`);
       } else if (data.exitCode !== null && data.exitCode !== 0) {
         this.postToWebview({
@@ -1763,7 +1835,6 @@ export class CodexMessageHandler {
           message: `Command failed (exit ${data.exitCode}): ${command || data.command}`,
         });
       }
-      void data.aggregatedOutput;
     });
 
     this.demux.on('turnCompleted', (data: { usage: { inputTokens: number; cachedInputTokens: number; outputTokens: number } }) => {
