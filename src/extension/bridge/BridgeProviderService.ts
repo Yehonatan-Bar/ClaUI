@@ -3,6 +3,11 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import {
+  BridgeModelOption,
+  diffNewFreeModels,
+  isFreeBridgeModel,
+} from '../../shared/bridge/freeModels';
 
 /**
  * Bridge Providers — drive non-Claude backends (xAI Grok, Google Antigravity,
@@ -28,10 +33,11 @@ export const BRIDGE_INSTALL_PREFIX = 'bridge:install/';
  *  tabs in snapshots even across extension updates (the absolute path moves). */
 const BRIDGE_CLI_MARKER = `bridge-runtime${path.sep}cli.js`;
 
-export interface BridgeModelOption {
-  label: string;
-  value: string;
-}
+export type { BridgeModelOption };
+
+/** globalState key: values of the free bridge models the user has already been
+ *  told about, so a "new free model" toast fires once per model, not per tab. */
+const SEEN_FREE_MODELS_KEY = 'claudeMirror.bridge.seenFreeModels';
 
 interface OpenAiProviderSetting {
   id?: string;
@@ -41,6 +47,8 @@ interface OpenAiProviderSetting {
   apiKeyEnv?: string;
   apiKeyFile?: string;
   models?: string[];
+  /** Every model of this provider is free (grouped under "Free" in the picker). */
+  free?: boolean;
 }
 
 export function isBridgeModelValue(value: string | null | undefined): boolean {
@@ -279,12 +287,41 @@ export class BridgeProviderService {
           options.push({
             label: `${label} · ${model.trim()}`,
             value: `${BRIDGE_MODEL_PREFIX}openai/${provider.id}/${model.trim()}`,
+            free: isFreeBridgeModel(model, provider.free === true),
           });
         }
       }
     }
 
     return options;
+  }
+
+  /** In-memory mirror of SEEN_FREE_MODELS_KEY. globalState.update is async;
+   *  several tabs can build their picker in the same tick, and only the first
+   *  one should announce a model. */
+  private seenFreeModels: string[] | undefined | null = null;
+
+  /** Free models that appeared in the picker since the last call (the first
+   *  run on a machine seeds the seen-set silently). Persists the current free
+   *  set so each model is announced once. */
+  takeNewFreeModels(options: BridgeModelOption[]): BridgeModelOption[] {
+    if (this.seenFreeModels === null) {
+      const stored = this.context.globalState.get<unknown>(SEEN_FREE_MODELS_KEY);
+      this.seenFreeModels = Array.isArray(stored)
+        ? stored.filter((v): v is string => typeof v === 'string')
+        : undefined;
+    }
+    const previous = this.seenFreeModels;
+    const { newFree, seenNext } = diffNewFreeModels(previous, options);
+    const changed =
+      previous === undefined ||
+      seenNext.length !== previous.length ||
+      seenNext.some((v, i) => v !== previous[i]);
+    this.seenFreeModels = seenNext;
+    if (changed) {
+      void this.context.globalState.update(SEEN_FREE_MODELS_KEY, seenNext);
+    }
+    return newFree;
   }
 
   /** Guided install for a missing provider CLI: primes the official install

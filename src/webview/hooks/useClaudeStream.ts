@@ -42,6 +42,7 @@ export function useClaudeStream(): void {
     setSelectedModel,
     setLastResolvedDefaultModel,
     setBridgeModelOptions,
+    addBridgeFreeModelNotices,
     setSelectedClaudeEffort,
     setSelectedClaudeFastMode,
     setSelectedCodexReasoningEffort,
@@ -693,6 +694,10 @@ export function useClaudeStream(): void {
         case 'bridgeModelOptions':
           // Bridge Provider models (Grok / Antigravity / OpenAI-compatible)
           setBridgeModelOptions(msg.options || []);
+          // Free models that showed up since the last picker build -> toast
+          if (msg.newFree && msg.newFree.length > 0) {
+            addBridgeFreeModelNotices(msg.newFree);
+          }
           break;
 
         case 'claudeEffortSetting':
@@ -1463,6 +1468,7 @@ export function useClaudeStream(): void {
     setSelectedModel,
     setLastResolvedDefaultModel,
     setBridgeModelOptions,
+    addBridgeFreeModelNotices,
     setSelectedClaudeEffort,
     setSelectedClaudeFastMode,
     setSelectedCodexReasoningEffort,
