@@ -4517,10 +4517,14 @@ export class MessageHandler {
   /** Push Bridge Provider model options (Grok / Antigravity / OpenAI-compatible)
    *  so the Model selector can offer them alongside the Claude models. */
   private sendBridgeModelOptions(): void {
-    const options = BridgeProviderService.get()?.modelOptions() ?? [];
+    const service = BridgeProviderService.get();
+    const options = service?.modelOptions() ?? [];
+    // Free models the user has not been told about yet (announced as a toast).
+    const newFree = service?.takeNewFreeModels(options) ?? [];
     this.webview.postMessage({
       type: 'bridgeModelOptions',
       options,
+      newFree,
     });
   }
 

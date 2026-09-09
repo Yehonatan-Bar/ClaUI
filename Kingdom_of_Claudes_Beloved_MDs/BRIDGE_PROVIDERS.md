@@ -60,7 +60,16 @@ never inherit a `bridge:*` value and hand it to the real claude CLI.
 **Extension side**
 - `src/extension/bridge/BridgeProviderService.ts` - mirrors `claudeMirror.bridge.*` into
   `~/.claui/bridge.json`, detects installed CLIs (so backends only appear when runnable),
-  builds model-picker options, guides CLI install, and checks for `node` on PATH.
+  builds model-picker options (flagging free ones), remembers which free models were already
+  announced (`globalState`), guides CLI install, and checks for `node` on PATH.
+- `src/shared/bridge/freeModels.ts` - pure helpers shared by the extension and the webview:
+  `isFreeBridgeModel()` (provider `free` flag or `:free` model-id suffix),
+  `splitBridgeModelOptions()` (paid vs. free picker groups), `diffNewFreeModels()`
+  (which free models are new since the last picker build; first run seeds silently).
+- `src/webview/components/ModelSelector/ModelSelector.tsx` - renders the `Claude`,
+  `Bridge Providers` and `Free` optgroups; `BridgeNoticeToastStack.tsx` shows the
+  "New free model" toast with a `Use` button that switches the tab through the normal
+  `setModel` path.
 - Integration touch points: `SessionTab.switchModel` (engage/release the bridge, enforce
   fresh session on provider-boundary crossings), `TabManager` (recompute the bridge
   command and restore the bridge selection on reload), `MessageHandler`
@@ -100,12 +109,48 @@ Provider-boundary switches (claude <-> bridge, or one bridge backend to another)
 start a fresh session. On window reload, the snapshot restores the bridge cliPathOverride
 (recomputed from the current install) and the picker selection + in-memory backend key.
 
+## Free models: picker group and toast
+
+Hosted OpenAI-compatible gateways (OpenRouter, OpenCode Zen, ...) expose zero-cost models
+next to paid ones. To keep them findable without reading every label:
+
+- A bridge model is **free** when its provider profile has `free: true`, or when the model
+  id ends with `:free` (OpenRouter's convention, e.g. `z-ai/glm-5.2:free`). Grok and
+  Antigravity are never free (own subscription).
+- The model picker shows three optgroups: `Claude`, `Bridge Providers` (paid backends and
+  local servers) and `Free`. Empty groups are omitted. Hovering the picker while a free
+  model is selected explains that free tiers can be rate-limited, slower or less capable.
+- When a free model appears in the picker for the first time (new settings entry, or a
+  provider newly flagged `free`), the webview shows a toast: **New free model** with the
+  label, a `Use` button (switches this tab via the normal `setModel` path) and dismiss.
+  More than three at once collapse into one aggregated toast. The toast auto-dismisses
+  after 12 s.
+- "Already announced" is tracked per machine in `globalState`
+  (`claudeMirror.bridge.seenFreeModels`) and mirrored in memory, so several tabs building
+  their picker in the same tick announce a model once. The very first picker build on a
+  machine seeds the set silently (no toast storm for pre-existing models). A model that is
+  removed from settings and later re-added is announced again.
+
+Example provider profile:
+
+```json
+{
+  "id": "zen",
+  "label": "OpenCode Zen",
+  "baseUrl": "https://opencode.ai/zen/v1",
+  "apiKeyFile": "~/.claui/zen-api-key.txt",
+  "free": true,
+  "models": ["big-pickle", "glm-5.2-free"]
+}
+```
+
 ## Settings
 
 - `claudeMirror.bridge.grok.enabled` / `.cliPath` / `.models`
 - `claudeMirror.bridge.antigravity.enabled` / `.cliPath` / `.models`
 - `claudeMirror.bridge.openaiProviders` - array of `{id, label, baseUrl, apiKeyEnv?,
-  apiKeyFile?, apiKey?, models}`
+  apiKeyFile?, apiKey?, models, free?}` (`free: true` groups every model of the profile
+  under `Free`; `:free` model ids are grouped there automatically)
 
 Grok and Antigravity are enabled by default but only appear when the matching CLI is
 detected; otherwise the picker shows an "Install CLI..." entry that primes (never
@@ -125,6 +170,7 @@ No secrets in settings: prefer `apiKeyEnv` / `apiKeyFile`; local servers need no
 
 `tests/bridge/` (run with `npm run test:bridge`): model parsing and API-key resolution,
 stdin/image parsing, session store (bounded history, atomic-write robustness, basename
-guard), Grok supervised read-only decision, shell-free executable resolution, and an
+guard), Grok supervised read-only decision, shell-free executable resolution, an
 end-to-end OpenAI SSE server test (streaming, non-streaming EOF flush, image pass-through,
-HTTP error surfacing).
+HTTP error surfacing), and free-model grouping (`:free` suffix / provider flag, paid-vs-free
+split, new-model diff with silent first-run seeding and re-announce after removal).

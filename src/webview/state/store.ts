@@ -67,6 +67,7 @@ import type {
 } from '../../extension/multiparticipant/MultiParticipantProtocol';
 import type { AdventureBeat } from '../components/Vitals/adventure/types';
 import { deriveTurnHistoryFromMessages } from '../utils/turnVitals';
+import type { BridgeModelOption } from '../../shared/bridge/freeModels';
 import type { AchievementLang } from '../components/Achievements/achievementI18n';
 import type { AuditEvent, SecretProtectionSettings } from '../../shared/secret-protection/types';
 import type {
@@ -168,6 +169,19 @@ export interface AchievementToast extends AchievementAwardPayload {
   createdAt: number;
 }
 
+/** Toast announcing a free Bridge Provider model that just appeared in the picker. */
+export interface BridgeNotice {
+  noticeId: string;
+  title: string;
+  detail: string;
+  /** Picker value to switch to from the toast's "Use" button (absent on the aggregated notice). */
+  modelValue?: string;
+  createdAt: number;
+}
+
+/** Above this many new free models at once, one aggregated toast is shown instead. */
+const MAX_INDIVIDUAL_FREE_MODEL_NOTICES = 3;
+
 export interface AppState {
   // Session
   sessionId: string | null;
@@ -184,7 +198,9 @@ export interface AppState {
   lastResolvedDefaultModel: string | null;
   // Bridge Provider models (Grok / Antigravity / OpenAI-compatible) pushed from
   // the extension; offered in the model picker alongside the Claude models.
-  bridgeModelOptions: { label: string; value: string }[];
+  bridgeModelOptions: BridgeModelOption[];
+  // Toasts announcing free bridge models that just appeared in the picker.
+  bridgeNotices: BridgeNotice[];
   selectedClaudeEffort: ClaudeEffortLevel;
   selectedClaudeFastMode: boolean;
   selectedCodexReasoningEffort: CodexReasoningEffort;
@@ -785,7 +801,9 @@ export interface AppState {
   setResuming: (resuming: boolean) => void;
   setSelectedModel: (model: string) => void;
   setLastResolvedDefaultModel: (model: string | null) => void;
-  setBridgeModelOptions: (options: { label: string; value: string }[]) => void;
+  setBridgeModelOptions: (options: BridgeModelOption[]) => void;
+  addBridgeFreeModelNotices: (newFree: BridgeModelOption[]) => void;
+  dismissBridgeNotice: (noticeId: string) => void;
   setSelectedClaudeEffort: (effort: ClaudeEffortLevel) => void;
   setSelectedClaudeFastMode: (fastMode: boolean) => void;
   setSelectedCodexReasoningEffort: (effort: CodexReasoningEffort) => void;
@@ -1193,6 +1211,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   model: null,
   lastResolvedDefaultModel: null,
   bridgeModelOptions: [],
+  bridgeNotices: [],
   selectedProvider: 'claude',
   providerCapabilities: { ...DEFAULT_PROVIDER_CAPABILITIES },
   selectedModel: '',
@@ -2233,6 +2252,29 @@ export const useAppStore = create<AppState>((set, get) => ({
   setLastResolvedDefaultModel: (model) => set({ lastResolvedDefaultModel: model }),
 
   setBridgeModelOptions: (options) => set({ bridgeModelOptions: options }),
+
+  addBridgeFreeModelNotices: (newFree) =>
+    set((state) => {
+      if (newFree.length === 0) return {};
+      const now = Date.now();
+      const notice = (title: string, detail: string, modelValue?: string): BridgeNotice => ({
+        noticeId: `bridge-${now}-${Math.random().toString(36).slice(2, 8)}`,
+        title,
+        detail,
+        modelValue,
+        createdAt: now,
+      });
+      const notices =
+        newFree.length <= MAX_INDIVIDUAL_FREE_MODEL_NOTICES
+          ? newFree.map((opt) => notice('New free model', opt.label, opt.value))
+          : [notice(`${newFree.length} new free models`, 'Open the Model picker and look under "Free".')];
+      return { bridgeNotices: [...state.bridgeNotices, ...notices] };
+    }),
+
+  dismissBridgeNotice: (noticeId) =>
+    set((state) => ({
+      bridgeNotices: state.bridgeNotices.filter((notice) => notice.noticeId !== noticeId),
+    })),
 
   setSelectedClaudeEffort: (effort) => set({ selectedClaudeEffort: effort }),
 

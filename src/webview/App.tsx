@@ -7,6 +7,7 @@ import { PlanApprovalBar } from './components/ChatView/PlanApprovalBar';
 import { PromptHistoryPanel } from './components/ChatView/PromptHistoryPanel';
 import { AchievementPanel } from './components/Achievements/AchievementPanel';
 import { AchievementToastStack } from './components/Achievements/AchievementToastStack';
+import { BridgeNoticeToastStack } from './components/ModelSelector/BridgeNoticeToastStack';
 import { SessionRecapCard } from './components/Achievements/SessionRecapCard';
 import { CommunityPanel } from './components/Achievements/CommunityPanel';
 import { ShareCard } from './components/Achievements/ShareCard';
@@ -830,6 +831,7 @@ const ChatAppContent: React.FC = () => {
         <WelcomeScreen />
       )}
       {achievementsEnabled && <AchievementToastStack />}
+      <BridgeNoticeToastStack />
       {/* SkillDocs first-time onboarding FAB — shown until user makes a choice */}
       {!skillGenOnboardingSeen && provider !== 'codex' && <SkillGenOnboarding />}
       <GlobalTooltip delay={400} />

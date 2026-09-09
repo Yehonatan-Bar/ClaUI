@@ -2,6 +2,7 @@ import React, { useCallback, useMemo } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { CLAUDE_MODEL_OPTIONS, getClaudeModelLabel } from '../../utils/claudeModelDisplay';
+import { splitBridgeModelOptions } from '../../../shared/bridge/freeModels';
 
 /**
  * Model selector dropdown for choosing which Claude model to use.
@@ -64,6 +65,15 @@ export const ModelSelector: React.FC = () => {
     );
   }, [selectedModel, resolvedDefaultLabel, bridgeModelOptions]);
 
+  // Bridge entries split into paid backends (own subscription / local server)
+  // and zero-cost models, each in its own optgroup so the free ones are found
+  // without reading every label.
+  const bridgeGroups = useMemo(
+    () => splitBridgeModelOptions(bridgeModelOptions),
+    [bridgeModelOptions],
+  );
+  const selectedIsFree = bridgeGroups.free.some((opt) => opt.value === selectedModel);
+
   const handleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const newModel = e.target.value;
     setSelectedModel(newModel);
@@ -71,16 +81,19 @@ export const ModelSelector: React.FC = () => {
   }, [setSelectedModel]);
 
   // Tooltip: for Default, explain that the CLI chooses and reveal the resolved
-  // model once known; for an explicit model, keep the active-model hint.
+  // model once known; for a free bridge model, set expectations; for any other
+  // explicit model, keep the active-model hint.
   const selectTooltip = isDefaultSelected
     ? (liveDefaultLabel
         ? `Default: Claude CLI is running ${liveDefaultLabel}`
         : rememberedDefaultLabel
           ? `Default: Claude CLI will run ${rememberedDefaultLabel} (confirmed once the session starts)`
           : 'Default: Claude CLI picks the model (resolved once the session starts)')
-    : (isConnected && activeModelLabel
-        ? `Active: ${activeModelLabel}`
-        : 'Select model');
+    : selectedIsFree
+      ? 'Free model: no cost, but free tiers can be rate-limited, slower, or less capable'
+      : (isConnected && activeModelLabel
+          ? `Active: ${activeModelLabel}`
+          : 'Select model');
 
   return (
     <div className="model-selector">
@@ -106,13 +119,24 @@ export const ModelSelector: React.FC = () => {
                 </option>
               ))}
             </optgroup>
-            <optgroup label="Bridge Providers">
-              {bridgeModelOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </optgroup>
+            {bridgeGroups.paid.length > 0 && (
+              <optgroup label="Bridge Providers">
+                {bridgeGroups.paid.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {bridgeGroups.free.length > 0 && (
+              <optgroup label="Free">
+                {bridgeGroups.free.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </>
         )}
       </select>

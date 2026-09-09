@@ -255,6 +255,8 @@ claude-code-mirror/
 |   |       +-- claudeWorkspaceAccessGuard.ts # Claude WAG hook (PreToolUse)
 |   |       +-- codexWorkspaceAccessGuard.ts  # Codex WAG hook (PreToolUse/PermissionRequest)
 |   +-- shared/                           # Cross-boundary modules (imported by both extension and runtime)
+|   |   +-- bridge/
+|   |       +-- freeModels.ts             #   Free-tier grouping for bridge models (`:free` suffix / provider flag), new-model diff for the toast
 |   |   +-- audit/
 |   |       +-- AuditStore.ts             #   Date-partitioned JSONL audit backend with filters, stats, retention cleanup
 |   |       +-- AuditEventWriter.ts       #   Audit writer facade over AuditStore
@@ -338,7 +340,8 @@ claude-code-mirror/
 |       |   |   +-- CustomSnippetPanel.tsx #  Config panel for the custom snippet button (text, Save, Clear)
 |       |   |   +-- CodexConsultPanel.tsx #   Input panel for Codex GPT expert consultation
 |       |   +-- ModelSelector/
-|       |   |   +-- ModelSelector.tsx          #   Claude model dropdown (Fable 5, Opus 5, Opus 4.8/4.7/4.6, Sonnet 5/4.6/4.5, Haiku 4.5, Mythos 5 [Blocked])
+|       |   |   +-- ModelSelector.tsx          #   Claude model dropdown (Fable 5, Opus 5, Opus 4.8/4.7/4.6, Sonnet 5/4.6/4.5, Haiku 4.5, Mythos 5 [Blocked]) + Bridge Providers / Free optgroups
+|       |   |   +-- BridgeNoticeToastStack.tsx  #   Toast for free bridge models that just appeared in the picker ("Use" switches the tab)
 |       |   |   +-- ClaudeEffortSelector.tsx   #   Claude thinking effort dropdown (Low/Medium/High/XHigh/Max)
 |       |   |   +-- ClaudeFastModeSelector.tsx  #   Claude Speed dropdown (Default / Fast, Opus only)
 |       |   |   +-- CodexModelSelector.tsx     #   Codex model dropdown (dynamic cache + fallback options)
@@ -610,7 +613,7 @@ claude-code-mirror/
 Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamManager`, `SessionStore`, and open-tab session getter from `TabManager`, so Codex tabs can request cached map data, build/reclassify maps, import external folders, and open the cross-project Portfolio through the same message protocol as Claude tabs.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_INTEGRATION_PROGRESS.md`
 
-**Bridge Providers** - Drives non-Claude backends (xAI Grok, Google Antigravity, any OpenAI-compatible server) through ordinary Claude tabs. A bundled Node runtime (`dist/bridge-runtime/cli.js`) impersonates the claude `stream-json` protocol and reuses the Happy/remote `cliPathOverride` seam; models are namespaced `bridge:<backend>/<model>` and never persisted to `claudeMirror.model`. `BridgeProviderService` mirrors `claudeMirror.bridge.*` into `~/.claui/bridge.json`, detects installed CLIs, and builds the picker options. Supervised mode limits Grok to read-only tools; note that ClaUi's PreToolUse guard hooks do not apply to third-party backends (they run their own executors).
+**Bridge Providers** - Drives non-Claude backends (xAI Grok, Google Antigravity, any OpenAI-compatible server) through ordinary Claude tabs. A bundled Node runtime (`dist/bridge-runtime/cli.js`) impersonates the claude `stream-json` protocol and reuses the Happy/remote `cliPathOverride` seam; models are namespaced `bridge:<backend>/<model>` and never persisted to `claudeMirror.model`. `BridgeProviderService` mirrors `claudeMirror.bridge.*` into `~/.claui/bridge.json`, detects installed CLIs, and builds the picker options. Zero-cost models (provider `free: true` or a `:free` model id) are grouped under a separate **Free** optgroup, and a free model that appears for the first time is announced with a toast (`BridgeNoticeToastStack`; seen-set persisted in globalState). Supervised mode limits Grok to read-only tools; note that ClaUi's PreToolUse guard hooks do not apply to third-party backends (they run their own executors).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/BRIDGE_PROVIDERS.md`
 
 **SessionNamer** - Spawns a one-shot `claude -p` process using Haiku to generate a 1-3 word tab name from the user's first message. Matches the language of the message (Hebrew/English). 10-second timeout, sanitized output, all errors silently logged.

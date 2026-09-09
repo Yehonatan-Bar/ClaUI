@@ -4253,6 +4253,78 @@ html, body, #root {
   border-color: #ff6a3d;
 }
 
+/* Bridge Provider notices (e.g. "New free model"): same corner as the
+   achievement toasts, one layer above so a fresh notice is never hidden. */
+.bridge-notice-stack {
+  position: absolute;
+  right: 16px;
+  top: 12px;
+  z-index: 31;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 360px;
+  max-width: calc(100% - 32px);
+}
+
+.bridge-notice-toast {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  border-radius: 10px;
+  border: 1px solid var(--vscode-charts-green, #89d185);
+  padding: 10px 14px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  animation: summaryFadeIn 0.2s ease-out;
+  font-size: 13px;
+}
+
+.bridge-notice-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bridge-notice-main strong {
+  color: var(--vscode-charts-green, #89d185);
+}
+
+.bridge-notice-main span {
+  color: var(--vscode-descriptionForeground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bridge-notice-use {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.bridge-notice-use:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.bridge-notice-dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bridge-notice-toast {
+    animation: none;
+  }
+}
+
 .session-recap-card {
   margin: 8px 16px 0 16px;
   padding: 8px 10px;

@@ -411,6 +411,11 @@
                   "type": "string"
                 },
                 "description": "Model ids offered in the model picker."
+              },
+              "free": {
+                "type": "boolean",
+                "default": false,
+                "description": "Group every model of this provider under \"Free\" in the model picker (zero-cost gateways such as OpenCode Zen). Models whose id ends with \":free\" (OpenRouter convention) are grouped there automatically."
               }
             }
           },
@@ -1792,7 +1797,7 @@
     "test:review-loop": "node --import tsx --test tests/review-loop/reviewLoopPrompts.test.ts",
     "test:spawn-cli": "node --import tsx --test tests/process/spawnCli.test.ts",
     "test:tabs": "node --import tsx --test tests/tabs/navigationOrder.test.ts tests/tabs/navTree.test.ts",
-    "test:bridge": "node --import tsx --test tests/bridge/config.test.ts tests/bridge/protocol.test.ts tests/bridge/sessionStore.test.ts tests/bridge/grokPermissions.test.ts tests/bridge/procUtils.test.ts tests/bridge/openaiCompat.test.ts",
+    "test:bridge": "node --import tsx --test tests/bridge/config.test.ts tests/bridge/protocol.test.ts tests/bridge/sessionStore.test.ts tests/bridge/grokPermissions.test.ts tests/bridge/procUtils.test.ts tests/bridge/openaiCompat.test.ts tests/bridge/freeModels.test.ts",
     "test:hibernation": "node --import tsx --test tests/hibernation/hibernationPlanner.test.ts",
     "verify:installed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installed.ps1",
     "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1",

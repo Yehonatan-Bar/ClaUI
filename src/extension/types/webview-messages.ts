@@ -12,6 +12,7 @@ import type {
 import type { ComplianceReport } from '../../shared/audit/ComplianceReporter';
 import type { AuditEventFilter } from '../../shared/audit/AuditStore';
 import type { AuditEvent, SecretProtectionSettings } from '../../shared/secret-protection/types';
+import type { BridgeModelOption } from '../../shared/bridge/freeModels';
 import type {
   MPAgentProvider,
   MPApprovalDecisionPayload,
@@ -1695,7 +1696,10 @@ export interface DefaultModelHintMessage {
  *  routed to the bundled bridge runtime instead of the claude CLI. */
 export interface BridgeModelOptionsMessage {
   type: 'bridgeModelOptions';
-  options: { label: string; value: string }[];
+  options: BridgeModelOption[];
+  /** Free models that appeared since the last picker build; the webview
+   *  announces them with a toast. Empty on first run and on plain refreshes. */
+  newFree?: BridgeModelOption[];
 }
 
 export interface ClaudeEffortSettingMessage {
