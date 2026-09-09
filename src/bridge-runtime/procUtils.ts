@@ -1,4 +1,5 @@
-import { ChildProcess, spawnSync } from 'child_process';
+import { ChildProcess, spawn, spawnSync, SpawnOptions } from 'child_process';
+import crossSpawn = require('cross-spawn');
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -73,6 +74,30 @@ export function resolveExecutable(
 }
 
 /**
+ * Spawn a CLI executable WITHOUT losing argv boundaries and WITHOUT a shell.
+ *
+ * On Windows, npm-installed CLIs are commonly `.cmd`/`.bat` shims that modern
+ * Node cannot spawn without a shell; `cross-spawn` resolves the shim and applies
+ * the correct Windows escaping so argv elements (including a user prompt) reach
+ * the process verbatim — never reinterpreted by cmd.exe. This is the same
+ * approach the extension uses, kept self-contained here so the runtime bundle
+ * does not import any extension code.
+ */
+export function spawnCli(
+  command: string,
+  args: string[],
+  options: SpawnOptions = {},
+): ChildProcess {
+  return crossSpawn(command, args, {
+    ...options,
+    // Never allow a caller to reintroduce shell string parsing. cross-spawn
+    // invokes cmd.exe itself only when a Windows shim actually requires it.
+    shell: false,
+    windowsHide: process.platform === 'win32' ? true : options.windowsHide,
+  });
+}
+
+/**
  * Kill a child and its descendants. `child.kill()` on Windows with a shell
  * wrapper only kills the wrapper, leaving the real CLI (and its own children)
  * running — mirror ClaudeProcessManager and use `taskkill /F /T`.
@@ -93,6 +118,39 @@ export function killTree(child: ChildProcess | null | undefined): void {
   }
   try {
     child.kill();
+  } catch {
+    /* already dead */
+  }
+}
+
+/**
+ * Non-blocking process-tree kill. Unlike `killTree` (which uses a *blocking*
+ * spawnSync + 5s timeout), this fires `taskkill /F /T` and returns immediately,
+ * so a caller killing many children at once (e.g. a council interrupt under
+ * Promise.all) is not stalled ~5s per child. Windows-first: elsewhere it falls
+ * back to a plain SIGTERM (no process-group kill) — a documented v1 limitation.
+ */
+export function killTreeAsync(child: ChildProcess | null | undefined): void {
+  if (!child) return;
+  const pid = child.pid;
+  if (process.platform === 'win32' && typeof pid === 'number') {
+    try {
+      const killer = spawn('taskkill', ['/F', '/T', '/PID', String(pid)], {
+        windowsHide: true,
+        detached: true,
+        stdio: 'ignore',
+      });
+      killer.on('error', () => {
+        /* best-effort; nothing to await */
+      });
+      killer.unref();
+      return;
+    } catch {
+      /* fall through to best-effort kill */
+    }
+  }
+  try {
+    child.kill('SIGTERM');
   } catch {
     /* already dead */
   }

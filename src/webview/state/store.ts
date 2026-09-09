@@ -169,6 +169,34 @@ export interface AchievementToast extends AchievementAwardPayload {
   createdAt: number;
 }
 
+/** OpenAI-compatible provider profile edited in the Council settings panel. */
+export interface CouncilOpenAiProvider {
+  id: string;
+  label?: string;
+  baseUrl: string;
+  apiKey?: string;
+  apiKeyEnv?: string;
+  apiKeyFile?: string;
+  models?: string[];
+}
+
+/** Full model-council configuration exchanged with the Council settings panel. */
+export interface CouncilSettingsData {
+  enabled: boolean;
+  members: string[];
+  chair: string;
+  timeoutMs: number;
+  providers: CouncilOpenAiProvider[];
+}
+
+/** Per-engine availability shown as hints in the Council settings panel. */
+export interface CouncilEngineDetection {
+  claude: boolean;
+  codex: boolean;
+  grok: boolean;
+  node: boolean;
+}
+
 export interface AppState {
   // Session
   sessionId: string | null;
@@ -548,6 +576,13 @@ export interface AppState {
   // Codex Consultation
   codexConsultPanelOpen: boolean;
   setCodexConsultPanelOpen: (open: boolean) => void;
+
+  // Council settings panel (Tools -> Council settings)
+  councilSettingsOpen: boolean;
+  setCouncilSettingsOpen: (open: boolean) => void;
+  councilSettings: CouncilSettingsData | null;
+  councilDetected: CouncilEngineDetection | null;
+  setCouncilSettingsData: (settings: CouncilSettingsData, detected: CouncilEngineDetection) => void;
 
   // Review Loop (automatic Claude<->Codex review)
   reviewLoopPanelOpen: boolean;
@@ -1417,6 +1452,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Codex Consultation
   codexConsultPanelOpen: false,
   setCodexConsultPanelOpen: (open) => set({ codexConsultPanelOpen: open }),
+
+  // Council settings panel
+  councilSettingsOpen: false,
+  setCouncilSettingsOpen: (open) => set({ councilSettingsOpen: open }),
+  councilSettings: null,
+  councilDetected: null,
+  setCouncilSettingsData: (settings, detected) => set({ councilSettings: settings, councilDetected: detected }),
 
   // Review Loop
   reviewLoopPanelOpen: false,
@@ -3360,6 +3402,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Note: githubSyncStatus and communityFriends persist across resets
       friendActionPending: false,
       codexConsultPanelOpen: false,
+      councilSettingsOpen: false,
       reviewLoopPanelOpen: false,
       reviewLoopRunning: false,
       reviewLoopPhase: 'idle',

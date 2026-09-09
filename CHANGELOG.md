@@ -1,6 +1,20 @@
 # ClaUi - Changelog
 
-## Unreleased - 2026-09-08
+## v0.1.230 - 2026-09-09
+
+**Feature: Model council (Bridge Providers)**
+
+- New model-picker entry **Council · all models** (`bridge:council`) turns a tab into a council: each user turn fans out in parallel to several models ("members"), each independent opinion is streamed, then a selectable chair synthesizes one combined ruling
+- Members are non-mutating by construction: OpenAI-compatible providers over HTTP with no tools, Codex in a read-only sandbox (with `--skip-git-repo-check`, since the throwaway cwd is never a git repo), and Grok as a text-only no-tools session — each in a throwaway temp directory
+- **Claude Code runs as a first-class member** when the `claude` CLI is installed: `claude -p --output-format json --restricted --permission-prompts none` in a throwaway temp cwd (no Bash/code tools, file tools confined to the throwaway cwd, prompts auto-denied, no MCP servers). It uses your existing Claude Code login (no `--bare`, so no API key needed) and is the preferred default chair when available. The Antigravity local CLI stays deferred to v2 (add it via an OpenAI-compatible provider instead)
+- **New Tools -> Council settings panel** (`CouncilSettingsPanel`): add/remove members (Claude Code / Codex / Grok / any provider), pick the chair, set the timeout, and manage OpenAI-compatible providers — with one-click presets for GPT / Gemini / Claude (API) — without hand-editing settings.json; per-engine availability is shown from `BridgeProviderService.detectedEngines()`
+- Configure with `claudeMirror.bridge.council.members` (default codex, grok), `claudeMirror.bridge.council.chair` (or an explicit `bridge:council/<chair>`; a chair outside the roster acts as an external judge), and `claudeMirror.bridge.council.timeoutMs` (default 240000, per member and per chair)
+- Cost is reported as zero and cannot be computed — one council turn invokes several paid/subscription models; the in-chat convening header states this. Council is text-only, and in v1 each turn is independent (members do not see prior turns)
+- Tests: `npm run test:bridge` (adds `tests/bridge/council.test.ts`, incl. Claude-member availability + default-chair)
+
+---
+
+## v0.1.229 - 2026-09-08
 
 **Feature: What's New notifications after an update**
 

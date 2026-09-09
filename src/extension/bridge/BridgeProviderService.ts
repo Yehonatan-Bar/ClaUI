@@ -76,7 +76,9 @@ export class BridgeProviderService {
       context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration((e) => {
           if (e.affectsConfiguration('claudeMirror.bridge') ||
-              e.affectsConfiguration('claudeMirror.permissionMode')) {
+              e.affectsConfiguration('claudeMirror.permissionMode') ||
+              e.affectsConfiguration('claudeMirror.cliPath') ||
+              e.affectsConfiguration('claudeMirror.codex.cliPath')) {
             this.instance?.syncConfigFile();
           }
         }),
@@ -170,6 +172,33 @@ export class BridgeProviderService {
     return ok;
   }
 
+  /** Probe a single command: absolute existing path, a known install location,
+   *  or a PATH hit (handles Windows `.cmd` shims via `where`). */
+  private commandDetected(configured: string, fallback: string, known: string[] = []): boolean {
+    const c = (configured || fallback).trim() || fallback;
+    if (path.isAbsolute(c)) return fs.existsSync(c);
+    for (const loc of known) if (loc && fs.existsSync(loc)) return true;
+    try {
+      const probe = process.platform === 'win32' ? 'where' : 'which';
+      return spawnSync(probe, [c], { timeout: 3000, windowsHide: true }).status === 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Which council engines are runnable on this machine. Used by the Council
+   *  settings UI to show per-engine availability. `openai` is always host-side
+   *  HTTP (per-provider key resolution is reported separately). */
+  detectedEngines(): { claude: boolean; codex: boolean; grok: boolean; node: boolean } {
+    const cfg = this.config();
+    return {
+      claude: this.commandDetected(cfg.get<string>('cliPath', 'claude'), 'claude'),
+      codex: this.commandDetected(cfg.get<string>('codex.cliPath', 'codex'), 'codex'),
+      grok: this.cliDetected('grok'),
+      node: this.nodeAvailable(),
+    };
+  }
+
   /** Command string spawned instead of the claude CLI for bridge tabs.
    *  ClaudeProcessManager spawns through a shell, so an embedded quoted path
    *  is safe. Requires `node` on PATH (same class of requirement as the other
@@ -195,6 +224,12 @@ export class BridgeProviderService {
       : [];
   }
 
+  /** Council member tokens (only well-formed non-empty strings). */
+  private councilMembers(): string[] {
+    const raw = this.config().get<string[]>('bridge.council.members', []);
+    return Array.isArray(raw) ? raw.filter((m) => typeof m === 'string' && m.trim()).map((m) => m.trim()) : [];
+  }
+
   /** Mirror settings into ~/.claui/bridge.json for the bridge runtime. */
   syncConfigFile(): void {
     this.cliDetectionCache.clear();
@@ -208,9 +243,18 @@ export class BridgeProviderService {
       );
       const payload = {
         version: 1,
+        // Claude/Codex CLI paths are mirrored so the council backend can detect
+        // them for availability (Claude is v2-deferred but still reported).
+        claude: { cliPath: cfg.get<string>('cliPath', 'claude') },
+        codex: { cliPath: cfg.get<string>('codex.cliPath', 'codex') },
         grok: { cliPath: cfg.get<string>('bridge.grok.cliPath', 'grok') },
         antigravity: { cliPath: cfg.get<string>('bridge.antigravity.cliPath', 'agy') },
         openai: this.openAiProviders(),
+        council: {
+          members: this.councilMembers(),
+          chair: cfg.get<string>('bridge.council.chair', ''),
+          timeoutMs: cfg.get<number>('bridge.council.timeoutMs', 240000),
+        },
         storageDir,
         permissionMode: cfg.get<string>('permissionMode', 'full-access'),
       };
@@ -282,6 +326,12 @@ export class BridgeProviderService {
           });
         }
       }
+    }
+
+    // Model council: one entry, gated only on `node` (the runtime host) — NOT on
+    // CLI detection, since member availability is reported at runtime in-chat.
+    if (cfg.get<boolean>('bridge.council.enabled', true) && this.nodeAvailable()) {
+      options.push({ label: 'Council · all models', value: `${BRIDGE_MODEL_PREFIX}council` });
     }
 
     return options;

@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AntigravityBackend } from './backends/antigravity';
+import { CouncilBackend } from './backends/council';
 import { GrokAcpBackend } from './backends/grokAcp';
 import { OpenAiCompatBackend } from './backends/openaiCompat';
 import {
@@ -70,7 +71,10 @@ async function main(): Promise<void> {
   let ref: BridgeModelRef | null = parseBridgeModel(requestedModel);
   if (!ref && resumeId) {
     const stored = store.read(sessionId);
-    if (stored?.backend && stored.model) {
+    // Council resumes on backend alone (it has no stored model).
+    if (stored?.backend === 'council') {
+      ref = { backend: 'council', chair: stored.councilChair };
+    } else if (stored?.backend && stored.model) {
       if (stored.backend === 'openai') {
         if (stored.openaiProviderId) {
           ref = { backend: 'openai', providerId: stored.openaiProviderId, model: stored.model };
@@ -86,7 +90,11 @@ async function main(): Promise<void> {
   const displayModel = ref
     ? ref.backend === 'openai'
       ? `${ref.providerId}/${ref.model}`
-      : `${ref.backend}/${ref.model}`
+      : ref.backend === 'council'
+        ? ref.chair
+          ? `council/${ref.chair}`
+          : 'council'
+        : `${ref.backend}/${ref.model}`
     : requestedModel || 'bridge';
   const emitter = new StreamEmitter(sessionId, displayModel);
   emitter.init(process.cwd(), flagValue('--permission-mode') || 'default');
@@ -123,6 +131,8 @@ async function main(): Promise<void> {
       permissionMode,
       log,
     );
+  } else if (ref.backend === 'council') {
+    backend = new CouncilBackend(config, ref.chair, sessionId, store, systemPrompt, log);
   } else {
     const provider = (config.openai || []).find((p) => p.id === ref!.providerId);
     if (!provider) {

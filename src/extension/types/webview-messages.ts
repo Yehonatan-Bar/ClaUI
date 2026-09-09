@@ -802,6 +802,46 @@ export interface OpenSettingsRequest {
   query: string;
 }
 
+/** One OpenAI-compatible provider profile as edited in the Council settings UI
+ *  (mirrors claudeMirror.bridge.openaiProviders entries). */
+export interface CouncilOpenAiProvider {
+  id: string;
+  label?: string;
+  baseUrl: string;
+  apiKey?: string;
+  apiKeyEnv?: string;
+  apiKeyFile?: string;
+  models?: string[];
+}
+
+/** Full council configuration exchanged with the Council settings panel. */
+export interface CouncilSettingsPayload {
+  enabled: boolean;
+  members: string[];
+  chair: string;
+  timeoutMs: number;
+  providers: CouncilOpenAiProvider[];
+}
+
+/** Which council engines are runnable on this machine (for availability hints). */
+export interface CouncilEngineDetection {
+  claude: boolean;
+  codex: boolean;
+  grok: boolean;
+  node: boolean;
+}
+
+/** Panel opened -> ask the extension for the current council configuration. */
+export interface GetCouncilSettingsRequest {
+  type: 'getCouncilSettings';
+}
+
+/** Panel Save -> persist the council configuration to VS Code settings. */
+export interface SetCouncilSettingsMessage {
+  type: 'setCouncilSettings';
+  settings: CouncilSettingsPayload;
+}
+
 export interface OpenTerminalRequest {
   type: 'openTerminal';
   command?: string;
@@ -1206,6 +1246,8 @@ export interface WhatsNewRequestStateRequest {
 }
 
 export type WebviewToExtensionMessage =
+  | GetCouncilSettingsRequest
+  | SetCouncilSettingsMessage
   | SendTextMessage
   | SendMessageWithImages
   | WakeFromHibernationRequest
@@ -1754,6 +1796,14 @@ export interface DefaultModelHintMessage {
 export interface BridgeModelOptionsMessage {
   type: 'bridgeModelOptions';
   options: { label: string; value: string }[];
+}
+
+/** Current council configuration + per-engine availability, pushed to the
+ *  Council settings panel on open and after a save. */
+export interface CouncilSettingsMessage {
+  type: 'councilSettings';
+  settings: CouncilSettingsPayload;
+  detected: CouncilEngineDetection;
 }
 
 export interface ClaudeEffortSettingMessage {
@@ -3140,6 +3190,7 @@ export interface WhatsNewStateMessage {
 }
 
 export type ExtensionToWebviewMessage =
+  | CouncilSettingsMessage
   | McpInventoryMessage
   | McpCatalogMessage
   | McpDiffPreviewMessage

@@ -629,7 +629,7 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **Codex Model Cache & Capabilities** - `~/.codex/models_cache.json` is the source of truth for which Codex models the account may use (incl. GPT-6 Astra) and each model's reasoning levels, Fast tier, and context window. `codexModelCache.ts` parses it (pure `parseCodexModelOptions()`) into `CodexModelOption` metadata (`contextWindow`, `maxContextWindow`, `supportsFast`, `defaultReasoningEffort` — validated primitives only), re-posted to the webview after each turn. `src/webview/utils/codexModels.ts` holds the static fallback table + `resolveCodexModelOption()` used by the model / reasoning / Speed selectors and `getModelMaxContext()` so capabilities stay correct before the cache exists. A static option never grants access; the Fast tier and unknown-model choices are enforced/flagged rather than sent silently. Tests: `npm run test:codex-models`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_INTEGRATION_PROGRESS.md`
 
-**Bridge Providers** - Drives non-Claude backends (xAI Grok, Google Antigravity, any OpenAI-compatible server) through ordinary Claude tabs. A bundled Node runtime (`dist/bridge-runtime/cli.js`) impersonates the claude `stream-json` protocol and reuses the Happy/remote `cliPathOverride` seam; models are namespaced `bridge:<backend>/<model>` and never persisted to `claudeMirror.model`. `BridgeProviderService` mirrors `claudeMirror.bridge.*` into `~/.claui/bridge.json`, detects installed CLIs, and builds the picker options. Supervised mode limits Grok to read-only tools; note that ClaUi's PreToolUse guard hooks do not apply to third-party backends (they run their own executors).
+**Bridge Providers** - Drives non-Claude backends (xAI Grok, Google Antigravity, any OpenAI-compatible server, and a native **model council**) through ordinary Claude tabs. A bundled Node runtime (`dist/bridge-runtime/cli.js`) impersonates the claude `stream-json` protocol and reuses the Happy/remote `cliPathOverride` seam; models are namespaced `bridge:<backend>/<model>` (or `bridge:council[/<chair>]`) and never persisted to `claudeMirror.model`. `BridgeProviderService` mirrors `claudeMirror.bridge.*` (plus the claude/codex CLI paths) into `~/.claui/bridge.json`, detects installed CLIs, and builds the picker options. The **council** (`bridge:council`) fans a turn out to several non-mutating members in parallel and a chair synthesizes a ruling; cost is reported as 0. Members: **Claude Code** (`claude -p --restricted --permission-prompts none` in a throwaway cwd, using the user's existing login — no API key), codex read-only, grok no-tools, and openai HTTP no-tools (GPT / Gemini / Claude API); only the Antigravity local CLI is deferred to v2. The whole council config is editable in the webview via **Tools -> Council settings** (`CouncilSettingsPanel` <-> `getCouncilSettings`/`setCouncilSettings`; per-engine availability from `BridgeProviderService.detectedEngines()`), with one-click GPT/Gemini/Claude-API provider presets. Supervised mode limits Grok to read-only tools; note that ClaUi's PreToolUse guard hooks do not apply to third-party backends (they run their own executors).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/BRIDGE_PROVIDERS.md`
 
 **SessionNamer** - Spawns a one-shot `claude -p` process using Haiku to generate a 1-3 word tab name from the user's first message. Matches the language of the message (Hebrew/English). 10-second timeout, sanitized output, all errors silently logged.
@@ -1147,6 +1147,27 @@ vsce publish patch
 - Update `CHANGELOG.md` with the new version entry
 - Users with auto-update enabled will get the new version automatically
 - The Marketplace page (`README.md`) updates within a few minutes
+
+**If the upload fails with `ERROR Request timeout: /_apis/gallery`:**
+
+This is a transient Marketplace-side hang (typed-rest-client's 3-minute socket timeout on the gallery API); local network, proxy and PAT are usually fine. By the time it fails, `npm version` has already bumped `package.json`, committed (`0.1.NNN`) and tagged, so the version number is consumed locally.
+
+```bash
+# 1. Check whether the upload landed anyway (verification can take a few minutes)
+npx vsce show JhonBar.claude-code-mirror
+
+# 2. Retry WITHOUT a bump. Re-running `vsce publish patch` would skip a number.
+vsce publish
+#    or, to avoid a 3-minute rebuild on every retry:
+vsce package
+vsce publish --packagePath claude-code-mirror-<version>.vsix
+
+# 3. Still failing after a few retries: upload the .vsix via the website (next section)
+```
+
+Retries are safe: the Marketplace rejects a duplicate version with "already exists". `vsce verify-pat JhonBar` checks the token but goes through a different API than publishing, so a passing check does not rule out a gallery-side hang. The publisher PAT is stored in Windows Credential Manager (keytar service `vscode-vsce`), not in `~/.vsce`.
+
+Package size: `.vscodeignore` excludes unreferenced assets and internal artifacts so the VSIX stays around 2.7 MB. `!dist/**` re-includes everything under `dist/` (vsce negations win regardless of order), so `dist/*.map` and `dist/**/*.d.ts` still ship; narrow the negation if you ever want them out.
 
 ### Publishing via Website (Fallback)
 

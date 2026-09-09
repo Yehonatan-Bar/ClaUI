@@ -89,6 +89,7 @@ export const StatusBar: React.FC<{
     provider,
     providerCapabilities,
     setCodexConsultPanelOpen,
+    setCouncilSettingsOpen,
     setReviewLoopPanelOpen,
     resetReviewLoop,
     reviewLoopAutoStart,
@@ -735,6 +736,13 @@ export const StatusBar: React.FC<{
         data-tooltip="Browse all slash commands (or type / in the input)"
       >
         Slash Commands
+      </button>
+      <button
+        className="status-bar-group-dropdown-item"
+        onClick={() => { setCouncilSettingsOpen(true); closeAllGroups(); }}
+        data-tooltip="Configure the model Council: members (Claude Code, Codex, Grok, GPT/Gemini/Claude API), chair, timeout, and providers"
+      >
+        Council settings
       </button>
       <div className="status-bar-group-dropdown-item status-bar-group-dropdown-item--static status-bar-autoreview-row">
         <span id="autocontinue-label" className="status-bar-autoreview-label">Auto-continue on limit</span>

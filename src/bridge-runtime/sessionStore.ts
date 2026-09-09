@@ -18,6 +18,8 @@ export interface BridgeSessionState {
   agyConversationId?: string;
   /** openai: which configured provider profile this session is bound to. */
   openaiProviderId?: string;
+  /** council: the resolved chair token (if any) so a resumed tab keeps it. */
+  councilChair?: string;
   /** openai: full chat history (the server is stateless). */
   history?: { role: 'user' | 'assistant'; content: string }[];
   updatedAt?: string;

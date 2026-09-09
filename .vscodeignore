@@ -29,3 +29,14 @@ CLAUDE.md
 ClaUi-Features-HE.html
 ClaUi-Features.html
 The-Complete-Guide-to-Building-Skill-for-Claude.pdf
+# --- Keep the published VSIX small ---
+# Note: `!dist/**` above re-includes EVERYTHING under dist (vsce negations win
+# regardless of order), so dist/*.map and dist/**/*.d.ts still ship. To drop them,
+# replace `!dist/**` with `!dist/**/*.js` and `!dist/**/*.txt` (the only non-JS
+# runtime file is dist/webview.js.LICENSE.txt).
+# Unreferenced assets and internal artifacts (the manifest icon is images/icon.png).
+images/output-onlinepngtools.png
+images/image.png
+IMPLEMENTATION_COMPLETE.md
+MAX_SCAN_BYTES
+html/**

@@ -469,6 +469,31 @@
           "default": [],
           "description": "Bridge Providers: OpenAI-compatible endpoints (Ollama, LM Studio, llama.cpp, vLLM, or hosted). Each entry's models appear in the model picker."
         },
+        "claudeMirror.bridge.council.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Bridge Providers: offer the model council ('Council' in the model picker). A council turn fans out your message to several models in parallel, shows each opinion, then a chair synthesizes a ruling. Note: ClaUi cannot compute council cost — a single turn invokes several paid/subscription models."
+        },
+        "claudeMirror.bridge.council.members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Bridge Providers: council member tokens. Empty = defaults (codex, grok). Grammar: 'claude[/<model>]', 'codex[/<model>]', 'grok[/<model>]', or 'openai/<providerId>/<model>' (providerId must match a claudeMirror.bridge.openaiProviders id). 'claude' uses your installed Claude Code login (headless, read-only). Only Antigravity is deferred to v2; add it via an OpenAI-compatible provider instead. Tip: edit all of this from Tools -> Council settings."
+        },
+        "claudeMirror.bridge.council.chair": {
+          "type": "string",
+          "default": "",
+          "description": "Bridge Providers: preferred council chair token (same grammar as members). Overridden by an explicit 'bridge:council/<chair>' model value. A chair not in the roster but otherwise available is used as an external judge. Empty = first available member."
+        },
+        "claudeMirror.bridge.council.timeoutMs": {
+          "type": "number",
+          "default": 240000,
+          "minimum": 15000,
+          "maximum": 600000,
+          "description": "Bridge Providers: per-member (and per-chair) council timeout in milliseconds. Clamped to 15000-600000. Worst-case turn is about 2x this value (members, then chair)."
+        },
         "claudeMirror.handoff.enabled": {
           "type": "boolean",
           "default": true,
@@ -1918,7 +1943,7 @@
     "test:usage-limit": "node --import tsx --test tests/process/usageLimitParser.test.ts",
     "test:codex-models": "node --import tsx --test tests/process/codexModelCache.test.ts tests/unit/codexModels.test.ts",
     "test:tabs": "node --import tsx --test tests/tabs/navigationOrder.test.ts tests/tabs/navTree.test.ts",
-    "test:bridge": "node --import tsx --test tests/bridge/config.test.ts tests/bridge/protocol.test.ts tests/bridge/sessionStore.test.ts tests/bridge/grokPermissions.test.ts tests/bridge/procUtils.test.ts tests/bridge/openaiCompat.test.ts",
+    "test:bridge": "node --import tsx --test tests/bridge/config.test.ts tests/bridge/protocol.test.ts tests/bridge/sessionStore.test.ts tests/bridge/grokPermissions.test.ts tests/bridge/procUtils.test.ts tests/bridge/openaiCompat.test.ts tests/bridge/council.test.ts",
     "test:hibernation": "node --import tsx --test tests/hibernation/hibernationPlanner.test.ts",
     "test:whats-new": "node --import tsx --test tests/unit/whatsNewLogic.test.ts tests/unit/whatsNewCore.test.ts tests/unit/whatsNewReceipt.test.ts",
     "verify:installed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installed.ps1",

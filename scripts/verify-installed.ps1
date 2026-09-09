@@ -50,7 +50,12 @@ $requiredManifestEntries = @(
   "claudeMirror.smartSearch.allowBash",
   # What's New after update (palette commands + setting)
   "claudeMirror.showWhatsNew",
-  "claudeMirror.openChangelog"
+  "claudeMirror.openChangelog",
+  # Model council settings (Bridge Providers)
+  "claudeMirror.bridge.council.enabled",
+  "claudeMirror.bridge.council.members",
+  "claudeMirror.bridge.council.chair",
+  "claudeMirror.bridge.council.timeoutMs"
 )
 
 foreach ($entry in $requiredManifestEntries) {
@@ -90,6 +95,22 @@ foreach ($symbol in $requiredBundleSymbols) {
 $changelogFile = Get-ChildItem -Path $installed.FullName -Filter "changelog.md" -File | Select-Object -First 1
 if (-not $changelogFile) {
   throw "Installed extension is missing changelog.md (required by ClaUi: Open Changelog)"
+}
+
+# Bridge runtime bundle (spawned instead of the claude CLI for bridge tabs) must
+# be packaged, and must contain the model-council backend — otherwise a bridge
+# tab (or a Council tab) would fail to launch or silently run a stale runtime.
+$bridgeRuntimePath = Join-Path $installed.FullName "dist\bridge-runtime\cli.js"
+if (-not (Test-Path $bridgeRuntimePath)) {
+  throw "Installed bridge runtime bundle not found: $bridgeRuntimePath"
+}
+# "CouncilBackend" is the backend class; "## Council" is the runtime-emitted
+# convening header (a code string literal, not just a comment) — both are robust
+# to a comment edit and prove the council code shipped in the bundle.
+foreach ($marker in @("CouncilBackend", "## Council")) {
+  if (-not (Select-String -Path $bridgeRuntimePath -Pattern $marker -SimpleMatch -Quiet)) {
+    throw "Installed bridge runtime is missing the model-council marker: $marker"
+  }
 }
 
 Write-Host "Installed extension verified:"

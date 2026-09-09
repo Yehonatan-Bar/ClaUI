@@ -2,6 +2,44 @@
   "$comment": "Bundled What's New entries shown after an update (toast + in-panel banner). Add ONE entry per release that ships user-visible features; bug-fix-only releases get no entry and stay silent. 'version' is the EARLIEST extension version allowed to show the entry (vsce publish patch may assign a higher number, that is fine). 'id' must be unique and must never change once shipped. Newest entries can go anywhere in the list; the extension sorts by version.",
   "announcements": [
     {
+      "id": "2026-09-09-council-claude-and-settings",
+      "version": "0.1.229",
+      "date": "2026-09-09",
+      "title": "Council: Claude Code member + settings panel",
+      "titleHe": "מועצה: חבר Claude Code + פאנל הגדרות",
+      "highlights": [
+        "Add Claude Code itself as a council member — it uses your existing Claude Code login, so no API key is needed (appears automatically when Claude Code is installed).",
+        "New Tools -> Council settings panel: add or remove members (Claude Code, Codex, Grok, or any provider), pick the chair, and set the timeout without editing settings.json.",
+        "One-click presets add GPT, Gemini, or Claude (via the API) as council members; the panel manages their providers for you.",
+        "Council members run read-only in a throwaway folder, so a consultation never changes your files."
+      ],
+      "highlightsHe": [
+        "הוסיפו את Claude Code עצמו כחבר מועצה — הוא משתמש בהתחברות הקיימת שלכם ל-Claude Code, כך שאין צורך במפתח API (מופיע אוטומטית כאשר Claude Code מותקן).",
+        "פאנל חדש Tools -> Council settings: הוספה או הסרה של חברים (Claude Code, Codex, Grok, או כל ספק), בחירת יושב הראש והגדרת הזמן הקצוב, בלי לערוך את settings.json.",
+        "כפתורי preset בלחיצה מוסיפים את GPT, Gemini או Claude (דרך ה-API) כחברי מועצה; הפאנל מנהל עבורכם את הספקים שלהם.",
+        "חברי המועצה רצים לקריאה בלבד בתיקייה זמנית, כך שהתייעצות לעולם לא משנה את הקבצים שלכם."
+      ]
+    },
+    {
+      "id": "2026-09-09-model-council",
+      "version": "0.1.229",
+      "date": "2026-09-09",
+      "title": "Model council",
+      "titleHe": "מועצת מודלים",
+      "highlights": [
+        "Pick 'Council · all models' in the model picker to turn a tab into a council: your message fans out to several models at once.",
+        "Each model answers independently, then a chair model synthesizes one combined ruling from their opinions.",
+        "Choose the chair with the model value bridge:council/<chair> or the claudeMirror.bridge.council.chair setting; set the members with claudeMirror.bridge.council.members.",
+        "Cost shows as zero: ClaUi cannot total a council turn, which invokes several paid or subscription models at once."
+      ],
+      "highlightsHe": [
+        "בחרו 'Council · all models' בבורר המודלים כדי להפוך טאב למועצת מודלים: ההודעה שלכם נשלחת לכמה מודלים במקביל.",
+        "כל מודל עונה באופן עצמאי, ולאחר מכן מודל 'יושב ראש' מסנתז פסיקה אחת משולבת מחוות הדעת שלהם.",
+        "בחרו את יושב הראש עם ערך המודל bridge:council/<chair> או ההגדרה claudeMirror.bridge.council.chair; הגדירו את החברים עם claudeMirror.bridge.council.members.",
+        "העלות מוצגת כאפס: ClaUi אינו יכול לחשב עלות של סבב מועצה, שמפעיל כמה מודלים בתשלום או במנוי בו-זמנית."
+      ]
+    },
+    {
       "id": "2026-09-08-whats-new-notifications",
       "version": "0.1.228",
       "date": "2026-09-08",

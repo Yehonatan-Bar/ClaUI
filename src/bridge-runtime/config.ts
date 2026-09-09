@@ -16,11 +16,28 @@ export interface OpenAiCompatProvider {
   models?: string[];
 }
 
+/** Model-council settings (see backends/council.ts). */
+export interface CouncilConfig {
+  /** Member tokens (e.g. `codex`, `grok`, `openai/<providerId>/<model>`). Empty
+   *  = runtime defaults (codex, grok). */
+  members?: string[];
+  /** Preferred chair token; overridden by an explicit `bridge:council/<chair>`. */
+  chair?: string;
+  /** Per-member (and per-chair) timeout in ms. */
+  timeoutMs?: number;
+}
+
 export interface BridgeConfig {
   version: number;
+  /** Claude subscription CLI path (council availability detection only in v1). */
+  claude?: { cliPath?: string };
+  /** Codex CLI path (used by the council backend). */
+  codex?: { cliPath?: string };
   grok?: { cliPath?: string };
   antigravity?: { cliPath?: string };
   openai?: OpenAiCompatProvider[];
+  /** Model-council configuration. */
+  council?: CouncilConfig;
   /** Directory for bridge session state (defaults to ~/.claui/bridge-sessions). */
   storageDir?: string;
   /** ClaUi permission mode at spawn time ('full-access' | 'supervised'). */
@@ -63,14 +80,16 @@ export function resolveOpenAiApiKey(p: OpenAiCompatProvider): string {
   return '';
 }
 
-/** Parsed form of a ClaUi bridge model value (`bridge:<backend>/<rest>`). */
-export interface BridgeModelRef {
-  backend: 'grok' | 'antigravity' | 'openai';
-  /** Backend model id (for openai this is the part after the provider id). */
-  model: string;
-  /** Only for openai backend: the provider profile id. */
-  providerId?: string;
-}
+/**
+ * Parsed form of a ClaUi bridge model value (`bridge:<backend>/<rest>`).
+ * A discriminated union: the `council` backend carries no model, only an
+ * optional chair; the others carry a model (and, for openai, a provider id).
+ */
+export type BridgeModelRef =
+  | { backend: 'grok'; model: string }
+  | { backend: 'antigravity'; model: string }
+  | { backend: 'openai'; providerId: string; model: string }
+  | { backend: 'council'; chair?: string };
 
 export const BRIDGE_MODEL_PREFIX = 'bridge:';
 
@@ -78,6 +97,16 @@ export function parseBridgeModel(value: string | null | undefined): BridgeModelR
   const v = String(value || '').trim();
   if (!v.startsWith(BRIDGE_MODEL_PREFIX)) return null;
   const rest = v.slice(BRIDGE_MODEL_PREFIX.length);
+
+  // Council has no backend model segment; the (optional) chair may itself
+  // contain '/', so keep the whole suffix. Handled BEFORE the slash guard so a
+  // bare `bridge:council` (no slash) is recognized.
+  if (rest === 'council') return { backend: 'council' };
+  if (rest.startsWith('council/')) {
+    const chair = rest.slice('council/'.length).trim();
+    return chair ? { backend: 'council', chair } : { backend: 'council' };
+  }
+
   const slash = rest.indexOf('/');
   if (slash < 0) return null;
   const backend = rest.slice(0, slash);

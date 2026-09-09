@@ -42,6 +42,7 @@ export function useClaudeStream(): void {
     setSelectedModel,
     setLastResolvedDefaultModel,
     setBridgeModelOptions,
+    setCouncilSettingsData,
     setSelectedClaudeEffort,
     setSelectedClaudeFastMode,
     setSelectedCodexReasoningEffort,
@@ -695,6 +696,11 @@ export function useClaudeStream(): void {
         case 'bridgeModelOptions':
           // Bridge Provider models (Grok / Antigravity / OpenAI-compatible)
           setBridgeModelOptions(msg.options || []);
+          break;
+
+        case 'councilSettings':
+          // Current model-council config + per-engine availability for the panel.
+          setCouncilSettingsData(msg.settings, msg.detected);
           break;
 
         case 'claudeEffortSetting':
@@ -1481,6 +1487,7 @@ export function useClaudeStream(): void {
     setSelectedModel,
     setLastResolvedDefaultModel,
     setBridgeModelOptions,
+    setCouncilSettingsData,
     setSelectedClaudeEffort,
     setSelectedClaudeFastMode,
     setSelectedCodexReasoningEffort,

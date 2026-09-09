@@ -2642,6 +2642,33 @@ export class MessageHandler {
           vscode.commands.executeCommand('workbench.action.openSettings', (msg as any).query || 'claudeMirror');
           break;
 
+        case 'getCouncilSettings':
+          this.sendCouncilSettings();
+          break;
+
+        case 'setCouncilSettings': {
+          const s = msg.settings || ({} as typeof msg.settings);
+          this.log('Saving council settings from the Council panel');
+          const cfg = vscode.workspace.getConfiguration('claudeMirror');
+          const timeout = Number(s.timeoutMs);
+          Promise.all([
+            cfg.update('bridge.council.enabled', s.enabled !== false, true),
+            cfg.update('bridge.council.members', Array.isArray(s.members) ? s.members : [], true),
+            cfg.update('bridge.council.chair', typeof s.chair === 'string' ? s.chair : '', true),
+            cfg.update('bridge.council.timeoutMs', Number.isFinite(timeout) && timeout > 0 ? Math.round(timeout) : 240000, true),
+            cfg.update('bridge.openaiProviders', Array.isArray(s.providers) ? s.providers : [], true),
+          ]).then(
+            () => {
+              // BridgeProviderService re-syncs ~/.claui/bridge.json on the config
+              // change; refresh the picker + echo the saved state back to the panel.
+              this.sendBridgeModelOptions();
+              this.sendCouncilSettings();
+            },
+            (e) => this.log(`Failed to save council settings: ${e instanceof Error ? e.message : String(e)}`),
+          );
+          break;
+        }
+
         case 'setTurnAnalysisEnabled':
           this.log(`Setting turn analysis to: ${msg.enabled}`);
           vscode.workspace.getConfiguration('claudeMirror').update('turnAnalysis.enabled', msg.enabled, true);
@@ -4613,6 +4640,25 @@ export class MessageHandler {
     this.webview.postMessage({
       type: 'bridgeModelOptions',
       options,
+    });
+  }
+
+  /** Push the current model-council configuration + per-engine availability to
+   *  the Council settings panel (on open and after a save). */
+  private sendCouncilSettings(): void {
+    const cfg = vscode.workspace.getConfiguration('claudeMirror');
+    const detected =
+      BridgeProviderService.get()?.detectedEngines() ?? { claude: false, codex: false, grok: false, node: false };
+    this.webview.postMessage({
+      type: 'councilSettings',
+      settings: {
+        enabled: cfg.get<boolean>('bridge.council.enabled', true),
+        members: cfg.get<string[]>('bridge.council.members', []),
+        chair: cfg.get<string>('bridge.council.chair', ''),
+        timeoutMs: cfg.get<number>('bridge.council.timeoutMs', 240000),
+        providers: cfg.get<import('../types/webview-messages').CouncilOpenAiProvider[]>('bridge.openaiProviders', []),
+      },
+      detected,
     });
   }
 

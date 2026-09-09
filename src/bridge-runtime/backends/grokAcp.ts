@@ -1,7 +1,7 @@
-import { ChildProcess, spawn } from 'child_process';
+import { ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as readline from 'readline';
-import { killTree, resolveExecutable } from '../procUtils';
+import { killTree, killTreeAsync, resolveExecutable, spawnCli } from '../procUtils';
 import { BridgePrompt, imagesOmittedNote, StreamEmitter } from '../protocol';
 import { SessionStore } from '../sessionStore';
 
@@ -40,10 +40,9 @@ export function isReadOnlyGrokKind(kind: string | undefined | null): boolean {
 /** Hard ceiling on a single Grok turn so a hung agent can't wedge the tab. */
 const PROMPT_TIMEOUT_MS = Number(process.env.CLAUI_BRIDGE_GROK_TIMEOUT_MS || 10 * 60 * 1000);
 
-/** Resolve a runnable Grok CLI invocation from the configured path. Always
- *  shell-free (grok's args are constant, but we stay consistent and robust to
- *  npm .cmd shims by resolving the real .exe). */
-export function resolveGrokCli(cliPath: string): { command: string; useShell: boolean } {
+/** Known global install locations for the Grok CLI (used both for spawning and
+ *  for availability detection, e.g. the council roster). */
+export function grokKnownLocations(): string[] {
   const known: string[] = [];
   if (process.platform === 'win32' && process.env.APPDATA) {
     known.push(
@@ -61,7 +60,14 @@ export function resolveGrokCli(cliPath: string): { command: string; useShell: bo
       ),
     );
   }
-  return resolveExecutable(cliPath, 'grok', known);
+  return known;
+}
+
+/** Resolve a runnable Grok CLI invocation from the configured path. Always
+ *  shell-free (grok's args are constant, but we stay consistent and robust to
+ *  npm .cmd shims by resolving the real .exe). */
+export function resolveGrokCli(cliPath: string): { command: string; useShell: boolean } {
+  return resolveExecutable(cliPath, 'grok', grokKnownLocations());
 }
 
 class AcpClient {
@@ -77,18 +83,26 @@ class AcpClient {
     return this.exited;
   }
 
+  /** Council mode: reject every tool-permission request so the agent answers
+   *  text-only and cannot invoke any tool (structurally non-mutating). */
+  private readonly noTools: boolean;
+
   constructor(
     cliPath: string,
     private readonly onUpdate: (update: Record<string, unknown>) => void,
     private readonly log: (msg: string) => void,
     private readonly permissionMode: string,
+    opts?: { cwd?: string; noTools?: boolean; onSpawn?: (child: ChildProcess) => void },
   ) {
-    const { command, useShell } = resolveGrokCli(cliPath);
-    this.child = spawn(command, ['agent', 'stdio'], {
-      cwd: process.cwd(),
-      shell: useShell,
+    this.noTools = !!opts?.noTools;
+    const { command } = resolveGrokCli(cliPath);
+    // spawnCli (cross-spawn) so a Windows `.cmd`/`.bat` shim — which detection
+    // (whichSync) accepts but a raw shell-free spawn cannot launch — still runs.
+    this.child = spawnCli(command, ['agent', 'stdio'], {
+      cwd: opts?.cwd || process.cwd(),
       windowsHide: true,
     });
+    opts?.onSpawn?.(this.child);
     this.child.on('error', (e) => {
       this.exited = true;
       this.rejectAll(new Error(`Failed to start Grok CLI: ${e.message}`));
@@ -143,6 +157,14 @@ class AcpClient {
     }
     if (msg.method === 'session/request_permission' && msg.id !== undefined) {
       const opts = msg.params?.options || [];
+      if (this.noTools) {
+        // Council mode: text-only advisor — deny EVERY tool request. A
+        // `cancelled` outcome denies without inspecting `options`, so a
+        // malformed options shape from the CLI can never throw here (fail
+        // closed: the member cannot touch the workspace or run any command).
+        this.send({ jsonrpc: '2.0', id: msg.id, result: { outcome: { outcome: 'cancelled' } } });
+        return;
+      }
       const kind = msg.params?.toolCall?.kind;
       // Supervised mirrors the real Claude CLI's read-only --allowedTools set:
       // only read/search/fetch/think auto-approve; write/execute (and unknown)
@@ -195,17 +217,35 @@ class AcpClient {
   }
 
   request(method: string, params: unknown, timeoutMs = 0): Promise<unknown> {
+    // Fail fast if the process has already exited — otherwise a request would
+    // sit in `pending` forever (no future 'exit' to trigger rejectAll), which
+    // would deadlock the caller's await.
+    if (this.exited) {
+      return Promise.reject(new Error(`Grok CLI is not running (cannot ${method})`));
+    }
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      // Clear the per-request timer on ANY settlement (response, error, or
+      // rejectAll) so its closure is not retained for the full timeout window.
+      this.pending.set(id, {
+        resolve: (v) => {
+          if (timer) clearTimeout(timer);
+          resolve(v);
+        },
+        reject: (e) => {
+          if (timer) clearTimeout(timer);
+          reject(e);
+        },
+      });
       if (timeoutMs > 0) {
-        const t = setTimeout(() => {
+        timer = setTimeout(() => {
           if (this.pending.has(id)) {
             this.pending.delete(id);
             reject(new Error(`ACP ${method} timed out after ${timeoutMs}ms`));
           }
         }, timeoutMs);
-        t.unref?.();
+        timer.unref?.();
       }
       this.send({ jsonrpc: '2.0', id, method, params });
     });
@@ -217,6 +257,122 @@ class AcpClient {
 
   kill(): void {
     killTree(this.child);
+  }
+
+  /** Non-blocking kill — used on the council path so an interrupt / per-member
+   *  timeout does not block on a synchronous taskkill. */
+  killAsync(): void {
+    killTreeAsync(this.child);
+  }
+
+  /** Kill and await the child's exit (bounded), so a normal council turn does
+   *  not return while its throwaway grok process is still alive (which would
+   *  leak an untracked child). Never blocks longer than `timeoutMs`. */
+  disposeAsync(timeoutMs = 2000): Promise<void> {
+    return new Promise((resolve) => {
+      if (this.exited) {
+        killTreeAsync(this.child);
+        resolve();
+        return;
+      }
+      let done = false;
+      const finish = (): void => {
+        if (done) return;
+        done = true;
+        clearTimeout(t);
+        resolve();
+      };
+      const t = setTimeout(finish, timeoutMs);
+      t.unref?.();
+      this.child.once('exit', finish);
+      this.child.once('close', finish);
+      killTreeAsync(this.child);
+    });
+  }
+}
+
+/**
+ * One-shot Grok council member: a throwaway ACP session in `cwd` (a temp dir),
+ * text-only (rejects every tool request), that returns the agent's message.
+ * Never persists session state — the council treats each turn as independent.
+ *
+ * Cancellation/timeout is driven by the caller's AbortSignal: on abort the grok
+ * process is killed non-blockingly (`killAsync`), which rejects the pending
+ * request; the caller distinguishes timeout vs. user-interrupt itself.
+ */
+export async function runGrokCouncilPrompt(
+  cliPath: string,
+  model: string,
+  systemPrompt: string,
+  question: string,
+  cwd: string,
+  signal: AbortSignal,
+  onChild: (child: ChildProcess) => void,
+  log: (msg: string) => void,
+): Promise<string> {
+  let lastText = '';
+  const client = new AcpClient(
+    cliPath,
+    (u) => {
+      if ((u.sessionUpdate as string) === 'agent_message_chunk') {
+        const content = u.content as { text?: string } | undefined;
+        lastText += content?.text ?? '';
+      }
+    },
+    log,
+    'council',
+    { cwd, noTools: true, onSpawn: onChild },
+  );
+
+  const onAbort = (): void => client.killAsync();
+  if (signal.aborted) {
+    client.killAsync();
+    throw new Error('aborted');
+  }
+  signal.addEventListener('abort', onAbort, { once: true });
+
+  try {
+    await client.request(
+      'initialize',
+      {
+        protocolVersion: 1,
+        clientCapabilities: {},
+        clientInfo: { name: 'claui-bridge-council', version: '1.0.0' },
+      },
+      30000,
+    );
+    const res = (await client.request(
+      'session/new',
+      { cwd, mcpServers: [], ...(model ? { modelId: model } : {}) },
+      60000,
+    )) as { sessionId?: string };
+    const sid = res.sessionId;
+    if (!sid) throw new Error('Grok CLI did not return a session id');
+    if (model) {
+      try {
+        await client.request('session/set_model', { sessionId: sid, modelId: model }, 15000);
+      } catch (e) {
+        // Swallow a "model not applied" (the model was already passed at
+        // session/new) — but if the process died/aborted mid-request, stop
+        // rather than send a prompt to a dead client (which would hang).
+        if (client.isDead || signal.aborted) throw new Error('Grok CLI exited before answering');
+        log(`council grok set_model not applied: ${(e as Error).message}`);
+      }
+    }
+    const promptBlocks: { type: 'text'; text: string }[] = [];
+    if (systemPrompt) {
+      promptBlocks.push({ type: 'text', text: `<system-rules>\n${systemPrompt}\n</system-rules>` });
+    }
+    promptBlocks.push({ type: 'text', text: question });
+    // No ACP-level timeout: the council owns per-member timeout via `signal`.
+    // (request() fails fast if the client is already dead.)
+    await client.request('session/prompt', { sessionId: sid, prompt: promptBlocks }, 0);
+    return lastText;
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+    // Await bounded process teardown so a normal turn does not leave the
+    // throwaway grok child alive/untracked.
+    await client.disposeAsync();
   }
 }
 
