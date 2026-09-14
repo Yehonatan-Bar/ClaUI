@@ -9,6 +9,7 @@ import { useFileMention } from '../../hooks/useFileMention';
 import type { WebviewImageData } from '../../../extension/types/webview-messages';
 import { getModelMaxContext } from '../../utils/modelContextLimits';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
+import { useVoiceDictation, VoiceMicButton, VoiceHud } from './VoiceDictation';
 
 const FOCUS_INPUT_POINTER_GUARD_MS = 280;
 
@@ -659,6 +660,17 @@ export const InputArea: React.FC = () => {
     });
   }, [undoMgr, resizeTextarea]);
 
+  // Voice dictation: results are inserted at the caret; manual edits always win.
+  const pushVoiceUndo = useCallback((t: string, cursor: number) => undoMgr.push(t, cursor), [undoMgr]);
+  const voice = useVoiceDictation({
+    textareaRef,
+    text,
+    setText,
+    pushUndo: pushVoiceUndo,
+    resizeTextarea,
+    enabled: isConnected && !inputLockedByHandoff,
+  });
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       const keyLower = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -841,6 +853,8 @@ export const InputArea: React.FC = () => {
       }
       setText(newValue);
       undoMgr.push(newValue, e.target.selectionStart);
+      // Manual edits win over dictation: continue dictating from the new caret
+      voice.onUserEdit(e.target.selectionStart);
       // Any manual typing exits history browsing mode
       historyIndexRef.current = -1;
       const el = e.target;
@@ -1742,6 +1756,7 @@ export const InputArea: React.FC = () => {
         </div>
       )}
 
+      <VoiceHud api={voice} />
       <div className="input-wrapper">
         {fileMention.isOpen && (
           <FileMentionPopup
@@ -1899,6 +1914,7 @@ export const InputArea: React.FC = () => {
           )}
         </div>
         <div className="input-buttons">
+          <VoiceMicButton api={voice} disabled={!isConnected || inputLockedByHandoff} />
           {providerCapabilities.supportsPromptEnhancer && (
             <div className="enhance-button-group" ref={enhanceGroupRef}>
               <button

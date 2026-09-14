@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
+import { VoiceDictationService } from '../voice/VoiceDictationService';
 import { SessionTab } from './SessionTab';
 import { CodexSessionTab } from './CodexSessionTab';
 import { buildSmartSearchPrompt } from './SmartSearchPrompt';
@@ -1655,6 +1656,7 @@ export class TabManager {
   // --- Internal handlers ---
 
   private handleTabClosed(tabId: string): void {
+    VoiceDictationService.current()?.onTabClosed(tabId);
     this.tabs.delete(tabId);
     this.tabSlotColors.delete(tabId);
     // During shutdown, the final snapshot has already been captured. Skip

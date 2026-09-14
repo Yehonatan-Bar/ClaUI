@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { VoiceDictationService } from '../voice/VoiceDictationService';
 import type { ClaudeProcessManager } from '../process/ClaudeProcessManager';
 import type { ControlProtocol } from '../process/ControlProtocol';
 import type { StreamDemux } from '../process/StreamDemux';
@@ -1789,6 +1790,14 @@ export class MessageHandler {
       this.log(`Webview -> Extension: ${msg.type}`);
 
       switch (msg.type) {
+        case 'voiceStart':
+          void VoiceDictationService.current()?.start(this.webview, this.tabId);
+          break;
+
+        case 'voiceStop':
+          void VoiceDictationService.current()?.stop(this.tabId);
+          break;
+
         case 'sendMessage':
           this.webview.notifyUserActivity?.();
           if (this.resolvePermissionFromText(msg.text)) { break; }

@@ -1146,7 +1146,49 @@ export interface MpRemoveReactionRequest {
   emoji: string;
 }
 
+/* ---------- Voice dictation ---------- */
+
+/** Webview -> extension: start dictating into this tab's composer. */
+export interface VoiceStartRequest {
+  type: 'voiceStart';
+}
+
+/** Webview -> extension: stop dictating. */
+export interface VoiceStopRequest {
+  type: 'voiceStop';
+}
+
+/** Extension -> webview: dictation state for this tab. */
+export interface VoiceStateMessage {
+  type: 'voiceState';
+  listening: boolean;
+  /** True while the capture window is still starting up. */
+  connecting?: boolean;
+  /** Human-readable problem (no browser, microphone blocked, network). */
+  error?: string;
+}
+
+/** Extension -> webview: one recognition result. Interims replace each other; a final closes the utterance. */
+export interface VoiceTranscriptMessage {
+  type: 'voiceTranscript';
+  kind: 'interim' | 'final';
+  text: string;
+}
+
+/** Extension -> webview: microphone level 0..1 for the waveform. */
+export interface VoiceLevelMessage {
+  type: 'voiceLevel';
+  level: number;
+}
+
+/** Extension -> webview: the toggle command/keybinding was invoked for this tab. */
+export interface VoiceToggleMessage {
+  type: 'voiceToggle';
+}
+
 export type WebviewToExtensionMessage =
+  | VoiceStartRequest
+  | VoiceStopRequest
   | SendTextMessage
   | SendMessageWithImages
   | QueuePromptUntilUsageResetRequest
@@ -3006,6 +3048,10 @@ export interface ReviewLoopMaxRoundsSettingMessage {
 }
 
 export type ExtensionToWebviewMessage =
+  | VoiceStateMessage
+  | VoiceTranscriptMessage
+  | VoiceLevelMessage
+  | VoiceToggleMessage
   | McpInventoryMessage
   | McpCatalogMessage
   | McpDiffPreviewMessage

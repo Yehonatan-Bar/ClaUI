@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { exec, execFile } from 'child_process';
+import { VoiceDictationService } from '../voice/VoiceDictationService';
 import type { CodexExecDemux } from '../process/CodexExecDemux';
 import type { PromptHistoryStore } from '../session/PromptHistoryStore';
 import type { ProjectAnalyticsStore } from '../session/ProjectAnalyticsStore';
@@ -846,6 +847,14 @@ export class CodexMessageHandler {
           void this.session.clearSession({ cwd: msg.workspacePath }).catch((err) => {
             this.webview.postMessage({ type: 'error', message: `Failed to clear Codex session: ${this.errMsg(err)}` });
           });
+          break;
+
+        case 'voiceStart':
+          void VoiceDictationService.current()?.start(this.webview, this.tabId);
+          break;
+
+        case 'voiceStop':
+          void VoiceDictationService.current()?.stop(this.tabId);
           break;
 
         case 'sendMessage':

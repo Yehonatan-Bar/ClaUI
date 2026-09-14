@@ -15,6 +15,7 @@ import { TokenUsageRatioTracker } from './session/TokenUsageRatioTracker';
 import { DeveloperUsageReporter } from './usage/DeveloperUsageReporter';
 import { SkillUsageTracker } from './skillgen/SkillUsageTracker';
 import { registerCommands } from './commands';
+import { VoiceDictationService } from './voice/VoiceDictationService';
 import { registerTabGroupCommands } from './commands/tabGroupCommands';
 import { registerDiscoverCommand } from './session/SessionDiscovery';
 import { ClaUiSidebarViewProvider } from './sidebar/ClaUiSidebarViewProvider';
@@ -226,6 +227,12 @@ export function activate(context: vscode.ExtensionContext): void {
     developerUsageReporter
   );
   memorySampler.setRootProvider(() => tabManager.enumerateCliProcesses());
+
+  // Voice dictation: one service per extension host; the capture window is only
+  // pre-warmed for users who have dictated before.
+  const voiceService = VoiceDictationService.get(context, log);
+  context.subscriptions.push(voiceService);
+  setTimeout(() => void voiceService.warmUp(), 3000);
 
   // Register commands routed through the tab manager
   registerCommands(context, tabManager, sessionStore, log, logDir, developerUsageReporter);
