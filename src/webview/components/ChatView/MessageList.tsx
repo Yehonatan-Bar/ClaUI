@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { MessageBubble } from './MessageBubble';
+import { CompactDivider } from './CompactDivider';
 import { StreamingText } from './StreamingText';
 import { ToolUseBlock } from './ToolUseBlock';
 import { BtwContextMenu } from './BtwContextMenu';
@@ -42,6 +43,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
   // tabs, widgets). Store actions have stable identities, so their
   // subscriptions never fire.
   const messages = useAppStore((s) => s.messages);
+  const compactBoundaries = useAppStore((s) => s.compactBoundaries);
   const streamingMessageId = useAppStore((s) => s.streamingMessageId);
   const streamingBlocks = useAppStore((s) => s.streamingBlocks);
   const isBusy = useAppStore((s) => s.isBusy);
@@ -245,16 +247,30 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
       onContextMenu={handleContextMenu}
     >
       {messages.map((msg) => (
-        <MessageBubble
-          key={msg.id}
-          message={msg}
-          isBusy={isBusy}
-          onEditAndResend={handleEditAndResend}
-          onFork={handleFork}
-          onCheckpointRevert={handleCheckpointRevert}
-          onCheckpointRedo={handleCheckpointRedo}
-        />
+        <Fragment key={msg.id}>
+          <MessageBubble
+            message={msg}
+            isBusy={isBusy}
+            onEditAndResend={handleEditAndResend}
+            onFork={handleFork}
+            onCheckpointRevert={handleCheckpointRevert}
+            onCheckpointRedo={handleCheckpointRedo}
+          />
+          {compactBoundaries
+            .filter((b) => b.afterMessageId === msg.id)
+            .map((b) => (
+              <CompactDivider key={b.id} boundary={b} />
+            ))}
+        </Fragment>
       ))}
+
+      {/* Boundaries anchored to the current end (e.g. compacting an empty chat)
+          or whose spinner is still pending without a surviving anchor message. */}
+      {compactBoundaries
+        .filter((b) => b.afterMessageId === null)
+        .map((b) => (
+          <CompactDivider key={b.id} boundary={b} />
+        ))}
 
       {/* Show streaming content for the in-progress message */}
       {streamingMessageId && streamingBlocks.length > 0 && (

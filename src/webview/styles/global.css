@@ -1344,6 +1344,47 @@ html, body, #root {
   to { transform: rotate(360deg); }
 }
 
+/* --- Inline "context compacted" divider in the chat --- */
+.compact-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 4px;
+  user-select: none;
+}
+
+.compact-divider-line {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--vscode-panel-border, var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.3)));
+}
+
+.compact-divider-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.compact-divider-label svg {
+  flex: 0 0 auto;
+  opacity: 0.8;
+}
+
+.compact-divider-pending .compact-divider-label {
+  color: var(--vscode-focusBorder);
+  opacity: 1;
+}
+
+.compact-divider-spin {
+  animation: compact-spin 0.9s linear infinite;
+}
+
 .browse-stack {
   display: flex;
   flex-direction: column;
@@ -5654,6 +5695,16 @@ html, body, #root {
   margin-bottom: 4px;
 }
 
+.slash-command-arg-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border, #333));
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
 .slash-command-item {
   display: flex;
   flex-direction: column;
@@ -5706,6 +5757,39 @@ html, body, #root {
   border-radius: 8px;
   background: var(--vscode-badge-background, #4d4d4d);
   color: var(--vscode-badge-foreground, #fff);
+}
+
+/* "Not available" tag for commands the headless CLI does not support. Hebrew
+   text, so no uppercase / letter-spacing; outlined instead of filled. */
+.slash-command-badge.unavailable {
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  border: 1px solid var(--vscode-descriptionForeground);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* Commands with no headless support: greyed and non-interactive in both the
+   inline popup and the full-list browser. */
+.slash-command-item.unavailable,
+.slash-browser-item.unavailable {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.slash-command-item.unavailable:hover,
+.slash-command-item.unavailable.selected {
+  background: none;
+  color: var(--vscode-editorSuggestWidget-foreground, var(--vscode-editor-foreground));
+}
+
+.slash-command-item.unavailable.selected .slash-command-desc,
+.slash-command-item.unavailable.selected .slash-command-args {
+  color: var(--vscode-descriptionForeground);
+}
+
+.slash-browser-item.unavailable:hover {
+  background: none;
 }
 
 .slash-command-desc {

@@ -59,6 +59,7 @@ export function useClaudeStream(): void {
     setPermissionMode,
     setCompactingSession,
     setCompactSessionNotice,
+    resolveCompactBoundary,
     setGitPushSettings,
     setGitPushResult,
     setGitPushRunning,
@@ -837,6 +838,10 @@ export function useClaudeStream(): void {
           break;
         }
 
+        case 'compactBoundary':
+          resolveCompactBoundary({ trigger: msg.trigger, preTokens: msg.preTokens });
+          break;
+
         case 'gitPushResult':
           setGitPushRunning(false);
           setGitPushResult({ success: msg.success, output: msg.output });
@@ -1504,6 +1509,7 @@ export function useClaudeStream(): void {
     setPermissionMode,
     setCompactingSession,
     setCompactSessionNotice,
+    resolveCompactBoundary,
     setGitPushSettings,
     setGitPushResult,
     setGitPushRunning,

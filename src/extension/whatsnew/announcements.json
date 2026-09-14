@@ -2,6 +2,42 @@
   "$comment": "Bundled What's New entries shown after an update (toast + in-panel banner). Add ONE entry per release that ships user-visible features; bug-fix-only releases get no entry and stay silent. 'version' is the EARLIEST extension version allowed to show the entry (vsce publish patch may assign a higher number, that is fine). 'id' must be unique and must never change once shipped. Newest entries can go anywhere in the list; the extension sorts by version.",
   "announcements": [
     {
+      "id": "2026-09-14-compact-context-divider",
+      "version": "0.1.230",
+      "date": "2026-09-14",
+      "title": "See when context is compacted",
+      "titleHe": "רואים מתי ההקשר מכווץ",
+      "highlights": [
+        "Running /compact now shows a live 'Compacting context…' marker in the chat, then a 'Context compacted' divider once it finishes.",
+        "The divider reports how large the context was before it was summarized, so you can see the space you freed.",
+        "Automatic compaction (when the window fills on its own) shows the same divider now, so it is no longer silent."
+      ],
+      "highlightsHe": [
+        "הרצת compact/ מציגה עכשיו סימון חי 'מכווץ הקשר…' בצ'אט, ואז מפריד 'ההקשר כווץ' עם סיום הפעולה.",
+        "המפריד מראה כמה גדול היה ההקשר לפני הסיכום, כדי שתראו כמה מקום פיניתם.",
+        "כיווץ אוטומטי (כשחלון ההקשר מתמלא מעצמו) מציג עכשיו את אותו מפריד, כך שהוא כבר לא שקוף."
+      ]
+    },
+    {
+      "id": "2026-09-11-slash-commands-run-on-pick",
+      "version": "0.1.230",
+      "date": "2026-09-11",
+      "title": "Slash commands run when you pick them",
+      "titleHe": "פקודות סלאש רצות כשבוחרים אותן",
+      "highlights": [
+        "Pick a slash command from the / autocomplete or the commands browser and it runs right away, like the CLI — no extra Send step.",
+        "Commands ClaUi supports now do their real action: /clear, /compact, /context, /model, /effort, /usage and /resume.",
+        "Commands that take a value (like /effort or /model) now show their options in a menu that filters as you type — pick one and it runs.",
+        "Commands the CLI can't run here (like /fork, /branch, /theme) stay listed but greyed and tagged 'not available'."
+      ],
+      "highlightsHe": [
+        "בחרו פקודת סלאש מההשלמה האוטומטית של / או ממאגר הפקודות והיא תרוץ מיד, כמו ב-CLI — בלי שלב שליחה נוסף.",
+        "פקודות ש-ClaUi תומך בהן מבצעות עכשיו את הפעולה עצמה: clear, compact, context, model, effort, usage ו-resume.",
+        "פקודות שמקבלות ערך (כמו effort או model) מציגות עכשיו את האפשרויות בתפריט שמסתנן תוך כדי הקלדה — בוחרים אחת והיא רצה.",
+        "פקודות שה-CLI לא יכול להריץ כאן (כמו fork, branch, theme) יישארו ברשימה אך מעומעמות ומסומנות 'לא זמין'."
+      ]
+    },
+    {
       "id": "2026-09-09-council-claude-and-settings",
       "version": "0.1.229",
       "date": "2026-09-09",

@@ -447,10 +447,13 @@ export class ClaudeProcessManager extends EventEmitter {
     this.log(`Control protocol: respondPermission requestId=${requestId} behavior=${result.behavior}`);
   }
 
-  /** Request context compaction */
+  /** Request context compaction. A `request_id` is required: the CLI pairs
+   *  control_request/control_response by this id (same as the initialize
+   *  handshake), and silently ignores a request that omits it. */
   sendCompact(instructions?: string): void {
     this.send({
       type: 'control_request',
+      request_id: `claui-compact-${Date.now()}`,
       request: {
         subtype: 'compact',
         ...(instructions ? { custom_instructions: instructions } : {}),

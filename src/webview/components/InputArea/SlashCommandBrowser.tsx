@@ -2,17 +2,27 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SLASH_COMMAND_GROUPS, filterSlashCommands, SlashCommand } from '../../data/slashCommands';
 
 interface SlashCommandBrowserProps {
-  /** Called with the chosen command name (no slash) to insert into the input. */
+  /**
+   * Called with the chosen command name (no slash). The command runs
+   * immediately, like the CLI; commands that need a value are inserted into the
+   * input instead so the user can complete them.
+   */
   onSelect: (name: string) => void;
   onClose: () => void;
 }
 
 const CommandRow: React.FC<{ cmd: SlashCommand; onSelect: (name: string) => void }> = ({ cmd, onSelect }) => (
-  <button className="slash-browser-item" onClick={() => onSelect(cmd.name)}>
+  <button
+    className={`slash-browser-item${cmd.unavailable ? ' unavailable' : ''}`}
+    disabled={cmd.unavailable}
+    title={cmd.unavailable ? 'Not available in this environment' : undefined}
+    onClick={() => { if (!cmd.unavailable) onSelect(cmd.name); }}
+  >
     <span className="slash-browser-item-header">
       <span className="slash-command-name">/{cmd.name}</span>
       {cmd.argsHint && <span className="slash-command-args">{cmd.argsHint}</span>}
       {cmd.native && <span className="slash-command-badge">ClaUi</span>}
+      {cmd.unavailable && <span className="slash-command-badge unavailable">לא זמין</span>}
     </span>
     <span className="slash-command-desc">{cmd.description}</span>
   </button>
@@ -22,7 +32,8 @@ const CommandRow: React.FC<{ cmd: SlashCommand; onSelect: (name: string) => void
  * Full browsable list of every built-in slash command, opened from the input
  * toolbar. Shows commands grouped by category (matching the CLI menu) with a
  * search box that flattens to a ranked result list while typing. Selecting a
- * command inserts it into the chat input and closes the modal.
+ * command runs it immediately (like the CLI) and closes the modal; commands
+ * that need a value are inserted into the input for the user to complete.
  */
 export const SlashCommandBrowser: React.FC<SlashCommandBrowserProps> = ({ onSelect, onClose }) => {
   const [query, setQuery] = useState('');
@@ -89,7 +100,7 @@ export const SlashCommandBrowser: React.FC<SlashCommandBrowserProps> = ({ onSele
           )}
         </div>
         <div className="slash-browser-hint">
-          Selecting a command inserts it into the input. Type / in the input for inline autocomplete.
+          Selecting a command runs it. Commands that need a value are filled into the input instead. Type / in the input for inline autocomplete.
         </div>
       </div>
     </div>

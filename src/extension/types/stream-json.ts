@@ -7,13 +7,18 @@
 
 export interface SystemInitEvent {
   type: 'system';
-  subtype: string; // 'init', 'hook_started', 'hook_response', etc.
+  subtype: string; // 'init', 'hook_started', 'hook_response', 'compact_boundary', etc.
   session_id: string;
   tools: string[];
   model: string;
   cwd: string;
   mcp_servers: McpServerInit[];
   thinking_effort?: string;
+  /** Present only on subtype 'compact_boundary': the CLI emits this after it
+   *  compacts the conversation (either from a /compact control request or an
+   *  automatic threshold trigger). `pre_tokens` is the context size before the
+   *  summary replaced it. */
+  compact_metadata?: { trigger?: string; pre_tokens?: number };
 }
 
 export interface McpServerInit {

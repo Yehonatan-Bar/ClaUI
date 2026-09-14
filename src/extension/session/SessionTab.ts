@@ -2734,6 +2734,15 @@ export class SessionTab implements WebviewBridge {
       if (event.type === 'system' && event.subtype === 'init' && this.silentResumeInFlight) {
         this.handleSilentResumeReady(event.session_id, tabLog);
       }
+      // Context compaction finished (manual /compact or the CLI's auto-compact).
+      // Forwarded directly (like handleResultEvent) since the generic demux
+      // 'system' path is not consumed for this and the compact control_response
+      // reply is dropped. Gives the webview its only visible compaction signal.
+      if (event.type === 'system' && event.subtype === 'compact_boundary') {
+        this.messageHandler.handleCompactBoundary(
+          (event as import('../types/stream-json').SystemInitEvent).compact_metadata,
+        );
+      }
       // Diagnostic: log raw assistant message usage
       if (event.type === 'assistant') {
         tabLog(`[DIAG] assistant raw usage: ${JSON.stringify((event as any).message?.usage).slice(0, 300)}`);

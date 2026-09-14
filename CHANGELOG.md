@@ -1,5 +1,32 @@
 # ClaUi - Changelog
 
+## v0.1.232 - 2026-09-14
+
+**Feature: Visible "context compacted" divider in the chat**
+
+- `/compact` used to run silently — the compaction `control_request` was sent, the CLI's `control_response` was dropped, and the `system/compact_boundary` event was logged but never rendered, so nothing appeared in the UI
+- Picking/sending `/compact` now shows a live **"Compacting context…"** divider immediately (`beginManualCompact` adds a `pending` marker anchored below the last message); a 90s safety timeout clears it if no boundary arrives
+- When the CLI emits `system/compact_boundary`, `SessionTab` forwards it via the new `MessageHandler.handleCompactBoundary` → `compactBoundary` webview message → `resolveCompactBoundary`, which flips the pending marker to a static **"Context compacted"** divider (showing pre-compaction token size and trigger)
+- **Automatic compaction** (CLI-triggered when the window fills) now renders the same divider instead of being invisible — a boundary with no pending marker creates a fresh `done` marker
+- New state lives in `compactBoundaries` (separate from `messages`, so it never touches turn history / fork / timeline); markers are pruned in `truncateFromMessage` and cleared on `reset`. New component `CompactDivider`; rendered interleaved in `MessageList`
+
+---
+
+## v0.1.231 - 2026-09-11
+
+**Change: Slash commands run when picked, with more native routes**
+
+- Selecting a slash command from the inline `/` autocomplete popup or the full-list commands browser now runs it immediately, matching the CLI — no separate Send step
+- Expanded native routing so more commands do their real ClaUi action instead of being shipped to the headless CLI: added `/effort <level>` (→ `setClaudeEffort`, native levels low/medium/high/xhigh/max), `/usage`+aliases (→ reveal the usage widget), and `/resume`/`/continue` (→ open the session picker), alongside existing `/clear`, `/compact`, `/context`, `/model <id>`. Routing now lives in one shared `applyNativeRoute` used by both send-time and pick-time paths
+- **Fixed `/compact` doing nothing**: the compaction `control_request` was sent without a `request_id`, so the CLI ignored it. It now carries one (matching the initialize handshake), so in-place compaction actually runs
+- Commands that need a value are inserted into the input instead of running. "Needs a value" = the `needsValue` flag (`/model`, `/effort`, `/goal`) or a required `<...>` argument (`/add-dir`, `/cd`, `/batch`, `/deep-research`) — see `slashCommandNeedsArg`
+- **Argument autocomplete (second stage)**: for a picked command with enumerable values, `useSlashCommand` opens a value list that filters as you type, so the user is never stranded with a bare `/effort ` and no hints. `/effort` offers low/medium/high/xhigh/max; `/model` offers `CLAUDE_MODEL_OPTIONS` + the store's `bridgeModelOptions`. Picking a value runs `/name value` immediately (or inserts it if the slash is mid-message). Options come from a `getArgOptions` resolver in `InputArea`; free-value commands like `/goal` still just insert for typing
+- Commands with no headless support (`/fork`, `/branch`, `/rewind`, `/export`, `/copy`, the Terminal-appearance and Platforms & integrations groups, interactive account items, ...) are flagged `unavailable`: still listed but greyed with a Hebrew "לא זמין" tag and not runnable (disabled + guarded in every selection path)
+- In the inline popup, a mouse click and `Enter` run the selected command (when it needs no value and is the whole input); `Tab` still only completes the token. Mid-message slash tokens are inserted (never run) so surrounding text is preserved
+- Webview routing reuses existing message types (`clearSession`, `compact`, `setModel`, `setClaudeEffort`, `setUsageWidgetEnabled`, `requestUsage`, `showHistory`, `sendMessage`); the only extension-side change is the `request_id` fix in `ClaudeProcessManager.sendCompact`
+
+---
+
 ## v0.1.230 - 2026-09-09
 
 **Feature: Model council (Bridge Providers)**

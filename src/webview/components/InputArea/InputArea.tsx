@@ -8,8 +8,10 @@ import { FileMentionPopup } from './FileMentionPopup';
 import { useFileMention } from '../../hooks/useFileMention';
 import { SlashCommandPopup } from './SlashCommandPopup';
 import { useSlashCommand } from '../../hooks/useSlashCommand';
-import { resolveNativeRoute } from '../../data/slashCommands';
-import type { WebviewImageData } from '../../../extension/types/webview-messages';
+import { resolveNativeRoute, slashCommandNeedsArg, ALL_SLASH_COMMANDS } from '../../data/slashCommands';
+import type { NativeRoute, SlashArgOption, SlashCommand } from '../../data/slashCommands';
+import { CLAUDE_MODEL_OPTIONS } from '../../utils/claudeModelDisplay';
+import type { WebviewImageData, ClaudeEffortLevel } from '../../../extension/types/webview-messages';
 import { getModelMaxContext } from '../../utils/modelContextLimits';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 
@@ -147,7 +149,24 @@ export const InputArea: React.FC = () => {
     setSlashBrowserOpen,
   } = useAppStore();
   const fileMention = useFileMention(textareaRef);
-  const slash = useSlashCommand(textareaRef);
+  // Supplies the second-stage (argument) options for a picked command: static
+  // catalog options (e.g. /effort levels) or a dynamic list (the /model list).
+  const resolveArgOptions = useCallback((cmd: SlashCommand): SlashArgOption[] | null => {
+    if (cmd.argOptions && cmd.argOptions.length) return cmd.argOptions;
+    if (cmd.native === 'model') {
+      const opts: SlashArgOption[] = [];
+      for (const o of CLAUDE_MODEL_OPTIONS) {
+        if (!o.value) continue; // skip "Default" (empty) - /model needs an explicit id
+        opts.push({ value: o.value, label: o.label });
+      }
+      for (const o of useAppStore.getState().bridgeModelOptions ?? []) {
+        if (o.value) opts.push({ value: o.value, label: o.label });
+      }
+      return opts;
+    }
+    return null;
+  }, []);
+  const slash = useSlashCommand(textareaRef, resolveArgOptions);
 
   // Context bar: poll store every 5s to keep bar current (same pattern as ContextUsageWidget)
   const [, setContextTick] = useState(0);
@@ -443,6 +462,57 @@ export const InputArea: React.FC = () => {
     setScheduleMessageAtMs(current.getTime());
   }, [scheduleMessageAtMs, setScheduleMessageAtMs]);
 
+  /** Execute a native ClaUi slash-command route. Shared by both entry points:
+   *  typing "/name" + Send (sendMessage) and picking a command from a menu
+   *  (runSlashCommand). These run the real ClaUi action instead of shipping the
+   *  command text to the headless CLI (which does not implement most of them). */
+  const applyNativeRoute = useCallback((native: { route: NativeRoute; arg: string }) => {
+    switch (native.route) {
+      case 'clear': {
+        useAppStore.getState().reset();
+        postToExtension({ type: 'clearSession' });
+        break;
+      }
+      case 'compact': {
+        // Show a live "Compacting context…" divider immediately; the CLI's
+        // compact_boundary event resolves it to a "Context compacted" divider.
+        useAppStore.getState().beginManualCompact();
+        postToExtension({ type: 'compact' });
+        // Safety net: if no boundary event arrives (e.g. CLI ignored it), clear
+        // the spinner rather than leaving it stuck.
+        setTimeout(() => {
+          const s = useAppStore.getState();
+          if (s.compactBoundaries.some((b) => b.status === 'pending')) {
+            s.dropPendingCompact();
+          }
+        }, 90_000);
+        break;
+      }
+      case 'context':
+        useAppStore.getState().setContextWidgetVisible(true);
+        break;
+      case 'model':
+        postToExtension({ type: 'setModel', model: native.arg });
+        break;
+      case 'effort': {
+        const effort = native.arg.toLowerCase() as ClaudeEffortLevel;
+        useAppStore.getState().setSelectedClaudeEffort(effort);
+        postToExtension({ type: 'setClaudeEffort', effort });
+        break;
+      }
+      case 'usage':
+        // Reveal the usage widget and refresh its data (mirrors the Vitals toggle).
+        useAppStore.getState().setUsageWidgetEnabled(true);
+        postToExtension({ type: 'setUsageWidgetEnabled', enabled: true });
+        postToExtension({ type: 'requestUsage' });
+        break;
+      case 'resume':
+        // Open ClaUi's session picker (the headless CLI has no interactive resume).
+        postToExtension({ type: 'showHistory' });
+        break;
+    }
+  }, []);
+
   /** Send the current message to Claude/Codex (allowed even while busy, to interrupt).
    *  When a plan approval bar is active, the text is sent as plan feedback
    *  so the CLI interprets it in the approval context. */
@@ -474,23 +544,7 @@ export const InputArea: React.FC = () => {
         addToPromptHistory(trimmed);
         historyIndexRef.current = -1;
         draftRef.current = '';
-        switch (native.route) {
-          case 'clear': {
-            const { reset } = useAppStore.getState();
-            reset();
-            postToExtension({ type: 'clearSession' });
-            break;
-          }
-          case 'compact':
-            postToExtension({ type: 'compact' });
-            break;
-          case 'context':
-            useAppStore.getState().setContextWidgetVisible(true);
-            break;
-          case 'model':
-            postToExtension({ type: 'setModel', model: native.arg });
-            break;
-        }
+        applyNativeRoute(native);
         setText('');
         setCodexSteerArmed(false);
         undoMgr.reset();
@@ -674,7 +728,41 @@ export const InputArea: React.FC = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [text, pendingImages, isConnected, inputLockedByHandoff, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer, promptTranslateEnabled, autoTranslateEnabled, isTranslatingPrompt, setIsTranslatingPrompt, isCodexBusy, codexSteerArmed, logUiDebug, ultrathinkMode, isUsageLimitMode, scheduleMessageEnabled, scheduleMessageAtMs, setUltrathinkMode]);
+  }, [text, pendingImages, isConnected, inputLockedByHandoff, addToPromptHistory, pendingApproval, setPendingApproval, undoMgr, markSessionPromptSent, autoEnhanceEnabled, isEnhancing, setIsEnhancing, providerCapabilities.supportsPromptEnhancer, promptTranslateEnabled, autoTranslateEnabled, isTranslatingPrompt, setIsTranslatingPrompt, isCodexBusy, codexSteerArmed, logUiDebug, ultrathinkMode, isUsageLimitMode, scheduleMessageEnabled, scheduleMessageAtMs, setUltrathinkMode, applyNativeRoute]);
+
+  /**
+   * Run a slash command immediately, the way selecting one in the CLI does.
+   * Natively-implemented commands (clear/compact/context/model) fire their real
+   * ClaUi action; everything else is sent to the CLI verbatim as "/name". Slash
+   * commands intentionally bypass the enhance / translate / schedule / queue
+   * paths - they are actions, not prompts. Commands that need a value are never
+   * routed here (see slashCommandNeedsArg); they are inserted for the user to
+   * complete instead.
+   */
+  const runSlashCommand = useCallback((name: string, arg?: string) => {
+    if (!isConnected || inputLockedByHandoff) return;
+    const commandText = arg ? `/${name} ${arg}` : `/${name}`;
+    addToPromptHistory(commandText);
+    historyIndexRef.current = -1;
+    draftRef.current = '';
+
+    const native = resolveNativeRoute(commandText);
+    if (native) {
+      applyNativeRoute(native);
+    } else {
+      markSessionPromptSent();
+      postToExtension({ type: 'sendMessage', text: commandText });
+    }
+
+    // Clear any partially-typed slash token and reset the input UI.
+    setText('');
+    setCodexSteerArmed(false);
+    undoMgr.reset();
+    slash.dismiss();
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  }, [isConnected, inputLockedByHandoff, addToPromptHistory, markSessionPromptSent, undoMgr, slash, applyNativeRoute]);
 
   /** Cancel the in-flight request */
   const cancelRequest = useCallback(() => {
@@ -767,8 +855,31 @@ export const InputArea: React.FC = () => {
         }
         if ((e.key === 'Enter' && !e.ctrlKey && !e.metaKey) || e.key === 'Tab') {
           e.preventDefault();
+          // Argument stage: pick a value and run "/name value" (like the CLI).
+          if (slash.mode === 'arg') {
+            const picked = slash.confirmArg();
+            if (!picked) return;
+            const wholeInput = picked.text.trim() === `/${picked.name} ${picked.value}`;
+            if (wholeInput) runSlashCommand(picked.name, picked.value);
+            else applyMentionInsert({ text: picked.text, cursor: picked.cursor });
+            return;
+          }
+          const selected = slash.results[slash.selectedIndex];
+          if (selected?.unavailable) return; // greyed, not runnable here (popup stays open)
           const inserted = slash.confirmSelection();
-          if (inserted) applyMentionInsert(inserted);
+          if (!inserted) return;
+          // Enter runs the command (CLI-style) when it needs no value and is the
+          // whole input; Tab always just completes the token so args can be typed.
+          const isWholeInput = selected ? inserted.text.trim() === `/${selected.name}` : false;
+          if (e.key === 'Enter' && selected && !slashCommandNeedsArg(selected) && isWholeInput) {
+            runSlashCommand(selected.name);
+          } else {
+            applyMentionInsert(inserted);
+            // If the command takes selectable values, open the argument stage now.
+            if (selected && resolveArgOptions(selected)?.length) {
+              slash.handleTextChange(inserted.text, inserted.cursor);
+            }
+          }
           return;
         }
         if (e.key === 'Escape') {
@@ -900,7 +1011,7 @@ export const InputArea: React.FC = () => {
         }
       }
     },
-    [sendMessage, isBusy, cancelRequest, text, resizeTextarea, undoMgr, fileMention, slash, applyMentionInsert, handleEnhancePrompt, enhanceComparisonData, handleUseOriginal, providerCapabilities.supportsPromptEnhancer, providerCapabilities.supportsImages, logUiDebug, effectiveProvider]
+    [sendMessage, runSlashCommand, resolveArgOptions, isBusy, cancelRequest, text, resizeTextarea, undoMgr, fileMention, slash, applyMentionInsert, handleEnhancePrompt, enhanceComparisonData, handleUseOriginal, providerCapabilities.supportsPromptEnhancer, providerCapabilities.supportsImages, logUiDebug, effectiveProvider]
   );
 
   /** Auto-resize textarea to fit content, reset history browsing on manual edits */
@@ -1315,6 +1426,33 @@ export const InputArea: React.FC = () => {
     window.addEventListener('claui-insert-snippet', handler);
     return () => window.removeEventListener('claui-insert-snippet', handler);
   }, [undoMgr]);
+
+  // Slash command chosen in the full-list browser (rendered at the App root).
+  // Run it immediately, like the CLI, unless it needs a value to complete - in
+  // which case insert it (via the snippet listener above) so the user can type
+  // the argument, then Send.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const name = (e as CustomEvent<string>).detail;
+      if (typeof name !== 'string' || !name) return;
+      const cmd = ALL_SLASH_COMMANDS.find((c) => c.name === name);
+      if (cmd?.unavailable) return; // greyed, not runnable in the headless environment
+      if (cmd && slashCommandNeedsArg(cmd)) {
+        window.dispatchEvent(new CustomEvent('claui-insert-snippet', { detail: `/${name} ` }));
+        // Once the command is in the box, open the argument stage if it has values.
+        if (resolveArgOptions(cmd)?.length) {
+          requestAnimationFrame(() => {
+            const el = textareaRef.current;
+            if (el) slash.handleTextChange(el.value, el.selectionStart);
+          });
+        }
+      } else {
+        runSlashCommand(name);
+      }
+    };
+    window.addEventListener('claui-slash-command-selected', handler);
+    return () => window.removeEventListener('claui-slash-command-selected', handler);
+  }, [runSlashCommand, resolveArgOptions, slash]);
 
   // Listen for prompt enhancement results
   useEffect(() => {
@@ -1863,12 +2001,38 @@ export const InputArea: React.FC = () => {
         )}
         {slash.isOpen && (
           <SlashCommandPopup
+            mode={slash.mode}
             results={slash.results}
+            argResults={slash.argResults}
+            argCommand={slash.argCommand}
             selectedIndex={slash.selectedIndex}
             onSelect={(cmd) => {
+              if (cmd.unavailable) return; // greyed, not runnable in the headless environment
               const inserted = slash.selectCommand(cmd);
-              if (inserted) {
+              if (!inserted) return;
+              // Run on pick (like the CLI) when the command is the whole input
+              // and needs no value; otherwise insert it so the user can add its
+              // argument, preserving any other text already in the box.
+              const isWholeInput = inserted.text.trim() === `/${cmd.name}`;
+              if (!slashCommandNeedsArg(cmd) && isWholeInput) {
+                runSlashCommand(cmd.name);
+              } else {
                 applyMentionInsert(inserted);
+                textareaRef.current?.focus();
+                // If the command takes selectable values, open the argument stage.
+                if (resolveArgOptions(cmd)?.length) {
+                  slash.handleTextChange(inserted.text, inserted.cursor);
+                }
+              }
+            }}
+            onSelectArg={(opt) => {
+              const picked = slash.selectArg(opt);
+              if (!picked) return;
+              const wholeInput = picked.text.trim() === `/${picked.name} ${picked.value}`;
+              if (wholeInput) {
+                runSlashCommand(picked.name, picked.value);
+              } else {
+                applyMentionInsert({ text: picked.text, cursor: picked.cursor });
                 textareaRef.current?.focus();
               }
             }}

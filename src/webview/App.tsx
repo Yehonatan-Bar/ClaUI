@@ -591,7 +591,9 @@ const ChatAppContent: React.FC = () => {
       {slashBrowserOpen && (
         <SlashCommandBrowser
           onSelect={(name) => {
-            window.dispatchEvent(new CustomEvent('claui-insert-snippet', { detail: `/${name} ` }));
+            // InputArea decides run-vs-insert: it runs the command immediately,
+            // like the CLI, unless the command needs a value to complete.
+            window.dispatchEvent(new CustomEvent('claui-slash-command-selected', { detail: name }));
             setSlashBrowserOpen(false);
           }}
           onClose={() => setSlashBrowserOpen(false)}

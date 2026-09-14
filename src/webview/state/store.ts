@@ -106,6 +106,22 @@ export interface ChatMessage {
   synthetic?: boolean;
 }
 
+/**
+ * A visible marker in the chat showing that the CLI compacted the conversation
+ * context. `afterMessageId` anchors it just below the message that was last in
+ * the transcript when compaction happened (null = anchor at the current end,
+ * e.g. compacting an empty chat). A 'pending' marker shows a live "Compacting…"
+ * spinner for a manual /compact until the boundary event confirms it.
+ */
+export interface CompactBoundaryMarker {
+  id: string;
+  afterMessageId: string | null;
+  status: 'pending' | 'done';
+  trigger: 'manual' | 'auto' | 'unknown';
+  preTokens?: number;
+  timestamp: number;
+}
+
 export interface StreamingBlock {
   blockIndex: number;
   type: 'text' | 'tool_use';
@@ -232,6 +248,8 @@ export interface AppState {
   messages: ChatMessage[];
   streamingMessageId: string | null;
   streamingBlocks: StreamingBlock[];
+  /** Inline "context compacted" dividers (manual /compact + CLI auto-compact). */
+  compactBoundaries: CompactBoundaryMarker[];
 
   // Last assistant snapshot (authoritative content from the server)
   lastAssistantSnapshot: AssistantSnapshot | null;
@@ -844,6 +862,13 @@ export interface AppState {
   setCodexModelOptions: (options: CodexModelOption[]) => void;
   setPendingApproval: (approval: { toolName: string; planText: string } | null) => void;
   truncateFromMessage: (messageId: string) => void;
+  /** Add a live "Compacting context…" divider for a manual /compact. */
+  beginManualCompact: () => void;
+  /** Confirm compaction finished: resolve a pending manual marker, or add a
+   *  new done marker for an auto-compact that had no pending state. */
+  resolveCompactBoundary: (data: { trigger: 'manual' | 'auto' | 'unknown'; preTokens?: number }) => void;
+  /** Remove any lingering pending compact marker (safety net on timeout). */
+  dropPendingCompact: () => void;
   setToolActivity: (detail: string | null) => void;
   setThinkingEffort: (effort: string | null) => void;
   setActivitySummary: (summary: { shortLabel: string; fullSummary: string } | null) => void;
@@ -1263,6 +1288,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   handoffArtifactPath: null,
   handoffManualPrompt: null,
   messages: [],
+  compactBoundaries: [],
   streamingMessageId: null,
   streamingBlocks: [],
   lastAssistantSnapshot: null,
@@ -2329,6 +2355,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       const retainedTurns = state.turnHistory
         .filter((turn) => retainedAssistantIds.has(turn.messageId))
         .map((turn, turnIndex) => ({ ...turn, turnIndex }));
+      // Drop compact dividers whose anchor message was truncated away; keep
+      // null-anchored ones (they render at the end).
+      const retainedMessageIds = new Set(retainedMessages.map((m) => m.id));
+      const retainedBoundaries = state.compactBoundaries.filter(
+        (b) => b.afterMessageId === null || retainedMessageIds.has(b.afterMessageId)
+      );
       return {
         messages: retainedMessages,
         turnHistory: retainedTurns,
@@ -2336,6 +2368,56 @@ export const useAppStore = create<AppState>((set, get) => ({
         weather: calculateWeather(retainedTurns),
         checkpointState: null,
         checkpointResult: null,
+        compactBoundaries: retainedBoundaries,
+      };
+    }),
+
+  beginManualCompact: () =>
+    set((state) => {
+      // One pending marker at a time; avoid stacking spinners on double-send.
+      if (state.compactBoundaries.some((b) => b.status === 'pending')) return {};
+      const lastId = state.messages.length
+        ? state.messages[state.messages.length - 1].id
+        : null;
+      const marker: CompactBoundaryMarker = {
+        id: `compact-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        afterMessageId: lastId,
+        status: 'pending',
+        trigger: 'manual',
+        timestamp: Date.now(),
+      };
+      return { compactBoundaries: [...state.compactBoundaries, marker] };
+    }),
+
+  resolveCompactBoundary: ({ trigger, preTokens }) =>
+    set((state) => {
+      const pendingIdx = state.compactBoundaries.findIndex((b) => b.status === 'pending');
+      if (pendingIdx >= 0) {
+        const next = state.compactBoundaries.slice();
+        next[pendingIdx] = { ...next[pendingIdx], status: 'done', trigger, preTokens };
+        return { compactBoundaries: next };
+      }
+      // Auto-compact (or a manual one whose spinner already timed out): add a
+      // fresh done marker anchored at the current end of the transcript.
+      const lastId = state.messages.length
+        ? state.messages[state.messages.length - 1].id
+        : null;
+      const marker: CompactBoundaryMarker = {
+        id: `compact-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        afterMessageId: lastId,
+        status: 'done',
+        trigger,
+        preTokens,
+        timestamp: Date.now(),
+      };
+      return { compactBoundaries: [...state.compactBoundaries, marker] };
+    }),
+
+  dropPendingCompact: () =>
+    set((state) => {
+      if (!state.compactBoundaries.some((b) => b.status === 'pending')) return {};
+      return {
+        compactBoundaries: state.compactBoundaries.filter((b) => b.status !== 'pending'),
       };
     }),
 
@@ -3332,6 +3414,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       checkpointState: null,
       checkpointResult: null,
       messages: [],
+      compactBoundaries: [],
       streamingMessageId: null,
       streamingBlocks: [],
       lastAssistantSnapshot: null,

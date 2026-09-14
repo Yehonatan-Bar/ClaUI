@@ -6577,6 +6577,19 @@ export class MessageHandler {
     });
   }
 
+  /** Forward a CLI `system/compact_boundary` event to the webview so it can
+   *  render a visible "context compacted" divider. Covers both the manual
+   *  /compact control request and the CLI's automatic compaction. The
+   *  control_response reply carries no useful body, so this boundary event is
+   *  our only signal that compaction actually happened. */
+  handleCompactBoundary(meta?: { trigger?: string; pre_tokens?: number }): void {
+    const trigger =
+      meta?.trigger === 'manual' ? 'manual' : meta?.trigger === 'auto' ? 'auto' : 'unknown';
+    const preTokens = typeof meta?.pre_tokens === 'number' ? meta.pre_tokens : undefined;
+    this.log(`Compact boundary: trigger=${trigger} preTokens=${preTokens ?? '?'}`);
+    this.webview.postMessage({ type: 'compactBoundary', trigger, preTokens });
+  }
+
   handlePermissionRequest(req: PermissionRequestPayload): void {
     this.log(`[Permission] can_use_tool received: tool=${req.toolName} requestId=${req.requestId}`);
     this.pendingPermissionRequest = req;

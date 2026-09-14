@@ -1908,6 +1908,21 @@ export interface CompactSessionResultMessage {
   source?: 'ai' | 'heuristic';
 }
 
+/**
+ * The CLI finished compacting the conversation context (in-place summary),
+ * either from a manual `/compact` (compact control request) or the CLI's own
+ * automatic threshold trigger. Posted so the webview can render a visible
+ * "context compacted" divider in the chat. Distinct from CompactSessionResult
+ * (the token-saving handoff to a new tab).
+ */
+export interface CompactBoundaryMessage {
+  type: 'compactBoundary';
+  /** Why compaction ran: user-invoked, auto threshold, or unknown. */
+  trigger: 'manual' | 'auto' | 'unknown';
+  /** Context token count before the summary replaced it, when the CLI reports it. */
+  preTokens?: number;
+}
+
 export interface GitPushResultMessage {
   type: 'gitPushResult';
   success: boolean;
@@ -3236,6 +3251,7 @@ export type ExtensionToWebviewMessage =
   | ToolActivityMessage
   | PermissionModeSettingMessage
   | CompactSessionResultMessage
+  | CompactBoundaryMessage
   | GitPushResultMessage
   | GitPushSettingsMessage
   | WorktreeListMessage
