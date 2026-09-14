@@ -43,6 +43,7 @@ Run multiple Claude conversations in parallel, each isolated in its own VS Code 
 
 ### Smart Input
 
+- **Voice dictation (Hebrew-first)** -- click the microphone (or `Ctrl+Alt+M`) and speak; words appear at the caret live, sentences are finalized with punctuation, manual edits always win. Free local Chrome/Edge speech recognition, no API key. See [Voice Dictation](#voice-dictation)
 - **Image paste** -- paste images from clipboard with `Ctrl+V`; thumbnails preview above the input
 - **@file mentions** -- type `@` to trigger workspace file search with autocomplete; navigate with arrows, select with Enter/Tab
 - **Prompt history** -- 3-tier history panel (Session / Project / Global) with search; cycle through recent prompts with Arrow Up/Down
@@ -109,6 +110,26 @@ A full-screen dashboard with three modes, opened from the "Dashboard" button in 
 - **Markdown rendering** -- full GFM support with syntax-highlighted code blocks, copy button, collapse toggle, and clickable file paths
 
 ---
+
+## Voice Dictation
+
+![Voice dictation demo](images/voice-dictation.gif)
+
+Click the microphone in the composer (or press `Ctrl+Alt+M`) and talk. Words appear at the caret while you speak; each finished sentence is finalized in place with punctuation. Delete a word, keep talking: dictation continues from your caret and never restores what you removed. Click **Stop** (or the microphone again) when you are done. The text stays in the composer, ready to send.
+
+- **Hebrew first.** `claudeMirror.voice.language` defaults to `he-IL`. Say "נקודה", "פסיק", "סימן שאלה" or "שורה חדשה" for punctuation; questions get `?` automatically, statements get `.`. English gets the same treatment ("period", "comma", "question mark"). Turn the automatic marks off with `claudeMirror.voice.autoPunctuation`.
+- **Free and local.** Recognition runs in a tiny always-on-top Chrome/Edge window that talks to VS Code over `127.0.0.1`. No API key, nothing is stored, the window keeps the microphone permission and closes itself when VS Code is gone. Google Chrome or Microsoft Edge must be installed (`claudeMirror.voice.browserPath` overrides auto-detection).
+- **One session at a time.** Dictation is bound to the tab that started it; starting it in another tab hands the microphone over.
+
+<details>
+<summary>הכתבה קולית — בעברית</summary>
+
+לוחצים על המיקרופון במלחין (או `Ctrl+Alt+M`) ומדברים. המילים מופיעות בנקודת הסמן תוך כדי דיבור, וכל משפט שהסתיים נסגר במקום עם פיסוק. מחקתם מילה? ההכתבה ממשיכה מהסמן ולא מחזירה מה שנמחק. "עצור" מסיים, והטקסט נשאר בשדה מוכן לשליחה.
+
+- ברירת המחדל היא עברית. אומרים "נקודה", "פסיק", "סימן שאלה" או "שורה חדשה" לפיסוק; שאלות מקבלות `?` אוטומטית ומשפטים רגילים `.`.
+- חינם ומקומי: התמלול רץ בחלון Chrome/Edge קטן שמדבר עם VS Code דרך `127.0.0.1`. בלי מפתח API, כלום לא נשמר.
+
+</details>
 
 ## Getting Started
 

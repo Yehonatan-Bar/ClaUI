@@ -631,6 +631,17 @@ export function registerCommands(
       }
     }),
 
+    // Toggle voice dictation in the ACTIVE tab (the webview owns the UI state)
+    vscode.commands.registerCommand('claudeMirror.toggleVoice', () => {
+      const tab = tabManager.getActiveTab();
+      if (!tab || tab instanceof MultiParticipantSessionTab) {
+        vscode.window.showWarningMessage('Open a ClaUi chat tab to use voice dictation.');
+        return;
+      }
+      tab.reveal();
+      tab.postMessage({ type: 'voiceToggle' });
+    }),
+
     // Send a message to the ACTIVE tab via the CLI control protocol
     vscode.commands.registerCommand('claudeMirror.sendMessage', async () => {
       const tab = tabManager.getActiveTab();

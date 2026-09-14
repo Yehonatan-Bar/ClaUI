@@ -291,6 +291,11 @@
         "command": "claudeMirror.tabs.openLayoutMenu",
         "title": "ClaUi: Tab Layout Settings",
         "icon": "$(gear)"
+      },
+      {
+        "command": "claudeMirror.toggleVoice",
+        "title": "ClaUi: Toggle Voice Dictation",
+        "category": "ClaUi"
       }
     ],
     "configuration": {
@@ -1428,6 +1433,48 @@
           "default": false,
           "scope": "application",
           "description": "Enable experimental entropy-based secret detection. Uses Shannon entropy on sliding windows to catch high-randomness strings that may be secrets. May produce false positives."
+        },
+        "claudeMirror.voice.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Voice dictation: show the microphone button in the chat composer (free, local Chrome/Edge speech recognition; no API key)."
+        },
+        "claudeMirror.voice.language": {
+          "type": "string",
+          "default": "he-IL",
+          "enum": [
+            "he-IL",
+            "en-US",
+            "en-GB",
+            "es-ES",
+            "fr-FR",
+            "de-DE",
+            "ru-RU",
+            "ar-SA",
+            "pt-BR"
+          ],
+          "enumDescriptions": [
+            "Hebrew",
+            "English (US)",
+            "English (UK)",
+            "Spanish",
+            "French",
+            "German",
+            "Russian",
+            "Arabic",
+            "Portuguese (Brazil)"
+          ],
+          "description": "Voice dictation language. Hebrew is the default and gets automatic punctuation (spoken \"נקודה\", \"פסיק\", \"סימן שאלה\" and question detection)."
+        },
+        "claudeMirror.voice.autoPunctuation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Voice dictation: end each finalized sentence with \".\" or \"?\" automatically. Spoken punctuation words always apply."
+        },
+        "claudeMirror.voice.browserPath": {
+          "type": "string",
+          "default": "",
+          "description": "Voice dictation: explicit path to a Chrome/Edge executable. Leave empty to auto-detect."
         }
       }
     },
@@ -1502,6 +1549,11 @@
         "command": "claudeMirror.toggleTeamPanel",
         "key": "ctrl+alt+t",
         "mac": "cmd+alt+t"
+      },
+      {
+        "command": "claudeMirror.toggleVoice",
+        "key": "ctrl+alt+m",
+        "mac": "cmd+alt+m"
       }
     ],
     "menus": {
@@ -1677,7 +1729,8 @@
     "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1",
     "git:push": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-push.ps1",
     "demo:secret-protection": "tsx tests/secret-protection-demo/run-demo-test.ts",
-    "demo:secret-protection:report": "tsx tests/secret-protection-demo/generate-html-report.ts"
+    "demo:secret-protection:report": "tsx tests/secret-protection-demo/generate-html-report.ts",
+    "test:voice": "node --import tsx --test tests/voice/punctuation.test.ts tests/voice/voiceInsert.test.ts"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",

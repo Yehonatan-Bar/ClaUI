@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ClaUi Voice</title>
+  <style>
+    html, body { margin: 0; padding: 0; background: #111; color: #ddd; font: 13px/1.4 'Segoe UI', sans-serif; }
+    body { display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+    #s { font-size: 22px; }
+    body.on #s { filter: drop-shadow(0 0 6px #e74c3c); }
+  </style>
+</head>
+<body>
+  <div id="s">🎤</div>
+  <script>
+    // ClaUi voice capture window.
+    // The only job of this page is to run the browser's Web Speech API and stream
+    // utterance-level events (interim / final) to the ClaUi extension host, which
+    // serves this page on localhost. Every event carries the session id it belongs to.
+    var el = document.getElementById('s');
+    var params = new URLSearchParams(location.search);
+    var VERSION = params.get('v') || '';
+    var lang = 'he-IL';
+    var session = 0;
+    var wantOn = false;
+    var rec = null;
+    var recGen = 0;
+    var emittedFinals = 0;
+    var lastInterim = '';
+    var stream = null;
+    var audioCtx = null;
+    var analyser = null;
+    var levelTimer = 0;
+    var lastServerOk = Date.now();
+
+    function show(t) { el.textContent = t; }
+
+    function post(path, body) {
+      return fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+      }).then(function (r) { lastServerOk = Date.now(); return r; }).catch(function () { return null; });
+    }
+
+    function sendInterim(text) {
+      if (text === lastInterim) return;
+      lastInterim = text;
+      post('/transcript', { session: session, kind: 'interim', text: text });
+    }
+
+    function sendFinal(text) {
+      lastInterim = '';
+      text = (text || '').trim();
+      if (!text) return;
+      post('/transcript', { session: session, kind: 'final', text: text });
+    }
+
+    async function ensureMic() {
+      if (stream && stream.getTracks().some(function (t) { return t.readyState === 'live'; })) return stream;
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 }
+      });
+      return stream;
+    }
+
+    function releaseMic() {
+      if (levelTimer) { clearInterval(levelTimer); levelTimer = 0; }
+      if (audioCtx) { try { audioCtx.close(); } catch (e) {} audioCtx = null; analyser = null; }
+      if (stream) { stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} }); stream = null; }
+    }
+
+    async function startLevels() {
+      var mic = await ensureMic();
+      if (audioCtx) { try { await audioCtx.close(); } catch (e) {} }
+      audioCtx = new AudioContext();
+      var src = audioCtx.createMediaStreamSource(mic);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      src.connect(analyser);
+      var buf = new Uint8Array(analyser.fftSize);
+      levelTimer = setInterval(function () {
+        if (!wantOn || !analyser) return;
+        analyser.getByteTimeDomainData(buf);
+        var s = 0;
+        for (var i = 0; i < buf.length; i++) { var v = (buf[i] - 128) / 128; s += v * v; }
+        post('/level', { session: session, level: Math.min(1, Math.sqrt(s / buf.length) * 4) });
+      }, 100);
+    }
+
+    function destroyRecognizer() {
+      if (!rec) return;
+      var r = rec;
+      rec = null;
+      recGen++;
+      r.onresult = null; r.onend = null; r.onerror = null;
+      try { r.abort(); } catch (e) {}
+    }
+
+    function startRecognizer() {
+      var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
+        post('/status', { status: 'error', session: session, text: 'This browser has no speech recognition; use Chrome or Edge' });
+        return;
+      }
+      destroyRecognizer();
+      var gen = ++recGen;
+      var r = new SR();
+      rec = r;
+      emittedFinals = 0;
+      lastInterim = '';
+      r.lang = lang;
+      r.interimResults = true;
+      r.continuous = true;
+      r.maxAlternatives = 1;
+      r.onresult = function (e) {
+        if (gen !== recGen || !wantOn) return;
+        var i = emittedFinals;
+        // Finals are appended in order and never change: emit each new final exactly once.
+        while (i < e.results.length && e.results[i].isFinal) {
+          sendFinal(e.results[i][0].transcript);
+          i++;
+        }
+        emittedFinals = i;
+        var inter = '';
+        for (var j = i; j < e.results.length; j++) inter += e.results[j][0].transcript;
+        sendInterim(inter.trim());
+      };
+      r.onend = function () {
+        if (gen !== recGen || !wantOn) return;
+        // The recognizer ended on its own (silence / timeout): flush and restart.
+        if (lastInterim) sendFinal(lastInterim);
+        setTimeout(function () { if (wantOn && gen === recGen) startRecognizer(); }, 100);
+      };
+      r.onerror = function (e) {
+        if (gen !== recGen) return;
+        if (e.error === 'aborted' || e.error === 'no-speech') return;
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          post('/status', { status: 'need-permission', session: session, text: e.error });
+          return;
+        }
+        if (e.error === 'network') {
+          post('/status', { status: 'error', session: session, code: 'network', text: 'Speech service unreachable (network)' });
+          return;
+        }
+        post('/status', { status: 'error', session: session, text: 'Speech recognition error: ' + e.error });
+      };
+      try { r.start(); } catch (e) {
+        post('/status', { status: 'error', session: session, text: 'Could not start speech recognition' });
+      }
+    }
+
+    async function start(nextSession, nextLang) {
+      nextSession = Number(nextSession) || 0;
+      if (!nextSession) return;
+      if (wantOn && nextSession === session && (!nextLang || nextLang === lang)) return;
+      if (nextLang) lang = nextLang;
+      session = nextSession;
+      wantOn = true;
+      document.body.classList.add('on');
+      try {
+        await startLevels();
+      } catch (err) {
+        wantOn = false;
+        document.body.classList.remove('on');
+        show('Allow');
+        post('/status', { status: 'need-permission', session: session, text: err && err.message });
+        return;
+      }
+      startRecognizer();
+      post('/status', { status: 'listening', session: session });
+    }
+
+    function stop() {
+      if (!wantOn && !rec) return;
+      var s = session;
+      wantOn = false;
+      // Flush the words still on screen so nothing said before "stop" is lost.
+      if (lastInterim) post('/transcript', { session: s, kind: 'final', text: lastInterim });
+      lastInterim = '';
+      destroyRecognizer();
+      releaseMic();
+      document.body.classList.remove('on');
+      post('/status', { status: 'stopped', session: s });
+    }
+
+    function connect() {
+      var sse = new EventSource('/events');
+      sse.onmessage = function (ev) {
+        lastServerOk = Date.now();
+        var msg;
+        try { msg = JSON.parse(ev.data); } catch (e) { return; }
+        if (!msg) return;
+        if (msg.type === 'state') {
+          if (msg.version && VERSION && msg.version !== VERSION) { location.replace('/capture?v=' + encodeURIComponent(msg.version)); return; }
+          if (msg.listening && msg.session) start(msg.session, msg.lang);
+          else stop();
+          return;
+        }
+        if (msg.type === 'command') {
+          if (msg.command === 'start') start(msg.session, msg.lang);
+          if (msg.command === 'stop') stop();
+        }
+      };
+    }
+
+    // The extension host is gone (VS Code closed or reloaded onto a new port): close this window.
+    setInterval(function () {
+      fetch('/ping', { cache: 'no-store' }).then(function () { lastServerOk = Date.now(); }).catch(function () {});
+      if (Date.now() - lastServerOk > 20000) { try { window.close(); } catch (e) {} }
+    }, 4000);
+
+    (async function () {
+      connect();
+      try {
+        await ensureMic();
+        releaseMic();
+        show('🎤');
+        post('/status', { status: 'ready', version: VERSION });
+      } catch (err) {
+        show('Allow');
+        post('/status', { status: 'need-permission', text: err && err.message });
+      }
+    })();
+  </script>
+</body>
+</html>

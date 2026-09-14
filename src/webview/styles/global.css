@@ -11549,3 +11549,121 @@ html, body, #root {
   color: var(--vscode-descriptionForeground, #9aa0a6);
   font-size: 13px;
 }
+
+/* ---------- Voice dictation ---------- */
+.voice-mic-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 6px;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+}
+
+.voice-mic-button:hover:not(:disabled) {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-textLink-foreground);
+  border-color: var(--vscode-focusBorder);
+}
+
+.voice-mic-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.voice-mic-button.active {
+  color: #fff;
+  background: #c0392b;
+  border-color: #c0392b;
+  animation: voice-pulse 1.4s ease-out infinite;
+}
+
+@keyframes voice-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.55); }
+  70% { box-shadow: 0 0 0 10px rgba(192, 57, 43, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0); }
+}
+
+.voice-hud {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 8px;
+  background: var(--vscode-editorWidget-background, rgba(0, 0, 0, 0.25));
+}
+
+.voice-hud.error {
+  border-color: var(--vscode-inputValidation-errorBorder, #be1100);
+}
+
+.voice-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e74c3c;
+  flex: 0 0 8px;
+  animation: voice-blink 1s infinite;
+}
+
+.voice-hud.error .voice-dot {
+  animation: none;
+  background: var(--vscode-inputValidation-errorBorder, #be1100);
+}
+
+@keyframes voice-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+.voice-label {
+  font-size: 12px;
+  color: var(--vscode-foreground);
+  white-space: nowrap;
+}
+
+.voice-live {
+  flex: 1;
+  min-width: 60px;
+  font-size: 12px;
+  color: var(--vscode-foreground);
+  opacity: 0.85;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.voice-wave {
+  flex: 0 0 140px;
+  width: 140px;
+  height: 24px;
+}
+
+.voice-stop {
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 6px;
+  background: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.voice-stop:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-mic-button.active,
+  .voice-dot {
+    animation: none;
+  }
+}

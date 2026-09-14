@@ -1,5 +1,20 @@
 # ClaUi - Changelog
 
+## Unreleased - 2026-09-14
+
+**Feature: Voice dictation (Hebrew-first) -- speak into the chat composer, free, no API key**
+
+- A microphone button in the composer (and `Ctrl+Alt+M` / `ClaUi: Toggle Voice Dictation`) starts live dictation: words appear at the caret while you speak, and every finished sentence is finalized in place with punctuation
+- **Hebrew is the default** (`claudeMirror.voice.language`, `he-IL`): spoken "נקודה", "פסיק", "סימן שאלה", "שורה חדשה" become symbols, questions (האם/מה/למה/איך… or a trailing הבנת/נכון) get `?`, statements get `.`; niqqud is stripped. English has the same treatment ("period", "comma", "question mark", question words). Other languages get spoken-punctuation-free plain text
+- **The composer stays the source of truth**: dictation owns a single caret-anchored range -- interim results replace it, a final closes it, and any manual edit collapses it to the caret. Deleted words never come back; Ctrl+Z undoes one finalized sentence at a time
+- **Free and local**: recognition runs in a tiny always-on-top Chrome/Edge app window (VS Code webviews cannot open the microphone) that talks to the extension host over `127.0.0.1` on an ephemeral port. No cloud API key, nothing stored; the window keeps the mic permission and closes itself when VS Code is gone
+- One dictation session at a time, bound to the tab that started it: text goes only to that composer, a second tab takes the microphone over cleanly, the last words said before "Stop" are still delivered
+- Recording HUD above the composer: live words, waveform from the real mic level, Stop button, clear errors (no browser found, microphone blocked, speech service unreachable)
+- Settings: `claudeMirror.voice.enabled`, `claudeMirror.voice.language`, `claudeMirror.voice.autoPunctuation`, `claudeMirror.voice.browserPath`
+- Unit tests: `npm run test:voice` (punctuation rules, caret-anchored insertion)
+
+---
+
 ## Unreleased - 2026-07-10
 
 **Improvement: current OpenAI Codex model lineup**
