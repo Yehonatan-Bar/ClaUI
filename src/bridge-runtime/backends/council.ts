@@ -548,7 +548,7 @@ export class CouncilBackend {
           'members via Tools -> Council settings — install Claude Code / the Codex or Grok CLI, ' +
           'or add OpenAI-compatible providers (GPT / Gemini / Claude API).\n',
       );
-      this.persistTurn(question, transcript);
+      this.persistTurn(prompt, question, transcript);
       return transcript;
     }
 
@@ -559,7 +559,7 @@ export class CouncilBackend {
         '\nCould not create a private temporary working directory for the council members; ' +
           'the turn was aborted. Check that the system temp directory is writable.\n',
       );
-      this.persistTurn(question, transcript);
+      this.persistTurn(prompt, question, transcript);
       return transcript;
     }
     const results = new Map<CouncilMember, MemberResult>();
@@ -581,20 +581,20 @@ export class CouncilBackend {
 
       if (successes.length === 0) {
         emit('\n---\nNo council member produced an answer.\n');
-        this.persistTurn(question, transcript);
+        this.persistTurn(prompt, question, transcript);
         return transcript;
       }
       if (successes.length === 1) {
         emit(
           `\n---\n> Degraded: 1 of ${available.length} members answered; showing it without synthesis.\n`,
         );
-        this.persistTurn(question, transcript);
+        this.persistTurn(prompt, question, transcript);
         return transcript;
       }
 
       await this.runChair(gen, emit, roster, available, successes, results, question, timeout, tmpCwd);
       if (this.isStale(gen)) return transcript;
-      this.persistTurn(question, transcript);
+      this.persistTurn(prompt, question, transcript);
       return transcript;
     } finally {
       // Defer temp-dir removal until this turn's CLI children have closed (a
@@ -659,14 +659,16 @@ export class CouncilBackend {
 
   /** Persist for resume-safety. v1 councils are independent per turn (members
    *  do not see prior turns), so history is stored only so a resumed tab keeps
-   *  its transcript + council identity. */
-  private persistTurn(question: string, transcript: string): void {
+   *  its transcript + council identity. `prompt.persistAs`, when set, is what
+   *  gets stored for the user turn instead of the (possibly macro-expanded)
+   *  `question` actually fanned out to members this turn. */
+  private persistTurn(prompt: BridgePrompt, question: string, transcript: string): void {
     this.store.write(this.sessionId, {
       backend: 'council',
       model: 'council',
       councilChair: this.chairToken,
     });
-    this.store.appendHistory(this.sessionId, 'user', question);
+    this.store.appendHistory(this.sessionId, 'user', prompt.persistAs ?? question);
     this.store.appendHistory(this.sessionId, 'assistant', transcript);
   }
 }
@@ -881,6 +883,14 @@ export function invokeCodexCouncil(
  * `--output-format json` emits a single JSON object whose `result` holds the
  * answer text; `is_error` marks a failed turn. Prompt is written on stdin.
  */
+/** Bound on captured stdout for a single claude -p invocation — a legitimate
+ *  --output-format json response is nowhere near this size; the cap exists
+ *  purely to stop unbounded memory growth from a misbehaving process, not to
+ *  serve as the "how much is useful" limit (callers truncate for their own
+ *  purposes on top of this). Crossing it kills the child and rejects rather
+ *  than silently returning truncated/partial JSON as if it were complete. */
+const CLAUDE_MAX_STDOUT_BYTES = 4 * 1024 * 1024;
+
 export function invokeClaudeCouncil(
   cliPath: string,
   model: string,
@@ -891,6 +901,11 @@ export function invokeClaudeCouncil(
   log: (msg: string) => void,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new Error('aborted'));
+      return;
+    }
+
     const args = [
       '-p',
       '--output-format',
@@ -901,6 +916,7 @@ export function invokeClaudeCouncil(
       '--strict-mcp-config',
       '--mcp-config',
       '{"mcpServers":{}}',
+      '--no-session-persistence',
     ];
     if (model) args.push('--model', model);
 
@@ -915,6 +931,8 @@ export function invokeClaudeCouncil(
 
     let settled = false;
     let stdout = '';
+    let stdoutBytes = 0;
+    let oversized = false;
 
     const onAbort = (): void => killTreeAsync(child);
     if (signal.aborted) killTreeAsync(child);
@@ -928,6 +946,14 @@ export function invokeClaudeCouncil(
     };
 
     child.stdout?.on('data', (chunk: Buffer) => {
+      if (oversized) return;
+      stdoutBytes += chunk.length;
+      if (stdoutBytes > CLAUDE_MAX_STDOUT_BYTES) {
+        oversized = true;
+        killTreeAsync(child);
+        done(() => reject(new Error(`Claude CLI output exceeded ${CLAUDE_MAX_STDOUT_BYTES} bytes`)));
+        return;
+      }
       stdout += chunk.toString('utf-8');
     });
     child.stderr?.on('data', (d: Buffer) => log(`council claude stderr: ${d.toString('utf-8').slice(0, 300)}`));

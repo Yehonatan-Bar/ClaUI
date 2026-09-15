@@ -55,7 +55,12 @@ $requiredManifestEntries = @(
   "claudeMirror.bridge.council.enabled",
   "claudeMirror.bridge.council.members",
   "claudeMirror.bridge.council.chair",
-  "claudeMirror.bridge.council.timeoutMs"
+  "claudeMirror.bridge.council.timeoutMs",
+  # Bridge command-tools settings (run /code-review etc. inside bridge tabs)
+  "claudeMirror.bridge.commandTools.enabled",
+  "claudeMirror.bridge.commandTools.strategy",
+  "claudeMirror.bridge.commandTools.offload",
+  "claudeMirror.bridge.commandTools.diffBase"
 )
 
 foreach ($entry in $requiredManifestEntries) {
@@ -82,7 +87,13 @@ $requiredBundleSymbols = @(
   "OPEN_SESSION",
   # What's New: internal resync command + the banner state message type
   "claudeMirror.whatsNew.resync",
-  "whatsNewState"
+  "whatsNewState",
+  # Bridge command-tools: proves the settings-mirroring code (BridgeProviderService
+  # .syncConfigFile) shipped in the bundle, not just that the manifest declares it.
+  "bridge.commandTools.enabled",
+  "bridge.commandTools.strategy",
+  "bridge.commandTools.offload",
+  "bridge.commandTools.diffBase"
 )
 
 foreach ($symbol in $requiredBundleSymbols) {
@@ -107,9 +118,24 @@ if (-not (Test-Path $bridgeRuntimePath)) {
 # "CouncilBackend" is the backend class; "## Council" is the runtime-emitted
 # convening header (a code string literal, not just a comment) — both are robust
 # to a comment edit and prove the council code shipped in the bundle.
-foreach ($marker in @("CouncilBackend", "## Council")) {
+# "claui-commands" is the MCP server name Grok registers via mcpServers() —
+# proves the Layer B wiring (registering the command-tools MCP server with
+# Grok's ACP session) shipped, not just the command server itself.
+foreach ($marker in @("CouncilBackend", "## Council", "claui-commands")) {
   if (-not (Select-String -Path $bridgeRuntimePath -Pattern $marker -SimpleMatch -Quiet)) {
-    throw "Installed bridge runtime is missing the model-council marker: $marker"
+    throw "Installed bridge runtime is missing expected marker: $marker"
+  }
+}
+
+# Bridge command-tools MCP server (Layer B — exposes /code-review etc. as
+# tools for Grok) is a separate webpack entry; must be packaged alongside cli.js.
+$commandServerPath = Join-Path $installed.FullName "dist\bridge-runtime\mcp\command-server.js"
+if (-not (Test-Path $commandServerPath)) {
+  throw "Installed bridge command-tools MCP server not found: $commandServerPath"
+}
+foreach ($marker in @("claui_code_review", "notifications/initialized")) {
+  if (-not (Select-String -Path $commandServerPath -Pattern $marker -SimpleMatch -Quiet)) {
+    throw "Installed command-server.js is missing expected marker: $marker"
   }
 }
 

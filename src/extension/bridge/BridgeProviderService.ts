@@ -255,6 +255,12 @@ export class BridgeProviderService {
           chair: cfg.get<string>('bridge.council.chair', ''),
           timeoutMs: cfg.get<number>('bridge.council.timeoutMs', 240000),
         },
+        commandTools: {
+          enabled: cfg.get<boolean>('bridge.commandTools.enabled', true),
+          strategy: cfg.get<string>('bridge.commandTools.strategy', 'auto'),
+          offload: cfg.get<boolean>('bridge.commandTools.offload', false),
+          diffBase: cfg.get<string>('bridge.commandTools.diffBase', 'main'),
+        },
         storageDir,
         permissionMode: cfg.get<string>('permissionMode', 'full-access'),
       };

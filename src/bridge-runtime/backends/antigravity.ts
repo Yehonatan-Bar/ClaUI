@@ -209,7 +209,7 @@ export class AntigravityBackend {
     }
 
     this.store.write(this.sessionId, { backend: 'antigravity', model: this.model });
-    this.store.appendHistory(this.sessionId, 'user', userText);
+    this.store.appendHistory(this.sessionId, 'user', prompt.persistAs ?? userText);
     this.store.appendHistory(this.sessionId, 'assistant', answer);
 
     emitter.append('text', answer);

@@ -56,15 +56,15 @@ function makeBackend(port: number): { backend: OpenAiCompatBackend; cleanup: () 
 }
 
 async function runQuietly(backend: OpenAiCompatBackend, prompt: BridgePrompt): Promise<string> {
-  // StreamEmitter writes stream-json to real stdout; silence it so it doesn't
-  // interleave with the test runner's TAP output.
-  const orig = process.stdout.write.bind(process.stdout);
-  (process.stdout as unknown as { write: () => boolean }).write = () => true;
-  try {
-    return await backend.runTurn(prompt, new StreamEmitter('sid', 'm'));
-  } finally {
-    (process.stdout as unknown as { write: typeof orig }).write = orig;
-  }
+  // StreamEmitter.out() writes stream-json to real stdout; silence THIS
+  // emitter instance instead of monkey-patching the global
+  // process.stdout.write — the global patch races with node:test's own TAP
+  // reporter (which also writes to process.stdout), and depending on timing
+  // can silently swallow every subsequent test's "ok N" line for the rest of
+  // the file. (Same instance-scoped pattern already used by council.test.ts.)
+  const emitter = new StreamEmitter('sid', 'm');
+  (emitter as unknown as { out: (obj: unknown) => void }).out = () => {};
+  return backend.runTurn(prompt, emitter);
 }
 
 test('OpenAI backend: streams SSE deltas into the full answer', async () => {
@@ -116,6 +116,41 @@ test('OpenAI backend: images are forwarded as image_url parts', async () => {
   assert.equal(imagePart.image_url.url, 'data:image/png;base64,AAAA');
   cleanup();
   await server.close();
+});
+
+test('OpenAI backend: persistAs overrides stored history while the model still sees the full prompt text', async () => {
+  const server = await startServer((res) => {
+    res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    res.write('data: {"choices":[{"delta":{"content":"ok"}}]}\n\n');
+    res.write('data: [DONE]\n\n');
+    res.end();
+  });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-openai-persist-'));
+  try {
+    const store = new SessionStore(dir);
+    const backend = new OpenAiCompatBackend(
+      { id: 'test', baseUrl: `http://127.0.0.1:${server.port}/v1`, models: ['m'] },
+      'm',
+      'sid',
+      store,
+      '',
+    );
+    await runQuietly(backend, { text: 'EXPANDED PACKET TEXT', images: [], persistAs: '/code-review' });
+
+    const body = server.lastBody();
+    const userMsg = body.messages[body.messages.length - 1];
+    assert.equal(userMsg.content, 'EXPANDED PACKET TEXT'); // this turn's request uses the expanded text
+
+    // History is [user, assistant] for this fresh session — the user entry
+    // (index 0) must be the terse persisted command, not the expanded packet.
+    const state = store.read('sid');
+    assert.equal(state?.history?.[0]?.role, 'user');
+    assert.equal(state?.history?.[0]?.content, '/code-review');
+    assert.equal(state?.history?.[1]?.role, 'assistant');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    await server.close();
+  }
 });
 
 test('OpenAI backend: surfaces a clear error on HTTP failure', async () => {

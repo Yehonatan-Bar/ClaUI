@@ -67,6 +67,7 @@ module.exports = [
     mode: 'none',
     entry: {
       'cli': './src/bridge-runtime/cli.ts',
+      'mcp/command-server': './src/bridge-runtime/mcp/commandMcpServer.ts',
     },
     output: {
       path: path.resolve(__dirname, 'dist', 'bridge-runtime'),

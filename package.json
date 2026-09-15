@@ -494,6 +494,32 @@
           "maximum": 600000,
           "description": "Bridge Providers: per-member (and per-chair) council timeout in milliseconds. Clamped to 15000-600000. Worst-case turn is about 2x this value (members, then chair)."
         },
+        "claudeMirror.bridge.commandTools.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Bridge Providers: let engine slash commands (`/code-review`, `/security-review`, `/simplify`) actually run inside bridge tabs (Grok, Antigravity, OpenAI-compatible, Council) instead of being forwarded to the backend as plain text."
+        },
+        "claudeMirror.bridge.commandTools.strategy": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "macro",
+            "tool",
+            "offload"
+          ],
+          "default": "auto",
+          "markdownDescription": "Bridge Providers: how a command-tools-enabled backend runs an engine slash command. `auto` uses a tool call on tool-capable backends (currently Grok) and a text macro elsewhere. `macro` always rewrites the prompt with a rubric + local diff. `tool` forces the MCP-tool path (falls back to `macro` if the backend isn't tool-capable). `offload` runs the real Claude Code CLI (requires `claudeMirror.bridge.commandTools.offload`)."
+        },
+        "claudeMirror.bridge.commandTools.offload": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Bridge Providers: allow command tools to offload to a real `claude` CLI running headless in the project directory for higher-fidelity results. Off by default (runs a second engine per command)."
+        },
+        "claudeMirror.bridge.commandTools.diffBase": {
+          "type": "string",
+          "default": "main",
+          "markdownDescription": "Bridge Providers: base branch/ref used by branch-scoped command tools to compute `git diff <base>...HEAD`."
+        },
         "claudeMirror.handoff.enabled": {
           "type": "boolean",
           "default": true,
@@ -1943,7 +1969,7 @@
     "test:usage-limit": "node --import tsx --test tests/process/usageLimitParser.test.ts",
     "test:codex-models": "node --import tsx --test tests/process/codexModelCache.test.ts tests/unit/codexModels.test.ts",
     "test:tabs": "node --import tsx --test tests/tabs/navigationOrder.test.ts tests/tabs/navTree.test.ts",
-    "test:bridge": "node --import tsx --test tests/bridge/config.test.ts tests/bridge/protocol.test.ts tests/bridge/sessionStore.test.ts tests/bridge/grokPermissions.test.ts tests/bridge/procUtils.test.ts tests/bridge/openaiCompat.test.ts tests/bridge/council.test.ts",
+    "test:bridge": "node --import tsx --test tests/bridge/config.test.ts tests/bridge/protocol.test.ts tests/bridge/sessionStore.test.ts tests/bridge/grokPermissions.test.ts tests/bridge/procUtils.test.ts tests/bridge/openaiCompat.test.ts tests/bridge/council.test.ts tests/bridge/commandCatalog.test.ts tests/bridge/contextProviders.test.ts tests/bridge/packetBuilder.test.ts tests/bridge/dispatcher.test.ts tests/bridge/commandMcpServer.test.ts tests/bridge/grokCommandTools.test.ts tests/bridge/offload.test.ts",
     "test:hibernation": "node --import tsx --test tests/hibernation/hibernationPlanner.test.ts",
     "test:whats-new": "node --import tsx --test tests/unit/whatsNewLogic.test.ts tests/unit/whatsNewCore.test.ts tests/unit/whatsNewReceipt.test.ts",
     "verify:installed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installed.ps1",

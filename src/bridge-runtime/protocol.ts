@@ -234,6 +234,11 @@ export interface BridgeImage {
 export interface BridgePrompt {
   text: string;
   images: BridgeImage[];
+  /** When set, backends persist THIS as the stored user turn instead of
+   *  `text` (command macros: the model sees an expanded rubric+diff packet
+   *  this turn, but stored/replayed history keeps the terse original command
+   *  so it isn't re-sent — or shown — forever). */
+  persistAs?: string;
 }
 
 export interface StdinHandlers {

@@ -42,6 +42,21 @@ export interface BridgeConfig {
   storageDir?: string;
   /** ClaUi permission mode at spawn time ('full-access' | 'supervised'). */
   permissionMode?: string;
+  /** Bridge command-tools (see src/bridge-runtime/commands/): lets
+   *  /code-review, /security-review, /simplify actually run inside bridge
+   *  tabs instead of being forwarded to the backend as inert text. */
+  commandTools?: {
+    /** Master switch. Default true. */
+    enabled?: boolean;
+    /** 'auto' prefers a tool-capable backend's MCP tool, else falls back to
+     *  a macro rewrite. 'macro'/'tool'/'offload' force that strategy. */
+    strategy?: 'auto' | 'macro' | 'tool' | 'offload';
+    /** Allow Layer C (running the real claude/codex CLI as a co-processor).
+     *  Default false. */
+    offload?: boolean;
+    /** Base ref for branch-scoped commands. Default 'main'. */
+    diffBase?: string;
+  };
 }
 
 export const CLAUI_HOME = path.join(os.homedir(), '.claui');

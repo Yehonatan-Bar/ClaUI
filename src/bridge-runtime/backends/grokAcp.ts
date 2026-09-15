@@ -1,6 +1,7 @@
 import { ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as readline from 'readline';
+import { BRIDGE_COMMANDS } from '../commands/commandCatalog';
 import { killTree, killTreeAsync, resolveExecutable, spawnCli } from '../procUtils';
 import { BridgePrompt, imagesOmittedNote, StreamEmitter } from '../protocol';
 import { SessionStore } from '../sessionStore';
@@ -37,6 +38,93 @@ export function isReadOnlyGrokKind(kind: string | undefined | null): boolean {
   return READ_ONLY_KINDS.has(String(kind || '').trim());
 }
 
+/** ACP tool-call kinds that mutate the workspace or run commands — the exact
+ *  complement of READ_ONLY_KINDS among the kinds ACP is known to report
+ *  (excludes 'other'/unknown deliberately: an unrecognized kind must stay
+ *  denied even inside an open write window, not be treated as "probably a
+ *  write"). Only these are auto-approved while a write window is open —
+ *  the window is a scoped ALLOWLIST expansion, never a blanket bypass of the
+ *  permission gate. */
+const KNOWN_WRITE_KINDS = new Set(['execute', 'edit', 'delete', 'move']);
+
+export function isKnownWriteGrokKind(kind: string | undefined | null): boolean {
+  return KNOWN_WRITE_KINDS.has(String(kind || '').trim());
+}
+
+/** The actual Grok ACP permission decision, extracted as a pure function so
+ *  it's directly unit-testable (not just the dispatcher's write-window
+ *  computation, and not just that the pre-session setter doesn't throw).
+ *  Deny-first: an open write window only expands the allowlist to KNOWN
+ *  write kinds — it is never a blanket "allow everything" bypass, so an
+ *  unrecognized/future `kind` value stays denied even while open. */
+export function shouldPermitGrokTool(
+  permissionMode: string,
+  kind: string | undefined | null,
+  writeWindowOpen: boolean,
+): boolean {
+  // Exact match, not `!== 'supervised'`: cli.ts only ever computes
+  // 'full-access' or 'supervised' today, but an exact check means an
+  // unexpected/future value defaults to the (more restrictive) supervised
+  // path instead of silently being treated as full-access.
+  if (permissionMode === 'full-access') return true;
+  if (isReadOnlyGrokKind(kind)) return true;
+  return writeWindowOpen && isKnownWriteGrokKind(kind);
+}
+
+/** Best-effort recognition of one of OUR OWN registered MCP command tools
+ *  (claui_code_review etc.) from an ACP tool_call update's TITLE ONLY (not
+ *  arbitrary input field values — e.g. a real `execute`/Bash call with
+ *  `command: "rg claui_code_review src"` would otherwise false-positive on
+ *  its own command string) so the timeline shows a real tool card instead of
+ *  the generic "Tool" fallback for an MCP-sourced call. Display-only: NEVER
+ *  used for the permission gate (see isReadOnlyGrokKind) — that must not
+ *  trust model-controlled text for an authorization decision, only this
+ *  cosmetic label. */
+export function resolveBridgeToolNameHint(title: string | undefined): string | null {
+  if (!title) return null;
+  const match = BRIDGE_COMMANDS.find((spec) => title.includes(spec.toolName));
+  return match ? match.toolName : null;
+}
+
+/** Full display-name resolution for a `tool_call` update, in priority order:
+ *  (1) a CONCRETE (non-generic) ACP built-in kind mapping via KIND_TO_TOOL —
+ *  trusted first, so a real execute/read/search/etc. call is never
+ *  relabeled just because its title or command text happens to mention one
+ *  of our tool names (see the false-positive above); (2) only when ACP
+ *  didn't confidently classify the call (kind is absent, or maps to the
+ *  generic 'Tool' bucket — the expected shape for an MCP-sourced call, since
+ *  ACP has no built-in semantic kind for MCP tools), check the title for one
+ *  of our own bridge tool names; (3) heuristics on the raw input shape;
+ *  (4) generic 'Tool'. A standalone exported function so the full priority
+ *  order is directly unit-testable.
+ *
+ *  Known tradeoff (disclosed, unverifiable without a live Grok CLI): if our
+ *  MCP `readOnlyHint` annotation ever causes Grok to report a CONCRETE
+ *  built-in kind (e.g. 'read') for our OWN tool call rather than 'other',
+ *  step (1) wins and the card shows the generic built-in label instead of
+ *  our tool name — display-only, so this is a cosmetic under-label, not a
+ *  functional or security issue. This is judged the better failure mode
+ *  than the alternative (mislabeling a real built-in call with our tool
+ *  name from a coincidental text match). */
+export function resolveToolCallName(
+  kind: string | undefined,
+  title: string | undefined,
+  input: Record<string, unknown>,
+): string {
+  const fromKind = KIND_TO_TOOL[kind || ''] || '';
+  if (fromKind && fromKind !== 'Tool') return fromKind;
+
+  const bridgeToolName = resolveBridgeToolNameHint(title);
+  if (bridgeToolName) return bridgeToolName;
+
+  if (input.command) return 'Bash';
+  if (input.file_path !== undefined && input.content !== undefined) return 'Write';
+  if (input.target_file || input.file_path) return 'Read';
+  if (input.pattern || input.query) return 'Grep';
+  if (input.url) return 'WebFetch';
+  return 'Tool';
+}
+
 /** Hard ceiling on a single Grok turn so a hung agent can't wedge the tab. */
 const PROMPT_TIMEOUT_MS = Number(process.env.CLAUI_BRIDGE_GROK_TIMEOUT_MS || 10 * 60 * 1000);
 
@@ -70,6 +158,83 @@ export function resolveGrokCli(cliPath: string): { command: string; useShell: bo
   return resolveExecutable(cliPath, 'grok', grokKnownLocations());
 }
 
+/** Bridge command-tools (Layer B — see src/bridge-runtime/commands/) wiring
+ *  for a single Grok tab. `enabled` gates whether the MCP command server is
+ *  registered with ACP at all; `serverScriptPath` is the sibling
+ *  dist/bridge-runtime/mcp/command-server.js bundle, computed by cli.ts. */
+export interface GrokCommandToolsConfig {
+  enabled: boolean;
+  serverScriptPath: string;
+  cwd: string;
+  diffBase: string;
+}
+
+/** MCP server descriptor for ACP's session/new & session/load, exposing
+ *  ClaUi's engine slash commands as callable tools (Layer B). Empty when
+ *  command-tools are disabled. `env` MUST be an array of {name,value} pairs,
+ *  not a plain object — confirmed against the published ACP session-setup
+ *  schema; a strict ACP agent rejects the object form outright (-32602
+ *  Invalid params). A standalone exported function (not a class method) so
+ *  it's directly unit-testable without spinning up a full GrokAcpBackend. */
+export function buildGrokMcpServers(commandTools: GrokCommandToolsConfig): unknown[] {
+  if (!commandTools.enabled) return [];
+  return [
+    {
+      type: 'stdio',
+      name: 'claui-commands',
+      command: process.execPath,
+      args: [commandTools.serverScriptPath],
+      env: [
+        { name: 'CLAUI_CWD', value: commandTools.cwd },
+        { name: 'CLAUI_DIFF_BASE', value: commandTools.diffBase },
+      ],
+    },
+  ];
+}
+
+/** Builds the optional system preamble for a Grok turn. `<system-rules>` is
+ *  sent only on a session's true first-ever turn (matching prior behavior —
+ *  a resumed session's underlying Grok ACP session already has it from
+ *  before). The command-tools teaching block is sent once per BACKEND
+ *  INSTANCE (tracked by the caller via `commandToolsAlreadyTaught`)
+ *  regardless of stored history — a resumed session may have history from
+ *  before command-tools existed/were enabled, and its Grok ACP session has
+ *  never actually seen the block, so history alone can't gate it. Returns
+ *  null when there is nothing to inject. A standalone exported function so
+ *  this decoupling is directly unit-testable without a live ACP session. */
+export function buildFirstTurnPreamble(opts: {
+  isFirstEverTurn: boolean;
+  systemPrompt: string;
+  commandToolsEnabled: boolean;
+  commandToolsAlreadyTaught: boolean;
+}): string | null {
+  const parts: string[] = [];
+  if (opts.isFirstEverTurn && opts.systemPrompt) {
+    parts.push(`<system-rules>\n${opts.systemPrompt}\n</system-rules>`);
+  }
+  if (opts.commandToolsEnabled && !opts.commandToolsAlreadyTaught) {
+    parts.push(buildCommandToolsSystemBlock());
+  }
+  return parts.length ? parts.join('\n\n') : null;
+}
+
+/** System-prompt block teaching Grok to call the command tools for a typed
+ *  slash command or an equivalent plain-language request — generated from
+ *  BRIDGE_COMMANDS so it never drifts out of sync with the actual catalog. */
+export function buildCommandToolsSystemBlock(): string {
+  const mappings = BRIDGE_COMMANDS.map((spec) => {
+    const names = [spec.name, ...(spec.aliases || [])].map((n) => `"/${n}"`).join(' or ');
+    return `For ${names} (or an equivalent plain-language request) call ${spec.toolName}.`;
+  }).join(' ');
+  return (
+    '<claui-commands>\n' +
+    `You have ClaUi command tools. ${mappings} Each tool returns a task packet ` +
+    '(rubric + diff); perform the task with your own read/grep tools and report findings. ' +
+    "Do not ask the user to paste the diff — the tool provides it.\n" +
+    '</claui-commands>'
+  );
+}
+
 class AcpClient {
   private nextId = 1;
   private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
@@ -86,6 +251,18 @@ class AcpClient {
   /** Council mode: reject every tool-permission request so the agent answers
    *  text-only and cannot invoke any tool (structurally non-mutating). */
   private readonly noTools: boolean;
+
+  /** Per-turn write window (Section 6 of the bridge command-tools plan):
+   *  while open, supervised mode also auto-approves write/execute tool
+   *  kinds — not just read-only ones — for a mutating command run with
+   *  `--fix` (or a full-access tab). The caller (GrokAcpBackend) is
+   *  responsible for opening it right before `session/prompt` and closing it
+   *  right after, so it is scoped to exactly one turn and never left open. */
+  private writeWindowOpen = false;
+
+  setWriteWindow(open: boolean): void {
+    this.writeWindowOpen = open;
+  }
 
   constructor(
     cliPath: string,
@@ -166,10 +343,7 @@ class AcpClient {
         return;
       }
       const kind = msg.params?.toolCall?.kind;
-      // Supervised mirrors the real Claude CLI's read-only --allowedTools set:
-      // only read/search/fetch/think auto-approve; write/execute (and unknown)
-      // kinds are rejected. Full-access auto-approves everything.
-      const permit = this.permissionMode !== 'supervised' || isReadOnlyGrokKind(kind);
+      const permit = shouldPermitGrokTool(this.permissionMode, kind, this.writeWindowOpen);
       if (permit) {
         const allow =
           opts.find((o) => o.kind === 'allow_once') ||
@@ -381,6 +555,18 @@ export class GrokAcpBackend {
   private acpSessionId: string | null = null;
   private lastText = '';
   private emitter: StreamEmitter | null = null;
+  /** Whether the command-tools teaching block has been sent by THIS backend
+   *  instance yet — tracked independently of stored session history, because
+   *  a RESUMED tab has non-empty history from before this feature (or before
+   *  command-tools were enabled) shipped, and its underlying Grok ACP session
+   *  has never actually seen the teaching block. Every fresh process/tab-open
+   *  gets exactly one re-teaching, regardless of the session's prior turns. */
+  private commandToolsTaught = false;
+  /** Desired write-window state for the NEXT `session/prompt` — set by
+   *  `setWriteWindow` (called from cli.ts before `runTurn`), applied to
+   *  `this.acp` at the start of `runTurn` (not directly here) because
+   *  `this.acp` may not exist yet (created lazily by `ensureSession`). */
+  private pendingWriteWindow = false;
 
   constructor(
     private readonly cliPath: string,
@@ -390,9 +576,26 @@ export class GrokAcpBackend {
     private readonly systemPrompt: string,
     private readonly permissionMode: string,
     private readonly log: (msg: string) => void,
+    private readonly commandTools: GrokCommandToolsConfig,
   ) {}
 
+  /** Open/close the per-turn write window (Section 6 — a mutating command
+   *  run with --fix, or a full-access tab). The caller is responsible for
+   *  closing it again after the turn settles, success or failure, so it is
+   *  scoped to exactly one turn. */
+  setWriteWindow(open: boolean): void {
+    this.pendingWriteWindow = open;
+    this.acp?.setWriteWindow(open);
+  }
+
   interrupt(): void {
+    // Revoke the write window EAGERLY, before cancellation even goes out —
+    // cli.ts's finally-based close only runs once runTurn's promise settles,
+    // which is not immediate: a hung/slow-to-cancel Grok process could still
+    // emit another session/request_permission during the cancellation grace
+    // period, and it must see the window already closed, not the up-to-10-
+    // minute PROMPT_TIMEOUT_MS window it would otherwise still be open for.
+    this.setWriteWindow(false);
     if (this.acp && this.acpSessionId) {
       this.acp.notify('session/cancel', { sessionId: this.acpSessionId });
     }
@@ -419,15 +622,7 @@ export class GrokAcpBackend {
         rawInput && typeof rawInput === 'object'
           ? (rawInput as Record<string, unknown>)
           : { description: (u.title as string) || '' };
-      let name = KIND_TO_TOOL[(u.kind as string) || ''] || '';
-      if (!name || name === 'Tool') {
-        if (input.command) name = 'Bash';
-        else if (input.file_path !== undefined && input.content !== undefined) name = 'Write';
-        else if (input.target_file || input.file_path) name = 'Read';
-        else if (input.pattern || input.query) name = 'Grep';
-        else if (input.url) name = 'WebFetch';
-        else name = 'Tool';
-      }
+      const name = resolveToolCallName(u.kind as string | undefined, u.title as string | undefined, input);
       if (u.title && !input.description && name !== 'Bash') {
         input.description = u.title;
       }
@@ -489,6 +684,12 @@ export class GrokAcpBackend {
       this.acpSessionId = null;
     }
     if (this.acp && this.acpSessionId) return;
+    // A brand-new underlying ACP client/session has never actually received
+    // the command-tools teaching block, regardless of whether THIS backend
+    // instance already sent it to a previous (now-dead) session — otherwise
+    // a mid-tab Grok crash/restart would silently leave the replacement
+    // session never taught about the tools.
+    this.commandToolsTaught = false;
     this.acp = new AcpClient(this.cliPath, this.onUpdate, this.log, this.permissionMode);
     await this.acp.request(
       'initialize',
@@ -505,7 +706,7 @@ export class GrokAcpBackend {
       try {
         await this.acp.request(
           'session/load',
-          { sessionId: stored.grokSessionId, cwd: process.cwd(), mcpServers: [] },
+          { sessionId: stored.grokSessionId, cwd: process.cwd(), mcpServers: buildGrokMcpServers(this.commandTools) },
           120000,
         );
         this.acpSessionId = stored.grokSessionId;
@@ -520,7 +721,7 @@ export class GrokAcpBackend {
         'session/new',
         {
           cwd: process.cwd(),
-          mcpServers: [],
+          mcpServers: buildGrokMcpServers(this.commandTools),
           ...(this.model ? { modelId: this.model } : {}),
         },
         60000,
@@ -540,6 +741,10 @@ export class GrokAcpBackend {
 
   async runTurn(prompt: BridgePrompt, emitter: StreamEmitter): Promise<string> {
     await this.ensureSession();
+    // ensureSession() may have just (re)built this.acp — re-apply the
+    // pending write-window state so a rebuilt session doesn't silently lose
+    // a window that was opened before the client existed.
+    this.acp!.setWriteWindow(this.pendingWriteWindow);
     this.emitter = emitter;
     this.lastText = '';
 
@@ -553,9 +758,14 @@ export class GrokAcpBackend {
     }
 
     const promptBlocks: { type: 'text'; text: string }[] = [];
-    if (this.systemPrompt && !this.store.read(this.sessionId)?.history?.length) {
-      promptBlocks.push({ type: 'text', text: `<system-rules>\n${this.systemPrompt}\n</system-rules>` });
-    }
+    const willTeachCommandTools = this.commandTools.enabled && !this.commandToolsTaught;
+    const preamble = buildFirstTurnPreamble({
+      isFirstEverTurn: !this.store.read(this.sessionId)?.history?.length,
+      systemPrompt: this.systemPrompt,
+      commandToolsEnabled: this.commandTools.enabled,
+      commandToolsAlreadyTaught: this.commandToolsTaught,
+    });
+    if (preamble) promptBlocks.push({ type: 'text', text: preamble });
     promptBlocks.push({ type: 'text', text: userText });
 
     // Bound the turn so a hung agent surfaces an error instead of wedging the
@@ -566,7 +776,12 @@ export class GrokAcpBackend {
       PROMPT_TIMEOUT_MS,
     )) as { stopReason?: string } | undefined;
 
-    this.store.appendHistory(this.sessionId, 'user', userText);
+    // Only mark "taught" once the request that actually carried the block
+    // has succeeded — a failed session/prompt (dead process, timeout, ACP
+    // error) must not permanently lose the teaching block for the retry.
+    if (willTeachCommandTools) this.commandToolsTaught = true;
+
+    this.store.appendHistory(this.sessionId, 'user', prompt.persistAs ?? userText);
     if (this.lastText) {
       this.store.appendHistory(this.sessionId, 'assistant', this.lastText);
     }

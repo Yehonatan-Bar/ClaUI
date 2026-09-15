@@ -2,6 +2,18 @@
 
 ## v0.1.233 - 2026-09-15
 
+**Feature: Claude Code slash commands actually run in Bridge Provider tabs**
+
+- `/code-review`, `/security-review`, and `/simplify` used to be forwarded to Grok/Antigravity/OpenAI-compatible/Council tabs as inert literal text. Three strategies now make them actually execute, resolved per-command by `dispatcher.ts`'s `dispatchCommand()` (called once per turn from `bridge-runtime/cli.ts`'s `pump()`, for every backend)
+- **Layer A - Command Macros (all backends)**: the dispatcher rewrites the prompt into a rubric + local-diff "task packet" (`commands/packetBuilder.ts` + `commands/contextProviders.ts`) before it reaches the backend - works even on a text-only OpenAI-compatible model, embedding bounded untracked-file content when there's no diff to show (brand-new files)
+- **Layer B - Command-as-Tool for Grok**: the same commands are registered as MCP tools over ACP's `mcpServers` (`bridge-runtime/mcp/command-server.js`, a dedicated webpack entry); Grok calls them itself mid-turn, producing real tool cards in the timeline instead of a rewritten prompt
+- **Layer C - Claude/Codex co-processor (opt-in)**: offloads the command to a real `claude -p` run in the project's own cwd and relays its result through the bridge model - "the bridge model stays the voice," not bypassed - by injecting the result as a normal prompt rewrite (`commands/offload.ts`); reuses the council backend's hardened `invokeClaudeCouncil` (`--restricted --strict-mcp-config --no-session-persistence`). Every catalog command offloads via Claude Code today; a new `invokeCodexCommand` runner (`--ask-for-approval never exec --sandbox read-only --ephemeral --ignore-user-config`) is implemented and tested for a future Codex-backed command. Off by default: requires both `commandTools.strategy: 'offload'` and `commandTools.offload: true`, and degrades gracefully to Layer B/A if the target CLI isn't installed
+- **Write-back (`/simplify --fix`, Grok only)**: a per-turn "write window" lets Grok use its own write/execute ACP tools for exactly one turn, opened only for a command marked `mutates: true` with an explicit `--fix` flag (or a full-access tab), and always closed in a `finally`/on interrupt - never a standing grant
+- New settings: `claudeMirror.bridge.commandTools.enabled` / `.strategy` (`auto`/`macro`/`tool`/`offload`) / `.offload` / `.diffBase`, mirrored into `~/.claui/bridge.json`
+- Docs: new `Kingdom_of_Claudes_Beloved_MDs/BRIDGE_COMMAND_TOOLS.md`; TECHNICAL.md index entry
+
+---
+
 **Change: Deferred first spawn - a missing CLI no longer blocks opening a session**
 
 - Opening a new interactive session tab (`claudeMirror.startSession`, new-tab-with-account) no longer spawns the provider CLI up front. `SessionTab.startSession({ defer: true })` arms `deferredFirstStartArmed`, posts a `pending` `sessionStarted` so the webview renders a ready chat, and returns without launching `claude`/`happy`

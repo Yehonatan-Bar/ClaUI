@@ -74,7 +74,7 @@ export class OpenAiCompatBackend {
     const historyText = prompt.images.length
       ? `${prompt.text}${prompt.text ? '\n' : ''}[${prompt.images.length} image(s) attached]`
       : prompt.text;
-    this.store.appendHistory(this.sessionId, 'user', historyText);
+    this.store.appendHistory(this.sessionId, 'user', prompt.persistAs ?? historyText);
     this.store.appendHistory(this.sessionId, 'assistant', text);
     return text;
   }

@@ -2,6 +2,25 @@
   "$comment": "Bundled What's New entries shown after an update (toast + in-panel banner). Add ONE entry per release that ships user-visible features; bug-fix-only releases get no entry and stay silent. 'version' is the EARLIEST extension version allowed to show the entry (vsce publish patch may assign a higher number, that is fine). 'id' must be unique and must never change once shipped. Newest entries can go anywhere in the list; the extension sorts by version.",
   "announcements": [
     {
+      "id": "2026-09-15-bridge-command-tools",
+      "version": "0.1.233",
+      "date": "2026-09-15",
+      "title": "Commands now run in Bridge tabs",
+      "titleHe": "פקודות רצות עכשיו גם בטאבי Bridge",
+      "highlights": [
+        "/code-review, /security-review, and /simplify now actually run in Grok, Antigravity, OpenAI-compatible, and Council tabs, not just as plain text.",
+        "Grok tabs run them as real tool calls; other Bridge tabs get an automatic rubric plus your local changes attached.",
+        "Add --fix to /simplify in a Grok tab to let it apply the suggested changes for that one command.",
+        "Turn on Offload in Bridge Command Tools settings to have the real Claude Code CLI run the command and report back."
+      ],
+      "highlightsHe": [
+        "code-review/, security-review/ ו-simplify/ רצות עכשיו באמת בטאבי Grok, Antigravity, תואם-OpenAI ומועצה, ולא רק כטקסט רגיל.",
+        "בטאבי Grok הן רצות כקריאות כלי אמיתיות; בטאבי Bridge אחרים מצורפים אוטומטית קריטריונים והשינויים המקומיים שלכם.",
+        "הוסיפו fix-- ל-simplify/ בטאב Grok כדי לאפשר לה להחיל את השינויים המוצעים עבור אותה פקודה בלבד.",
+        "הפעילו Offload בהגדרות Bridge Command Tools כדי שה-CLI האמיתי של Claude Code ירוץ ויחזיר תשובה."
+      ]
+    },
+    {
       "id": "2026-09-15-open-without-cli",
       "version": "0.1.231",
       "date": "2026-09-15",

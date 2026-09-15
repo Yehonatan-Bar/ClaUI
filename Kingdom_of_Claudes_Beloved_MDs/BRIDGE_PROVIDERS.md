@@ -65,6 +65,9 @@ never inherit a `bridge:*` value and hand it to the real claude CLI.
 - `src/bridge-runtime/backends/openaiCompat.ts` - direct HTTP + SSE to any
   `/v1/chat/completions` server; replays history per turn; forwards images to vision
   models as `image_url` parts.
+- `src/bridge-runtime/commands/` and `src/bridge-runtime/mcp/` - makes Claude Code engine
+  slash commands (`/code-review` etc.) actually run inside bridge tabs instead of being
+  forwarded as inert text. See `Kingdom_of_Claudes_Beloved_MDs/BRIDGE_COMMAND_TOOLS.md`.
 
 **Extension side**
 - `src/extension/bridge/BridgeProviderService.ts` - mirrors `claudeMirror.bridge.*` into

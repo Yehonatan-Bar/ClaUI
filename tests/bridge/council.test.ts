@@ -14,6 +14,7 @@ import {
   buildRoster,
   buildSynthesisPrompt,
   cliExists,
+  invokeClaudeCouncil,
   invokeCodexCouncil,
   invokeOpenAiCouncil,
   reapChildrenThenCleanup,
@@ -23,6 +24,24 @@ import { SessionStore } from '../../src/bridge-runtime/sessionStore';
 import { BridgePrompt, StreamEmitter } from '../../src/bridge-runtime/protocol';
 
 const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/** Retry a recursive rmSync a few times with a short backoff. Windows can
+ *  briefly hold a directory handle open after killing a process that was
+ *  using it as its cwd — killTreeAsync is fire-and-forget (non-blocking), so
+ *  a test that force-kills a still-actively-writing child can race its own
+ *  cleanup. Used by tests that kill a child mid-flight rather than letting it
+ *  exit naturally. */
+async function rmDirRetry(p: string, attempts = 8, delayMs = 150): Promise<void> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      fs.rmSync(p, { recursive: true, force: true });
+      return;
+    } catch (e) {
+      if (i === attempts - 1) throw e;
+      await delay(delayMs);
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -527,6 +546,183 @@ test('reapChildrenThenCleanup: does not clean while a child is alive, then clean
   assert.equal(cleaned, 1, 'cleans exactly once after the child terminates');
 });
 
+/** Shared fake-CLI-shim helper (same pattern as the invokeCodexCouncil test
+ *  below): a small Node script wrapped in a platform shim, spawnable as a
+ *  single `cliPath` exactly like a real installed CLI. Used by the new
+ *  invokeClaudeCouncil tests to avoid repeating the shim-creation boilerplate
+ *  five times over. */
+function makeFakeCliShim(dir: string, scriptBody: string, baseName: string): string {
+  const script = path.join(dir, `${baseName}.js`);
+  fs.writeFileSync(script, scriptBody);
+  const shim = path.join(dir, process.platform === 'win32' ? `${baseName}.cmd` : `${baseName}.sh`);
+  if (process.platform === 'win32') {
+    fs.writeFileSync(shim, `@echo off\r\n"${process.execPath}" "${script}" %*\r\n`);
+  } else {
+    fs.writeFileSync(shim, `#!/bin/sh\n"${process.execPath}" "${script}" "$@"\n`);
+    fs.chmodSync(shim, 0o755);
+  }
+  return shim;
+}
+
+// ---------------------------------------------------------------------------
+// invokeClaudeCouncil — real subprocess argv + JSON result contract. Zero
+// direct tests existed for this function before it started serving double
+// duty for bridge command-tools offload (Layer C) as well as the council.
+// ---------------------------------------------------------------------------
+
+test('invokeClaudeCouncil: parses --output-format json result on success', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-fake-'));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-cwd-'));
+  try {
+    const shim = makeFakeCliShim(
+      dir,
+      `let stdin = '';
+       process.stdin.on('data', (d) => { stdin += d; });
+       process.stdin.on('end', () => {
+         process.stdout.write(JSON.stringify({ result: 'ANSWER:' + stdin.trim(), is_error: false }));
+       });`,
+      'fake-claude',
+    );
+    const result = await invokeClaudeCouncil(shim, '', 'question', cwd, new AbortController().signal, () => {}, () => {});
+    assert.equal(result, 'ANSWER:question');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('invokeClaudeCouncil: passes --restricted, --permission-prompts none, and an empty strict MCP config', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-argv-'));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-cwd-'));
+  try {
+    const shim = makeFakeCliShim(
+      dir,
+      `process.stdout.write(JSON.stringify({ result: JSON.stringify(process.argv.slice(2)), is_error: false }));`,
+      'fake-claude',
+    );
+    const result = await invokeClaudeCouncil(shim, '', 'question', cwd, new AbortController().signal, () => {}, () => {});
+    const argv: string[] = JSON.parse(result);
+    assert.ok(argv.includes('--restricted'), argv.join(' '));
+    assert.ok(argv.includes('--permission-prompts') && argv.includes('none'), argv.join(' '));
+    assert.ok(argv.includes('--strict-mcp-config'), argv.join(' '));
+    assert.ok(argv.includes('--mcp-config') && argv.includes('{"mcpServers":{}}'), argv.join(' '));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('invokeClaudeCouncil: is_error:true rejects with the result text', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-err-'));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-cwd-'));
+  try {
+    const shim = makeFakeCliShim(dir, `process.stdout.write(JSON.stringify({ result: 'boom', is_error: true }));`, 'fake-claude');
+    await assert.rejects(
+      () => invokeClaudeCouncil(shim, '', 'question', cwd, new AbortController().signal, () => {}, () => {}),
+      /boom/,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('invokeClaudeCouncil: non-zero exit rejects', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-exit-'));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-cwd-'));
+  try {
+    const shim = makeFakeCliShim(dir, `process.exitCode = 1;`, 'fake-claude');
+    await assert.rejects(
+      () => invokeClaudeCouncil(shim, '', 'question', cwd, new AbortController().signal, () => {}, () => {}),
+      /Claude CLI exited 1/,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('invokeClaudeCouncil: malformed (non-JSON) stdout rejects with a clear message', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-malformed-'));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-cwd-'));
+  try {
+    const shim = makeFakeCliShim(dir, `process.stdout.write('not json');`, 'fake-claude');
+    await assert.rejects(
+      () => invokeClaudeCouncil(shim, '', 'question', cwd, new AbortController().signal, () => {}, () => {}),
+      /Malformed response/,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('invokeClaudeCouncil: an already-aborted signal rejects without ever spawning the process', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-aborted-'));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-cwd-'));
+  try {
+    // Would create a sentinel file if actually spawned/run — its absence
+    // proves spawnCli was never reached, not just that the result was
+    // discarded after a spawn-then-kill.
+    const sentinel = path.join(dir, 'spawned.marker');
+    const shim = makeFakeCliShim(dir, `require('fs').writeFileSync(${JSON.stringify(sentinel)}, '1');`, 'fake-claude');
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(
+      () => invokeClaudeCouncil(shim, '', 'question', cwd, controller.signal, () => {}, () => {}),
+      /aborted/,
+    );
+    assert.equal(fs.existsSync(sentinel), false, 'process must never spawn once the signal is already aborted');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('invokeClaudeCouncil: --no-session-persistence is passed (one-shot invocation, never persisted)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-nopersist-'));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-cwd-'));
+  try {
+    const shim = makeFakeCliShim(
+      dir,
+      `process.stdout.write(JSON.stringify({ result: JSON.stringify(process.argv.slice(2)), is_error: false }));`,
+      'fake-claude',
+    );
+    const result = await invokeClaudeCouncil(shim, '', 'question', cwd, new AbortController().signal, () => {}, () => {});
+    const argv: string[] = JSON.parse(result);
+    assert.ok(argv.includes('--no-session-persistence'), argv.join(' '));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('invokeClaudeCouncil: output exceeding the stdout cap kills the child and rejects with a clear message (never returns truncated output as success)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-oversized-'));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-claude-cwd-'));
+  try {
+    // Writes well past the 4 MiB cap in one line, then keeps writing forever
+    // — if the cap didn't kill the child, this test would hang.
+    const shim = makeFakeCliShim(
+      dir,
+      `const big = 'x'.repeat(6 * 1024 * 1024);
+       process.stdout.write(big);
+       setInterval(() => process.stdout.write('more'), 10);`,
+      'fake-claude',
+    );
+    await assert.rejects(
+      () => invokeClaudeCouncil(shim, '', 'question', cwd, new AbortController().signal, () => {}, () => {}),
+      /output exceeded/,
+    );
+  } finally {
+    // The oversized-output kill races killTreeAsync's fire-and-forget
+    // taskkill — retry cleanup rather than flaking on a still-briefly-locked
+    // Windows directory handle.
+    await rmDirRetry(dir);
+    await rmDirRetry(cwd);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // invokeCodexCouncil — real subprocess argv (read-only sandbox, throwaway cwd)
 // ---------------------------------------------------------------------------
@@ -641,4 +837,30 @@ test('invokeOpenAiCouncil: an aborted request rejects', async () => {
     /* ignore */
   }
   await server.close();
+});
+
+// ---------------------------------------------------------------------------
+// persistAs — command macros keep stored history terse
+// ---------------------------------------------------------------------------
+
+test('CouncilBackend: persistAs overrides stored history (insufficient-members path)', async () => {
+  const { store, cleanup } = tmpStore();
+  try {
+    // A single member is "available" but insufficient (a council needs >=2),
+    // which returns via persistTurn before any member is actually invoked —
+    // exercising the history-write path without needing a mocked dispatch.
+    const config = councilConfig(['openai/p/model']);
+    const backend = new CouncilBackend(config, undefined, 'sid', store, '', () => {});
+    const emitter = new StreamEmitter('sid', 'council');
+    await runCouncil(backend, emitter, {
+      text: 'EXPANDED PACKET TEXT',
+      images: [],
+      persistAs: '/code-review',
+    });
+
+    const state = store.read('sid');
+    assert.equal(state?.history?.[0]?.content, '/code-review');
+  } finally {
+    cleanup();
+  }
 });
