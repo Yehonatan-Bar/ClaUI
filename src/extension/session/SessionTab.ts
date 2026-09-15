@@ -136,6 +136,17 @@ export class SessionTab implements WebviewBridge {
    *  view-state changes triggered by panel creation from waking lazy tabs
    *  before the user has actually clicked them. */
   private lazyWakeArmed: boolean = false;
+  /** Deferred first spawn: when true, this tab was opened WITHOUT spawning its
+   *  CLI process, so a missing/unavailable provider (Claude or Happy) can never
+   *  block opening the panel or surface an error before the user's first prompt.
+   *  The first user send calls ensureStarted(), which performs the real spawn;
+   *  any missing-CLI/Happy-fallback UX then surfaces through the normal exit/
+   *  error handlers - i.e. only AFTER the user has actually sent a prompt. */
+  private deferredFirstStartArmed = false;
+  /** Options captured at deferred open, replayed by ensureStarted() on the real spawn. */
+  private deferredStartOptions: { cwd?: string; model?: string } | null = null;
+  /** In-flight guard/promise so concurrent first sends share a single real spawn. */
+  private deferredStartPromise: Promise<void> | null = null;
   /** Tracks whether stderr indicates Claude CLI is not installed */
   private claudeCliMissingDetected = false;
   /** Tracks whether stderr indicates Happy CLI authentication is required */
@@ -1137,6 +1148,39 @@ export class SessionTab implements WebviewBridge {
     );
   }
 
+  /** Deferred first spawn: true iff this tab was opened without spawning its CLI
+   *  yet (or the spawn is still in flight from the first send). The first user
+   *  send must await ensureStarted() before delivering text so a missing provider
+   *  never blocks opening the panel or errors before the first prompt. */
+  isStartDeferred(): boolean {
+    return this.deferredFirstStartArmed;
+  }
+
+  /** Perform the deferred first spawn now (idempotent + concurrency-safe). Runs
+   *  the real startSession with the options captured at open. Concurrent first
+   *  sends share the single in-flight spawn, then dispatch in arrival order. The
+   *  armed flag stays set until the spawn settles so late sends still route here. */
+  async ensureStarted(): Promise<void> {
+    if (!this.deferredFirstStartArmed) {
+      return;
+    }
+    if (this.deferredStartPromise) {
+      return this.deferredStartPromise;
+    }
+    const opts = this.deferredStartOptions ?? {};
+    this.deferredStartOptions = null;
+    this.log(`[Tab ${this.tabNumber}] Deferred first spawn: starting CLI on first prompt.`);
+    this.deferredStartPromise = (async () => {
+      try {
+        await this.startSession({ cwd: opts.cwd, model: opts.model });
+      } finally {
+        this.deferredFirstStartArmed = false;
+        this.deferredStartPromise = null;
+      }
+    })();
+    return this.deferredStartPromise;
+  }
+
   /** Allocate a deferred-message id, queue the text, and kick off the silent respawn.
    *  Returns the id so the caller can correlate `messageDeferred` ↔ delivered/failed. */
   enqueueSilentResume(text: string): { id: string } {
@@ -1573,7 +1617,7 @@ export class SessionTab implements WebviewBridge {
   }
 
   /** Start a new CLI session in this tab (Claude by default, Happy when overridden) */
-  async startSession(options?: { resume?: string; fork?: boolean; skipReplay?: boolean; truncatedFork?: boolean; cwd?: string; model?: string }): Promise<void> {
+  async startSession(options?: { resume?: string; fork?: boolean; skipReplay?: boolean; truncatedFork?: boolean; cwd?: string; model?: string; defer?: boolean }): Promise<void> {
     this.clearHibernationMarkers('startSession');
     this.messageHandler.resetTransientStateForHostLifecycle(
       options?.resume
@@ -1585,6 +1629,33 @@ export class SessionTab implements WebviewBridge {
     this.claudeCliMissingDetected = false;
     this.happyAuthDetected = false;
     this.resumeTargetMissingDetected = false;
+
+    // Deferred first spawn: opening a brand-new tab must never spawn the CLI, so
+    // a missing/unavailable provider (Claude or Happy) cannot block the panel or
+    // surface an error before the first prompt. Arm deferral, render a ready
+    // (pending) chat, and let the first user send trigger the real spawn via
+    // ensureStarted(). Resume/fork keep eager spawn (they need a live process to
+    // replay history, and a missing CLI there is a legitimate error to show).
+    if (options?.defer && !options?.resume && !options?.fork) {
+      this.deferredFirstStartArmed = true;
+      this.deferredStartOptions = { cwd: options.cwd, model: options.model };
+      this.postMessage({
+        type: 'sessionStarted',
+        sessionId: 'pending',
+        model: this.processManager.configuredModel,
+        isResume: false,
+        provider: this.getProvider(),
+        tabKind: this.kind,
+        claudeAccountProfileId: this.claudeAccountProfileId,
+        claudeAccountProfileLabel: this.claudeAccountProfile?.label ?? null,
+      });
+      this.log(
+        `[Tab ${this.tabNumber}] Deferred first spawn armed (provider=${this.getProvider()}); ` +
+          'CLI will start on the first prompt.',
+      );
+      return;
+    }
+
     const effectiveCwd = options?.cwd ?? this.getEffectiveCwd();
 
     // Create Particle Accelerator context file before spawning CLI (env vars reference it)

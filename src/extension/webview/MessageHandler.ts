@@ -126,6 +126,13 @@ export interface WebviewBridge {
    *  and trigger the respawn (idempotent). Returns the deferred-message id so
    *  callers can correlate `messageDeferred` -> delivered/failed. */
   enqueueSilentResume?(text: string): { id: string };
+  /** Deferred first spawn: true iff this tab was opened without spawning its CLI
+   *  yet. The first user send must await ensureStarted() before delivering text,
+   *  so a missing provider never blocks opening the panel or errors before the
+   *  first prompt. */
+  isStartDeferred?(): boolean;
+  /** Perform the deferred first spawn now (idempotent + concurrency-safe). */
+  ensureStarted?(): Promise<void>;
 }
 
 /**
@@ -1476,6 +1483,32 @@ export class MessageHandler {
    * Scans the final payload (text + handoff), handles all DLP actions, and only commits side
    * effects (achievement, history, UI) after DLP approves.
    */
+  /** First user send on a deferred-start tab: perform the real CLI spawn now,
+   *  then dispatch the message through the normal DLP + send path. Any missing-
+   *  CLI/Happy-fallback UX surfaces via the tab's exit/error handlers - i.e. only
+   *  after this first prompt, never before. Concurrent first sends share a single
+   *  spawn (see SessionTab.ensureStarted) and dispatch in arrival order. */
+  private async startDeferredThenDispatch(text: string, images: WebviewImageData[]): Promise<void> {
+    try {
+      await this.webview.ensureStarted?.();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`[DeferredStart] spawn failed: ${message}`);
+      this.webview.postMessage({ type: 'error', message: `Failed to start session: ${message}` });
+      this.webview.postMessage({ type: 'processBusy', busy: false });
+      return;
+    }
+    await this.dlpScanAndDispatch(
+      text,
+      images,
+      () => {},
+      (message) => {
+        this.log(`[DeferredStart] dispatch failed: ${message}`);
+        this.webview.postMessage({ type: 'error', message: `Failed to send message: ${message}` });
+      },
+    );
+  }
+
   private async dlpScanAndDispatch(
     text: string,
     images: WebviewImageData[],
@@ -1919,6 +1952,12 @@ export class MessageHandler {
         case 'sendMessage':
           this.webview.notifyUserActivity?.();
           if (this.resolvePermissionFromText(msg.text)) { break; }
+          // Deferred first spawn: this tab opened without spawning its CLI so a
+          // missing provider never blocked the panel. Spawn now, then dispatch.
+          if (this.webview.isStartDeferred?.()) {
+            void this.startDeferredThenDispatch(msg.text, []);
+            break;
+          }
           if (this.usageLimitActive && this.getActiveProvider() === 'claude') {
             this.queuePromptUntilUsageReset(msg.text);
             break;
@@ -2000,6 +2039,11 @@ export class MessageHandler {
         case 'sendMessageWithImages': {
           this.webview.notifyUserActivity?.();
           if (this.resolvePermissionFromText(msg.text)) { break; }
+          // Deferred first spawn: spawn the CLI on this first send, then dispatch.
+          if (this.webview.isStartDeferred?.()) {
+            void this.startDeferredThenDispatch(msg.text, msg.images);
+            break;
+          }
           if (this.usageLimitActive && this.getActiveProvider() === 'claude') {
             this.queuePromptUntilUsageReset(msg.text, msg.images);
             break;

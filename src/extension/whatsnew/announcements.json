@@ -2,6 +2,21 @@
   "$comment": "Bundled What's New entries shown after an update (toast + in-panel banner). Add ONE entry per release that ships user-visible features; bug-fix-only releases get no entry and stay silent. 'version' is the EARLIEST extension version allowed to show the entry (vsce publish patch may assign a higher number, that is fine). 'id' must be unique and must never change once shipped. Newest entries can go anywhere in the list; the extension sorts by version.",
   "announcements": [
     {
+      "id": "2026-09-15-open-without-cli",
+      "version": "0.1.231",
+      "date": "2026-09-15",
+      "title": "Open a session without a CLI installed",
+      "titleHe": "פתיחת סשן גם בלי CLI מותקן",
+      "highlights": [
+        "Opening a new session now works even if Claude, Codex, or Happy is not installed - the chat opens right away with no error or install prompt.",
+        "The provider starts only when you send your first message, so any 'not found' or install notice appears after that, and only if the tool is really missing."
+      ],
+      "highlightsHe": [
+        "פתיחת סשן חדש עובדת עכשיו גם אם Claude, Codex או Happy אינם מותקנים - הצ'אט נפתח מיד, בלי שגיאה ובלי בקשת התקנה.",
+        "הכלי מופעל רק כששולחים את ההודעה הראשונה, כך שכל הודעת 'לא נמצא' או בקשת התקנה תופיע רק לאחר מכן, ורק אם הכלי באמת חסר."
+      ]
+    },
+    {
       "id": "2026-09-14-compact-context-divider",
       "version": "0.1.230",
       "date": "2026-09-14",

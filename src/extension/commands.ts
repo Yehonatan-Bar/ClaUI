@@ -288,7 +288,9 @@ export function registerCommands(
   const startClaudeTabWithProfile = async (profile: ClaudeAccountProfile): Promise<void> => {
     const tab = tabManager.createClaudeTab();
     tabManager.applyClaudeAccountProfile(tab, profile);
-    await tab.startSession();
+    // Defer the CLI spawn until the first prompt so a missing/misconfigured CLI
+    // never blocks opening the panel.
+    await tab.startSession({ defer: true });
     await claudeProfileStore.markUsed(profile.id);
     log(`New Claude tab started with profileId=${profile.id}`);
   };
@@ -437,8 +439,11 @@ export function registerCommands(
         const provider = args?.provider ?? getConfiguredProvider();
         const tab = tabManager.createTabForProvider(provider);
         try {
-          await tab.startSession();
-          log(`New ${provider} tab session started`);
+          // Defer the CLI spawn until the user's first prompt so a missing
+          // provider (Claude/Codex/Happy) never blocks opening the interface or
+          // surfaces an install/fallback prompt before the first message.
+          await tab.startSession({ defer: true });
+          log(`New ${provider} tab session opened (spawn deferred to first prompt)`);
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err);
           vscode.window.showErrorMessage(

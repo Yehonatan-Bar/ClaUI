@@ -1,5 +1,18 @@
 # ClaUi - Changelog
 
+## v0.1.233 - 2026-09-15
+
+**Change: Deferred first spawn - a missing CLI no longer blocks opening a session**
+
+- Opening a new interactive session tab (`claudeMirror.startSession`, new-tab-with-account) no longer spawns the provider CLI up front. `SessionTab.startSession({ defer: true })` arms `deferredFirstStartArmed`, posts a `pending` `sessionStarted` so the webview renders a ready chat, and returns without launching `claude`/`happy`
+- The real spawn happens on the user's first prompt: `MessageHandler.sendMessage`/`sendMessageWithImages` detect `webview.isStartDeferred()` and route through the new `startDeferredThenDispatch`, which `await`s `SessionTab.ensureStarted()` (idempotent, concurrency-safe via `deferredStartPromise`) then dispatches via the normal `dlpScanAndDispatch` path (DLP scan, optimistic bubble, auto-naming, history)
+- Result: the "Happy Coder CLI not found. Switched to Claude Code…" toast, the "Claude CLI not found. Install…" banner, and Happy auth guidance can now only appear **after** the first message is sent - never before. The existing exit/error handlers are unchanged; they simply fire post-first-prompt
+- Codex was already turn-based (its CLI is invoked per turn), so it never blocked at open; `CodexSessionTab.startSession` accepts `defer` for signature parity and ignores it
+- Scope is opt-in: resume, fork, worktree move, Smart Search, review loop, provider handoff, and snapshot restore keep eager/lazy-resume spawn. A deferred tab that is never prompted has no session id, so it is excluded from the open-tabs snapshot and never restored with a bogus `pending` id
+- Docs: new `Kingdom_of_Claudes_Beloved_MDs/DEFERRED_FIRST_SPAWN.md`; TECHNICAL.md index entry; REMOTE_SESSIONS.md fallback timing note
+
+---
+
 ## v0.1.232 - 2026-09-14
 
 **Feature: Visible "context compacted" divider in the chat**

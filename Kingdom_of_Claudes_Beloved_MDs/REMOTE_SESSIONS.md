@@ -60,6 +60,8 @@ If a remote tab tries to spawn `happy` and the executable is missing from PATH (
 
 The fallback path runs from both the process `exit` handler and the `error` handler, so synchronous ENOENT and async stderr-driven detection both lead to the same recovery. The Claude-missing path is unchanged: there is no fallback target, so install guidance is shown.
 
+Because interactive tabs use **deferred first spawn** (see `DEFERRED_FIRST_SPAWN.md`), the `happy` executable is not launched when the tab opens — it is spawned on the user's first prompt. As a result this fallback toast (and the Claude-missing install guidance) can only appear **after** the first message is sent, never before. Opening a Happy tab whose CLI is missing shows a normal, ready chat until the user actually sends something.
+
 ---
 
 ## Cross-Device Session Resume

@@ -437,7 +437,12 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.setTabName(`Search ${this.tabNumber}`);
   }
 
-  async startSession(options?: { resume?: string; fork?: boolean; cwd?: string }): Promise<void> {
+  async startSession(options?: { resume?: string; fork?: boolean; cwd?: string; defer?: boolean }): Promise<void> {
+    // `defer` is accepted for signature parity with SessionTab but is a no-op
+    // here: Codex is turn-based and never spawns a CLI at startSession (the
+    // Codex CLI is only invoked per turn), so opening a Codex tab already never
+    // blocks on a missing CLI before the first prompt.
+    void options?.defer;
     this.messageHandler.resetTransientStateForHostLifecycle(
       options?.resume
         ? 'CodexSessionTab.startSession(resume)'
