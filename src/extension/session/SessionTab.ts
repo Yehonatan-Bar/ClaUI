@@ -155,6 +155,11 @@ export class SessionTab implements WebviewBridge {
    *  with session ID: ..."). When true the silent-resume classifier MUST decline
    *  so we do not loop forever on a stale session id. Cleared on each spawn. */
   private resumeTargetMissingDetected = false;
+  /** Tracks whether stderr indicates the Claude CLI native binary is incompatible
+   *  with this machine's CPU architecture/bitness (Windows "not compatible with the
+   *  version of Windows" / "not a valid Win32 application", or Unix "exec format
+   *  error"). Cleared on each spawn. */
+  private claudeCliIncompatibleDetected = false;
   /** Silent crash resume: armed state distinguishes a mid-session crash recovery
    *  from boot-time lazy resume. While armed, the next user send (or focus) silently
    *  respawns the CLI with --resume <sid> and flushes the queued message(s). */
@@ -1629,6 +1634,7 @@ export class SessionTab implements WebviewBridge {
     this.claudeCliMissingDetected = false;
     this.happyAuthDetected = false;
     this.resumeTargetMissingDetected = false;
+    this.claudeCliIncompatibleDetected = false;
 
     // Deferred first spawn: opening a brand-new tab must never spawn the CLI, so
     // a missing/unavailable provider (Claude or Happy) cannot block the panel or
@@ -2929,6 +2935,7 @@ export class SessionTab implements WebviewBridge {
         const eligibleForSilent =
           silentCfg.enabled &&
           !this.claudeCliMissingDetected &&
+          !this.claudeCliIncompatibleDetected &&
           !(this.happyAuthDetected && this.isHappyCliSession()) &&
           !this.resumeTargetMissingDetected &&
           !!currentSessionId &&
@@ -2972,6 +2979,19 @@ export class SessionTab implements WebviewBridge {
           this.postMessage({
             type: 'error',
             message: this.getCliMissingMessage(),
+          });
+          return;
+        }
+
+        // Claude CLI native binary can't run on this machine's CPU architecture.
+        // Show reinstall guidance instead of the opaque "exited with code 1".
+        if (this.claudeCliIncompatibleDetected) {
+          this.claudeCliIncompatibleDetected = false;
+          tabLog('Claude CLI binary incompatible with CPU architecture - showing reinstall guidance');
+          this.postMessage({ type: 'sessionEnded', reason: 'crashed' });
+          this.postMessage({
+            type: 'error',
+            message: this.getCliIncompatibleMessage(),
           });
           return;
         }
@@ -3051,6 +3071,15 @@ export class SessionTab implements WebviewBridge {
       if (this.isLikelyClaudeCliMissing(normalized)) {
         this.claudeCliMissingDetected = true;
         tabLog('Detected Claude CLI missing from stderr');
+        // Don't forward raw stderr - the exit handler will send a better message
+        return;
+      }
+      // Detect a Claude CLI native binary that can't run on this machine's CPU
+      // architecture (wrong-arch install / unsupported arch). The OS loader, not
+      // the CLI, prints this; the exit handler will surface actionable guidance.
+      if (this.isLikelyClaudeCliIncompatible(normalized)) {
+        this.claudeCliIncompatibleDetected = true;
+        tabLog('Detected incompatible Claude CLI binary (architecture mismatch) from stderr');
         // Don't forward raw stderr - the exit handler will send a better message
         return;
       }
@@ -3143,6 +3172,22 @@ export class SessionTab implements WebviewBridge {
     return missingPatterns.some((pattern) => pattern.test(normalized));
   }
 
+  /** Check if stderr/error text indicates the CLI executable was found but cannot
+   *  run on this machine. Claude Code ships a per-arch native claude.exe; installing
+   *  the wrong build (e.g. an arm64 binary on an x64 machine, or via a Node whose
+   *  arch differs from the real CPU) makes the OS loader refuse it. These are
+   *  loader messages, not CLI output. */
+  private isLikelyClaudeCliIncompatible(text: string): boolean {
+    const normalized = this.stripAnsi(text);
+    const incompatiblePatterns = [
+      /is not compatible with the version of windows/i,
+      /is not a valid win32 application/i,
+      /\bbad exe format\b/i,
+      /\bexec format error\b/i,
+    ];
+    return incompatiblePatterns.some((pattern) => pattern.test(normalized));
+  }
+
   private isHappyCliSession(): boolean {
     // A bridge tab also carries a cliPathOverride, but it impersonates the
     // Claude CLI — it must NOT be treated as a Happy/remote session (which would
@@ -3179,6 +3224,13 @@ export class SessionTab implements WebviewBridge {
       return 'Happy Coder CLI not found. Install Happy Coder CLI or set "claudeMirror.happy.cliPath" to the correct executable path.';
     }
     return 'Claude CLI not found. Install Claude Code CLI by running: npm install -g @anthropic-ai/claude-code';
+  }
+
+  private getCliIncompatibleMessage(): string {
+    if (this.isHappyCliSession()) {
+      return 'The Happy Coder CLI executable is not compatible with your computer\'s CPU architecture. Reinstall it using a Node.js build that matches your CPU, or set "claudeMirror.happy.cliPath" to a working executable.';
+    }
+    return 'The Claude CLI executable is not compatible with your computer\'s CPU architecture. Reinstall it using a Node.js build that matches your CPU (npm install -g @anthropic-ai/claude-code), or set "claudeMirror.cliPath" to a working "claude" executable.';
   }
 
   /** Auto-fallback from Happy to Claude when the Happy CLI is missing on this

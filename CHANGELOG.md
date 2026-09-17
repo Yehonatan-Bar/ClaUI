@@ -1,5 +1,16 @@
 # ClaUi - Changelog
 
+## v0.1.234 - 2026-09-17
+
+**Change: Actionable error when the Claude CLI binary is incompatible with the machine**
+
+- Claude Code 2.x ships a per-architecture native `claude.exe` (selected at install time from `optionalDependencies` by the installing Node's `os.arch()`). Installing the wrong build - e.g. an `arm64` binary on an `x64` machine, or via a Node whose arch differs from the real CPU - makes the OS loader refuse it, and the CLI exits immediately with the opaque Windows message *"This version of ...claude.exe is not compatible with the version of Windows you're running"* (error 216, `ERROR_EXE_MACHINE_TYPE_MISMATCH`) or *"is not a valid Win32 application"* / Unix *"exec format error"*
+- `SessionTab` now detects these OS-loader signatures on the CLI's stderr (`isLikelyClaudeCliIncompatible`) and, on exit, surfaces a clear message via `getCliIncompatibleMessage()` telling the user to reinstall Claude Code with a matching Node.js or set `claudeMirror.cliPath` - instead of the generic "Claude process exited with code 1. Check ClaUi output channel"
+- The new `claudeCliIncompatibleDetected` flag also excludes the crash from Silent Crash Resume, so ClaUi does not loop retrying an un-loadable binary before showing the guidance. The flag is reset on every spawn, mirroring `claudeCliMissingDetected`
+- Docs: `Kingdom_of_Claudes_Beloved_MDs/SILENT_CRASH_RESUME.md` eligibility classifier updated
+
+---
+
 ## v0.1.233 - 2026-09-15
 
 **Feature: Claude Code slash commands actually run in Bridge Provider tabs**

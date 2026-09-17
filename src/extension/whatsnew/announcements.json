@@ -2,6 +2,21 @@
   "$comment": "Bundled What's New entries shown after an update (toast + in-panel banner). Add ONE entry per release that ships user-visible features; bug-fix-only releases get no entry and stay silent. 'version' is the EARLIEST extension version allowed to show the entry (vsce publish patch may assign a higher number, that is fine). 'id' must be unique and must never change once shipped. Newest entries can go anywhere in the list; the extension sorts by version.",
   "announcements": [
     {
+      "id": "2026-09-17-cli-arch-mismatch",
+      "version": "0.1.234",
+      "date": "2026-09-17",
+      "title": "Clearer error for an incompatible Claude CLI",
+      "titleHe": "הודעה ברורה כש-CLI לא תואם למחשב",
+      "highlights": [
+        "When the installed Claude CLI cannot run on your computer's CPU architecture, ClaUi now shows a clear reinstall message instead of a generic 'exited with code 1'.",
+        "It points you to reinstall Claude Code with a Node.js that matches your CPU, or to set claudeMirror.cliPath to a working 'claude' executable."
+      ],
+      "highlightsHe": [
+        "כשה-CLI המותקן של Claude לא יכול לרוץ על ארכיטקטורת המעבד של המחשב, ClaUi מציג עכשיו הודעת התקנה-מחדש ברורה במקום 'exited with code 1' כללי.",
+        "ההודעה מפנה אתכם להתקין מחדש את Claude Code עם Node.js שתואם למעבד, או להגדיר את claudeMirror.cliPath לנתיב 'claude' תקין."
+      ]
+    },
+    {
       "id": "2026-09-15-bridge-command-tools",
       "version": "0.1.233",
       "date": "2026-09-15",

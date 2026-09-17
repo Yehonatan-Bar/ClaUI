@@ -14,10 +14,11 @@ A crash falls into the silent path when **all** of these are true:
 2. Not `cancelledByUser` (user-cancel auto-resume already exists; that path is left unchanged).
 3. Not `suppressNextExit` (deliberate stop+restart, e.g. edit-and-resend).
 4. Not `claudeCliMissingDetected` / `happyAuthDetected` (install / auth guidance must surface).
-5. Not `resumeTargetMissingDetected` (CLI rejected our `--resume <sid>` because the session JSONL no longer exists on disk; retrying would loop forever).
-6. The tab has a `currentSessionId` to resume.
-7. `silentResumeAttempts < silentCrashResume.maxAttempts` (cap; default 2).
-8. `silentCrashResume.enabled === true` (default).
+5. Not `claudeCliIncompatibleDetected` (the CLI native binary can't run on this machine's CPU architecture; retrying an un-loadable binary would loop forever, so reinstall guidance must surface instead).
+6. Not `resumeTargetMissingDetected` (CLI rejected our `--resume <sid>` because the session JSONL no longer exists on disk; retrying would loop forever).
+7. The tab has a `currentSessionId` to resume.
+8. `silentResumeAttempts < silentCrashResume.maxAttempts` (cap; default 2).
+9. `silentCrashResume.enabled === true` (default).
 
 If any check fails, the existing visible UX runs unchanged. The exit-handler ordering puts `resumeTargetMissingDetected` highest priority, then in-flight escalation, then the classifier — so a stale resume target always surfaces a clean single-toast error and never re-arms.
 
