@@ -1972,6 +1972,7 @@
     "test:bridge": "node --import tsx --test tests/bridge/config.test.ts tests/bridge/protocol.test.ts tests/bridge/sessionStore.test.ts tests/bridge/grokPermissions.test.ts tests/bridge/procUtils.test.ts tests/bridge/openaiCompat.test.ts tests/bridge/council.test.ts tests/bridge/commandCatalog.test.ts tests/bridge/contextProviders.test.ts tests/bridge/packetBuilder.test.ts tests/bridge/dispatcher.test.ts tests/bridge/commandMcpServer.test.ts tests/bridge/grokCommandTools.test.ts tests/bridge/offload.test.ts",
     "test:hibernation": "node --import tsx --test tests/hibernation/hibernationPlanner.test.ts",
     "test:whats-new": "node --import tsx --test tests/unit/whatsNewLogic.test.ts tests/unit/whatsNewCore.test.ts tests/unit/whatsNewReceipt.test.ts",
+    "test:truncator": "node --import tsx --test tests/unit/SessionTruncator.test.ts tests/unit/CodexSessionTruncator.test.ts",
     "verify:installed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installed.ps1",
     "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1",
     "git:push": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-push.ps1",

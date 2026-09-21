@@ -437,7 +437,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.setTabName(`Search ${this.tabNumber}`);
   }
 
-  async startSession(options?: { resume?: string; fork?: boolean; cwd?: string; defer?: boolean }): Promise<void> {
+  async startSession(options?: { resume?: string; fork?: boolean; truncatedFork?: boolean; cwd?: string; defer?: boolean }): Promise<void> {
     // `defer` is accepted for signature parity with SessionTab but is a no-op
     // here: Codex is turn-based and never spawns a CLI at startSession (the
     // Codex CLI is only invoked per turn), so opening a Codex tab already never
@@ -451,6 +451,11 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
           : 'CodexSessionTab.startSession',
     );
     const isFork = !!options?.fork;
+    // Isolated-branch fork: `resume` points at a truncated COPY of the parent
+    // rollout (its own new thread id), so the fork resumes with full context
+    // without mutating the original thread. The webview history comes from
+    // forkInit, so we must not also replay the copy's transcript.
+    const isTruncatedFork = !!options?.truncatedFork;
 
     this.sessionCwd =
       options?.cwd ||
@@ -461,7 +466,9 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.sessionActive = true;
     this.threadId = isFork ? null : (options?.resume || null);
     this.currentModel = this.getCurrentModel();
-    this.sessionStartedAt = isFork ? new Date().toISOString() : (this.sessionStartedAt || new Date().toISOString());
+    this.sessionStartedAt = (isFork || isTruncatedFork)
+      ? new Date().toISOString()
+      : (this.sessionStartedAt || new Date().toISOString());
     this.analyticsSaved = false;
 
     // Create Particle Accelerator context file before any turns are sent
@@ -476,11 +483,11 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.deferredAutoSessionName = null;
     this.achievementService.onSessionStart(this.id);
 
-    if (options?.resume && !isFork) {
+    if (options?.resume && !isFork && !isTruncatedFork) {
       this.restoreSessionName(options.resume);
       this.loadAndSendConversationHistory(options.resume);
       this.persistSessionMetadata();
-    } else if (isFork && options?.resume) {
+    } else if ((isFork || isTruncatedFork) && options?.resume) {
       // For forks, inherit the parent session's name (without overwriting
       // fork-specific metadata like sessionStartedAt).
       const parentSession = this.sessionStore.getSession(options.resume);

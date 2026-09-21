@@ -107,7 +107,8 @@ claude-code-mirror/
 |   |   |   +-- SessionDiscovery.ts       #   Discover all Claude sessions from ~/.claude/projects/ filesystem
 |   |   |   +-- ChatSearchService.ts      #   Cross-session text search via raw JSONL string matching
 |   |   |   +-- CheckpointManager.ts      #   Per-session file change checkpoint for revert/redo
-|   |   |   +-- SessionTruncator.ts       #   Truncates JSONL for forked sessions (reduces API context)
+|   |   |   +-- SessionTruncator.ts       #   Truncates Claude JSONL for forked sessions (reduces API context)
+|   |   |   +-- CodexSessionTruncator.ts  #   Isolated-branch Codex fork: truncated rollout copy under a new thread id
 |   |   |   +-- sessionPathResolver.ts    #   Shared utility to find session JSONL files
 |   |   +-- usage/                        #   Developer usage reporting for admin cost dashboard
 |   |   |   +-- DeveloperUsageReporter.ts #   Hourly usage reporting: token accumulation, consent, registration, delta computation
@@ -588,6 +589,9 @@ claude-code-mirror/
 
 **Silent Crash Resume** - Suppresses the legacy "process exited - Restart?" toast / `sessionEnded` UI on a non-zero CLI exit when an eligibility classifier passes. The tab is armed with the existing `pendingResumeSessionId`; on the next user message (or panel focus, for Claude), the extension transparently respawns the CLI with `--resume <sessionId>` (Claude) / `--resume <threadId>` (Codex), flushes any queued prompts, and streams responses normally. Mid-stream interruptions finalize the partial assistant bubble with a muted "(message ended unexpectedly)" footer (`ChatMessage.interrupted`). Failure paths (timeout, spawn-error, exit-while-spawning, fresh-session, cap-exhausted) escalate to the visible Restart UX and restore the user's typed text via a `messageDeferredFailed -> silent-resume-restore-input` handoff. Configurable via `claudeMirror.silentCrashResume.enabled` (default true), `.maxAttempts` (default 2), `.timeoutMs` (default 15000), `.reconnectingHintDelayMs` (default 4000). Telemetry under `[SilentResume]` tags in `Output -> ClaUi`.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SILENT_CRASH_RESUME.md`
+
+**Fork From Message (Isolated Branch)** - Forking a conversation from a user message opens a new tab that resumes an isolated, truncated copy of the source session so the model (Claude or Codex) keeps the context up to the fork point without mutating the original. Claude uses `SessionTruncator` (truncated `.jsonl` copy, resumed with `--resume`); Codex uses `CodexSessionTruncator` (truncated rollout copy under a new thread id, resumed with `codex exec resume`). The truncated file always ends on a terminal assistant turn, so no dangling `tool_use` reaches the API.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/FORK_ISOLATED_BRANCH.md`
 
 **Deferred First Spawn** - Opening a new interactive session tab does not launch the provider CLI (`claude` / `happy`) up front; the spawn is deferred until the user's first prompt. A missing or misconfigured CLI therefore can never block opening the panel or surface an install/auth/fallback prompt before the first message - the tab always renders a clean, ready chat. The interactive commands call `SessionTab.startSession({ defer: true })`, which posts a `pending` `sessionStarted` and arms the tab; the first `sendMessage`/`sendMessageWithImages` runs `ensureStarted()` (real spawn) then dispatches through the normal DLP + send path. Any missing-CLI UX then fires via the existing exit/error handlers, only after that first prompt. Resume/fork/restore/Smart Search keep eager spawn. Codex is already turn-based (its CLI is invoked per turn), so it was never affected.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/DEFERRED_FIRST_SPAWN.md`

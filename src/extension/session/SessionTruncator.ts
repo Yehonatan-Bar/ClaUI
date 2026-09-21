@@ -56,7 +56,7 @@ export class SessionTruncator {
     const annotations = this.buildAnnotations(parsedLines);
     let cutLine = this.findCutPoint(annotations, forkMessageIndex);
     cutLine = this.ensureValidConversation(parsedLines, annotations, cutLine);
-    cutLine = this.ensureEndsWithAssistant(annotations, cutLine);
+    cutLine = this.ensureEndsWithAssistant(parsedLines, annotations, cutLine);
 
     // Check if the truncation would produce any actual conversation content
     const hasUiContent = annotations.slice(0, cutLine).some(a => a.uiMessageIndex !== undefined);
@@ -244,7 +244,11 @@ export class SessionTruncator {
       || role === LineRole.TOOL_RESULT_USER;
   }
 
-  private ensureEndsWithAssistant(annotations: LineAnnotation[], cut: number): number {
+  private ensureEndsWithAssistant(
+    parsedLines: (Record<string, unknown> | null)[],
+    annotations: LineAnnotation[],
+    cut: number,
+  ): number {
     let newCut = cut;
 
     while (newCut > 0) {
@@ -258,14 +262,63 @@ export class SessionTruncator {
 
       if (lastContentIdx === -1) break;
 
-      if (annotations[lastContentIdx].role === LineRole.ASSISTANT) {
-        break;
+      // A trailing user-role line (real / meta / tool_result) can't be the last
+      // message: drop it so the conversation ends on an assistant turn.
+      if (annotations[lastContentIdx].role !== LineRole.ASSISTANT) {
+        newCut = lastContentIdx;
+        continue;
       }
 
-      newCut = lastContentIdx;
+      // Landed on an assistant. It is a valid terminal turn ONLY if its merged
+      // content does not end with a tool_use block. If it does, the matching
+      // tool_result lives after this line and has been trimmed away — keeping it
+      // would leave a dangling tool_use that the Anthropic API rejects. Drop the
+      // whole group and keep walking back to the previous terminal assistant.
+      const groupStart = this.assistantGroupStart(annotations, lastContentIdx);
+      if (this.assistantGroupEndsWithToolUse(parsedLines, annotations, groupStart, lastContentIdx)) {
+        newCut = groupStart;
+        continue;
+      }
+
+      break;
     }
 
     return newCut;
+  }
+
+  /** First line index of the contiguous assistant group (same message id) ending at `endIdx`. */
+  private assistantGroupStart(annotations: LineAnnotation[], endIdx: number): number {
+    const msgId = annotations[endIdx].assistantMsgId;
+    let start = endIdx;
+    while (
+      start - 1 >= 0 &&
+      annotations[start - 1].role === LineRole.ASSISTANT &&
+      annotations[start - 1].assistantMsgId === msgId
+    ) {
+      start--;
+    }
+    return start;
+  }
+
+  /** True when the merged blocks of the assistant group [start..end] end with a tool_use. */
+  private assistantGroupEndsWithToolUse(
+    parsedLines: (Record<string, unknown> | null)[],
+    annotations: LineAnnotation[],
+    start: number,
+    end: number,
+  ): boolean {
+    const msgId = annotations[end].assistantMsgId;
+    const blocks: unknown[] = [];
+    for (let i = start; i <= end; i++) {
+      if (annotations[i].role === LineRole.ASSISTANT && annotations[i].assistantMsgId === msgId) {
+        const content = (parsedLines[i] as any)?.message?.content;
+        if (Array.isArray(content)) {
+          blocks.push(...content);
+        }
+      }
+    }
+    const lastBlock = blocks[blocks.length - 1] as Record<string, unknown> | undefined;
+    return !!lastBlock && lastBlock.type === 'tool_use';
   }
 
   private writeTruncatedFile(

@@ -1,0 +1,9 @@
+{"type":"queue-operation","operation":"enqueue","sessionId":"test-session-dangling"}
+{"type":"user","message":{"role":"user","content":"do X"},"sessionId":"test-session-dangling"}
+{"type":"assistant","message":{"id":"msg_01","role":"assistant","content":[{"type":"text","text":"Answer to X."}]},"sessionId":"test-session-dangling"}
+{"type":"user","message":{"role":"user","content":"do Y"},"sessionId":"test-session-dangling"}
+{"type":"assistant","message":{"id":"msg_02","role":"assistant","content":[{"type":"text","text":"Let me use a tool."},{"type":"tool_use","id":"toolu_1","name":"Read","input":{"path":"a.txt"}}]},"sessionId":"test-session-dangling"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"contents"}]},"sessionId":"test-session-dangling"}
+{"type":"attachment","name":"ctx","sessionId":"test-session-dangling"}
+{"type":"user","message":{"role":"user","content":"do Z"},"sessionId":"test-session-dangling"}
+{"type":"assistant","message":{"id":"msg_03","role":"assistant","content":[{"type":"text","text":"Answer to Z."}]},"sessionId":"test-session-dangling"}

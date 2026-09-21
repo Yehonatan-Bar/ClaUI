@@ -1,5 +1,11 @@
 # Fork Context Truncation - Solution Specification
 
+> STATUS: Implemented. This file is the original design rationale (Claude only) and
+> describes the pre-implementation "cosmetic fork" as the current state. For the
+> current, shipped behavior — including the Codex isolated-branch fork and the
+> terminal-assistant rule that prevents dangling `tool_use` — see
+> `FORK_ISOLATED_BRANCH.md`.
+
 ## The Need
 
 When a user forks a conversation from message N (e.g., at 40% of the conversation), **the model should only see messages 1..N-1**. Currently, the fork is cosmetic only: the UI shows the truncated history, but the CLI session retains the full conversation. The context utilization bar correctly reflects this -- it stays high because the model truly processes the entire original context.

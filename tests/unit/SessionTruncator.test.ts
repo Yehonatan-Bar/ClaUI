@@ -353,6 +353,55 @@ describe('SessionTruncator', () => {
     });
   });
 
+  describe('dangling tool_use tail', () => {
+    // UI messages: [0:user "do X", 1:assistant msg_01 (text), 2:user "do Y",
+    //   3:assistant msg_02 (text + tool_use), <tool_result>, <attachment>,
+    //   4:user "do Z", 5:assistant msg_03 (text)]
+    // The msg_02 turn was interrupted after the tool_result (no terminal
+    // assistant), then the user typed "do Z". Forking from "do Z" must not
+    // leave msg_02's dangling tool_use as the final message.
+
+    it('never ends on a dangling tool_use when the terminal assistant is missing', () => {
+      const { sessionId, cleanup } = setupSession('dangling-tool-use-tail');
+      cleanups.push(cleanup);
+
+      const result = truncator.truncateSession(sessionId, 4);
+      assert.ok(result, 'truncation should succeed');
+      cleanups.push(() => { try { fs.unlinkSync(result!.jsonlPath); } catch {} });
+
+      const lines = readTruncatedLines(result.jsonlPath);
+
+      // Must end on an assistant whose final block is NOT a tool_use.
+      const last = lastNonMetadataLine(lines);
+      assert.ok(last, 'should have content');
+      assert.equal(last.type, 'assistant', 'should end on an assistant');
+      const content = (last.message as { content?: unknown[] }).content ?? [];
+      const lastBlock = Array.isArray(content) ? content[content.length - 1] as { type?: string } : undefined;
+      assert.notEqual(lastBlock?.type, 'tool_use', 'final block must not be a dangling tool_use');
+
+      // Every tool_use kept must have a matching tool_result somewhere in the file.
+      const toolUseIds = new Set<string>();
+      const toolResultIds = new Set<string>();
+      for (const l of lines) {
+        const blocks = (l.message as { content?: unknown } | undefined)?.content;
+        if (!Array.isArray(blocks)) continue;
+        for (const b of blocks as Array<{ type?: string; id?: string; tool_use_id?: string }>) {
+          if (b.type === 'tool_use' && b.id) toolUseIds.add(b.id);
+          if (b.type === 'tool_result' && b.tool_use_id) toolResultIds.add(b.tool_use_id);
+        }
+      }
+      for (const id of toolUseIds) {
+        assert.ok(toolResultIds.has(id), `tool_use ${id} must have a matching tool_result`);
+      }
+
+      // The interrupted msg_02 turn is dropped; the clean msg_01 answer remains.
+      const assistantIds = getUniqueAssistantMsgIds(lines);
+      assert.ok(assistantIds.includes('msg_01'), 'should keep the clean assistant turn');
+      assert.ok(!assistantIds.includes('msg_02'), 'should drop the interrupted tool_use turn');
+      assert.ok(!assistantIds.includes('msg_03'), 'should not include the forked-from turn');
+    });
+  });
+
   describe('general edge cases', () => {
     it('returns null for non-existent session', () => {
       const result = truncator.truncateSession('non-existent-session-id', 2);

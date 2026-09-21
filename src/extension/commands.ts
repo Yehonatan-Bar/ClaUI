@@ -9,6 +9,7 @@ import type { ProviderId, SerializedChatMessage } from './types/webview-messages
 import { openHtmlPreviewPanel } from './webview/HtmlPreviewPanel';
 import { MultiParticipantSessionTab } from './multiparticipant/MultiParticipantSessionTab';
 import { SessionTruncator } from './session/SessionTruncator';
+import { CodexSessionTruncator } from './session/CodexSessionTruncator';
 import { AuthManager } from './auth/AuthManager';
 import {
   DEFAULT_CLAUDE_ACCOUNT_PROFILE_ID,
@@ -1291,6 +1292,28 @@ export function registerCommands(
               return;
             }
             log('Truncation failed, falling back to full fork');
+          }
+
+          // Isolated-branch fork for Codex: copy the parent rollout truncated to the
+          // fork point into a new thread id, then resume that copy. Without this the
+          // Codex fork spawned a brand-new thread with no context (the UI showed the
+          // history but the model saw an empty session).
+          if (sourceProvider === 'codex') {
+            const codexTruncator = new CodexSessionTruncator((msg) => log(msg));
+            const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            const result = codexTruncator.truncateSession(sessionId, forkMessageIndex, workspacePath);
+
+            if (result) {
+              log(`Codex truncated fork: newThread=${result.newThreadId}, msgs=${result.uiMessagesKept}, lines=${result.linesWritten}`);
+              await tab.startSession({ resume: result.newThreadId, truncatedFork: true });
+              return;
+            }
+
+            // Fallback: resume the parent thread so the model keeps full context
+            // (not isolated, but far better than a zero-context new thread).
+            log('Codex truncation failed, falling back to resuming the parent thread');
+            await tab.startSession({ resume: sessionId });
+            return;
           }
 
           // Fallback: original full-copy fork
