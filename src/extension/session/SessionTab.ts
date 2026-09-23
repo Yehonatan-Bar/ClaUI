@@ -790,6 +790,34 @@ export class SessionTab implements WebviewBridge {
     }
   }
 
+  /** Replace the conversation with a fresh CLI session (no --resume) on this
+   *  tab's own model, cwd, account and bridge backend. Used by /clear and the
+   *  plan approval "clear context" option. The old process's exit is suppressed:
+   *  on Windows taskkill ends it with code 1, which the exit handler would
+   *  otherwise report as a crash (or a session end) after the new session is up.
+   *  Rejects when the spawn fails; the caller reports it. */
+  async restartFresh(): Promise<void> {
+    this.log(`[Tab ${this.tabNumber}] Restarting with a fresh session`);
+    if (this.processManager.isRunning) {
+      this.suppressNextExit = true;
+    }
+    this.processManager.stop();
+    // A fresh session takes over the process lifecycle from any armed
+    // lazy-wake / silent-resume / hibernation cycle.
+    this.supersedeSleepLifecycle('fresh-restart');
+    await this.processManager.start({
+      // THIS tab's model (explicit pick, else the running model).
+      ...this.resumeSpawnModelOption(),
+      // Bridge tabs: the namespaced bridge:* value must win (see restartWithCurrentSession).
+      ...this.bridgeModelSpawnOption(),
+      cwd: this.getEffectiveCwd(),
+      cliPathOverride: this.cliPathOverride ?? undefined,
+      appendSystemPrompt: this.appendSystemPrompt ?? undefined,
+      allowedTools: this.allowedTools ?? undefined,
+      ...this.claudeAccountProcessOptions(),
+    });
+  }
+
   // --- Public API ---
 
   /** Set fork initialization data (must be called before startSession) */
@@ -1774,7 +1802,7 @@ export class SessionTab implements WebviewBridge {
 
   /** Request context compaction */
   compact(instructions?: string): void {
-    this.control.compact(instructions);
+    this.messageHandler.requestCompact(instructions);
   }
 
   /** Reveal (focus) this tab's panel. When `viewColumn` is supplied, the panel
@@ -2813,12 +2841,20 @@ export class SessionTab implements WebviewBridge {
       }
       // Context compaction finished (manual /compact or the CLI's auto-compact).
       // Forwarded directly (like handleResultEvent) since the generic demux
-      // 'system' path is not consumed for this and the compact control_response
-      // reply is dropped. Gives the webview its only visible compaction signal.
+      // 'system' path is not consumed for this. Gives the webview its only
+      // visible compaction signal.
       if (event.type === 'system' && event.subtype === 'compact_boundary') {
         this.messageHandler.handleCompactBoundary(
           (event as import('../types/stream-json').SystemInitEvent).compact_metadata,
         );
+      }
+      // A compaction attempt that did not compact (e.g. "Not enough messages
+      // to compact.") emits no boundary, only this status.
+      if (event.type === 'system' && event.subtype === 'status') {
+        const statusEvent = event as import('../types/stream-json').SystemInitEvent;
+        if (statusEvent.compact_result === 'failed') {
+          this.messageHandler.handleCompactFailed(statusEvent.compact_error);
+        }
       }
       // Diagnostic: log raw assistant message usage
       if (event.type === 'assistant') {

@@ -60,6 +60,7 @@ export function useClaudeStream(): void {
     setCompactingSession,
     setCompactSessionNotice,
     resolveCompactBoundary,
+    dropPendingCompact,
     setGitPushSettings,
     setGitPushResult,
     setGitPushRunning,
@@ -842,6 +843,17 @@ export function useClaudeStream(): void {
           resolveCompactBoundary({ trigger: msg.trigger, preTokens: msg.preTokens });
           break;
 
+        case 'compactFailed':
+          // The reason is shown by the CLI's own reply (or an error banner).
+          dropPendingCompact();
+          break;
+
+        case 'conversationReset':
+          // Plan approval "clear context": same chat reset as /clear; the fresh
+          // session's sessionStarted and first message follow.
+          useAppStore.getState().reset();
+          break;
+
         case 'gitPushResult':
           setGitPushRunning(false);
           setGitPushResult({ success: msg.success, output: msg.output });
@@ -1510,6 +1522,7 @@ export function useClaudeStream(): void {
     setCompactingSession,
     setCompactSessionNotice,
     resolveCompactBoundary,
+    dropPendingCompact,
     setGitPushSettings,
     setGitPushResult,
     setGitPushRunning,

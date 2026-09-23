@@ -177,7 +177,7 @@ Also updated `markApprovalCycleResultObserved` to NOT cancel the fallback timer.
 8. Approval bar never shows. Model stuck in plan mode.
 
 **Fix**: Added a `compactPending` flag to MessageHandler:
-1. When compaction is requested (via `compact` webview message, ExitPlanMode `approveClearBypass`, or non-ExitPlanMode `approveClearBypass`), set `compactPending = true`
+1. When compaction is requested (`MessageHandler.requestCompact`: `/compact`, Tools > Compact Context, `claudeMirror.compact`), set `compactPending = true` (also set by the in-place fallback of `approveClearBypass`, used only when no plan text is available; normally that option starts a fresh session instead)
 2. In the `messageStart` handler, if `compactPending` is true, reset `exitPlanModeProcessed = false` and `compactPending = false`
 3. This ensures the first assistant turn after compaction gets a clean slate while late events from the pre-compaction turn are still suppressed
 
@@ -486,7 +486,7 @@ if (isExitPlanMode) {
     this.control.sendText(msg.feedback.trim());
   } else {
     // Approve/reject: close bar without sending text (CLI auto-approves).
-    if (msg.action === 'approveClearBypass') this.control.compact();
+    if (msg.action === 'approveClearBypass') this.compactPending = true; // in-place fallback only (no plan text); normally approvePlanInFreshSession ran first
     else if (msg.action === 'approveManual') { /* switch permission mode */ }
     // Approve actions schedule fallback (immediate nudge if CLI idle,
     // delayed nudge if no activity yet, skip if CLI actively working).

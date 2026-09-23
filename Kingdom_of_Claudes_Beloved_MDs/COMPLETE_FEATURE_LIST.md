@@ -82,7 +82,7 @@ A comprehensive catalog of every feature and capability in the ClaUi VS Code ext
 ## 7. Plan Approval UI
 
 - **4-option approval bar** matching the Claude CLI:
-  1. Clear context + bypass permissions (also triggers context compaction)
+  1. Clear context + bypass permissions (the chat is cleared and a fresh session implements the plan, starting with only the plan and a pointer to the previous transcript)
   2. Bypass permissions
   3. Manually approve edits (switches to supervised permission mode)
   4. Type feedback (sends text to CLI)
@@ -537,7 +537,7 @@ All toggles sync bidirectionally with VS Code settings.
 | `Ctrl+Alt+Shift+C` | Send current file path to chat |
 | `Ctrl+V` | Paste image from clipboard |
 | `Ctrl+Alt+Q` | Stop current session |
-| `Ctrl+Alt+K` | Compact context (free up token space) |
+| `Ctrl+Alt+K` | Compact context in place (free up token space; same as `/compact` and Tools > Compact Context) |
 | `Ctrl+Alt+R` | Resume a previous session |
 | `Ctrl+Alt+Enter` | Send message (via input box) |
 | `Ctrl+Alt+P` | Open plan documents |

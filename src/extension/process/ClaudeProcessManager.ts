@@ -447,18 +447,19 @@ export class ClaudeProcessManager extends EventEmitter {
     this.log(`Control protocol: respondPermission requestId=${requestId} behavior=${result.behavior}`);
   }
 
-  /** Request context compaction. A `request_id` is required: the CLI pairs
-   *  control_request/control_response by this id (same as the initialize
-   *  handshake), and silently ignores a request that omits it. */
+  /** Request in-place context compaction by posting the `/compact` slash
+   *  command as a user message. The CLI has no `compact` control_request
+   *  subtype (it answers "Unsupported control request subtype: compact");
+   *  `/compact` is a local command that headless (-p stream-json) mode runs
+   *  when it arrives as text. Sent mid-turn, the CLI queues it and compacts
+   *  right after the current turn. On success it emits
+   *  system/compact_boundary (trigger "manual"), the summary and a
+   *  "<local-command-stdout>" user envelope, then a result with num_turns 0. */
   sendCompact(instructions?: string): void {
-    this.send({
-      type: 'control_request',
-      request_id: `claui-compact-${Date.now()}`,
-      request: {
-        subtype: 'compact',
-        ...(instructions ? { custom_instructions: instructions } : {}),
-      },
-    });
+    const trimmedInstructions = instructions?.trim();
+    const commandText = trimmedInstructions ? `/compact ${trimmedInstructions}` : '/compact';
+    this.log(`sendCompact: posting "${commandText.slice(0, 80)}"`);
+    this.send({ type: 'user', message: { role: 'user', content: commandText } });
   }
 
   /** Kill the entire process tree via the shared killTree utility. */

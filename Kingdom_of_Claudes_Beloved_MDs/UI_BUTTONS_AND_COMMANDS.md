@@ -50,8 +50,8 @@ All commands are registered under the `claudeMirror.*` namespace in `package.jso
 
 ### `claudeMirror.compact` — "ClaUi: Compact Context"
 - **Tooltip:** Compact the conversation context
-- **EN:** Triggers the CLI's context-compaction so a long conversation is summarized into a smaller footprint, freeing context-window room.
-- **HE:** מפעיל דחיסת-הקשר של ה-CLI כך ששיחה ארוכה מסוכמת לטביעת-רגל קטנה יותר, ומשחרר מקום בחלון ההקשר.
+- **EN:** Triggers the CLI's context-compaction so a long conversation is summarized into a smaller footprint, freeing context-window room. Same as typing /compact (optionally followed by instructions for the summary) or Tools > Compact Context in the status bar. Shortcut: Ctrl+Alt+K.
+- **HE:** מפעיל דחיסת-הקשר של ה-CLI כך ששיחה ארוכה מסוכמת לטביעת-רגל קטנה יותר, ומשחרר מקום בחלון ההקשר. זהה להקלדת /compact (אפשר להוסיף אחריו הנחיות לסיכום) או ל-Tools > Compact Context בשורת הסטטוס. קיצור: Ctrl+Alt+K.
 
 ### `claudeMirror.sendMessage` — "ClaUi: Send Message"
 - **Tooltip:** Send a message to the session
@@ -320,6 +320,7 @@ All commands are registered under the `claudeMirror.*` namespace in `package.jso
 | Git `*` | Git push settings | Open Git push settings panel. | פתח את פאנל הגדרות ה-Git push. |
 | Snippet | Insert snippet at cursor / set it up | Insert your saved snippet; opens config if empty. | הכנס את ה-snippet השמור; פותח הגדרה אם ריק. |
 | Snippet `*` | Edit custom snippet text | Open the snippet editor. | פתח את עורך ה-snippet. |
+| Compact Context (Claude tabs) | Summarize this conversation in place to free context (same as /compact). If Claude is still answering, it runs right after the reply. | Run the CLI's in-place compaction; a "Compacting context..." divider turns into "Context compacted". | הרץ את דחיסת ההקשר של ה-CLI במקום; מפריד "Compacting context..." הופך ל-"Context compacted". |
 | Consult Codex | Consult Codex GPT expert | Ask a Codex/GPT expert about the current work. | התייעץ עם מומחה Codex/GPT לגבי העבודה הנוכחית. |
 | Run Review Now | Run a Claude + Codex review now | Launch a one-off Claude+Codex review (when auto-review is off). | הפעל סקירת Claude+Codex חד-פעמית (כשאוטו-סקירה כבויה). |
 | Auto-review toggle | Auto-start the review loop after each work turn | Global default: auto-run review after every turn. | ברירת מחדל גלובלית: הרצת סקירה אוטומטית אחרי כל תור. |
@@ -445,7 +446,7 @@ All commands are registered under the `claudeMirror.*` namespace in `package.jso
 ## Plan Approval & Question bar *(Wave 2)* / באנר אישור תוכנית ושאלות (`PlanApprovalBar.tsx`)
 | Button | Tooltip | EN | HE |
 |---|---|---|---|
-| Plan option 1 | Approve the plan, clear the context window, and stop asking permission for each action | Approve + clear context + bypass permissions. | אשר + נקה הקשר + עקוף הרשאות. |
+| Plan option 1 | Approve the plan and implement it in a fresh session that starts with only the plan (this chat is cleared), without asking permission for each action | Approve + clear context + bypass permissions: the chat is cleared and a fresh session starts implementing, with the plan as its first message. | אשר + נקה הקשר + עקוף הרשאות: הצ'אט מתנקה וסשן חדש מתחיל לממש, כשהתוכנית היא ההודעה הראשונה שלו. |
 | Plan option 2 | Approve the plan and stop asking permission for each action | Approve + bypass permissions. | אשר + עקוף הרשאות. |
 | Plan option 3 | Approve the plan but review and confirm each edit manually | Approve, confirm edits manually. | אשר, אשר כל עריכה ידנית. |
 | Plan option 4 | Reject for now and type changes you want Claude to make | Open free-text feedback. | פתח משוב בטקסט חופשי. |

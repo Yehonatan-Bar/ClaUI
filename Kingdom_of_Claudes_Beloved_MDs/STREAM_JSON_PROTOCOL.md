@@ -307,20 +307,36 @@ Send a user message (text or content blocks).
 }
 ```
 
-### control_request
+### Compact context (the `/compact` slash command)
 
-Send control commands.
+The CLI has **no `compact` control request** (it answers
+`{"subtype":"error","error":"Unsupported control request subtype: compact"}`).
+In-place compaction is the local `/compact` command, which headless
+(`-p` stream-json) mode runs when it arrives as a user message. Optional text
+after the command becomes custom summarization instructions:
 
-**Compact context:**
 ```json
-{
-  "type": "control_request",
-  "request": {
-    "subtype": "compact",
-    "custom_instructions": "Focus on the authentication module"
-  }
-}
+{ "type": "user", "message": { "role": "user", "content": "/compact Focus on the authentication module" } }
 ```
+
+Posted while a turn is running, it is queued and runs right after that turn.
+The CLI then emits, in order (verified against CLI 2.1.280):
+
+| Event | Notes |
+|-------|-------|
+| `system/status` `status: "compacting"` | Compaction started |
+| `system/hook_*` | `SessionStart:compact` hooks, if configured |
+| `system/status` `compact_result: "success"` or `"failed"` | Failure carries `compact_error` (e.g. `"Not enough messages to compact."`) and has no boundary; the CLI then sends a `<synthetic>` assistant message with the reason |
+| `system/init` | Same session id |
+| `system/compact_boundary` | `compact_metadata: { trigger: "manual", pre_tokens, post_tokens, ... }` |
+| `user` (`isSynthetic: true`) | The summary ("This session is being continued from a previous conversation...") |
+| `user` (`isReplay: true`) | `<local-command-stdout>Compacted </local-command-stdout>` |
+| `result` | `num_turns: 0`, `result: ""` |
+
+ClaUi consumes the two `user` envelopes and the closing `result` without
+rendering them or recording a turn (`MessageHandler.manualCompactClosing`).
+
+### control_request
 
 **Cancel current request:**
 ```json

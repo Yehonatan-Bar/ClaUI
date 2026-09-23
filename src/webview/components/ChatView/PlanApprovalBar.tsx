@@ -66,6 +66,20 @@ function parseAllowedPrompts(planText: string): AllowedPrompt[] {
   }
 }
 
+/**
+ * The approved plan from the ExitPlanMode tool input ({ plan, planFilePath }).
+ * Sent with "clear context" so the extension can seed the fresh session.
+ */
+function parseApprovedPlan(planText: string): string {
+  if (!planText) return '';
+  try {
+    const data = JSON.parse(planText);
+    return typeof data?.plan === 'string' ? data.plan : '';
+  } catch {
+    return '';
+  }
+}
+
 /** Max context window tokens for percentage calculation */
 const MAX_CONTEXT_TOKENS = 200_000;
 
@@ -142,8 +156,16 @@ export const PlanApprovalBar: React.FC = () => {
 
   // --- Plan approval handlers (4 CLI-matching options) ---
   const handleApproveClearBypass = () => {
-    logApprovalUi('clickOption', { action: 'approveClearBypass' });
-    postToExtension({ type: 'planApprovalResponse', action: 'approveClearBypass', toolName: approvalToolName });
+    const approvedPlan = parseApprovedPlan(pendingApproval.planText);
+    logApprovalUi('clickOption', { action: 'approveClearBypass', planChars: approvedPlan.length });
+    // The extension replaces the conversation with a fresh session seeded with
+    // the plan (and tells the webview to reset via conversationReset).
+    postToExtension({
+      type: 'planApprovalResponse',
+      action: 'approveClearBypass',
+      toolName: approvalToolName,
+      plan: approvedPlan || undefined,
+    });
     setPendingApproval(null);
   };
 
@@ -417,7 +439,7 @@ export const PlanApprovalBar: React.FC = () => {
       key: 1,
       label: `Yes, clear context${contextPercent > 0 ? ` (${contextPercent}% used)` : ''} and bypass permissions`,
       handler: handleApproveClearBypass,
-      tooltip: 'Approve the plan, clear the context window, and stop asking permission for each action',
+      tooltip: 'Approve the plan and implement it in a fresh session that starts with only the plan (this chat is cleared), without asking permission for each action',
     },
     {
       key: 2,

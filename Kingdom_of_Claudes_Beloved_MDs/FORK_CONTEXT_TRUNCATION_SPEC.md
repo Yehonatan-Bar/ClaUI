@@ -126,7 +126,7 @@ The CLI accepts exactly **two** message types via stdin:
 | Type | Schema | Purpose |
 |------|--------|---------|
 | `UserInputMessage` | `{ type: 'user', message: { role: 'user', content: string \| ContentBlock[] } }` | Send a user message |
-| `ControlRequest` | `{ type: 'control_request', request: { subtype: 'compact' \| 'cancel' } }` | Compact or cancel |
+| `InitializeControlRequest` | `{ type: 'control_request', request_id, request: { subtype: 'initialize' } }` | Control-protocol handshake (compaction is the `/compact` user message; cancel kills the process) |
 
 **There is no way to inject assistant messages via stdin.** The CLI only accepts `role: 'user'` messages. We cannot reconstruct conversation history through the stdin pipe.
 

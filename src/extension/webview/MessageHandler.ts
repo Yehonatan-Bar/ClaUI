@@ -13,6 +13,7 @@ import type { PromptEnhancer } from '../session/PromptEnhancer';
 import type { PromptTranslator } from '../session/PromptTranslator';
 import type { PromptHistoryStore } from '../session/PromptHistoryStore';
 import type { ProjectAnalyticsStore } from '../session/ProjectAnalyticsStore';
+import { findSessionJsonlPath } from '../session/sessionPathResolver';
 import type { AchievementService } from '../achievements/AchievementService';
 import type { SkillGenService } from '../skillgen/SkillGenService';
 import { getStoredApiKey, setStoredApiKey, maskApiKey } from '../process/envUtils';
@@ -85,6 +86,10 @@ export interface WebviewBridge {
   /** Restart the CLI process while preserving the live conversation (stop + --resume).
    *  Used by the MCP panel so config changes load without losing the chat. */
   restartWithCurrentSession?(): Promise<void>;
+  /** Replace the conversation with a fresh CLI session (no --resume) on this tab's
+   *  own model, cwd, account and bridge backend. Used by /clear and the plan
+   *  approval "clear context" option. Rejects when the spawn fails. */
+  restartFresh?(): Promise<void>;
   /** Save project analytics immediately (called before session clear/reset to avoid data loss) */
   saveProjectAnalyticsNow?(): void;
   /** Optional per-tab CLI override (e.g. Happy provider uses `happy` instead of `claude`) */
@@ -261,15 +266,23 @@ export class MessageHandler {
   private pendingApprovalCycleResultObserved = false;
   /** Delayed fallback: nudge Claude to proceed if ExitPlanMode approve did not auto-resume */
   private exitPlanApproveResumeFallbackTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Set when a compact request is sent to CLI. On next messageStart, resets exitPlanModeProcessed
-   *  so the model can call ExitPlanMode again after compaction re-activates plan mode. */
+  /** Set when a manual compaction or a clear-context plan approval is requested. On next
+   *  messageStart, resets exitPlanModeProcessed so the model can call ExitPlanMode again
+   *  after compaction re-activates plan mode. */
   private compactPending = false;
+  /** True between a manual compact_boundary and the result that closes the CLI's
+   *  `/compact` command. User-role envelopes in that window (the summary and the
+   *  "<local-command-stdout>Compacted" line) are compaction output, not input. */
+  private manualCompactClosing = false;
+  /** Context size after the last manual compaction (compact_boundary post_tokens). */
+  private manualCompactPostTokens: number | null = null;
   private exitPlanApproveResumeFallbackCycleId: number | null = null;
   /** True while the CLI is between messageStart and result (assistant turn in progress) */
   private inAssistantTurn = false;
-  /** Guard: last turnIndex for which result was handled (prevents double-fire if both
-   *  the demux listener AND the direct wireProcessEvents path deliver the same result) */
-  private lastResultHandledTurnIndex = -1;
+  /** Guard: the last CLI result event handled. The same event object is delivered twice
+   *  (the direct wireProcessEvents path AND the demux 'result' listener), so a repeat
+   *  of this reference is skipped. */
+  private lastHandledResultEvent: ResultSuccess | ResultError | null = null;
   /** Thinking effort level detected from system init or content blocks (reset per message) */
   private currentThinkingEffort: string | null = null;
   /** Session-level effort (from CLI init or user config); persists across messages so
@@ -2111,8 +2124,7 @@ export class MessageHandler {
           break;
 
         case 'compact':
-          this.compactPending = true;
-          this.control.compact(msg.instructions);
+          this.requestCompact(msg.instructions);
           break;
 
         case 'startSession':
@@ -2233,50 +2245,7 @@ export class MessageHandler {
           break;
 
         case 'clearSession':
-          // Save analytics for the current session BEFORE clearing records
-          this.webview.saveProjectAnalyticsNow?.();
-          this.clearUsageLimitState('clearSession', { notifyWebview: true, clearQueuedPrompt: true });
-          this.clearScheduledPromptState(true);
-          this.firstMessageSent = false;
-          this.clearPendingHandoffPrompt();
-          this.exitPlanModeBarActive = false;
-          this.clearApprovalTracking();
-          this.resetExitPlanModeProcessed('clearSession');
-          this.exitPlanModeReopenCount = 0;
-          this.activitySummarizer?.reset();
-          this.adventureInterpreter?.reset();
-          this.turnRecords = [];
-          this.resetCheckpointState('clearSession');
-          this.log('clearSession - stopping current process and starting fresh');
-          this.achievementService.onSessionEnd(this.tabId);
-          this.processManager.stop();
-          // Sync CLI override with provider dropdown before restarting
-          this.syncProviderOverrideForNewSession();
-          this.processManager
-            .start({
-              cwd: msg.workspacePath,
-              cliPathOverride: this.getCliPathOverride(),
-              // A bridge tab starts a FRESH (non-resume) session on clear; carry
-              // its bridge:* model so it stays on the same backend instead of
-              // erroring "no backend selected".
-              ...this.bridgeSpawnModelOption(),
-            })
-            .then(() => {
-              this.achievementService.onSessionStart(this.tabId);
-              this.log('Process restarted after clear');
-              this.webview.postMessage({
-                type: 'sessionStarted',
-                sessionId: this.processManager.currentSessionId || 'pending',
-                model: this.processManager.configuredModel,
-                provider: this.getActiveProvider(),
-              });
-            })
-            .catch((err) => {
-              this.webview.postMessage({
-                type: 'error',
-                message: `Failed to restart session: ${err.message}`,
-              });
-            });
+          this.clearAndRestartSession(msg.workspacePath);
           break;
 
         case 'setModel':
@@ -3218,6 +3187,7 @@ export class MessageHandler {
         case 'planApprovalResponse':
           this.log(`Plan approval response: action=${msg.action} toolName=${msg.toolName || '(none)'} pendingTool=${this.pendingApprovalTool || '(none)'}`);
           this.logApprovalState('planApprovalResponse-entry');
+          if (msg.action === 'approveClearBypass' && this.approvePlanInFreshSession(msg.plan)) { break; }
           if (this.resolvePermissionFromApproval(msg)) { break; }
           {
           const sendApprovalText = (text: string, context: string): boolean => {
@@ -3275,19 +3245,9 @@ export class MessageHandler {
             } else {
               this.log(`ExitPlanMode ${msg.action} - closing bar without sending user message (CLI auto-approves)`);
               if (msg.action === 'approveClearBypass') {
-                this.log('Plan approval: also compacting context');
+                // Reached only when no plan text was available (approvePlanInFreshSession
+                // returned false): approve in place, the context is kept.
                 this.compactPending = true;
-                try {
-                  this.control.compact();
-                  this.log('[EPM_APPROVE] Compact request sent');
-                } catch (err) {
-                  const errorText = err instanceof Error ? err.message : String(err);
-                  this.log(`[EPM_APPROVE] Compact request failed: ${errorText}`);
-                  this.webview.postMessage({
-                    type: 'error',
-                    message: `Plan approval action failed (compact): ${errorText}`,
-                  });
-                }
               } else if (msg.action === 'approveManual') {
                 this.log('Plan approval: switching to supervised mode');
                 vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', 'supervised', true);
@@ -3304,19 +3264,10 @@ export class MessageHandler {
           } else if (msg.action === 'approve') {
             sendApprovalText('Continue with the implementation.', 'approve');
           } else if (msg.action === 'approveClearBypass') {
-            this.log('Plan approval: approving, then clearing context (compact)');
+            // Reached only when no plan text was available (approvePlanInFreshSession
+            // returned false): approve in place, the context is kept.
             this.compactPending = true;
-            sendApprovalText('Continue with the implementation. Please compact context to free up space.', 'approveClearBypass');
-            try {
-              this.control.compact();
-            } catch (err) {
-              const errorText = err instanceof Error ? err.message : String(err);
-              this.log(`[EPM_APPROVE] Non-ExitPlan compact request failed: ${errorText}`);
-              this.webview.postMessage({
-                type: 'error',
-                message: `Plan approval action failed (compact): ${errorText}`,
-              });
-            }
+            sendApprovalText('Continue with the implementation.', 'approveClearBypass');
           } else if (msg.action === 'approveManual') {
             this.log('Plan approval: switching to supervised mode for manual edit approval');
             vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', 'supervised', true);
@@ -5828,6 +5779,13 @@ export class MessageHandler {
           this.resetExitPlanModeProcessed('post-compact messageStart');
           this.compactPending = false;
         }
+        // A real assistant message means the /compact closing window is over
+        // (its result was lost, e.g. the CLI crashed mid-compaction).
+        if (this.manualCompactClosing) {
+          this.log('messageStart inside /compact closing window: closing it');
+          this.manualCompactClosing = false;
+          this.manualCompactPostTokens = null;
+        }
         this.toolBlockNames.clear();
         this.toolBlockContexts.clear();
         this.currentAdventureArtifacts.clear();
@@ -5877,6 +5835,15 @@ export class MessageHandler {
         // passed via tool_use.input.prompt, which is already rendered inside
         // AgentSpawnBlock. Drop it here so it does not double-render as "YOU".
         if (event.parent_tool_use_id) {
+          return;
+        }
+
+        // A manual /compact replays its summary and a
+        // "<local-command-stdout>Compacted</local-command-stdout>" line as
+        // user-role envelopes at idle. The compact divider already reports
+        // the result, so neither may render as "YOU".
+        if (this.manualCompactClosing) {
+          this.log('[userMessage] Suppressed /compact output envelope');
           return;
         }
 
@@ -5997,16 +5964,24 @@ export class MessageHandler {
    * not fire in some webpack-bundled builds).
    */
   handleResultEvent(event: ResultSuccess | ResultError, source: string = 'unknown'): void {
-    // Dedup guard: the same result can arrive via both the demux listener
-    // and the direct wireProcessEvents path. Use turnIndex to detect dupes.
-    const nextTurn = this.turnIndex;
-    if (nextTurn === this.lastResultHandledTurnIndex) {
-      this.log(`[RESULT_HANDLER] Skipping duplicate result (turnIndex=${nextTurn}, source=${source})`);
+    // Dedup guard: the same result object arrives via both the direct
+    // wireProcessEvents path and the demux listener. Compared by reference:
+    // turnIndex advances while a result is processed, so it cannot spot a repeat.
+    if (event === this.lastHandledResultEvent) {
+      this.log(`[RESULT_HANDLER] Skipping duplicate result (source=${source})`);
       return;
     }
-    this.lastResultHandledTurnIndex = nextTurn;
+    this.lastHandledResultEvent = event;
 
-    this.log(`[RESULT_HANDLER] Processing result: subtype=${event.subtype} source=${source} turnIndex=${nextTurn}`);
+    // The result that closes a manual /compact is not a conversation turn: it
+    // must not add a timeline/vitals record, checkpoint or turn analysis.
+    if (this.manualCompactClosing) {
+      this.manualCompactClosing = false;
+      this.finishManualCompact(event, source);
+      return;
+    }
+
+    this.log(`[RESULT_HANDLER] Processing result: subtype=${event.subtype} source=${source} turnIndex=${this.turnIndex}`);
     this.inAssistantTurn = false;
     try {
       // Codex consultation: log result timing if a consultation was in flight
@@ -6104,8 +6079,6 @@ export class MessageHandler {
           this.log(`[CHECKPOINT-DEBUG] After finalizeTurn: ${cpState.checkpoints.length} checkpoints, revertedToIndex=${cpState.revertedToIndex}`);
           this.postCheckpointState();
         }
-        // Update the dedup guard with the actual assigned turnIndex
-        this.lastResultHandledTurnIndex = successTurn.turnIndex;
         // Token-Usage Ratio Tracker: record turn and sample if due
         if (this.tokenRatioTracker) {
           const shouldSample = this.tokenRatioTracker.recordTurn({
@@ -6174,8 +6147,6 @@ export class MessageHandler {
         this.log(`Emitting turnComplete (error): turn=${errorTurn.turnIndex}`);
         this.webview.postMessage({ type: 'turnComplete', turn: errorTurn });
         this.turnRecords.push(errorTurn as TurnRecord);
-        // Update the dedup guard with the actual assigned turnIndex
-        this.lastResultHandledTurnIndex = errorTurn.turnIndex;
         // Token-Usage Ratio Tracker: record turn (0 tokens for error turns)
         if (this.tokenRatioTracker) {
           const shouldSample = this.tokenRatioTracker.recordTurn({
@@ -6621,17 +6592,218 @@ export class MessageHandler {
     });
   }
 
+  /** Run the CLI's in-place context compaction (the /compact slash command,
+   *  the Tools menu item and the `claudeMirror.compact` command all land here).
+   *  The command is posted as text; the CLI queues it behind a running turn. */
+  requestCompact(instructions?: string): void {
+    // The bridge runtime (Grok / Antigravity / OpenAI-compatible / Council) has
+    // no compaction: a posted "/compact" would reach the bridge model as a prompt.
+    if (isBridgeCliCommand(this.getCliPathOverride())) {
+      this.log('Compact request ignored: bridge tab');
+      this.webview.postMessage({ type: 'compactFailed', error: 'bridge tab' });
+      this.webview.postMessage({
+        type: 'error',
+        message: '/compact is not supported in bridge tabs (Grok, Antigravity, OpenAI-compatible, Council).',
+      });
+      return;
+    }
+    try {
+      this.control.compact(instructions);
+      this.compactPending = true;
+    } catch (err) {
+      const errorText = err instanceof Error ? err.message : String(err);
+      this.log(`Compact request failed: ${errorText}`);
+      this.webview.postMessage({ type: 'compactFailed', error: errorText });
+      this.webview.postMessage({ type: 'error', message: `Compact failed: ${errorText}` });
+    }
+  }
+
   /** Forward a CLI `system/compact_boundary` event to the webview so it can
-   *  render a visible "context compacted" divider. Covers both the manual
-   *  /compact control request and the CLI's automatic compaction. The
-   *  control_response reply carries no useful body, so this boundary event is
-   *  our only signal that compaction actually happened. */
-  handleCompactBoundary(meta?: { trigger?: string; pre_tokens?: number }): void {
+   *  render a visible "context compacted" divider. Covers both a manual
+   *  /compact and the CLI's automatic compaction. A manual boundary also opens
+   *  the window in which the /compact output envelopes and its closing result
+   *  are consumed (see manualCompactClosing). */
+  handleCompactBoundary(meta?: { trigger?: string; pre_tokens?: number; post_tokens?: number }): void {
     const trigger =
       meta?.trigger === 'manual' ? 'manual' : meta?.trigger === 'auto' ? 'auto' : 'unknown';
     const preTokens = typeof meta?.pre_tokens === 'number' ? meta.pre_tokens : undefined;
-    this.log(`Compact boundary: trigger=${trigger} preTokens=${preTokens ?? '?'}`);
+    const postTokens = typeof meta?.post_tokens === 'number' ? meta.post_tokens : undefined;
+    this.log(`Compact boundary: trigger=${trigger} preTokens=${preTokens ?? '?'} postTokens=${postTokens ?? '?'}`);
+    if (trigger === 'manual') {
+      this.manualCompactClosing = true;
+      this.manualCompactPostTokens = postTokens ?? null;
+    }
     this.webview.postMessage({ type: 'compactBoundary', trigger, preTokens });
+  }
+
+  /** A compaction attempt ended without compacting (CLI `system/status` with
+   *  compact_result "failed"). The CLI explains why in a synthetic assistant
+   *  reply, so only the pending "Compacting context..." divider is cleared. */
+  handleCompactFailed(error?: string): void {
+    this.log(`Compact failed: ${error ?? '(no reason given)'}`);
+    this.webview.postMessage({ type: 'compactFailed', error });
+  }
+
+  /** Close a manual /compact: report the compacted context size and mark the
+   *  tab idle without recording a conversation turn. */
+  private finishManualCompact(event: ResultSuccess | ResultError, source: string): void {
+    this.log(
+      `[RESULT_HANDLER] /compact finished: subtype=${event.subtype} source=${source} ` +
+      `postTokens=${this.manualCompactPostTokens ?? '?'}`,
+    );
+    this.inAssistantTurn = false;
+    if (this.manualCompactPostTokens !== null) {
+      // A later result without a messageStart must not fall back to the pre-compact size.
+      this.lastAssistantInputTokens = this.manualCompactPostTokens;
+    }
+    this.manualCompactPostTokens = null;
+    if (event.subtype === 'success') {
+      const success = event as ResultSuccess;
+      this.webview.postMessage({
+        type: 'costUpdate',
+        costUsd: success.cost_usd ?? 0,
+        totalCostUsd: success.total_cost_usd ?? 0,
+        inputTokens: this.lastAssistantInputTokens,
+        outputTokens: 0,
+      });
+    } else {
+      this.webview.postMessage({ type: 'error', message: (event as ResultError).error });
+    }
+    this.webview.postMessage({ type: 'processBusy', busy: false });
+  }
+
+  /** Clear this tab's conversation state and start a fresh CLI session (the
+   *  /clear slash command, the Clear button, and the plan approval "clear
+   *  context" option). `afterStart` runs once the new process is up. */
+  private clearAndRestartSession(workspacePath?: string, afterStart?: () => void): void {
+    // Save analytics for the current session BEFORE clearing records
+    this.webview.saveProjectAnalyticsNow?.();
+    this.clearUsageLimitState('clearSession', { notifyWebview: true, clearQueuedPrompt: true });
+    this.clearScheduledPromptState(true);
+    this.firstMessageSent = false;
+    this.clearPendingHandoffPrompt();
+    this.exitPlanModeBarActive = false;
+    this.cancelExitPlanApproveResumeFallback();
+    this.cancelPostApproveNudge();
+    this.clearApprovalTracking();
+    this.resetExitPlanModeProcessed('clearSession');
+    this.exitPlanModeReopenCount = 0;
+    this.manualCompactClosing = false;
+    this.manualCompactPostTokens = null;
+    this.activitySummarizer?.reset();
+    this.adventureInterpreter?.reset();
+    this.turnRecords = [];
+    this.resetCheckpointState('clearSession');
+    this.log('clearSession - stopping current process and starting fresh');
+    this.achievementService.onSessionEnd(this.tabId);
+    // Sync CLI override with provider dropdown before restarting
+    this.syncProviderOverrideForNewSession();
+    let restart: Promise<void>;
+    if (this.webview.restartFresh) {
+      restart = this.webview.restartFresh();
+    } else {
+      this.processManager.stop();
+      restart = this.processManager.start({
+        cwd: workspacePath,
+        cliPathOverride: this.getCliPathOverride(),
+        // A bridge tab starts a FRESH (non-resume) session on clear; carry
+        // its bridge:* model so it stays on the same backend instead of
+        // erroring "no backend selected".
+        ...this.bridgeSpawnModelOption(),
+      });
+    }
+    restart
+      .then(() => {
+        this.achievementService.onSessionStart(this.tabId);
+        this.log('Process restarted after clear');
+        this.webview.postMessage({
+          type: 'sessionStarted',
+          sessionId: this.processManager.currentSessionId || 'pending',
+          model: this.processManager.configuredModel,
+          provider: this.getActiveProvider(),
+        });
+        // The webview's reset() returns these display preferences to their
+        // defaults, and they are otherwise only sent on 'ready'.
+        this.sendTextSettings();
+        this.sendTypingThemeSetting();
+        this.sendMessageColorSchemeSetting();
+        this.sendPermissionModeSetting();
+        this.sendGitPushSettings();
+        afterStart?.();
+      })
+      .catch((err) => {
+        const errorText = err instanceof Error ? err.message : String(err);
+        this.webview.postMessage({ type: 'processBusy', busy: false });
+        this.webview.postMessage({
+          type: 'error',
+          message: `Failed to restart session: ${errorText}`,
+        });
+      });
+  }
+
+  /** Plan approval option 1, "Yes, clear context and bypass permissions".
+   *  Mirrors the Claude Code CLI: ExitPlanMode is denied (the old conversation
+   *  never starts implementing), the conversation is replaced by a fresh
+   *  session, and that session's first message is the approved plan plus a
+   *  pointer to the previous transcript. Returns false when no plan text is
+   *  available; the caller then approves in place instead. */
+  private approvePlanInFreshSession(webviewPlan?: string): boolean {
+    const req = this.pendingPermissionRequest;
+    const reqNorm = req?.toolName.trim().toLowerCase() ?? '';
+    const reqIsExitPlanMode = reqNorm === 'exitplanmode' || reqNorm.endsWith('.exitplanmode');
+    const requestPlan = reqIsExitPlanMode && typeof req?.input.plan === 'string' ? req.input.plan : '';
+    const planText = (requestPlan || webviewPlan || '').trim();
+    if (!planText) {
+      this.log('[EPM_CLEAR] No plan text available; approving in place without clearing context');
+      this.webview.postMessage({
+        type: 'error',
+        message: 'Could not read the plan text, so the plan was approved without clearing the context.',
+      });
+      return false;
+    }
+
+    // Capture the old transcript before the restart drops the session id.
+    const previousSessionId = this.processManager.currentSessionId;
+    const transcriptPath = previousSessionId
+      ? findSessionJsonlPath(
+          previousSessionId,
+          this.getWorkspacePath(),
+          this.webview.getClaudeConfigDir?.() ?? undefined,
+        )
+      : null;
+    this.log(
+      `[EPM_CLEAR] Approving plan (${planText.length} chars) in a fresh session; ` +
+      `previousSession=${previousSessionId ?? '(none)'} transcript=${transcriptPath ?? '(not found)'}`,
+    );
+
+    if (req && reqIsExitPlanMode) {
+      this.finishPermission(
+        {
+          behavior: 'deny',
+          message: 'The user approved this plan and chose to clear the context. It will be implemented in a fresh session, so stop here without taking further action.',
+        },
+        true,
+      );
+    }
+
+    const transcriptHint = transcriptPath
+      ? '\n\nIf you need specific details from before exiting plan mode (like exact code snippets, error messages, or content you generated), ' +
+        `read the full transcript at: ${transcriptPath}`
+      : '';
+    const seedPrompt = `Implement the following plan:\n\n${planText}${transcriptHint}`;
+
+    this.webview.postMessage({ type: 'conversationReset' });
+    this.clearAndRestartSession(undefined, () => {
+      void this.dlpScanAndDispatch(seedPrompt, [], () => undefined, (message) => {
+        this.log(`[EPM_CLEAR] Failed to send the plan to the fresh session: ${message}`);
+        this.webview.postMessage({ type: 'processBusy', busy: false });
+        this.webview.postMessage({
+          type: 'error',
+          message: `Failed to send the plan to the new session: ${message}`,
+        });
+      });
+    });
+    return true;
   }
 
   handlePermissionRequest(req: PermissionRequestPayload): void {
@@ -6678,8 +6850,9 @@ export class MessageHandler {
     } else {
       result = { behavior: 'allow', updatedInput: req.input };
       if (msg.action === 'approveClearBypass') {
+        // Reached only when no plan text was available (approvePlanInFreshSession
+        // returned false): approve in place, the context is kept.
         this.compactPending = true;
-        try { this.control.compact(); } catch (err) { const errorText = err instanceof Error ? err.message : String(err); this.log(`[Permission] compact request failed: ${errorText}`); }
       } else if (msg.action === 'approveManual') {
         vscode.workspace.getConfiguration('claudeMirror').update('permissionMode', 'supervised', true);
         this.webview.postMessage({ type: 'permissionModeSetting', mode: 'supervised' });

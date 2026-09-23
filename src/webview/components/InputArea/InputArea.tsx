@@ -474,18 +474,29 @@ export const InputArea: React.FC = () => {
         break;
       }
       case 'compact': {
+        // "/compact <instructions>" forwards the text as custom summarization
+        // instructions.
+        const instructions = native.arg || undefined;
+        // Providers without in-place compaction (Codex) answer with an error
+        // message; skip the spinner there.
+        if (!useAppStore.getState().providerCapabilities.supportsCompact) {
+          postToExtension({ type: 'compact', instructions });
+          break;
+        }
         // Show a live "Compacting context…" divider immediately; the CLI's
-        // compact_boundary event resolves it to a "Context compacted" divider.
+        // compact_boundary event resolves it to a "Context compacted" divider,
+        // and a failed attempt removes it (compactFailed).
         useAppStore.getState().beginManualCompact();
-        postToExtension({ type: 'compact' });
-        // Safety net: if no boundary event arrives (e.g. CLI ignored it), clear
-        // the spinner rather than leaving it stuck.
+        postToExtension({ type: 'compact', instructions });
+        // Safety net: if neither event arrives, clear the spinner rather than
+        // leaving it stuck. Generous because the CLI queues /compact behind a
+        // running turn and summarizing a large context can take minutes.
         setTimeout(() => {
           const s = useAppStore.getState();
           if (s.compactBoundaries.some((b) => b.status === 'pending')) {
             s.dropPendingCompact();
           }
-        }, 90_000);
+        }, 5 * 60_000);
         break;
       }
       case 'context':

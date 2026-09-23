@@ -90,7 +90,7 @@ Two resolvers translate UI events into a `PermissionResult`:
 | Action | Result |
 |--------|--------|
 | `approve` (default) | `allow` with original input |
-| `approveClearBypass` | `allow` + request context compaction |
+| `approveClearBypass` | Handled before this method by `approvePlanInFreshSession`: `deny` (as the CLI does for this option), then a fresh session seeded with the plan. Only reaches here (as `allow` + `compactPending`) when no plan text is available |
 | `approveManual` | `allow` + switch setting to supervised mode |
 | `questionAnswer` | `allow` with `updatedInput.answers` built from `questionAnswers` (per-question) or `selectedOptions` |
 | `feedback` | `deny` with the feedback text |

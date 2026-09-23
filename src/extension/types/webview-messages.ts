@@ -421,6 +421,10 @@ export interface PlanApprovalResponseMessage {
    *  Ordered like the tool input `questions` array; `answers` holds the
    *  selected option label(s) or a single free-text answer. */
   questionAnswers?: { question: string; answers: string[] }[];
+  /** `approveClearBypass` only: the approved plan text (ExitPlanMode input `plan`),
+   *  used to seed the fresh session when the extension has no pending request to
+   *  read it from. */
+  plan?: string;
 }
 
 export interface OpenFileRequest {
@@ -1910,7 +1914,7 @@ export interface CompactSessionResultMessage {
 
 /**
  * The CLI finished compacting the conversation context (in-place summary),
- * either from a manual `/compact` (compact control request) or the CLI's own
+ * either from a manual `/compact` (posted as a user message) or the CLI's own
  * automatic threshold trigger. Posted so the webview can render a visible
  * "context compacted" divider in the chat. Distinct from CompactSessionResult
  * (the token-saving handoff to a new tab).
@@ -1921,6 +1925,25 @@ export interface CompactBoundaryMessage {
   trigger: 'manual' | 'auto' | 'unknown';
   /** Context token count before the summary replaced it, when the CLI reports it. */
   preTokens?: number;
+}
+
+/**
+ * A manual `/compact` ended without compacting: the CLI reported a failed
+ * compaction (e.g. "Not enough messages to compact.") or the command could not
+ * be sent. The webview drops its pending "Compacting context..." divider.
+ */
+export interface CompactFailedMessage {
+  type: 'compactFailed';
+  error?: string;
+}
+
+/**
+ * The extension is replacing this tab's conversation with a fresh CLI session
+ * (plan approval "Yes, clear context"). The webview clears its chat state the
+ * same way /clear does; the new session's first message follows.
+ */
+export interface ConversationResetMessage {
+  type: 'conversationReset';
 }
 
 export interface GitPushResultMessage {
@@ -3252,6 +3275,8 @@ export type ExtensionToWebviewMessage =
   | PermissionModeSettingMessage
   | CompactSessionResultMessage
   | CompactBoundaryMessage
+  | CompactFailedMessage
+  | ConversationResetMessage
   | GitPushResultMessage
   | GitPushSettingsMessage
   | WorktreeListMessage

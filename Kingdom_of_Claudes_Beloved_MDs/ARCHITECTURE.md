@@ -86,7 +86,7 @@ claude -p --verbose
 | `start(options?)` | Spawn CLI process. Options: resume, fork, cwd |
 | `send(message)` | Write JSON line to stdin |
 | `sendUserMessage(text)` | Send user text message |
-| `sendCompact(instructions?)` | Request context compaction |
+| `sendCompact(instructions?)` | Request in-place context compaction: posts `/compact [instructions]` as a user message (the CLI has no `compact` control request) |
 | `sendCancel()` | Cancel: kills the process (polite cancel is unreliable). SessionTab auto-resumes. |
 | `stop()` | SIGTERM the process |
 
@@ -124,7 +124,7 @@ Convenience wrapper over ClaudeProcessManager for sending commands.
 
 - `sendText(text)` - Send plain text user message
 - `sendWithImages(text, images)` - Send message with base64 image content blocks
-- `compact(instructions?)` - Send compact control request
+- `compact(instructions?)` - Post the `/compact` slash command (see `ClaudeProcessManager.sendCompact`)
 - `cancel()` - Kill the CLI process (auto-resumed by SessionTab exit handler)
 
 ---
@@ -178,7 +178,7 @@ MessageHandler tracks tool names during streaming (`currentMessageToolNames`). W
 
 **ExitPlanMode: No User Message on Approve:**
 The CLI auto-approves `ExitPlanMode` (via `--permission-mode bypassPermissions` or `--allowedTools`). Sending a user message like `"Yes, proceed with the plan."` after approval creates a spurious conversation turn that the model interprets as a new request, causing it to call `ExitPlanMode` again in an infinite loop. Therefore:
-- **Approve actions** (`approve`, `approveClearBypass`, `approveManual`): Close the approval bar without sending any text to the CLI. Side effects (compaction, permission mode switch) are still applied.
+- **Approve actions** (`approve`, `approveManual`): Close the approval bar without sending any text to the CLI. Side effects (permission mode switch) are still applied. `approveClearBypass` is handled first by `approvePlanInFreshSession` (see option 1 below).
 - **Reject/feedback actions**: Send the rejection/feedback text to the CLI as a user message, which the model processes normally.
 
 **Race condition handling (result vs. approval):**
@@ -193,7 +193,7 @@ MessageHandler tracks a `planModeActive` flag:
 
 **Plan Approval Options (CLI-matching):**
 PlanApprovalBar shows 4 options matching the CLI's plan approval UX:
-1. **"Yes, clear context and bypass permissions"** (`approveClearBypass`): Closes bar + triggers context compaction.
+1. **"Yes, clear context and bypass permissions"** (`approveClearBypass`): Denies ExitPlanMode (like the Claude Code CLI), resets the webview (`conversationReset`), replaces the conversation with a fresh CLI session (`MessageHandler.approvePlanInFreshSession` -> `clearAndRestartSession` -> `SessionTab.restartFresh`), and sends `Implement the following plan:` + the plan + a pointer to the previous transcript as its first message. Falls back to approving in place when no plan text is available.
 2. **"Yes, and bypass permissions"** (`approve`): Standard approval - closes bar, model continues in full-access mode.
 3. **"Yes, manually approve edits"** (`approveManual`): Closes bar + switches to supervised permission mode.
 4. **"Type here to tell Claude what to change"** (`feedback`): Sends feedback text to the CLI.

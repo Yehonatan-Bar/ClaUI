@@ -15,10 +15,15 @@ export interface SystemInitEvent {
   mcp_servers: McpServerInit[];
   thinking_effort?: string;
   /** Present only on subtype 'compact_boundary': the CLI emits this after it
-   *  compacts the conversation (either from a /compact control request or an
+   *  compacts the conversation (either from a posted `/compact` command or an
    *  automatic threshold trigger). `pre_tokens` is the context size before the
-   *  summary replaced it. */
-  compact_metadata?: { trigger?: string; pre_tokens?: number };
+   *  summary replaced it; `post_tokens` (when present) is the size after. */
+  compact_metadata?: { trigger?: string; pre_tokens?: number; post_tokens?: number };
+  /** Present on subtype 'status' when a compaction attempt ends ('success' |
+   *  'failed'); `compact_error` explains a failure (e.g. "Not enough messages
+   *  to compact."). */
+  compact_result?: string;
+  compact_error?: string;
 }
 
 export interface McpServerInit {
@@ -208,14 +213,6 @@ export interface UserInputMessage {
   };
 }
 
-export interface ControlRequest {
-  type: 'control_request';
-  request: {
-    subtype: 'compact' | 'cancel';
-    custom_instructions?: string;
-  };
-}
-
 /**
  * Handshake that activates the SDK control protocol for this session. Sent once
  * after spawn. Pairing it with the `--permission-prompt-tool stdio` flag makes
@@ -248,7 +245,6 @@ export interface ControlResponseMessage {
 
 export type CliInputMessage =
   | UserInputMessage
-  | ControlRequest
   | InitializeControlRequest
   | ControlResponseMessage;
 
@@ -275,7 +271,7 @@ export interface CanUseToolRequest {
   };
 }
 
-/** CLI's reply to one of our control_requests (initialize/compact/cancel). */
+/** CLI's reply to one of our control_requests (initialize). */
 export interface IncomingControlResponse {
   type: 'control_response';
   response: {

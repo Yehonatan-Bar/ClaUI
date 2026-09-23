@@ -20,11 +20,11 @@ Because ClaUi runs the Claude CLI headless (`-p` + stream-json), the interactive
 | `src/webview/components/InputArea/SlashCommandBrowser.tsx` | Full-list modal (grouped, searchable); rendered at the App root |
 | `src/webview/components/InputArea/InputArea.tsx` | Integration: keyboard intercepts, handleInput notification, send-time routing, `runSlashCommand` (run-on-pick), `claui-slash-command-selected` listener, popup + toolbar button |
 | `src/webview/App.tsx` | Renders `SlashCommandBrowser` gated on `slashBrowserOpen`; selection dispatches `claui-slash-command-selected` (InputArea decides run-vs-insert) |
-| `src/webview/components/StatusBar/StatusBar.tsx` | "Slash Commands" item in the Tools dropdown -> `setSlashBrowserOpen(true)` |
+| `src/webview/components/StatusBar/StatusBar.tsx` | "Slash Commands" item in the Tools dropdown -> `setSlashBrowserOpen(true)`; "Compact Context" item -> runs `/compact` |
 | `src/webview/state/store.ts` | `slashBrowserOpen` + `setSlashBrowserOpen` (shared open-state for the modal) |
 | `src/webview/styles/global.css` | CSS: `.slash-command-popup`, `.slash-command-item`, `.slash-browser-*` |
 
-The slash-command *routing* itself needs no extension-host or `webview-messages.ts` changes: it reuses existing message types (`clearSession`, `compact`, `setModel`) and store actions (`setContextWidgetVisible`, `setSlashBrowserOpen`). (The separate "context compacted" divider — see "Compaction feedback" below — does add a `compactBoundary` message and new store state.)
+The slash-command *routing* itself needs no extension-host or `webview-messages.ts` changes: it reuses existing message types (`clearSession`, `compact`, `setModel`) and store actions (`setContextWidgetVisible`, `setSlashBrowserOpen`). (The separate "context compacted" divider — see "Compaction feedback" below — adds the `compactBoundary` / `compactFailed` messages and new store state.)
 
 ## Data Flow (inline autocomplete)
 
@@ -76,8 +76,8 @@ The `switch` lives in one place, `applyNativeRoute(native)`, shared by both `sen
 
 | Command (aliases) | Native action |
 |-------------------|---------------|
-| `/clear` (`/reset`, `/new`) | `useAppStore.reset()` + `postToExtension({ type: 'clearSession' })` |
-| `/compact` | `beginManualCompact()` (live "Compacting context…" divider) + `postToExtension({ type: 'compact' })` (in-place CLI compaction via control protocol; see "Compaction feedback" below) |
+| `/clear` (`/reset`, `/new`) | `useAppStore.reset()` + `postToExtension({ type: 'clearSession' })` -> `MessageHandler.clearAndRestartSession` -> `SessionTab.restartFresh` (fresh session on the tab's own model, cwd/worktree, account and bridge backend; the old process's exit is suppressed; display settings are re-sent after the webview reset) |
+| `/compact [instructions]` | `beginManualCompact()` (live "Compacting context…" divider) + `postToExtension({ type: 'compact', instructions })` (in-place CLI compaction; see "In-place compaction" below). Providers without `supportsCompact` (Codex) skip the divider and get the handler's "not supported" error |
 | `/context` | `setContextWidgetVisible(true)` (reveals the context strip) |
 | `/model <id>` | `postToExtension({ type: 'setModel', model: <id> })` (only routes when an id/alias is given) |
 | `/effort <level>` | `setSelectedClaudeEffort` + `postToExtension({ type: 'setClaudeEffort' })` (only for a native level: low/medium/high/xhigh/max; `auto`/`status`/`ultracode` fall through to the CLI) |
@@ -86,22 +86,39 @@ The `switch` lives in one place, `applyNativeRoute(native)`, shared by both `sen
 
 Any other slash command falls through and is sent to the CLI as plain text, exactly as before.
 
-> The `/compact` control request carries a `request_id` (`ClaudeProcessManager.sendCompact`); the CLI pairs control_request/response by that id and ignores a request without one, so it is required for compaction to run.
+## In-place compaction (`/compact`)
+
+**Entry points** (all end in `MessageHandler.requestCompact(instructions?)`):
+- `/compact [instructions]` typed + Send, or picked in the popup / browser.
+- Status bar **Tools > Compact Context** (shown when `providerCapabilities.supportsCompact`); it dispatches `claui-slash-command-selected` with `compact`, so it runs through `runSlashCommand` exactly like a browser pick.
+- Command palette `ClaUi: Compact Context` (`claudeMirror.compact`, `Ctrl+Alt+K`) -> `SessionTab.compact()`. This path shows no pending spinner; the done divider still appears.
+
+**Transport.** `ClaudeProcessManager.sendCompact` posts `/compact [instructions]` as a plain user message. The CLI has no `compact` control request (it replies "Unsupported control request subtype: compact"); `/compact` is a local command that headless mode runs when it arrives as text. Posted during a running turn, the CLI queues it and compacts right after that turn. Event sequence: `Kingdom_of_Claudes_Beloved_MDs/STREAM_JSON_PROTOCOL.md` ("Compact context").
+
+**Extension side (`MessageHandler`).**
+- `requestCompact` sends the command and sets `compactPending` (ExitPlanMode guard reset on the next messageStart). A send failure posts `compactFailed` + an `error`. Bridge tabs (`isBridgeCliCommand(cliPathOverride)`: Grok / Antigravity / OpenAI-compatible / Council) share the Claude capability set but their runtime has no compaction (a posted `/compact` would reach the bridge model as a prompt), so they get `compactFailed` + an explanatory `error` and nothing is sent.
+- `handleCompactBoundary` (called from `SessionTab.wireProcessEvents` on `system/compact_boundary`): posts `compactBoundary`; for `trigger: "manual"` it also opens the closing window (`manualCompactClosing = true`) and keeps `post_tokens`.
+- While the window is open, the demux `userMessage` listener drops the CLI's summary envelope and the `<local-command-stdout>Compacted</local-command-stdout>` envelope (they would otherwise render as "YOU").
+- `handleResultEvent` consumes the closing `result` (`num_turns: 0`) via `finishManualCompact`: no turn record, checkpoint or turn analysis; it posts `costUpdate` with the compacted context size (`post_tokens`) and `processBusy: false`. Like every result, it arrives twice (direct + demux path); the generic `lastHandledResultEvent` guard skips the second copy.
+- `handleCompactFailed` (from `system/status` with `compact_result: "failed"`, e.g. "Not enough messages to compact.") posts `compactFailed`. The CLI explains the reason in a synthetic assistant reply, which renders normally.
+- A `messageStart` inside the window closes it (guards against a lost result).
+
+The plan-approval option "Yes, clear context and bypass permissions" does not use `/compact` (a posted command would only run after the implementation turn); it starts a fresh session seeded with the plan instead (see `ARCHITECTURE.md`, Plan Approval Options).
 
 ## Compaction feedback (the "context compacted" divider)
 
-In-place compaction (both the manual `/compact` and the CLI's own automatic compaction when the window fills) is otherwise invisible: the CLI's `control_response` reply is dropped, and the `system/compact_boundary` event was never rendered. A visible divider now surfaces it.
+In-place compaction (the manual `/compact` and the CLI's own automatic compaction when the window fills) is surfaced as an inline divider.
 
 Flow:
 
-1. Manual `/compact` → `applyNativeRoute` calls `beginManualCompact()`, which appends a `pending` marker to `compactBoundaries` (store) anchored below the last message, then posts `{ type: 'compact' }`. A 90s safety timeout calls `dropPendingCompact()` if no boundary arrives.
-2. The CLI emits `system/compact_boundary` (with `compact_metadata.trigger` and `pre_tokens`). `SessionTab` detects it in `wireProcessEvents` and calls `MessageHandler.handleCompactBoundary`, which posts `{ type: 'compactBoundary', trigger, preTokens }` to the webview.
-3. `useClaudeStream` handles `compactBoundary` → `resolveCompactBoundary`: flips the pending marker to `done` (manual), or, when there is no pending marker (auto-compact), appends a fresh `done` marker anchored at the current end.
+1. Manual `/compact` -> `applyNativeRoute` calls `beginManualCompact()`, which appends a `pending` marker to `compactBoundaries` (store) anchored below the last message, then posts `{ type: 'compact', instructions }`. A 5-minute safety timeout calls `dropPendingCompact()` if neither a boundary nor a failure arrives (the CLI may queue `/compact` behind a running turn, and summarizing a large context can take minutes).
+2. The CLI emits `system/compact_boundary` (with `compact_metadata.trigger`, `pre_tokens`, `post_tokens`). `SessionTab` detects it in `wireProcessEvents` and calls `MessageHandler.handleCompactBoundary`, which posts `{ type: 'compactBoundary', trigger, preTokens }` to the webview.
+3. `useClaudeStream` handles `compactBoundary` -> `resolveCompactBoundary`: flips the pending marker to `done` (manual), or, when there is no pending marker (auto-compact, command-palette compact), appends a fresh `done` marker anchored at the current end. `compactFailed` -> `dropPendingCompact()`.
 4. `MessageList` renders `compactBoundaries` interleaved after their anchor message using `CompactDivider` (spinner + "Compacting context…" while pending; "Context compacted · summarized ~Nk tokens · <trigger>" when done).
 
 `compactBoundaries` is kept separate from `messages` so it never affects turn history, fork, or the timeline. Markers whose anchor is truncated away are pruned in `truncateFromMessage`; all are cleared on `reset`.
 
-Key files: `src/webview/components/ChatView/CompactDivider.tsx`, `MessageList.tsx`; `src/webview/state/store.ts` (`compactBoundaries`, `beginManualCompact`, `resolveCompactBoundary`, `dropPendingCompact`); `src/extension/session/SessionTab.ts`; `src/extension/webview/MessageHandler.ts` (`handleCompactBoundary`); `src/extension/types/webview-messages.ts` (`CompactBoundaryMessage`); `src/extension/types/stream-json.ts` (`SystemInitEvent.compact_metadata`).
+Key files: `src/webview/components/ChatView/CompactDivider.tsx`, `MessageList.tsx`; `src/webview/state/store.ts` (`compactBoundaries`, `beginManualCompact`, `resolveCompactBoundary`, `dropPendingCompact`); `src/webview/components/StatusBar/StatusBar.tsx` (Tools > Compact Context); `src/extension/process/ClaudeProcessManager.ts` (`sendCompact`); `src/extension/session/SessionTab.ts`; `src/extension/webview/MessageHandler.ts` (`requestCompact`, `handleCompactBoundary`, `handleCompactFailed`, `finishManualCompact`); `src/extension/types/webview-messages.ts` (`CompactBoundaryMessage`, `CompactFailedMessage`); `src/extension/types/stream-json.ts` (`SystemInitEvent.compact_metadata`, `compact_result`).
 
 ## Run on Pick
 

@@ -2,6 +2,25 @@
   "$comment": "Bundled What's New entries shown after an update (toast + in-panel banner). Add ONE entry per release that ships user-visible features; bug-fix-only releases get no entry and stay silent. 'version' is the EARLIEST extension version allowed to show the entry (vsce publish patch may assign a higher number, that is fine). 'id' must be unique and must never change once shipped. Newest entries can go anywhere in the list; the extension sorts by version.",
   "announcements": [
     {
+      "id": "2026-09-23-compact-context-in-place",
+      "version": "0.1.237",
+      "date": "2026-09-23",
+      "title": "Free up context: /compact and clear",
+      "titleHe": "פינוי הקשר: /compact וניקוי",
+      "highlights": [
+        "Type /compact to summarize the conversation and free context in the same tab; add text after it to say what the summary should keep.",
+        "Or pick Tools > Compact Context in the status bar, or press Ctrl+Alt+K. If Claude is mid-reply, it runs right after.",
+        "A \"Compacting context...\" divider marks the spot, and the context gauge drops as soon as it finishes.",
+        "Approving a plan with \"Yes, clear context\" now clears the chat and implements the plan in a fresh session that starts with only the plan."
+      ],
+      "highlightsHe": [
+        "הקלידו /compact כדי לסכם את השיחה ולפנות הקשר באותה לשונית; הוסיפו טקסט אחריו כדי לציין מה הסיכום צריך לשמור.",
+        "או בחרו Tools > Compact Context בשורת הסטטוס, או הקישו Ctrl+Alt+K. אם Claude באמצע תשובה, הדחיסה תרוץ מיד אחריה.",
+        "מפריד \"Compacting context...\" מסמן את המקום, ומד ההקשר יורד ברגע שהדחיסה מסתיימת.",
+        "אישור תוכנית עם \"Yes, clear context\" מנקה עכשיו את הצ'אט ומממש את התוכנית בסשן חדש שמתחיל רק עם התוכנית."
+      ]
+    },
+    {
       "id": "2026-09-23-opus-5-5-gpt-6-sol-luna",
       "version": "0.1.236",
       "date": "2026-09-23",

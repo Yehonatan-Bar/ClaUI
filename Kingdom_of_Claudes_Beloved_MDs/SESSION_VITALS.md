@@ -94,7 +94,7 @@ SessionTab.wireProcessEvents
     - Also passes to demux.handleEvent() (demux listener is a secondary path)
     |
     v
-MessageHandler.handleResultEvent() (public method, dedup-guarded)
+MessageHandler.handleResultEvent() (public method; the same event object arrives on both paths, so a repeat of lastHandledResultEvent is skipped)
     - Snapshots toolNames BEFORE clearApprovalTracking()
     - Builds TurnRecord with categorizeTurn() helper
     - postMessage({ type: 'turnComplete', turn })

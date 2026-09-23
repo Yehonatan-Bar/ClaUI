@@ -746,6 +746,19 @@ export const StatusBar: React.FC<{
       >
         Slash Commands
       </button>
+      {providerCapabilities.supportsCompact && (
+        <button
+          className="status-bar-group-dropdown-item"
+          onClick={() => {
+            // Same path as picking /compact in the slash browser (InputArea runs it).
+            window.dispatchEvent(new CustomEvent('claui-slash-command-selected', { detail: 'compact' }));
+            closeAllGroups();
+          }}
+          data-tooltip="Summarize this conversation in place to free context (same as /compact). If Claude is still answering, it runs right after the reply."
+        >
+          Compact Context
+        </button>
+      )}
       <button
         className="status-bar-group-dropdown-item"
         onClick={() => { setCouncilSettingsOpen(true); closeAllGroups(); }}

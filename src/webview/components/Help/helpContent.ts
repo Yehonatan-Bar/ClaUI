@@ -75,8 +75,8 @@ export const HELP_ENTRIES: HelpEntry[] = [
     section: 'commands',
     name: 'ClaUi: Compact Context',
     tooltip: 'Compact the conversation context',
-    detailEn: "Triggers the CLI's context-compaction so a long conversation is summarized into a smaller footprint, freeing context-window room.",
-    detailHe: 'מפעיל דחיסת-הקשר של ה-CLI כך ששיחה ארוכה מסוכמת לטביעת-רגל קטנה יותר, ומשחרר מקום בחלון ההקשר.',
+    detailEn: "Triggers the CLI's context-compaction so a long conversation is summarized into a smaller footprint, freeing context-window room. Same as typing /compact (optionally followed by instructions for the summary) or Tools > Compact Context in the status bar. Shortcut: Ctrl+Alt+K.",
+    detailHe: 'מפעיל דחיסת-הקשר של ה-CLI כך ששיחה ארוכה מסוכמת לטביעת-רגל קטנה יותר, ומשחרר מקום בחלון ההקשר. זהה להקלדת /compact (אפשר להוסיף אחריו הנחיות לסיכום) או ל-Tools > Compact Context בשורת הסטטוס. קיצור: Ctrl+Alt+K.',
   },
   {
     id: 'commands-send-message',
@@ -1139,9 +1139,9 @@ export const HELP_ENTRIES: HelpEntry[] = [
     id: 'chatview-plan-option-1',
     section: 'chatview',
     name: 'Plan option 1',
-    tooltip: 'Approve the plan, clear the context window, and stop asking permission for each action',
-    detailEn: 'Approve + clear context + bypass permissions.',
-    detailHe: 'אשר + נקה הקשר + עקוף הרשאות.',
+    tooltip: 'Approve the plan and implement it in a fresh session that starts with only the plan (this chat is cleared), without asking permission for each action',
+    detailEn: 'Approve + clear context + bypass permissions: the chat is cleared and a fresh session starts implementing, with the plan as its first message.',
+    detailHe: 'אשר + נקה הקשר + עקוף הרשאות: הצ\'אט מתנקה וסשן חדש מתחיל לממש, כשהתוכנית היא ההודעה הראשונה שלו.',
   },
   {
     id: 'chatview-plan-option-2',

@@ -1,5 +1,30 @@
 # ClaUi - Changelog
 
+## v0.1.238 - 2026-09-23
+
+**Fix + feature: in-place `/compact` works, and is reachable from the Tools menu**
+
+- `/compact` did nothing: ClaUi sent a `control_request` with `subtype: "compact"`, which the Claude CLI does not support (it replies "Unsupported control request subtype: compact" and ClaUi dropped the reply). `ClaudeProcessManager.sendCompact` now posts `/compact [instructions]` as a user message, which headless mode runs as the CLI's local `/compact` command. Sent while Claude is answering, the CLI queues it and compacts right after the reply
+- Text after `/compact` is now forwarded as custom summarization instructions (it was dropped before)
+- New status bar item **Tools > Compact Context** (Claude tabs); `ClaUi: Compact Context` / `Ctrl+Alt+K` use the same path (`MessageHandler.requestCompact`)
+- The CLI's post-compaction output no longer leaks into the chat: the summary envelope and `<local-command-stdout>Compacted</local-command-stdout>` are not rendered as user messages, and the closing `num_turns: 0` result is not recorded as a turn (no timeline/vitals entry, checkpoint or turn analysis). The context gauge updates to the compacted size (`post_tokens`) right away
+- A compaction that cannot run (e.g. "Not enough messages to compact.", reported via `system/status` `compact_result: "failed"`) clears the "Compacting context..." divider immediately; the CLI's own reply explains why. The divider's safety timeout is now 5 minutes (queued or large compactions can exceed 90s)
+- Bridge tabs (Grok / Antigravity / OpenAI-compatible / Council) have no compaction; `/compact` there now shows a clear "not supported" message instead of a spinner
+- Docs: `SLASH_COMMANDS.md`, `STREAM_JSON_PROTOCOL.md`, `ARCHITECTURE.md`, `CONTROL_PROTOCOL_PERMISSIONS.md`, `UI_BUTTONS_AND_COMMANDS.md`, `BUG_EXITPLANMODE_INFINITE_LOOP.md`, `FORK_CONTEXT_TRUNCATION_SPEC.md`, `COMPLETE_FEATURE_LIST.md`, TECHNICAL.md
+
+**Fix + feature: plan approval "Yes, clear context and bypass permissions" really clears the context**
+
+- The option never cleared anything (it sent the unsupported compact request). It now matches the Claude Code CLI: ExitPlanMode is denied, the chat is reset (`conversationReset`), the conversation is replaced by a fresh CLI session, and that session's first message is `Implement the following plan:` + the plan + a pointer to the previous session's transcript (`MessageHandler.approvePlanInFreshSession`). The plan text comes from the pending `can_use_tool` input, else from the webview (`planApprovalResponse.plan`); without it the option falls back to approving in place
+
+**Fix: `/clear` and the Clear button restart cleanly**
+
+- New `SessionTab.restartFresh()` (shared by `/clear`, the Clear button and plan option 1): the old process's exit is suppressed (on Windows `taskkill` ends it with code 1, which was reported as a crash / session end after the new session was up), and the fresh session keeps the tab's own model, cwd/worktree, Claude account profile and bridge backend (it used to fall back to the global model, the first workspace folder and the default account)
+- Font, typing theme, message colors, permission-mode indicator and git push settings are re-sent after the reset (the webview reset returned them to defaults until a reload)
+
+**Fix: every turn result was processed twice**
+
+- The result arrives through two paths (direct + demux) and the turnIndex-based dedup guard never matched, so each turn was recorded twice in achievements, token-ratio sampling and the developer usage report, and got two turn analyses and adventure beats. `MessageHandler.handleResultEvent` now dedups by event identity
+
 ## v0.1.236 - 2026-09-22
 
 **Feature: Claude Opus 5.5 is selectable**
