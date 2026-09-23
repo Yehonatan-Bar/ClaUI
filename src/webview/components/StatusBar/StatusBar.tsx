@@ -301,6 +301,10 @@ export const StatusBar: React.FC<{
   };
 
   const handleFeedbackAction = (action: 'bug' | 'feature' | 'email' | 'fullBugReport') => {
+    // Close the dropdown first: 'fullBugReport' opens an in-webview modal whose
+    // panel stops click propagation, so the outside-click handler can never
+    // close the menu afterwards and it would stay on top of the modal.
+    closeAllGroups();
     postToExtension({ type: 'feedbackAction', action });
   };
 

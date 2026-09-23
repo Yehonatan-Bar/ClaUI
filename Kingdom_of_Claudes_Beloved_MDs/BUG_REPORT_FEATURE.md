@@ -30,6 +30,18 @@ User clicks Feedback -> "Full Bug Report" ->
                 FormspreeService submits to developer's email
 ```
 
+Status bar entry (Tools dropdown -> "Full Bug Report"):
+
+```
+StatusBar handleFeedbackAction('fullBugReport') ->
+  closeAllGroups() closes the Tools dropdown ->
+    postToExtension feedbackAction ->
+      MessageHandler / CodexMessageHandler post bugReportOpen ->
+        useClaudeStream sets bugReportPanelOpen = true
+```
+
+The dropdown must be closed in the click handler itself: `.bugreport-panel` stops click propagation, so the shared outside-click listener (`useOutsideClick`) never sees clicks inside the modal and could not close a dropdown left open on top of it.
+
 MCP-specific entry:
 
 ```
