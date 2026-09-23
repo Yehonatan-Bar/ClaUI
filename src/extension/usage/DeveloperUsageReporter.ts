@@ -31,6 +31,9 @@ interface DeveloperUsageState {
  * authoritative, admin-editable prices live on the server.
  */
 const LOCAL_PRICES: Record<string, TokenTypeCounts> = {
+  // Opus 5.5 is ~20% cheaper than Opus 5 ($4/$20, cache write $5, cache read $0.20)
+  // and needs its own row so the prefix fallback does not price it as Opus 5.
+  'claude-opus-5-5': { input: 4, output: 20, cacheCreation: 5, cacheRead: 0.2 },
   'claude-opus-5': { input: 5, output: 25, cacheCreation: 6.25, cacheRead: 0.5 },
   'claude-opus-4-8': { input: 5, output: 25, cacheCreation: 6.25, cacheRead: 0.5 },
   'claude-opus-4-7': { input: 5, output: 25, cacheCreation: 6.25, cacheRead: 0.5 },

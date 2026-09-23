@@ -2,6 +2,25 @@
   "$comment": "Bundled What's New entries shown after an update (toast + in-panel banner). Add ONE entry per release that ships user-visible features; bug-fix-only releases get no entry and stay silent. 'version' is the EARLIEST extension version allowed to show the entry (vsce publish patch may assign a higher number, that is fine). 'id' must be unique and must never change once shipped. Newest entries can go anywhere in the list; the extension sorts by version.",
   "announcements": [
     {
+      "id": "2026-09-23-opus-5-5-gpt-6-sol-luna",
+      "version": "0.1.236",
+      "date": "2026-09-23",
+      "title": "Opus 5.5, GPT-6 Sol and Luna",
+      "titleHe": "Opus 5.5, GPT-6 Sol ו-Luna",
+      "highlights": [
+        "Pick Claude Opus 5.5 from the Model dropdown in the AI chip - Anthropic's new flagship for agentic coding, with a 1M-token context window.",
+        "Opus 5.5 costs about 20% less than Opus 5, and ClaUi's cost and usage tracking already uses its lower rates.",
+        "GPT-6 Sol (everyday coding) and GPT-6 Luna (fast, low cost) join the Codex model dropdown; Luna is also offered in Smart Search - Codex.",
+        "GPT-6 Sol and Luna need Codex CLI 0.156.1 or newer - update it with: npm i -g @openai/codex@latest."
+      ],
+      "highlightsHe": [
+        "בחרו את Claude Opus 5.5 מתפריט המודל בצ'יפ ה-AI - הדגל החדש של Anthropic לעבודת קוד אג'נטית, עם חלון הקשר של מיליון טוקנים.",
+        "Opus 5.5 זול בכ-20 אחוז מ-Opus 5, ומעקב העלויות והשימוש ב-ClaUi כבר משתמש בתעריפים הנמוכים שלו.",
+        "GPT-6 Sol (לקוד יומיומי) ו-GPT-6 Luna (מהיר וזול) נוספו לתפריט המודלים של Codex; Luna זמין גם ב-Smart Search - Codex.",
+        "GPT-6 Sol ו-Luna דורשים Codex CLI בגרסה 0.156.1 ומעלה - עדכנו עם: npm i -g @openai/codex@latest."
+      ]
+    },
+    {
       "id": "2026-09-17-cli-arch-mismatch",
       "version": "0.1.234",
       "date": "2026-09-17",

@@ -1,7 +1,8 @@
 # Claude Model Controls (Model, Thinking Effort, Fast Mode)
 
-Snapshot: 2026-09-02. Model lineup: Fable 5.1, Fable 5, Opus 5, Opus 4.8/4.7/4.6,
-Sonnet 5/4.6/4.5, Haiku 4.5 are selectable; Mythos 5 is marked blocked.
+Snapshot: 2026-09-22. Model lineup: Fable 5.1, Fable 5, Opus 5.5, Opus 5,
+Opus 4.8/4.7/4.6, Sonnet 5/4.6/4.5, Haiku 4.5 are selectable; Mythos 5 is marked
+blocked.
 
 This document covers the three Claude-side controls exposed in the AI chip's
 model area:
@@ -17,8 +18,11 @@ Codex has its own parallel controls (`CodexModelSelector`,
 
 Codex model options are loaded dynamically from `~/.codex/models_cache.json`.
 When that cache is unavailable, the fallback list includes the current OpenAI
-Codex lineup: GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4, GPT-5.4 Mini,
-GPT-5.3-Codex-Spark, and older compatibility aliases. Codex reasoning effort is
+Codex lineup: GPT-6 Astra/Sol/Luna, GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4,
+GPT-5.4 Mini, GPT-5.3-Codex-Spark, and older compatibility aliases. GPT-6 Sol and
+Luna enter the CLI cache only from Codex CLI 0.156.1 on; with an older CLI they
+are missing from the cache-driven dropdown (the cache always wins over the
+fallback). Codex reasoning effort is
 also model-dependent; ClaUi exposes `none`, `minimal`, `low`, `medium`, `high`,
 `xhigh`, `max`, and `ultra`, and filters the selector to the selected model's
 supported efforts when cache metadata is present.
@@ -135,6 +139,7 @@ and mirrored in the `claudeMirror.model` enum in `package.json`:
 | Default | `""` (CLI default) |
 | Fable 5.1 | `claude-fable-5-1` |
 | Fable 5 | `claude-fable-5` |
+| Opus 5.5 | `claude-opus-5-5` |
 | Opus 5 | `claude-opus-5` |
 | Opus 4.8 | `claude-opus-4-8` |
 | Opus 4.7 | `claude-opus-4-7` |
@@ -163,14 +168,25 @@ price tables (`LOCAL_PRICES` in `DeveloperUsageReporter.ts` and `DEFAULT_PRICES`
 in `server/src/usage/PriceDefaults.ts`) rather than inheriting Fable 5's row
 through the prefix fallback.
 
-Opus 5 (`claude-opus-5`, released 2026-07-24) is Anthropic's flagship everyday
+Opus 5.5 (`claude-opus-5-5`, released 2026-09-22) is Anthropic's flagship model
+for long-running agentic coding and knowledge work and its recommended default
+for most workloads. It has a 1M-token context window, a 128K max output, and a
+default effort of `medium`. It is priced ~20% below Opus 5 — $4/$20 per 1M
+input/output, cache write $5, cache read $0.20 (5% of input, not the 10% the other
+Opus rows use) — so it gets its own row in both price tables (`LOCAL_PRICES` in
+`DeveloperUsageReporter.ts` and `DEFAULT_PRICES` in
+`server/src/usage/PriceDefaults.ts`) rather than inheriting Opus 5's row through
+the longest-prefix fallback. It is listed directly after Fable 5 as the top of
+the Opus group.
+
+Opus 5 (`claude-opus-5`, released 2026-07-24) is the previous flagship everyday
 model — near-Fable quality at Opus-tier pricing ($5/$25 per 1M input/output, the
-same as Opus 4.8), with a 1M-token context window. It is listed directly after
-Fable 5 as the top of the Opus group.
+same as Opus 4.8), with a 1M-token context window. It is listed directly below
+Opus 5.5.
 
 **Context windows are not uniform.** `getModelMaxContext()` in
 `src/webview/utils/modelContextLimits.ts` returns `1_000_000` for the 1M-context
-models — Fable 5.1, Fable 5, Opus 5, Opus 4.6/4.7/4.8, Sonnet 4.6, and Sonnet 5 — and
+models — Fable 5.1, Fable 5, Opus 5.5, Opus 5, Opus 4.6/4.7/4.8, Sonnet 4.6, and Sonnet 5 — and
 `200_000` for other Claude models (Sonnet 4.5, Haiku 4.5, Mythos 5, and older Claude
 models), so the context-usage gauge scales correctly. `inferClaudeModelLabel()`
 also treats `fable` and `mythos` as known families. For Codex (`gpt-*`/`codex`)
@@ -444,7 +460,7 @@ the model name (`.ai-chip-fast` in `global.css`). Tooltip: "Claude Fast mode
 (~2.5x faster output on Opus, costs more; applies on next session start)".
 
 Fast mode roughly 2.5x's output tokens/sec. It only has an effect on Opus models
-(5/4.8/4.7/4.6); it is a no-op on Sonnet/Haiku and costs more on supported models.
+(5.5/5/4.8/4.7/4.6); it is a no-op on Sonnet/Haiku and costs more on supported models.
 The selector is intentionally **not** gated by the selected model (to avoid the
 control popping in and out of the UI); the CLI decides whether fast mode applies.
 

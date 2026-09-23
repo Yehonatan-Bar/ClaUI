@@ -14,6 +14,27 @@ test('CODEX_MODEL_FALLBACK: Astra fallback advertises the local capabilities', (
   assert.deepEqual(astra!.supportedReasoningEfforts, ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
 });
 
+test('CODEX_MODEL_FALLBACK: GPT-6 Sol and Luna mirror the Codex 0.156.1 catalog', () => {
+  const sol = CODEX_MODEL_FALLBACK.find((o) => o.value === 'gpt-6-sol');
+  const luna = CODEX_MODEL_FALLBACK.find((o) => o.value === 'gpt-6-luna');
+  assert.ok(sol, 'Sol must be in the static fallback table');
+  assert.ok(luna, 'Luna must be in the static fallback table');
+  assert.deepEqual(sol!.supportedReasoningEfforts, ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
+  // Luna tops out at max: offering ultra would let the user pick an effort the CLI rejects.
+  assert.deepEqual(luna!.supportedReasoningEfforts, ['low', 'medium', 'high', 'xhigh', 'max']);
+  for (const option of [sol!, luna!]) {
+    assert.equal(option.contextWindow, 272000);
+    assert.equal(option.maxContextWindow, 872000);
+    assert.equal(option.supportsFast, true);
+    assert.equal(option.defaultReasoningEffort, 'medium');
+  }
+});
+
+test('getModelMaxContext: GPT-6 Sol and Luna use the 272K active window', () => {
+  assert.equal(getModelMaxContext('gpt-6-sol'), 272000);
+  assert.equal(getModelMaxContext('gpt-6-luna', []), 272000);
+});
+
 test('resolveCodexModelOption: prefers the live cache over the static fallback', () => {
   const cache: CodexModelOption[] = [
     { label: 'GPT-6 Astra', value: 'gpt-6-astra', contextWindow: 300000, supportsFast: false },

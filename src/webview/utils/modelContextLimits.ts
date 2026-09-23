@@ -29,8 +29,8 @@ export function getModelMaxContext(model: string, codexModelOptions?: CodexModel
   }
   // Active context windows as reported by the Codex CLI model cache. GPT-5.4
   // advertises a larger max_context_window, but the active window is 272K.
-  // GPT-6 (Astra) active window is 272K locally even though the published max
-  // for the client is 872K; never hard-code the API's 1.05M here.
+  // GPT-6 (Astra, Sol, Luna) active window is 272K locally even though the
+  // published max for the client is 872K; never hard-code the API's 1.05M here.
   if (lower.includes('gpt-6')) {
     return 272_000;
   }
@@ -56,11 +56,12 @@ export function getModelMaxContext(model: string, codexModelOptions?: CodexModel
   if (lower.includes('gpt-3.5')) {
     return 16_385;
   }
-  // Claude models with a 1M-token context window: Fable 5.1, Fable 5, Opus 5,
-  // Opus 4.6/4.7/4.8, Sonnet 4.6, and Sonnet 5.
+  // Claude models with a 1M-token context window: Fable 5.1, Fable 5, Opus 5.5,
+  // Opus 5, Opus 4.6/4.7/4.8, Sonnet 4.6, and Sonnet 5.
   const oneMillionContextModels = [
     'claude-fable-5-1',
     'claude-fable-5',
+    'claude-opus-5-5',
     'claude-opus-5',
     'claude-opus-4-6',
     'claude-opus-4-7',

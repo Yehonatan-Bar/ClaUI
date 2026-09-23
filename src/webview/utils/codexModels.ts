@@ -21,6 +21,27 @@ export const CODEX_MODEL_FALLBACK: CodexModelOption[] = [
     supportsFast: true,
     defaultReasoningEffort: 'medium',
   },
+  // GPT-6 Sol / Luna (released 2026-09-22) are in the Codex CLI catalog from
+  // 0.156.1 on. Capabilities mirror that catalog: same 272K active / 872K max
+  // window as Astra, Fast tier on both; Luna tops out at `max` (no `ultra`).
+  {
+    label: 'GPT-6 Sol',
+    value: 'gpt-6-sol',
+    supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
+    contextWindow: 272_000,
+    maxContextWindow: 872_000,
+    supportsFast: true,
+    defaultReasoningEffort: 'medium',
+  },
+  {
+    label: 'GPT-6 Luna',
+    value: 'gpt-6-luna',
+    supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+    contextWindow: 272_000,
+    maxContextWindow: 872_000,
+    supportsFast: true,
+    defaultReasoningEffort: 'medium',
+  },
   {
     label: 'GPT-5.6 Sol',
     value: 'gpt-5.6-sol',

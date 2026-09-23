@@ -10,6 +10,11 @@ import { CostConfig, PriceRow } from './types';
  * and add new rows for models that ship later.
  */
 export const DEFAULT_PRICES: Record<string, PriceRow> = {
+  // Opus 5.5 (released 2026-09-22) is priced ~20% below Opus 5: $4/$20 input/output,
+  // cache write $5 (input x 1.25), cache read $0.20 (5% of input, not the 10% other
+  // rows use). It needs its own row so the longest-prefix price resolver does not
+  // fall back to the pricier 'claude-opus-5' key.
+  'claude-opus-5-5':   { input: 4.0,  output: 20.0, cacheCreation: 5.0,   cacheRead: 0.2 },
   'claude-opus-5':     { input: 5.0,  output: 25.0, cacheCreation: 6.25,  cacheRead: 0.5 },
   'claude-opus-4-8':   { input: 5.0,  output: 25.0, cacheCreation: 6.25,  cacheRead: 0.5 },
   'claude-opus-4-7':   { input: 5.0,  output: 25.0, cacheCreation: 6.25,  cacheRead: 0.5 },

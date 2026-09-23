@@ -2,6 +2,17 @@
 
 > **Note:** This is a historical development log, not a current-state specification. For current Codex feature status, refer to `COMPLETE_FEATURE_LIST.md` (section 5) and `CODEX_FAST_MODE.md`.
 
+## 2026-09-23 - GPT-6 Sol / Luna support
+
+Added GPT-6 Sol (`gpt-6-sol`) and GPT-6 Luna (`gpt-6-luna`), released by OpenAI on 2026-09-22, as Codex options without changing any default. They are in the Codex CLI model catalog from **0.156.1** on (release `rust-v0.156.1`: "Add GPT-6 Sol and Luna to the model catalog"). The cache stays the source of truth, so with an older CLI they are absent from the cache-driven dropdown; after updating the CLI, the first Codex turn refreshes the cache and they appear without a reload.
+
+- **Fallback.** Added both to `CODEX_MODEL_FALLBACK` (`codexModels.ts`), the `CodexModelSelector` fallback, and `CODEX_SMART_SEARCH_FALLBACK` (`StatusBar`). Capabilities mirror the 0.156.1 catalog: `272,000` active / `872,000` max context window, Fast tier, default reasoning `medium`; Sol supports `low`..`ultra`, Luna `low`..`max` (no `ultra`).
+- **Smart Search.** The Codex section lists the Luna tier via `CODEX_SMART_SEARCH_MODELS` (`gpt-6-luna`, `gpt-5.6-luna`). GPT-6 Luna is shown next to GPT-5.6 Luna, not instead of it, so a pre-0.156.1 cache keeps a working option.
+- **Context meter.** Covered by the existing `gpt-6` rule in `getModelMaxContext()` (`272,000`).
+- **Catalog notes.** In 0.156.1, GPT-5.6 Sol/Terra/Luna and GPT-5.5 are labeled older/legacy with upgrade targets (`gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.5` -> `gpt-6-sol`; `gpt-5.6-luna` -> `gpt-6-luna`) but remain visible, so existing selections keep working.
+- **Defaults untouched.** `claudeMirror.codex.model` stays empty (description examples now include GPT-6 Sol/Luna and the 0.156.1 requirement); `claudeMirror.reviewLoop.reviewerModel` stays `gpt-5.5`.
+- **Tests.** `tests/unit/codexModels.test.ts`: Sol/Luna fallback metadata (incl. Luna without `ultra`) and their `272,000` context window.
+
 ## 2026-09-06 - GPT-6 Astra support
 
 Added GPT-6 Astra (`gpt-6-astra`) as a first-class Codex option without changing any default. `~/.codex/models_cache.json` stays the source of truth; a static option never grants access (availability depends on the account, workspace, CLI, and policy).

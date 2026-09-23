@@ -189,7 +189,7 @@ All settings are under `claudeMirror.*` in VS Code Settings (`Ctrl+,`).
 | `cliPath` | `"claude"` | Path to Claude CLI executable |
 | `provider` | `"claude"` | Default provider: `claude` or `codex` |
 | `model` | `""` | Claude model for new sessions (empty = CLI default) |
-| `codex.model` | `""` | Codex model for new sessions; selector includes GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4 Mini, and GPT-5.3-Codex-Spark |
+| `codex.model` | `""` | Codex model for new sessions; selector includes GPT-6 Astra/Sol/Luna, GPT-5.6 Sol/Terra/Luna, GPT-5.5, GPT-5.4 Mini, and GPT-5.3-Codex-Spark |
 | `codex.reasoningEffort` | `""` | Codex reasoning depth: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
 | `codex.serviceTier` | `""` | Codex service tier override: `fast` or empty for CLI/config default |
 | `permissionMode` | `"full-access"` | `full-access` or `supervised` (read-only) |

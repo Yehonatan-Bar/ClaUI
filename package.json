@@ -666,7 +666,7 @@
         "claudeMirror.codex.model": {
           "type": "string",
           "default": "",
-          "description": "Codex model to use for new Codex sessions (e.g. gpt-6-astra, gpt-5.6-sol, gpt-5.5). Availability depends on your account, workspace, CLI version, and policy. Leave empty to use the CLI/config default."
+          "description": "Codex model to use for new Codex sessions (e.g. gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol). Availability depends on your account, workspace, CLI version, and policy (GPT-6 Sol/Luna need Codex CLI 0.156.1 or newer). Leave empty to use the CLI/config default."
         },
         "claudeMirror.codex.reasoningEffort": {
           "type": "string",
@@ -856,6 +856,7 @@
             "",
             "claude-fable-5-1",
             "claude-fable-5",
+            "claude-opus-5-5",
             "claude-opus-5",
             "claude-opus-4-8",
             "claude-opus-4-7",
@@ -870,7 +871,8 @@
             "Default (CLI default)",
             "Claude Fable 5.1 - most capable Claude model, 1M-token context",
             "Claude Fable 5 - previous most capable Claude model, 1M-token context",
-            "Claude Opus 5 - flagship everyday model, near-Fable quality, 1M-token context",
+            "Claude Opus 5.5 - flagship for agentic coding, ~20% cheaper than Opus 5, 1M-token context",
+            "Claude Opus 5 - previous flagship everyday model, 1M-token context",
             "Claude Opus 4.8",
             "Claude Opus 4.7",
             "Claude Sonnet 5 - most agentic Sonnet, near-Opus quality, low cost",

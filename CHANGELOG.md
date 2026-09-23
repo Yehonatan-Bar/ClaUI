@@ -1,5 +1,25 @@
 # ClaUi - Changelog
 
+## v0.1.236 - 2026-09-22
+
+**Feature: Claude Opus 5.5 is selectable**
+
+- Added `claude-opus-5-5` (Claude Opus 5.5, released 2026-09-22) to the Model dropdown (`CLAUDE_MODEL_OPTIONS` in `claudeModelDisplay.ts`) and the `claudeMirror.model` setting enum. It is Anthropic's new flagship for long-running agentic coding, with a 1M-token context window and 128K max output; it sits at the top of the Opus group, directly under Fable 5
+- Cost and usage tracking price it correctly: Opus 5.5 is ~20% cheaper than Opus 5 ($4/$20 input/output, cache write $5, cache read $0.20), so it gets its own row in both `DEFAULT_PRICES` (`server/src/usage/PriceDefaults.ts`) and `LOCAL_PRICES` (`DeveloperUsageReporter.ts`) instead of inheriting Opus 5's pricing through the longest-prefix resolver
+- `getModelMaxContext()` reports the full 1M-token window for it, so the context-usage gauge scales correctly
+- Docs: `Kingdom_of_Claudes_Beloved_MDs/CLAUDE_MODEL_CONTROLS.md` and TECHNICAL.md updated
+
+**Feature: GPT-6 Sol and GPT-6 Luna in Codex tabs**
+
+- Added `gpt-6-sol` (everyday coding workhorse) and `gpt-6-luna` (fast, low cost), released by OpenAI on 2026-09-22, to the Codex model fallbacks: `CODEX_MODEL_FALLBACK` (`codexModels.ts`), the `CodexModelSelector` list, and `CODEX_SMART_SEARCH_FALLBACK` (`StatusBar.tsx`). Capabilities mirror the Codex CLI 0.156.1 catalog: 272K active / 872K max context, Fast tier, default reasoning `medium`; Sol supports up to `ultra`, Luna up to `max`
+- They reach the Codex CLI model cache only from Codex CLI **0.156.1** on. The cache stays the source of truth, so with an older CLI they are not listed until the CLI is updated; the first Codex turn afterwards refreshes the dropdown without a reload
+- Smart Search - Codex now offers GPT-6 Luna next to GPT-5.6 Luna (`CODEX_SMART_SEARCH_MODELS`), never instead of it, so a pre-0.156.1 cache keeps a working option
+- No defaults changed (`claudeMirror.codex.model` stays empty, review-loop reviewer stays `gpt-5.5`); the `claudeMirror.codex.model` description now names GPT-6 Sol/Luna and the 0.156.1 requirement
+- Tests: `tests/unit/codexModels.test.ts` covers the Sol/Luna fallback metadata and context window
+- Docs: `CLAUDE_MODEL_CONTROLS.md`, `CODEX_INTEGRATION_PROGRESS.md`, TECHNICAL.md, README.md updated
+
+---
+
 ## v0.1.234 - 2026-09-17
 
 **Change: Actionable error when the Claude CLI binary is incompatible with the machine**

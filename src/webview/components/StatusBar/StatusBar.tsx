@@ -20,12 +20,21 @@ import { useOutsideClick } from '../../hooks/useOutsideClick';
  */
 const CODEX_SMART_SEARCH_FALLBACK = [
   { label: 'GPT-6 Astra', value: 'gpt-6-astra' },
+  { label: 'GPT-6 Sol', value: 'gpt-6-sol' },
+  { label: 'GPT-6 Luna', value: 'gpt-6-luna' },
   { label: 'GPT-5.6 Sol', value: 'gpt-5.6-sol' },
   { label: 'GPT-5.6 Terra', value: 'gpt-5.6-terra' },
   { label: 'GPT-5.6 Luna', value: 'gpt-5.6-luna' },
   { label: 'GPT-5.5', value: 'gpt-5.5' },
   { label: 'GPT-5.3-Codex-Spark', value: 'gpt-5.3-codex-spark' },
 ];
+
+/**
+ * Smart Search runs on the fast, low-cost Luna tier. GPT-6 Luna is listed next to
+ * GPT-5.6 Luna (never instead of it), so a Codex CLI older than 0.156.1, whose
+ * cache has no GPT-6 Luna yet, still keeps a working Smart Search option.
+ */
+const CODEX_SMART_SEARCH_MODELS = new Set(['gpt-6-luna', 'gpt-5.6-luna']);
 
 function formatDuration(durationMs: number): string {
   const totalSec = Math.max(0, Math.floor(durationMs / 1000));
@@ -131,7 +140,7 @@ export const StatusBar: React.FC<{
   const codexSearchModels = (codexModelOptions.length > 0
     ? codexModelOptions
     : CODEX_SMART_SEARCH_FALLBACK
-  ).filter((opt) => opt.value === 'gpt-5.6-luna');
+  ).filter((opt) => CODEX_SMART_SEARCH_MODELS.has(opt.value));
 
   const { barRef, layoutMode, hideClockFromBar, hideMcpFromBar, hideUsageFromBar } = useStatusBarCollapse();
   const logUiDebug = React.useCallback((event: string, payload?: Record<string, unknown>) => {
