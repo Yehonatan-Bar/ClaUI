@@ -2,6 +2,19 @@
   "$comment": "Bundled What's New entries shown after an update (toast + in-panel banner). Add ONE entry per release that ships user-visible features; bug-fix-only releases get no entry and stay silent. 'version' is the EARLIEST extension version allowed to show the entry (vsce publish patch may assign a higher number, that is fine). 'id' must be unique and must never change once shipped. Newest entries can go anywhere in the list; the extension sorts by version.",
   "announcements": [
     {
+      "id": "2026-09-27-message-date-weekday",
+      "version": "0.1.239",
+      "date": "2026-09-27",
+      "title": "Date and weekday on messages",
+      "titleHe": "תאריך ויום בהודעות",
+      "highlights": [
+        "Every Claude and Codex chat message now shows its date and weekday next to the time, for example 27/09 Sun 14:05."
+      ],
+      "highlightsHe": [
+        "כל הודעה בצ'אט של Claude ו-Codex מציגה עכשיו תאריך ויום בשבוע ליד השעה, לדוגמה 27/09 Sun 14:05."
+      ]
+    },
+    {
       "id": "2026-09-23-compact-context-in-place",
       "version": "0.1.237",
       "date": "2026-09-23",

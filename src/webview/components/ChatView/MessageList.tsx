@@ -7,6 +7,7 @@ import { StreamingText } from './StreamingText';
 import { ToolUseBlock } from './ToolUseBlock';
 import { BtwContextMenu } from './BtwContextMenu';
 import { BtwPopup } from './BtwPopup';
+import { formatMessageTimestamp } from '../../utils/messageTimestamp';
 
 /**
  * If the right-clicked element is (inside) a clickable link, return its target
@@ -278,7 +279,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onScrollFractionChange
           <div className="message-role">
             <span className="message-role-name">Assistant</span>
             <span className="message-timestamp">
-              {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {formatMessageTimestamp(new Date())}
             </span>
             {currentThinkingEffort && (
               <span className={`thinking-effort-badge thinking-effort-${currentThinkingEffort} thinking-effort-live`}>

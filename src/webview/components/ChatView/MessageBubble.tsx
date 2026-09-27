@@ -14,6 +14,7 @@ import { postToExtension } from '../../hooks/useClaudeStream';
 import { deriveTurnFromAssistantMessage } from '../../utils/turnVitals';
 import { resolveDir } from '../../hooks/useRtlDetection';
 import { getClaudeModelLabel } from '../../utils/claudeModelDisplay';
+import { formatMessageTimestamp } from '../../utils/messageTimestamp';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -308,7 +309,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
         )}
         {message.timestamp && (
           <span className="message-timestamp">
-            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {formatMessageTimestamp(new Date(message.timestamp))}
           </span>
         )}
         {message.model && (

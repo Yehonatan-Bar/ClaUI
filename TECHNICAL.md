@@ -482,6 +482,7 @@ claude-code-mirror/
 |       +-- utils/
 |       |   +-- claudeModelDisplay.ts     #   Shared Claude model options + raw model ID -> friendly label mapping
 |       |   +-- modelContextLimits.ts     #   Context window heuristics for Claude/Codex/Gemini models
+|       |   +-- messageTimestamp.ts       #   formatMessageTimestamp() - chat message header time as `dd/mm Ddd HH:MM`
 |       +-- data/
 |           +-- slashCommands.ts          #   Static slash-command catalog (grouped) + filter/parse/native-route helpers
 +-- sr-ptd-skill/                         # Bundled SR-PTD skill (installed to ~/.claude/skills/)

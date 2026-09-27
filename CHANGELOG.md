@@ -1,5 +1,11 @@
 # ClaUi - Changelog
 
+## v0.1.240 - 2026-09-27
+
+**Feature: date and weekday on chat messages**
+
+- The header of every chat message (Claude and Codex tabs, including the live streaming bubble) now shows `dd/mm Ddd HH:MM`, e.g. `27/09 Sun 14:05`, instead of the time alone. Shared formatter: `src/webview/utils/messageTimestamp.ts` (`formatMessageTimestamp()`); tests: `tests/unit/messageTimestamp.test.ts`
+
 ## v0.1.238 - 2026-09-23
 
 **Fix + feature: in-place `/compact` works, and is reachable from the Tools menu**
