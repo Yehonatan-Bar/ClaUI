@@ -2,6 +2,25 @@
   "$comment": "Bundled What's New entries shown after an update (toast + in-panel banner). Add ONE entry per release that ships user-visible features; bug-fix-only releases get no entry and stay silent. 'version' is the EARLIEST extension version allowed to show the entry (vsce publish patch may assign a higher number, that is fine). 'id' must be unique and must never change once shipped. Newest entries can go anywhere in the list; the extension sorts by version.",
   "announcements": [
     {
+      "id": "2026-09-30-sonnet-5-5",
+      "version": "0.1.240",
+      "date": "2026-09-30",
+      "title": "Claude Sonnet 5.5",
+      "titleHe": "Claude Sonnet 5.5",
+      "highlights": [
+        "Pick Claude Sonnet 5.5 from the Model dropdown in the AI chip - near-Opus quality, faster than Sonnet 5, with a 1M-token context window.",
+        "It is also offered for the prompt enhancer and for background analysis in the Vitals settings.",
+        "Sonnet 5.5 needs Claude Code CLI 2.1.284 or newer - update it with: claude update.",
+        "Cost tracking uses the current $2/$10 Sonnet price for Sonnet 5.5 and Sonnet 5."
+      ],
+      "highlightsHe": [
+        "בחרו את Claude Sonnet 5.5 מתפריט המודל בצ'יפ ה-AI - איכות קרובה ל-Opus, מהיר יותר מ-Sonnet 5, עם חלון הקשר של מיליון טוקנים.",
+        "הוא זמין גם לשיפור פרומפטים ולניתוח ברקע בהגדרות ה-Vitals.",
+        "Sonnet 5.5 דורש Claude Code CLI בגרסה 2.1.284 ומעלה - עדכנו עם: claude update.",
+        "מעקב העלויות משתמש במחיר Sonnet הנוכחי, $2/$10, עבור Sonnet 5.5 ו-Sonnet 5."
+      ]
+    },
+    {
       "id": "2026-09-27-message-date-weekday",
       "version": "0.1.239",
       "date": "2026-09-27",

@@ -1,5 +1,17 @@
 # ClaUi - Changelog
 
+## v0.1.241 - 2026-09-30
+
+**Feature: Claude Sonnet 5.5 is selectable**
+
+- Added `claude-sonnet-5-5` (Claude Sonnet 5.5, released 2026-09-28) to the Model dropdown (`CLAUDE_MODEL_OPTIONS` in `claudeModelDisplay.ts`) and the `claudeMirror.model` setting enum, directly above Sonnet 5. It is Anthropic's current Sonnet: near-Opus quality, 30%+ faster output than Sonnet 5, 1M-token context, 128K max output
+- Also offered as a prompt-enhancer model (`claudeMirror.promptEnhancer.model`, enhancer popover) and a background-analysis model (`claudeMirror.analysisModel`, Vitals settings). No defaults changed
+- The id is shown as "Sonnet 5.5"; before, the longest-prefix label match rendered it as "Sonnet 5". `getModelMaxContext()` lists it as a 1M-token model
+- Needs Claude Code CLI 2.1.284+. An older CLI still runs it, but logs `unrecognized_model` and uses a 200K window for its own auto-compaction
+- Pricing: Sonnet 5's $2/$10 launch price became its standard price (the planned $3/$15 rise was cancelled), and Sonnet 5.5 uses the same price. `claude-sonnet-5` and the new `claude-sonnet-5-5` row are now $2/$10 (cache write $2.50, cache read $0.20) in `DEFAULT_PRICES` (`server/src/usage/PriceDefaults.ts`) and `LOCAL_PRICES` (`DeveloperUsageReporter.ts`). A usage server with a saved price list keeps its saved rows until an admin edits them
+- Tests: `npm run test:claude-models` (`tests/unit/claudeModels.test.ts`) covers the Sonnet 5.5 label, context window and price key
+- Docs: `CLAUDE_MODEL_CONTROLS.md`, `ADMIN_USAGE_DASHBOARD.md`, TECHNICAL.md, feature catalogs
+
 ## v0.1.240 - 2026-09-27
 
 **Feature: date and weekday on chat messages**

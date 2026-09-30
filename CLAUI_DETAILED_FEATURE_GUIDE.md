@@ -138,8 +138,8 @@
 ### 9. מרחקי מודל Claude
 
 **מודלים נתמכים:**
-- Fable 5.1, Opus 5, Sonnet 5, Haiku 4.5
-- Legacy: Opus 4.8/4.7/4.6, Sonnet 4.6/4.5
+- Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 4.5
+- Legacy: Fable 5, Opus 5/4.8/4.7/4.6, Sonnet 5/4.6/4.5
 
 **מנטי:**
 - **בוחר dropdown** בשורת הסטטוס עם תוויות ידידותיות

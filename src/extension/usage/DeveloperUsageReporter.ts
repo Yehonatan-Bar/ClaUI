@@ -38,7 +38,10 @@ const LOCAL_PRICES: Record<string, TokenTypeCounts> = {
   'claude-opus-4-8': { input: 5, output: 25, cacheCreation: 6.25, cacheRead: 0.5 },
   'claude-opus-4-7': { input: 5, output: 25, cacheCreation: 6.25, cacheRead: 0.5 },
   'claude-opus-4-6': { input: 5, output: 25, cacheCreation: 6.25, cacheRead: 0.5 },
-  'claude-sonnet-5': { input: 3, output: 15, cacheCreation: 3.75, cacheRead: 0.3 },
+  // Sonnet 5.5 and Sonnet 5 share the $2/$10 price (cache write $2.50, read $0.20).
+  // Sonnet 5.5 keeps its own row so the prefix fallback never depends on Sonnet 5's.
+  'claude-sonnet-5-5': { input: 2, output: 10, cacheCreation: 2.5, cacheRead: 0.2 },
+  'claude-sonnet-5': { input: 2, output: 10, cacheCreation: 2.5, cacheRead: 0.2 },
   'claude-sonnet-4-6': { input: 3, output: 15, cacheCreation: 3.75, cacheRead: 0.3 },
   'claude-haiku-4-5': { input: 1, output: 5, cacheCreation: 1.25, cacheRead: 0.1 },
   // Fable 5.1 matches Fable 5 on input/output but reads cache at a quarter of

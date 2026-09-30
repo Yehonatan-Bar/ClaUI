@@ -20,9 +20,12 @@ export const DEFAULT_PRICES: Record<string, PriceRow> = {
   'claude-opus-4-7':   { input: 5.0,  output: 25.0, cacheCreation: 6.25,  cacheRead: 0.5 },
   'claude-opus-4-6':   { input: 5.0,  output: 25.0, cacheCreation: 6.25,  cacheRead: 0.5 },
   'claude-opus-4-5':   { input: 5.0,  output: 25.0, cacheCreation: 6.25,  cacheRead: 0.5 },
-  // Sonnet 5 standard pricing. Note: an introductory promo of $2/$10 input/output
-  // runs through 2026-08-31 — an admin can lower this row during the promo window.
-  'claude-sonnet-5':   { input: 3.0,  output: 15.0, cacheCreation: 3.75,  cacheRead: 0.3 },
+  // Sonnet 5.5 (released 2026-09-28) keeps Sonnet 5's prices. It has its own row so
+  // the longest-prefix resolver never ties its price to the 'claude-sonnet-5' key.
+  'claude-sonnet-5-5': { input: 2.0,  output: 10.0, cacheCreation: 2.5,   cacheRead: 0.2 },
+  // Sonnet 5's $2/$10 launch price became its standard price (the planned rise to
+  // $3/$15 on 2026-09-01 was cancelled).
+  'claude-sonnet-5':   { input: 2.0,  output: 10.0, cacheCreation: 2.5,   cacheRead: 0.2 },
   'claude-sonnet-4-6': { input: 3.0,  output: 15.0, cacheCreation: 3.75,  cacheRead: 0.3 },
   'claude-sonnet-4-5': { input: 3.0,  output: 15.0, cacheCreation: 3.75,  cacheRead: 0.3 },
   'claude-haiku-4-5':  { input: 1.0,  output: 5.0,  cacheCreation: 1.25,  cacheRead: 0.1 },

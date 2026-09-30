@@ -40,7 +40,7 @@
 ## 3. Model & Provider Selection
 
 **Claude Models:**
-- Supported versions: Fable 5.1, Opus 5, Sonnet 5, Haiku 4.5, plus legacy versions (Opus 4.8/4.7/4.6, Sonnet 4.6/4.5)
+- Supported versions: Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 4.5, plus legacy versions (Fable 5, Opus 5/4.8/4.7/4.6, Sonnet 5/4.6/4.5)
 - Model selector dropdown in status bar with friendly labels and live switching
 - Selection persists to VS Code settings and is restored on startup
 - Changing model during an active session stops and resumes it with the new model

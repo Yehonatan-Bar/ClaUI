@@ -57,7 +57,7 @@ export function getModelMaxContext(model: string, codexModelOptions?: CodexModel
     return 16_385;
   }
   // Claude models with a 1M-token context window: Fable 5.1, Fable 5, Opus 5.5,
-  // Opus 5, Opus 4.6/4.7/4.8, Sonnet 4.6, and Sonnet 5.
+  // Opus 5, Opus 4.6/4.7/4.8, Sonnet 5.5, Sonnet 5, and Sonnet 4.6.
   const oneMillionContextModels = [
     'claude-fable-5-1',
     'claude-fable-5',
@@ -66,6 +66,7 @@ export function getModelMaxContext(model: string, codexModelOptions?: CodexModel
     'claude-opus-4-6',
     'claude-opus-4-7',
     'claude-opus-4-8',
+    'claude-sonnet-5-5',
     'claude-sonnet-5',
     'claude-sonnet-4-6',
   ];

@@ -1,8 +1,8 @@
 # Claude Model Controls (Model, Thinking Effort, Fast Mode)
 
-Snapshot: 2026-09-22. Model lineup: Fable 5.1, Fable 5, Opus 5.5, Opus 5,
-Opus 4.8/4.7/4.6, Sonnet 5/4.6/4.5, Haiku 4.5 are selectable; Mythos 5 is marked
-blocked.
+Snapshot: 2026-09-30. Model lineup: Fable 5.1, Fable 5, Opus 5.5, Opus 5,
+Opus 4.8/4.7/4.6, Sonnet 5.5/5/4.6/4.5, Haiku 4.5 are selectable; Mythos 5 is
+marked blocked.
 
 This document covers the three Claude-side controls exposed in the AI chip's
 model area:
@@ -143,6 +143,7 @@ and mirrored in the `claudeMirror.model` enum in `package.json`:
 | Opus 5 | `claude-opus-5` |
 | Opus 4.8 | `claude-opus-4-8` |
 | Opus 4.7 | `claude-opus-4-7` |
+| Sonnet 5.5 | `claude-sonnet-5-5` |
 | Sonnet 5 | `claude-sonnet-5` |
 | Sonnet 4.6 | `claude-sonnet-4-6` |
 | Sonnet 4.5 | `claude-sonnet-4-5-20250929` |
@@ -186,17 +187,31 @@ Opus 5.5.
 
 **Context windows are not uniform.** `getModelMaxContext()` in
 `src/webview/utils/modelContextLimits.ts` returns `1_000_000` for the 1M-context
-models — Fable 5.1, Fable 5, Opus 5.5, Opus 5, Opus 4.6/4.7/4.8, Sonnet 4.6, and Sonnet 5 — and
+models — Fable 5.1, Fable 5, Opus 5.5, Opus 5, Opus 4.6/4.7/4.8, Sonnet 5.5, Sonnet 5, and Sonnet 4.6 — and
 `200_000` for other Claude models (Sonnet 4.5, Haiku 4.5, Mythos 5, and older Claude
 models), so the context-usage gauge scales correctly. `inferClaudeModelLabel()`
 also treats `fable` and `mythos` as known families. For Codex (`gpt-*`/`codex`)
 models it takes an optional `codexModelOptions` argument and prefers each model's
 dynamic active `context_window` from the CLI cache (see `CODEX_INTEGRATION_PROGRESS.md`).
 
-Sonnet 5 (alias `claude-sonnet-5`, dated id `claude-sonnet-5-20260630`) is
-Anthropic's most agentic Sonnet — near-Opus quality at Sonnet-tier cost, with a
-1M-token context window. Its dated id resolves to the `Sonnet 5` label via the
-prefix match in `getClaudeModelLabel()`.
+Sonnet 5.5 (`claude-sonnet-5-5`, released 2026-09-28) is Anthropic's current
+Sonnet and the Claude Code CLI's default Sonnet — near-Opus quality, 30%+ faster
+output than Sonnet 5, with a 1M-token context window, a 128K max output, and
+adaptive thinking on by default. It is listed directly above Sonnet 5. The CLI
+recognizes it from **Claude Code CLI 2.1.284** on; an older CLI still runs it (the
+API accepts the id) but logs `unrecognized_model`, assumes a 200K window for its
+own auto-compaction, and reports its cost basis as unknown. ClaUi's gauge and
+price tables do not depend on the CLI for this, so they stay correct either way.
+
+Sonnet 5 (alias `claude-sonnet-5`, dated id `claude-sonnet-5-20260630`) is the
+previous Sonnet, also with a 1M-token context window. Its dated id resolves to the
+`Sonnet 5` label via the prefix match in `getClaudeModelLabel()`, and the exact
+match keeps `claude-sonnet-5-5` from being shown as "Sonnet 5".
+
+Sonnet 5.5 and Sonnet 5 share one price: $2/$10 per 1M input/output, cache write
+$2.50, cache read $0.20 (Sonnet 5's launch price became its standard price). Both
+have rows in `LOCAL_PRICES` and `DEFAULT_PRICES`; Sonnet 5.5 has its own row so
+its price never depends on the `claude-sonnet-5` prefix fallback.
 
 **Label matching is exact-first, then longest prefix.** `getClaudeModelLabel()`
 first looks for an option whose id equals the model id, and only then falls back

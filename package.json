@@ -860,6 +860,7 @@
             "claude-opus-5",
             "claude-opus-4-8",
             "claude-opus-4-7",
+            "claude-sonnet-5-5",
             "claude-sonnet-5",
             "claude-sonnet-4-6",
             "claude-sonnet-4-5-20250929",
@@ -875,7 +876,8 @@
             "Claude Opus 5 - previous flagship everyday model, 1M-token context",
             "Claude Opus 4.8",
             "Claude Opus 4.7",
-            "Claude Sonnet 5 - most agentic Sonnet, near-Opus quality, low cost",
+            "Claude Sonnet 5.5 - fastest near-Opus Sonnet, low cost, 1M-token context (needs Claude Code CLI 2.1.284+)",
+            "Claude Sonnet 5 - previous agentic Sonnet, 1M-token context",
             "Claude Sonnet 4.6",
             "Claude Sonnet 4.5",
             "Claude Opus 4.6",
@@ -1059,13 +1061,15 @@
           "default": "claude-haiku-4-5-20251001",
           "enum": [
             "claude-haiku-4-5-20251001",
+            "claude-sonnet-5-5",
             "claude-sonnet-5",
             "claude-sonnet-4-6",
             "claude-opus-4-6"
           ],
           "enumDescriptions": [
             "Haiku - fastest and cheapest, good for quick summaries (recommended)",
-            "Sonnet 5 - most agentic Sonnet, near-Opus quality, low cost",
+            "Sonnet 5.5 - fastest near-Opus Sonnet, low cost",
+            "Sonnet 5 - previous agentic Sonnet, low cost",
             "Sonnet 4.6 - higher quality analysis, moderate cost",
             "Opus - highest quality, slower and more expensive"
           ],
@@ -1081,6 +1085,7 @@
           "default": "claude-sonnet-4-6",
           "enum": [
             "claude-haiku-4-5-20251001",
+            "claude-sonnet-5-5",
             "claude-sonnet-5",
             "claude-sonnet-4-6",
             "claude-sonnet-4-5-20250929",
@@ -1088,7 +1093,8 @@
           ],
           "enumDescriptions": [
             "Haiku - fastest and cheapest",
-            "Sonnet 5 - most agentic Sonnet, near-Opus quality, low cost",
+            "Sonnet 5.5 - fastest near-Opus Sonnet, low cost",
+            "Sonnet 5 - previous agentic Sonnet, low cost",
             "Sonnet 4.6 - good balance of quality and speed (recommended)",
             "Sonnet 4.5 - previous generation",
             "Opus 4.6 - highest quality, slower"
@@ -1970,6 +1976,7 @@
     "test:spawn-cli": "node --import tsx --test tests/process/spawnCli.test.ts",
     "test:usage-limit": "node --import tsx --test tests/process/usageLimitParser.test.ts",
     "test:codex-models": "node --import tsx --test tests/process/codexModelCache.test.ts tests/unit/codexModels.test.ts",
+    "test:claude-models": "node --import tsx --test tests/unit/claudeModels.test.ts",
     "test:tabs": "node --import tsx --test tests/tabs/navigationOrder.test.ts tests/tabs/navTree.test.ts",
     "test:bridge": "node --import tsx --test tests/bridge/config.test.ts tests/bridge/protocol.test.ts tests/bridge/sessionStore.test.ts tests/bridge/grokPermissions.test.ts tests/bridge/procUtils.test.ts tests/bridge/openaiCompat.test.ts tests/bridge/council.test.ts tests/bridge/commandCatalog.test.ts tests/bridge/contextProviders.test.ts tests/bridge/packetBuilder.test.ts tests/bridge/dispatcher.test.ts tests/bridge/commandMcpServer.test.ts tests/bridge/grokCommandTools.test.ts tests/bridge/offload.test.ts",
     "test:hibernation": "node --import tsx --test tests/hibernation/hibernationPlanner.test.ts",
