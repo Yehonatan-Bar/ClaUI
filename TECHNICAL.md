@@ -98,7 +98,7 @@ claude-code-mirror/
 |   |   |   +-- hibernation/
 |   |   |   |   +-- HibernationPlanner.ts #   Pure eligibility planner for light/deep tab hibernation (unit-tested)
 |   |   |   +-- ProjectAnalyticsStore.ts  #   Persists SessionSummary in workspaceState (per-project)
-|   |   |   +-- ConversationReader.ts     #   Reads conversation history from Claude's session JSONL files
+|   |   |   +-- ConversationReader.ts     #   Reads conversation history (with original message timestamps) from Claude's session JSONL files
 |   |   |   +-- PromptHistoryStore.ts     #   Persists prompt history (project + global scope)
 |   |   |   +-- TurnAnalyzer.ts           #   Semantic turn analysis via Claude (mood, task type, outcome)
 |   |   |   +-- PromptEnhancer.ts         #   AI-powered prompt rewriting via one-shot CLI call

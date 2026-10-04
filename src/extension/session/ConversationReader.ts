@@ -47,7 +47,7 @@ export class ConversationReader {
     const assistantBlocks = new Map<string, {
       blocks: ContentBlock[];
       model?: string;
-      timestamp?: string;
+      timestamp?: number;
     }>();
     // Track the order in which assistant message IDs appear
     const assistantOrder: string[] = [];
@@ -83,12 +83,13 @@ export class ConversationReader {
         // reminders) with isMeta=true. These are NOT user input; render them
         // as part of Claude's output flow so they never appear as "YOU".
         const isMeta = entry.isMeta === true;
+        const entryTimestamp = this.resolveTimestamp(this.parseEntryTimestamp(entry), messages);
         if (isMeta) {
           messages.push({
             id: `history-synthetic-${messages.length}`,
             role: 'assistant',
             content: userVisible,
-            timestamp: Date.now() - 1000000 + messages.length * 100,
+            timestamp: entryTimestamp,
             synthetic: true,
           });
           continue;
@@ -98,7 +99,7 @@ export class ConversationReader {
           id: `history-user-${messages.length}`,
           role: 'user',
           content: userVisible,
-          timestamp: Date.now() - 1000000 + messages.length * 100,
+          timestamp: entryTimestamp,
           source: 'input',
         });
       } else if (type === 'assistant') {
@@ -126,6 +127,9 @@ export class ConversationReader {
         if (msg.model) {
           existing.model = msg.model;
         }
+        // Entries are chronological, so the last one marks when the message finished
+        // (the live path stamps a message when it finalizes, not when it starts).
+        existing.timestamp = this.parseEntryTimestamp(entry) ?? existing.timestamp;
       }
     }
 
@@ -140,7 +144,7 @@ export class ConversationReader {
    * Convert accumulated assistant blocks into finalized messages.
    */
   private flushAssistantMessages(
-    assistantBlocks: Map<string, { blocks: ContentBlock[]; model?: string }>,
+    assistantBlocks: Map<string, { blocks: ContentBlock[]; model?: string; timestamp?: number }>,
     assistantOrder: string[],
     messages: SerializedChatMessage[]
   ): void {
@@ -164,13 +168,40 @@ export class ConversationReader {
         role: 'assistant',
         content: visibleBlocks,
         model: data.model,
-        timestamp: Date.now() - 1000000 + messages.length * 100,
+        timestamp: this.resolveTimestamp(data.timestamp, messages),
         thinkingEffort,
       });
     }
 
     assistantBlocks.clear();
     assistantOrder.length = 0;
+  }
+
+  /**
+   * Epoch ms from the entry's own ISO `timestamp` field, or undefined when it is
+   * missing or unparseable. The CLI stamps every user/assistant line when it is
+   * written, so this is the real send time, independent of when the session is
+   * reloaded (resume after hibernation, VS Code restart, etc.).
+   */
+  private parseEntryTimestamp(entry: Record<string, unknown>): number | undefined {
+    if (typeof entry.timestamp !== 'string') {
+      return undefined;
+    }
+    const parsed = Date.parse(entry.timestamp);
+    return Number.isNaN(parsed) ? undefined : parsed;
+  }
+
+  /**
+   * Use the entry's real timestamp when it has one. Otherwise inherit the previous
+   * message's time (+1ms keeps the order strict); with no previous message there is
+   * nothing better than the current time.
+   */
+  private resolveTimestamp(entryTimestamp: number | undefined, messages: SerializedChatMessage[]): number {
+    if (entryTimestamp !== undefined) {
+      return entryTimestamp;
+    }
+    const previous = messages[messages.length - 1];
+    return previous ? previous.timestamp + 1 : Date.now();
   }
 
 }
