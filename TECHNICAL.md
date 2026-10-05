@@ -332,7 +332,7 @@ claude-code-mirror/
 |       |   |   +-- AgentSpawnBlock.tsx  #   Inline agent spawn card with type badge, status dot, collapsible prompt/result
 |       |   |   +-- AgentHierarchyBlock.tsx # Nested sub-agent tree visualization with connector lines
 |       |   |   +-- TeamInlineWidget.tsx #   Compact inline team card with member status dots
-|       |   |   +-- PlanApprovalBar.tsx  #   CLI-matching plan approval (4 options: clear+bypass, bypass, manual, feedback) or question UI (option buttons + custom answer)
+|       |   |   +-- PlanApprovalBar.tsx  #   CLI-matching plan approval (4 options: clear+bypass, bypass, manual, feedback) or question UI (option buttons + custom answer; height-capped, question list scrolls, Submit stays pinned)
 |       |   |   +-- PromptHistoryPanel.tsx #  3-tab prompt history overlay (session/project/global)
 |       |   |   +-- VisualProgress/
 |       |   |   |   +-- VisualProgressView.tsx  #  VPM container with auto-scroll card timeline

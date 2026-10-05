@@ -4617,6 +4617,12 @@ html, body, #root {
   padding: 10px 16px;
   border-top: 2px solid var(--vscode-textLink-foreground, #3794ff);
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  /* Never outgrow the panel: cap the height and scroll the overflow so every
+     option stays reachable. Being a scroll container also lets the bar shrink
+     below the cap when the panel is too short for it plus the input area. */
+  max-height: 60vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .plan-approval-header {
@@ -4841,6 +4847,47 @@ html, body, #root {
 /* Question bar (AskUserQuestion) */
 .question-bar {
   border-top-color: var(--vscode-charts-green, #89d185);
+  /* Column layout so only .question-scroll-area scrolls; the progress line and
+     the footer (submit / custom answer) stay pinned and always visible */
+  display: flex;
+  flex-direction: column;
+}
+
+.question-scroll-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Bleed into the bar's side padding so the scrollbar sits on the bar's edge
+     instead of floating inside the content */
+  margin: 0 -16px;
+  padding: 0 16px;
+}
+
+.question-bar > .question-progress {
+  flex-shrink: 0;
+}
+
+.question-bar-footer {
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* Fade over the bottom of the question list while more questions are hidden
+   below it (PlanApprovalBar toggles the modifier on scroll/resize) */
+.question-bar--more-below .question-bar-footer::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 28px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--vscode-sideBar-background, var(--vscode-editor-background))
+  );
+  pointer-events: none;
 }
 
 .question-title {
@@ -4954,9 +5001,9 @@ html, body, #root {
   border-top: 1px solid var(--vscode-panel-border, #333);
 }
 
-/* The progress line always precedes the first group, so the group right after
-   it needs no separator */
-.question-progress + .question-group {
+/* The progress line always sits right above the first group, so that group
+   needs no separator */
+.question-scroll-area > .question-group:first-child {
   border-top: none;
   padding-top: 0;
 }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../../state/store';
 import { postToExtension } from '../../hooks/useClaudeStream';
 import { detectRtl } from '../../hooks/useRtlDetection';
@@ -97,6 +97,9 @@ export const PlanApprovalBar: React.FC = () => {
   const [questionCustom, setQuestionCustom] = useState<Record<number, string>>({});
   const [questionCustomOpen, setQuestionCustomOpen] = useState<Record<number, boolean>>({});
   const [hoveredOption, setHoveredOption] = useState<number | null>(null);
+  // Scrollable question list; also measured for the "more questions below" fade
+  const questionScrollRef = useRef<HTMLDivElement>(null);
+  const [hasMoreBelow, setHasMoreBelow] = useState(false);
 
   const isQuestion = pendingApproval?.toolName === 'AskUserQuestion';
 
@@ -107,11 +110,12 @@ export const PlanApprovalBar: React.FC = () => {
   const isMultiQuestion = questions.length > 1;
 
   // A replacement approval request (bar re-shown without unmounting) must not
-  // inherit answer state from the previous question set
+  // inherit answer state or scroll position from the previous question set
   useEffect(() => {
     setQuestionSelections({});
     setQuestionCustom({});
     setQuestionCustomOpen({});
+    if (questionScrollRef.current) questionScrollRef.current.scrollTop = 0;
   }, [pendingApproval?.planText]);
 
   // Hebrew/Arabic anywhere in the questions or their options flips the whole bar to RTL
@@ -124,6 +128,30 @@ export const PlanApprovalBar: React.FC = () => {
     ]);
     return detectRtl(parts.join(' '));
   }, [questions]);
+
+  // hasMoreBelow is true while part of the question list is scrolled out of
+  // view below the footer
+  const updateHasMoreBelow = useCallback(() => {
+    const scrollArea = questionScrollRef.current;
+    setHasMoreBelow(
+      !!scrollArea && scrollArea.scrollTop + scrollArea.clientHeight < scrollArea.scrollHeight - 1
+    );
+  }, []);
+
+  // Re-measure after every render: answering can open/close custom-answer
+  // textareas, changing the content height without resizing the scroll area
+  useLayoutEffect(() => {
+    updateHasMoreBelow();
+  });
+
+  // Re-measure when the scroll area itself resizes (panel resize, footer growth)
+  useEffect(() => {
+    const scrollArea = questionScrollRef.current;
+    if (!scrollArea || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(updateHasMoreBelow);
+    observer.observe(scrollArea);
+    return () => observer.disconnect();
+  }, [questions, updateHasMoreBelow]);
 
   const allowedPrompts = useMemo(
     () => (!isQuestion && pendingApproval ? parseAllowedPrompts(pendingApproval.planText) : []),
@@ -311,124 +339,133 @@ export const PlanApprovalBar: React.FC = () => {
   // --- Render question UI ---
   if (isQuestion && questions.length > 0) {
     return (
-      <div className="plan-approval-bar question-bar" dir={isQuestionRtl ? 'rtl' : 'ltr'}>
+      <div
+        className={`plan-approval-bar question-bar${hasMoreBelow ? ' question-bar--more-below' : ''}`}
+        dir={isQuestionRtl ? 'rtl' : 'ltr'}
+      >
         {isMultiQuestion && (
           <div className="question-progress">
             {answeredCount}/{questions.length} answered
           </div>
         )}
-        {questions.map((q, qi) => {
-          const selected = questionSelections[qi] ?? [];
-          const customText = questionCustom[qi] || '';
-          return (
-            <div className={isMultiQuestion ? 'question-group' : undefined} key={qi}>
-              <div className="question-title">
-                {q.header && (
-                  <span className="question-header">{q.header}</span>
-                )}
-                {q.question}
-              </div>
-              <div className="question-options">
-                {q.options.map((opt, i) => {
-                  const isSelected = selected.includes(opt.label);
-                  return (
-                    <button
-                      key={i}
-                      className={`question-option-btn ${isSelected ? 'selected' : ''}`}
-                      onClick={() => handleOptionClick(qi, opt.label)}
-                      data-tooltip={opt.description || undefined}
-                    >
-                      {(q.multiSelect || isMultiQuestion) && (
+        {/* Only the questions scroll: a tall question set must never push the
+            progress line or the submit/custom-answer controls out of view */}
+        <div className="question-scroll-area" ref={questionScrollRef} onScroll={updateHasMoreBelow}>
+          {questions.map((q, qi) => {
+            const selected = questionSelections[qi] ?? [];
+            const customText = questionCustom[qi] || '';
+            return (
+              <div className={isMultiQuestion ? 'question-group' : undefined} key={qi}>
+                <div className="question-title">
+                  {q.header && (
+                    <span className="question-header">{q.header}</span>
+                  )}
+                  {q.question}
+                </div>
+                <div className="question-options">
+                  {q.options.map((opt, i) => {
+                    const isSelected = selected.includes(opt.label);
+                    return (
+                      <button
+                        key={i}
+                        className={`question-option-btn ${isSelected ? 'selected' : ''}`}
+                        onClick={() => handleOptionClick(qi, opt.label)}
+                        data-tooltip={opt.description || undefined}
+                      >
+                        {(q.multiSelect || isMultiQuestion) && (
+                          <span className="question-checkbox">
+                            {q.multiSelect
+                              ? (isSelected ? '[x]' : '[ ]')
+                              : (isSelected ? '(*)' : '( )')}
+                          </span>
+                        )}
+                        <span className="question-option-label">{opt.label}</span>
+                        {opt.description && (
+                          <span className="question-option-desc">{opt.description}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                  {isMultiQuestion && (
+                    <>
+                      <button
+                        className={`question-option-btn question-custom-toggle ${customText.trim() ? 'selected' : ''}`}
+                        onClick={() => handleToggleCustomOpen(qi)}
+                        data-tooltip={questionCustomOpen[qi] ? 'Discard the custom answer' : 'Write a free-text answer for this question'}
+                      >
                         <span className="question-checkbox">
-                          {q.multiSelect
-                            ? (isSelected ? '[x]' : '[ ]')
-                            : (isSelected ? '(*)' : '( )')}
+                          {customText.trim() ? '(*)' : '( )'}
                         </span>
+                        <span className="question-option-label">
+                          {questionCustomOpen[qi] ? 'Cancel custom answer' : 'Custom answer...'}
+                        </span>
+                      </button>
+                      {questionCustomOpen[qi] && (
+                        <textarea
+                          className="plan-feedback-textarea question-custom-textarea"
+                          value={customText}
+                          onChange={(e) => handleCustomTextChange(qi, e.target.value)}
+                          placeholder="Type your answer..."
+                          rows={2}
+                          autoFocus
+                        />
                       )}
-                      <span className="question-option-label">{opt.label}</span>
-                      {opt.description && (
-                        <span className="question-option-desc">{opt.description}</span>
-                      )}
-                    </button>
-                  );
-                })}
-                {isMultiQuestion && (
-                  <>
-                    <button
-                      className={`question-option-btn question-custom-toggle ${customText.trim() ? 'selected' : ''}`}
-                      onClick={() => handleToggleCustomOpen(qi)}
-                      data-tooltip={questionCustomOpen[qi] ? 'Discard the custom answer' : 'Write a free-text answer for this question'}
-                    >
-                      <span className="question-checkbox">
-                        {customText.trim() ? '(*)' : '( )'}
-                      </span>
-                      <span className="question-option-label">
-                        {questionCustomOpen[qi] ? 'Cancel custom answer' : 'Custom answer...'}
-                      </span>
-                    </button>
-                    {questionCustomOpen[qi] && (
-                      <textarea
-                        className="plan-feedback-textarea question-custom-textarea"
-                        value={customText}
-                        onChange={(e) => handleCustomTextChange(qi, e.target.value)}
-                        placeholder="Type your answer..."
-                        rows={2}
-                        autoFocus
-                      />
-                    )}
-                  </>
-                )}
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
-        {isMultiQuestion && (
-          <button
-            className="question-submit-btn"
-            onClick={handleSubmitAllAnswers}
-            disabled={!allQuestionsAnswered}
-            data-tooltip={allQuestionsAnswered ? 'Send all your answers' : 'Answer every question to submit'}
-          >
-            Submit answers ({answeredCount}/{questions.length})
-          </button>
-        )}
-        {!isMultiQuestion && questions[0].multiSelect && (questionSelections[0]?.length ?? 0) > 0 && (
-          <button className="question-submit-btn" onClick={handleSubmitMultiSelect} data-tooltip="Submit your selected answers">
-            Submit ({(questionSelections[0] ?? []).length} selected)
-          </button>
-        )}
-        {!isMultiQuestion && (
-          <div className="question-custom-area">
+            );
+          })}
+        </div>
+        <div className="question-bar-footer">
+          {isMultiQuestion && (
             <button
-              className="plan-feedback-btn"
-              onClick={() => setShowFeedback(!showFeedback)}
-              data-tooltip={showFeedback ? 'Cancel the custom answer' : 'Write a free-text answer instead of choosing an option'}
+              className="question-submit-btn"
+              onClick={handleSubmitAllAnswers}
+              disabled={!allQuestionsAnswered}
+              data-tooltip={allQuestionsAnswered ? 'Send all your answers' : 'Answer every question to submit'}
             >
-              {showFeedback ? 'Cancel' : 'Custom answer...'}
+              Submit answers ({answeredCount}/{questions.length})
             </button>
-            {showFeedback && (
-              <div className="plan-feedback-area">
-                <textarea
-                  className="plan-feedback-textarea"
-                  value={feedbackText}
-                  onChange={(e) => setFeedbackText(e.target.value)}
-                  onKeyDown={handleCustomAnswerKeyDown}
-                  placeholder="Type your answer..."
-                  rows={2}
-                  autoFocus
-                />
-                <button
-                  className="plan-feedback-send"
-                  onClick={handleSendCustomAnswer}
-                  disabled={!feedbackText.trim()}
-                  data-tooltip="Send your custom answer (Enter)"
-                >
-                  Send
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+          )}
+          {!isMultiQuestion && questions[0].multiSelect && (questionSelections[0]?.length ?? 0) > 0 && (
+            <button className="question-submit-btn" onClick={handleSubmitMultiSelect} data-tooltip="Submit your selected answers">
+              Submit ({(questionSelections[0] ?? []).length} selected)
+            </button>
+          )}
+          {!isMultiQuestion && (
+            <div className="question-custom-area">
+              <button
+                className="plan-feedback-btn"
+                onClick={() => setShowFeedback(!showFeedback)}
+                data-tooltip={showFeedback ? 'Cancel the custom answer' : 'Write a free-text answer instead of choosing an option'}
+              >
+                {showFeedback ? 'Cancel' : 'Custom answer...'}
+              </button>
+              {showFeedback && (
+                <div className="plan-feedback-area">
+                  <textarea
+                    className="plan-feedback-textarea"
+                    value={feedbackText}
+                    onChange={(e) => setFeedbackText(e.target.value)}
+                    onKeyDown={handleCustomAnswerKeyDown}
+                    placeholder="Type your answer..."
+                    rows={2}
+                    autoFocus
+                  />
+                  <button
+                    className="plan-feedback-send"
+                    onClick={handleSendCustomAnswer}
+                    disabled={!feedbackText.trim()}
+                    data-tooltip="Send your custom answer (Enter)"
+                  >
+                    Send
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     );
   }

@@ -165,6 +165,12 @@ bar or its suppression flags.
   label/description; if any Hebrew/Arabic is present it sets `dir="rtl"` on the bar so the
   whole question UI is right-aligned (overrides for the hard-coded physical styles live in
   `src/webview/styles/rtl.css`).
+  The bar is height-capped (`max-height: 60vh`) so any number of questions fits the panel:
+  it is a flex column of the progress line, a `question-scroll-area` (the only part that
+  scrolls), and a `question-bar-footer` (Submit / custom answer) that stays pinned and
+  always visible. While questions are hidden below the fold the bar gets the
+  `question-bar--more-below` modifier (measured on scroll, on resize via `ResizeObserver`,
+  and after every render), which shows a fade above the footer.
 
 ## How to verify
 
@@ -177,6 +183,10 @@ bar or its suppression flags.
     an answer, and the model's next message must reflect **every** answer -- especially a
     non-first option picked for the second question, which previously collapsed to that
     question's first option.
+3c. With a multi-question call in a short panel, only the question list scrolls; the
+    `answered/total` line and the Submit button stay visible, and the fade above Submit
+    disappears once the last question is scrolled into view. Layout fixture for a browser:
+    `tests/fixtures/question-bar-scroll.html` (serve the repo root over HTTP).
 4. Trigger plan mode (`ExitPlanMode`). Approve -> the model exits plan mode and continues.
    Reject / feedback -> the model revises the plan instead of proceeding.
 5. Confirm the `Output -> ClaUi` log shows `Control protocol: sent initialize handshake`

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<!--
+  Manual layout fixture for the AskUserQuestion bar (PlanApprovalBar question mode).
+  Renders 4 long questions inside the real app-container layout using the real
+  global.css, to verify that only the question list scrolls while the progress
+  line, the Submit footer, the input area and the status bar stay visible.
+  Open in a browser and shrink the window height.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../../src/webview/styles/global.css">
+  <style>
+    /* Stand-ins for the theme variables VS Code injects into the webview (Dark Modern) */
+    :root {
+      --vscode-editor-background: #1f1f1f;
+      --vscode-editor-foreground: #cccccc;
+      --vscode-sideBar-background: #181818;
+      --vscode-input-background: #313131;
+      --vscode-input-border: #3c3c3c;
+      --vscode-panel-border: #2b2b2b;
+      --vscode-descriptionForeground: #9d9d9d;
+      --vscode-button-background: #0078d4;
+      --vscode-button-foreground: #ffffff;
+      --vscode-charts-green: #89d185;
+      --vscode-font-family: 'Segoe UI', sans-serif;
+    }
+    html, body { height: 100%; margin: 0; font-family: var(--vscode-font-family); }
+    .fake-input { height: 90px; }
+    .fake-status { height: 26px; border-top: 1px solid #333; }
+  </style>
+</head>
+<body>
+  <div class="app-container" id="app">
+    <div class="chat-area-wrapper">
+      <div class="message-list" id="messages">
+        <p>Claude's message that precedes the questions.</p>
+      </div>
+    </div>
+    <div class="plan-approval-bar question-bar" dir="ltr" id="bar">
+      <div class="question-progress">0/4 answered</div>
+      <div class="question-scroll-area" id="scroll"></div>
+      <div class="question-bar-footer" id="footer">
+        <button class="question-submit-btn" disabled>Submit answers (0/4)</button>
+      </div>
+    </div>
+    <div class="input-area fake-input" id="input">input area</div>
+    <div class="fake-status" id="status">status bar</div>
+  </div>
+  <script>
+    // Build 4 question groups with 4 described options each plus the custom toggle
+    const scrollArea = document.getElementById('scroll');
+    for (let questionIndex = 0; questionIndex < 4; questionIndex++) {
+      const group = document.createElement('div');
+      group.className = 'question-group';
+      let optionsHtml = '';
+      for (let optionIndex = 0; optionIndex < 4; optionIndex++) {
+        optionsHtml +=
+          '<button class="question-option-btn"><span class="question-checkbox">( )</span>' +
+          '<span class="question-option-label">Option ' + (optionIndex + 1) + '</span>' +
+          '<span class="question-option-desc">A fairly long description that explains what choosing this option means for the implementation.</span></button>';
+      }
+      optionsHtml +=
+        '<button class="question-option-btn question-custom-toggle"><span class="question-checkbox">( )</span>' +
+        '<span class="question-option-label">Custom answer...</span></button>';
+      group.innerHTML =
+        '<div class="question-title"><span class="question-header">Topic ' + (questionIndex + 1) + '</span>' +
+        'Question number ' + (questionIndex + 1) + ': which approach should be used here?</div>' +
+        '<div class="question-options">' + optionsHtml + '</div>';
+      scrollArea.appendChild(group);
+    }
+
+    // Mirror PlanApprovalBar's "more questions below" toggle
+    const bar = document.getElementById('bar');
+    const updateHasMoreBelow = () => {
+      const hasMoreBelow = scrollArea.scrollTop + scrollArea.clientHeight < scrollArea.scrollHeight - 1;
+      bar.classList.toggle('question-bar--more-below', hasMoreBelow);
+    };
+    scrollArea.addEventListener('scroll', updateHasMoreBelow);
+    new ResizeObserver(updateHasMoreBelow).observe(scrollArea);
+  </script>
+</body>
+</html>
