@@ -32,6 +32,7 @@ import type {
 import type { CodexExecJsonEvent } from '../types/codex-exec-json';
 import type { HandoffProvider, HandoffSourceSnapshot } from './handoff/HandoffTypes';
 import type { ContentBlock } from '../types/stream-json';
+import { remoteControlTap } from '../remote-control/RemoteControlTap';
 
 /**
  * Codex runtime tab (Stage 2 MVP): logical session per tab, one `codex exec` process per turn.
@@ -247,6 +248,7 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     if (this.disposed) {
       return;
     }
+    remoteControlTap.outbound(this.id, msg);
     // Tag every sessionStarted with the current tabKind so the webview can
     // branch into Smart Search view on receipt.
     const outbound: ExtensionToWebviewMessage =
@@ -1463,23 +1465,57 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     });
   }
 
+  /** Remote Control: inject a chat-UI action exactly as if the webview sent it.
+   *  Webview lifecycle messages ('ready' / 'diag') are refused. */
+  dispatchRemoteMessage(message: WebviewToExtensionMessage): void {
+    const type = (message as { type?: unknown }).type;
+    if (type === 'ready' || type === 'diag') {
+      throw new Error(`"${String(type)}" can only be sent by the chat UI itself.`);
+    }
+    if (this.disposed) {
+      throw new Error('This tab is closed.');
+    }
+    this.handleIncomingWebviewMessage(message);
+  }
+
+  /** Remote Control: rename without the interactive input box. */
+  applyRemoteRename(name: string): void {
+    const trimmed = name.trim();
+    if (this.disposed || !trimmed) {
+      return;
+    }
+    this.setTabName(trimmed);
+    this.fileLogger?.updateSessionName(trimmed);
+    this.deferredAutoSessionName = null;
+    this.persistSessionMetadata(trimmed);
+  }
+
+  /** True once the React app has sent 'ready'. */
+  get isWebviewReadyState(): boolean {
+    return this.isWebviewReady;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private handleIncomingWebviewMessage(message: any): void {
+    if (message.type === 'diag') {
+      this.log(`[Codex Tab ${this.tabNumber}] Webview DIAG: phase="${message.phase}" ${message.detail || ''}`);
+      return;
+    }
+    remoteControlTap.inbound(this.id, message);
+    if (message.type === 'renameTab') {
+      void this.handleRenameRequest();
+      return;
+    }
+    if (message.type === 'ready') {
+      this.isWebviewReady = true;
+      this.flushPendingMessages();
+    }
+    this.messageCallback?.(message as WebviewToExtensionMessage);
+  }
+
   private wireWebviewEvents(): void {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.panel.webview.onDidReceiveMessage((message: any) => {
-      if (message.type === 'diag') {
-        this.log(`[Codex Tab ${this.tabNumber}] Webview DIAG: phase="${message.phase}" ${message.detail || ''}`);
-        return;
-      }
-      if (message.type === 'renameTab') {
-        void this.handleRenameRequest();
-        return;
-      }
-      if (message.type === 'ready') {
-        this.isWebviewReady = true;
-        this.flushPendingMessages();
-      }
-      this.messageCallback?.(message as WebviewToExtensionMessage);
-    });
+    this.panel.webview.onDidReceiveMessage((message: any) => this.handleIncomingWebviewMessage(message));
 
     this.panel.onDidChangeViewState((e) => {
       this.log(

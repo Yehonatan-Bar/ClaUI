@@ -60,7 +60,11 @@ $requiredManifestEntries = @(
   "claudeMirror.bridge.commandTools.enabled",
   "claudeMirror.bridge.commandTools.strategy",
   "claudeMirror.bridge.commandTools.offload",
-  "claudeMirror.bridge.commandTools.diffBase"
+  "claudeMirror.bridge.commandTools.diffBase",
+  # Remote Control (MCP): setup command + settings
+  "claudeMirror.remoteControl.setup",
+  "claudeMirror.remoteControl.enabled",
+  "claudeMirror.remoteControl.allowSensitiveActions"
 )
 
 foreach ($entry in $requiredManifestEntries) {
@@ -93,7 +97,10 @@ $requiredBundleSymbols = @(
   "bridge.commandTools.enabled",
   "bridge.commandTools.strategy",
   "bridge.commandTools.offload",
-  "bridge.commandTools.diffBase"
+  "bridge.commandTools.diffBase",
+  # Remote Control (MCP): service command + the tab dispatch entry point
+  "claudeMirror.remoteControl.setup",
+  "dispatchRemoteMessage"
 )
 
 foreach ($symbol in $requiredBundleSymbols) {
@@ -136,6 +143,21 @@ if (-not (Test-Path $commandServerPath)) {
 foreach ($marker in @("claui_code_review", "notifications/initialized")) {
   if (-not (Select-String -Path $commandServerPath -Pattern $marker -SimpleMatch -Quiet)) {
     throw "Installed command-server.js is missing expected marker: $marker"
+  }
+}
+
+# Remote Control runtime (stdio MCP server + CLI): copied by the extension into
+# ~/.claui/remote-control/bin, so both bundles must ship in the VSIX.
+foreach ($runtimeFile in @("mcp-server.js", "cli.js")) {
+  $runtimePath = Join-Path $installed.FullName "dist\remote-control-runtime\$runtimeFile"
+  if (-not (Test-Path $runtimePath)) {
+    throw "Installed Remote Control runtime bundle not found: $runtimePath"
+  }
+}
+$rcServerPath = Join-Path $installed.FullName "dist\remote-control-runtime\mcp-server.js"
+foreach ($marker in @("notifications/progress", "list_instances")) {
+  if (-not (Select-String -Path $rcServerPath -Pattern $marker -SimpleMatch -Quiet)) {
+    throw "Installed Remote Control MCP server is missing expected marker: $marker"
   }
 }
 

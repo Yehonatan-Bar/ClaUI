@@ -49,6 +49,7 @@ import type {
 import type { HandoffProvider, HandoffSourceSnapshot } from './handoff/HandoffTypes';
 import { BackgroundSession } from './BackgroundSession';
 import { MergeAssistantSession, type MergeAssistantStartOptions } from './MergeAssistantSession';
+import { remoteControlTap } from '../remote-control/RemoteControlTap';
 import {
   ReviewLoopOrchestrator,
   CodexReviewerSession,
@@ -487,6 +488,8 @@ export class SessionTab implements WebviewBridge {
     if (this.disposed || !this.panel) {
       return;
     }
+    // Remote Control observes every UI-bound message (even ones dropped below).
+    remoteControlTap.outbound(this.id, msg);
     // Deep-hibernated: the webview is a static placeholder — drop messages
     // instead of queueing them unboundedly. The wake path rebuilds all state
     // from scratch (fresh app + --resume + history reload).
@@ -2612,44 +2615,80 @@ export class SessionTab implements WebviewBridge {
 
   // --- Internal wiring ---
 
+  /** Remote Control: inject a chat-UI action exactly as if the webview sent it.
+   *  Webview lifecycle messages ('ready' / 'diag') are refused. */
+  dispatchRemoteMessage(message: WebviewToExtensionMessage): void {
+    const type = (message as { type?: unknown }).type;
+    if (type === 'ready' || type === 'diag') {
+      throw new Error(`"${String(type)}" can only be sent by the chat UI itself.`);
+    }
+    if (this.disposed) {
+      throw new Error('This tab is closed.');
+    }
+    this.handleIncomingWebviewMessage(message);
+  }
+
+  /** Remote Control: rename without the interactive input box. */
+  applyRemoteRename(name: string): void {
+    if (this.disposed || !name.trim()) {
+      return;
+    }
+    this.setTabName(name.trim());
+    this.fileLogger?.updateSessionName(name.trim());
+    this.persistSessionMetadata(name.trim());
+    this.log(`[Tab ${this.tabNumber}] Renamed remotely to "${name.trim()}"`);
+  }
+
+  /** True once the React app has sent 'ready'. */
+  get isWebviewReadyState(): boolean {
+    return this.isWebviewReady;
+  }
+
   private wireWebviewEvents(): void {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.panel.webview.onDidReceiveMessage((message: any) => {
-      if (message.type === 'diag') {
-        this.log(`[Tab ${this.tabNumber}] Webview DIAG: phase="${message.phase}" ${message.detail || ''}`);
-        return;
-      }
-      // Handle rename request from the tab header bar (not from React)
-      if (message.type === 'renameTab') {
-        void this.handleRenameRequest();
-        return;
-      }
-      // Hibernation: the user clicked the "sleeping" banner to wake the CLI.
-      if (message.type === 'wakeFromHibernation') {
-        void this.wakeFromHibernation('banner-click');
-        return;
-      }
-      // Deep hibernation: the user clicked the static placeholder page.
-      // An explicit click always wakes, even before armLazyWake() ran.
-      if (message.type === 'wakeFromDeepHibernation') {
-        this.deepWakeArmed = true;
-        void this.wakeFromDeepHibernation('placeholder-click');
-        return;
-      }
-      if (message.type === 'ready') {
-        this.isWebviewReady = true;
-        this.flushPendingMessages();
-        // The per-session auto-review override lives in-memory on this tab and the
-        // extension is its source of truth. Push the current value so the StatusBar
-        // toggle reflects it after any (re)load WITHOUT mutating the flag here.
-        // Resetting it on 'ready' would silently re-enable a session the user turned
-        // off whenever 'ready' fires again mid-session (e.g. on a new session's first
-        // turn) — that was the bug where "This session: Off" still ran the loop.
-        this.postMessage({ type: 'reviewLoopSessionEnabledSetting', enabled: this.reviewLoopEnabledThisSession });
-      }
-      this.messageCallback?.(message as WebviewToExtensionMessage);
-    });
+    this.panel.webview.onDidReceiveMessage((message: any) => this.handleIncomingWebviewMessage(message));
+    this.wirePanelLifecycleEvents();
+  }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private handleIncomingWebviewMessage(message: any): void {
+    if (message.type === 'diag') {
+      this.log(`[Tab ${this.tabNumber}] Webview DIAG: phase="${message.phase}" ${message.detail || ''}`);
+      return;
+    }
+    remoteControlTap.inbound(this.id, message);
+    // Handle rename request from the tab header bar (not from React)
+    if (message.type === 'renameTab') {
+      void this.handleRenameRequest();
+      return;
+    }
+    // Hibernation: the user clicked the "sleeping" banner to wake the CLI.
+    if (message.type === 'wakeFromHibernation') {
+      void this.wakeFromHibernation('banner-click');
+      return;
+    }
+    // Deep hibernation: the user clicked the static placeholder page.
+    // An explicit click always wakes, even before armLazyWake() ran.
+    if (message.type === 'wakeFromDeepHibernation') {
+      this.deepWakeArmed = true;
+      void this.wakeFromDeepHibernation('placeholder-click');
+      return;
+    }
+    if (message.type === 'ready') {
+      this.isWebviewReady = true;
+      this.flushPendingMessages();
+      // The per-session auto-review override lives in-memory on this tab and the
+      // extension is its source of truth. Push the current value so the StatusBar
+      // toggle reflects it after any (re)load WITHOUT mutating the flag here.
+      // Resetting it on 'ready' would silently re-enable a session the user turned
+      // off whenever 'ready' fires again mid-session (e.g. on a new session's first
+      // turn) — that was the bug where "This session: Off" still ran the loop.
+      this.postMessage({ type: 'reviewLoopSessionEnabledSetting', enabled: this.reviewLoopEnabledThisSession });
+    }
+    this.messageCallback?.(message as WebviewToExtensionMessage);
+  }
+
+  private wirePanelLifecycleEvents(): void {
     this.panel.onDidChangeViewState((e) => {
       this.log(
         `[Tab ${this.tabNumber}] ViewState changed: active=${e.webviewPanel.active} visible=${e.webviewPanel.visible}`,

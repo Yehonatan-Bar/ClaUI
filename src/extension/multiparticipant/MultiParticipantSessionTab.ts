@@ -9,6 +9,7 @@ import type {
   ServerToClientMessage,
 } from './MultiParticipantProtocol';
 import type { ExtensionToWebviewMessage } from '../types/webview-messages';
+import { remoteControlTap } from '../remote-control/RemoteControlTap';
 
 export interface MultiParticipantSessionTabCallbacks {
   onClosed: (tabId: string) => void;
@@ -261,6 +262,7 @@ export class MultiParticipantSessionTab {
 
   private wireWebviewMessages(): void {
     this.panel.webview.onDidReceiveMessage((msg) => {
+      remoteControlTap.inbound(this.tabId, msg);
       switch (msg.type) {
         case 'ready':
           this.webviewReady = true;
@@ -676,6 +678,7 @@ export class MultiParticipantSessionTab {
 
   private postToWebview(msg: ExtensionToWebviewMessage): void {
     if (this.disposed) return;
+    remoteControlTap.outbound(this.tabId, msg);
     if (!this.webviewReady) {
       this.pendingMessages.push(msg);
       return;

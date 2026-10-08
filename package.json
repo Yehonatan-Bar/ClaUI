@@ -355,6 +355,35 @@
         "command": "claudeMirror.tabs.openLayoutMenu",
         "title": "ClaUi: Tab Layout Settings",
         "icon": "$(gear)"
+      },
+      {
+        "command": "claudeMirror.remoteControl.setup",
+        "title": "ClaUi: Remote Control (MCP) Setup",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "claudeMirror.remoteControl.enable",
+        "title": "ClaUi: Enable Remote Control (MCP)"
+      },
+      {
+        "command": "claudeMirror.remoteControl.disable",
+        "title": "ClaUi: Disable Remote Control (MCP)"
+      },
+      {
+        "command": "claudeMirror.remoteControl.registerWithClaudeCode",
+        "title": "ClaUi: Register Remote Control with Claude Code"
+      },
+      {
+        "command": "claudeMirror.remoteControl.copyMcpConfig",
+        "title": "ClaUi: Copy Remote Control MCP Config"
+      },
+      {
+        "command": "claudeMirror.remoteControl.regenerateToken",
+        "title": "ClaUi: Regenerate Remote Control Token"
+      },
+      {
+        "command": "claudeMirror.remoteControl.quickGuide",
+        "title": "ClaUi: Remote Control Quick Guide"
       }
     ],
     "configuration": {
@@ -1672,6 +1701,36 @@
           "default": false,
           "scope": "application",
           "description": "Enable experimental entropy-based secret detection. Uses Shannon entropy on sliding windows to catch high-randomness strings that may be secrets. May produce false positives."
+        },
+        "claudeMirror.remoteControl.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Remote Control (MCP): run a localhost-only control server so MCP clients (Claude Code, Claude Desktop, Cursor, VS Code) and scripts can drive ClaUi - open tabs, send prompts, read replies, answer approvals, change models and settings. Every request needs the per-user token in ~/.claui/remote-control/token. Use \"ClaUi: Remote Control (MCP) Setup\" to connect clients."
+        },
+        "claudeMirror.remoteControl.port": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "Remote Control (MCP): TCP port on 127.0.0.1. 0 = pick a free port automatically (recommended; clients find it through ~/.claui/remote-control/instances). A fixed port that is already taken (e.g. by another VS Code window) falls back to a random one."
+        },
+        "claudeMirror.remoteControl.accessLevel": {
+          "type": "string",
+          "enum": [
+            "full",
+            "readOnly"
+          ],
+          "enumDescriptions": [
+            "Remote clients can use every tool (send prompts, open/close tabs, change settings, ...).",
+            "Remote clients can only read: status, tabs, transcripts, history, settings and events."
+          ],
+          "default": "full",
+          "description": "Remote Control (MCP): what remote clients are allowed to do."
+        },
+        "claudeMirror.remoteControl.allowSensitiveActions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Remote Control (MCP): also allow remote clients to reach sensitive features through the generic tools - sign in/out and API keys, git push / worktrees / merges, MCP server config, security-policy changes (Secret Protection, Workspace Access Guard, accelerators), Bridge Provider routing (council / OpenAI-compatible providers), checkpoint revert/redo, SkillGen, opening files/URLs/terminals, clipboard, external sends (bug reports, feedback), and settings that hold paths, URLs, scripts or tokens. Off by default."
         }
       }
     },
@@ -1986,7 +2045,9 @@
     "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1",
     "git:push": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-push.ps1",
     "demo:secret-protection": "tsx tests/secret-protection-demo/run-demo-test.ts",
-    "demo:secret-protection:report": "tsx tests/secret-protection-demo/generate-html-report.ts"
+    "demo:secret-protection:report": "tsx tests/secret-protection-demo/generate-html-report.ts",
+    "gen:remote-control-catalog": "node scripts/generate-remote-control-catalog.js",
+    "test:remote-control": "node scripts/generate-remote-control-catalog.js --check && node --import tsx --test tests/remote-control/*.test.ts"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",

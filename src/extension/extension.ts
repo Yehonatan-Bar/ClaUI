@@ -32,6 +32,7 @@ import { SuperParticleAcceleratorService } from './super-particle-accelerator/Su
 import { WorkspaceAccessGuardService } from './workspace-access-guard/WorkspaceAccessGuardService';
 import { BridgeProviderService } from './bridge/BridgeProviderService';
 import { WhatsNewService, wireWhatsNew } from './whatsnew/WhatsNewService';
+import { RemoteControlService } from './remote-control/RemoteControlService';
 
 let tabManager: TabManager;
 let outputChannel: vscode.OutputChannel;
@@ -393,6 +394,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Tab folder + tab focus commands
   registerTabGroupCommands(context, tabManager, tabGroupStore, log);
+
+  // Remote Control (MCP): lets external scripts / MCP clients drive ClaUi.
+  // Isolated: a failure here must never block activation.
+  try {
+    context.subscriptions.push(new RemoteControlService(context, tabManager, sessionStore, tabGroupStore, log));
+  } catch (err) {
+    log(`[RemoteControl] Disabled - failed to initialize: ${err instanceof Error ? err.message : String(err)}`);
+  }
 
   // Permanent launcher status bar item (always visible)
   const launcherItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);

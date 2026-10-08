@@ -1,5 +1,16 @@
 # ClaUi - Changelog
 
+## v0.1.244 - 2026-10-08
+
+**Feature: Remote Control via MCP (drive ClaUi from outside)**
+
+- New localhost control server per VS Code window, off by default (`claudeMirror.remoteControl.enabled`). MCP clients (Claude Code, Claude Desktop, Cursor, Windsurf, VS Code) connect through a stable stdio launcher (`~/.claui/remote-control/bin/claui-mcp.js`) that finds the right window automatically; scripts use the bundled CLI (`claui.js`) or the HTTP API (`/mcp`, `/api/tools/<name>`, `/api/events`, SSE)
+- About 45 tools: status and tab list, create/close/focus/rename tabs, resume/fork sessions, hibernate/wake, send prompts and wait for the reply (with tool calls, cost and a clear status such as `awaiting_approval`), read transcripts, answer plan approvals and AskUserQuestion, switch model/permission mode/effort/fast mode, provider handoff, history listing and full-text search, tab folders, read/change settings, run ClaUi commands, a live event log, and `dispatch_ui_action` for every other chat-UI feature
+- Remote prompts behave exactly like typing in the chat (they appear as normal chat bubbles); remote sends are serialized per tab
+- Security: 127.0.0.1 only, per-user token (`~/.claui/remote-control/token`) checked before any body is read, browser/Origin and non-loopback Host requests refused, no tokens in URLs, size/concurrency limits. `accessLevel: readOnly` blocks all state changes; credential, git, security-policy, file/URL and external-send actions need `allowSensitiveActions`; remote control can never reconfigure itself
+- `ClaUi: Remote Control (MCP) Setup` (also the status-bar `MCP` item): turn on/off, register with Claude Code, copy configs, access level, regenerate token, quick guide
+- Docs: `REMOTE_CONTROL_MCP.md`. Tests: `npm run test:remote-control`
+
 ## v0.1.241 - 2026-09-30
 
 **Feature: Claude Sonnet 5.5 is selectable**

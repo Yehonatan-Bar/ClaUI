@@ -175,6 +175,7 @@ Press `Ctrl+Shift+P` and type "ClaUi" to see all commands:
 | **Toggle Achievements** | Open or close the achievements panel |
 | **Send Feedback** | Open the feedback / issue reporter |
 | **Discover All Sessions** | Scan and import all known sessions |
+| **Remote Control (MCP) Setup** | Turn on remote control and connect Claude Code / other MCP clients or scripts |
 
 ---
 
@@ -249,6 +250,7 @@ All settings are under `claudeMirror.*` in VS Code Settings (`Ctrl+,`).
 ## Developer Tools
 
 - **Git push** -- one-click commit and push via a configurable PowerShell script and commit message template
+- **Remote Control (MCP)** -- control ClaUi from Claude Code, Claude Desktop, Cursor or your own scripts: open tabs, send prompts and get the replies, answer approvals, change models and settings. Run **ClaUi: Remote Control (MCP) Setup** to turn it on and connect a client (off by default, localhost only, token protected, optional read-only mode)
 - **File logging** -- per-session log files written to disk with auto-rotation (2MB) and auto-rename
 - **Authentication management** -- Claude CLI login/logout/status display and Anthropic API key management from the Vitals gear panel
 - **SR-PTD integration** -- auto-injects documentation instructions into your project's CLAUDE.md and installs the sr-ptd-skill

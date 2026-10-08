@@ -2,6 +2,25 @@
   "$comment": "Bundled What's New entries shown after an update (toast + in-panel banner). Add ONE entry per release that ships user-visible features; bug-fix-only releases get no entry and stay silent. 'version' is the EARLIEST extension version allowed to show the entry (vsce publish patch may assign a higher number, that is fine). 'id' must be unique and must never change once shipped. Newest entries can go anywhere in the list; the extension sorts by version.",
   "announcements": [
     {
+      "id": "2026-10-08-remote-control-mcp",
+      "version": "0.1.243",
+      "date": "2026-10-08",
+      "title": "Remote Control via MCP",
+      "titleHe": "שליטה מרחוק דרך MCP",
+      "highlights": [
+        "Control ClaUi from Claude Code, Claude Desktop, Cursor or your own scripts: open tabs, send prompts, read replies and answer approvals.",
+        "Turn it on with the command ClaUi: Remote Control (MCP) Setup, then pick Register with Claude Code or copy a config.",
+        "Scripts can use the included CLI or the local HTTP API; the quick guide in the setup menu shows ready-to-run examples.",
+        "It is off by default, listens only on this computer, needs a secret token, and can be set to read-only."
+      ],
+      "highlightsHe": [
+        "שלטו ב-ClaUi מתוך Claude Code, Claude Desktop, Cursor או סקריפטים משלכם: פתיחת טאבים, שליחת פרומפטים, קריאת תשובות ואישור בקשות.",
+        "הפעילו דרך הפקודה ClaUi: Remote Control (MCP) Setup ובחרו Register with Claude Code או העתיקו הגדרות.",
+        "סקריפטים יכולים להשתמש ב-CLI המצורף או ב-API מקומי ב-HTTP; המדריך המהיר בתפריט ההגדרה מציג דוגמאות מוכנות להרצה.",
+        "הפיצ'ר כבוי כברירת מחדל, מאזין רק במחשב הזה, דורש טוקן סודי ואפשר להגביל אותו לקריאה בלבד."
+      ]
+    },
+    {
       "id": "2026-09-30-sonnet-5-5",
       "version": "0.1.240",
       "date": "2026-09-30",

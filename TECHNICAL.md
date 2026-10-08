@@ -37,7 +37,7 @@ User-facing documentation (features, shortcuts, settings): see [README.md](READM
 claude-code-mirror/
 +-- package.json                          # Extension manifest, commands, settings, Activity Bar views
 +-- tsconfig.json                         # TypeScript config (ES2022, JSX)
-+-- webpack.config.js                     # Triple-target: extension (Node) + webview (browser) + particle-accelerator-runtime (Node)
++-- webpack.config.js                     # Multi-target: extension (Node) + webview (browser) + bridge / remote-control / accelerator / SPA / WAG runtimes (Node)
 +-- .vscodeignore
 +-- dist/                                 # Build output
 |   +-- extension.js                      #   Extension host bundle (15 KB)
@@ -132,6 +132,12 @@ claude-code-mirror/
 |   |   |   +-- McpRegistryService.ts    #   Merges runtime truth, config truth, and restart drift into UI inventory
 |   |   |   +-- McpTemplateCatalog.ts    #   Curated MCP templates with Windows-safe defaults
 |   |   |   +-- McpSecretsService.ts     #   SecretStorage registry for MCP placeholders + process env injection
+|   |   +-- remote-control/              #   Remote Control (MCP): external scripts / MCP clients drive ClaUi
+|   |   |   +-- RemoteControlService.ts  #   Lifecycle, settings, instance record, runtime install, setup quick pick, status bar
+|   |   |   +-- RemoteControlToolHandlers.ts # Every tool's implementation (validation + access check, hybrid host API / UI dispatch)
+|   |   |   +-- RemoteControlTap.ts      #   Process-wide in/out observation point called by every tab class
+|   |   |   +-- uiActionCatalog.generated.json # Generated list of all UI actions/events (scripts/generate-remote-control-catalog.js)
+|   |   |   +-- core/                    #   Pure modules (no vscode): HTTP server, EventLog, TabStateTracker, TurnWaiter, accessPolicy, argValidator, payload/content helpers
 |   |   +-- auth/
 |   |   |   +-- AuthManager.ts           #   Claude CLI auth status/login/logout helpers
 |   |   +-- skillgen/
@@ -218,6 +224,8 @@ claude-code-mirror/
 |   |   +-- enforcement/
 |   |       +-- ApprovalEngine.ts         #   DLP approval/allow/block decision wrapper for enforced boundaries
 |   |       +-- ExceptionStore.ts         #   JSON-backed temporary DLP exception store
+|   +-- remote-control-shared/            # Remote Control contract shared by extension + runtime (protocol, toolCatalog, mcpProtocol, instanceRegistry, httpClient)
+|   +-- remote-control-runtime/           # Remote Control stdio MCP server + CLI (webpack target -> dist/remote-control-runtime/{mcp-server,cli}.js)
 |   +-- particle-accelerator-runtime/               # Standalone CLI runner (separate webpack target, no VS Code deps)
 |   |   +-- cli.ts                        #   claui-run entry point (decode, execute, redact, filter, trace)
 |   |   +-- SecretRedactor.ts             #   Env-value scanning + regex rules, fail-closed
@@ -542,6 +550,7 @@ claude-code-mirror/
     +-- DLP_SETUP.md                     #   Secret Protection setup and validation guide
     +-- MARKDOWN_RENDERING.md            #   Markdown rendering pipeline (marked + DOMPurify)
     +-- MCP_SUPPORT.md                  #   Implemented MCP visibility + management model
+    +-- REMOTE_CONTROL_MCP.md           #   Remote Control (MCP server + HTTP API + CLI that control ClaUi from outside)
     +-- Archive/plans/MCP_SUPPORT_PLAN.md #  (archived) MCP product, UX, and architecture roadmap for ClaUi
     +-- MESSAGE_TRANSLATION.md           #   Hebrew translation via Sonnet CLI
     +-- PROJECT_30_DAYS_TAB.md          #   Project dashboard 30-day filtered tab behavior
@@ -643,6 +652,9 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 
 **Bridge Command Tools** - Makes Claude Code slash commands (`/code-review`, `/security-review`, `/simplify`) actually execute inside Bridge Provider tabs instead of being forwarded as inert text. Layer A (macro, all backends): `dispatcher.ts` rewrites the prompt into a rubric + local-diff task packet (`src/bridge-runtime/commands/`). Layer B (MCP tool, Grok only): the same commands are registered as ACP `mcpServers` tools (`src/bridge-runtime/mcp/command-server.js`) that Grok calls itself. Layer C (opt-in, any backend): offloads the command to a real `claude -p` run in the project cwd and relays its result through the bridge model ("the bridge model stays the voice") rather than bypassing it — see `offload.ts`. Every catalog command offloads via Claude Code today; the runner also supports a Codex path (`codex exec`) for future commands. `claudeMirror.bridge.commandTools.*` settings (`enabled`/`strategy`/`offload`/`diffBase`) control it; `strategy: 'macro'` is an escape hatch that also stops Grok's MCP server from being registered; `strategy: 'offload'` + `offload: true` (both required) enables Layer C. A per-turn "write window" (`/simplify --fix`) lets Grok use its own write/execute tools for that one turn only.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/BRIDGE_COMMAND_TOOLS.md`
+
+**Remote Control (MCP)** - Lets MCP clients (Claude Code, Claude Desktop, Cursor, VS Code) and scripts drive ClaUi: ~45 tools for tabs, prompts with wait-for-reply, transcripts, approvals/questions, model/permission/effort, history, folders, settings, commands, events, plus a policy-checked `dispatch_ui_action` for every other UI feature. Localhost token-authenticated server per window (`/mcp` + `/api/*`), stable stdio launcher + CLI in `~/.claui/remote-control/bin`, off by default (`claudeMirror.remoteControl.*`). Tests: `npm run test:remote-control`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/REMOTE_CONTROL_MCP.md`
 
 **SessionNamer** - Spawns a one-shot `claude -p` process using Haiku to generate a 1-3 word tab name from the user's first message. Matches the language of the message (Hebrew/English). 10-second timeout, sanitized output, all errors silently logged.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/SESSION_NAMER.md`
@@ -869,6 +881,10 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 | `claudeMirror.effortLevel` | `""` | Claude thinking effort level (empty = model default; choices: low/medium/high/xhigh/max) |
 | `claudeMirror.fastMode` | `false` | Claude Fast mode: ~2.5x faster output on Opus (4.8/4.7/4.6), costs more, no effect on Sonnet/Haiku; applied via a `--settings` overlay on next session start |
 | `claudeMirror.permissionMode` | `"full-access"` | Permission mode: "full-access" (all tools) or "supervised" (read-only tools only) |
+| `claudeMirror.remoteControl.enabled` | `false` | Run the localhost Remote Control (MCP / HTTP) server for this window. See `REMOTE_CONTROL_MCP.md` |
+| `claudeMirror.remoteControl.port` | `0` | Remote Control port on 127.0.0.1 (0 = automatic; busy fixed port falls back to random) |
+| `claudeMirror.remoteControl.accessLevel` | `"full"` | `full` or `readOnly` (blocks every state-changing remote tool) |
+| `claudeMirror.remoteControl.allowSensitiveActions` | `false` | Let remote clients reach credential, git, security-policy, file/URL and external-send features |
 | `claudeMirror.enableFileLogging` | `true` | Write logs to disk files in addition to the Output Channel |
 | `claudeMirror.logDirectory` | `""` | Directory for log files (empty = extension's default storage) |
 | `claudeMirror.sessionVitals` | `false` | Show timeline minimap and turn intensity borders on assistant messages |

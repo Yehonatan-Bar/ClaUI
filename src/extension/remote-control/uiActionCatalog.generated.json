@@ -1,0 +1,5853 @@
+{
+ "generatedFrom": "src/extension/types/webview-messages.ts",
+ "uiActions": [
+  {
+   "type": "abortMerge",
+   "interface": "AbortMergeRequest",
+   "fields": [
+    {
+     "name": "targetPath",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "squash",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "Abort a paused merge sitting in a worktree."
+  },
+  {
+   "type": "addFriend",
+   "interface": "AddFriendRequest",
+   "fields": [
+    {
+     "name": "username",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "adventureDebugLog",
+   "interface": "AdventureDebugLogMessage",
+   "fields": [
+    {
+     "name": "source",
+     "type": "'engine' | 'maze'",
+     "optional": false
+    },
+    {
+     "name": "event",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "payload",
+     "type": "Record<string, unknown>",
+     "optional": true
+    },
+    {
+     "name": "ts",
+     "type": "number",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "autoDetectCodexCliPath",
+   "interface": "AutoDetectCodexCliPathRequest",
+   "fields": []
+  },
+  {
+   "type": "autoSetupCodexCli",
+   "interface": "AutoSetupCodexCliRequest",
+   "fields": []
+  },
+  {
+   "type": "bugReportApproveScript",
+   "interface": "BugReportApproveScriptRequest",
+   "fields": [
+    {
+     "name": "command",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "index",
+     "type": "number",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "bugReportChat",
+   "interface": "BugReportChatRequest",
+   "fields": [
+    {
+     "name": "message",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "bugReportClose",
+   "interface": "BugReportCloseRequest",
+   "fields": []
+  },
+  {
+   "type": "bugReportGetPreview",
+   "interface": "BugReportGetPreviewRequest",
+   "fields": []
+  },
+  {
+   "type": "bugReportInit",
+   "interface": "BugReportInitRequest",
+   "fields": [
+    {
+     "name": "context",
+     "type": "BugReportContext",
+     "optional": true
+    }
+   ],
+   "doc": "--- Bug Report (Webview -> Extension) ---"
+  },
+  {
+   "type": "bugReportSubmit",
+   "interface": "BugReportSubmitRequest",
+   "fields": [
+    {
+     "name": "mode",
+     "type": "'quick' | 'ai'",
+     "optional": false
+    },
+    {
+     "name": "description",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "cancelRequest",
+   "interface": "CancelRequest",
+   "fields": []
+  },
+  {
+   "type": "cancelScheduledMessage",
+   "interface": "CancelScheduledMessageRequest",
+   "fields": []
+  },
+  {
+   "type": "chatSearchProject",
+   "interface": "ChatSearchProjectRequest",
+   "fields": [
+    {
+     "name": "query",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "requestId",
+     "type": "number",
+     "optional": false
+    }
+   ],
+   "doc": "--- Chat Search ---"
+  },
+  {
+   "type": "chatSearchResumeSession",
+   "interface": "ChatSearchResumeSessionRequest",
+   "fields": [
+    {
+     "name": "sessionId",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "checkpointRedo",
+   "interface": "CheckpointRedoRequest",
+   "fields": [
+    {
+     "name": "turnIndex",
+     "type": "number",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "checkpointRevert",
+   "interface": "CheckpointRevertRequest",
+   "fields": [
+    {
+     "name": "turnIndex",
+     "type": "number",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "claudeAuthLogin",
+   "interface": "ClaudeAuthLoginRequest",
+   "fields": []
+  },
+  {
+   "type": "claudeAuthLogout",
+   "interface": "ClaudeAuthLogoutRequest",
+   "fields": []
+  },
+  {
+   "type": "claudeAuthStatus",
+   "interface": "ClaudeAuthStatusRequest",
+   "fields": []
+  },
+  {
+   "type": "clearSession",
+   "interface": "ClearSessionRequest",
+   "fields": [
+    {
+     "name": "workspacePath",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "clearTokenRatioData",
+   "interface": "ClearTokenRatioDataRequest",
+   "fields": []
+  },
+  {
+   "type": "closeBtwSession",
+   "interface": "CloseBtwSessionRequest",
+   "fields": []
+  },
+  {
+   "type": "closeDocument",
+   "interface": "CloseDocumentRequest",
+   "fields": [
+    {
+     "name": "docId",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Close an open document listed in the rail's Files section."
+  },
+  {
+   "type": "closeTab",
+   "interface": "CloseTabRequest",
+   "fields": [
+    {
+     "name": "tabId",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "closeTabGroup",
+   "interface": "CloseTabGroupRequest",
+   "fields": [
+    {
+     "name": "groupId",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Close (delete) an EMPTY folder from the rail. Extension re-validates emptiness."
+  },
+  {
+   "type": "codexConsult",
+   "interface": "CodexConsultRequest",
+   "fields": [
+    {
+     "name": "question",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "commitWorktree",
+   "interface": "CommitWorktreeRequest",
+   "fields": [
+    {
+     "name": "worktreePath",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "message",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "targetBranch",
+     "type": "string",
+     "optional": true,
+     "doc": "The wizard's current target, so a fresh preview can be returned post-commit."
+    }
+   ],
+   "doc": "Commit everything in the source worktree before merging it."
+  },
+  {
+   "type": "compact",
+   "interface": "CompactRequest",
+   "fields": [
+    {
+     "name": "instructions",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "compactSession",
+   "interface": "CompactSessionRequest",
+   "fields": [],
+   "doc": "\"Compact Session\" (token-saving handoff): read the current session, summarize it into a comprehensive self-contained continuation prompt, copy it to the clipboard, and open a fresh tab with that prompt pre-filled in the input. Distinct from `compact` (the CLI's in-place context compaction)."
+  },
+  {
+   "type": "completeMerge",
+   "interface": "CompleteMergeRequest",
+   "fields": [
+    {
+     "name": "targetPath",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "squash",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "message",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "preSha",
+     "type": "string",
+     "optional": true
+    }
+   ],
+   "doc": "Finalize a merge once conflicts are resolved."
+  },
+  {
+   "type": "copyShareCard",
+   "interface": "CopyShareCardRequest",
+   "fields": [
+    {
+     "name": "format",
+     "type": "'markdown' | 'shields-badge'",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "copyToClipboard",
+   "interface": "CopyToClipboardRequest",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "createTabGroup",
+   "interface": "CreateTabGroupRequest",
+   "fields": [],
+   "doc": "Rail \"+\" affordance: create a new top-level folder (routes to the existing command)."
+  },
+  {
+   "type": "createWorktree",
+   "interface": "CreateWorktreeRequest",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "baseBranch",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "startSession",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "Create a new worktree; optionally auto-start a session inside it."
+  },
+  {
+   "type": "createWorktreeSession",
+   "interface": "CreateWorktreeSessionRequest",
+   "fields": [
+    {
+     "name": "worktreePath",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Start a new session inside an existing worktree directory."
+  },
+  {
+   "type": "editAndResend",
+   "interface": "EditAndResendRequest",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "enhancePrompt",
+   "interface": "EnhancePromptRequest",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "model",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "feedbackAction",
+   "interface": "FeedbackActionRequest",
+   "fields": [
+    {
+     "name": "action",
+     "type": "FeedbackActionValue",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "fileSearch",
+   "interface": "FileSearchRequest",
+   "fields": [
+    {
+     "name": "query",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "requestId",
+     "type": "number",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "focusDocument",
+   "interface": "FocusDocumentRequest",
+   "fields": [
+    {
+     "name": "docId",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Focus an open document listed in the rail's Files section."
+  },
+  {
+   "type": "focusTab",
+   "interface": "FocusTabRequest",
+   "fields": [
+    {
+     "name": "tabId",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "focusWorktreeSession",
+   "interface": "FocusWorktreeSessionRequest",
+   "fields": [
+    {
+     "name": "tabId",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Focus the tab whose session runs in a given worktree."
+  },
+  {
+   "type": "forceResampleTokenRatio",
+   "interface": "ForceResampleTokenRatioRequest",
+   "fields": []
+  },
+  {
+   "type": "forkFromMessage",
+   "interface": "ForkFromMessageRequest",
+   "fields": [
+    {
+     "name": "sessionId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "forkMessageIndex",
+     "type": "number",
+     "optional": false,
+     "doc": "Index of the user message to fork from (0-based in the messages array)"
+    },
+    {
+     "name": "promptText",
+     "type": "string",
+     "optional": false,
+     "doc": "The text content of the user message being forked"
+    },
+    {
+     "name": "messages",
+     "type": "SerializedChatMessage[]",
+     "optional": false,
+     "doc": "Conversation history up to (but not including) the fork message"
+    }
+   ]
+  },
+  {
+   "type": "forkSession",
+   "interface": "ForkSessionRequest",
+   "fields": [
+    {
+     "name": "sessionId",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "getAchievementsSnapshot",
+   "interface": "GetAchievementsSnapshotRequest",
+   "fields": []
+  },
+  {
+   "type": "getCommunityData",
+   "interface": "GetCommunityDataRequest",
+   "fields": []
+  },
+  {
+   "type": "getCouncilSettings",
+   "interface": "GetCouncilSettingsRequest",
+   "fields": [],
+   "doc": "Panel opened -> ask the extension for the current council configuration."
+  },
+  {
+   "type": "getCustomSnippet",
+   "interface": "GetCustomSnippetRequest",
+   "fields": []
+  },
+  {
+   "type": "getGitPushSettings",
+   "interface": "GetGitPushSettingsRequest",
+   "fields": []
+  },
+  {
+   "type": "getMergePreview",
+   "interface": "GetMergePreviewRequest",
+   "fields": [
+    {
+     "name": "sourcePath",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "targetBranch",
+     "type": "string",
+     "optional": true
+    }
+   ],
+   "doc": "Read-only \"merge <source> into <target>\" analysis for the wizard."
+  },
+  {
+   "type": "getProjectAnalytics",
+   "interface": "GetProjectAnalyticsRequest",
+   "fields": []
+  },
+  {
+   "type": "getPromptHistory",
+   "interface": "GetPromptHistoryRequest",
+   "fields": [
+    {
+     "name": "scope",
+     "type": "'project' | 'global'",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "getSkillGenStatus",
+   "interface": "GetSkillGenStatusRequest",
+   "fields": []
+  },
+  {
+   "type": "getTokenRatioData",
+   "interface": "GetTokenRatioDataRequest",
+   "fields": []
+  },
+  {
+   "type": "getWorktreeList",
+   "interface": "GetWorktreeListRequest",
+   "fields": [],
+   "doc": "Request the joined list of worktrees + the sessions running on each."
+  },
+  {
+   "type": "githubSync",
+   "interface": "GitHubSyncRequest",
+   "fields": [
+    {
+     "name": "action",
+     "type": "'connect' | 'publish' | 'disconnect'",
+     "optional": false
+    }
+   ],
+   "doc": "--- GitHub Sync (Webview -> Extension) ---"
+  },
+  {
+   "type": "gitPush",
+   "interface": "GitPushRequest",
+   "fields": []
+  },
+  {
+   "type": "gitPushConfig",
+   "interface": "GitPushConfigRequest",
+   "fields": [
+    {
+     "name": "instruction",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "listBranches",
+   "interface": "ListBranchesRequest",
+   "fields": [],
+   "doc": "List local branches (target dropdown in the merge wizard)."
+  },
+  {
+   "type": "mcpAddServer",
+   "interface": "McpAddServerRequest",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "config",
+     "type": "McpServerConfig",
+     "optional": false
+    },
+    {
+     "name": "scope",
+     "type": "McpScope",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mcpImportDesktop",
+   "interface": "McpImportDesktopRequest",
+   "fields": []
+  },
+  {
+   "type": "mcpOpenConfig",
+   "interface": "McpOpenConfigRequest",
+   "fields": [
+    {
+     "name": "scope",
+     "type": "McpScope",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "mcpOpenLogs",
+   "interface": "McpOpenLogsRequest",
+   "fields": []
+  },
+  {
+   "type": "mcpPreviewAddServer",
+   "interface": "McpPreviewAddServerRequest",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "config",
+     "type": "McpServerConfig",
+     "optional": false
+    },
+    {
+     "name": "scope",
+     "type": "McpScope",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mcpRefresh",
+   "interface": "McpRefreshRequest",
+   "fields": []
+  },
+  {
+   "type": "mcpRemoveServer",
+   "interface": "McpRemoveServerRequest",
+   "fields": [
+    {
+     "name": "name",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "scope",
+     "type": "McpScope",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mcpResetProjectChoices",
+   "interface": "McpResetProjectChoicesRequest",
+   "fields": []
+  },
+  {
+   "type": "mcpRestartSession",
+   "interface": "McpRestartSessionRequest",
+   "fields": []
+  },
+  {
+   "type": "moveTabInNavigation",
+   "interface": "MoveTabInNavigationRequest",
+   "fields": [
+    {
+     "name": "tabId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "targetGroupId",
+     "type": "string | null",
+     "optional": false,
+     "doc": "Destination folder id, or null for the top-level (\"Ungrouped\") list."
+    },
+    {
+     "name": "targetIndex",
+     "type": "number",
+     "optional": false,
+     "doc": "Insertion index in the destination folder's tab list (extension clamps)."
+    }
+   ],
+   "doc": "Group-aware tab move used by the grouped vertical rail. Unlike the flat `reorderTabs`, this carries an explicit target folder and an index *within that folder's tab-only sibling list*, so cross-folder drops are unambiguous."
+  },
+  {
+   "type": "mpAddReaction",
+   "interface": "MpAddReactionRequest",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "emoji",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpApprovalDecision",
+   "interface": "MpApprovalDecisionRequest",
+   "fields": [
+    {
+     "name": "eventId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "decision",
+     "type": "MPApprovalDecisionPayload",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpCancelAgent",
+   "interface": "MpCancelAgentRequest",
+   "fields": [
+    {
+     "name": "deliveryId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "agentParticipantId",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "mpJoinSession",
+   "interface": "MpJoinSessionRequest",
+   "fields": [
+    {
+     "name": "serverUrl",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "humanName",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "agentName",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "agentProvider",
+     "type": "MPAgentProvider",
+     "optional": false
+    },
+    {
+     "name": "sessionNumber",
+     "type": "number",
+     "optional": true
+    },
+    {
+     "name": "sessionName",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "mode",
+     "type": "'create' | 'join'",
+     "optional": true
+    },
+    {
+     "name": "password",
+     "type": "string",
+     "optional": true
+    }
+   ],
+   "doc": "--- Multi-Participant (Webview -> Extension) ---"
+  },
+  {
+   "type": "mpLeaveSession",
+   "interface": "MpLeaveSessionRequest",
+   "fields": []
+  },
+  {
+   "type": "mpRemoveReaction",
+   "interface": "MpRemoveReactionRequest",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "emoji",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpRenameParticipant",
+   "interface": "MpRenameParticipantRequest",
+   "fields": [
+    {
+     "name": "participantId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "newDisplayName",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpResetSession",
+   "interface": "MpResetSessionRequest",
+   "fields": []
+  },
+  {
+   "type": "mpSendMessage",
+   "interface": "MpSendMessageRequest",
+   "fields": [
+    {
+     "name": "rawBody",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpStopA2A",
+   "interface": "MpStopA2ARequest",
+   "fields": []
+  },
+  {
+   "type": "mpTypingIndicator",
+   "interface": "MpTypingIndicatorRequest",
+   "fields": [
+    {
+     "name": "state",
+     "type": "Extract<MPParticipantActivityState, 'idle' | 'typing'>",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "openCodexLogin",
+   "interface": "OpenCodexLoginRequest",
+   "fields": []
+  },
+  {
+   "type": "openConflictFiles",
+   "interface": "OpenConflictFilesRequest",
+   "fields": [
+    {
+     "name": "targetPath",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "files",
+     "type": "string[]",
+     "optional": false
+    }
+   ],
+   "doc": "Open conflicted files in the editor so the user can resolve them."
+  },
+  {
+   "type": "openFeedback",
+   "interface": "OpenFeedbackRequest",
+   "fields": []
+  },
+  {
+   "type": "openFile",
+   "interface": "OpenFileRequest",
+   "fields": [
+    {
+     "name": "filePath",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "openHtmlPreview",
+   "interface": "OpenHtmlPreviewRequest",
+   "fields": [
+    {
+     "name": "html",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "openMultiParticipant",
+   "interface": "OpenMultiParticipantRequest",
+   "fields": []
+  },
+  {
+   "type": "openPlanDocs",
+   "interface": "OpenPlanDocsRequest",
+   "fields": []
+  },
+  {
+   "type": "openProviderTab",
+   "interface": "OpenProviderTabRequest",
+   "fields": [
+    {
+     "name": "provider",
+     "type": "ProviderId",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "openSessionFromSearch",
+   "interface": "OpenSessionFromSearchRequest",
+   "fields": [
+    {
+     "name": "sessionId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "provider",
+     "type": "ProviderId",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "openSettings",
+   "interface": "OpenSettingsRequest",
+   "fields": [
+    {
+     "name": "query",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "openSkillGenGuide",
+   "interface": "OpenSkillGenGuideRequest",
+   "fields": []
+  },
+  {
+   "type": "openSmartSearch",
+   "interface": "OpenSmartSearchRequest",
+   "fields": [
+    {
+     "name": "provider",
+     "type": "'claude' | 'codex'",
+     "optional": false,
+     "doc": "'claude' or 'codex' — Smart Search runs the picked agent in a search-only tab."
+    },
+    {
+     "name": "model",
+     "type": "string",
+     "optional": false,
+     "doc": "Model id (Claude model id or Codex model id). Empty string = use default."
+    }
+   ]
+  },
+  {
+   "type": "openTerminal",
+   "interface": "OpenTerminalRequest",
+   "fields": [
+    {
+     "name": "command",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "openUrl",
+   "interface": "OpenUrlRequest",
+   "fields": [
+    {
+     "name": "url",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "openWorktreeFolder",
+   "interface": "OpenWorktreeFolderRequest",
+   "fields": [
+    {
+     "name": "worktreePath",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Reveal a worktree directory in the OS file explorer."
+  },
+  {
+   "type": "particleAcceleratorClearData",
+   "interface": "ParticleAcceleratorClearDataRequest",
+   "fields": [
+    {
+     "name": "scope",
+     "type": "'workspace' | 'all'",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "particleAcceleratorGetStatus",
+   "interface": "ParticleAcceleratorGetStatusRequest",
+   "fields": [],
+   "doc": "--- Particle Accelerator (Webview -> Extension) ---"
+  },
+  {
+   "type": "particleAcceleratorInstallHooks",
+   "interface": "ParticleAcceleratorInstallHooksRequest",
+   "fields": [
+    {
+     "name": "provider",
+     "type": "'claude' | 'codex' | 'both'",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "particleAcceleratorOpenTrace",
+   "interface": "ParticleAcceleratorOpenTraceRequest",
+   "fields": [
+    {
+     "name": "traceId",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "particleAcceleratorSetEnabled",
+   "interface": "ParticleAcceleratorSetEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "particleAcceleratorUninstallHooks",
+   "interface": "ParticleAcceleratorUninstallHooksRequest",
+   "fields": [
+    {
+     "name": "provider",
+     "type": "'claude' | 'codex' | 'both'",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "performMerge",
+   "interface": "PerformMergeRequest",
+   "fields": [
+    {
+     "name": "sourcePath",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "targetBranch",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "strategy",
+     "type": "'merge' | 'squash' | 'ff'",
+     "optional": false
+    },
+    {
+     "name": "commitMessage",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "allowMainSwitch",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "removeAfter",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "pushAfter",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "Run a merge of the source worktree's branch into a target branch."
+  },
+  {
+   "type": "pickCodexCliPath",
+   "interface": "PickCodexCliPathRequest",
+   "fields": []
+  },
+  {
+   "type": "pickFiles",
+   "interface": "PickFilesRequest",
+   "fields": []
+  },
+  {
+   "type": "planApprovalResponse",
+   "interface": "PlanApprovalResponseMessage",
+   "fields": [
+    {
+     "name": "action",
+     "type": "'approve' | 'approveClearBypass' | 'approveManual' | 'reject' | 'feedback' | 'questionAnswer'",
+     "optional": false
+    },
+    {
+     "name": "feedback",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "toolName",
+     "type": "string",
+     "optional": true,
+     "doc": "The tool that triggered the approval (ExitPlanMode / AskUserQuestion). Sent by the webview so the handler can identify the tool even if the `result` event already cleared `pendingApprovalTool`."
+    },
+    {
+     "name": "selectedOptions",
+     "type": "string[]",
+     "optional": true,
+     "doc": "Selected option label(s) when answering AskUserQuestion"
+    },
+    {
+     "name": "questionAnswers",
+     "type": "{ question: string; answers: string[] }[]",
+     "optional": true,
+     "doc": "Per-question answers when AskUserQuestion contains multiple questions. Ordered like the tool input `questions` array; `answers` holds the selected option label(s) or a single free-text answer."
+    },
+    {
+     "name": "plan",
+     "type": "string",
+     "optional": true,
+     "doc": "`approveClearBypass` only: the approved plan text (ExitPlanMode input `plan`), used to seed the fresh session when the extension has no pending request to read it from."
+    }
+   ]
+  },
+  {
+   "type": "queuePromptUntilUsageReset",
+   "interface": "QueuePromptUntilUsageResetRequest",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "images",
+     "type": "WebviewImageData[]",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "ready",
+   "interface": "WebviewReady",
+   "fields": []
+  },
+  {
+   "type": "refreshFriends",
+   "interface": "RefreshFriendsRequest",
+   "fields": []
+  },
+  {
+   "type": "refreshMergeConflicts",
+   "interface": "RefreshMergeConflictsRequest",
+   "fields": [
+    {
+     "name": "targetPath",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Re-read the unmerged paths from git after the assistant acts."
+  },
+  {
+   "type": "removeFriend",
+   "interface": "RemoveFriendRequest",
+   "fields": [
+    {
+     "name": "username",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "removeWorktree",
+   "interface": "RemoveWorktreeRequest",
+   "fields": [
+    {
+     "name": "worktreePath",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "force",
+     "type": "boolean",
+     "optional": true
+    }
+   ],
+   "doc": "Remove a worktree; `force` discards dirty/untracked changes."
+  },
+  {
+   "type": "reorderTabs",
+   "interface": "ReorderTabsRequest",
+   "fields": [
+    {
+     "name": "tabIds",
+     "type": "string[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "requestMemoryStream",
+   "interface": "RequestMemoryStreamRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false,
+     "doc": "True to start streaming; false to stop."
+    },
+    {
+     "name": "intervalMs",
+     "type": "number",
+     "optional": true,
+     "doc": "Sampling interval in ms. Clamped on the extension side. Default 2500."
+    }
+   ],
+   "doc": "--- Memory dashboard (Webview -> Extension) ---"
+  },
+  {
+   "type": "requestSessionRecapSnapshot",
+   "interface": "RequestSessionRecapSnapshot",
+   "fields": []
+  },
+  {
+   "type": "requestTabList",
+   "interface": "RequestTabListRequest",
+   "fields": []
+  },
+  {
+   "type": "requestUsage",
+   "interface": "RequestUsageMessage",
+   "fields": []
+  },
+  {
+   "type": "resumeSession",
+   "interface": "ResumeSessionRequest",
+   "fields": [
+    {
+     "name": "sessionId",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "reviewLoopStart",
+   "interface": "ReviewLoopStartRequest",
+   "fields": [],
+   "doc": "--- Review Loop (Webview -> Extension) --- Start the automatic Claude<->Codex review loop on the active tab."
+  },
+  {
+   "type": "reviewLoopStop",
+   "interface": "ReviewLoopStopRequest",
+   "fields": [],
+   "doc": "Stop an in-flight review loop on the active tab."
+  },
+  {
+   "type": "scheduleMessage",
+   "interface": "ScheduleMessageRequest",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "images",
+     "type": "WebviewImageData[]",
+     "optional": true
+    },
+    {
+     "name": "scheduledAtMs",
+     "type": "number",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "secretProtectionGetAuditEvents",
+   "interface": "SecretProtectionGetAuditEventsRequest",
+   "fields": [
+    {
+     "name": "filter",
+     "type": "AuditEventFilter",
+     "optional": true
+    },
+    {
+     "name": "limit",
+     "type": "number",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "secretProtectionGetComplianceReport",
+   "interface": "SecretProtectionGetComplianceReportRequest",
+   "fields": [
+    {
+     "name": "filter",
+     "type": "AuditEventFilter",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "secretProtectionGetStatus",
+   "interface": "SecretProtectionGetStatusRequest",
+   "fields": [],
+   "doc": "--- Secret Protection (Webview -> Extension) ---"
+  },
+  {
+   "type": "secretProtectionSetSetting",
+   "interface": "SecretProtectionSetSettingRequest",
+   "fields": [
+    {
+     "name": "key",
+     "type": "keyof SecretProtectionSettings",
+     "optional": false
+    },
+    {
+     "name": "value",
+     "type": "SecretProtectionSettings[keyof SecretProtectionSettings]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "sendBtwMessage",
+   "interface": "SendBtwMessageRequest",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "sendMergeAssistantMessage",
+   "interface": "SendMergeAssistantMessageRequest",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Send a user turn to the running merge assistant."
+  },
+  {
+   "type": "sendMessage",
+   "interface": "SendTextMessage",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "steer",
+     "type": "boolean",
+     "optional": true,
+     "doc": "Codex only: user approved interrupting a running turn to steer the next prompt."
+    }
+   ],
+   "doc": "--- Webview -> Extension ---"
+  },
+  {
+   "type": "sendMessageWithImages",
+   "interface": "SendMessageWithImages",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "images",
+     "type": "WebviewImageData[]",
+     "optional": false
+    },
+    {
+     "name": "steer",
+     "type": "boolean",
+     "optional": true,
+     "doc": "Codex only: user approved interrupting a running turn to steer the next prompt."
+    }
+   ]
+  },
+  {
+   "type": "setAchievementsEnabled",
+   "interface": "SetAchievementsEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setActivitySummaryEnabled",
+   "interface": "SetActivitySummaryEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setAdventureWidgetEnabled",
+   "interface": "SetAdventureWidgetEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setAnalysisModel",
+   "interface": "SetAnalysisModelRequest",
+   "fields": [
+    {
+     "name": "model",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setApiKey",
+   "interface": "SetApiKeyRequest",
+   "fields": [
+    {
+     "name": "apiKey",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setAutoContinueOnLimit",
+   "interface": "SetAutoContinueOnLimitRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "Toggle auto-continue-on-limit: when a Claude session/usage limit is detected, automatically queue the continuation prompt to send one minute after reset."
+  },
+  {
+   "type": "setAutoEnhance",
+   "interface": "SetAutoEnhanceRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setAutoTranslate",
+   "interface": "SetAutoTranslateRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setBabelFishEnabled",
+   "interface": "SetBabelFishEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "--- Babel Fish (Webview -> Extension) ---"
+  },
+  {
+   "type": "setClaudeEffort",
+   "interface": "SetClaudeEffortRequest",
+   "fields": [
+    {
+     "name": "effort",
+     "type": "ClaudeEffortLevel",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setClaudeFastMode",
+   "interface": "SetClaudeFastModeRequest",
+   "fields": [
+    {
+     "name": "fastMode",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setCodexReasoningEffort",
+   "interface": "SetCodexReasoningEffortRequest",
+   "fields": [
+    {
+     "name": "effort",
+     "type": "CodexReasoningEffort",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setCodexServiceTier",
+   "interface": "SetCodexServiceTierRequest",
+   "fields": [
+    {
+     "name": "serviceTier",
+     "type": "CodexServiceTier",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setCouncilSettings",
+   "interface": "SetCouncilSettingsMessage",
+   "fields": [
+    {
+     "name": "settings",
+     "type": "CouncilSettingsPayload",
+     "optional": false
+    }
+   ],
+   "doc": "Panel Save -> persist the council configuration to VS Code settings."
+  },
+  {
+   "type": "setCustomSnippet",
+   "interface": "SetCustomSnippetRequest",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setDetailedDiffViewEnabled",
+   "interface": "SetDetailedDiffViewEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setEnhancerModel",
+   "interface": "SetEnhancerModelRequest",
+   "fields": [
+    {
+     "name": "model",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setGitHubSyncEnabled",
+   "interface": "SetGitHubSyncEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setGoalState",
+   "interface": "SetGoalStateRequest",
+   "fields": [
+    {
+     "name": "active",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "objective",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Webview -> Extension: persist goal state at project level"
+  },
+  {
+   "type": "setGroupCollapsed",
+   "interface": "SetGroupCollapsedRequest",
+   "fields": [
+    {
+     "name": "groupId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "collapsed",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "Toggle a folder's collapsed state in the vertical rail (persisted per-workspace)."
+  },
+  {
+   "type": "setMessageColorScheme",
+   "interface": "SetMessageColorSchemeRequest",
+   "fields": [
+    {
+     "name": "scheme",
+     "type": "MessageColorScheme",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setModel",
+   "interface": "SetModelRequest",
+   "fields": [
+    {
+     "name": "model",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setPermissionMode",
+   "interface": "SetPermissionModeRequest",
+   "fields": [
+    {
+     "name": "mode",
+     "type": "'full-access' | 'supervised'",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setPromptTranslationEnabled",
+   "interface": "SetPromptTranslationEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setProvider",
+   "interface": "SetProviderRequest",
+   "fields": [
+    {
+     "name": "provider",
+     "type": "ProviderId",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setRestoreSessionsEnabled",
+   "interface": "SetRestoreSessionsEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setReviewLoopAutoStart",
+   "interface": "SetReviewLoopAutoStartRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "Toggle whether the review loop auto-starts after each work turn."
+  },
+  {
+   "type": "setReviewLoopMaxRounds",
+   "interface": "SetReviewLoopMaxRoundsRequest",
+   "fields": [
+    {
+     "name": "value",
+     "type": "number",
+     "optional": false
+    }
+   ],
+   "doc": "Set the max review rounds. Clamped to 1-20 on the extension side too."
+  },
+  {
+   "type": "setReviewLoopSessionEnabled",
+   "interface": "SetReviewLoopSessionEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "Per-session override: enable/disable auto-review for the current tab only."
+  },
+  {
+   "type": "setSkillGenEnabled",
+   "interface": "SetSkillGenEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "--- Skill Generation (Webview -> Extension) ---"
+  },
+  {
+   "type": "setSkillGenThreshold",
+   "interface": "SetSkillGenThresholdRequest",
+   "fields": [
+    {
+     "name": "threshold",
+     "type": "number",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setSummaryModeEnabled",
+   "interface": "SetSummaryModeEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "Webview -> Extension: toggle summary mode"
+  },
+  {
+   "type": "setTabLayout",
+   "interface": "SetTabLayoutRequest",
+   "fields": [
+    {
+     "name": "layout",
+     "type": "'horizontal' | 'vertical'",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setTranslationLanguage",
+   "interface": "SetTranslationLanguageRequest",
+   "fields": [
+    {
+     "name": "language",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setTurnAnalysisEnabled",
+   "interface": "SetTurnAnalysisEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setTypingTheme",
+   "interface": "SetTypingThemeRequest",
+   "fields": [
+    {
+     "name": "theme",
+     "type": "TypingTheme",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setUltrathinkMode",
+   "interface": "SetUltrathinkModeRequest",
+   "fields": [
+    {
+     "name": "mode",
+     "type": "'off' | 'single' | 'locked'",
+     "optional": false
+    }
+   ],
+   "doc": "Webview -> Extension: persist ultrathink mode at project level"
+  },
+  {
+   "type": "setUsageWidgetEnabled",
+   "interface": "SetUsageWidgetEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setVerticalTabRailWidth",
+   "interface": "SetVerticalTabRailWidthRequest",
+   "fields": [
+    {
+     "name": "width",
+     "type": "number | null",
+     "optional": false
+    }
+   ],
+   "doc": "User resized (or double-clicked to reset) the in-webview vertical tab rail. The extension persists the width and re-broadcasts it to every tab so the choice is shared across tabs and survives reloads and layout switches. `width: null` restores the CSS default."
+  },
+  {
+   "type": "setVitalsEnabled",
+   "interface": "SetVitalsEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "setVpmEnabled",
+   "interface": "SetVpmEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "--- Summary Mode --- Webview -> Extension: toggle Visual Progress Mode"
+  },
+  {
+   "type": "setWeatherWidgetEnabled",
+   "interface": "SetWeatherWidgetEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "showHistory",
+   "interface": "ShowHistoryRequest",
+   "fields": []
+  },
+  {
+   "type": "skillGenCancel",
+   "interface": "SkillGenCancelRequest",
+   "fields": []
+  },
+  {
+   "type": "skillGenOnboardingDecision",
+   "interface": "SkillGenOnboardingDecisionRequest",
+   "fields": [
+    {
+     "name": "accepted",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "skillGenTrigger",
+   "interface": "SkillGenTriggerRequest",
+   "fields": []
+  },
+  {
+   "type": "skillGenUiLog",
+   "interface": "SkillGenUiLogMessage",
+   "fields": [
+    {
+     "name": "level",
+     "type": "'INFO' | 'DEBUG'",
+     "optional": false
+    },
+    {
+     "name": "event",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "data",
+     "type": "Record<string, unknown>",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "skillUsageReport",
+   "interface": "SkillUsageReportMessage",
+   "fields": [
+    {
+     "name": "skillName",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "startBtwSession",
+   "interface": "StartBtwSessionRequest",
+   "fields": [
+    {
+     "name": "promptText",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "--- BTW Background Session (Webview -> Extension) ---"
+  },
+  {
+   "type": "startMergeAssistant",
+   "interface": "StartMergeAssistantRequest",
+   "fields": [
+    {
+     "name": "targetPath",
+     "type": "string",
+     "optional": false,
+     "doc": "Target checkout where the conflict markers and unmerged index actually live."
+    },
+    {
+     "name": "conflictFiles",
+     "type": "string[]",
+     "optional": false
+    },
+    {
+     "name": "sourceBranch",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "targetBranch",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Start a fresh, merge-focused Claude session seeded with the conflict file list."
+  },
+  {
+   "type": "startSession",
+   "interface": "StartSessionRequest",
+   "fields": [
+    {
+     "name": "workspacePath",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "stopMergeAssistant",
+   "interface": "StopMergeAssistantRequest",
+   "fields": [],
+   "doc": "Stop (kill) the merge assistant before any merge teardown."
+  },
+  {
+   "type": "stopSession",
+   "interface": "StopSessionRequest",
+   "fields": []
+  },
+  {
+   "type": "superParticleAcceleratorCreateException",
+   "interface": "SuperParticleAcceleratorCreateExceptionRequest",
+   "fields": [
+    {
+     "name": "exception",
+     "type": "Record<string, unknown>",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "superParticleAcceleratorDeleteException",
+   "interface": "SuperParticleAcceleratorDeleteExceptionRequest",
+   "fields": [
+    {
+     "name": "exceptionId",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "superParticleAcceleratorGetAuditEvents",
+   "interface": "SuperParticleAcceleratorGetAuditEventsRequest",
+   "fields": [
+    {
+     "name": "limit",
+     "type": "number",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "superParticleAcceleratorGetStatus",
+   "interface": "SuperParticleAcceleratorGetStatusRequest",
+   "fields": [],
+   "doc": "--- Super Particle Accelerator (Webview -> Extension) ---"
+  },
+  {
+   "type": "superParticleAcceleratorSetEnabled",
+   "interface": "SuperParticleAcceleratorSetEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "superParticleAcceleratorSetMode",
+   "interface": "SuperParticleAcceleratorSetModeRequest",
+   "fields": [
+    {
+     "name": "mode",
+     "type": "'block' | 'audit'",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "switchProviderWithContext",
+   "interface": "SwitchProviderWithContextRequest",
+   "fields": [
+    {
+     "name": "targetProvider",
+     "type": "'claude' | 'codex'",
+     "optional": false
+    },
+    {
+     "name": "keepSourceOpen",
+     "type": "boolean",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "teamCreateTask",
+   "interface": "TeamCreateTaskRequest",
+   "fields": [
+    {
+     "name": "subject",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "description",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "teamPanelOpen",
+   "interface": "TeamPanelOpenRequest",
+   "fields": [],
+   "doc": "--- Agent Teams (Webview -> Extension) ---"
+  },
+  {
+   "type": "teamSendMessage",
+   "interface": "TeamSendMessageRequest",
+   "fields": [
+    {
+     "name": "agentName",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "content",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "teamShutdownAgent",
+   "interface": "TeamShutdownAgentRequest",
+   "fields": [
+    {
+     "name": "agentName",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "teamUpdateTask",
+   "interface": "TeamUpdateTaskRequest",
+   "fields": [
+    {
+     "name": "taskId",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "updates",
+     "type": "{ status?: 'pending' | 'in_progress' | 'completed' | 'blocked'; owner?: string; }",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "translateMessage",
+   "interface": "TranslateMessageRequest",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "textContent",
+     "type": "string",
+     "optional": false,
+     "doc": "Text content to translate (code blocks already stripped by the webview)"
+    },
+    {
+     "name": "language",
+     "type": "string",
+     "optional": true,
+     "doc": "Target language selected in the webview (fallback to config when omitted)"
+    }
+   ]
+  },
+  {
+   "type": "translatePrompt",
+   "interface": "TranslatePromptRequest",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "--- Prompt Translation (Webview -> Extension) ---"
+  },
+  {
+   "type": "uiDebugLog",
+   "interface": "UiDebugLogMessage",
+   "fields": [
+    {
+     "name": "source",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "event",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "payload",
+     "type": "Record<string, unknown>",
+     "optional": true
+    },
+    {
+     "name": "ts",
+     "type": "number",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "undoMerge",
+   "interface": "UndoMergeRequest",
+   "fields": [
+    {
+     "name": "targetPath",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "mode",
+     "type": "'revert' | 'discard'",
+     "optional": false
+    },
+    {
+     "name": "strategy",
+     "type": "'merge' | 'squash' | 'ff'",
+     "optional": false
+    },
+    {
+     "name": "newSha",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "preSha",
+     "type": "string",
+     "optional": true
+    }
+   ],
+   "doc": "Undo a completed merge (revert by default, guarded discard when unpushed)."
+  },
+  {
+   "type": "wakeFromDeepHibernation",
+   "interface": "WakeFromDeepHibernationRequest",
+   "fields": [],
+   "doc": "Deep hibernation: the user clicked the static placeholder page to wake the tab."
+  },
+  {
+   "type": "wakeFromHibernation",
+   "interface": "WakeFromHibernationRequest",
+   "fields": [],
+   "doc": "Tab hibernation: the user clicked the sleeping banner to wake the CLI."
+  },
+  {
+   "type": "whatsNewDismiss",
+   "interface": "WhatsNewDismissRequest",
+   "fields": [],
+   "doc": "--- What's New (post-update banner) --- User dismissed the What's New banner (persisted; clears it in every tab)."
+  },
+  {
+   "type": "whatsNewOpenChangelog",
+   "interface": "WhatsNewOpenChangelogRequest",
+   "fields": [],
+   "doc": "\"Full changelog\" button: open the bundled changelog in the markdown preview."
+  },
+  {
+   "type": "whatsNewRequestState",
+   "interface": "WhatsNewRequestStateRequest",
+   "fields": [],
+   "doc": "Sent on every webview mount so a rebuilt webview (reload, deep-hibernation wake) gets the current banner state."
+  },
+  {
+   "type": "workspaceAccessGuardAddAllowedRoots",
+   "interface": "WorkspaceAccessGuardAddAllowedRootsRequest",
+   "fields": [
+    {
+     "name": "roots",
+     "type": "string[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workspaceAccessGuardAddCurrentWorkspace",
+   "interface": "WorkspaceAccessGuardAddCurrentWorkspaceRequest",
+   "fields": []
+  },
+  {
+   "type": "workspaceAccessGuardGetAllowedRoots",
+   "interface": "WorkspaceAccessGuardGetAllowedRootsRequest",
+   "fields": []
+  },
+  {
+   "type": "workspaceAccessGuardGetAuditEvents",
+   "interface": "WorkspaceAccessGuardGetAuditEventsRequest",
+   "fields": [
+    {
+     "name": "limit",
+     "type": "number",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "workspaceAccessGuardGetOrgPolicyStatus",
+   "interface": "WorkspaceAccessGuardGetOrgPolicyStatusRequest",
+   "fields": []
+  },
+  {
+   "type": "workspaceAccessGuardGetStatus",
+   "interface": "WorkspaceAccessGuardGetStatusRequest",
+   "fields": [],
+   "doc": "--- Workspace Access Guard (Webview -> Extension) ---"
+  },
+  {
+   "type": "workspaceAccessGuardPickAllowedRoots",
+   "interface": "WorkspaceAccessGuardPickAllowedRootsRequest",
+   "fields": []
+  },
+  {
+   "type": "workspaceAccessGuardRemoveAllowedRoot",
+   "interface": "WorkspaceAccessGuardRemoveAllowedRootRequest",
+   "fields": [
+    {
+     "name": "root",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workspaceAccessGuardSetEnabled",
+   "interface": "WorkspaceAccessGuardSetEnabledRequest",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workspaceAccessGuardSetMode",
+   "interface": "WorkspaceAccessGuardSetModeRequest",
+   "fields": [
+    {
+     "name": "mode",
+     "type": "'block' | 'audit'",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workspaceAccessGuardTestCommand",
+   "interface": "WorkspaceAccessGuardTestCommandRequest",
+   "fields": [
+    {
+     "name": "command",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "cwd",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "workspaceAccessGuardTestPath",
+   "interface": "WorkspaceAccessGuardTestPathRequest",
+   "fields": [
+    {
+     "name": "value",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workstreamMapApplyEdit",
+   "interface": "WorkstreamMapApplyEditRequest",
+   "fields": [
+    {
+     "name": "edit",
+     "type": "UserEdit",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workstreamMapDismissResumeView",
+   "interface": "WorkstreamMapDismissResumeViewRequest",
+   "fields": []
+  },
+  {
+   "type": "workstreamMapImportExternalFolder",
+   "interface": "WorkstreamMapImportExternalFolderRequest",
+   "fields": [
+    {
+     "name": "folderPath",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "workstreamMapNaturalLanguageEdit",
+   "interface": "WorkstreamMapNaturalLanguageEditRequest",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "context",
+     "type": "MapInteractionContext",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workstreamMapOpen",
+   "interface": "WorkstreamMapOpenRequest",
+   "fields": [],
+   "doc": "--- Workstream Map (Webview -> Extension) ---"
+  },
+  {
+   "type": "workstreamMapOpenSession",
+   "interface": "WorkstreamMapOpenSessionRequest",
+   "fields": [
+    {
+     "name": "sessionId",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workstreamMapReclassify",
+   "interface": "WorkstreamMapReclassifyRequest",
+   "fields": [
+    {
+     "name": "force",
+     "type": "boolean",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "workstreamMapRequestData",
+   "interface": "WorkstreamMapRequestDataRequest",
+   "fields": []
+  },
+  {
+   "type": "workstreamMapSaveSnapshot",
+   "interface": "WorkstreamMapSaveSnapshotRequest",
+   "fields": []
+  },
+  {
+   "type": "workstreamPortfolioOpenProject",
+   "interface": "WorkstreamPortfolioOpenProjectRequest",
+   "fields": [
+    {
+     "name": "projectPath",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workstreamPortfolioRequestData",
+   "interface": "WorkstreamPortfolioRequestDataRequest",
+   "fields": [],
+   "doc": "--- Workstream Portfolio (Webview -> Extension) ---"
+  }
+ ],
+ "uiEvents": [
+  {
+   "type": "achievementAwarded",
+   "interface": "AchievementAwardedMessage",
+   "fields": [
+    {
+     "name": "achievement",
+     "type": "AchievementAwardPayload",
+     "optional": false
+    },
+    {
+     "name": "profile",
+     "type": "AchievementProfilePayload",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "achievementProgress",
+   "interface": "AchievementProgressMessage",
+   "fields": [
+    {
+     "name": "goals",
+     "type": "AchievementGoalPayload[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "achievementsSettings",
+   "interface": "AchievementsSettingsMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "sound",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "achievementsSnapshot",
+   "interface": "AchievementsSnapshotMessage",
+   "fields": [
+    {
+     "name": "profile",
+     "type": "AchievementProfilePayload",
+     "optional": false
+    },
+    {
+     "name": "goals",
+     "type": "AchievementGoalPayload[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "activitySummary",
+   "interface": "ActivitySummaryMessage",
+   "fields": [
+    {
+     "name": "shortLabel",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "fullSummary",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "activitySummarySetting",
+   "interface": "ActivitySummarySettingMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "adventureBeat",
+   "interface": "AdventureBeatMessage",
+   "fields": [
+    {
+     "name": "beat",
+     "type": "{ turnIndex: number; timestamp: number; beat: string; intensity: 1 | 2 | 3; outcome: 'success' | 'fail' | 'mixed' | 'neutral'; toolNames: string[]; labelShort: string; tooltipDetail?: string; roomType: string; isHaikuEnhanced: boolean; achievementRarity?: string; artifacts?: string[]; indicators?: string[]; commandTags?: string[]; }",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "adventureWidgetSetting",
+   "interface": "AdventureWidgetSettingMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "apiKeySetting",
+   "interface": "ApiKeySettingMessage",
+   "fields": [
+    {
+     "name": "hasKey",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "maskedKey",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "assistantMessage",
+   "interface": "AssistantCompleteMessage",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "content",
+     "type": "ContentBlock[]",
+     "optional": false
+    },
+    {
+     "name": "model",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "thinkingEffort",
+     "type": "string",
+     "optional": true
+    }
+   ],
+   "extends": [
+    "DlpMessageMetadata"
+   ]
+  },
+  {
+   "type": "autoContinueOnLimitSetting",
+   "interface": "AutoContinueOnLimitSettingMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "Reports the current auto-continue-on-limit toggle state to the webview."
+  },
+  {
+   "type": "autoTranslateStarted",
+   "interface": "AutoTranslateStartedMessage",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "babelFishSettings",
+   "interface": "BabelFishSettingsMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "language",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "--- Babel Fish (Extension -> Webview) ---"
+  },
+  {
+   "type": "branchList",
+   "interface": "BranchListMessage",
+   "fields": [
+    {
+     "name": "branches",
+     "type": "string[]",
+     "optional": false
+    }
+   ],
+   "doc": "Local branches for the merge wizard target dropdown."
+  },
+  {
+   "type": "bridgeModelOptions",
+   "interface": "BridgeModelOptionsMessage",
+   "fields": [
+    {
+     "name": "options",
+     "type": "{ label: string; value: string }[]",
+     "optional": false
+    }
+   ],
+   "doc": "Bridge Provider models (Grok / Antigravity / OpenAI-compatible) offered in the model picker. Values are namespaced `bridge:<backend>/<model>` and are routed to the bundled bridge runtime instead of the claude CLI."
+  },
+  {
+   "type": "btwAssistantMessage",
+   "interface": "BtwAssistantMessageMessage",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "content",
+     "type": "ContentBlock[]",
+     "optional": false
+    },
+    {
+     "name": "model",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "btwMessageStart",
+   "interface": "BtwMessageStartMessage",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "btwMessageStop",
+   "interface": "BtwMessageStopMessage",
+   "fields": []
+  },
+  {
+   "type": "btwResult",
+   "interface": "BtwResultMessage",
+   "fields": []
+  },
+  {
+   "type": "btwSessionEnded",
+   "interface": "BtwSessionEndedMessage",
+   "fields": [
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "btwSessionStarted",
+   "interface": "BtwSessionStartedMessage",
+   "fields": [],
+   "doc": "--- BTW Background Session (Extension -> Webview) ---"
+  },
+  {
+   "type": "btwStreamingText",
+   "interface": "BtwStreamingTextMessage",
+   "fields": [
+    {
+     "name": "blockIndex",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "btwUserMessage",
+   "interface": "BtwUserMessageMessage",
+   "fields": [
+    {
+     "name": "content",
+     "type": "ContentBlock[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "bugReportChatResponse",
+   "interface": "BugReportChatResponseMessage",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "scripts",
+     "type": "Array<{ command: string; language: string }>",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "bugReportOpen",
+   "interface": "BugReportOpenMessage",
+   "fields": [],
+   "doc": "--- Bug Report (Extension -> Webview) ---"
+  },
+  {
+   "type": "bugReportPreview",
+   "interface": "BugReportPreviewMessage",
+   "fields": [
+    {
+     "name": "files",
+     "type": "Array<{ name: string; sizeBytes: number; preview?: string }>",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "bugReportScriptResult",
+   "interface": "BugReportScriptResultMessage",
+   "fields": [
+    {
+     "name": "index",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "output",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "exitCode",
+     "type": "number",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "bugReportStatus",
+   "interface": "BugReportStatusMessage",
+   "fields": [
+    {
+     "name": "phase",
+     "type": "'collecting' | 'ready' | 'sending' | 'sent' | 'error'",
+     "optional": false
+    },
+    {
+     "name": "summary",
+     "type": "{ os: string; vsCodeVersion: string; extensionVersion: string; nodeVersion: string; claudeCliVersion: string | null; codexCliVersion: string | null; logFileCount: number; logTotalSize: number; }",
+     "optional": true
+    },
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "bugReportSubmitResult",
+   "interface": "BugReportSubmitResultMessage",
+   "fields": [
+    {
+     "name": "ok",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "chatSearchProjectResults",
+   "interface": "ChatSearchProjectResultMessage",
+   "fields": [
+    {
+     "name": "requestId",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "results",
+     "type": "ChatSearchProjectResult[]",
+     "optional": false
+    },
+    {
+     "name": "totalMatches",
+     "type": "number",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "checkpointResult",
+   "interface": "CheckpointResultMessage",
+   "fields": [
+    {
+     "name": "success",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "action",
+     "type": "'revert' | 'redo'",
+     "optional": false
+    },
+    {
+     "name": "targetTurnIndex",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "conflicts",
+     "type": "string[]",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "checkpointState",
+   "interface": "CheckpointStateMessage",
+   "fields": [
+    {
+     "name": "state",
+     "type": "CheckpointState",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "claudeAuthStatus",
+   "interface": "ClaudeAuthStatusMessage",
+   "fields": [
+    {
+     "name": "loggedIn",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "email",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "subscriptionType",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "claudeEffortSetting",
+   "interface": "ClaudeEffortSettingMessage",
+   "fields": [
+    {
+     "name": "effort",
+     "type": "ClaudeEffortLevel",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "claudeFastModeSetting",
+   "interface": "ClaudeFastModeSettingMessage",
+   "fields": [
+    {
+     "name": "fastMode",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "codexModelOptions",
+   "interface": "CodexModelOptionsMessage",
+   "fields": [
+    {
+     "name": "options",
+     "type": "CodexModelOption[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "codexReasoningEffortSetting",
+   "interface": "CodexReasoningEffortSettingMessage",
+   "fields": [
+    {
+     "name": "effort",
+     "type": "CodexReasoningEffort",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "codexServiceTierSetting",
+   "interface": "CodexServiceTierSettingMessage",
+   "fields": [
+    {
+     "name": "serviceTier",
+     "type": "CodexServiceTier",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "communityData",
+   "interface": "CommunityDataMessage",
+   "fields": [
+    {
+     "name": "friends",
+     "type": "CommunityFriendProfilePayload[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "compactBoundary",
+   "interface": "CompactBoundaryMessage",
+   "fields": [
+    {
+     "name": "trigger",
+     "type": "'manual' | 'auto' | 'unknown'",
+     "optional": false,
+     "doc": "Why compaction ran: user-invoked, auto threshold, or unknown."
+    },
+    {
+     "name": "preTokens",
+     "type": "number",
+     "optional": true,
+     "doc": "Context token count before the summary replaced it, when the CLI reports it."
+    }
+   ],
+   "doc": "The CLI finished compacting the conversation context (in-place summary), either from a manual `/compact` (posted as a user message) or the CLI's own automatic threshold trigger. Posted so the webview can render a visible \"context compacted\" divider in the chat. Distinct from CompactSessionResult (the token-saving handoff to a new tab)."
+  },
+  {
+   "type": "compactFailed",
+   "interface": "CompactFailedMessage",
+   "fields": [
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true
+    }
+   ],
+   "doc": "A manual `/compact` ended without compacting: the CLI reported a failed compaction (e.g. \"Not enough messages to compact.\") or the command could not be sent. The webview drops its pending \"Compacting context...\" divider."
+  },
+  {
+   "type": "compactSessionResult",
+   "interface": "CompactSessionResultMessage",
+   "fields": [
+    {
+     "name": "success",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true,
+     "doc": "Failure reason when success is false."
+    },
+    {
+     "name": "promptChars",
+     "type": "number",
+     "optional": true,
+     "doc": "Character length of the generated prompt (shown in the success notice)."
+    },
+    {
+     "name": "openedNewTab",
+     "type": "boolean",
+     "optional": true,
+     "doc": "True when a new tab was opened and its input pre-filled with the prompt."
+    },
+    {
+     "name": "copiedToClipboard",
+     "type": "boolean",
+     "optional": true,
+     "doc": "True when the prompt was also copied to the OS clipboard."
+    },
+    {
+     "name": "source",
+     "type": "'ai' | 'heuristic'",
+     "optional": true,
+     "doc": "Which engine produced the prompt: 'ai' (CLI summary) or 'heuristic' (fallback)."
+    }
+   ],
+   "doc": "Result of a \"Compact Session\" run (see CompactSessionRequest). Posted back to the SOURCE tab's webview so it can clear the button's loading state and show a transient notice."
+  },
+  {
+   "type": "conversationHistory",
+   "interface": "ConversationHistoryMessage",
+   "fields": [
+    {
+     "name": "messages",
+     "type": "SerializedChatMessage[]",
+     "optional": false,
+     "doc": "Full conversation history loaded from Claude's session storage"
+    }
+   ]
+  },
+  {
+   "type": "conversationReset",
+   "interface": "ConversationResetMessage",
+   "fields": [],
+   "doc": "The extension is replacing this tab's conversation with a fresh CLI session (plan approval \"Yes, clear context\"). The webview clears its chat state the same way /clear does; the new session's first message follows."
+  },
+  {
+   "type": "costUpdate",
+   "interface": "CostUpdateMessage",
+   "fields": [
+    {
+     "name": "costUsd",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "totalCostUsd",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "inputTokens",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "outputTokens",
+     "type": "number",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "councilSettings",
+   "interface": "CouncilSettingsMessage",
+   "fields": [
+    {
+     "name": "settings",
+     "type": "CouncilSettingsPayload",
+     "optional": false
+    },
+    {
+     "name": "detected",
+     "type": "CouncilEngineDetection",
+     "optional": false
+    }
+   ],
+   "doc": "Current council configuration + per-engine availability, pushed to the Council settings panel on open and after a save."
+  },
+  {
+   "type": "customSnippetSettings",
+   "interface": "CustomSnippetSettingsMessage",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "defaultModelHint",
+   "interface": "DefaultModelHintMessage",
+   "fields": [
+    {
+     "name": "model",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Last model the Claude CLI resolved \"Default\" to (i.e. a session spawned with no --model flag). Lets the Model selector show \"the model that will run\" before the first turn's system/init event reports it. Empty string when none is known yet."
+  },
+  {
+   "type": "detailedDiffViewSetting",
+   "interface": "DetailedDiffViewSettingMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "enhancePromptResult",
+   "interface": "EnhancePromptResultMessage",
+   "fields": [
+    {
+     "name": "enhancedText",
+     "type": "string | null",
+     "optional": false
+    },
+    {
+     "name": "success",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "error",
+   "interface": "ErrorMessage",
+   "fields": [
+    {
+     "name": "message",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "fileOldContent",
+   "interface": "FileOldContentMessage",
+   "fields": [
+    {
+     "name": "toolUseId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "filePath",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "oldContent",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Carries the pre-write file content for a Write tool call so the webview can show a diff"
+  },
+  {
+   "type": "filePathsPicked",
+   "interface": "FilePathsPickedMessage",
+   "fields": [
+    {
+     "name": "paths",
+     "type": "string[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "fileSearchResults",
+   "interface": "FileSearchResultMessage",
+   "fields": [
+    {
+     "name": "results",
+     "type": "Array<{ relativePath: string; fileName: string }>",
+     "optional": false
+    },
+    {
+     "name": "requestId",
+     "type": "number",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "focusInput",
+   "interface": "FocusInputMessage",
+   "fields": [],
+   "doc": "Extension -> Webview: tell the webview to focus the input textarea"
+  },
+  {
+   "type": "forkInit",
+   "interface": "ForkInitMessage",
+   "fields": [
+    {
+     "name": "promptText",
+     "type": "string",
+     "optional": false,
+     "doc": "The prompt text to place in the input area"
+    },
+    {
+     "name": "messages",
+     "type": "SerializedChatMessage[]",
+     "optional": false,
+     "doc": "Conversation history to display (already truncated at fork point)"
+    }
+   ]
+  },
+  {
+   "type": "friendActionResult",
+   "interface": "FriendActionResultMessage",
+   "fields": [
+    {
+     "name": "action",
+     "type": "'add' | 'remove' | 'refresh'",
+     "optional": false
+    },
+    {
+     "name": "username",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "success",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "profile",
+     "type": "CommunityFriendProfilePayload",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "githubSyncStatus",
+   "interface": "GitHubSyncStatusMessage",
+   "fields": [
+    {
+     "name": "connected",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "username",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "gistId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "gistUrl",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "lastSyncedAt",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "syncEnabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "gitPushResult",
+   "interface": "GitPushResultMessage",
+   "fields": [
+    {
+     "name": "success",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "output",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "gitPushSettings",
+   "interface": "GitPushSettingsMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "scriptPath",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "commitMessageTemplate",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "goalStateSetting",
+   "interface": "GoalStateSettingMessage",
+   "fields": [
+    {
+     "name": "active",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "objective",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Extension -> Webview: send goal state (project-level)"
+  },
+  {
+   "type": "handoffProgress",
+   "interface": "HandoffProgressMessage",
+   "fields": [
+    {
+     "name": "stage",
+     "type": "HandoffStage",
+     "optional": false
+    },
+    {
+     "name": "sourceProvider",
+     "type": "'claude' | 'codex'",
+     "optional": false
+    },
+    {
+     "name": "targetProvider",
+     "type": "'claude' | 'codex'",
+     "optional": false
+    },
+    {
+     "name": "detail",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "artifactPath",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "manualPrompt",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "hibernationState",
+   "interface": "HibernationStateMessage",
+   "fields": [
+    {
+     "name": "hibernated",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "Tab hibernation: toggles the \"sleeping\" banner above the input area."
+  },
+  {
+   "type": "interruptedAssistantMessage",
+   "interface": "InterruptedAssistantMessageMessage",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string | null",
+     "optional": false,
+     "doc": "Streaming message id to finalize and mark as interrupted. May be null if no streaming was in progress."
+    }
+   ],
+   "doc": "Silent crash resume: assistant turn was cut off mid-stream by a crash."
+  },
+  {
+   "type": "mcpCatalog",
+   "interface": "McpCatalogMessage",
+   "fields": [
+    {
+     "name": "templates",
+     "type": "McpTemplateDefinition[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mcpDiffPreview",
+   "interface": "McpDiffPreviewMessage",
+   "fields": [
+    {
+     "name": "preview",
+     "type": "McpConfigDiffPreview",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mcpInventory",
+   "interface": "McpInventoryMessage",
+   "fields": [
+    {
+     "name": "servers",
+     "type": "McpServerInfo[]",
+     "optional": false
+    },
+    {
+     "name": "pendingRestartCount",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "configPaths",
+     "type": "McpConfigPaths",
+     "optional": true
+    },
+    {
+     "name": "lastError",
+     "type": "string",
+     "optional": true
+    }
+   ],
+   "doc": "--- Extension -> Webview ---"
+  },
+  {
+   "type": "mcpOperationResult",
+   "interface": "McpOperationResultMessage",
+   "fields": [
+    {
+     "name": "success",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "operation",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "name",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "restartNeeded",
+     "type": "boolean",
+     "optional": true
+    },
+    {
+     "name": "nextAction",
+     "type": "McpNextAction",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "memorySnapshot",
+   "interface": "MemorySnapshotMessage",
+   "fields": [
+    {
+     "name": "timestamp",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "systemTotalBytes",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "systemFreeBytes",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "extensionHost",
+     "type": "{ pid: number; rssBytes: number; heapUsedBytes: number; heapTotalBytes: number; externalBytes: number; }",
+     "optional": false
+    },
+    {
+     "name": "vscodeProcesses",
+     "type": "MemoryVsCodeProcess[]",
+     "optional": false
+    },
+    {
+     "name": "cliProcesses",
+     "type": "MemoryCliProcess[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "memoryStreamError",
+   "interface": "MemoryStreamErrorMessage",
+   "fields": [
+    {
+     "name": "error",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mergeAssistantAssistantMessage",
+   "interface": "MergeAssistantAssistantMessageMessage",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "content",
+     "type": "ContentBlock[]",
+     "optional": false
+    },
+    {
+     "name": "model",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "mergeAssistantMessageStart",
+   "interface": "MergeAssistantMessageStartMessage",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mergeAssistantResult",
+   "interface": "MergeAssistantResultMessage",
+   "fields": []
+  },
+  {
+   "type": "mergeAssistantSessionEnded",
+   "interface": "MergeAssistantSessionEndedMessage",
+   "fields": [
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "mergeAssistantStreamingText",
+   "interface": "MergeAssistantStreamingTextMessage",
+   "fields": [
+    {
+     "name": "blockIndex",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mergeAssistantToolUse",
+   "interface": "MergeAssistantToolUseMessage",
+   "fields": [
+    {
+     "name": "blockIndex",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "toolName",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "summary",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Compact activity line so the user can see what Claude is doing to their files."
+  },
+  {
+   "type": "mergeAssistantUserMessage",
+   "interface": "MergeAssistantUserMessageMessage",
+   "fields": [
+    {
+     "name": "content",
+     "type": "ContentBlock[]",
+     "optional": false
+    }
+   ],
+   "doc": "--- Merge Conflict Assistant (Extension -> Webview) ---"
+  },
+  {
+   "type": "mergeConflictsRefreshed",
+   "interface": "MergeConflictsRefreshedMessage",
+   "fields": [
+    {
+     "name": "targetPath",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "conflictFiles",
+     "type": "string[]",
+     "optional": false
+    }
+   ],
+   "doc": "Fresh unmerged-path list re-read from git after the assistant acts."
+  },
+  {
+   "type": "mergePreview",
+   "interface": "MergePreviewMessage",
+   "fields": [
+    {
+     "name": "preview",
+     "type": "MergePreview",
+     "optional": false
+    },
+    {
+     "name": "defaultStrategy",
+     "type": "'merge' | 'squash' | 'ff'",
+     "optional": false,
+     "doc": "Strategy pre-selected in the wizard (from settings)."
+    },
+    {
+     "name": "removeAfterDefault",
+     "type": "boolean",
+     "optional": false,
+     "doc": "Default state of the \"remove worktree after merge\" checkbox."
+    },
+    {
+     "name": "confirmIntoProtected",
+     "type": "boolean",
+     "optional": false,
+     "doc": "Whether to show an extra confirm when merging into a protected branch."
+    }
+   ],
+   "doc": "Read-only merge analysis for the wizard's Review stage."
+  },
+  {
+   "type": "mergeResult",
+   "interface": "MergeResultMessage",
+   "fields": [
+    {
+     "name": "result",
+     "type": "MergeResult",
+     "optional": false
+    }
+   ],
+   "doc": "Outcome of a merge / complete / abort / undo, routed by `result.action`."
+  },
+  {
+   "type": "messageColorSchemeSetting",
+   "interface": "MessageColorSchemeSettingMessage",
+   "fields": [
+    {
+     "name": "scheme",
+     "type": "MessageColorScheme",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "messageDeferred",
+   "interface": "MessageDeferredMessage",
+   "fields": [
+    {
+     "name": "id",
+     "type": "string",
+     "optional": false,
+     "doc": "Stable id used to correlate deferred -> delivered/failed."
+    },
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Silent crash resume: a user-typed prompt was queued while the CLI is being respawned."
+  },
+  {
+   "type": "messageDeferredDelivered",
+   "interface": "MessageDeferredDeliveredMessage",
+   "fields": [
+    {
+     "name": "id",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Silent crash resume: a previously-deferred prompt was successfully sent to the resumed CLI."
+  },
+  {
+   "type": "messageDeferredFailed",
+   "interface": "MessageDeferredFailedMessage",
+   "fields": [
+    {
+     "name": "id",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "reason",
+     "type": "'timeout' | 'spawn-error' | 'exit-while-spawning' | 'cap-exhausted' | 'fresh-session'",
+     "optional": false
+    }
+   ],
+   "doc": "Silent crash resume: the deferred prompt could not be delivered; restore text to input."
+  },
+  {
+   "type": "messageStart",
+   "interface": "MessageStartMessage",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "model",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "inputTokens",
+     "type": "number",
+     "optional": true
+    },
+    {
+     "name": "thinkingEffort",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "messageStop",
+   "interface": "MessageStopMessage",
+   "fields": []
+  },
+  {
+   "type": "messageSummary",
+   "interface": "MessageSummaryMessage",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "shortLabel",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "fullSummary",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Extension -> Webview: per-message summary text"
+  },
+  {
+   "type": "modelSetting",
+   "interface": "ModelSettingMessage",
+   "fields": [
+    {
+     "name": "model",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpA2aPendingApproval",
+   "interface": "MpA2aPendingApprovalMessage",
+   "fields": [
+    {
+     "name": "approval",
+     "type": "MPApprovalEvent",
+     "optional": false
+    },
+    {
+     "name": "pendingMessageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "sourceAgentId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "targetAgentId",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpAgentStreamingText",
+   "interface": "MpAgentStreamingTextMessage",
+   "fields": [
+    {
+     "name": "deliveryId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "agentParticipantId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "accumulatedText",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "mpAgentToAgentApproval",
+   "interface": "MpAgentToAgentApprovalMessage",
+   "fields": [
+    {
+     "name": "approval",
+     "type": "MPApprovalEvent",
+     "optional": false
+    },
+    {
+     "name": "pendingMessage",
+     "type": "MPMessage",
+     "optional": false
+    },
+    {
+     "name": "sourceAgent",
+     "type": "MPParticipant",
+     "optional": false
+    },
+    {
+     "name": "targetAgent",
+     "type": "MPParticipant",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpApprovalResolved",
+   "interface": "MpApprovalResolvedMessage",
+   "fields": [
+    {
+     "name": "approval",
+     "type": "MPApprovalEvent",
+     "optional": false
+    },
+    {
+     "name": "decision",
+     "type": "MPApprovalDecisionPayload",
+     "optional": false
+    },
+    {
+     "name": "decidedByParticipantId",
+     "type": "string | null",
+     "optional": false
+    },
+    {
+     "name": "deliveryId",
+     "type": "string | null",
+     "optional": true
+    },
+    {
+     "name": "deniedReason",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "mpConnectionStatus",
+   "interface": "MpConnectionStatusMessage",
+   "fields": [
+    {
+     "name": "status",
+     "type": "'connecting' | 'connected' | 'disconnected' | 'error'",
+     "optional": false
+    },
+    {
+     "name": "message",
+     "type": "string",
+     "optional": true
+    }
+   ],
+   "doc": "--- Multi-Participant (Extension -> Webview) ---"
+  },
+  {
+   "type": "mpDeliveryStatus",
+   "interface": "MpDeliveryStatusMessage",
+   "fields": [
+    {
+     "name": "deliveryId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "agentParticipantId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "agentDisplayName",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "status",
+     "type": "MPDeliveryStatus",
+     "optional": false
+    },
+    {
+     "name": "errorText",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "interruptedByDeliveryId",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "mpError",
+   "interface": "MpErrorMessage",
+   "fields": [
+    {
+     "name": "code",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "message",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpFileConflictWarning",
+   "interface": "MpFileConflictWarningMessage",
+   "fields": [
+    {
+     "name": "warning",
+     "type": "MPFileConflictWarning",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpGuardStop",
+   "interface": "MpGuardStopMessage",
+   "fields": [
+    {
+     "name": "approval",
+     "type": "MPApprovalEvent",
+     "optional": false
+    },
+    {
+     "name": "reason",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "lastMessages",
+     "type": "MPMessage[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpInitDialog",
+   "interface": "MpInitDialogMessage",
+   "fields": [
+    {
+     "name": "mode",
+     "type": "'create' | 'join'",
+     "optional": false
+    },
+    {
+     "name": "defaultHumanName",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "defaultAgentName",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "serverUrl",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpJoinRejected",
+   "interface": "MpJoinRejectedMessage",
+   "fields": [
+    {
+     "name": "reason",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpNewMessage",
+   "interface": "MpNewMessageMessage",
+   "fields": [
+    {
+     "name": "message",
+     "type": "MPMessage",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpParticipantActivity",
+   "interface": "MpParticipantActivityMessage",
+   "fields": [
+    {
+     "name": "activity",
+     "type": "MPTypingState",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpParticipantRenamed",
+   "interface": "MpParticipantRenamedMessage",
+   "fields": [
+    {
+     "name": "event",
+     "type": "MPRenameEvent",
+     "optional": false
+    },
+    {
+     "name": "participant",
+     "type": "MPParticipant",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpParticipants",
+   "interface": "MpParticipantsMessage",
+   "fields": [
+    {
+     "name": "participants",
+     "type": "MPParticipant[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpReactionUpdate",
+   "interface": "MpReactionUpdateMessage",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "reactions",
+     "type": "import('../multiparticipant/MultiParticipantProtocol').MPReactionSummary[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpRenameRejected",
+   "interface": "MpRenameRejectedMessage",
+   "fields": [
+    {
+     "name": "participantId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "requestedDisplayName",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "reason",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "mpSessionState",
+   "interface": "MpSessionStateMessage",
+   "fields": [
+    {
+     "name": "session",
+     "type": "MPSession | null",
+     "optional": false
+    },
+    {
+     "name": "participants",
+     "type": "MPParticipant[]",
+     "optional": false
+    },
+    {
+     "name": "transcript",
+     "type": "MPMessage[]",
+     "optional": false
+    },
+    {
+     "name": "myHumanId",
+     "type": "string | null",
+     "optional": false
+    },
+    {
+     "name": "myAgentId",
+     "type": "string | null",
+     "optional": false
+    },
+    {
+     "name": "approvals",
+     "type": "MPApprovalEvent[]",
+     "optional": true
+    },
+    {
+     "name": "typingStates",
+     "type": "MPTypingState[]",
+     "optional": true
+    },
+    {
+     "name": "fileConflicts",
+     "type": "MPFileConflictWarning[]",
+     "optional": true
+    },
+    {
+     "name": "reactions",
+     "type": "Record<string, import('../multiparticipant/MultiParticipantProtocol').MPReactionSummary[]>",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "openWorktreePanel",
+   "interface": "OpenWorktreePanelMessage",
+   "fields": [],
+   "doc": "Command-palette / StatusBar request to open the worktree dashboard overlay."
+  },
+  {
+   "type": "particleAcceleratorAggregateUpdate",
+   "interface": "ParticleAcceleratorAggregateUpdateMessage",
+   "fields": [
+    {
+     "name": "aggregate",
+     "type": "import('../particle-accelerator/ParticleAcceleratorTypes').ParticleAcceleratorAggregate",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "particleAcceleratorError",
+   "interface": "ParticleAcceleratorErrorMessage",
+   "fields": [
+    {
+     "name": "error",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "particleAcceleratorRecentTraces",
+   "interface": "ParticleAcceleratorRecentTracesMessage",
+   "fields": [
+    {
+     "name": "traces",
+     "type": "import('../particle-accelerator/ParticleAcceleratorTypes').ParticleAcceleratorTraceSummary[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "particleAcceleratorStatus",
+   "interface": "ParticleAcceleratorStatusMessage",
+   "fields": [
+    {
+     "name": "status",
+     "type": "import('../particle-accelerator/ParticleAcceleratorTypes').ParticleAcceleratorStatus",
+     "optional": false
+    }
+   ],
+   "doc": "--- Particle Accelerator (Extension -> Webview) ---"
+  },
+  {
+   "type": "particleAcceleratorTraceUpdate",
+   "interface": "ParticleAcceleratorTraceUpdateMessage",
+   "fields": [
+    {
+     "name": "trace",
+     "type": "import('../particle-accelerator/ParticleAcceleratorTypes').ParticleAcceleratorTraceSummary",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "permissionModeSetting",
+   "interface": "PermissionModeSettingMessage",
+   "fields": [
+    {
+     "name": "mode",
+     "type": "'full-access' | 'supervised'",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "planApprovalDismissed",
+   "interface": "PlanApprovalDismissedMessage",
+   "fields": []
+  },
+  {
+   "type": "planApprovalRequired",
+   "interface": "PlanApprovalRequiredMessage",
+   "fields": [
+    {
+     "name": "toolName",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "planText",
+     "type": "string",
+     "optional": true,
+     "doc": "Present only on the control-protocol path (handlePermissionRequest), where the can_use_tool request arrives after messageStop has cleared streamingBlocks, so the plan/question detail cannot be recovered from the stream and is passed here."
+    }
+   ]
+  },
+  {
+   "type": "processBusy",
+   "interface": "ProcessBusyMessage",
+   "fields": [
+    {
+     "name": "busy",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "projectAnalyticsData",
+   "interface": "ProjectAnalyticsDataMessage",
+   "fields": [
+    {
+     "name": "sessions",
+     "type": "SessionSummary[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "promptEnhancerSettings",
+   "interface": "PromptEnhancerSettingsMessage",
+   "fields": [
+    {
+     "name": "autoEnhance",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "enhancerModel",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "promptHistoryResponse",
+   "interface": "PromptHistoryResponseMessage",
+   "fields": [
+    {
+     "name": "scope",
+     "type": "'project' | 'global'",
+     "optional": false
+    },
+    {
+     "name": "prompts",
+     "type": "string[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "promptTranslatorSettings",
+   "interface": "PromptTranslatorSettingsMessage",
+   "fields": [
+    {
+     "name": "translateEnabled",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "autoTranslate",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "providerCapabilities",
+   "interface": "ProviderCapabilitiesMessage",
+   "fields": [
+    {
+     "name": "capabilities",
+     "type": "ProviderCapabilities",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "providerSetting",
+   "interface": "ProviderSettingMessage",
+   "fields": [
+    {
+     "name": "provider",
+     "type": "ProviderId",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "restoreSessionsSetting",
+   "interface": "RestoreSessionsSettingMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "reviewLoopAutoStartSetting",
+   "interface": "ReviewLoopAutoStartSettingMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "reviewLoopEvent",
+   "interface": "ReviewLoopEventMessage",
+   "fields": [
+    {
+     "name": "event",
+     "type": "ReviewLoopEvent",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "reviewLoopMaxRoundsSetting",
+   "interface": "ReviewLoopMaxRoundsSettingMessage",
+   "fields": [
+    {
+     "name": "value",
+     "type": "number",
+     "optional": false
+    }
+   ],
+   "doc": "Current configured max review rounds (the setting, not the running loop's value)."
+  },
+  {
+   "type": "reviewLoopSessionEnabledSetting",
+   "interface": "ReviewLoopSessionEnabledSettingMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "scheduledMessageState",
+   "interface": "ScheduledMessageStateMessage",
+   "fields": [
+    {
+     "name": "scheduled",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "text",
+     "type": "string",
+     "optional": true
+    },
+    {
+     "name": "scheduledAtMs",
+     "type": "number",
+     "optional": true
+    },
+    {
+     "name": "summary",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "secretProtectionAuditEvents",
+   "interface": "SecretProtectionAuditEventsMessage",
+   "fields": [
+    {
+     "name": "events",
+     "type": "AuditEvent[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "secretProtectionComplianceReport",
+   "interface": "SecretProtectionComplianceReportMessage",
+   "fields": [
+    {
+     "name": "report",
+     "type": "ComplianceReport",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "secretProtectionError",
+   "interface": "SecretProtectionErrorMessage",
+   "fields": [
+    {
+     "name": "error",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "secretProtectionStatus",
+   "interface": "SecretProtectionStatusMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "settings",
+     "type": "SecretProtectionSettings",
+     "optional": false
+    },
+    {
+     "name": "auditCount",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "lastEvent",
+     "type": "AuditEvent | null",
+     "optional": false
+    }
+   ],
+   "doc": "--- Secret Protection (Extension -> Webview) ---"
+  },
+  {
+   "type": "sessionEnded",
+   "interface": "SessionEndedMessage",
+   "fields": [
+    {
+     "name": "reason",
+     "type": "'stopped' | 'crashed' | 'completed'",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "sessionMetadata",
+   "interface": "SessionMetadataMessage",
+   "fields": [
+    {
+     "name": "tools",
+     "type": "string[]",
+     "optional": false
+    },
+    {
+     "name": "model",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "cwd",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "mcpServers",
+     "type": "McpServerInfo[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "sessionRecap",
+   "interface": "SessionRecapMessage",
+   "fields": [
+    {
+     "name": "recap",
+     "type": "SessionRecapPayload",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "sessionStarted",
+   "interface": "SessionStartedMessage",
+   "fields": [
+    {
+     "name": "sessionId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "model",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "isResume",
+     "type": "boolean",
+     "optional": true
+    },
+    {
+     "name": "provider",
+     "type": "ProviderId",
+     "optional": true
+    },
+    {
+     "name": "tabKind",
+     "type": "'chat' | 'search' | 'multiparticipant'",
+     "optional": true,
+     "doc": "'chat' (default), 'search' for Smart Search tabs, or 'multiparticipant'."
+    },
+    {
+     "name": "worktreePath",
+     "type": "string | null",
+     "optional": true,
+     "doc": "Absolute worktree path when the session runs in a non-primary worktree, else null."
+    },
+    {
+     "name": "worktreeName",
+     "type": "string | null",
+     "optional": true,
+     "doc": "Basename of worktreePath, shown as the in-chat worktree indicator, else null."
+    },
+    {
+     "name": "claudeAccountProfileId",
+     "type": "string | null",
+     "optional": true
+    },
+    {
+     "name": "claudeAccountProfileLabel",
+     "type": "string | null",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "shareCardCopied",
+   "interface": "ShareCardCopiedMessage",
+   "fields": [
+    {
+     "name": "success",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "format",
+     "type": "'markdown' | 'shields-badge'",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "silentResumeStatus",
+   "interface": "SilentResumeStatusMessage",
+   "fields": [
+    {
+     "name": "active",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "Silent crash resume: lightweight banner state (\"(reconnecting...)\") shown only after a delay."
+  },
+  {
+   "type": "skillGenComplete",
+   "interface": "SkillGenCompleteMessage",
+   "fields": [
+    {
+     "name": "success",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "newSkills",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "upgradedSkills",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "skippedSkills",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "durationMs",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "skillGenProgress",
+   "interface": "SkillGenProgressMessage",
+   "fields": [
+    {
+     "name": "runStatus",
+     "type": "SkillGenRunStatus",
+     "optional": false
+    },
+    {
+     "name": "progress",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "progressLabel",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "skillGenSettings",
+   "interface": "SkillGenSettingsMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "threshold",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "docsDirectory",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "autoRun",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "onboardingSeen",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "skillGenStatus",
+   "interface": "SkillGenStatusMessage",
+   "fields": [
+    {
+     "name": "pendingDocs",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "threshold",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "runStatus",
+     "type": "SkillGenRunStatus",
+     "optional": false
+    },
+    {
+     "name": "progress",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "progressLabel",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "lastRun",
+     "type": "SkillGenRunHistoryEntry | null",
+     "optional": false
+    },
+    {
+     "name": "history",
+     "type": "SkillGenRunHistoryEntry[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "streamingText",
+   "interface": "StreamingTextMessage",
+   "fields": [
+    {
+     "name": "text",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "blockIndex",
+     "type": "number",
+     "optional": false
+    }
+   ],
+   "extends": [
+    "DlpMessageMetadata"
+   ]
+  },
+  {
+   "type": "summaryModeSetting",
+   "interface": "SummaryModeSettingMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "Extension -> Webview: send summary mode setting"
+  },
+  {
+   "type": "superParticleAcceleratorAuditEvents",
+   "interface": "SuperParticleAcceleratorAuditEventsMessage",
+   "fields": [
+    {
+     "name": "events",
+     "type": "import('../../shared/super-particle-accelerator/types').SuperParticleAcceleratorAuditEvent[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "superParticleAcceleratorError",
+   "interface": "SuperParticleAcceleratorErrorMessage",
+   "fields": [
+    {
+     "name": "error",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "superParticleAcceleratorLastEvent",
+   "interface": "SuperParticleAcceleratorLastEventMessage",
+   "fields": [
+    {
+     "name": "event",
+     "type": "import('../../shared/super-particle-accelerator/types').SuperParticleAcceleratorAuditEvent",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "superParticleAcceleratorStatus",
+   "interface": "SuperParticleAcceleratorStatusMessage",
+   "fields": [
+    {
+     "name": "status",
+     "type": "import('../../shared/super-particle-accelerator/types').SuperParticleAcceleratorStatus",
+     "optional": false
+    },
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "mode",
+     "type": "'block' | 'audit'",
+     "optional": false
+    }
+   ],
+   "doc": "--- Super Particle Accelerator (Extension -> Webview) ---"
+  },
+  {
+   "type": "syntheticToolContent",
+   "interface": "SyntheticToolContentMessage",
+   "fields": [
+    {
+     "name": "content",
+     "type": "ContentBlock[]",
+     "optional": false
+    },
+    {
+     "name": "sourceToolUseID",
+     "type": "string",
+     "optional": true
+    }
+   ],
+   "doc": "Synthetic content emitted by the CLI as a `type: \"user\"` envelope with isMeta=true (e.g. skill body loaded into context, sub-agent dispatch context, system reminders). Rendered as part of Claude's output flow, never as a \"YOU\" message."
+  },
+  {
+   "type": "tabLayoutSetting",
+   "interface": "TabLayoutSettingMessage",
+   "fields": [
+    {
+     "name": "layout",
+     "type": "'horizontal' | 'vertical'",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "tabList",
+   "interface": "TabListMessage",
+   "fields": [
+    {
+     "name": "tabs",
+     "type": "WebviewTabSummary[]",
+     "optional": false
+    },
+    {
+     "name": "activeTabId",
+     "type": "string | null",
+     "optional": false
+    },
+    {
+     "name": "groups",
+     "type": "WebviewTabGroup[]",
+     "optional": true,
+     "doc": "Folder records so the rail can rebuild the tree. Optional for backward compatibility — consumers must default to `[]` when absent."
+    },
+    {
+     "name": "collapsedGroupIds",
+     "type": "string[]",
+     "optional": true,
+     "doc": "Ids of folders the user has collapsed in the rail. Default `[]` when absent."
+    },
+    {
+     "name": "openDocuments",
+     "type": "WebviewOpenDocument[]",
+     "optional": true,
+     "doc": "Open non-ClaUi editors for the rail's Files section. Default `[]` when absent."
+    },
+    {
+     "name": "verticalTabRailWidth",
+     "type": "number | null",
+     "optional": true,
+     "doc": "Shared width (px) of the in-webview vertical tab rail, persisted by the extension so every tab uses the same width and it survives reloads / layout switches. `null` = CSS default; `undefined` = not provided (leave the current width untouched)."
+    }
+   ]
+  },
+  {
+   "type": "teamDetected",
+   "interface": "TeamDetectedMessage",
+   "fields": [
+    {
+     "name": "teamName",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "teamDismissed",
+   "interface": "TeamDismissedMessage",
+   "fields": [
+    {
+     "name": "teamName",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "teamStateUpdate",
+   "interface": "TeamStateUpdateMessage",
+   "fields": [
+    {
+     "name": "teamName",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "config",
+     "type": "{ name: string; description?: string; members: Array<{ agentId: string; name: string; agentType: string; color?: string; }>; }",
+     "optional": false
+    },
+    {
+     "name": "tasks",
+     "type": "Array<{ id: number; subject: string; description?: string; activeForm?: string; owner?: string; status: string; blockedBy?: number[]; blocks?: number[]; }>",
+     "optional": false
+    },
+    {
+     "name": "agentStatuses",
+     "type": "Record<string, string>",
+     "optional": false
+    },
+    {
+     "name": "recentMessages",
+     "type": "Array<{ from: string; to?: string; text: string; timestamp: string | number; read?: boolean; type?: string; summary?: string; }>",
+     "optional": false
+    },
+    {
+     "name": "lastUpdatedAt",
+     "type": "number",
+     "optional": false
+    }
+   ],
+   "doc": "--- Agent Teams (Extension -> Webview) ---"
+  },
+  {
+   "type": "textSettings",
+   "interface": "TextSettingsMessage",
+   "fields": [
+    {
+     "name": "fontSize",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "fontFamily",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "thinkingEffortUpdate",
+   "interface": "ThinkingEffortUpdateMessage",
+   "fields": [
+    {
+     "name": "effort",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "toggleMcpPanel",
+   "interface": "ToggleMcpPanelMessage",
+   "fields": [
+    {
+     "name": "open",
+     "type": "boolean",
+     "optional": true
+    },
+    {
+     "name": "tab",
+     "type": "'session' | 'workspace' | 'add' | 'debug'",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "toggleWorkstreamMap",
+   "interface": "ToggleWorkstreamMapMessage",
+   "fields": [
+    {
+     "name": "open",
+     "type": "boolean",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "toggleWorkstreamPortfolio",
+   "interface": "ToggleWorkstreamPortfolioMessage",
+   "fields": [
+    {
+     "name": "open",
+     "type": "boolean",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "tokenRatioData",
+   "interface": "TokenRatioDataMessage",
+   "fields": [
+    {
+     "name": "samples",
+     "type": "TokenUsageRatioSample[]",
+     "optional": false
+    },
+    {
+     "name": "summaries",
+     "type": "TokenRatioBucketSummary[]",
+     "optional": false
+    },
+    {
+     "name": "globalTurnCount",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "cumulativeTokens",
+     "type": "{ input: number; output: number; cacheCreation: number; cacheRead: number }",
+     "optional": false
+    },
+    {
+     "name": "cumulativeWeightedTokens",
+     "type": "number",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "toolActivity",
+   "interface": "ToolActivityMessage",
+   "fields": [
+    {
+     "name": "toolName",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "detail",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "toolResult",
+   "interface": "ToolResultMessage",
+   "fields": [
+    {
+     "name": "toolId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "content",
+     "type": "string | ContentBlock[]",
+     "optional": false
+    },
+    {
+     "name": "isError",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "extends": [
+    "DlpMessageMetadata"
+   ]
+  },
+  {
+   "type": "toolUseInput",
+   "interface": "ToolUseInputMessage",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "blockIndex",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "partialJson",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "toolUseStart",
+   "interface": "ToolUseStartMessage",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "blockIndex",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "toolName",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "toolId",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "translatePromptResult",
+   "interface": "TranslatePromptResultMessage",
+   "fields": [
+    {
+     "name": "translatedText",
+     "type": "string | null",
+     "optional": false
+    },
+    {
+     "name": "success",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true
+    }
+   ],
+   "doc": "--- Prompt Translation (Extension -> Webview) ---"
+  },
+  {
+   "type": "translationLanguageSetting",
+   "interface": "TranslationLanguageSettingMessage",
+   "fields": [
+    {
+     "name": "language",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "translationResult",
+   "interface": "TranslationResultMessage",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "translatedText",
+     "type": "string | null",
+     "optional": false,
+     "doc": "The translated text, or null if translation failed"
+    },
+    {
+     "name": "success",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "turnAnalysisSettings",
+   "interface": "TurnAnalysisSettingsMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "analysisModel",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "turnComplete",
+   "interface": "TurnCompleteMessage",
+   "fields": [
+    {
+     "name": "turn",
+     "type": "TurnRecord",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "turnSemantics",
+   "interface": "TurnSemanticsMessage",
+   "fields": [
+    {
+     "name": "messageId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "semantics",
+     "type": "TurnSemantics",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "typingThemeSetting",
+   "interface": "TypingThemeSettingMessage",
+   "fields": [
+    {
+     "name": "theme",
+     "type": "TypingTheme",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "ultrathinkModeSetting",
+   "interface": "UltrathinkModeSettingMessage",
+   "fields": [
+    {
+     "name": "mode",
+     "type": "'off' | 'single' | 'locked'",
+     "optional": false
+    }
+   ],
+   "doc": "Extension -> Webview: send ultrathink mode state (project-level)"
+  },
+  {
+   "type": "usageData",
+   "interface": "UsageDataMessage",
+   "fields": [
+    {
+     "name": "stats",
+     "type": "UsageStat[]",
+     "optional": false
+    },
+    {
+     "name": "fetchedAt",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "error",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "usageLimitDetected",
+   "interface": "UsageLimitDetectedMessage",
+   "fields": [
+    {
+     "name": "active",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "resetAtMs",
+     "type": "number",
+     "optional": true
+    },
+    {
+     "name": "resetDisplay",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "rawMessage",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "usageQueuedPromptState",
+   "interface": "UsageQueuedPromptStateMessage",
+   "fields": [
+    {
+     "name": "queued",
+     "type": "boolean",
+     "optional": false
+    },
+    {
+     "name": "scheduledSendAtMs",
+     "type": "number",
+     "optional": true
+    },
+    {
+     "name": "summary",
+     "type": "string",
+     "optional": true
+    }
+   ]
+  },
+  {
+   "type": "usageWidgetSetting",
+   "interface": "UsageWidgetSettingMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "userMessage",
+   "interface": "UserMessageDisplay",
+   "fields": [
+    {
+     "name": "content",
+     "type": "ContentBlock[]",
+     "optional": false
+    },
+    {
+     "name": "source",
+     "type": "'input' | 'auto-prompt'",
+     "optional": true,
+     "doc": "Origin of this user message. 'input' = typed by the user via the input box. 'auto-prompt' = injected by ClaUi (e.g. team idle, queued/scheduled prompt). Defaults to 'input' if absent. Only 'input' messages are eligible for Fork / Revert / prompt-navigation buttons."
+    }
+   ],
+   "extends": [
+    "DlpMessageMetadata"
+   ]
+  },
+  {
+   "type": "visualProgressCard",
+   "interface": "VisualProgressCardMessage",
+   "fields": [
+    {
+     "name": "card",
+     "type": "{ id: string; category: string; toolName: string; description: string; filePath?: string; command?: string; pattern?: string; timestamp: number; isStreaming: boolean; }",
+     "optional": false
+    }
+   ],
+   "doc": "Extension -> Webview: new VPM card"
+  },
+  {
+   "type": "visualProgressCardUpdate",
+   "interface": "VisualProgressCardUpdateMessage",
+   "fields": [
+    {
+     "name": "cardId",
+     "type": "string",
+     "optional": false
+    },
+    {
+     "name": "aiDescription",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "Extension -> Webview: update VPM card with AI description"
+  },
+  {
+   "type": "vitalsSetting",
+   "interface": "VitalsSettingMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "vpmSetting",
+   "interface": "VpmSettingMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ],
+   "doc": "Extension -> Webview: send Visual Progress Mode setting"
+  },
+  {
+   "type": "weatherWidgetSetting",
+   "interface": "WeatherWidgetSettingMessage",
+   "fields": [
+    {
+     "name": "enabled",
+     "type": "boolean",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "whatsNewState",
+   "interface": "WhatsNewStateMessage",
+   "fields": [
+    {
+     "name": "items",
+     "type": "WhatsNewAnnouncement[]",
+     "optional": false
+    },
+    {
+     "name": "currentVersion",
+     "type": "string",
+     "optional": false,
+     "doc": "Installed extension version, shown in the banner header."
+    }
+   ],
+   "doc": "Authoritative banner state; an empty `items` array hides the banner."
+  },
+  {
+   "type": "workspaceAccessGuardAllowedRoots",
+   "interface": "WorkspaceAccessGuardAllowedRootsMessage",
+   "fields": [
+    {
+     "name": "roots",
+     "type": "import('../../shared/workspace-access-guard/types').WorkspaceAccessAllowedRootView[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workspaceAccessGuardAuditEvents",
+   "interface": "WorkspaceAccessGuardAuditEventsMessage",
+   "fields": [
+    {
+     "name": "events",
+     "type": "import('../../shared/workspace-access-guard/types').WorkspaceAccessAuditEvent[]",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workspaceAccessGuardError",
+   "interface": "WorkspaceAccessGuardErrorMessage",
+   "fields": [
+    {
+     "name": "error",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workspaceAccessGuardOrgPolicyStatus",
+   "interface": "WorkspaceAccessGuardOrgPolicyStatusMessage",
+   "fields": [
+    {
+     "name": "status",
+     "type": "import('../../shared/workspace-access-guard/types').WorkspaceAccessOrgPolicyStatus",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workspaceAccessGuardStatus",
+   "interface": "WorkspaceAccessGuardStatusMessage",
+   "fields": [
+    {
+     "name": "status",
+     "type": "{ enabled: boolean; mode: 'block' | 'audit'; hookStatus: string; }",
+     "optional": false
+    }
+   ],
+   "doc": "--- Workspace Access Guard (Extension -> Webview) ---"
+  },
+  {
+   "type": "workspaceAccessGuardTestResult",
+   "interface": "WorkspaceAccessGuardTestResultMessage",
+   "fields": [
+    {
+     "name": "result",
+     "type": "import('../../shared/workspace-access-guard/types').WorkspaceAccessDecision",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workstreamMapClassifying",
+   "interface": "WorkstreamMapClassifyingMessage",
+   "fields": [
+    {
+     "name": "progress",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "phase",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workstreamMapData",
+   "interface": "WorkstreamMapDataMessage",
+   "fields": [
+    {
+     "name": "data",
+     "type": "ProjectMapState",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workstreamMapError",
+   "interface": "WorkstreamMapErrorMessage",
+   "fields": [
+    {
+     "name": "message",
+     "type": "string",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workstreamMapResumeState",
+   "interface": "WorkstreamMapResumeStateMessage",
+   "fields": [
+    {
+     "name": "resumeState",
+     "type": "ResumeState",
+     "optional": false
+    }
+   ]
+  },
+  {
+   "type": "workstreamPortfolioData",
+   "interface": "WorkstreamPortfolioDataMessage",
+   "fields": [
+    {
+     "name": "data",
+     "type": "UserPortfolioState",
+     "optional": false
+    },
+    {
+     "name": "currentWorkspacePath",
+     "type": "string",
+     "optional": false
+    }
+   ],
+   "doc": "--- Workstream Portfolio (Extension -> Webview) ---"
+  },
+  {
+   "type": "workstreamPortfolioNavigateToProject",
+   "interface": "WorkstreamPortfolioNavigateToProjectMessage",
+   "fields": []
+  },
+  {
+   "type": "worktreeActionResult",
+   "interface": "WorktreeActionResultMessage",
+   "fields": [
+    {
+     "name": "action",
+     "type": "'create' | 'remove' | 'commit'",
+     "optional": false,
+     "doc": "Which action produced this result, so the UI can route the toast/dialog."
+    }
+   ],
+   "extends": [
+    "WorktreeActionResult"
+   ],
+   "doc": "Result of a create/remove/commit worktree mutation."
+  },
+  {
+   "type": "worktreeList",
+   "interface": "WorktreeListMessage",
+   "fields": [
+    {
+     "name": "worktrees",
+     "type": "WorktreeWithSessions[]",
+     "optional": false
+    },
+    {
+     "name": "isGitRepo",
+     "type": "boolean",
+     "optional": false,
+     "doc": "True when the workspace is a git repo; false disables create/remove in the UI."
+    }
+   ],
+   "doc": "The joined worktree + sessions list for the dashboard."
+  }
+ ]
+}

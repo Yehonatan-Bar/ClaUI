@@ -91,6 +91,39 @@ module.exports = [
     },
     devtool: 'nosources-source-map',
   },
+  // Remote Control runtime (Node.js, runs outside VS Code): the stdio MCP server
+  // and CLI that external tools launch. The extension copies these into
+  // ~/.claui/remote-control/bin/<version>/ behind stable launchers.
+  {
+    name: 'remote-control-runtime',
+    target: 'node',
+    mode: 'none',
+    entry: {
+      'mcp-server': './src/remote-control-runtime/mcpServerMain.ts',
+      'cli': './src/remote-control-runtime/cli.ts',
+    },
+    output: {
+      path: path.resolve(__dirname, 'dist', 'remote-control-runtime'),
+      filename: '[name].js',
+      libraryTarget: 'commonjs2',
+    },
+    resolve: {
+      extensions: ['.ts', '.js'],
+    },
+    module: {
+      rules: [
+        {
+          test: /\.ts$/,
+          exclude: /node_modules/,
+          use: 'ts-loader',
+        },
+      ],
+    },
+    optimization: {
+      minimize: false,
+    },
+    devtool: false,
+  },
   // Particle Accelerator runtime (Node.js CLI, runs outside VS Code)
   {
     name: 'particle-accelerator-runtime',
