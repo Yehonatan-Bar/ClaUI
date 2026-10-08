@@ -1,5 +1,7 @@
 # ClaUi - Workflows & Real-World Scenarios
 
+> **Connecting an AI agent to ClaUi (MCP)?** See the README section "For AI agents and automation" or `Kingdom_of_Claudes_Beloved_MDs/AI_AGENT_INTEGRATION.md` (shipped with the extension).
+
 **מסמך זה מייצג את יכולות ClaUi דרך עדשת תרחישי משתמש בעולם אמיתי וזרימות עבודה יומיומיות.**
 
 ---

@@ -1,5 +1,7 @@
 # ClaUi - Comprehensive Feature Catalog
 
+> **Connecting an AI agent to ClaUi (MCP)?** See the README section "For AI agents and automation" or `Kingdom_of_Claudes_Beloved_MDs/AI_AGENT_INTEGRATION.md` (shipped with the extension).
+
 **ClaUi** is a professional VS Code extension that transforms the Claude Code CLI into a full-featured visual IDE experience. It manages multiple independent Claude/Codex AI agent sessions in parallel, each with its own process and dedicated UI, while providing rich analytics, gamification, security controls, and advanced workflow tools.
 
 ---
@@ -1049,9 +1051,34 @@ GitHub, Playwright, Brave Search, Sentry, Slack, Postgres, Context7, Codex (Wind
 - Secrets re-hydrated on session start
 - Removed when server removed
 
+Section 35 is about MCP servers that Claude sessions *use*. The opposite direction, where an AI agent *controls*
+ClaUi, is section 36.
+
 ---
 
-## 36. Smart Search
+## 36. Remote Control via MCP (connect an AI agent to ClaUi)
+
+**What it is:** ClaUi ships its own MCP server, a CLI and Node.js / Python client libraries, so Claude Code, Codex,
+Cursor, Claude Desktop, Windsurf, VS Code agents or your own code can control it. They can open tabs, send prompts
+and read the replies, answer approvals, change models and settings, search history and follow UI events (47 tools).
+
+**Setup:** nothing has to be turned on. When VS Code starts, ClaUi installs the tools into `~/.claui/remote-control/`
+and writes this machine's connection guide to `~/.claui/remote-control/CONNECT.md`. Each window starts its local
+control server on the first request (`claudeMirror.remoteControl.mode`: `auto` / `on` / `off`).
+
+**Connect an agent:**
+- Agents inside VS Code: nothing to do (ClaUi registers its MCP server with VS Code)
+- Claude Code: `node "$env:USERPROFILE\.claui\remote-control\bin\claui.js" register` (PowerShell) or
+  `node ~/.claui/remote-control/bin/claui.js register` (macOS / Linux), then start a new Claude Code session
+- Codex / Cursor / Claude Desktop / Windsurf / any MCP client: `claui.js mcp-config --client <name>` prints the config
+- Diagnose: `claui.js doctor`
+
+**Full guide:** `Kingdom_of_Claudes_Beloved_MDs/AI_AGENT_INTEGRATION.md` in the extension package, and the README
+section "For AI agents and automation".
+
+---
+
+## 37. Smart Search
 
 **Dedicated search tabs** - Read-only tool allowlists, magenta slot color
 
@@ -1059,7 +1086,7 @@ GitHub, Playwright, Brave Search, Sentry, Slack, Postgres, Context7, Codex (Wind
 
 ---
 
-## 37. Keyboard Shortcuts
+## 38. Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|

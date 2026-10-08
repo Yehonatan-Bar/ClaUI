@@ -20,6 +20,7 @@ ClaUi transforms the Claude Code CLI into a rich, interactive workspace. Run par
 - **Message Translation** -- translate assistant responses into 10 languages
 - **Session Vitals** -- weather widget, timeline minimap, cost heat bar, and a pixel-art dungeon crawler
 - **40+ settings** -- typing themes, font controls, RTL support, and granular feature toggles
+- **Built-in MCP server for AI agents** -- Claude Code, Codex, Cursor or your own code can drive ClaUi ([how to connect](#for-ai-agents-and-automation))
 
 ---
 
@@ -260,16 +261,30 @@ All settings are under `claudeMirror.*` in VS Code Settings (`Ctrl+,`).
 
 ## For AI agents and automation
 
-ClaUi ships its own MCP server, a CLI and Node/Python client libraries. Nothing has to be turned on: when VS Code starts, ClaUi installs them into `~/.claui/remote-control/` and writes the connection details to `~/.claui/remote-control/CONNECT.md` (machine-readable: `connection.json`). The localhost control server starts by itself on the first request from a local tool.
+**Connect an AI agent to ClaUi (MCP).** ClaUi ships its own MCP server, a CLI and Node.js / Python client libraries, so Claude Code, Codex, Cursor, Claude Desktop, Windsurf, VS Code agents or your own code can control it: open tabs, send prompts and read the replies, answer approvals, change models and settings. Nothing has to be turned on. When VS Code starts, ClaUi installs the tools into `~/.claui/remote-control/` and writes this machine's connection details to `~/.claui/remote-control/CONNECT.md`. The local control server starts by itself on the first request. VS Code with ClaUi must be running.
 
-- **Agents inside VS Code** (e.g. Copilot agent mode): the ClaUi MCP server is registered with VS Code automatically.
-- **Claude Code**: `node ~/.claui/remote-control/bin/claui.js register`
-- **Claude Desktop, Cursor, Windsurf, Codex, any MCP client**: `node ~/.claui/remote-control/bin/claui.js mcp-config --client <name>` prints the config. The server is a stdio command: `node ~/.claui/remote-control/bin/claui-mcp.js`.
-- **Your own code**: `require('~/.claui/remote-control/bin/claui-client.js').connect()` (Node) or `from claui_client import ClauiClient` (Python, in the same folder).
-- **Shell**: `node ~/.claui/remote-control/bin/claui.js send "Run the tests" --tab 1`
-- **Diagnostics**: `node ~/.claui/remote-control/bin/claui.js doctor`
+| Agent | What to do |
+|-------|------------|
+| Agents inside VS Code (e.g. Copilot agent mode) | Nothing: ClaUi registers its MCP server with VS Code |
+| Claude Code | Run the `register` command below, then start a new Claude Code session |
+| Codex, Cursor, Claude Desktop, Windsurf, any MCP client | Run `mcp-config --client <codex\|cursor\|claude-desktop\|windsurf\|generic>` below and paste the printed config |
+| Your own code | Node: `claui-client.js`, Python: `claui_client.py` (both in `~/.claui/remote-control/bin/`), the CLI, or the local HTTP API |
 
-Start with the tools `get_status` / `list_tabs`; `send_message` behaves exactly like typing in the chat and waits for the reply. Localhost only and token protected. Setting `claudeMirror.remoteControl.mode` (`auto` / `on` / `off`) and `accessLevel` (`full` / `readOnly`) control it; **ClaUi: Remote Control (MCP) Setup** has every option.
+```powershell
+# Windows PowerShell
+node "$env:USERPROFILE\.claui\remote-control\bin\claui.js" register
+node "$env:USERPROFILE\.claui\remote-control\bin\claui.js" mcp-config --client codex
+node "$env:USERPROFILE\.claui\remote-control\bin\claui.js" doctor
+```
+
+```bash
+# macOS / Linux (Windows cmd: use "%USERPROFILE%\.claui\remote-control\bin\claui.js")
+node ~/.claui/remote-control/bin/claui.js register
+node ~/.claui/remote-control/bin/claui.js mcp-config --client codex
+node ~/.claui/remote-control/bin/claui.js doctor
+```
+
+Full guide, shipped with the extension: [AI agent integration guide](Kingdom_of_Claudes_Beloved_MDs/AI_AGENT_INTEGRATION.md). It covers every agent, all 47 tools, window selection, settings and troubleshooting. Start with the tools `get_status` / `list_tabs`; `send_message` behaves exactly like typing in the chat and waits for the reply. The server is localhost only and token protected. `claudeMirror.remoteControl.mode` (`auto` / `on` / `off`) and `accessLevel` (`full` / `readOnly`) control it, and **ClaUi: Remote Control (MCP) Setup** has every option.
 
 ---
 

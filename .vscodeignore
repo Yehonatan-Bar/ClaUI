@@ -10,6 +10,8 @@ webpack.config.js
 !dist/**
 DEVELOPMENT.md
 Kingdom_of_Claudes_Beloved_MDs/**
+# ...except the user/agent-facing guide for connecting AI agents (read by agents from the installed package).
+!Kingdom_of_Claudes_Beloved_MDs/AI_AGENT_INTEGRATION.md
 .claude/**
 .codex/**
 server/**

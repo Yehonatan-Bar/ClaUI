@@ -161,6 +161,12 @@ foreach ($marker in @("notifications/progress", "list_instances")) {
     throw "Installed Remote Control MCP server is missing expected marker: $marker"
   }
 }
+# Agent-facing docs that ship in the package (agents read them from the installed folder).
+foreach ($doc in @("llms.txt", "Kingdom_of_Claudes_Beloved_MDs\AI_AGENT_INTEGRATION.md")) {
+  if (-not (Test-Path (Join-Path $installed.FullName $doc))) {
+    throw "Installed extension is missing the agent documentation: $doc"
+  }
+}
 
 Write-Host "Installed extension verified:"
 Write-Host "  Path: $($installed.FullName)"

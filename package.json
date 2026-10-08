@@ -1,7 +1,7 @@
 {
   "name": "claude-code-mirror",
   "displayName": "ClaUi",
-  "description": "The full IDE experience for Claude Code - multi-tab sessions, analytics, achievements, dual providers, prompt enhancement, and deep customization",
+  "description": "The full IDE experience for Claude Code - multi-tab sessions, analytics, achievements, dual providers, prompt enhancement, deep customization, and a built-in MCP server so AI agents can control it",
   "version": "0.1.245",
   "publisher": "JhonBar",
   "icon": "images/icon.png",
@@ -28,7 +28,13 @@
     "claude-code",
     "ai-chat",
     "copilot",
-    "ai-assistant"
+    "ai-assistant",
+    "claui",
+    "codex",
+    "mcp",
+    "mcp-server",
+    "ai-agent",
+    "automation"
   ],
   "galleryBanner": {
     "color": "#1a1a2e",

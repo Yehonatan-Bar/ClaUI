@@ -1,5 +1,7 @@
 # ClaUi - מדריך תכונות מפורט וקיף
 
+> **Connecting an AI agent to ClaUi (MCP)?** See the README section "For AI agents and automation" or `Kingdom_of_Claudes_Beloved_MDs/AI_AGENT_INTEGRATION.md` (shipped with the extension).
+
 **מסמך זה תיאור ממוקד של כל יכולות ClaUi, ארגון בקטגוריות סמנטיות עם הסבר מלא של כל תכונה, מקרי שימוש, וקשרים בין-תכונות.**
 
 ---
@@ -1309,6 +1311,19 @@ Orchestrated transfer of conversation context between Claude and Codex.
 | `Ctrl+Alt+T` | Toggle team panel |
 
 Mac: Replace `Ctrl` with `Cmd`
+
+---
+
+## XXX. Remote Control via MCP - חיבור סוכן AI ל-ClaUi
+
+ClaUi כולל שרת MCP, CLI וספריות Node.js ו-Python. בעזרתם Claude Code, Codex, Cursor, Claude Desktop, Windsurf, סוכנים בתוך VS Code או קוד משלכם יכולים לשלוט בו. הם יכולים לפתוח טאבים, לשלוח פרומפטים ולקרוא תשובות, לאשר בקשות, לשנות מודלים והגדרות, ולעקוב אחרי אירועים. בסך הכול יש 47 כלים.
+
+- **אין מה להפעיל:** כשמפעילים את VS Code, ClaUi מתקין את הכלים ל-`~/.claui/remote-control/`. הוא גם כותב את מדריך החיבור של המחשב הזה ל-`CONNECT.md`. השרת המקומי עולה מעצמו בבקשה הראשונה.
+- **Claude Code:** `node "$env:USERPROFILE\.claui\remote-control\bin\claui.js" register` (ב-PowerShell). אחר כך פותחים session חדש.
+- **Codex / Cursor / Claude Desktop / Windsurf:** `claui.js mcp-config --client <name>` מדפיס את ההגדרות.
+- **סוכנים בתוך VS Code:** אין צורך לעשות כלום.
+- **בדיקה:** `claui.js doctor`.
+- **מדריך מלא:** `Kingdom_of_Claudes_Beloved_MDs/AI_AGENT_INTEGRATION.md` בחבילת התוסף, וגם הסעיף "For AI agents and automation" ב-README.
 
 ---
 

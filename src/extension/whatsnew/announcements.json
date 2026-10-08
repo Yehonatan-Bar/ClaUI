@@ -2,6 +2,21 @@
   "$comment": "Bundled What's New entries shown after an update (toast + in-panel banner). Add ONE entry per release that ships user-visible features; bug-fix-only releases get no entry and stay silent. 'version' is the EARLIEST extension version allowed to show the entry (vsce publish patch may assign a higher number, that is fine). 'id' must be unique and must never change once shipped. Newest entries can go anywhere in the list; the extension sorts by version.",
   "announcements": [
     {
+      "id": "2026-10-08-ask-agent-how-to-connect",
+      "version": "0.1.245",
+      "date": "2026-10-08",
+      "title": "Ask your AI agent how to connect",
+      "titleHe": "שאלו את סוכן ה-AI איך להתחבר",
+      "highlights": [
+        "Ask Claude Code, Codex or any AI agent, in any language, how to connect it to ClaUi: the answer is in the documentation that ships with ClaUi.",
+        "Agents find the guide in the installed extension and in ~/.claui/README.md, with exact commands for Windows, macOS and Linux."
+      ],
+      "highlightsHe": [
+        "שאלו את Claude Code, את Codex או כל סוכן AI, בכל שפה, איך לחבר אותו ל-ClaUi: התשובה נמצאת בתיעוד שמגיע עם ClaUi.",
+        "הסוכנים מוצאים את המדריך בתוסף המותקן וב-~/.claui/README.md, עם פקודות מדויקות ל-Windows, ל-macOS ול-Linux."
+      ]
+    },
+    {
       "id": "2026-10-08-remote-control-zero-setup",
       "version": "0.1.244",
       "date": "2026-10-08",

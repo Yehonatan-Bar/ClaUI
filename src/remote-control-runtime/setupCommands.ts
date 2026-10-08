@@ -20,6 +20,7 @@ import {
   resolveNodeCommand,
   stdioServerEntry,
   writeConnectionFiles,
+  writeHomeReadme,
   type ConnectionInfo,
   type NodeCommand,
 } from '../remote-control-shared/runtimeInstaller';
@@ -74,7 +75,10 @@ export function runInstall(): Record<string, unknown> {
   }
   const result = installRuntime(__dirname, pkg.version);
   const node = resolveNodeCommand(currentProcessNodeCommand());
-  writeConnectionFiles(buildConnectionInfo(node, pkg.version));
+  const guide = path.join(__dirname, '..', '..', 'Kingdom_of_Claudes_Beloved_MDs', 'AI_AGENT_INTEGRATION.md');
+  const info = buildConnectionInfo(node, pkg.version, undefined, fs.existsSync(guide) ? path.resolve(guide) : undefined);
+  writeConnectionFiles(info);
+  writeHomeReadme(info);
   return {
     installed: true,
     version: result.version,

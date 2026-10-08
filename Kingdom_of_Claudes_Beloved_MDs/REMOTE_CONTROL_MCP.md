@@ -54,6 +54,25 @@ never starts a server: it serves the bundled catalog until the window is serving
 | Shell scripts | `node ~/.claui/remote-control/bin/claui.js <command>` |
 | Before VS Code was ever opened | `node ~/.vscode/extensions/jhonbar.claude-code-mirror-<version>/dist/remote-control-runtime/cli.js install` installs the launchers from the extension folder |
 
+### Agent-discoverable documentation (nothing injected)
+
+A user can ask Claude Code, Codex or any agent, in any language, how to connect an agent to ClaUi. The agent
+finds the answer in documentation ClaUi ships or writes in its own folder. Nothing is written into any agent's
+instructions or configuration (no CLAUDE.md / AGENTS.md edits, no skills, no system prompts).
+
+| Where an agent looks | What it finds |
+|----------------------|---------------|
+| Installed package `~/.vscode/extensions/jhonbar.claude-code-mirror-<version>/` | `README.md` ("For AI agents and automation": decision table + Windows PowerShell / macOS / Linux commands), `llms.txt` (LLM-oriented pointer file), `Kingdom_of_Claudes_Beloved_MDs/AI_AGENT_INTEGRATION.md` (the full guide; the only file of that folder packaged, via a `.vscodeignore` negation), `package.json` keywords `mcp`, `mcp-server`, `ai-agent`, `claui` |
+| `~/.claui/README.md` | Written at activation by `writeHomeReadme()`: what the folder is, the key commands, links to `CONNECT.md` and the full guide (absolute path inside the installed package) |
+| `~/.claui/remote-control/CONNECT.md`, `connection.json` | This machine's exact commands and configs; `guide` field / header line link the full guide |
+| Marketplace page and GitHub | The same README; `llms.txt` and the guide in the repository |
+
+`AI_AGENT_INTEGRATION.md` is user/agent-facing (static paths: `~`, `%USERPROFILE%`, `$env:USERPROFILE`). A test
+(`catalogAndPolicy.test.ts`) fails when it misses a tool of the catalog or when `llms.txt` / README stop linking it.
+Measured on 2026-10-08, each agent asked in Hebrew from an unrelated folder with read-only tools: Claude Code (a clean config
+with no memory and no access to the repo) and Codex CLI both found the installed package, read the guide (Codex also read
+README and `CONNECT.md`) and answered with the right Windows commands.
+
 ---
 
 ## Architecture
@@ -158,6 +177,7 @@ Webpack target `remote-control-runtime` emits `dist/remote-control-runtime/mcp-s
 | `bin/claui_client.py` | Python client (stdlib only); the installer embeds the tool catalog so `tools()` needs no server |
 | `connection.json` | Machine-readable connection manifest: stdio command/args/env, per-client configs (claude-code, claude-desktop, cursor, windsurf, codex, vscode, generic), CLI, libraries, HTTP routes |
 | `CONNECT.md` | The same as a guide for agents and humans (also opened by "Open connection guide") |
+| `../README.md` (`~/.claui/README.md`) | Index of the whole `~/.claui` folder for agents and humans, with the connect commands and links to `CONNECT.md` and the full guide |
 
 Override the root with `CLAUI_REMOTE_CONTROL_HOME` (used by tests).
 

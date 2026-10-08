@@ -1,5 +1,15 @@
 # ClaUi - Changelog
 
+## v0.1.246 - 2026-10-08
+
+**Feature: AI agents find how to connect to ClaUi in the shipped documentation**
+
+- Ask Claude Code, Codex or any agent, in any language, how to connect an agent to ClaUi: the answer is in documentation that ships with the extension (nothing is injected into any agent's instructions)
+- New `Kingdom_of_Claudes_Beloved_MDs/AI_AGENT_INTEGRATION.md` in the extension package: every agent (Claude Code, Codex, Cursor, Claude Desktop, Windsurf, VS Code agents, own code), Windows / macOS / Linux commands, all 47 tools, window selection, settings, troubleshooting
+- New `llms.txt` at the package root pointing agents to the guide; README "For AI agents and automation" rewritten with Windows-correct commands
+- `~/.claui/README.md` (written when VS Code starts) explains the folder and links the guides; `connection.json` / `CONNECT.md` link the full guide
+- Marketplace keywords: `mcp`, `mcp-server`, `ai-agent`, `claui`, `codex`, `automation`
+
 ## v0.1.245 - 2026-10-08
 
 **Feature: Remote Control works with zero setup for AI agents**
@@ -10,7 +20,7 @@
 - Every window has a discovery record (with `mode` / `serving`); clients pick the window by working directory or last focus, skip windows that are `off`, and never start a server just to list tools
 - CLI: `install`, `mcp-config [--client X]`, `register` (Claude Code, safe through `.cmd` shims; never drops a working registration), `doctor`, `connection`
 - Robustness: records of windows that died without cleanup are ignored once their heartbeat stops (PID reuse cannot redirect calls); a window picked by recency falls back to the next one, a window matching the working directory is never swapped for another project; Codex TOML and Claude Code snippets are escaped/ordered correctly
-- Docs: `REMOTE_CONTROL_MCP.md`, README "For AI agents and automation". Tests: `npm run test:remote-control` (46)
+- Docs: README "For AI agents and automation" and `Kingdom_of_Claudes_Beloved_MDs/AI_AGENT_INTEGRATION.md` (shipped with the extension). Tests: `npm run test:remote-control` (46)
 
 ## v0.1.244 - 2026-10-08
 
@@ -21,7 +31,7 @@
 - Remote prompts behave exactly like typing in the chat (they appear as normal chat bubbles); remote sends are serialized per tab
 - Security: 127.0.0.1 only, per-user token (`~/.claui/remote-control/token`) checked before any body is read, browser/Origin and non-loopback Host requests refused, no tokens in URLs, size/concurrency limits. `accessLevel: readOnly` blocks all state changes; credential, git, security-policy, file/URL and external-send actions need `allowSensitiveActions`; remote control can never reconfigure itself
 - `ClaUi: Remote Control (MCP) Setup` (also the status-bar `MCP` item): turn on/off, register with Claude Code, copy configs, access level, regenerate token, quick guide
-- Docs: `REMOTE_CONTROL_MCP.md`. Tests: `npm run test:remote-control`
+- Docs: README "For AI agents and automation" and `Kingdom_of_Claudes_Beloved_MDs/AI_AGENT_INTEGRATION.md` (shipped with the extension). Tests: `npm run test:remote-control`
 
 ## v0.1.241 - 2026-09-30
 

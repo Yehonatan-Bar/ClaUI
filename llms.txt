@@ -1,0 +1,18 @@
+# ClaUi
+
+> VS Code extension (Marketplace id JhonBar.claude-code-mirror, installed as ~/.vscode/extensions/jhonbar.claude-code-mirror-<version>) that gives Claude Code and Codex a multi-tab chat UI. It ships its own MCP server, a CLI and Node.js / Python client libraries so AI agents can control it: open chat tabs, send prompts and read the replies, answer approvals, change models and settings, search history, follow UI events. Nothing has to be turned on; VS Code with ClaUi must be running.
+
+## Connect an AI agent to ClaUi
+
+- [AI agent integration guide](Kingdom_of_Claudes_Beloved_MDs/AI_AGENT_INTEGRATION.md): Claude Code, Codex, Cursor, Claude Desktop, Windsurf, VS Code agents and custom code; all 47 tools; window selection; settings; troubleshooting
+- Machine-specific guide written when VS Code starts: ~/.claui/remote-control/CONNECT.md (machine-readable: ~/.claui/remote-control/connection.json)
+- Claude Code, one command: `node ~/.claui/remote-control/bin/claui.js register` (Windows PowerShell: `node "$env:USERPROFILE\.claui\remote-control\bin\claui.js" register`), then start a new Claude Code session
+- Codex / Cursor / Claude Desktop / Windsurf / any MCP client: `node ~/.claui/remote-control/bin/claui.js mcp-config --client <codex|cursor|claude-desktop|windsurf|generic>` prints the config to paste
+- Agents inside VS Code: nothing to do, ClaUi registers its MCP server with VS Code
+- Check the connection: `node ~/.claui/remote-control/bin/claui.js doctor`
+
+## Documentation
+
+- [README](README.md): features, commands, settings, "For AI agents and automation"
+- [CHANGELOG](CHANGELOG.md)
+- Source and issues: https://github.com/Yehonatan-Bar/ClaUI

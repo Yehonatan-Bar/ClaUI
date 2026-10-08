@@ -162,3 +162,36 @@ test('schedule time parsing', () => {
   assert.equal(parseScheduleTime('2026-10-08T12:00:00Z', now), Date.UTC(2026, 9, 8, 12, 0, 0));
   assert.throws(() => parseScheduleTime('tomorrow-ish', now), RemoteControlError);
 });
+
+test('shipped agent docs: the guide lists every tool, ships in the VSIX, and is linked from llms.txt + README', () => {
+  const guidePath = path.join(ROOT, 'Kingdom_of_Claudes_Beloved_MDs', 'AI_AGENT_INTEGRATION.md');
+  const guide = fs.readFileSync(guidePath, 'utf8');
+  for (const tool of TOOL_CATALOG) {
+    assert.ok(guide.includes(`\`${tool.name}\``), `AI_AGENT_INTEGRATION.md does not mention the tool ${tool.name}`);
+  }
+  assert.match(guide, new RegExp(`${TOOL_CATALOG.length} tools`), 'tool count in the guide is current');
+  const ignore = fs.readFileSync(path.join(ROOT, '.vscodeignore'), 'utf8');
+  assert.match(ignore, /^!Kingdom_of_Claudes_Beloved_MDs\/AI_AGENT_INTEGRATION\.md$/m, 'the guide is packaged');
+  const llms = fs.readFileSync(path.join(ROOT, 'llms.txt'), 'utf8');
+  const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
+  for (const doc of [llms, readme]) {
+    assert.ok(doc.includes('](Kingdom_of_Claudes_Beloved_MDs/AI_AGENT_INTEGRATION.md)'), 'links the guide');
+    assert.ok(doc.includes(String.raw`$env:USERPROFILE\.claui\remote-control\bin\claui.js`), 'has the Windows PowerShell form');
+  }
+});
+
+test('home README points agents to CONNECT.md and the full guide', async () => {
+  const { buildConnectionInfo, writeHomeReadme, writeConnectionFiles } = await import('../../src/remote-control-shared/runtimeInstaller');
+  const os = await import('node:os');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'claui-home-'));
+  const info = buildConnectionInfo({ command: process.execPath }, '0.1.246', path.join(home, 'bin'), '/opt/claui-ext/guide.md');
+  assert.equal(info.guide, '/opt/claui-ext/guide.md');
+  writeHomeReadme(info, home);
+  const readme = fs.readFileSync(path.join(home, 'README.md'), 'utf8');
+  assert.match(readme, /Connect an AI agent to ClaUi \(MCP\)/);
+  assert.match(readme, /\/opt\/claui-ext\/guide\.md/);
+  assert.match(readme, /register/);
+  writeConnectionFiles(info, home);
+  assert.match(fs.readFileSync(path.join(home, 'CONNECT.md'), 'utf8'), /Full guide \(all agents, every tool, troubleshooting\): \/opt\/claui-ext\/guide\.md/);
+  fs.rmSync(home, { recursive: true, force: true });
+});

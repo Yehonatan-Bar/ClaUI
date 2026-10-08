@@ -52,6 +52,9 @@ Global options:
   --instance <id|workspace>      Target a specific VS Code window (or env CLAUI_INSTANCE)
   --json                         Print raw JSON results
   -h, --help                     Show this help
+
+Docs: ~/.claui/remote-control/CONNECT.md (this machine) and the AI agent integration guide
+shipped with the extension (Kingdom_of_Claudes_Beloved_MDs/AI_AGENT_INTEGRATION.md).
 `;
 
 interface ParsedArgs {

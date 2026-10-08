@@ -35,6 +35,7 @@ import {
   resolveNodeCommand,
   stdioServerEntry,
   writeConnectionFiles,
+  writeHomeReadme,
   type NodeCommand,
 } from '../../remote-control-shared/runtimeInstaller';
 import { SERVER_INSTRUCTIONS } from '../../remote-control-shared/mcpProtocol';
@@ -445,7 +446,11 @@ export class RemoteControlService implements vscode.Disposable {
       const result = installRuntime(path.join(this.context.extensionPath, 'dist', 'remote-control-runtime'), version);
       // An older ClaUi window (e.g. VS Code Insiders on an older build) never rewrites the manifest of a newer runtime.
       if (result.becameCurrent) {
-        writeConnectionFiles(buildConnectionInfo(this.nodeCommand(), version));
+        // The full agent guide ships inside the extension package (see .vscodeignore).
+        const guide = path.join(this.context.extensionPath, 'Kingdom_of_Claudes_Beloved_MDs', 'AI_AGENT_INTEGRATION.md');
+        const info = buildConnectionInfo(this.nodeCommand(), version, undefined, fs.existsSync(guide) ? guide : undefined);
+        writeConnectionFiles(info);
+        writeHomeReadme(info);
       }
       this.log(`[RemoteControl] Runtime ${version} ready (${result.becameCurrent ? 'current' : 'a newer version is current'}); guide: ${CONNECT_DOC}`);
     } catch (err) {
