@@ -101,6 +101,7 @@ module.exports = [
     entry: {
       'mcp-server': './src/remote-control-runtime/mcpServerMain.ts',
       'cli': './src/remote-control-runtime/cli.ts',
+      'client': './src/remote-control-runtime/client.ts',
     },
     output: {
       path: path.resolve(__dirname, 'dist', 'remote-control-runtime'),

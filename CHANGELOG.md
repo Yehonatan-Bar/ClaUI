@@ -1,5 +1,17 @@
 # ClaUi - Changelog
 
+## v0.1.245 - 2026-10-08
+
+**Feature: Remote Control works with zero setup for AI agents**
+
+- New setting `claudeMirror.remoteControl.mode` (`auto` default, `on`, `off`) replaces `remoteControl.enabled`. In `auto` no port is open until a local tool asks; the first request makes the window start its server (on-demand start via `~/.claui/remote-control/requests/`, typically under a second). A 0.1.244 `enabled: true` still means `on`
+- Every activation installs the runtime into `~/.claui/remote-control/bin` (stdio MCP server, CLI, Node client `claui-client.js`, Python client `claui_client.py`) and writes `connection.json` + `CONNECT.md` with this machine's paths and ready-to-paste configs for Claude Code, Claude Desktop, Cursor, Windsurf, Codex, VS Code and generic MCP clients. Before activation was required only after turning the feature on
+- ClaUi registers its MCP server with VS Code's MCP registry (VS Code 1.101+), so agents inside VS Code get the tools with no configuration
+- Every window has a discovery record (with `mode` / `serving`); clients pick the window by working directory or last focus, skip windows that are `off`, and never start a server just to list tools
+- CLI: `install`, `mcp-config [--client X]`, `register` (Claude Code, safe through `.cmd` shims; never drops a working registration), `doctor`, `connection`
+- Robustness: records of windows that died without cleanup are ignored once their heartbeat stops (PID reuse cannot redirect calls); a window picked by recency falls back to the next one, a window matching the working directory is never swapped for another project; Codex TOML and Claude Code snippets are escaped/ordered correctly
+- Docs: `REMOTE_CONTROL_MCP.md`, README "For AI agents and automation". Tests: `npm run test:remote-control` (46)
+
 ## v0.1.244 - 2026-10-08
 
 **Feature: Remote Control via MCP (drive ClaUi from outside)**

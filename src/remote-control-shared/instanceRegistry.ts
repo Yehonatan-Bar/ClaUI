@@ -1,25 +1,40 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { INSTANCES_DIR, REMOTE_CONTROL_HOME, TOKEN_FILE, type InstanceInfo } from './protocol';
+import { INSTANCES_DIR, REMOTE_CONTROL_HOME, REQUESTS_DIR, TOKEN_FILE, type InstanceInfo } from './protocol';
 
 /**
  * Discovery of live ClaUi windows + the shared auth token.
  *
- * Every VS Code window (extension host) with remote control enabled writes
- * `<INSTANCES_DIR>/<instanceId>.json`; readers skip (and garbage-collect)
- * records whose owning process is gone. Must never import `vscode`.
+ * Every VS Code window (extension host) running ClaUi writes
+ * `<INSTANCES_DIR>/<instanceId>.json` (with `serving` / `port` telling whether its
+ * server is listening); readers skip (and garbage-collect) records whose owning
+ * process is gone. Clients ask a non-serving 'auto' window to start by dropping
+ * a request file into REQUESTS_DIR. Must never import `vscode`.
  */
 
 export interface RegistryPaths {
   instancesDir: string;
   tokenFile: string;
+  requestsDir: string;
 }
 
 export const DEFAULT_REGISTRY_PATHS: RegistryPaths = {
   instancesDir: INSTANCES_DIR,
   tokenFile: TOKEN_FILE,
+  requestsDir: REQUESTS_DIR,
 };
+
+/** Request files older than this are ignored and deleted. */
+const REQUEST_MAX_AGE_MS = 2 * 60_000;
+
+/**
+ * Windows rewrite their record every 30 s. A record whose heartbeat stopped
+ * belongs to a window that died without cleanup (its PID may since have been
+ * reused by an unrelated process): skipped after 2 min, deleted after 15 min.
+ */
+export const HEARTBEAT_STALE_MS = 2 * 60_000;
+const HEARTBEAT_DELETE_MS = 15 * 60_000;
 
 /** True when a process with this pid exists (EPERM = exists but not ours to signal). */
 export function isProcessAlive(pid: number): boolean {
@@ -63,6 +78,25 @@ export function removeInstance(instanceId: string, paths: RegistryPaths = DEFAUL
   }
 }
 
+/** One window's record (null when missing or unreadable). */
+export function readInstance(instanceId: string, paths: RegistryPaths = DEFAULT_REGISTRY_PATHS): InstanceInfo | null {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(instanceFilePath(instanceId, paths), 'utf8'));
+    return isInstanceInfo(parsed) ? normalizeInstance(parsed) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Records written before `mode` / `serving` existed count as serving when they carry a port. */
+function normalizeInstance(info: InstanceInfo): InstanceInfo {
+  return {
+    ...info,
+    mode: info.mode ?? 'on',
+    serving: typeof info.serving === 'boolean' ? info.serving && info.port > 0 : info.port > 0,
+  };
+}
+
 function isInstanceInfo(value: unknown): value is InstanceInfo {
   const v = value as Partial<InstanceInfo> | null;
   return (
@@ -75,12 +109,14 @@ function isInstanceInfo(value: unknown): value is InstanceInfo {
 }
 
 /**
- * All live instances, most recently focused first. Records of dead processes
- * are deleted as a side effect (they are leftovers of crashed windows).
+ * All live windows (serving or not), most recently focused first. Records of
+ * dead processes and long-stale heartbeats are deleted as a side effect (they
+ * are leftovers of crashed windows).
  */
 export function listInstances(
   paths: RegistryPaths = DEFAULT_REGISTRY_PATHS,
   aliveCheck: (pid: number) => boolean = isProcessAlive,
+  now: number = Date.now(),
 ): InstanceInfo[] {
   let entries: string[];
   try {
@@ -103,7 +139,8 @@ export function listInstances(
     if (!isInstanceInfo(parsed)) {
       continue;
     }
-    if (!aliveCheck(parsed.pid)) {
+    const heartbeatAge = now - (Date.parse(parsed.heartbeatAt || parsed.startedAt) || 0);
+    if (!aliveCheck(parsed.pid) || heartbeatAge > HEARTBEAT_DELETE_MS) {
       try {
         fs.unlinkSync(filePath);
       } catch {
@@ -111,7 +148,10 @@ export function listInstances(
       }
       continue;
     }
-    instances.push(parsed);
+    if (heartbeatAge > HEARTBEAT_STALE_MS) {
+      continue;
+    }
+    instances.push(normalizeInstance(parsed));
   }
   const rank = (i: InstanceInfo): number => Date.parse(i.lastFocusedAt || i.startedAt) || 0;
   return instances.sort((a, b) => rank(b) - rank(a));
@@ -163,16 +203,20 @@ export function selectInstance(
     );
   }
   if (opts.cwd) {
-    const cwd = opts.cwd;
-    // Deepest matching workspace wins (nested workspaces).
-    const matches = instances
-      .flatMap((i) => i.workspaceFolders.filter((f) => isInsideOrEqual(cwd, f)).map((f) => ({ i, depth: normalizePathForCompare(f).length })))
-      .sort((a, b) => b.depth - a.depth);
-    if (matches.length > 0) {
-      return matches[0].i;
+    const match = matchInstanceByCwd(instances, opts.cwd);
+    if (match) {
+      return match;
     }
   }
   return instances[0];
+}
+
+/** The window whose workspace folder contains `cwd` (deepest workspace wins), if any. */
+export function matchInstanceByCwd(instances: InstanceInfo[], cwd: string): InstanceInfo | undefined {
+  const matches = instances
+    .flatMap((i) => i.workspaceFolders.filter((f) => isInsideOrEqual(cwd, f)).map((f) => ({ i, depth: normalizePathForCompare(f).length })))
+    .sort((a, b) => b.depth - a.depth);
+  return matches[0]?.i;
 }
 
 // ---------------------------------------------------------------------------
@@ -221,3 +265,74 @@ export function newInstanceId(): string {
 }
 
 export { REMOTE_CONTROL_HOME };
+
+// ---------------------------------------------------------------------------
+// On-demand start requests
+// ---------------------------------------------------------------------------
+
+function sanitizeId(id: string): string {
+  return id.replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
+/** Ask window `instanceId` (mode 'auto') to start serving. Returns the request file path. */
+export function writeStartRequest(
+  instanceId: string,
+  client: string,
+  paths: RegistryPaths = DEFAULT_REGISTRY_PATHS,
+): string {
+  const fileName = `${sanitizeId(instanceId)}__${crypto.randomBytes(6).toString('hex')}.json`;
+  const filePath = path.join(paths.requestsDir, fileName);
+  writeFileAtomic(filePath, JSON.stringify({ requestedAt: new Date().toISOString(), clientPid: process.pid, client }));
+  return filePath;
+}
+
+/**
+ * Consume (read + delete) the pending start requests addressed to
+ * `instanceId`. Stale requests (any window) are deleted and not returned.
+ */
+export function takeStartRequests(
+  instanceId: string,
+  paths: RegistryPaths = DEFAULT_REGISTRY_PATHS,
+): Array<{ client: string; requestedAt: string }> {
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(paths.requestsDir);
+  } catch {
+    return [];
+  }
+  const prefix = `${sanitizeId(instanceId)}__`;
+  const out: Array<{ client: string; requestedAt: string }> = [];
+  const now = Date.now();
+  for (const entry of entries) {
+    if (!entry.endsWith('.json')) {
+      continue;
+    }
+    const filePath = path.join(paths.requestsDir, entry);
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(filePath);
+    } catch {
+      continue;
+    }
+    const mine = entry.startsWith(prefix);
+    const stale = now - stat.mtimeMs > REQUEST_MAX_AGE_MS;
+    if (!mine && !stale) {
+      continue;
+    }
+    let parsed: { client?: unknown; requestedAt?: unknown } = {};
+    try {
+      parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } catch {
+      /* deleted below anyway */
+    }
+    try {
+      fs.unlinkSync(filePath);
+    } catch {
+      continue; // another reader consumed it first
+    }
+    if (mine && !stale) {
+      out.push({ client: String(parsed.client ?? 'unknown'), requestedAt: String(parsed.requestedAt ?? '') });
+    }
+  }
+  return out;
+}

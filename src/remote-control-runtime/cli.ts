@@ -2,6 +2,7 @@ import { RemoteControlError } from '../remote-control-shared/protocol';
 import { TOOL_CATALOG } from '../remote-control-shared/toolCatalog';
 import { InstanceClient } from './instanceClient';
 import { LOCAL_TOOL_NAMES, runLocalTool } from './localTools';
+import { connectionInfoText, doctor, mcpConfigText, registerWithClaudeCode, runInstall } from './setupCommands';
 
 /**
  * ClaUi Remote Control - command-line client for scripts.
@@ -16,9 +17,19 @@ const HELP = `ClaUi Remote Control CLI
 
 Usage: claui <command> [options]
 
+Setup (for agents and scripts):
+  install                        Install the stable launchers (run from the extension folder; VS Code
+                                 does this automatically on startup)
+  mcp-config [--client NAME]     Print MCP client configs (claude-code, claude-desktop, cursor,
+                                 windsurf, codex, vscode, generic)
+  register [--scope user|project|local] [--claude PATH]
+                                 Add the ClaUi MCP server to Claude Code
+  doctor                         Check every link: runtime, token, VS Code windows, connection
+  connection                     Print the connection manifest (connection.json)
+
 Commands:
   status                         Window status (version, workspace, tabs, defaults)
-  instances                      Every ClaUi window with remote control on
+  instances                      Every VS Code window running ClaUi (mode / serving)
   tabs                           List open chat tabs
   tools                          List every tool with its description
   new [--provider P] [--model M] [--name N] [--prompt TEXT] [--no-wait]
@@ -138,7 +149,37 @@ async function main(): Promise<number> {
     return 0;
   }
   const asJson = args.flags.has('json');
-  const client = new InstanceClient({ preferred: flag(args, 'instance') ?? process.env.CLAUI_INSTANCE, cwd: process.cwd() });
+  switch (command) {
+    case 'install':
+      process.stdout.write(`${JSON.stringify(runInstall(), null, 2)}\n`);
+      return 0;
+    case 'mcp-config':
+      process.stdout.write(mcpConfigText(flag(args, 'client')));
+      return 0;
+    case 'connection':
+      process.stdout.write(`${connectionInfoText()}\n`);
+      return 0;
+    case 'register':
+      process.stdout.write(`${JSON.stringify(await registerWithClaudeCode(flag(args, 'scope') ?? 'user', flag(args, 'claude') ?? process.env.CLAUI_CLAUDE_CLI ?? 'claude'), null, 2)}\n`);
+      return 0;
+    default:
+      break;
+  }
+  const client = new InstanceClient({ preferred: flag(args, 'instance') ?? process.env.CLAUI_INSTANCE, cwd: process.cwd(), clientName: 'cli' });
+  if (command === 'doctor') {
+    const report = await doctor(client, flag(args, 'claude') ?? process.env.CLAUI_CLAUDE_CLI ?? 'claude');
+    if (asJson) {
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    } else {
+      for (const c of report.checks as Array<{ check: string; ok: boolean; detail: string }>) {
+        process.stdout.write(`${c.ok ? 'ok  ' : 'FAIL'}  ${c.check.padEnd(38)} ${c.detail}\n`);
+      }
+      for (const w of report.windows as Array<Record<string, unknown>>) {
+        process.stdout.write(`      window ${w.instanceId} ${w.workspace} v${w.version} mode=${w.mode} serving=${w.serving}\n`);
+      }
+    }
+    return report.ok ? 0 : 1;
+  }
   const tabArg = (): Record<string, unknown> => {
     const tab = flag(args, 'tab');
     return tab === undefined ? {} : { tabId: coerce(tab) };

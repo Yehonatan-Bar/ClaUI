@@ -63,7 +63,8 @@ $requiredManifestEntries = @(
   "claudeMirror.bridge.commandTools.diffBase",
   # Remote Control (MCP): setup command + settings
   "claudeMirror.remoteControl.setup",
-  "claudeMirror.remoteControl.enabled",
+  "claudeMirror.remoteControl.mode",
+  "mcpServerDefinitionProviders",
   "claudeMirror.remoteControl.allowSensitiveActions"
 )
 
@@ -148,7 +149,7 @@ foreach ($marker in @("claui_code_review", "notifications/initialized")) {
 
 # Remote Control runtime (stdio MCP server + CLI): copied by the extension into
 # ~/.claui/remote-control/bin, so both bundles must ship in the VSIX.
-foreach ($runtimeFile in @("mcp-server.js", "cli.js")) {
+foreach ($runtimeFile in @("mcp-server.js", "cli.js", "client.js")) {
   $runtimePath = Join-Path $installed.FullName "dist\remote-control-runtime\$runtimeFile"
   if (-not (Test-Path $runtimePath)) {
     throw "Installed Remote Control runtime bundle not found: $runtimePath"

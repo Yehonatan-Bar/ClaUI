@@ -16,8 +16,18 @@ export const CLAUI_HOME = process.env.CLAUI_HOME || path.join(os.homedir(), '.cl
 export const REMOTE_CONTROL_HOME =
   process.env.CLAUI_REMOTE_CONTROL_HOME || path.join(CLAUI_HOME, 'remote-control');
 
-/** One JSON file per live VS Code window (extension host) that serves remote control. */
+/** One JSON file per live VS Code window (extension host) running ClaUi, serving or not. */
 export const INSTANCES_DIR = path.join(REMOTE_CONTROL_HOME, 'instances');
+
+/**
+ * On-demand start requests. A client drops `<instanceId>__<nonce>.json` here;
+ * the window with that id (mode 'auto') starts its server within ~1 s.
+ */
+export const REQUESTS_DIR = path.join(REMOTE_CONTROL_HOME, 'requests');
+
+/** Machine-readable "how to connect" manifest + human/agent guide, rewritten on every activation. */
+export const CONNECTION_FILE = path.join(REMOTE_CONTROL_HOME, 'connection.json');
+export const CONNECT_DOC = path.join(REMOTE_CONTROL_HOME, 'CONNECT.md');
 
 /** Per-user shared secret. Every request must present it. */
 export const TOKEN_FILE = path.join(REMOTE_CONTROL_HOME, 'token');
@@ -26,6 +36,8 @@ export const TOKEN_FILE = path.join(REMOTE_CONTROL_HOME, 'token');
 export const BIN_DIR = path.join(REMOTE_CONTROL_HOME, 'bin');
 export const MCP_SERVER_BIN = path.join(BIN_DIR, 'claui-mcp.js');
 export const CLI_BIN = path.join(BIN_DIR, 'claui.js');
+export const NODE_CLIENT_BIN = path.join(BIN_DIR, 'claui-client.js');
+export const PYTHON_CLIENT_BIN = path.join(BIN_DIR, 'claui_client.py');
 
 /** Name used when registering the stdio server with MCP clients. */
 export const MCP_SERVER_NAME = 'claui';
@@ -49,10 +61,11 @@ export const ROUTES = {
   health: '/health',
 } as const;
 
-/** Discovery record written by each extension host while remote control is on. */
+/** Discovery record written by every extension host running ClaUi (serving or not). */
 export interface InstanceInfo {
   instanceId: string;
   pid: number;
+  /** 0 while not serving. */
   port: number;
   host: string;
   /** Absolute paths of the workspace folders open in that window. */
@@ -60,6 +73,10 @@ export interface InstanceInfo {
   workspaceName: string;
   extensionVersion: string;
   accessLevel: AccessLevel;
+  /** 'auto' = starts serving when a client asks, 'on' = always serving, 'off' = never. */
+  mode: RemoteControlMode;
+  /** True while the localhost server is listening (port > 0). */
+  serving: boolean;
   startedAt: string;
   /** Rewritten periodically (liveness / record recreation). */
   heartbeatAt: string;
@@ -68,6 +85,7 @@ export interface InstanceInfo {
 }
 
 export type AccessLevel = 'full' | 'readOnly';
+export type RemoteControlMode = 'auto' | 'on' | 'off';
 
 /** JSON body returned by POST /api/tools/<name>. */
 export type ToolCallResponse =

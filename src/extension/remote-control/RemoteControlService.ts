@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { spawnSync } from 'child_process';
 import type { TabManager } from '../session/TabManager';
 import type { SessionStore } from '../session/SessionStore';
 import type { TabGroupStore } from '../session/TabGroupStore';
@@ -13,14 +12,12 @@ import { TabStateTracker } from './core/TabStateTracker';
 import { RemoteControlHttpServer, type RemoteControlBackend } from './core/RemoteControlHttpServer';
 import { RemoteControlToolHandlers } from './RemoteControlToolHandlers';
 import {
-  BIN_DIR,
-  CLI_BIN,
-  MCP_SERVER_BIN,
+  CONNECT_DOC,
   MCP_SERVER_NAME,
-  REMOTE_CONTROL_HOME,
-  ROUTES,
+  REQUESTS_DIR,
   type AccessLevel,
   type InstanceInfo,
+  type RemoteControlMode,
 } from '../../remote-control-shared/protocol';
 import {
   ensureToken,
@@ -28,19 +25,31 @@ import {
   readToken,
   regenerateToken,
   removeInstance,
+  takeStartRequests,
   writeInstance,
 } from '../../remote-control-shared/instanceRegistry';
+import {
+  buildConnectionInfo,
+  clientConfigs,
+  installRuntime,
+  resolveNodeCommand,
+  stdioServerEntry,
+  writeConnectionFiles,
+  type NodeCommand,
+} from '../../remote-control-shared/runtimeInstaller';
 import { SERVER_INSTRUCTIONS } from '../../remote-control-shared/mcpProtocol';
 import { TOOL_CATALOG } from '../../remote-control-shared/toolCatalog';
 
 /** Bumped when the HTTP/tool contract changes incompatibly (the stdio runtime checks it). */
 export const REMOTE_CONTROL_PROTOCOL_VERSION = 1;
 
+/** Provider id declared in package.json `contributes.mcpServerDefinitionProviders`. */
+const VSCODE_MCP_PROVIDER_ID = 'claui.remoteControl';
 const HEARTBEAT_MS = 30_000;
-const RUNTIME_FILES = ['mcp-server.js', 'cli.js'];
+const REQUEST_POLL_MS = 3_000;
 
 interface RemoteControlSettings {
-  enabled: boolean;
+  mode: RemoteControlMode;
   port: number;
   accessLevel: AccessLevel;
   allowSensitiveActions: boolean;
@@ -52,17 +61,19 @@ interface RawWaiter {
   resolve: (msg: Record<string, unknown> | null) => void;
 }
 
-interface NodeCommand {
-  command: string;
-  env?: Record<string, string>;
-}
-
 /**
- * ClaUi Remote Control (MCP): lets external scripts and MCP clients drive the
- * extension. Owns the per-tab state tracker (always on, fed by the tab tap),
- * and — while `claudeMirror.remoteControl.enabled` is true — the localhost
- * control server, the instance discovery record and the stable runtime copy.
- * Detail doc: Kingdom_of_Claudes_Beloved_MDs/REMOTE_CONTROL_MCP.md
+ * ClaUi Remote Control (MCP): lets agents, MCP clients and scripts drive the
+ * extension with zero setup after installing it.
+ *
+ * On every activation (any mode except where noted):
+ *  - installs the runtime (stdio MCP server, CLI, Node/Python clients) and the
+ *    connection manifest into ~/.claui/remote-control (stable paths);
+ *  - writes this window's instance record (serving or not);
+ *  - registers the MCP server with VS Code itself (agents inside VS Code see it);
+ *  - feeds the per-tab state tracker from the tab tap.
+ * The localhost server itself runs per `claudeMirror.remoteControl.mode`:
+ * 'auto' (default) = starts on the first client request, 'on' = always,
+ * 'off' = never. Detail doc: Kingdom_of_Claudes_Beloved_MDs/REMOTE_CONTROL_MCP.md
  */
 export class RemoteControlService implements vscode.Disposable {
   private readonly tracker = new TabStateTracker();
@@ -76,12 +87,14 @@ export class RemoteControlService implements vscode.Disposable {
   private lastFocusedAt = vscode.window.state.focused ? new Date().toISOString() : this.startedAt;
   /** Random per-activation value echoed by /api/status so clients can detect PID reuse. */
   private readonly startupNonce = crypto.randomBytes(8).toString('hex');
+  /** Stable for the life of this extension host (clients address the window by it). */
+  private readonly instanceId = newInstanceId();
   private server: RemoteControlHttpServer | null = null;
-  private instanceId: string | null = null;
   private token = '';
-  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private lifecycle: Promise<void> = Promise.resolve();
   private lastTabSnapshot = new Map<string, { name: string; busy: boolean; sessionId: string | null; sleepState: string }>();
-  private applyQueue: Promise<void> = Promise.resolve();
+  private nodeCommandCache: NodeCommand | null = null;
+  private readonly mcpDefinitionsChanged = new vscode.EventEmitter<void>();
   private disposed = false;
 
   constructor(
@@ -105,21 +118,29 @@ export class RemoteControlService implements vscode.Disposable {
       instanceSummary: () => this.instanceSummary(),
     });
 
-    // The tracker is always fed, so transcripts are complete even when remote
-    // control is switched on mid-session. Events are recorded only while serving.
+    // The tracker is always fed, so transcripts are complete whenever a client
+    // connects. Events are recorded only while serving.
     remoteControlTap.setListener((tabId, direction, message) => this.onTap(tabId, direction, message));
 
     this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 98);
     this.statusBarItem.command = 'claudeMirror.remoteControl.setup';
 
+    try {
+      this.token = ensureToken();
+    } catch (err) {
+      this.log(`[RemoteControl] Could not create the token file: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
     this.disposables.push(
       this.statusBarItem,
+      this.mcpDefinitionsChanged,
       tabManager.onTreeStateChanged(() => this.emitTabLifecycleEvents()),
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration('claudeMirror.remoteControl')) {
-          this.scheduleApply();
+          this.enqueue(() => this.applySettings());
         }
       }),
+      vscode.workspace.onDidChangeWorkspaceFolders(() => this.writeInstanceRecord()),
       vscode.window.onDidChangeWindowState((e) => {
         if (e.focused) {
           this.lastFocusedAt = new Date().toISOString();
@@ -128,7 +149,15 @@ export class RemoteControlService implements vscode.Disposable {
       }),
       ...this.registerCommands(),
     );
-    this.scheduleApply();
+
+    this.registerVsCodeMcpProvider();
+    this.watchStartRequests();
+    const heartbeat = setInterval(() => this.writeInstanceRecord(false), HEARTBEAT_MS);
+    this.disposables.push({ dispose: () => clearInterval(heartbeat) });
+    // Runtime install probes for `node` (a short synchronous child process); keep it off the activation path.
+    const installTimer = setTimeout(() => this.prepareRuntime(), 1500);
+    this.disposables.push({ dispose: () => clearTimeout(installTimer) });
+    this.enqueue(() => this.applySettings());
   }
 
   // -------------------------------------------------------------------------
@@ -139,17 +168,39 @@ export class RemoteControlService implements vscode.Disposable {
     const cfg = vscode.workspace.getConfiguration('claudeMirror.remoteControl');
     const port = cfg.get<number>('port', 0);
     return {
-      enabled: cfg.get<boolean>('enabled', false),
+      mode: this.effectiveMode(cfg),
       port: Number.isInteger(port) && port >= 0 && port <= 65535 ? port : 0,
       accessLevel: cfg.get<string>('accessLevel', 'full') === 'readOnly' ? 'readOnly' : 'full',
       allowSensitiveActions: cfg.get<boolean>('allowSensitiveActions', false),
     };
   }
 
-  private scheduleApply(): void {
-    this.applyQueue = this.applyQueue.then(() => this.applySettings()).catch((err) => {
-      this.log(`[RemoteControl] apply failed: ${err instanceof Error ? err.message : String(err)}`);
+  /**
+   * `mode` when set; otherwise the 0.1.244 boolean `enabled` (true = 'on',
+   * explicit false = 'off'); otherwise 'auto'.
+   */
+  private effectiveMode(cfg: vscode.WorkspaceConfiguration): RemoteControlMode {
+    const inspected = cfg.inspect<string>('mode');
+    const explicit = inspected?.workspaceFolderValue ?? inspected?.workspaceValue ?? inspected?.globalValue;
+    if (explicit === 'auto' || explicit === 'on' || explicit === 'off') {
+      return explicit;
+    }
+    const legacy = cfg.get<unknown>('enabled');
+    if (legacy === true) {
+      return 'on';
+    }
+    if (legacy === false) {
+      return 'off';
+    }
+    return 'auto';
+  }
+
+  /** Serialize start/stop work so concurrent triggers never race. */
+  private enqueue(work: () => Promise<void>): Promise<void> {
+    this.lifecycle = this.lifecycle.then(work).catch((err) => {
+      this.log(`[RemoteControl] ${err instanceof Error ? err.message : String(err)}`);
     });
+    return this.lifecycle;
   }
 
   private async applySettings(): Promise<void> {
@@ -157,28 +208,36 @@ export class RemoteControlService implements vscode.Disposable {
       return;
     }
     const settings = this.readSettings();
-    const portChanged = this.server !== null && settings.port !== 0 && settings.port !== this.server.port;
-    if (!settings.enabled || portChanged) {
-      await this.stopServer();
+    if (settings.mode === 'off') {
+      await this.stopServer('mode is off');
+    } else if (this.server && settings.port !== 0 && settings.port !== this.server.port) {
+      await this.stopServer('port setting changed');
+      await this.startServer('port setting changed');
+    } else if (settings.mode === 'on' && !this.server) {
+      await this.startServer('mode is on');
     }
-    if (settings.enabled && !this.server) {
-      await this.startServer(settings);
-    }
-    if (this.server) {
-      this.writeInstanceRecord();
-    }
+    this.writeInstanceRecord();
     this.updateStatusBar();
+    this.mcpDefinitionsChanged.fire();
   }
 
-  private async startServer(settings: RemoteControlSettings): Promise<void> {
-    this.token = ensureToken();
-    this.instanceId = this.instanceId ?? newInstanceId();
+  /** Start serving now unless the mode is 'off'. Resolves to whether the server runs. */
+  async ensureServing(reason: string): Promise<boolean> {
+    await this.enqueue(async () => {
+      if (!this.server && !this.disposed && this.readSettings().mode !== 'off') {
+        await this.startServer(reason);
+        this.writeInstanceRecord();
+        this.updateStatusBar();
+      }
+    });
+    return !!this.server;
+  }
+
+  private async startServer(reason: string): Promise<void> {
+    const settings = this.readSettings();
+    this.token = readToken() ?? ensureToken();
     const backend: RemoteControlBackend = {
-      identity: {
-        name: 'claui',
-        version: this.extensionVersion(),
-        instructions: SERVER_INSTRUCTIONS,
-      },
+      identity: { name: 'claui', version: this.extensionVersion(), instructions: SERVER_INSTRUCTIONS },
       instanceId: this.instanceId,
       listTools: () => TOOL_CATALOG.filter((t) => t.scope === 'instance'),
       callTool: async (name, args, ctx) => {
@@ -205,24 +264,15 @@ export class RemoteControlService implements vscode.Disposable {
       return;
     }
     this.server = server;
-    this.installRuntime();
     this.lastTabSnapshot = this.snapshotTabs();
-    this.heartbeatTimer = setInterval(() => this.writeInstanceRecord(false), HEARTBEAT_MS);
     this.log(
-      `[RemoteControl] Serving on http://127.0.0.1:${server.port} (instance ${this.instanceId}, access=${settings.accessLevel}` +
-        `${settings.allowSensitiveActions ? ', sensitive actions allowed' : ''})`,
+      `[RemoteControl] Serving on http://127.0.0.1:${server.port} (instance ${this.instanceId}, ${reason}, ` +
+        `access=${settings.accessLevel}${settings.allowSensitiveActions ? ', sensitive actions allowed' : ''})`,
     );
-    this.eventLog.record({ tabId: null, direction: 'system', type: 'remoteControlStarted', data: { port: server.port } });
+    this.eventLog.record({ tabId: null, direction: 'system', type: 'remoteControlStarted', data: { port: server.port, reason } });
   }
 
-  private async stopServer(): Promise<void> {
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
-    }
-    if (this.instanceId) {
-      removeInstance(this.instanceId);
-    }
+  private async stopServer(reason: string): Promise<void> {
     const server = this.server;
     this.server = null;
     for (const waiter of this.rawWaiters) {
@@ -231,14 +281,15 @@ export class RemoteControlService implements vscode.Disposable {
     this.rawWaiters.clear();
     if (server) {
       await server.stop();
-      this.log('[RemoteControl] Server stopped');
+      this.log(`[RemoteControl] Server stopped (${reason})`);
     }
   }
 
   dispose(): void {
     this.disposed = true;
     remoteControlTap.setListener(null);
-    void this.stopServer();
+    removeInstance(this.instanceId);
+    void this.stopServer('window closing');
     for (const d of this.disposables) {
       try {
         d.dispose();
@@ -262,6 +313,7 @@ export class RemoteControlService implements vscode.Disposable {
       extensionVersion: this.extensionVersion(),
       pid: process.pid,
       port: this.server?.port ?? null,
+      mode: settings.mode,
       accessLevel: settings.accessLevel,
       allowSensitiveActions: settings.allowSensitiveActions,
       workspaceName: vscode.workspace.name ?? null,
@@ -278,28 +330,32 @@ export class RemoteControlService implements vscode.Disposable {
       instanceId: this.instanceId,
       extensionVersion: this.extensionVersion(),
       pid: process.pid,
+      mode: settings.mode,
       accessLevel: settings.accessLevel,
       allowSensitiveActions: settings.allowSensitiveActions,
       endpoint: this.server ? `http://127.0.0.1:${this.server.port}` : null,
     };
   }
 
+  /** This window's discovery record, written in every mode (serving or not). */
   private writeInstanceRecord(log = true): void {
-    if (!this.server || !this.instanceId) {
+    if (this.disposed) {
       return;
     }
-    const now = new Date().toISOString();
+    const settings = this.readSettings();
     const info: InstanceInfo = {
       instanceId: this.instanceId,
       pid: process.pid,
-      port: this.server.port,
+      port: this.server?.port ?? 0,
       host: '127.0.0.1',
       workspaceFolders: (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath),
       workspaceName: vscode.workspace.name ?? '(no folder)',
       extensionVersion: this.extensionVersion(),
-      accessLevel: this.readSettings().accessLevel,
+      accessLevel: settings.accessLevel,
+      mode: settings.mode,
+      serving: !!this.server,
       startedAt: this.startedAt,
-      heartbeatAt: now,
+      heartbeatAt: new Date().toISOString(),
       lastFocusedAt: this.lastFocusedAt,
     };
     try {
@@ -319,9 +375,129 @@ export class RemoteControlService implements vscode.Disposable {
     const settings = this.readSettings();
     this.statusBarItem.text = settings.accessLevel === 'readOnly' ? '$(plug) MCP (read-only)' : '$(plug) MCP';
     this.statusBarItem.tooltip =
-      `ClaUi Remote Control is ON\nhttp://127.0.0.1:${this.server.port}  (instance ${this.instanceId})\n` +
-      `Access: ${settings.accessLevel}${settings.allowSensitiveActions ? ' + sensitive actions' : ''}\nClick for setup options`;
+      `ClaUi Remote Control is serving local clients\nhttp://127.0.0.1:${this.server.port}  (instance ${this.instanceId})\n` +
+      `Mode: ${settings.mode}  Access: ${settings.accessLevel}${settings.allowSensitiveActions ? ' + sensitive actions' : ''}\n` +
+      'Click for setup options';
     this.statusBarItem.show();
+  }
+
+  // -------------------------------------------------------------------------
+  // On-demand start (mode 'auto'): clients drop a request file for this window
+  // -------------------------------------------------------------------------
+
+  private watchStartRequests(): void {
+    try {
+      fs.mkdirSync(REQUESTS_DIR, { recursive: true, mode: 0o700 });
+    } catch {
+      /* the poll below still works once the directory exists */
+    }
+    try {
+      const watcher = fs.watch(REQUESTS_DIR, () => this.checkStartRequests());
+      watcher.on('error', () => undefined);
+      this.disposables.push({ dispose: () => watcher.close() });
+    } catch {
+      /* fs.watch unsupported here: rely on polling */
+    }
+    const poll = setInterval(() => this.checkStartRequests(), REQUEST_POLL_MS);
+    this.disposables.push({ dispose: () => clearInterval(poll) });
+    this.checkStartRequests();
+  }
+
+  private checkStartRequests(): void {
+    if (this.disposed) {
+      return;
+    }
+    let requests: Array<{ client: string }> = [];
+    try {
+      requests = takeStartRequests(this.instanceId);
+    } catch {
+      return;
+    }
+    if (requests.length === 0 || this.server) {
+      return;
+    }
+    if (this.readSettings().mode === 'off') {
+      this.log(`[RemoteControl] Ignored a start request from ${requests[0].client}: mode is off`);
+      return;
+    }
+    void this.ensureServing(`started on demand by ${requests[0].client}`);
+  }
+
+  // -------------------------------------------------------------------------
+  // Zero-setup availability: runtime install + VS Code MCP registration
+  // -------------------------------------------------------------------------
+
+  private nodeCommand(): NodeCommand {
+    if (!this.nodeCommandCache) {
+      // Absolute node on PATH, else VS Code's own Electron binary running as Node.
+      this.nodeCommandCache = resolveNodeCommand({ command: process.execPath, env: { ELECTRON_RUN_AS_NODE: '1' } });
+    }
+    return this.nodeCommandCache;
+  }
+
+  /** Install launchers + clients into ~/.claui/remote-control/bin and refresh connection.json / CONNECT.md. */
+  private prepareRuntime(): void {
+    if (this.disposed) {
+      return;
+    }
+    const version = this.extensionVersion();
+    try {
+      const result = installRuntime(path.join(this.context.extensionPath, 'dist', 'remote-control-runtime'), version);
+      // An older ClaUi window (e.g. VS Code Insiders on an older build) never rewrites the manifest of a newer runtime.
+      if (result.becameCurrent) {
+        writeConnectionFiles(buildConnectionInfo(this.nodeCommand(), version));
+      }
+      this.log(`[RemoteControl] Runtime ${version} ready (${result.becameCurrent ? 'current' : 'a newer version is current'}); guide: ${CONNECT_DOC}`);
+    } catch (err) {
+      this.log(`[RemoteControl] Runtime install failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  /**
+   * Register the stdio server with VS Code's MCP registry (VS Code 1.101+), so
+   * agents running inside VS Code get the ClaUi tools with no configuration.
+   * The server is pinned to this window (CLAUI_INSTANCE) and started on demand.
+   */
+  private registerVsCodeMcpProvider(): void {
+    const api = vscode as unknown as {
+      lm?: { registerMcpServerDefinitionProvider?: (id: string, provider: unknown) => vscode.Disposable };
+      McpStdioServerDefinition?: new (
+        label: string,
+        command: string,
+        args?: string[],
+        env?: Record<string, string | number | null>,
+        version?: string,
+      ) => unknown;
+    };
+    const register = api.lm?.registerMcpServerDefinitionProvider;
+    const Definition = api.McpStdioServerDefinition;
+    if (typeof register !== 'function' || typeof Definition !== 'function') {
+      this.log('[RemoteControl] VS Code MCP server registration not available in this VS Code version');
+      return;
+    }
+    const script = path.join(this.context.extensionPath, 'dist', 'remote-control-runtime', 'mcp-server.js');
+    try {
+      this.disposables.push(
+        register.call(api.lm, VSCODE_MCP_PROVIDER_ID, {
+          onDidChangeMcpServerDefinitions: this.mcpDefinitionsChanged.event,
+          provideMcpServerDefinitions: () =>
+            this.readSettings().mode === 'off'
+              ? []
+              : [
+                  new Definition(
+                    'ClaUi',
+                    process.execPath,
+                    [script],
+                    { ELECTRON_RUN_AS_NODE: '1', CLAUI_INSTANCE: this.instanceId },
+                    this.extensionVersion(),
+                  ),
+                ],
+        }),
+      );
+      this.log('[RemoteControl] Registered the ClaUi MCP server with VS Code');
+    } catch (err) {
+      this.log(`[RemoteControl] VS Code MCP registration failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -417,159 +593,13 @@ export class RemoteControlService implements vscode.Disposable {
   }
 
   // -------------------------------------------------------------------------
-  // Stable runtime install (versioned dirs + launchers that survive updates)
+  // Setup UI (palette commands + status bar menu)
   // -------------------------------------------------------------------------
-
-  private installRuntime(): void {
-    const sourceDir = path.join(this.context.extensionPath, 'dist', 'remote-control-runtime');
-    const version = this.extensionVersion();
-    const targetDir = path.join(BIN_DIR, version);
-    try {
-      fs.mkdirSync(targetDir, { recursive: true });
-      for (const file of RUNTIME_FILES) {
-        const src = path.join(sourceDir, file);
-        if (!fs.existsSync(src)) {
-          this.log(`[RemoteControl] Runtime bundle missing: ${src}`);
-          return;
-        }
-        const content = fs.readFileSync(src);
-        const dest = path.join(targetDir, file);
-        const same =
-          fs.existsSync(dest) &&
-          crypto.createHash('sha256').update(fs.readFileSync(dest)).digest('hex') ===
-            crypto.createHash('sha256').update(content).digest('hex');
-        if (!same) {
-          const tmp = `${dest}.${process.pid}.tmp`;
-          fs.writeFileSync(tmp, content);
-          fs.renameSync(tmp, dest);
-        }
-      }
-      const currentFile = path.join(BIN_DIR, 'current.json');
-      const tmpCurrent = `${currentFile}.${process.pid}.tmp`;
-      fs.writeFileSync(tmpCurrent, JSON.stringify({ version, dir: targetDir, installedAt: new Date().toISOString() }, null, 2));
-      fs.renameSync(tmpCurrent, currentFile);
-      this.writeLauncher(MCP_SERVER_BIN, 'mcp-server.js', 'ClaUi Remote Control MCP server (stdio)');
-      this.writeLauncher(CLI_BIN, 'cli.js', 'ClaUi Remote Control command-line client');
-      this.pruneOldRuntimes(version);
-    } catch (err) {
-      this.log(`[RemoteControl] Runtime install failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-
-  private writeLauncher(launcherPath: string, entry: string, title: string): void {
-    const content =
-      `#!/usr/bin/env node\n` +
-      `// ${title}.\n` +
-      `// Generated by the ClaUi VS Code extension: a stable entry point that loads the\n` +
-      `// newest installed runtime, so MCP client configs survive extension updates.\n` +
-      `'use strict';\n` +
-      `const fs = require('fs');\n` +
-      `const path = require('path');\n` +
-      `let current;\n` +
-      `try {\n` +
-      `  current = JSON.parse(fs.readFileSync(path.join(__dirname, 'current.json'), 'utf8'));\n` +
-      `} catch (err) {\n` +
-      `  process.stderr.write('ClaUi runtime not installed. Enable Remote Control in VS Code (ClaUi: Remote Control Setup).\\n');\n` +
-      `  process.exit(1);\n` +
-      `}\n` +
-      `require(path.join(current.dir, ${JSON.stringify(entry)}));\n`;
-    const existing = fs.existsSync(launcherPath) ? fs.readFileSync(launcherPath, 'utf8') : '';
-    if (existing !== content) {
-      const tmp = `${launcherPath}.${process.pid}.tmp`;
-      fs.writeFileSync(tmp, content, 'utf8');
-      fs.renameSync(tmp, launcherPath);
-    }
-  }
-
-  /** Keep the current and the newest previous version directory; delete older ones. */
-  private pruneOldRuntimes(currentVersion: string): void {
-    try {
-      const dirs = fs
-        .readdirSync(BIN_DIR, { withFileTypes: true })
-        .filter((d) => d.isDirectory() && d.name !== currentVersion && /^\d+\.\d+\.\d+/.test(d.name))
-        .map((d) => d.name)
-        .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-      for (const old of dirs.slice(1)) {
-        fs.rmSync(path.join(BIN_DIR, old), { recursive: true, force: true });
-      }
-    } catch {
-      /* best effort */
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // Client configuration helpers
-  // -------------------------------------------------------------------------
-
-  /** Absolute node path when available; otherwise VS Code's own Electron binary in node mode. */
-  private resolveNodeCommand(): NodeCommand {
-    try {
-      const probe = process.platform === 'win32' ? 'where' : 'which';
-      const res = spawnSync(probe, ['node'], { encoding: 'utf8', timeout: 4000, windowsHide: true });
-      const first = (res.stdout || '').split(/\r?\n/).map((l) => l.trim()).find((l) => l && fs.existsSync(l));
-      if (res.status === 0 && first) {
-        return { command: first };
-      }
-    } catch {
-      /* fall through */
-    }
-    return { command: process.execPath, env: { ELECTRON_RUN_AS_NODE: '1' } };
-  }
-
-  private stdioServerConfig(): { command: string; args: string[]; env?: Record<string, string> } {
-    const node = this.resolveNodeCommand();
-    return { command: node.command, args: [MCP_SERVER_BIN], ...(node.env ? { env: node.env } : {}) };
-  }
-
-  private quote(value: string): string {
-    return /[\s"'&|<>^]/.test(value) ? `"${value.replace(/"/g, '\\"')}"` : value;
-  }
-
-  private claudeCodeCommand(): string {
-    const cfg = this.stdioServerConfig();
-    const envArgs = Object.entries(cfg.env ?? {}).map(([k, v]) => `-e ${k}=${v}`).join(' ');
-    return `claude mcp add --scope user ${envArgs ? `${envArgs} ` : ''}${MCP_SERVER_NAME} -- ${this.quote(cfg.command)} ${this.quote(MCP_SERVER_BIN)}`;
-  }
-
-  private desktopConfigJson(): string {
-    return JSON.stringify({ mcpServers: { [MCP_SERVER_NAME]: this.stdioServerConfig() } }, null, 2);
-  }
-
-  private vscodeMcpJson(): string {
-    return JSON.stringify({ servers: { [MCP_SERVER_NAME]: { type: 'stdio', ...this.stdioServerConfig() } } }, null, 2);
-  }
-
-  private async ensureEnabledFor(action: string): Promise<boolean> {
-    if (this.server) {
-      return true;
-    }
-    const choice = await vscode.window.showInformationMessage(
-      `ClaUi Remote Control is off. Turn it on to ${action}?`,
-      'Enable',
-      'Cancel',
-    );
-    if (choice !== 'Enable') {
-      return false;
-    }
-    await vscode.workspace.getConfiguration('claudeMirror.remoteControl').update('enabled', true, vscode.ConfigurationTarget.Global);
-    await this.waitForServer();
-    return !!this.server;
-  }
-
-  private async waitForServer(): Promise<void> {
-    for (let i = 0; i < 40 && !this.server; i++) {
-      await new Promise((r) => setTimeout(r, 100));
-    }
-    await this.applyQueue;
-  }
 
   private async registerWithClaudeCode(): Promise<void> {
-    if (!(await this.ensureEnabledFor('register it with Claude Code'))) {
-      return;
-    }
     const cliPath = vscode.workspace.getConfiguration('claudeMirror').get<string>('cliPath', 'claude') || 'claude';
     const service = new McpCliService(() => cliPath, (m) => this.log(`[RemoteControl][mcp-cli] ${m}`));
-    const cfg = this.stdioServerConfig();
+    const entry = stdioServerEntry(this.nodeCommand());
     try {
       try {
         await service.removeServer(MCP_SERVER_NAME, 'user');
@@ -578,7 +608,7 @@ export class RemoteControlService implements vscode.Disposable {
       }
       await service.addServer(
         MCP_SERVER_NAME,
-        { transport: 'stdio', command: cfg.command, args: cfg.args, env: cfg.env, raw: { type: 'stdio', ...cfg } },
+        { transport: 'stdio', command: entry.command, args: entry.args, env: entry.env, raw: { type: 'stdio', ...entry } },
         'user',
       );
       void vscode.window.showInformationMessage(
@@ -588,92 +618,59 @@ export class RemoteControlService implements vscode.Disposable {
       const message = err instanceof Error ? err.message : String(err);
       const pick = await vscode.window.showErrorMessage(`Could not register with Claude Code: ${message}`, 'Copy command instead');
       if (pick) {
-        await vscode.env.clipboard.writeText(this.claudeCodeCommand());
+        await vscode.env.clipboard.writeText(clientConfigs(this.nodeCommand())['claude-code'].config);
       }
     }
   }
 
   private async openQuickGuide(): Promise<void> {
-    const port = this.server?.port;
-    const lines = [
-      '# ClaUi Remote Control (MCP) - quick guide',
-      '',
-      `Status: ${this.server ? `ON at http://127.0.0.1:${port} (instance ${this.instanceId})` : 'OFF'}`,
-      '',
-      '## MCP clients (stdio, recommended)',
-      '',
-      'Claude Code:',
-      '',
-      '```',
-      this.claudeCodeCommand(),
-      '```',
-      '',
-      'Claude Desktop / Cursor / Windsurf (mcpServers JSON):',
-      '',
-      '```json',
-      this.desktopConfigJson(),
-      '```',
-      '',
-      'VS Code (.vscode/mcp.json):',
-      '',
-      '```json',
-      this.vscodeMcpJson(),
-      '```',
-      '',
-      '## Scripts',
-      '',
-      `CLI: \`node "${CLI_BIN}" help\``,
-      '',
-      '```',
-      `node "${CLI_BIN}" tabs`,
-      `node "${CLI_BIN}" send "Summarize the open diff" --tab 1`,
-      `node "${CLI_BIN}" call create_tab --json "{\\"provider\\":\\"claude\\",\\"prompt\\":\\"hello\\"}"`,
-      `node "${CLI_BIN}" events --follow`,
-      '```',
-      '',
-      `HTTP (token in ${path.join(REMOTE_CONTROL_HOME, 'token')}):`,
-      '',
-      '```',
-      `curl -s -H "Authorization: Bearer <token>" http://127.0.0.1:${port ?? '<port>'}${ROUTES.tools}`,
-      `curl -s -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d "{\\"text\\":\\"hi\\"}" http://127.0.0.1:${port ?? '<port>'}${ROUTES.toolPrefix}send_message`,
-      '```',
-      '',
-      `Discovery: one JSON file per VS Code window in ${path.join(REMOTE_CONTROL_HOME, 'instances')}.`,
-      '',
-      '## Safety',
-      '',
-      '- Listens on 127.0.0.1 only; every request needs the token; browser requests are refused.',
-      '- Anyone holding the token can run prompts (and therefore code, in full-access mode) as you.',
-      '- `claudeMirror.remoteControl.accessLevel = readOnly` blocks every state-changing tool.',
-      '- Credential, git, security-policy, file/URL and external-send actions stay blocked unless',
-      '  `claudeMirror.remoteControl.allowSensitiveActions` is enabled.',
-      '- "Regenerate token" in the setup menu revokes every existing client.',
-    ];
-    const doc = await vscode.workspace.openTextDocument({ language: 'markdown', content: lines.join('\n') });
-    await vscode.window.showTextDocument(doc, { preview: false });
+    if (!fs.existsSync(CONNECT_DOC)) {
+      this.prepareRuntime();
+    }
+    await vscode.window.showTextDocument(vscode.Uri.file(CONNECT_DOC), { preview: false });
   }
 
   private async showSetup(): Promise<void> {
     const settings = this.readSettings();
     type Item = vscode.QuickPickItem & { run: () => Thenable<void> | void };
+    const cfg = vscode.workspace.getConfiguration('claudeMirror.remoteControl');
+    const configs = clientConfigs(this.nodeCommand());
     const copy = async (text: string, what: string): Promise<void> => {
       await vscode.env.clipboard.writeText(text);
       void vscode.window.showInformationMessage(`Copied ${what} to the clipboard.`);
     };
-    const cfg = vscode.workspace.getConfiguration('claudeMirror.remoteControl');
+    const modeLabel: Record<RemoteControlMode, string> = {
+      auto: 'Auto - starts when a local tool connects (default)',
+      on: 'Always on',
+      off: 'Off',
+    };
     const items: Item[] = [
-      settings.enabled
-        ? { label: '$(debug-disconnect) Turn Remote Control off', run: () => cfg.update('enabled', false, vscode.ConfigurationTarget.Global) }
-        : { label: '$(plug) Turn Remote Control on', description: 'Starts the localhost MCP / HTTP control server', run: () => cfg.update('enabled', true, vscode.ConfigurationTarget.Global) },
+      {
+        label: `$(settings) Mode: ${modeLabel[settings.mode]}`,
+        description: 'change',
+        run: async () => {
+          const pick = await vscode.window.showQuickPick(
+            (['auto', 'on', 'off'] as RemoteControlMode[]).map((m) => ({ label: modeLabel[m], mode: m, picked: m === settings.mode })),
+            { placeHolder: 'When should this window serve remote clients?' },
+          );
+          if (pick) await cfg.update('mode', pick.mode, vscode.ConfigurationTarget.Global);
+        },
+      },
+      ...(!this.server && settings.mode !== 'off'
+        ? [{ label: '$(play) Start serving now', description: 'otherwise it starts on the first client request', run: () => this.ensureServing('started from the setup menu').then(() => undefined) }]
+        : []),
       { label: '$(add) Register with Claude Code', description: 'claude mcp add (user scope)', run: () => this.registerWithClaudeCode() },
-      { label: '$(copy) Copy Claude Code command', run: () => copy(this.claudeCodeCommand(), 'the Claude Code command') },
-      { label: '$(json) Copy MCP config (Claude Desktop / Cursor / Windsurf)', run: () => copy(this.desktopConfigJson(), 'the MCP config') },
-      { label: '$(json) Copy VS Code mcp.json config', run: () => copy(this.vscodeMcpJson(), 'the VS Code mcp.json config') },
+      { label: '$(copy) Copy Claude Code command', run: () => copy(configs['claude-code'].config, 'the Claude Code command') },
+      { label: '$(json) Copy MCP config (Claude Desktop / Cursor / Windsurf / agents)', run: () => copy(configs.generic.config, 'the MCP config') },
+      { label: '$(json) Copy Codex CLI config (config.toml)', run: () => copy(configs.codex.config, 'the Codex config') },
       {
         label: '$(globe) Copy HTTP endpoint and token (scripts)',
-        description: this.server ? `http://127.0.0.1:${this.server.port}` : 'turn on first',
+        description: this.server ? `http://127.0.0.1:${this.server.port}` : 'starts the server',
         run: async () => {
-          if (!(await this.ensureEnabledFor('get its endpoint'))) return;
+          if (!(await this.ensureServing('started from the setup menu'))) {
+            void vscode.window.showWarningMessage('Remote Control is off (claudeMirror.remoteControl.mode).');
+            return;
+          }
           await copy(`Endpoint: http://127.0.0.1:${this.server?.port}\nAuthorization: Bearer ${readToken() ?? this.token}`, 'the endpoint and token');
         },
       },
@@ -698,12 +695,12 @@ export class RemoteControlService implements vscode.Disposable {
           }
         },
       },
-      { label: '$(book) Open quick guide', run: () => this.openQuickGuide() },
+      { label: '$(book) Open connection guide', description: CONNECT_DOC, run: () => this.openQuickGuide() },
     ];
     const picked = await vscode.window.showQuickPick(items, {
       placeHolder: this.server
-        ? `ClaUi Remote Control: ON - http://127.0.0.1:${this.server.port} (${settings.accessLevel})`
-        : 'ClaUi Remote Control: OFF',
+        ? `ClaUi Remote Control: serving on http://127.0.0.1:${this.server.port} (${settings.mode}, ${settings.accessLevel})`
+        : `ClaUi Remote Control: ${settings.mode === 'off' ? 'off' : 'ready - starts when a local tool connects'}`,
       ignoreFocusOut: true,
     });
     if (picked) {
@@ -716,22 +713,22 @@ export class RemoteControlService implements vscode.Disposable {
     return [
       vscode.commands.registerCommand('claudeMirror.remoteControl.setup', () => this.showSetup()),
       vscode.commands.registerCommand('claudeMirror.remoteControl.enable', async () => {
-        await cfg().update('enabled', true, vscode.ConfigurationTarget.Global);
-        await this.waitForServer();
+        await cfg().update('mode', 'on', vscode.ConfigurationTarget.Global);
+        await this.ensureServing('enabled by command');
         const pick = await vscode.window.showInformationMessage(
           this.server ? `ClaUi Remote Control is on (http://127.0.0.1:${this.server.port}).` : 'ClaUi Remote Control is turning on.',
           'Register with Claude Code',
-          'Quick guide',
+          'Connection guide',
         );
         if (pick === 'Register with Claude Code') await this.registerWithClaudeCode();
-        if (pick === 'Quick guide') await this.openQuickGuide();
+        if (pick === 'Connection guide') await this.openQuickGuide();
       }),
       vscode.commands.registerCommand('claudeMirror.remoteControl.disable', () =>
-        cfg().update('enabled', false, vscode.ConfigurationTarget.Global),
+        cfg().update('mode', 'off', vscode.ConfigurationTarget.Global),
       ),
       vscode.commands.registerCommand('claudeMirror.remoteControl.registerWithClaudeCode', () => this.registerWithClaudeCode()),
       vscode.commands.registerCommand('claudeMirror.remoteControl.copyMcpConfig', async () => {
-        await vscode.env.clipboard.writeText(this.desktopConfigJson());
+        await vscode.env.clipboard.writeText(clientConfigs(this.nodeCommand()).generic.config);
         void vscode.window.showInformationMessage('Copied the ClaUi MCP config to the clipboard.');
       }),
       vscode.commands.registerCommand('claudeMirror.remoteControl.regenerateToken', async () => {

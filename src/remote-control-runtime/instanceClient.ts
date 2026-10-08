@@ -1,8 +1,11 @@
 import { requestJson } from '../remote-control-shared/httpClient';
 import {
   listInstances,
+  matchInstanceByCwd,
+  readInstance,
   readToken,
   selectInstance,
+  writeStartRequest,
   DEFAULT_REGISTRY_PATHS,
   type RegistryPaths,
 } from '../remote-control-shared/instanceRegistry';
@@ -16,11 +19,15 @@ import {
 import type { ToolDefinition } from '../remote-control-shared/toolCatalog';
 
 /**
- * Talks to a running ClaUi window over its localhost control server.
- * Selection order: explicit select_instance / CLAUI_INSTANCE, then the window
- * whose workspace contains the client's cwd, then the most recently focused.
- * A candidate only counts when an authenticated /api/status answers with the
- * same instanceId (guards against stale records and PID reuse).
+ * Talks to a ClaUi window over its localhost control server.
+ *
+ * Every VS Code window running ClaUi has a record (serving or not). Selection
+ * order: explicit select_instance / CLAUI_INSTANCE, then the window whose
+ * workspace contains the client's cwd, then the most recently focused window
+ * (windows with mode 'off' are skipped unless explicitly chosen). A window in
+ * mode 'auto' that is not serving yet is asked to start (request file) and the
+ * client waits for it. A candidate only counts once an authenticated
+ * /api/status answers with the same instanceId (stale records, PID reuse).
  */
 
 export interface InstanceStatus {
@@ -39,12 +46,22 @@ export interface LiveInstance extends InstanceInfo {
   status?: InstanceStatus;
 }
 
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 export class InstanceClient {
   private preferred: string | undefined;
   private current: InstanceInfo | null = null;
 
   constructor(
-    private readonly opts: { preferred?: string; cwd?: string; paths?: RegistryPaths } = {},
+    private readonly opts: {
+      preferred?: string;
+      cwd?: string;
+      paths?: RegistryPaths;
+      /** Label recorded in start requests (diagnostics only). */
+      clientName?: string;
+      /** How long to wait for an 'auto' window to start serving. */
+      startTimeoutMs?: number;
+    } = {},
   ) {
     this.preferred = opts.preferred?.trim() || undefined;
   }
@@ -66,13 +83,16 @@ export class InstanceClient {
     if (!token) {
       throw new RemoteControlError(
         ERROR_CODES.noInstance,
-        'No ClaUi Remote Control token found. In VS Code run "ClaUi: Remote Control Setup" and turn it on.',
+        'No ClaUi Remote Control token found. Install the ClaUi VS Code extension and open VS Code once.',
       );
     }
     return token;
   }
 
   async probe(info: InstanceInfo, timeoutMs = 2000): Promise<InstanceStatus | null> {
+    if (!info.serving || !info.port) {
+      return null;
+    }
     try {
       const res = await requestJson({
         host: info.host || '127.0.0.1',
@@ -92,6 +112,7 @@ export class InstanceClient {
     }
   }
 
+  /** Every window running ClaUi; `reachable` is true for serving windows that answered. */
   async listLive(): Promise<LiveInstance[]> {
     const instances = listInstances(this.paths);
     return Promise.all(
@@ -104,51 +125,116 @@ export class InstanceClient {
 
   /** Change the preferred window (instanceId, workspace path or name). Throws when nothing matches. */
   async select(query: string): Promise<InstanceInfo> {
-    const live = (await this.listLive()).filter((i) => i.reachable);
-    const match = selectInstance(live, { preferred: query });
+    const windows = listInstances(this.paths);
+    const match = selectInstance(windows, { preferred: query });
     if (!match) {
       throw new RemoteControlError(ERROR_CODES.noInstance, `No running ClaUi window matches "${query}".`, {
-        instances: live.map((i) => ({ instanceId: i.instanceId, workspaceName: i.workspaceName, folders: i.workspaceFolders })),
+        windows: windows.map((i) => ({ instanceId: i.instanceId, workspaceName: i.workspaceName, folders: i.workspaceFolders })),
       });
     }
     this.preferred = match.instanceId;
-    this.current = match;
-    return match;
+    this.current = null;
+    return this.resolve();
   }
 
-  /** Resolve (and cache) the instance to talk to, verifying it is alive. */
-  async resolve(): Promise<InstanceInfo> {
+  /** Ask an 'auto' window to start serving and wait until its record says so. */
+  private async requestStart(target: InstanceInfo): Promise<InstanceInfo> {
+    writeStartRequest(target.instanceId, this.opts.clientName ?? 'claui-runtime', this.paths);
+    const deadline = Date.now() + (this.opts.startTimeoutMs ?? 20_000);
+    while (Date.now() < deadline) {
+      const latest = readInstance(target.instanceId, this.paths);
+      if (!latest) {
+        throw new RemoteControlError(ERROR_CODES.noInstance, `The ClaUi window "${target.workspaceName}" closed.`);
+      }
+      if (latest.serving && latest.port) {
+        return latest;
+      }
+      await sleep(200);
+    }
+    throw new RemoteControlError(
+      ERROR_CODES.noInstance,
+      `The ClaUi window "${target.workspaceName}" did not start Remote Control in time. ` +
+        'Check claudeMirror.remoteControl.mode (auto or on) and that ClaUi is up to date.',
+    );
+  }
+
+  /**
+   * Resolve (and cache) the window to talk to, starting its server on demand.
+   * With start=false a window that is not serving yet is NOT started (throws).
+   */
+  async resolve(options: { start?: boolean } = {}): Promise<InstanceInfo> {
     if (this.current && (await this.probe(this.current, 1500))) {
       return this.current;
     }
     this.current = null;
-    const instances = listInstances(this.paths);
-    if (instances.length === 0) {
+    const windows = listInstances(this.paths);
+    if (windows.length === 0) {
       throw new RemoteControlError(
         ERROR_CODES.noInstance,
-        'No running ClaUi window has Remote Control enabled. Open VS Code (or call open_vscode_window) and turn it on via "ClaUi: Remote Control Setup".',
+        'VS Code with the ClaUi extension is not running. Open VS Code (or call the open_vscode_window tool) and try again.',
       );
     }
-    const ordered: InstanceInfo[] = [];
-    const first = selectInstance(instances, { preferred: this.preferred, cwd: this.opts.cwd });
-    if (first) ordered.push(first);
-    for (const i of instances) if (!ordered.includes(i)) ordered.push(i);
-    for (const candidate of ordered) {
-      // An explicit preference must not silently fall back to another window.
-      if (this.preferred && candidate !== first) {
-        break;
+    let candidates: InstanceInfo[];
+    // A window chosen explicitly or by working-directory match must never be
+    // silently swapped for another project's window; only a pick by recency
+    // falls back to the next most recently focused window.
+    let mayFallBack = false;
+    if (this.preferred) {
+      const target = selectInstance(windows, { preferred: this.preferred });
+      if (!target) {
+        throw new RemoteControlError(
+          ERROR_CODES.noInstance,
+          `No running ClaUi window matches "${this.preferred}". Use list_instances / select_instance.`,
+        );
       }
-      if (await this.probe(candidate)) {
-        this.current = candidate;
-        return candidate;
+      candidates = [target];
+    } else {
+      const usable = windows.filter((w) => w.mode !== 'off');
+      if (usable.length === 0) {
+        throw new RemoteControlError(
+          ERROR_CODES.noInstance,
+          'Remote Control is turned off in every open ClaUi window (setting claudeMirror.remoteControl.mode).',
+        );
+      }
+      const byCwd = this.opts.cwd ? matchInstanceByCwd(usable, this.opts.cwd) : undefined;
+      candidates = byCwd ? [byCwd] : usable;
+      mayFallBack = !byCwd;
+    }
+
+    let lastError: unknown;
+    for (const candidate of candidates) {
+      try {
+        let target = candidate;
+        if (!target.serving) {
+          if (target.mode === 'off') {
+            throw new RemoteControlError(
+              ERROR_CODES.noInstance,
+              `Remote Control is turned off in the ClaUi window "${target.workspaceName}" (setting claudeMirror.remoteControl.mode).`,
+            );
+          }
+          if (options.start === false) {
+            throw new RemoteControlError(ERROR_CODES.noInstance, `The ClaUi window "${target.workspaceName}" is not serving yet.`);
+          }
+          target = await this.requestStart(target);
+        }
+        if (await this.probe(target)) {
+          this.current = target;
+          return target;
+        }
+        throw new RemoteControlError(
+          ERROR_CODES.noInstance,
+          `The ClaUi window "${target.workspaceName}" is not answering. Is VS Code still running?`,
+        );
+      } catch (err) {
+        lastError = err;
+        if (!mayFallBack) {
+          break;
+        }
       }
     }
-    throw new RemoteControlError(
-      ERROR_CODES.noInstance,
-      this.preferred
-        ? `The selected ClaUi window (${this.preferred}) is not reachable. Use list_instances / select_instance.`
-        : 'Found ClaUi instance records, but none answered. Is VS Code still running?',
-    );
+    throw lastError instanceof Error
+      ? lastError
+      : new RemoteControlError(ERROR_CODES.noInstance, 'No usable ClaUi window found.');
   }
 
   async callTool(name: string, args: Record<string, unknown>, timeoutMs: number): Promise<unknown> {
@@ -181,10 +267,14 @@ export class InstanceClient {
     return body.result;
   }
 
-  /** Live tool catalog of the selected window (null when unreachable). */
+  /**
+   * Live tool catalog of the selected window when it is already serving (null
+   * otherwise). Never starts a server: MCP clients list tools at every session
+   * start, and merely listing must not open a port.
+   */
   async fetchTools(timeoutMs = 1500): Promise<ToolDefinition[] | null> {
     try {
-      const info = await this.resolve();
+      const info = await this.resolve({ start: false });
       const res = await requestJson({
         host: info.host || '127.0.0.1',
         port: info.port,

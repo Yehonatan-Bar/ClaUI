@@ -22,17 +22,16 @@ export async function runLocalTool(
   switch (name) {
     case 'list_instances': {
       const live = await client.listLive();
-      let selectedId: string | null = null;
-      try {
-        selectedId = (await client.resolve()).instanceId;
-      } catch {
-        selectedId = null;
-      }
+      // Listing must not start any server: report the cached selection only.
+      const selectedId = client.selected?.instanceId ?? null;
       return {
         selectedInstanceId: selectedId,
+        note: 'Windows with serving=false start their server automatically on the first tool call (mode auto).',
         instances: live.map((i) => ({
           instanceId: i.instanceId,
           selected: i.instanceId === selectedId,
+          mode: i.mode,
+          serving: i.serving,
           reachable: i.reachable,
           workspaceName: i.workspaceName,
           workspaceFolders: i.workspaceFolders,
@@ -90,7 +89,8 @@ async function openVsCodeWindow(client: InstanceClient, args: Record<string, unk
   const deadline = Date.now() + timeoutSec * 1000;
   while (Date.now() < deadline) {
     const match = listInstances().find((i) => i.workspaceFolders.some((f) => normalizePathForCompare(f) === target));
-    if (match && (await client.probe(match))) {
+    if (match) {
+      // select() resolves the window, starting its server on demand (mode auto).
       await client.select(match.instanceId);
       return { opened: folder, selectedInstanceId: match.instanceId, workspaceName: match.workspaceName };
     }
@@ -99,7 +99,7 @@ async function openVsCodeWindow(client: InstanceClient, args: Record<string, unk
   return {
     opened: folder,
     selectedInstanceId: null,
-    note: 'VS Code was launched, but no ClaUi Remote Control instance appeared for that folder in time. ' +
-      'Check that ClaUi is installed and claudeMirror.remoteControl.enabled is on (user settings).',
+    note: 'VS Code was launched, but no ClaUi window appeared for that folder in time. ' +
+      'Check that the ClaUi extension is installed in that VS Code.',
   };
 }

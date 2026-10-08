@@ -363,11 +363,11 @@
       },
       {
         "command": "claudeMirror.remoteControl.enable",
-        "title": "ClaUi: Enable Remote Control (MCP)"
+        "title": "ClaUi: Remote Control (MCP): Always On"
       },
       {
         "command": "claudeMirror.remoteControl.disable",
-        "title": "ClaUi: Disable Remote Control (MCP)"
+        "title": "ClaUi: Remote Control (MCP): Turn Off"
       },
       {
         "command": "claudeMirror.remoteControl.registerWithClaudeCode",
@@ -383,7 +383,7 @@
       },
       {
         "command": "claudeMirror.remoteControl.quickGuide",
-        "title": "ClaUi: Remote Control Quick Guide"
+        "title": "ClaUi: Remote Control Connection Guide"
       }
     ],
     "configuration": {
@@ -1702,10 +1702,20 @@
           "scope": "application",
           "description": "Enable experimental entropy-based secret detection. Uses Shannon entropy on sliding windows to catch high-randomness strings that may be secrets. May produce false positives."
         },
-        "claudeMirror.remoteControl.enabled": {
-          "type": "boolean",
-          "default": false,
-          "description": "Remote Control (MCP): run a localhost-only control server so MCP clients (Claude Code, Claude Desktop, Cursor, VS Code) and scripts can drive ClaUi - open tabs, send prompts, read replies, answer approvals, change models and settings. Every request needs the per-user token in ~/.claui/remote-control/token. Use \"ClaUi: Remote Control (MCP) Setup\" to connect clients."
+        "claudeMirror.remoteControl.mode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "on",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Default. No port is open until a local tool (MCP client, CLI, script) connects; then this window starts serving automatically.",
+            "Serve from VS Code startup.",
+            "Never serve remote clients in this window."
+          ],
+          "default": "auto",
+          "description": "Remote Control (MCP): lets AI agents, MCP clients (Claude Code, Claude Desktop, Cursor, Codex, VS Code) and scripts drive ClaUi - open tabs, send prompts, read replies, answer approvals, change models and settings. Localhost only; every request needs the per-user token in ~/.claui/remote-control/token. How to connect: ~/.claui/remote-control/CONNECT.md or \"ClaUi: Remote Control (MCP) Setup\"."
         },
         "claudeMirror.remoteControl.port": {
           "type": "number",
@@ -2024,7 +2034,13 @@
           "group": "9_destructive@1"
         }
       ]
-    }
+    },
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "claui.remoteControl",
+        "label": "ClaUi Remote Control"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run build && node scripts/verify-bundle.js",
