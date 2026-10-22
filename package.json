@@ -2,7 +2,7 @@
   "name": "claude-code-mirror",
   "displayName": "ClaUi",
   "description": "The full IDE experience for Claude Code - multi-tab sessions, analytics, achievements, dual providers, prompt enhancement, deep customization, and a built-in MCP server so AI agents can control it",
-  "version": "0.1.246",
+  "version": "0.1.247",
   "publisher": "JhonBar",
   "icon": "images/icon.png",
   "engines": {
@@ -2063,7 +2063,7 @@
     "test:hibernation": "node --import tsx --test tests/hibernation/hibernationPlanner.test.ts",
     "test:whats-new": "node --import tsx --test tests/unit/whatsNewLogic.test.ts tests/unit/whatsNewCore.test.ts tests/unit/whatsNewReceipt.test.ts",
     "test:file-drop": "node --import tsx --test tests/unit/droppedFiles.test.ts",
-    "test:truncator":"node --import tsx --test tests/unit/SessionTruncator.test.ts tests/unit/CodexSessionTruncator.test.ts",
+    "test:truncator": "node --import tsx --test tests/unit/SessionTruncator.test.ts tests/unit/CodexSessionTruncator.test.ts",
     "verify:installed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-installed.ps1",
     "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-local.ps1",
     "git:push": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-push.ps1",
