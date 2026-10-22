@@ -11,11 +11,29 @@ import { useSlashCommand } from '../../hooks/useSlashCommand';
 import { resolveNativeRoute, slashCommandNeedsArg, ALL_SLASH_COMMANDS } from '../../data/slashCommands';
 import type { NativeRoute, SlashArgOption, SlashCommand } from '../../data/slashCommands';
 import { CLAUDE_MODEL_OPTIONS } from '../../utils/claudeModelDisplay';
-import type { WebviewImageData, ClaudeEffortLevel } from '../../../extension/types/webview-messages';
+import type { WebviewImageData, ClaudeEffortLevel, OsDroppedFilesResolvedMessage } from '../../../extension/types/webview-messages';
 import { getModelMaxContext } from '../../utils/modelContextLimits';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
+import { useFileDrop, readFileAsBase64 } from '../../hooks/useFileDrop';
+import type { FileDropPayload } from '../../hooks/useFileDrop';
 
 const FOCUS_INPUT_POINTER_GUARD_MS = 280;
+
+/** Image types the CLI accepts as inline image attachments */
+const INLINE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+/** Dropped images above this size are attached as a file path instead (the API caps inline images at 5 MB of base64) */
+const MAX_INLINE_DROPPED_IMAGE_BYTES = Math.floor(3.75 * 1024 * 1024);
+/** Same cap as MAX_DROPPED_FILE_BYTES in src/extension/webview/droppedFiles.ts */
+const MAX_DROPPED_FILE_BYTES = 25 * 1024 * 1024;
+/** Max wait for the extension to find the originals of OS-dropped files before falling back */
+const OS_DROP_RESOLVE_TIMEOUT_MS = 8000;
+/** localStorage flag: the user closed the "Shift + drag" hint bar (webview origins are stable, so it persists) */
+const SHIFT_DRAG_HINT_DISMISSED_KEY = 'claui-shift-drag-hint-dismissed';
+
+/** "a, b, c and 2 more" */
+function formatNameList(names: string[]): string {
+  return names.length <= 3 ? names.join(', ') : `${names.slice(0, 3).join(', ')} and ${names.length - 3} more`;
+}
 
 /**
  * Manages an undo/redo stack for a textarea controlled by React state.
@@ -74,6 +92,7 @@ class UndoManager {
  * "+" button opens VS Code file picker to paste file paths.
  * Explorer context action can also send paths into this input.
  * Ctrl+V pastes images from clipboard as base64 attachments.
+ * Shift+drag files onto the panel attaches them (useFileDrop).
  *
  * When a plan approval bar is active (pendingApproval is set), typed messages
  * are routed as plan feedback instead of a new conversation message. This
@@ -1097,6 +1116,48 @@ export const InputArea: React.FC = () => {
     });
   }, [text, resizeTextarea, undoMgr, logUiDebug, effectiveProvider, providerCapabilities.supportsImages]);
 
+  /** Read an image file into a pending base64 attachment (clipboard paste and file drop) */
+  const queueImageFile = useCallback((file: File, source: 'paste' | 'drop', mimeHint = '') => {
+    logUiDebug(`${source}ImageFileReadStart`, {
+      provider: effectiveProvider,
+      mime: file.type || mimeHint,
+      size: file.size,
+    });
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      // dataUrl format: "data:image/png;base64,iVBOR..."
+      const match = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+      if (!match) {
+        logUiDebug(`${source}ImageDataUrlParseFailed`, {
+          provider: effectiveProvider,
+          resultType: typeof reader.result,
+          preview: typeof dataUrl === 'string' ? dataUrl.slice(0, 40) : '',
+        });
+        return;
+      }
+
+      const mediaType = match[1] as WebviewImageData['mediaType'];
+      const base64 = match[2];
+
+      logUiDebug(`${source}ImageQueued`, {
+        provider: effectiveProvider,
+        mediaType,
+        base64Len: base64.length,
+      });
+      setPendingImages((prev) => [...prev, { base64, mediaType }]);
+    };
+    reader.onerror = () => {
+      logUiDebug(`${source}ImageFileReadError`, {
+        provider: effectiveProvider,
+        mime: file.type || mimeHint,
+        size: file.size,
+      });
+    };
+    reader.readAsDataURL(file);
+  }, [logUiDebug, effectiveProvider]);
+
   /** Handle paste events - extract images from clipboard */
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items;
@@ -1150,47 +1211,142 @@ export const InputArea: React.FC = () => {
         logUiDebug('pasteImageItemNoFile', { provider: effectiveProvider, mime: item.type });
         continue;
       }
-
-      logUiDebug('pasteImageFileReadStart', {
-        provider: effectiveProvider,
-        mime: file.type || item.type,
-        size: file.size,
-      });
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        const dataUrl = reader.result as string;
-        // dataUrl format: "data:image/png;base64,iVBOR..."
-        const match = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
-        if (!match) {
-          logUiDebug('pasteImageDataUrlParseFailed', {
-            provider: effectiveProvider,
-            resultType: typeof reader.result,
-            preview: typeof dataUrl === 'string' ? dataUrl.slice(0, 40) : '',
-          });
-          return;
-        }
-
-        const mediaType = match[1] as WebviewImageData['mediaType'];
-        const base64 = match[2];
-
-        logUiDebug('pasteImageQueued', {
-          provider: effectiveProvider,
-          mediaType,
-          base64Len: base64.length,
-        });
-        setPendingImages((prev) => [...prev, { base64, mediaType }]);
-      };
-      reader.onerror = () => {
-        logUiDebug('pasteImageFileReadError', {
-          provider: effectiveProvider,
-          mime: file.type || item.type,
-          size: file.size,
-        });
-      };
-      reader.readAsDataURL(file);
+      queueImageFile(file, 'paste', item.type);
     }
-  }, [providerCapabilities.supportsImages, logUiDebug, effectiveProvider]);
+  }, [providerCapabilities.supportsImages, logUiDebug, effectiveProvider, queueImageFile]);
+
+  // "Shift + drag" hint bar above the input: shown until the user closes it
+  const [shiftDragHintDismissed, setShiftDragHintDismissed] = useState(() => {
+    try { return localStorage.getItem(SHIFT_DRAG_HINT_DISMISSED_KEY) === '1'; } catch { return false; }
+  });
+  const dismissShiftDragHint = useCallback(() => {
+    setShiftDragHintDismissed(true);
+    try { localStorage.setItem(SHIFT_DRAG_HINT_DISMISSED_KEY, '1'); } catch { /* webview localStorage may not be available */ }
+  }, []);
+
+  // Notice for dropped items that could not be attached (folders from the OS, oversized files)
+  const [dropNotice, setDropNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!dropNotice) return;
+    const id = setTimeout(() => setDropNotice(null), 8000);
+    return () => clearTimeout(id);
+  }, [dropNotice]);
+
+  /**
+   * Fallback for OS-dropped items that have no original path (dragged from Outlook,
+   * a browser, an archive, or the Explorer lookup failed): small images attach inline,
+   * other files are copied to a temp folder by the extension (answered with filePathsPicked).
+   */
+  const attachOsItemsWithoutPath = useCallback((files: File[], folderNames: string[]) => {
+    const notices: string[] = [];
+    if (folderNames.length > 0) {
+      notices.push(`Could not find the original location of ${formatNameList(folderNames)}: drag folders from File Explorer or the VS Code Explorer.`);
+    }
+    const oversizedFiles = files.filter((file) => file.size > MAX_DROPPED_FILE_BYTES);
+    if (oversizedFiles.length > 0) {
+      notices.push(`Not attached, larger than 25 MB: ${formatNameList(oversizedFiles.map((file) => file.name))}.`);
+    }
+
+    const acceptedFiles = files.filter((file) => file.size <= MAX_DROPPED_FILE_BYTES);
+    const inlineImageFiles = providerCapabilities.supportsImages
+      ? acceptedFiles.filter((file) => INLINE_IMAGE_TYPES.has(file.type) && file.size <= MAX_INLINE_DROPPED_IMAGE_BYTES)
+      : [];
+    const filesToCopy = acceptedFiles.filter((file) => !inlineImageFiles.includes(file));
+
+    for (const imageFile of inlineImageFiles) {
+      queueImageFile(imageFile, 'drop');
+    }
+
+    if (filesToCopy.length > 0) {
+      notices.push(`No original location for ${formatNameList(filesToCopy.map((file) => file.name))}: attached as a temporary copy.`);
+      void Promise.allSettled(
+        filesToCopy.map(async (file) => ({ name: file.name, base64: await readFileAsBase64(file) })),
+      ).then((results) => {
+        const readableFiles = results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
+        const unreadableNames = filesToCopy
+          .filter((_, index) => results[index].status === 'rejected')
+          .map((file) => file.name);
+        if (unreadableNames.length > 0) {
+          setDropNotice(`Could not read: ${formatNameList(unreadableNames)}.`);
+        }
+        if (readableFiles.length > 0) {
+          postToExtension({ type: 'saveDroppedFiles', files: readableFiles });
+        }
+      });
+    }
+
+    if (notices.length > 0) {
+      setDropNotice(notices.join(' '));
+    }
+  }, [providerCapabilities.supportsImages, queueImageFile]);
+
+  // OS drops waiting for the extension to find their original paths (keyed by dropId).
+  // The File objects are kept so the fallback can still read them.
+  const pendingOsDropsRef = useRef(new Map<number, { files: File[]; folderNames: string[]; fallbackTimer: number }>());
+  const osDropCounterRef = useRef(0);
+
+  /**
+   * Files Shift+dropped onto the panel. VS Code Explorer / tab items carry their
+   * paths. OS items (File Explorer, Desktop) only have name/size/date here, so the
+   * extension maps them to the originals through the Explorer selection
+   * (osDroppedFilesResolved); whatever it cannot map goes to attachOsItemsWithoutPath.
+   */
+  const handleFileDrop = useCallback((payload: FileDropPayload) => {
+    logUiDebug('fileDrop', {
+      provider: effectiveProvider,
+      vscodePathCount: payload.vscodePaths.length,
+      vscodeUriCount: payload.vscodeUris.length,
+      osFileCount: payload.osFiles.length,
+      osFolderCount: payload.osFolderNames.length,
+    });
+
+    if (payload.vscodePaths.length > 0 || payload.vscodeUris.length > 0) {
+      postToExtension({ type: 'resolveDroppedFiles', paths: payload.vscodePaths, uris: payload.vscodeUris });
+      return;
+    }
+    if (payload.osFiles.length === 0 && payload.osFolderNames.length === 0) return;
+
+    const dropId = ++osDropCounterRef.current;
+    // Safety net: if the extension never answers, attach everything without paths
+    const fallbackTimer = window.setTimeout(() => {
+      const pendingDrop = pendingOsDropsRef.current.get(dropId);
+      if (!pendingDrop) return;
+      pendingOsDropsRef.current.delete(dropId);
+      logUiDebug('osDropResolveTimeout', { dropId });
+      attachOsItemsWithoutPath(pendingDrop.files, pendingDrop.folderNames);
+    }, OS_DROP_RESOLVE_TIMEOUT_MS);
+    pendingOsDropsRef.current.set(dropId, { files: payload.osFiles, folderNames: payload.osFolderNames, fallbackTimer });
+
+    postToExtension({
+      type: 'resolveOsDroppedFiles',
+      dropId,
+      items: [
+        ...payload.osFiles.map((file) => ({ name: file.name, size: file.size, lastModified: file.lastModified, isDirectory: false })),
+        ...payload.osFolderNames.map((name) => ({ name, size: -1, lastModified: 0, isDirectory: true })),
+      ],
+    });
+    textareaRef.current?.focus();
+  }, [logUiDebug, effectiveProvider, attachOsItemsWithoutPath]);
+
+  /** Let the extension snapshot the File Explorer selection while the user is still dragging */
+  const handleOsFileDragEnter = useCallback(() => {
+    postToExtension({ type: 'osFileDragStarted' });
+  }, []);
+
+  const { isFileDragActive, blockedDragHintVisible, dismissBlockedDragHint } = useFileDrop({
+    enabled: isConnected && !inputLockedByHandoff,
+    onDrop: handleFileDrop,
+    onOsFileDragEnter: handleOsFileDragEnter,
+  });
+
+  // Drop all pending fallback timers on unmount
+  useEffect(() => {
+    const pendingOsDrops = pendingOsDropsRef.current;
+    return () => {
+      pendingOsDrops.forEach((pendingDrop) => window.clearTimeout(pendingDrop.fallbackTimer));
+      pendingOsDrops.clear();
+    };
+  }, []);
 
   /** Remove a pending image by index */
   const removePendingImage = useCallback((index: number) => {
@@ -1322,17 +1478,15 @@ export const InputArea: React.FC = () => {
     persistUltrathinkMode(nextMode);
   }, [ultrathinkAnim, ultrathinkMode, undoMgr, stripUltrathinkPrefix, persistUltrathinkMode]);
 
-  // Consume file paths inserted by picker or Explorer context command
-  useEffect(() => {
-    if (!pendingFilePaths || pendingFilePaths.length === 0) return;
-
-    const pathText = pendingFilePaths.join('\n');
+  /** Append file paths to the input, one per line (picker, Explorer command, file drops) */
+  const appendPathsToInput = useCallback((paths: string[]) => {
+    if (paths.length === 0) return;
+    const pathText = paths.join('\n');
     setText((prev) => {
       const newText = !prev ? pathText : prev + (prev.endsWith('\n') ? '' : '\n') + pathText;
       undoMgr.push(newText, newText.length);
       return newText;
     });
-    setPendingFilePaths(null);
 
     // Auto-resize textarea after inserting paths
     requestAnimationFrame(() => {
@@ -1343,7 +1497,52 @@ export const InputArea: React.FC = () => {
         el.focus();
       }
     });
-  }, [pendingFilePaths, setPendingFilePaths, undoMgr]);
+  }, [undoMgr]);
+
+  // Consume file paths inserted by picker or Explorer context command
+  useEffect(() => {
+    if (!pendingFilePaths || pendingFilePaths.length === 0) return;
+    appendPathsToInput(pendingFilePaths);
+    setPendingFilePaths(null);
+  }, [pendingFilePaths, setPendingFilePaths, appendPathsToInput]);
+
+  // Original paths found for OS-dropped items: insert them, send the rest to the fallback
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const { dropId, paths } = (event as CustomEvent<OsDroppedFilesResolvedMessage>).detail;
+      const pendingDrop = pendingOsDropsRef.current.get(dropId);
+      if (!pendingDrop) return; // already handled by the timeout fallback
+      pendingOsDropsRef.current.delete(dropId);
+      window.clearTimeout(pendingDrop.fallbackTimer);
+
+      // Items were sent as [...files, ...folders]; paths come back in the same order
+      const resolvedPaths: string[] = [];
+      const unresolvedFiles: File[] = [];
+      const unresolvedFolderNames: string[] = [];
+      pendingDrop.files.forEach((file, index) => {
+        const originalPath = Array.isArray(paths) ? paths[index] : null;
+        if (originalPath) resolvedPaths.push(originalPath);
+        else unresolvedFiles.push(file);
+      });
+      pendingDrop.folderNames.forEach((folderName, index) => {
+        const originalPath = Array.isArray(paths) ? paths[pendingDrop.files.length + index] : null;
+        if (originalPath) resolvedPaths.push(originalPath);
+        else unresolvedFolderNames.push(folderName);
+      });
+
+      logUiDebug('osDropResolved', {
+        dropId,
+        resolvedCount: resolvedPaths.length,
+        unresolvedCount: unresolvedFiles.length + unresolvedFolderNames.length,
+      });
+      appendPathsToInput(resolvedPaths);
+      if (unresolvedFiles.length > 0 || unresolvedFolderNames.length > 0) {
+        attachOsItemsWithoutPath(unresolvedFiles, unresolvedFolderNames);
+      }
+    };
+    window.addEventListener('claui-os-drop-resolved', handler);
+    return () => window.removeEventListener('claui-os-drop-resolved', handler);
+  }, [appendPathsToInput, attachOsItemsWithoutPath, logUiDebug]);
 
   // Listen for prompt selection from history panel
   useEffect(() => {
@@ -1856,6 +2055,18 @@ export const InputArea: React.FC = () => {
           ))}
         </div>
       )}
+      {/* File drag-and-drop: drop target highlight + hints (see useFileDrop) */}
+      {isFileDragActive && (
+        <div className="file-drop-overlay" aria-hidden="true">
+          <span className="file-drop-overlay-text">Drop to attach to the message</span>
+        </div>
+      )}
+      {dropNotice && (
+        <div className="git-push-toast info">
+          <span>{dropNotice}</span>
+          <button className="git-push-toast-dismiss" onClick={() => setDropNotice(null)} data-tooltip="Dismiss">x</button>
+        </div>
+      )}
       {/* Compact Session result toast (reuses git-push-toast styling) */}
       {compactSessionNotice && (
         <div className={`git-push-toast ${compactSessionNotice.success ? 'success' : 'error'}`}>
@@ -1992,6 +2203,32 @@ export const InputArea: React.FC = () => {
           >
             x
           </button>
+        </div>
+      )}
+
+      {/*
+        Shift tip bar. Turns into an enlarged alert when a drag arrived without Shift
+        (shown even if the tip was closed). It sits above the input on purpose: during a
+        drag VS Code paints its own centered "Hold Shift to drop into editor" label over
+        the whole panel, and a centered reminder would collide with it.
+      */}
+      {blockedDragHintVisible ? (
+        <div className="shift-drag-hint shift-drag-hint-alert" role="alert">
+          <kbd className="shift-drag-key">Shift</kbd>
+          <span className="shift-drag-hint-text">
+            Hold Shift while dragging to attach files to the chat
+            <span className="shift-drag-hint-note">Without Shift, VS Code opens the file in an editor instead.</span>
+          </span>
+          <button className="shift-drag-hint-dismiss" onClick={dismissBlockedDragHint} data-tooltip="Close">x</button>
+        </div>
+      ) : !shiftDragHintDismissed && (
+        <div className="shift-drag-hint">
+          <kbd className="shift-drag-key">Shift</kbd>
+          <span className="shift-drag-hint-text">
+            + drag files into the chat to attach them
+            <span className="shift-drag-hint-note"> (without Shift, VS Code opens the file)</span>
+          </span>
+          <button className="shift-drag-hint-dismiss" onClick={dismissShiftDragHint} data-tooltip="Hide this tip">x</button>
         </div>
       )}
 
@@ -2138,7 +2375,7 @@ export const InputArea: React.FC = () => {
             className="browse-button"
             onClick={handleBrowseFiles}
             disabled={!isConnected || inputLockedByHandoff}
-            data-tooltip="Browse files to paste their paths"
+            data-tooltip="Browse files to paste their paths (or hold Shift and drag files into the chat)"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
@@ -2178,7 +2415,7 @@ export const InputArea: React.FC = () => {
                   ? (isCodexBusy
                       ? (codexSteerArmed ? 'Press Ctrl+Enter again to confirm steer...' : 'Type to steer Codex... (Ctrl+Enter to confirm)')
                       : 'Type to interrupt... (Ctrl+Enter to send)')
-                  : 'Type a message... (Ctrl+Enter to send)'
+                  : 'Type a message... (Ctrl+Enter to send, Shift+drag files to attach)'
             }
             disabled={!isConnected || inputLockedByHandoff}
             rows={1}

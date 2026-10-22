@@ -1,5 +1,15 @@
 # ClaUi - Changelog
 
+## v0.1.247 - 2026-10-19
+
+**Feature: Shift+drag files into the chat**
+
+- Hold Shift and drag files or folders from the VS Code Explorer, editor tabs or Open Editors onto a chat panel: their full paths are inserted into the input (same as the `+` picker). VS Code only lets drags reach a webview while Shift is held; without it the file opens in an editor
+- Shift+drag from Windows File Explorer or the Desktop inserts the ORIGINAL paths of the dropped files and folders. The webview never sees OS paths, so when the drag enters the panel the extension asks Explorer for its selected items (Shell.Application COM, one PowerShell call hidden behind the drag) and matches the dropped items by name + size + modified time; ambiguous matches are never guessed
+- Items with no location on disk (Outlook attachments, browser drags, archive members) or no unique match: PNG/JPEG/GIF/WebP images up to ~3.75 MB attach inline like Ctrl+V, other files are copied to `%TEMP%\claui-dropped-files` (a notice says so). Copy limits: 25 MB per file, 20 files per drop; copies older than 7 days are deleted
+- A prominent "Shift + drag files into the chat" tip bar above the input (close it with its x, the choice is remembered), the bar turns into an enlarged, pulsing "Hold Shift while dragging" alert when a drag arrives without Shift (it stays clear of VS Code's own centered "Hold Shift to drop into editor" label), and a drop overlay on the input area while dragging. The placeholder and `+` tooltip also mention Shift+drag. Works in Claude, Codex and bridge tabs
+- Tests: `npm run test:file-drop`
+
 ## v0.1.246 - 2026-10-08
 
 **Feature: AI agents find how to connect to ClaUi in the shipped documentation**

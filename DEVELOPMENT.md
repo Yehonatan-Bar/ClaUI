@@ -175,7 +175,7 @@ claude-code-mirror/
     +-- ACTIVITY_SUMMARIZER.md            #   Activity summary feature
     +-- FILE_LOGGER.md                    #   File logging architecture
     +-- STREAM_JSON_PROTOCOL.md           #   CLI protocol reference
-    +-- DRAG_AND_DROP_CHALLENGE.md        #   Why drag-and-drop isn't supported
+    +-- FILE_DRAG_AND_DROP.md             #   Shift+drag files into the chat
 ```
 
 ---
@@ -242,8 +242,8 @@ claude-code-mirror/
 **Open Plan Docs** - "Plans" button in the status bar that opens HTML plan documents from `Kingdom_of_Claudes_Beloved_MDs/` in the default browser. Single file opens directly; multiple files show a QuickPick sorted by modification time. Also available via Command Palette (`claudeMirror.openPlanDocs`).
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/ARCHITECTURE.md`
 
-**File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
-> Detail: `Kingdom_of_Claudes_Beloved_MDs/DRAG_AND_DROP_CHALLENGE.md`
+**File Path Insertion / Drag-and-Drop** - Shift+drag files onto the chat panel (VS Code only passes drags to webviews while Shift is held): VS Code Explorer / tab items and Windows File Explorer / Desktop items insert their original paths (OS drops matched against the Explorer selection); items with no location on disk fall back to inline images or copies in `%TEMP%\claui-dropped-files`. Other flows: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, `Ctrl+Alt+Shift+C` (active editor file path).
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/FILE_DRAG_AND_DROP.md`
 
 ---
 

@@ -2,6 +2,23 @@
   "$comment": "Bundled What's New entries shown after an update (toast + in-panel banner). Add ONE entry per release that ships user-visible features; bug-fix-only releases get no entry and stay silent. 'version' is the EARLIEST extension version allowed to show the entry (vsce publish patch may assign a higher number, that is fine). 'id' must be unique and must never change once shipped. Newest entries can go anywhere in the list; the extension sorts by version.",
   "announcements": [
     {
+      "id": "2026-10-19-shift-drag-files-into-chat",
+      "version": "0.1.246",
+      "date": "2026-10-19",
+      "title": "Drag files into the chat",
+      "titleHe": "גרירת קבצים לצ'אט",
+      "highlights": [
+        "Hold Shift and drag files from the VS Code Explorer or an editor tab onto the chat to add their paths to your message.",
+        "Shift+drag from Windows File Explorer or the Desktop attaches the original file or folder, not a copy.",
+        "Without Shift, VS Code opens the file in an editor instead of attaching it."
+      ],
+      "highlightsHe": [
+        "החזיקו Shift וגררו קבצים מסייר הקבצים של VS Code או מלשונית עורך אל הצ'אט כדי להוסיף את הנתיבים שלהם להודעה.",
+        "גרירה עם Shift מסייר הקבצים של Windows או משולחן העבודה מצרפת את הקובץ או התיקייה המקוריים, לא עותק.",
+        "בלי Shift, VS Code פותח את הקובץ בעורך במקום לצרף אותו."
+      ]
+    },
+    {
       "id": "2026-10-08-ask-agent-how-to-connect",
       "version": "0.1.245",
       "date": "2026-10-08",

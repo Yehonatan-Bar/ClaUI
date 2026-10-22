@@ -290,11 +290,12 @@ Full guide, shipped with the extension: [AI agent integration guide](Kingdom_of_
 
 ## Sending Files
 
-Three ways to reference files in your messages:
+Four ways to reference files in your messages:
 
-1. **Right-click in Explorer** -- select "ClaUi: Send Path to Chat" (works with multiple files)
-2. **The "+" button** -- click the + button next to the chat input to open a file picker
-3. **Keyboard shortcut** -- press `Ctrl+Alt+Shift+C` while focused on a file in the editor
+1. **Shift+drag** -- hold Shift and drag files onto the chat panel, from the VS Code Explorer, an editor tab, or Windows Explorer (without Shift, VS Code opens the file in an editor instead). Files and folders from Windows File Explorer or the Desktop are attached by their original path; items with no location on disk (such as email attachments) are attached as a temporary copy
+2. **Right-click in Explorer** -- select "ClaUi: Send Path to Chat" (works with multiple files)
+3. **The "+" button** -- click the + button next to the chat input to open a file picker
+4. **Keyboard shortcut** -- press `Ctrl+Alt+Shift+C` while focused on a file in the editor
 
 The path is inserted into the input box so you can add context before sending.
 

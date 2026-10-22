@@ -44,10 +44,11 @@ A comprehensive catalog of every feature and capability in the ClaUi VS Code ext
 - **Cancel with Escape** - Press Escape or click the Cancel button to stop Claude mid-response. The session auto-resumes so you can keep chatting immediately. Both Send and Cancel buttons are visible during processing
 - **RTL support** - Full right-to-left support for Hebrew and Arabic, with automatic direction detection (`dir="auto"` on messages, `useRtlDetection` hook for InputArea)
 - **File mention (@)** - Type `@` in the textarea to trigger workspace file search with autocomplete popup. 150ms debounce, navigate with ArrowUp/Down, select with Enter/Tab/click. Replaces `@query` with the relative file path
-- **File sending** - Three methods:
-  1. Right-click in Explorer: "ClaUi: Send Path to Chat" (works with multiple files)
-  2. "+" button next to chat input to open a file picker
-  3. `Ctrl+Alt+Shift+C` keyboard shortcut while editing a file
+- **File sending** - Four methods:
+  1. Shift+drag files onto the chat panel (VS Code Explorer / editor tabs and Windows File Explorer / Desktop insert the original paths; items with no location on disk attach as inline images or temp copies)
+  2. Right-click in Explorer: "ClaUi: Send Path to Chat" (works with multiple files)
+  3. "+" button next to chat input to open a file picker
+  4. `Ctrl+Alt+Shift+C` keyboard shortcut while editing a file
 - **Ctrl+Enter to send** - Configurable via `claudeMirror.useCtrlEnterToSend`. When enabled, Enter adds a newline and Ctrl+Enter sends
 - **Clipboard paste diagnostics** - Paste/shortcut issues from InputArea are forwarded to the extension log as `[UiDebug][InputArea]` entries for troubleshooting
 

@@ -13,6 +13,7 @@ import { setStoredApiKey, maskApiKey } from '../process/envUtils';
 import { readCodexModelOptions } from '../process/codexModelCache';
 import { MessageTranslator } from '../session/MessageTranslator';
 import { BugReportService } from '../feedback/BugReportService';
+import { processFileDropRequest } from './droppedFiles';
 import type {
   CodexReasoningEffort,
   CodexServiceTier,
@@ -1191,6 +1192,17 @@ export class CodexMessageHandler {
 
         case 'openFile':
           void this.handleOpenFile(msg.filePath);
+          break;
+
+        case 'resolveDroppedFiles':
+        case 'saveDroppedFiles':
+        case 'osFileDragStarted':
+        case 'resolveOsDroppedFiles':
+          void processFileDropRequest(msg, {
+            post: (reply) => this.postToWebview(reply),
+            log: (line) => this.log(line),
+            warn: (text) => { void vscode.window.showWarningMessage(text); },
+          });
           break;
 
         case 'openUrl':

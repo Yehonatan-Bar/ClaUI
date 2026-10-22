@@ -741,9 +741,9 @@ export const HELP_ENTRIES: HelpEntry[] = [
     id: 'inputarea-browse',
     section: 'inputarea',
     name: 'Browse 📎',
-    tooltip: 'Browse files to paste their paths',
-    detailEn: 'Open the file picker to insert file paths.',
-    detailHe: 'פתח את בורר הקבצים להכנסת נתיבי קבצים.',
+    tooltip: 'Browse files to paste their paths (or hold Shift and drag files into the chat)',
+    detailEn: 'Open the file picker to insert file paths. You can also hold Shift and drag files onto the chat from the VS Code Explorer or Windows Explorer.',
+    detailHe: "פתח את בורר הקבצים להכנסת נתיבי קבצים. אפשר גם להחזיק Shift ולגרור קבצים לצ'אט מסייר הקבצים של VS Code או מסייר הקבצים של Windows.",
   },
   {
     id: 'inputarea-enhance',

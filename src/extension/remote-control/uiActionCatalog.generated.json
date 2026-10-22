@@ -1081,6 +1081,12 @@
    "doc": "Reveal a worktree directory in the OS file explorer."
   },
   {
+   "type": "osFileDragStarted",
+   "interface": "OsFileDragStartedRequest",
+   "fields": [],
+   "doc": "An OS file drag entered the chat panel: the extension snapshots the File Explorer / Desktop selection while the user is still dragging"
+  },
+  {
    "type": "particleAcceleratorClearData",
    "interface": "ParticleAcceleratorClearDataRequest",
    "fields": [
@@ -1345,6 +1351,42 @@
    "fields": []
   },
   {
+   "type": "resolveDroppedFiles",
+   "interface": "ResolveDroppedFilesRequest",
+   "fields": [
+    {
+     "name": "paths",
+     "type": "string[]",
+     "optional": false,
+     "doc": "Absolute filesystem paths (VS Code \"CodeFiles\" drag payload, includes folders)"
+    },
+    {
+     "name": "uris",
+     "type": "string[]",
+     "optional": false,
+     "doc": "Resource URI strings (\"ResourceURLs\" and text/uri-list drag payloads)"
+    }
+   ],
+   "doc": "Shift+drop of files dragged from the VS Code Explorer / editor tabs onto the chat panel; the extension resolves them to filesystem paths and answers with filePathsPicked"
+  },
+  {
+   "type": "resolveOsDroppedFiles",
+   "interface": "ResolveOsDroppedFilesRequest",
+   "fields": [
+    {
+     "name": "dropId",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "items",
+     "type": "DroppedOsItemMeta[]",
+     "optional": false
+    }
+   ],
+   "doc": "Map OS-dropped items to their original paths by matching them against the File Explorer / Desktop selection; answered by osDroppedFilesResolved"
+  },
+  {
    "type": "resumeSession",
    "interface": "ResumeSessionRequest",
    "fields": [
@@ -1366,6 +1408,18 @@
    "interface": "ReviewLoopStopRequest",
    "fields": [],
    "doc": "Stop an in-flight review loop on the active tab."
+  },
+  {
+   "type": "saveDroppedFiles",
+   "interface": "SaveDroppedFilesRequest",
+   "fields": [
+    {
+     "name": "files",
+     "type": "DroppedFileContent[]",
+     "optional": false
+    }
+   ],
+   "doc": "Shift+drop of files from the OS file manager onto the chat panel; the extension saves copies to a temp folder and answers with filePathsPicked"
   },
   {
    "type": "scheduleMessage",
@@ -4387,6 +4441,23 @@
    "interface": "OpenWorktreePanelMessage",
    "fields": [],
    "doc": "Command-palette / StatusBar request to open the worktree dashboard overlay."
+  },
+  {
+   "type": "osDroppedFilesResolved",
+   "interface": "OsDroppedFilesResolvedMessage",
+   "fields": [
+    {
+     "name": "dropId",
+     "type": "number",
+     "optional": false
+    },
+    {
+     "name": "paths",
+     "type": "Array<string | null>",
+     "optional": false
+    }
+   ],
+   "doc": "Answer to resolveOsDroppedFiles: original path per dropped item (same order), null where no unique match was found"
   },
   {
    "type": "particleAcceleratorAggregateUpdate",

@@ -678,6 +678,11 @@ export function useClaudeStream(): void {
           setPendingFilePaths(msg.paths);
           break;
 
+        case 'osDroppedFilesResolved':
+          // Handled by InputArea, which still holds the dropped File objects for the fallback
+          window.dispatchEvent(new CustomEvent('claui-os-drop-resolved', { detail: msg }));
+          break;
+
         case 'textSettings':
           setTextSettings({
             fontSize: msg.fontSize,

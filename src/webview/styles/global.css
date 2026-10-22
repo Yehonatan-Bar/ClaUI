@@ -2648,6 +2648,121 @@ html, body, #root {
   color: var(--vscode-inputValidation-errorForeground, #fff);
 }
 
+.git-push-toast.info {
+  background: var(--vscode-inputValidation-infoBackground, #063b49);
+  border: 1px solid var(--vscode-inputValidation-infoBorder, #007acc);
+  color: var(--vscode-foreground, #cccccc);
+}
+
+/* Shift+drag file drop target over the input area (pointer-events: none keeps drag events on the elements below) */
+.file-drop-overlay {
+  position: absolute;
+  inset: 4px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--vscode-focusBorder, #007fd4);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--vscode-focusBorder, #007fd4) 14%, var(--vscode-sideBar-background, var(--vscode-editor-background)));
+  pointer-events: none;
+}
+
+.file-drop-overlay-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vscode-foreground, #cccccc);
+}
+
+/* Keyboard-key look for "Shift" (VS Code keybinding label colors, so it matches every theme) */
+.shift-drag-key {
+  display: inline-block;
+  padding: 2px 10px;
+  font-family: var(--vscode-font-family, sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: var(--vscode-keybindingLabel-foreground, #cccccc);
+  background: var(--vscode-keybindingLabel-background, rgba(128, 128, 128, 0.17));
+  border: 1px solid var(--vscode-keybindingLabel-border, rgba(51, 51, 51, 0.6));
+  border-bottom: 3px solid var(--vscode-keybindingLabel-bottomBorder, rgba(68, 68, 68, 0.6));
+  border-radius: 5px;
+}
+
+/* "Shift + drag" tip bar above the input (closed with its x, remembered in localStorage) */
+.shift-drag-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  margin-bottom: 8px;
+  border: 1px dashed var(--vscode-focusBorder, #007fd4);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--vscode-focusBorder, #007fd4) 10%, transparent);
+  color: var(--vscode-foreground, #cccccc);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.shift-drag-hint-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.shift-drag-hint-note {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--vscode-descriptionForeground, #9d9d9d);
+}
+
+.shift-drag-hint-dismiss {
+  background: none;
+  border: none;
+  color: var(--vscode-descriptionForeground, #9d9d9d);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+  opacity: 0.7;
+}
+
+.shift-drag-hint-dismiss:hover {
+  opacity: 1;
+}
+
+/*
+ * Alert state of the tip bar: a drag arrived without Shift. Enlarged and anchored above
+ * the input (never centered: VS Code centers its own "Hold Shift to drop into editor"
+ * label over the panel during drags).
+ */
+.shift-drag-hint-alert {
+  gap: 14px;
+  padding: 12px 14px;
+  border: 2px solid var(--vscode-focusBorder, #007fd4);
+  background: color-mix(in srgb, var(--vscode-focusBorder, #007fd4) 22%, var(--vscode-sideBar-background, var(--vscode-editor-background)));
+  font-size: 18px;
+  font-weight: 700;
+  animation: shiftDragHintPulse 1s ease-in-out 3;
+}
+
+.shift-drag-hint-alert .shift-drag-key {
+  font-size: 18px;
+  padding: 4px 16px;
+  border-bottom-width: 4px;
+}
+
+.shift-drag-hint-alert .shift-drag-hint-note {
+  display: block;
+  margin-top: 3px;
+  font-size: 13px;
+}
+
+@keyframes shiftDragHintPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--vscode-focusBorder, #007fd4) 0%, transparent); }
+  50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--vscode-focusBorder, #007fd4) 45%, transparent); }
+}
+
 .git-push-toast-dismiss {
   background: none;
   border: none;

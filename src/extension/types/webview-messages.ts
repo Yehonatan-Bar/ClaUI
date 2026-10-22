@@ -280,6 +280,49 @@ export interface PickFilesRequest {
   type: 'pickFiles';
 }
 
+/** Shift+drop of files dragged from the VS Code Explorer / editor tabs onto the chat panel; the extension resolves them to filesystem paths and answers with filePathsPicked */
+export interface ResolveDroppedFilesRequest {
+  type: 'resolveDroppedFiles';
+  /** Absolute filesystem paths (VS Code "CodeFiles" drag payload, includes folders) */
+  paths: string[];
+  /** Resource URI strings ("ResourceURLs" and text/uri-list drag payloads) */
+  uris: string[];
+}
+
+/** A file dropped from the OS file manager (the webview sees its contents, never its path) */
+export interface DroppedFileContent {
+  name: string;
+  base64: string;
+}
+
+/** Shift+drop of files from the OS file manager onto the chat panel; the extension saves copies to a temp folder and answers with filePathsPicked */
+export interface SaveDroppedFilesRequest {
+  type: 'saveDroppedFiles';
+  files: DroppedFileContent[];
+}
+
+/** An OS file drag entered the chat panel: the extension snapshots the File Explorer / Desktop selection while the user is still dragging */
+export interface OsFileDragStartedRequest {
+  type: 'osFileDragStarted';
+}
+
+/** Metadata of one item dropped from the OS file manager (no contents, no path) */
+export interface DroppedOsItemMeta {
+  name: string;
+  /** Bytes; -1 for folders */
+  size: number;
+  /** File.lastModified (ms since epoch); 0 when unknown */
+  lastModified: number;
+  isDirectory: boolean;
+}
+
+/** Map OS-dropped items to their original paths by matching them against the File Explorer / Desktop selection; answered by osDroppedFilesResolved */
+export interface ResolveOsDroppedFilesRequest {
+  type: 'resolveOsDroppedFiles';
+  dropId: number;
+  items: DroppedOsItemMeta[];
+}
+
 export interface ClearSessionRequest {
   type: 'clearSession';
   workspacePath?: string;
@@ -1268,6 +1311,10 @@ export type WebviewToExtensionMessage =
   | ForkSessionRequest
   | WebviewReady
   | PickFilesRequest
+  | ResolveDroppedFilesRequest
+  | SaveDroppedFilesRequest
+  | OsFileDragStartedRequest
+  | ResolveOsDroppedFilesRequest
   | ClearSessionRequest
   | SetModelRequest
   | SetClaudeEffortRequest
@@ -1763,6 +1810,13 @@ export interface ThinkingEffortUpdateMessage {
 export interface FilePathsPickedMessage {
   type: 'filePathsPicked';
   paths: string[];
+}
+
+/** Answer to resolveOsDroppedFiles: original path per dropped item (same order), null where no unique match was found */
+export interface OsDroppedFilesResolvedMessage {
+  type: 'osDroppedFilesResolved';
+  dropId: number;
+  paths: Array<string | null>;
 }
 
 export interface TextSettingsMessage {
@@ -3253,6 +3307,7 @@ export type ExtensionToWebviewMessage =
   | MessageStopMessage
   | ThinkingEffortUpdateMessage
   | FilePathsPickedMessage
+  | OsDroppedFilesResolvedMessage
   | TextSettingsMessage
   | TypingThemeSettingMessage
   | MessageColorSchemeSettingMessage

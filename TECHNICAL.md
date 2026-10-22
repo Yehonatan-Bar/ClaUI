@@ -80,6 +80,8 @@ claude-code-mirror/
 |   |   |   +-- MessageHandler.ts         #   postMessage bridge (uses WebviewBridge interface, broadcasts checkpoint state/reset)
 |   |   |   +-- CodexMessageHandler.ts    #   Codex bridge, including Workstream Map/Portfolio message routing
 |   |   |   +-- HtmlPreviewPanel.ts       #   Opens HTML code blocks as rendered preview tabs
+|   |   |   +-- droppedFiles.ts           #   Shift+drop files: VS Code drag URIs to paths, OS drops matched to originals, temp-copy fallback
+|   |   |   +-- explorerSelection.ts      #   Windows: File Explorer / Desktop selection via Shell.Application COM (original paths of OS drops)
 |   |   +-- session/
 |   |   |   +-- SessionTab.ts             #   Per-tab bundle (process+demux+panel+handler)
 |   |   |   +-- TabManager.ts             #   Manages all tabs, tracks active tab
@@ -324,6 +326,7 @@ claude-code-mirror/
 |       |   +-- useClaudeStream.ts        #   postMessage event dispatcher
 |       |   +-- useRtlDetection.ts        #   detectRtl() / resolveDir() - RTL auto-detection (per-message LTR override lives in Zustand messageForcedLtr Set)
 |       |   +-- useFileMention.ts         #   @ file mention trigger detection, debounced search, popup state
+|       |   +-- useFileDrop.ts            #   Shift+drag file drop onto the panel: drag tracking, overlay, payload extraction
 |       |   +-- useSlashCommand.ts        #   / slash command trigger detection, synchronous filtering, popup state
 |       |   +-- useStatusBarCollapse.ts  #   3-stage responsive layout hook for grouped StatusBar (full/compact/minimal) + progressive right-side collapse (clock/MCP/usage)
 |       |   +-- useOutsideClick.ts      #   Centralized outside-click manager for all dropdowns/popovers
@@ -540,8 +543,8 @@ claude-code-mirror/
     +-- CLAUDE_MODEL_CONTROLS.md         #   Claude model (incl. Opus 5.5, Sonnet 5.5), thinking effort, and fast mode controls
     +-- CODEX_FAST_MODE.md              #   Codex Fast mode selector + CLI service tier override
     +-- CUSTOM_SNIPPET_BUTTON.md         #   Configurable text snippet button that injects text into the input
-    +-- DRAG_AND_DROP_CHALLENGE.md        #   Why drag-and-drop is blocked, workarounds
     +-- DOUBLE_CLICK_FOCUS_FIX_2026-03.md #   Focus hardening for click reliability + rollback guide
+    +-- FILE_DRAG_AND_DROP.md             #   Shift+drag files into the chat (VS Code Explorer paths, OS files)
     +-- FILE_LOGGER.md                    #   File-based logging with rotation and rename
     +-- FILE_MENTION.md                   #   @ file mention autocomplete feature
     +-- SLASH_COMMANDS.md                 #   / slash command autocomplete popup + full-list browser + smart routing + in-place /compact (transport, output handling, divider)
@@ -819,8 +822,8 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 **Codex Consultation** - Consult an external GPT expert (Codex) directly from the chat UI. A "Consult" button in the StatusBar opens an input panel where the user types a question. The question is sent to the Claude CLI session as a structured prompt instructing Claude to enrich it with system context and call the `mcp__codex__codex` MCP tool. The Codex response streams into the chat, and Claude continues development based on the advice.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_CONSULTATION.md`
 
-**File Path Insertion** - Drag-and-drop into editor-area webviews is blocked by VS Code, so direct drop is not supported. Supported workflows are: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, and keyboard shortcut `Ctrl+Alt+Shift+C` (active editor file path).
-> Detail: `Kingdom_of_Claudes_Beloved_MDs/DRAG_AND_DROP_CHALLENGE.md`
+**File Path Insertion / Drag-and-Drop** - Shift+drag files onto the chat panel (VS Code only passes drags to webviews while Shift is held): VS Code Explorer / tab items and Windows File Explorer / Desktop items insert their ORIGINAL paths (OS drops are matched against the Explorer selection, which the extension reads via Shell.Application COM while the user drags); items with no location on disk fall back to inline images or copies in `%TEMP%\claui-dropped-files`. Other flows: `+` file picker, Explorer context command `ClaUi: Send Path to Chat`, `Ctrl+Alt+Shift+C` (active editor file path); all end in `filePathsPicked`.
+> Detail: `Kingdom_of_Claudes_Beloved_MDs/FILE_DRAG_AND_DROP.md`
 
 **FormspreeService** - Standalone service for sending user feedback (text + optional file attachments) to the developer via Formspree.io. Write-only endpoint, no secrets in the codebase. Supports native multipart file uploads (paid plan) with automatic fallback to base64-embedded files in the message body (free plan). 15-second timeout, logger injection, follows GitHubSyncService patterns.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/FORMSPREE_FEEDBACK.md`

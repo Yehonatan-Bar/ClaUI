@@ -37,6 +37,7 @@ import { McpRegistryService } from '../mcp/McpRegistryService';
 import { McpSecretsService } from '../mcp/McpSecretsService';
 import { McpTemplateCatalog } from '../mcp/McpTemplateCatalog';
 import { openHtmlPreviewPanel } from './HtmlPreviewPanel';
+import { processFileDropRequest } from './droppedFiles';
 import type {
   AdventureBeatMessage,
   ExtensionToWebviewMessage,
@@ -2238,6 +2239,17 @@ export class MessageHandler {
 
         case 'pickFiles':
           this.handlePickFiles();
+          break;
+
+        case 'resolveDroppedFiles':
+        case 'saveDroppedFiles':
+        case 'osFileDragStarted':
+        case 'resolveOsDroppedFiles':
+          void processFileDropRequest(msg, {
+            post: (reply) => this.webview.postMessage(reply),
+            log: (line) => this.log(line),
+            warn: (text) => { void vscode.window.showWarningMessage(text); },
+          });
           break;
 
         case 'fileSearch':

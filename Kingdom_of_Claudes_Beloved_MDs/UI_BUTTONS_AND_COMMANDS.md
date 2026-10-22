@@ -366,7 +366,7 @@ All commands are registered under the `claudeMirror.*` namespace in `package.jso
 | Clear | Clear session and start fresh | Reset the conversation and restart the session. | אפס את השיחה והפעל מחדש את הסשן. |
 | Ultrathink lock 🔒 | Lock ultrathink on every prompt | Keep "ultrathink" prepended to every prompt. | שמור על "ultrathink" בתחילת כל פקודה. |
 | Ultrathink ⚡ | Ultrathink – boost reasoning power | Cycle ultrathink off → single → locked. | החלף ultrathink כבוי → חד-פעמי → נעול. |
-| Browse 📎 | Browse files to paste their paths | Open the file picker to insert file paths. | פתח את בורר הקבצים להכנסת נתיבי קבצים. |
+| Browse 📎 | Browse files to paste their paths (or hold Shift and drag files into the chat) | Open the file picker to insert file paths. You can also hold Shift and drag files onto the chat from the VS Code Explorer or Windows Explorer. | פתח את בורר הקבצים להכנסת נתיבי קבצים. אפשר גם להחזיק Shift ולגרור קבצים לצ'אט מסייר הקבצים של VS Code או מסייר הקבצים של Windows. |
 | Enhance ✨ | Enhance prompt (Ctrl+Shift+E) | Rewrite/improve the current prompt via AI. | שכתב/שפר את הפקודה הנוכחית בעזרת AI. |
 | Enhance ⚙ | Enhancer settings | Open enhancer settings (auto-enhance, model). | פתח הגדרות שיפור (אוטו-שיפור, מודל). |
 | Cancel / Stop | Cancel current response (Esc) | Interrupt the in-flight response (or steer Codex). | קטע את התגובה המתבצעת (או הכוון את Codex). |
