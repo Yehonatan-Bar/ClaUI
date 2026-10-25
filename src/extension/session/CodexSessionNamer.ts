@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { buildSanitizedEnv } from '../process/envUtils';
 import { killProcessTree } from '../process/killTree';
 import { spawnCli } from '../process/spawnCli';
+import { CODEX_SKIP_GIT_REPO_CHECK_FLAG } from '../process/codexExecArgs';
 
 /**
  * Spawns a lightweight one-shot Codex CLI process to generate
@@ -35,7 +36,9 @@ export class CodexSessionNamer {
     // thread in ~/.codex/sessions within milliseconds of each other, which races
     // codex-core's session/rollout store and can produce
     // "failed to record rollout items: thread ... not found" for either thread.
-    const args = ['exec', '--json', '--sandbox', 'read-only', '--ephemeral'];
+    // --skip-git-repo-check: read-only runs otherwise fail outside a git repo /
+    // trusted folder, and the tab silently never gets a name.
+    const args = ['exec', '--json', '--sandbox', 'read-only', '--ephemeral', CODEX_SKIP_GIT_REPO_CHECK_FLAG];
     if (selectedCwd) {
       args.push('-C', selectedCwd);
     }

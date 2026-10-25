@@ -2,6 +2,16 @@
 
 > **Note:** This is a historical development log, not a current-state specification. For current Codex feature status, refer to `COMPLETE_FEATURE_LIST.md` (section 5) and `CODEX_FAST_MODE.md`.
 
+## 2026-10-25 - Codex turns that never answered (GitHub issue #15)
+
+Report: "Codex doesn't answer" (0.1.247, Windows). Reproduced with Codex CLI 0.144.6 / 0.162.1 / 0.164.0; four causes fixed:
+
+- **Not a git repo / untrusted folder.** `codex exec` exits 1 with "Not inside a trusted directory and --skip-git-repo-check was not specified." whenever the cwd is neither a git repo nor trusted in `~/.codex/config.toml`. Full Access never hit it (`--dangerously-bypass-approvals-and-sandbox` skips the check); Supervised mode (`--sandbox read-only`), Smart Search (cwd = home), the tab namer, the summarizer fallback and the review-loop reviewer failed on every turn. Every ClaUi `codex exec` / `exec resume` now passes `--skip-git-repo-check` (`CODEX_SKIP_GIT_REPO_CHECK_FLAG`); ClaUi's permission mode already decides the sandbox. The argv builder moved to the pure `src/extension/process/codexExecArgs.ts` (`buildCodexExecArgs`, `buildCodexPermissionArgs`, `toTomlBasicString`) so it is unit tested. The bridge offload runner (`--ignore-user-config`) is unchanged.
+- **Non-fatal notices treated as errors.** Codex emits warnings as `item.completed` items with `item.type: "error"` (by contract non-fatal), e.g. "Using legacy `features` requirement `codex_hooks` from C:\ProgramData\OpenAI\Codex\requirements.toml" on every turn when an organization manages Codex (Check Point GenAI Protect writes that file). `CodexExecDemux` emitted them as `error`, so the chat showed a red error and flipped to idle before `turn.started`, and the BTW overlay, review-loop reviewer and multi-participant Codex agent failed the whole turn. The demux now emits them as `warning` (logged only); top-level `error` and `turn.failed` stay fatal.
+- **Unreadable fatal errors.** API failures arrive as a JSON document inside the message (`{"type":"error","status":400,"error":{"message":"The 'gpt-6-astra' model requires a newer version of Codex..."}}`). The demux unwraps it (`unwrapCodexErrorMessage`), and `CodexMessageHandler` appends which CLI ClaUi runs plus the update command when Codex says the CLI is too old (`withOutdatedCodexCliHint`). Typical cause: an older `codex.exe` first on PATH while `~/.codex/config.toml` names a newer default model.
+- **Failed turns with no visible result.** A non-zero exit whose only output was non-JSON stdout or Codex log lines showed nothing; a crashed turn under Silent Crash Resume showed nothing when no reply had arrived. The exit handler now always shows a message in those cases, with the last captured Codex output (see "Codex CLI Error Detection" below).
+- **Tests.** `npm run test:codex-exec`: `tests/process/codexExecArgs.test.ts`, `codexErrorText.test.ts`, `codexExecDemux.test.ts` (fixtures in `tests/fixtures/codex-exec/` are real CLI output).
+
 ## 2026-09-23 - GPT-6 Sol / Luna support
 
 Added GPT-6 Sol (`gpt-6-sol`) and GPT-6 Luna (`gpt-6-luna`), released by OpenAI on 2026-09-22, as Codex options without changing any default. They are in the Codex CLI model catalog from **0.156.1** on (release `rust-v0.156.1`: "Add GPT-6 Sol and Luna to the model catalog"). The cache stays the source of truth, so with an older CLI they are absent from the cache-driven dropdown; after updating the CLI, the first Codex turn refreshes the cache and they appear without a reload.
@@ -97,6 +107,14 @@ Recognizes these patterns on stderr to show proper install guidance instead of g
 - `codex: command not found` (Unix shells)
 - `spawn codex enoent` / `enoent codex` (Node.js spawn errors)
 - `the system cannot find the path/file specified` (Windows OS-level error, commonly emitted by extension-bundled binaries that fail on `exec` mode)
+
+**Turn failure surfacing** (`CodexSessionTab.wireProcessEvents()` + `CodexExecDemux`):
+- Top-level `error` / `turn.failed` events are fatal: the unwrapped message is shown and the tab goes idle.
+- `item.completed` items of type `error` are non-fatal Codex notices: emitted as demux `warning`, logged as `Codex warning (non-fatal): ...`, never shown or used to end the turn.
+- stderr is classified per complete line: chunks are joined across reads (`takeCompleteStderrLines`, 64 KB cap) and the unterminated tail is flushed when the process exits, so a Codex log line split across two chunks is still recognized.
+- Codex tracing lines on stderr (`<ISO time>Z ERROR|WARN|INFO codex_x::y: ...`, `isCodexTracingLogLine`) are kept as failure context instead of chat errors, because they also appear on successful turns. Other stderr text is shown immediately (after the CLI-missing / auth / model-rejection checks). The fixed noise patterns in `isKnownNonFatalCodexStderr()` are dropped entirely.
+- Exits of processes ClaUi killed itself (`CodexExecProcessManager.stop()`: turn-complete watchdog, idle-running recovery before a new turn, tab close) carry `stoppedByExtension: true` and are ignored by the tab: the forced kill exits with code 1 on Windows, which is not a turn failure, and a newer turn may already be running.
+- Non-zero exit with nothing shown yet (no fatal event, no stderr error): `Codex process exited with code N. Check Output -> ClaUi for details.` plus the last captured Codex output. Under Silent Crash Resume the tab stays armed but still shows `Codex stopped before replying (exit code N). Send your message again to retry.` when the turn produced no assistant message.
 
 **Auto-Detect & Auto-Configure** (`CodexCliDetector.ts` - shared utility):
 Detection logic is extracted into `src/extension/process/CodexCliDetector.ts` and used by both `CodexSessionTab` (runtime recovery) and `CodexMessageHandler` (auto-setup / auto-detect UI flows).

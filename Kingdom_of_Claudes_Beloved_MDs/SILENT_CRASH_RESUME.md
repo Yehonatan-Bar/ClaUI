@@ -76,7 +76,7 @@ If any check fails, the existing visible UX runs unchanged. The exit-handler ord
               └──────────────┘ └─────────────────────────┘
 ```
 
-Codex is spawn-per-turn, so the equivalent state machine is degenerate: a crashed turn arms the tab, the next `sendTurn` naturally passes `--resume <threadId>`, and a clean `turnCompleted` event resets `silentResumeAttempts` to 0.
+Codex is spawn-per-turn, so the equivalent state machine is degenerate: a crashed turn arms the tab, the next `sendTurn` naturally passes `--resume <threadId>`, and a clean `turnCompleted` event resets `silentResumeAttempts` to 0. Silence is limited to the scary "process exited" wording: if the crashed Codex turn produced no assistant message and no error was already shown, the tab posts a short "Codex stopped before replying (exit code N). Send your message again to retry." banner (plus the last captured Codex output), so a prompt never ends with no visible result.
 
 ## Per-tab fields
 

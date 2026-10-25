@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import { buildClaudeCliEnv, buildSanitizedEnv } from '../process/envUtils';
 import { killProcessTree } from '../process/killTree';
+import { CODEX_SKIP_GIT_REPO_CHECK_FLAG } from '../process/codexExecArgs';
 import { ConversationReader } from './ConversationReader';
 import type { SerializedChatMessage } from '../types/webview-messages';
 
@@ -225,6 +226,8 @@ export class SessionSummarizer {
         '--json',
         '--sandbox',
         'read-only',
+        // Read-only runs otherwise fail outside a git repo / trusted folder.
+        CODEX_SKIP_GIT_REPO_CHECK_FLAG,
         '-c',
         'model_reasoning_effort=low',
       ];

@@ -2,7 +2,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { exec, execSync } from 'child_process';
-import { CodexExecProcessManager } from '../process/CodexExecProcessManager';
+import { CodexExecProcessManager, type CodexProcessExitInfo } from '../process/CodexExecProcessManager';
 import { CodexExecDemux } from '../process/CodexExecDemux';
 import { findWorkingCodexCliCandidates, pickPreferredCodexCliCandidate } from '../process/CodexCliDetector';
 import { CodexMessageHandler, type CodexSessionController } from '../webview/CodexMessageHandler';
@@ -29,7 +29,8 @@ import type {
   WebviewImageData,
   WebviewToExtensionMessage,
 } from '../types/webview-messages';
-import type { CodexExecJsonEvent } from '../types/codex-exec-json';
+import type { CodexExecJsonEvent, CodexItemCompletedEvent } from '../types/codex-exec-json';
+import { isCodexTracingLogLine, takeCompleteStderrLines } from '../process/codexErrorText';
 import type { HandoffProvider, HandoffSourceSnapshot } from './handoff/HandoffTypes';
 import type { ContentBlock } from '../types/stream-json';
 import { remoteControlTap } from '../remote-control/RemoteControlTap';
@@ -83,6 +84,13 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
   private turnCliMissingDetected = false;
   private turnStructuredErrorDetected = false;
   private turnFailureText: string[] = [];
+  /** A stderr failure line was already shown in the chat for the current turn. */
+  private turnStderrErrorShown = false;
+  /** The current turn produced at least one assistant message. */
+  private turnHadAgentMessage = false;
+  /** Incomplete trailing stderr line, held until its newline (or process exit) arrives. */
+  private stderrPartialLine = '';
+  private static readonly STDERR_PARTIAL_LINE_MAX = 64 * 1024;
   private codexLoginLaunchInProgress = false;
   private codexInstallGuidanceShownAt = 0;
   private sessionNamingRequested = false;
@@ -1594,6 +1602,9 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
         this.scheduleTurnCompletedExitWatchdog();
         this.setBusy(false);
       }
+      if (event.type === 'item.completed' && (event as CodexItemCompletedEvent).item?.type === 'agent_message') {
+        this.turnHadAgentMessage = true;
+      }
       this.demux.handleEvent(event);
     });
 
@@ -1605,15 +1616,30 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       this.maybeMarkTurnAuthFailure(text, tabLog);
     });
 
-    this.processManager.on('stderr', (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed) {
+    const handleStderrText = (text: string) => {
+      const rawTrimmed = text.trim();
+      if (!rawTrimmed) {
         return;
       }
-      tabLog(`Codex STDERR: ${trimmed}`);
-      this.noteTurnDiagnosticsActivity('stderr', trimmed);
-      if (this.isKnownNonFatalCodexStderr(trimmed)) {
+      if (this.isKnownNonFatalCodexStderr(rawTrimmed)) {
         tabLog(`Ignoring known non-fatal Codex stderr noise`);
+        return;
+      }
+      // Codex's own tracing lines ("<time>Z ERROR codex_x::y: ...") also appear on
+      // turns that succeed, so they are not chat errors. Keep them as failure
+      // context; the exit handler shows them only if the turn actually fails.
+      const stderrLines = rawTrimmed.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      const tracingLines = stderrLines.filter((line) => isCodexTracingLogLine(line));
+      for (const tracingLine of tracingLines) {
+        this.captureTurnFailureText(tracingLine);
+        this.maybeMarkTurnCliMissing(tracingLine, tabLog);
+        this.maybeMarkTurnAuthFailure(tracingLine, tabLog);
+      }
+      const trimmed = stderrLines.filter((line) => !isCodexTracingLogLine(line)).join('\n');
+      if (!trimmed) {
+        if (tracingLines.length > 0) {
+          tabLog(`Deferred ${tracingLines.length} Codex log line(s) as failure context (shown only if the turn fails)`);
+        }
         return;
       }
       this.captureTurnFailureText(trimmed);
@@ -1632,11 +1658,43 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
       }
       this.maybeMarkTurnAuthFailure(trimmed, tabLog);
       const modelRejection = this.translateCodexModelRejection(trimmed);
+      this.turnStderrErrorShown = true;
       this.postMessage({ type: 'error', message: modelRejection ?? trimmed });
+    };
+
+    // Node delivers stderr in arbitrary chunks, so one Codex log line can arrive in
+    // two pieces. Only complete lines are classified; the remainder waits for the
+    // next chunk or for the process exit.
+    this.processManager.on('stderr', (text: string) => {
+      const chunkTrimmed = text.trim();
+      if (chunkTrimmed) {
+        tabLog(`Codex STDERR: ${chunkTrimmed}`);
+        this.noteTurnDiagnosticsActivity('stderr', chunkTrimmed);
+      }
+      // After the exit was reported no later flush will come, so late output is
+      // classified right away instead of being held.
+      const { complete, rest } = takeCompleteStderrLines(
+        this.stderrPartialLine,
+        text,
+        this.processManager.isTurnRunning ? CodexSessionTab.STDERR_PARTIAL_LINE_MAX : 0,
+      );
+      this.stderrPartialLine = rest;
+      handleStderrText(complete);
     });
 
-    this.processManager.on('exit', (info: { code: number | null; signal: string | null }) => {
+    this.processManager.on('exit', (info: CodexProcessExitInfo) => {
       tabLog(`Codex turn process exited: code=${info.code}, signal=${info.signal}`);
+      if (info.stoppedByExtension) {
+        // ClaUi killed this process itself (turn-complete watchdog, idle-running
+        // recovery before a new turn, tab close); whoever called stop() already
+        // reset the UI. The forced kill's exit code (1 on Windows) is not a turn
+        // failure, and a newer turn may already be running in this tab.
+        tabLog('Exit of a Codex process ClaUi stopped itself; not treated as a turn failure');
+        return;
+      }
+      const trailingStderr = this.stderrPartialLine;
+      this.stderrPartialLine = '';
+      handleStderrText(trailingStderr);
       this.clearTurnCompletedExitWatchdog();
       this.noteTurnDiagnosticsActivity('lifecycle', `process exit code=${info.code ?? 'null'} signal=${info.signal ?? 'null'}`);
       this.endTurnDiagnostics(`process exit code=${info.code ?? 'null'} signal=${info.signal ?? 'null'}`);
@@ -1700,6 +1758,16 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
           }
           // Finalize any partial assistant bubble; webview falls back to whatever is currently streaming.
           this.postMessage({ type: 'interruptedAssistantMessage', messageId: null });
+          if (!this.turnHadAgentMessage && !this.turnStructuredErrorDetected && !this.turnStderrErrorShown) {
+            // Nothing at all reached the chat for this prompt. Staying silent here
+            // reads as "Codex does not answer", so say what happened (gently).
+            this.postMessage({
+              type: 'error',
+              message: this.buildTurnExitMessage(
+                `Codex stopped before replying (exit code ${info.code}). Send your message again to retry.`,
+              ),
+            });
+          }
           this.resetTurnFailureCapture();
           return;
         }
@@ -1713,10 +1781,14 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
           this.silentResumeArmedFlag = false;
         }
 
-        if (!this.turnStructuredErrorDetected && this.turnFailureText.length === 0) {
+        if (!this.turnStructuredErrorDetected && !this.turnStderrErrorShown) {
+          // Covers failures whose only output was non-JSON stdout or deferred
+          // Codex log lines: those are captured but never shown on their own.
           this.postMessage({
             type: 'error',
-            message: `Codex process exited with code ${info.code}. Check output logs for details.`,
+            message: this.buildTurnExitMessage(
+              `Codex process exited with code ${info.code}. Check Output -> ClaUi for details.`,
+            ),
           });
         }
       }
@@ -1752,7 +1824,20 @@ export class CodexSessionTab implements WebviewBridge, CodexSessionController {
     this.turnAuthFailureDetected = false;
     this.turnCliMissingDetected = false;
     this.turnStructuredErrorDetected = false;
+    this.turnStderrErrorShown = false;
+    this.turnHadAgentMessage = false;
+    this.stderrPartialLine = '';
     this.turnFailureText = [];
+  }
+
+  /** Append the last captured failure line (if any) so the user sees why the turn ended. */
+  private buildTurnExitMessage(baseMessage: string): string {
+    const lastFailureLine = this.turnFailureText[this.turnFailureText.length - 1];
+    if (!lastFailureLine) {
+      return baseMessage;
+    }
+    const detail = this.translateCodexModelRejection(lastFailureLine) ?? lastFailureLine;
+    return `${baseMessage} Last Codex output: ${detail.slice(0, 400)}`;
   }
 
   private beginTurnDiagnostics(text: string): void {

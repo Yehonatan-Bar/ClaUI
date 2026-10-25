@@ -2057,6 +2057,7 @@
     "test:spawn-cli": "node --import tsx --test tests/process/spawnCli.test.ts",
     "test:usage-limit": "node --import tsx --test tests/process/usageLimitParser.test.ts",
     "test:codex-models": "node --import tsx --test tests/process/codexModelCache.test.ts tests/unit/codexModels.test.ts",
+    "test:codex-exec": "node --import tsx --test tests/process/codexExecArgs.test.ts tests/process/codexErrorText.test.ts tests/process/codexExecDemux.test.ts",
     "test:claude-models": "node --import tsx --test tests/unit/claudeModels.test.ts",
     "test:tabs": "node --import tsx --test tests/tabs/navigationOrder.test.ts tests/tabs/navTree.test.ts",
     "test:bridge": "node --import tsx --test tests/bridge/config.test.ts tests/bridge/protocol.test.ts tests/bridge/sessionStore.test.ts tests/bridge/grokPermissions.test.ts tests/bridge/procUtils.test.ts tests/bridge/openaiCompat.test.ts tests/bridge/council.test.ts tests/bridge/commandCatalog.test.ts tests/bridge/contextProviders.test.ts tests/bridge/packetBuilder.test.ts tests/bridge/dispatcher.test.ts tests/bridge/commandMcpServer.test.ts tests/bridge/grokCommandTools.test.ts tests/bridge/offload.test.ts",

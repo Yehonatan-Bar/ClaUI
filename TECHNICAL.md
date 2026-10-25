@@ -66,6 +66,9 @@ claude-code-mirror/
 |   |   |   +-- ClaudeProcessManager.ts   #   Spawns and manages CLI process
 |   |   |   +-- CodexCliDetector.ts        #  Shared Codex CLI detection, probing & candidate scoring
 |   |   |   +-- CodexExecProcessManager.ts #  Spawns and manages Codex exec processes
+|   |   |   +-- codexExecArgs.ts           #  Pure `codex exec` / `exec resume` argv builder (always --skip-git-repo-check)
+|   |   |   +-- CodexExecDemux.ts          #  Codex JSONL -> internal events (fatal `error` vs non-fatal `warning`)
+|   |   |   +-- codexErrorText.ts          #  Readable Codex failure text (JSON error unwrap, tracing-line filter, outdated-CLI hint)
 |   |   |   +-- codexModelCache.ts         #  Reads ~/.codex/models_cache.json (shared by both handlers)
 |   |   |   +-- envUtils.ts               #   Shared env sanitization & API key management
 |   |   |   +-- killTree.ts              #   Shared cross-platform process tree kill utility
@@ -711,7 +714,7 @@ Workstream Map parity: `CodexMessageHandler` receives the shared `WorkstreamMana
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CLAUDE_MODEL_CONTROLS.md`
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/CODEX_FAST_MODE.md`
 
-**PermissionModeSelector** - Dropdown in the status bar for choosing between "Full Access" and "Supervised" modes. Selection is persisted to VS Code settings (`claudeMirror.permissionMode`). In the Claude path, "Full Access" passes `--permission-mode bypassPermissions` and "Supervised" passes `--allowedTools` (read-only tool set). In the Codex path, "Full Access" passes `--dangerously-bypass-approvals-and-sandbox` and "Supervised" passes `--sandbox read-only`. Changes take effect on the next process/session start (Claude) or next turn spawn (Codex).
+**PermissionModeSelector** - Dropdown in the status bar for choosing between "Full Access" and "Supervised" modes. Selection is persisted to VS Code settings (`claudeMirror.permissionMode`). In the Claude path, "Full Access" passes `--permission-mode bypassPermissions` and "Supervised" passes `--allowedTools` (read-only tool set). In the Codex path, "Full Access" passes `--dangerously-bypass-approvals-and-sandbox` and "Supervised" passes `--sandbox read-only`. Every Codex turn also passes `--skip-git-repo-check`, so Supervised works in folders that are not git repos or trusted in `~/.codex/config.toml`. Changes take effect on the next process/session start (Claude) or next turn spawn (Codex).
 
 **GitPushButton** - One-click git add/commit/push via the `scripts/git-push.ps1` PowerShell script. The "Git" button in InputArea executes the script with the session tab name as commit message. A companion gear button opens a configuration panel where users can ask Claude to set up or modify the git push settings (`claudeMirror.gitPush.*`). If not configured (enabled=false), clicking the Git button opens the config panel instead. Results appear as auto-dismissing toast notifications.
 > Detail: `Kingdom_of_Claudes_Beloved_MDs/GIT_PUSH_BUTTON.md`

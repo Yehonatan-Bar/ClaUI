@@ -1,0 +1,6 @@
+{"type":"thread.started","thread_id":"01a172dc-7e6f-7a22-b4f8-b1203c093231"}
+{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Using legacy `features` requirement `codex_hooks` from C:\\ProgramData\\OpenAI\\Codex\\requirements.toml; prefer canonical feature key `hooks`"}}
+{"type":"item.completed","item":{"id":"item_1","type":"error","message":"Using legacy `features` requirement `codex_hooks` from C:\\ProgramData\\OpenAI\\Codex\\requirements.toml; prefer canonical feature key `hooks`"}}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"pong"}}
+{"type":"turn.completed","usage":{"input_tokens":18470,"cached_input_tokens":13312,"cache_write_input_tokens":0,"output_tokens":5,"reasoning_output_tokens":0}}

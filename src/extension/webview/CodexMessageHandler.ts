@@ -11,6 +11,7 @@ import type { WebviewBridge } from './MessageHandler';
 import type { ContentBlock } from '../types/stream-json';
 import { setStoredApiKey, maskApiKey } from '../process/envUtils';
 import { readCodexModelOptions } from '../process/codexModelCache';
+import { withOutdatedCodexCliHint } from '../process/codexErrorText';
 import { MessageTranslator } from '../session/MessageTranslator';
 import { BugReportService } from '../feedback/BugReportService';
 import { processFileDropRequest } from './droppedFiles';
@@ -1900,8 +1901,15 @@ export class CodexMessageHandler {
 
     this.demux.on('error', (data: { message: string }) => {
       this.log(`Codex demux error: ${data.message}`);
-      this.postToWebview({ type: 'error', message: data.message });
+      const cliPath = vscode.workspace.getConfiguration('claudeMirror').get<string>('codex.cliPath', 'codex') || 'codex';
+      this.postToWebview({ type: 'error', message: withOutdatedCodexCliHint(data.message, cliPath) });
       this.postToWebview({ type: 'processBusy', busy: false });
+    });
+
+    // Non-fatal Codex notices (e.g. a legacy key in a managed requirements.toml).
+    // The turn keeps running, so they must not flip the UI to idle or show as errors.
+    this.demux.on('warning', (data: { message: string }) => {
+      this.log(`Codex warning (non-fatal): ${data.message}`);
     });
 
     this.demux.on('reasoning', (data: { text: string }) => {

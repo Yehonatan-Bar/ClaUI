@@ -10,20 +10,7 @@ import { killProcessTree } from './killTree';
 import { spawnCli } from './spawnCli';
 import { readCodexModelOptions } from './codexModelCache';
 import { buildCodexDlpInstructions } from '../../server/Codex';
-
-/**
- * Encode a JS string as a TOML basic string literal: a double-quoted form
- * with backslash escapes (\\, \", \r, \n, \t). Used for building Codex CLI
- * `-c key=value` overrides where the value is parsed as a TOML expression.
- */
-function toTomlBasicString(s: string): string {
-  return '"' + s
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\r/g, '\\r')
-    .replace(/\n/g, '\\n')
-    .replace(/\t/g, '\\t') + '"';
-}
+import { buildCodexExecArgs } from './codexExecArgs';
 
 export interface CodexRunTurnOptions {
   prompt: string;
@@ -48,6 +35,10 @@ export interface CodexRunTurnOptions {
 export interface CodexProcessExitInfo {
   code: number | null;
   signal: NodeJS.Signals | null;
+  /** True when ClaUi killed this process itself via stop() (turn-complete watchdog,
+   *  idle-running recovery before a new turn, tab close). On Windows the forced kill
+   *  exits with code 1, which is not a turn failure. */
+  stoppedByExtension: boolean;
 }
 
 /**
@@ -56,7 +47,11 @@ export interface CodexProcessExitInfo {
  * Codex differs from Claude here: one process per turn (no persistent stdin protocol).
  */
 export class CodexExecProcessManager extends EventEmitter {
+  /** Max wait between a child's 'exit' and its stdio 'close' before the exit is reported anyway. */
+  private static readonly EXIT_STDIO_GRACE_MS = 500;
   private process: ChildProcess | null = null;
+  /** Processes ended through stop(); their exit is reported with stoppedByExtension=true. */
+  private readonly extensionStoppedProcesses = new WeakSet<ChildProcess>();
   private stdoutBuffer = '';
   private log: (msg: string) => void = () => {};
   private _cancelledByUser = false;
@@ -180,7 +175,7 @@ export class CodexExecProcessManager extends EventEmitter {
       this.log('Secret Protection instruction metadata appended for Codex turn');
     }
 
-    const args = this.buildArgs({
+    const args = buildCodexExecArgs({
       threadId: options.threadId,
       cwd,
       model: selectedModel,
@@ -235,17 +230,51 @@ export class CodexExecProcessManager extends EventEmitter {
       this.emit('stderr', text);
     });
 
-    child.on('exit', (code, signal) => {
+    // Node may fire 'exit' while stdout/stderr still hold unread output. Report the
+    // exit once the streams have closed ('close'), or after a short grace period when
+    // a lingering grandchild keeps a pipe open, so listeners see the turn's complete
+    // output (final JSON events, the last stderr line) before they classify the exit.
+    let exitSeen = false;
+    let exitReported = false;
+    let exitGraceTimer: ReturnType<typeof setTimeout> | null = null;
+    const reportExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      if (exitReported) {
+        return;
+      }
+      exitReported = true;
+      if (exitGraceTimer) {
+        clearTimeout(exitGraceTimer);
+        exitGraceTimer = null;
+      }
       this.flushRemainingStdoutBuffer();
       this.logProcessSummary(`exit code=${code ?? 'null'} signal=${signal ?? 'null'}`);
-      this.emit('exit', { code, signal } as CodexProcessExitInfo);
+      const exitInfo: CodexProcessExitInfo = {
+        code,
+        signal,
+        stoppedByExtension: this.extensionStoppedProcesses.has(child),
+      };
+      this.emit('exit', exitInfo);
       if (this.process === child) {
         this.process = null;
       }
+    };
+
+    child.on('exit', (code, signal) => {
+      exitSeen = true;
+      this.log(`Codex process exit: code=${code ?? 'null'} signal=${signal ?? 'null'} (turn #${this.activeRunId}); waiting for stdio to close`);
+      exitGraceTimer = setTimeout(() => {
+        this.log(`Codex stdio still open ${CodexExecProcessManager.EXIT_STDIO_GRACE_MS}ms after exit (turn #${this.activeRunId}); reporting exit now`);
+        reportExit(code, signal);
+      }, CodexExecProcessManager.EXIT_STDIO_GRACE_MS);
     });
 
     child.on('close', (code, signal) => {
       this.log(`Codex process close: code=${code ?? 'null'} signal=${signal ?? 'null'} (turn #${this.activeRunId})`);
+      // 'close' without a prior 'exit' follows a spawn failure, which the 'error'
+      // listener already reports.
+      if (exitSeen) {
+        reportExit(code, signal);
+      }
     });
 
     child.on('error', (err) => {
@@ -288,6 +317,7 @@ export class CodexExecProcessManager extends EventEmitter {
     if (!this.process) {
       return;
     }
+    this.extensionStoppedProcesses.add(this.process);
     try {
       this.process.stdin?.end();
     } catch {
@@ -309,62 +339,6 @@ export class CodexExecProcessManager extends EventEmitter {
    *  Used by the memory dashboard to enumerate active CLI process trees. */
   get pid(): number | undefined {
     return this.process?.pid;
-  }
-
-  private buildArgs(opts: {
-    threadId?: string;
-    cwd?: string;
-    model?: string;
-    reasoningEffort?: string;
-    serviceTier?: 'fast';
-    permissionMode?: 'full-access' | 'supervised';
-    imagePaths?: string[];
-    forceReadOnlySandbox?: boolean;
-    appendSystemPrompt?: string;
-  }): string[] {
-    const permissionArgs = opts.forceReadOnlySandbox
-      ? ['--sandbox', 'read-only']
-      : this.buildPermissionArgs(opts.permissionMode ?? 'full-access');
-    const instructionsArgs = opts.appendSystemPrompt
-      ? ['-c', `instructions=${toTomlBasicString(opts.appendSystemPrompt)}`]
-      : [];
-    const serviceTierArgs = opts.serviceTier === 'fast'
-      ? ['-c', `service_tier=${toTomlBasicString('fast')}`, '-c', 'features.fast_mode=true']
-      : [];
-    if (opts.threadId) {
-      const args = ['exec', ...permissionArgs, 'resume', '--json'];
-      if (opts.model) {
-        args.push('--model', opts.model);
-      }
-      if (opts.reasoningEffort) {
-        args.push('-c', `model_reasoning_effort=${opts.reasoningEffort}`);
-      }
-      args.push(...serviceTierArgs);
-      args.push(...instructionsArgs);
-      for (const imagePath of opts.imagePaths ?? []) {
-        args.push('--image', imagePath);
-      }
-      args.push(opts.threadId, '-');
-      return args;
-    }
-
-    const args = ['exec', '--json', ...permissionArgs];
-    if (opts.cwd) {
-      args.push('-C', opts.cwd);
-    }
-    if (opts.model) {
-      args.push('--model', opts.model);
-    }
-    if (opts.reasoningEffort) {
-      args.push('-c', `model_reasoning_effort=${opts.reasoningEffort}`);
-    }
-    args.push(...serviceTierArgs);
-    args.push(...instructionsArgs);
-    for (const imagePath of opts.imagePaths ?? []) {
-      args.push('--image', imagePath);
-    }
-    args.push('-');
-    return args;
   }
 
   createTempImageFiles(images: Array<{ base64: string; mediaType: string }>): { paths: string[]; cleanup: () => void } {
@@ -415,17 +389,6 @@ export class CodexExecProcessManager extends EventEmitter {
       default:
         return '.img';
     }
-  }
-
-  private buildPermissionArgs(permissionMode: 'full-access' | 'supervised'): string[] {
-    if (permissionMode === 'supervised') {
-      // Match the extension's "Supervised" semantics: Codex may read and analyze, but shell/file
-      // actions run inside a read-only sandbox.
-      return ['--sandbox', 'read-only'];
-    }
-
-    // Match the extension's "Full Access" semantics: no approval prompts and no sandboxing.
-    return ['--dangerously-bypass-approvals-and-sandbox'];
   }
 
   private handleStdoutChunk(chunk: Buffer): void {

@@ -9,9 +9,16 @@ import type {
   CodexTurnCompletedEvent,
   CodexTurnFailedEvent,
 } from '../types/codex-exec-json';
+import { unwrapCodexErrorMessage } from './codexErrorText';
 
 /**
  * Demultiplexes `codex exec --json` JSONL events into a stable internal event set.
+ *
+ * Failure semantics follow the Codex exec JSONL contract:
+ *  - top-level `error` and `turn.failed` are fatal for the turn -> 'error'
+ *  - an `item.completed` whose item.type is "error" is a NON-fatal warning
+ *    (config notices such as a legacy key in a managed requirements.toml, missing
+ *    model metadata, ...); the turn keeps running -> 'warning'
  */
 export class CodexExecDemux extends EventEmitter {
   handleEvent(event: CodexExecJsonEvent): void {
@@ -49,7 +56,7 @@ export class CodexExecDemux extends EventEmitter {
         : typeof event.error?.message === 'string'
           ? event.error.message
           : 'Codex turn failed';
-    this.emit('error', { message, raw: event });
+    this.emit('error', { message: unwrapCodexErrorMessage(message) || 'Codex turn failed', raw: event });
   }
 
   private handleTopLevelError(event: CodexErrorEvent): void {
@@ -61,7 +68,7 @@ export class CodexExecDemux extends EventEmitter {
           : typeof event.error?.message === 'string'
             ? event.error.message
             : 'Codex error';
-    this.emit('error', { message, raw: event });
+    this.emit('error', { message: unwrapCodexErrorMessage(message) || 'Codex error', raw: event });
   }
 
   private handleTurnCompleted(event: CodexTurnCompletedEvent): void {
@@ -125,13 +132,14 @@ export class CodexExecDemux extends EventEmitter {
     }
 
     if (item.type === 'error') {
+      // Non-fatal by contract: Codex keeps the turn going after this item.
       const message =
         typeof item.message === 'string'
           ? item.message
           : typeof item.text === 'string'
             ? item.text
-            : 'Codex item error';
-      this.emit('error', { message, item });
+            : 'Codex warning';
+      this.emit('warning', { message, item });
       return;
     }
 

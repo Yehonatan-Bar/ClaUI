@@ -1,5 +1,15 @@
 # ClaUi - Changelog
 
+## v0.1.248 - 2026-10-25
+
+**Fix: Codex tabs that never answered (GitHub issue #15)**
+
+- Supervised mode, Smart Search, auto tab naming, the session-summary fallback and the review-loop reviewer now work in folders that are not git repos: every Codex turn passes `--skip-git-repo-check`. Before, Codex refused with "Not inside a trusted directory..." on every turn in such folders (Full Access was not affected)
+- Codex's non-fatal notices (for example "Using legacy `features` requirement `codex_hooks`..." on machines where an organization manages Codex) no longer show as red errors, no longer flip the chat to idle mid-turn, and no longer fail BTW, review-loop and multi-participant Codex turns
+- Fatal Codex API errors show their readable message instead of a raw JSON blob; when Codex says the CLI is too old for the model, the message names the CLI ClaUi runs and how to update it
+- A failed Codex turn always leaves a visible message (with the last Codex output), including crashes before any reply under Silent Crash Resume. Codex's own log lines on stderr only appear when the turn actually fails
+- Tests: `npm run test:codex-exec`
+
 ## v0.1.247 - 2026-10-19
 
 **Feature: Shift+drag files into the chat**
